@@ -49,6 +49,7 @@ module m_acoustic_substep
     use m_variables_conversion
     use m_boundary_common
     use m_weno, only: s_weno
+    use m_riemann_solver_hllc, only: s_acoustic_face_flux
 
     implicit none
 
@@ -88,18 +89,39 @@ module m_acoustic_substep
     $:GPU_DECLARE(create='[acL_rs_vf, acR_rs_vf]')
 
     !> Per-face discontinuity mask (1 = flagged -> robust WENO+HLLC-acoustic tier, 0 = smooth -> cheap centered tier), last index =
-    !! face-normal direction (1=x, 2=y, 3=z), addressed at cell (j,k,l) for the face between (j,k,l) and its +dir neighbour. Produced
-    !! here (A3) and consumed by the flux tier selection (A4); integer is the cheapest GPU-portable form of a per-face boolean.
+    !! face-normal direction (1=x, 2=y, 3=z), addressed at cell (j,k,l) for the face between (j,k,l) and its +dir neighbour.
+    !! Produced here (A3) and consumed by the flux tier selection (A4); integer is the cheapest GPU-portable form of a per-face
+    !! boolean.
     integer, allocatable, dimension(:,:,:,:) :: acoustic_flag
     $:GPU_DECLARE(create='[acoustic_flag]')
 
-    !> Dimensionless smoothness factor for the WENO-indicator face test (no physical scale). The WENO smoothness indicators are
-    !! squared cell differences; a face is flagged when its across-face indicator (p_{j+1}-p_j)^2 exceeds the larger neighbour
-    !! indicator by more than this factor -- i.e. the gradient across the face is more than twice the steepest neighbouring
-    !! gradient, which a smooth resolved field cannot produce (slopes vary slowly) but a discontinuity does by orders of magnitude.
-    !! 2 is the natural dyadic relative factor and matches the beta-ratio scale at which WENO's nonlinear weights begin to
-    !! discriminate stencils; it sits in the wide gap above the worst smooth value measured (~1.05) and far below any discontinuity.
-    real(wp), parameter :: weno_smooth_factor = 2._wp
+    !> Robust-tier face fluxes from the HLLC acoustic Riemann solve, stored per face-normal direction so the per-direction WENO
+    !! buffers (acL_rs_vf/acR_rs_vf, overwritten each direction) can be reused. dEflux = robust pressure-work flux minus the
+    !! centered pressure-work flux (the energy delta consumed by the forward sweep); flux_mom_rob = robust normal-momentum
+    !! (star-pressure) flux consumed by the backward sweep. Both are addressed at cell (j,k,l) for the +dir face and are exactly
+    !! zero at unflagged (smooth) faces, so the centered tier is left bit-identical there.
+    real(wp), allocatable, dimension(:,:,:,:) :: dEflux, flux_mom_rob
+    $:GPU_DECLARE(create='[dEflux, flux_mom_rob]')
+
+    !> Dimensionless WENO-Z spread/median ratio above which a face's pressure stencil is judged too uneven to be smooth. The face
+    !! test compares tau_z = |beta_p - beta_m| (the spread of the outer-stencil smoothness indicators; Borges et al. 2008) to the
+    !! MEDIAN stencil indicator, both pressure-squared, so the ratio is dimensionless and pressure-scale-invariant. The median is
+    !! floored RELATIVELY by (eps_rel*p_scale)^2 (see eps_rel), never by weno_eps, so the ratio is independent of the user's WENO
+    !! epsilon: it stays O(dx) (small) wherever the pressure is smooth and grows by many orders across a genuine pressure jump (one
+    !! outer indicator explodes while the median does not). disc_ratio_thresh sits in that gap. The relative floor caps the ratio at
+    !! smooth extrema, so the smooth-side ceiling is set by how WELL RESOLVED the smoothest feature is, not by weno_eps: a feature
+    !! spread over many cells gives O(dx); the (deliberately under-resolved, sigma~1.6*dx) golden pulse, being nearly discontinuous
+    !! on its grid, reaches ~1.1e3. 1e4 sits an order above that smooth ceiling and ~6x below the dispersed-jump ratio (~6e4
+    !! measured on a 2:1 step at weno_eps=1e-6), flagging zero faces on smooth resolved flow while flagging the band straddling a
+    !! sharp step.
+    real(wp), parameter :: disc_ratio_thresh = 1.e4_wp
+
+    !> Dimensionless relative-roundoff fraction for the face test. A face is a candidate only if its across-face pressure gradient
+    !! exceeds eps_rel of the local pressure scale (max |p| over the 4-point stencil); below that the gradient is floating-point
+    !! roundoff, not a resolved feature. It sets the relative median floor (eps_rel*p_scale)^2 and the candidate guard, making both
+    !! scale as pressure^2 so the whole test is invariant to the pressure normalization. This is a roundoff-rejection threshold, NOT
+    !! a tuned shock sensor.
+    real(wp), parameter :: eps_rel = 1.e-6_wp
 
     !> Volume-fraction jump tolerance flagging a material interface. alpha in [0,1] is dimensionless, so this is a pure jump in a
     !! [0,1] field: far above roundoff, far below any real interface jump (O(0.1-1)). For num_fluids==1 alpha==1 everywhere, so the
@@ -130,6 +152,9 @@ contains
                    & 1:n_acoustic))
         @:ALLOCATE(acoustic_flag(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
                    & 1:num_dims))
+        @:ALLOCATE(dEflux(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:num_dims))
+        @:ALLOCATE(flux_mom_rob(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
+                   & 1:num_dims))
 
     end subroutine s_initialize_acoustic_substep_module
 
@@ -149,26 +174,35 @@ contains
         real(wp)                                                   :: rho  !< Mixture density max(sum_k alpha_k*rho_k, sgm_eps)
         !> Frozen mixture stiffened-gas coefficients (sum_k alpha_k*{gammas,pi_infs}, sum_k alpha_rho_k*qvs)
         real(wp) :: gamma, pinf, qv
-        real(wp) :: rho_n                               !< Neighbour-cell mixture density (velocity denominator)
-        real(wp) :: dyn_p                               !< Dynamic pressure 0.5*rho*|u|^2
-        real(wp) :: div                                 !< Centered flux divergence accumulator
-        real(wp) :: dpdx                                !< Centered pressure-gradient component
-        real(wp) :: damp                                !< Grad-div divergence-damping stencil accumulator
-        real(wp) :: inv_2dx, inv_2dy, inv_2dz           !< 1/(2*dx) etc. for centered first differences
+        real(wp) :: rho_n  !< Neighbour-cell mixture density (velocity denominator)
+        real(wp) :: dyn_p  !< Dynamic pressure 0.5*rho*|u|^2
+        real(wp) :: div  !< Centered flux divergence accumulator
+        real(wp) :: dpdx  !< Centered pressure-gradient component
+        real(wp) :: damp  !< Grad-div divergence-damping stencil accumulator
+        real(wp) :: inv_2dx, inv_2dy, inv_2dz  !< 1/(2*dx) etc. for centered first differences
         real(wp) :: u_xp, u_xm, u_yp, u_ym, u_zp, u_zm  !< Stencil-neighbour cell-center velocities (computed once per cell)
-        integer  :: q                                   !< Microstep iterator
-        integer  :: f                                   !< Fluid iterator (mixture sums)
-        integer  :: i, j, k, l                          !< Generic / spatial iterators
-        integer  :: momxb, momxe, contb                 !< First/last momentum and first continuity equation indices
-        integer  :: esnap                               !< Total-energy slot in the q_snap snapshot (= num_fluids + 1)
+        integer  :: q  !< Microstep iterator
+        integer  :: f  !< Fluid iterator (mixture sums)
+        integer  :: i, j, k, l  !< Generic / spatial iterators
+        integer  :: momxb, momxe, contb  !< First/last momentum and first continuity equation indices
+        integer  :: esnap  !< Total-energy slot in the q_snap snapshot (= num_fluids + 1)
         integer  :: db_x, de_x, db_y, de_y, db_z, de_z  !< div_sf loop bounds (interior + one ghost layer)
-        integer  :: advb, adve                          !< First/last volume-fraction (advection) equation indices
-        integer  :: joff, koff, loff                    !< +1 face-neighbour offset for the current direction (one nonzero)
-        real(wp) :: eps_w                               !< Local copy of weno_eps (loop-invariant module scalar)
-        real(wp) :: d_m, d_0, d_p                       !< Acoustic-pressure first differences across the face stencil
-        real(wp) :: beta_m, beta_0, beta_p              !< WENO smoothness indicators (squared differences) of the stencil
-        real(wp) :: beta_face, beta_nbr_max             !< Across-face indicator and larger neighbour-stencil indicator (+eps_w)
-        logical  :: flag_disc                           !< Combined per-face discontinuity flag
+        integer  :: advb, adve  !< First/last volume-fraction (advection) equation indices
+        integer  :: joff, koff, loff  !< +1 face-neighbour offset for the current direction (one nonzero)
+        real(wp) :: p_m4, p_0c, p_p1, p_p2  !< Acoustic pressures over the 4-point face stencil (j-off, j, j+off, j+2off)
+        real(wp) :: p_scale, beta_floor  !< Local pressure scale max|p| and the relative median floor (eps_rel*p_scale)^2
+        real(wp) :: d_m, d_0, d_p  !< Acoustic-pressure first differences across the face stencil
+        real(wp) :: beta_m, beta_0, beta_p  !< WENO smoothness indicators (squared differences) of the stencil
+        real(wp) :: tau_z, beta_ref  !< WENO-Z spread |beta_p-beta_m| and the median stencil indicator, floored relatively
+        logical  :: flag_disc  !< Combined per-face discontinuity flag
+        real(wp) :: gam_a, pin_a, gam_b, pin_b  !< Left/right cell mixture stiffened-gas coefficients for the face EOS
+        real(wp) :: pres_a, vel_a, rho_a, c_a  !< Left reconstructed face state (pressure, normal velocity, density) + sound speed
+        real(wp) :: pres_b, vel_b, rho_b, c_b  !< Right reconstructed face state + sound speed
+        real(wp) :: flmom, flE  !< HLLC acoustic face fluxes (normal momentum, pressure work)
+        real(wp) :: se_face  !< Centered (smooth) pressure-work face flux the robust tier replaces
+        real(wp) :: sm_r, sm_l, gd_r, gd_l, dfm_r, dfm_l  !< Backward momentum robust-correction face pressures/damping/deltas
+        integer  :: flg_r, flg_l  !< Right/left face discontinuity flags (backward momentum correction)
+        integer  :: fb_x, fb_y, fb_z  !< Flag/flux loop low bounds (one ghost below interior on the normal axis)
 
         momxb = eqn_idx%mom%beg
         momxe = eqn_idx%mom%end
@@ -176,7 +210,6 @@ contains
         esnap = num_fluids + 1
         advb = eqn_idx%adv%beg
         adve = eqn_idx%adv%end
-        eps_w = weno_eps
 
         ! div_sf is needed one ghost layer beyond the interior so its centered gradient can be taken
         ! at interior cells; momentum carries >= 2 ghost layers, so this layer is always halo-valid.
@@ -232,6 +265,140 @@ contains
             ! p_sf is filled over the full buffered range (idwbuff) from the already-exchanged
             ! q_cons_vf, so the centered energy flux at interior edges sees a consistent p in
             ! the one ghost cell it touches. No separate pressure halo exchange is needed.
+
+            ! 2b'. Two-tier acoustic reconstruction + flux, from the FROZEN pre-forward state so it pairs with the snapshot the
+            !      forward sweep transports (pre-forward pressure p_sf and frozen momentum). Build the primitive acoustic
+            !      sub-vector (pressure, normal velocity, mixture density), WENO-reconstruct its L/R face states per direction,
+            !      then per face choose the tier. dEflux carries the robust-minus-centered pressure-work delta consumed by the
+            !      forward energy sweep (same pre-forward p, u); flux_mom_rob carries the robust normal-momentum flux consumed by
+            !      the backward sweep. Both are exactly zero at smooth faces, so the centered tier is left bit-identical there.
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, rho]')
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                        rho = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do f = 1, num_fluids
+                            rho = rho + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                        end do
+                        q_acoustic_vf(acou_p)%sf(j, k, l) = p_sf(j, k, l)
+                        q_acoustic_vf(acou_rho)%sf(j, k, l) = max(rho, sgm_eps)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            do i = 1, num_dims
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            q_acoustic_vf(acou_u)%sf(j, k, l) = q_cons_vf(momxb + i - 1)%sf(j, k, &
+                                          & l)/q_acoustic_vf(acou_rho)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+
+                call s_reconstruct_acoustic_boundary_values(q_acoustic_vf, acL_rs_vf, acR_rs_vf, i)
+
+                ! Per-face discontinuity criterion for direction i, then the two-tier flux. The loop runs one cell below the
+                ! interior on the normal axis so every interior cell's lower (-dir) face also has a stored flag/flux (and the value
+                ! at a processor-boundary face matches the neighbour rank's, which sees it as its own interior +dir face). The shock
+                ! test uses the WENO-Z smoothness measure (Borges et al. 2008) on the acoustic-pressure stencil:
+                ! beta_m/beta_0/beta_p
+                ! are squared cell differences (pressure^2) and tau_z = |beta_p - beta_m| is their outer-stencil spread; a face is
+                ! flagged when tau_z exceeds disc_ratio_thresh times the MEDIAN stencil indicator beta_ref AND the across-face
+                ! gradient beta_0 rises above the relative roundoff floor (eps_rel*p_scale)^2. Numerator, denominator and floor are
+                ! all pressure^2, so the ratio is invariant to the pressure scale and free of weno_eps; it stays O(dx) where the
+                ! pressure is smooth and grows by orders across a genuine jump. A volume-fraction jump also flags the face. At a
+                ! flagged face the HLLC acoustic flux (A1) replaces the centered pressure work / pressure gradient; at smooth faces
+                ! both stored fluxes are exactly zero.
+                joff = 0; koff = 0; loff = 0
+                if (i == 1) then; joff = 1; else if (i == 2) then; koff = 1; else; loff = 1; end if
+                fb_x = idwint(1)%beg; fb_y = idwint(2)%beg; fb_z = idwint(3)%beg
+                if (i == 1) then; fb_x = idwint(1)%beg - 1; else if (i == 2) then; fb_y = idwint(2)%beg &
+                    & - 1; else; fb_z = idwint(3)%beg - 1; end if
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, p_m4, p_0c, p_p1, p_p2, p_scale, beta_floor, d_m, d_0, d_p, &
+                                    & beta_m, beta_0, beta_p, tau_z, beta_ref, flag_disc, gam_a, pin_a, gam_b, pin_b, pres_a, &
+                                    & vel_a, rho_a, c_a, pres_b, vel_b, rho_b, c_b, flmom, flE, se_face]')
+                do l = fb_z, idwint(3)%end
+                    do k = fb_y, idwint(2)%end
+                        do j = fb_x, idwint(1)%end
+                            p_m4 = q_acoustic_vf(acou_p)%sf(j - joff, k - koff, l - loff)
+                            p_0c = q_acoustic_vf(acou_p)%sf(j, k, l)
+                            p_p1 = q_acoustic_vf(acou_p)%sf(j + joff, k + koff, l + loff)
+                            p_p2 = q_acoustic_vf(acou_p)%sf(j + 2*joff, k + 2*koff, l + 2*loff)
+                            d_m = p_0c - p_m4; d_0 = p_p1 - p_0c; d_p = p_p2 - p_p1
+                            beta_m = d_m*d_m; beta_0 = d_0*d_0; beta_p = d_p*d_p
+                            ! WENO-Z smoothness measure (Borges et al. 2008): tau_z is the spread of the outer-stencil
+                            ! indicators; beta_ref is the MEDIAN stencil indicator, chosen because the median is immune to a
+                            ! single vanishing OR exploding indicator (a smooth symmetric extremum sends one outer indicator to
+                            ! zero; a discontinuity sends one to a huge value), which min/max are not. The median is floored by
+                            ! beta_floor = (eps_rel*p_scale)^2 -- a RELATIVE roundoff floor scaling as pressure^2, not weno_eps --
+                            ! so tau_z/beta_ref is pressure-scale-invariant and weno_eps-independent: O(dx) at smooth points,
+                            ! orders larger across a genuine discontinuity. The beta_0 > beta_floor guard rejects faces whose
+                            ! across-face gradient is pure roundoff (no real feature to resolve).
+                            p_scale = max(abs(p_m4), abs(p_0c), abs(p_p1), abs(p_p2))
+                            beta_floor = (eps_rel*p_scale)*(eps_rel*p_scale)
+                            tau_z = abs(beta_p - beta_m)
+                            beta_ref = max((beta_m + beta_0 + beta_p) - max(beta_m, beta_0, beta_p) - min(beta_m, beta_0, &
+                                           & beta_p), beta_floor)
+                            flag_disc = (tau_z > disc_ratio_thresh*beta_ref) .and. (beta_0 > beta_floor)
+
+                            ! Volume-fraction (material-interface) variation across the face, any fluid.
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do f = advb, adve
+                                if (abs(q_cons_vf(f)%sf(j + joff, k + koff, l + loff) - q_cons_vf(f)%sf(j, k, l)) > eps_alpha) then
+                                    flag_disc = .true.
+                                end if
+                            end do
+
+                            if (flag_disc) then
+                                acoustic_flag(j, k, l, i) = 1
+
+                                ! Mixture stiffened-gas coefficients of the two cells straddling the face (frozen volume fractions);
+                                ! sound speed from the SAME EOS as the pressure recompute: c^2 = (1/gamma + 1)(p +
+                                ! pi_inf/(gamma+1))/rho.
+                                gam_a = 0._wp; pin_a = 0._wp; gam_b = 0._wp; pin_b = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do f = 1, num_fluids
+                                    gam_a = gam_a + q_cons_vf(advb + f - 1)%sf(j, k, l)*gammas(f)
+                                    pin_a = pin_a + q_cons_vf(advb + f - 1)%sf(j, k, l)*pi_infs(f)
+                                    gam_b = gam_b + q_cons_vf(advb + f - 1)%sf(j + joff, k + koff, l + loff)*gammas(f)
+                                    pin_b = pin_b + q_cons_vf(advb + f - 1)%sf(j + joff, k + koff, l + loff)*pi_infs(f)
+                                end do
+
+                                pres_a = acL_rs_vf(j, k, l, acou_p); vel_a = acL_rs_vf(j, k, l, acou_u)
+                                rho_a = max(acL_rs_vf(j, k, l, acou_rho), sgm_eps)
+                                pres_b = acR_rs_vf(j + joff, k + koff, l + loff, acou_p)
+                                vel_b = acR_rs_vf(j + joff, k + koff, l + loff, acou_u)
+                                rho_b = max(acR_rs_vf(j + joff, k + koff, l + loff, acou_rho), sgm_eps)
+                                c_a = sqrt(max((1._wp/gam_a + 1._wp)*(pres_a + pin_a/(gam_a + 1._wp))/rho_a, sgm_eps))
+                                c_b = sqrt(max((1._wp/gam_b + 1._wp)*(pres_b + pin_b/(gam_b + 1._wp))/rho_b, sgm_eps))
+
+                                call s_acoustic_face_flux(pres_a, vel_a, rho_a, c_a, pres_b, vel_b, rho_b, c_b, flmom, flE)
+
+                                ! Centered pressure-work face flux being replaced, formed from the same pre-forward p and cell
+                                ! velocity the forward sweep uses: 0.5*(p_j u_j + p_{j+1} u_{j+1}). dEflux is the
+                                ! robust-minus-centered
+                                ! delta, so adding -dtau*div(dEflux) swaps only the pressure work, leaving the convective rho*E
+                                ! transport (and the convective mass transport) shared with the centered tier.
+                                se_face = 0.5_wp*(q_acoustic_vf(acou_p)%sf(j, k, l)*q_acoustic_vf(acou_u)%sf(j, k, &
+                                                  & l) + q_acoustic_vf(acou_p)%sf(j + joff, k + koff, &
+                                                  & l + loff)*q_acoustic_vf(acou_u)%sf(j + joff, k + koff, l + loff))
+                                flux_mom_rob(j, k, l, i) = flmom
+                                dEflux(j, k, l, i) = flE - se_face
+                            else
+                                acoustic_flag(j, k, l, i) = 0
+                                flux_mom_rob(j, k, l, i) = 0._wp
+                                dEflux(j, k, l, i) = 0._wp
+                            end if
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end do
 
             ! 2b. FORWARD: advance alpha_k*rho_k and rho*E by the centered divergence of
             !     (alpha_k*rho_k * u) and ((rho*E + p) * u), plus dtau*rhs_slow. Velocity u
@@ -322,6 +489,17 @@ contains
                         end if
                         q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_snap(j, k, l, esnap) + dtau*(-div + rhs_slow_vf(eqn_idx%E)%sf(j, k, l))
 
+                        ! Robust-tier energy correction: -dtau*div(dEflux), where dEflux = HLLC pressure work - centered pressure
+                        ! work at flagged faces and 0 at smooth faces. This swaps only the pressure-work term just transported; the
+                        ! divergence is single-valued per face (same value seen by both adjacent cells) so species/energy stay
+                        ! conserved, and at smooth faces it adds exactly zero -> the centered energy update is bit-identical.
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, l, &
+                                  & 1) - dEflux(j - 1, k, l, 1))/dx(j)
+                        if (n > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, l, &
+                            & 2) - dEflux(j, k - 1, l, 2))/dy(k)
+                        if (p > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, l, &
+                            & 3) - dEflux(j, k, l - 1, 3))/dz(l)
+
                         ! Volume fractions: pure slow (material) advection. The frozen slow forcing
                         ! rhs_slow_vf(%adv) already holds the contact-upwinded HLLC volume-fraction
                         ! flux, integrating to dt_stage*rhs_slow over the stage. The acoustic div(u)
@@ -367,86 +545,6 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            ! 3b. Two-tier acoustic reconstruction: build the primitive acoustic sub-vector (pressure,
-            !     direction-normal velocity, mixture density) over the buffered domain and WENO-reconstruct
-            !     its L/R face states per direction. p_sf and the conserved-field halos are valid here.
-            !     Pressure and density are direction-independent (filled once); the normal velocity is
-            !     refreshed before each directional reconstruction. The reconstructed states are wired but
-            !     not yet consumed by the flux (A4) -- so this leaves the smooth/unflagged answer unchanged.
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, rho]')
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        rho = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do f = 1, num_fluids
-                            rho = rho + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
-                        end do
-                        q_acoustic_vf(acou_p)%sf(j, k, l) = p_sf(j, k, l)
-                        q_acoustic_vf(acou_rho)%sf(j, k, l) = max(rho, sgm_eps)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            do i = 1, num_dims
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            q_acoustic_vf(acou_u)%sf(j, k, l) = q_cons_vf(momxb + i - 1)%sf(j, k, &
-                                          & l)/q_acoustic_vf(acou_rho)%sf(j, k, l)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                call s_reconstruct_acoustic_boundary_values(q_acoustic_vf, acL_rs_vf, acR_rs_vf, i)
-
-                ! 3c. Per-face discontinuity criterion for direction i: flag the robust acoustic tier (A4) when EITHER the
-                !     reconstructed acoustic pressure is non-smooth across the face OR the volume fraction varies across it.
-                !     The shock test reuses WENO's own smoothness indicators (no new physical threshold): the WENO beta_* are
-                !     squared cell-difference stencils, so beta_0 = (p_{j+1}-p_j)^2 measures the smoothness of the stencil
-                !     STRADDLING the face and beta_m/beta_p the smoothness of the left/right neighbour stencils. A face is smooth
-                !     when its across-face indicator does not exceed the larger neighbour indicator by more than weno_smooth_factor
-                !     (using the LARGER neighbour as the local scale keeps the test finite at smooth extrema / flat shoulders where
-                !     one one-sided difference vanishes -- the failure mode that sinks a min(beta) test). At a discontinuity the
-                !     across-face difference dwarfs the smooth-side differences, exactly the imbalance WENO's nonlinear weights act on.
-                joff = 0; koff = 0; loff = 0
-                if (i == 1) then; joff = 1; else if (i == 2) then; koff = 1; else; loff = 1; end if
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, d_m, d_0, d_p, beta_m, beta_0, beta_p, beta_face, beta_nbr_max, &
-                                    & flag_disc]')
-                do l = idwint(3)%beg, idwint(3)%end
-                    do k = idwint(2)%beg, idwint(2)%end
-                        do j = idwint(1)%beg, idwint(1)%end
-                            d_m = q_acoustic_vf(acou_p)%sf(j, k, l) - q_acoustic_vf(acou_p)%sf(j - joff, k - koff, l - loff)
-                            d_0 = q_acoustic_vf(acou_p)%sf(j + joff, k + koff, l + loff) - q_acoustic_vf(acou_p)%sf(j, k, l)
-                            d_p = q_acoustic_vf(acou_p)%sf(j + 2*joff, k + 2*koff, l + 2*loff) &
-                                  - q_acoustic_vf(acou_p)%sf(j + joff, k + koff, l + loff)
-                            beta_m = d_m*d_m; beta_0 = d_0*d_0; beta_p = d_p*d_p
-                            beta_face = beta_0                       ! across-face smoothness indicator
-                            beta_nbr_max = max(beta_m, beta_p) + eps_w  ! larger neighbour-stencil indicator (finite local scale)
-                            flag_disc = (beta_face > weno_smooth_factor*beta_nbr_max)
-
-                            ! Volume-fraction (material-interface) variation across the face, any fluid.
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do f = advb, adve
-                                if (abs(q_cons_vf(f)%sf(j + joff, k + koff, l + loff) - q_cons_vf(f)%sf(j, k, l)) > eps_alpha) then
-                                    flag_disc = .true.
-                                end if
-                            end do
-
-                            if (flag_disc) then
-                                acoustic_flag(j, k, l, i) = 1
-                            else
-                                acoustic_flag(j, k, l, i) = 0
-                            end if
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end do
-
             ! 4a. DIVERGENCE: build div_sf = centered div(rho*u) over the interior + one ghost
             !     layer. The momentum halo is current from the exchange above and was untouched
             !     by the forward sweep, so all neighbours are valid.
@@ -475,7 +573,8 @@ contains
             !     The damping is the centered gradient of div_sf scaled by Dx_i^2 so that
             !     acoustic_div_damp is dimensionless; sharing the divergence stencil makes the
             !     operator annihilate divergence-free vortical modes exactly.
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, dpdx, damp, inv_2dx, inv_2dy, inv_2dz]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, dpdx, damp, inv_2dx, inv_2dy, inv_2dz, flg_r, flg_l, sm_r, sm_l, &
+                                & gd_r, gd_l, dfm_r, dfm_l]')
             do l = idwint(3)%beg, idwint(3)%end
                 do k = idwint(2)%beg, idwint(2)%end
                     do j = idwint(1)%beg, idwint(1)%end
@@ -503,6 +602,42 @@ contains
                             damp = 0.5_wp*dz(l)*(div_sf(j, k, l + 1) - div_sf(j, k, l - 1))
                             q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) + dtau*(-dpdx + rhs_slow_vf(momxe)%sf(j, &
                                       & k, l)) + acoustic_div_damp*damp
+                        end if
+
+                        ! Robust-tier normal-momentum correction. At a flagged face replace the centered acoustic momentum flux
+                        ! (dtau*p_centered minus the grad-div damping flux gd) by the HLLC star-pressure flux dtau*flux_mom_rob and
+                        ! drop the damping. Written as a single-valued face-flux delta dfm = flag*(dtau*flux_mom_rob - dtau*p_avg +
+                        ! gd):
+                        ! the centered pressure gradient (Sm) and damping (gd) here are the exact face-flux equivalents of the
+                        ! centered backward sweep above (using the post-forward p_sf / div_sf it used), so subtracting them removes
+                        ! the centered contribution of that face and the -div(dfm) update stays momentum-conservative. flag and
+                        ! flux_mom_rob are zero at smooth faces, so this adds exactly zero there (centered tier bit-identical).
+                        flg_r = acoustic_flag(j, k, l, 1); flg_l = acoustic_flag(j - 1, k, l, 1)
+                        sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j + 1, k, l)); sm_l = 0.5_wp*(p_sf(j - 1, k, l) + p_sf(j, k, l))
+                        gd_r = acoustic_div_damp*0.5_wp*dx(j)*dx(j)*(div_sf(j, k, l) + div_sf(j + 1, k, l))
+                        gd_l = acoustic_div_damp*0.5_wp*dx(j - 1)*dx(j - 1)*(div_sf(j - 1, k, l) + div_sf(j, k, l))
+                        dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 1) - dtau*sm_r + gd_r)
+                        dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j - 1, k, l, 1) - dtau*sm_l + gd_l)
+                        q_cons_vf(momxb)%sf(j, k, l) = q_cons_vf(momxb)%sf(j, k, l) - (dfm_r - dfm_l)/dx(j)
+
+                        if (n > 0) then
+                            flg_r = acoustic_flag(j, k, l, 2); flg_l = acoustic_flag(j, k - 1, l, 2)
+                            sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k + 1, l)); sm_l = 0.5_wp*(p_sf(j, k - 1, l) + p_sf(j, k, l))
+                            gd_r = acoustic_div_damp*0.5_wp*dy(k)*dy(k)*(div_sf(j, k, l) + div_sf(j, k + 1, l))
+                            gd_l = acoustic_div_damp*0.5_wp*dy(k - 1)*dy(k - 1)*(div_sf(j, k - 1, l) + div_sf(j, k, l))
+                            dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 2) - dtau*sm_r + gd_r)
+                            dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k - 1, l, 2) - dtau*sm_l + gd_l)
+                            q_cons_vf(momxb + 1)%sf(j, k, l) = q_cons_vf(momxb + 1)%sf(j, k, l) - (dfm_r - dfm_l)/dy(k)
+                        end if
+
+                        if (p > 0) then
+                            flg_r = acoustic_flag(j, k, l, 3); flg_l = acoustic_flag(j, k, l - 1, 3)
+                            sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k, l + 1)); sm_l = 0.5_wp*(p_sf(j, k, l - 1) + p_sf(j, k, l))
+                            gd_r = acoustic_div_damp*0.5_wp*dz(l)*dz(l)*(div_sf(j, k, l) + div_sf(j, k, l + 1))
+                            gd_l = acoustic_div_damp*0.5_wp*dz(l - 1)*dz(l - 1)*(div_sf(j, k, l - 1) + div_sf(j, k, l))
+                            dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 3) - dtau*sm_r + gd_r)
+                            dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k, l - 1, 3) - dtau*sm_l + gd_l)
+                            q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) - (dfm_r - dfm_l)/dz(l)
                         end if
                     end do
                 end do
@@ -555,6 +690,8 @@ contains
         @:DEALLOCATE(acL_rs_vf)
         @:DEALLOCATE(acR_rs_vf)
         @:DEALLOCATE(acoustic_flag)
+        @:DEALLOCATE(dEflux)
+        @:DEALLOCATE(flux_mom_rob)
 
     end subroutine s_finalize_acoustic_substep_module
 
