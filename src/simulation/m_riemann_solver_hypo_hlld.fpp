@@ -34,7 +34,13 @@ contains
 
         ! Local variables:
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        ! Hypo HLLD has num_fluids==2 guard -> reads alpha_* at a hard-coded index 2.
+        ! With case-opt, `num_fluids=1` makes dimension(num_fluids) length 1,
+        ! so amdflang gives a compile-time out-of-bounds error. max(num_fluids, 2) fixes it
+
+        #:if MFC_CASE_OPTIMIZATION
+            real(wp), dimension(${max(num_fluids, 2)}$) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+        #:elif USING_AMD
             real(wp), dimension(3) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
         #:else
             real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
@@ -93,7 +99,11 @@ contains
         real(wp) :: rho_hat
         real(wp) :: tau_nn_hat, tau_nt_hat, tau_tt_hat, tau_qq_hat
         real(wp) :: tau_nt2_hat, tau_t2t2_hat, tau_t1t2_hat
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        ! alpha_hat/alpha_rho_hat: same max(num_fluids, 2) reason as alpha_* above
+        #:if MFC_CASE_OPTIMIZATION
+            real(wp), dimension(${max(num_fluids, 2)}$)                      :: alpha_hat, alpha_rho_hat
+            real(wp), dimension(eqn_idx%stress%end - eqn_idx%stress%beg + 1) :: tau_e_hat
+        #:elif USING_AMD
             real(wp), dimension(3) :: alpha_hat, alpha_rho_hat
             real(wp), dimension(6) :: tau_e_hat
         #:else
