@@ -756,16 +756,21 @@ contains
                                     ! stays
                                     ! conserved, and at smooth faces it adds exactly zero -> the centered mass update is
                                     ! bit-identical.
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do f = 1, num_fluids
-                                        i = eqn_idx%cont%beg + f - 1
-                                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, 1, &
-                                                  & f) - dmassflux(j - 1, k, l, 1, f))/dx(j)
-                                        if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, &
-                                            & 2, f) - dmassflux(j, k - 1, l, 2, f))/dy(k)
-                                        if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, &
-                                            & 3, f) - dmassflux(j, k, l - 1, 3, f))/dz(l)
-                                    end do
+                                    ! Skipped entirely on unflagged stages: the deltas are exactly 0 there (zeroed in the FLAG
+                                    ! PASS, never overwritten), so omitting the apply is bit-identical and removes the zero-delta
+                                    ! memory traffic on smooth flow. any_flagged is a stage-invariant scalar -> uniform branch.
+                                    if (any_flagged) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do f = 1, num_fluids
+                                            i = eqn_idx%cont%beg + f - 1
+                                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, 1, &
+                                                      & f) - dmassflux(j - 1, k, l, 1, f))/dx(j)
+                                            if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, &
+                                                & k, l, 2, f) - dmassflux(j, k - 1, l, 2, f))/dy(k)
+                                            if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, &
+                                                & k, l, 3, f) - dmassflux(j, k, l - 1, 3, f))/dz(l)
+                                        end do
+                                    end if
 
                                     ! Total-energy equation: d/dt(rho*E) = -div((rho*E + p) * u) + slow. p_sf is the frozen
                                     ! cell pressure (built from the same pre-sweep state as q_snap), so the energy flux is
@@ -795,12 +800,14 @@ contains
                                     ! the upwinded HLLC energy flux; the divergence is single-valued per face (same value seen by
                                     ! both adjacent
                                     ! cells) so energy stays conserved, and at smooth faces it adds exactly zero -> bit-identical.
-                                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, l, &
-                                              & 1) - dEflux(j - 1, k, l, 1))/dx(j)
-                                    if (n > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
-                                        & l) - dtau*(dEflux(j, k, l, 2) - dEflux(j, k - 1, l, 2))/dy(k)
-                                    if (p > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
-                                        & l) - dtau*(dEflux(j, k, l, 3) - dEflux(j, k, l - 1, 3))/dz(l)
+                                    if (any_flagged) then
+                                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, &
+                                                  & l, 1) - dEflux(j - 1, k, l, 1))/dx(j)
+                                        if (n > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
+                                            & l) - dtau*(dEflux(j, k, l, 2) - dEflux(j, k - 1, l, 2))/dy(k)
+                                        if (p > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
+                                            & l) - dtau*(dEflux(j, k, l, 3) - dEflux(j, k, l - 1, 3))/dz(l)
+                                    end if
 
                                     ! Volume fractions: pure slow (material) advection. The frozen slow forcing
                                     ! rhs_slow_vf(%adv) already holds the contact-upwinded HLLC volume-fraction
@@ -922,61 +929,74 @@ contains
                                     ! flag and
                                     ! flux_mom_rob are zero at smooth faces, so this adds exactly zero there (centered tier
                                     ! bit-identical).
-                                    flg_r = acoustic_flag(j, k, l, 1); flg_l = acoustic_flag(j - 1, k, l, 1)
-                                    sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j + 1, k, l)); sm_l = 0.5_wp*(p_sf(j - 1, k, l) + p_sf(j, &
-                                                   & k, l))
-                                    gd_r = acoustic_div_damp*0.5_wp*dx(j)*dx(j)*(div_sf(j, k, l) + div_sf(j + 1, k, l))
-                                    gd_l = acoustic_div_damp*0.5_wp*dx(j - 1)*dx(j - 1)*(div_sf(j - 1, k, l) + div_sf(j, k, l))
-                                    dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 1) - dtau*sm_r + gd_r)
-                                    dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j - 1, k, l, 1) - dtau*sm_l + gd_l)
-                                    q_cons_vf(momxb)%sf(j, k, l) = q_cons_vf(momxb)%sf(j, k, l) - (dfm_r - dfm_l)/dx(j)
-
-                                    if (n > 0) then
-                                        flg_r = acoustic_flag(j, k, l, 2); flg_l = acoustic_flag(j, k - 1, l, 2)
-                                        sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k + 1, l)); sm_l = 0.5_wp*(p_sf(j, k - 1, &
+                                    ! Robust-tier momentum corrections (normal acoustic + convective): skipped entirely on
+                                    ! unflagged stages, where flux_mom_rob/dmomflux and every flag are exactly 0 (FLAG PASS) so the
+                                    ! face-flux deltas dfm_r/dfm_l and the dmomflux divergence are exactly 0 -> omitting the apply
+                                    ! is
+                                    ! bit-identical and removes the zero-delta memory traffic on smooth flow. any_flagged is a
+                                    ! stage-invariant scalar -> uniform branch.
+                                    if (any_flagged) then
+                                        flg_r = acoustic_flag(j, k, l, 1); flg_l = acoustic_flag(j - 1, k, l, 1)
+                                        sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j + 1, k, l)); sm_l = 0.5_wp*(p_sf(j - 1, k, &
                                                        & l) + p_sf(j, k, l))
-                                        gd_r = acoustic_div_damp*0.5_wp*dy(k)*dy(k)*(div_sf(j, k, l) + div_sf(j, k + 1, l))
-                                        gd_l = acoustic_div_damp*0.5_wp*dy(k - 1)*dy(k - 1)*(div_sf(j, k - 1, l) + div_sf(j, k, l))
-                                        dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 2) - dtau*sm_r + gd_r)
-                                        dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k - 1, l, 2) - dtau*sm_l + gd_l)
-                                        q_cons_vf(momxb + 1)%sf(j, k, l) = q_cons_vf(momxb + 1)%sf(j, k, l) - (dfm_r - dfm_l)/dy(k)
-                                    end if
+                                        gd_r = acoustic_div_damp*0.5_wp*dx(j)*dx(j)*(div_sf(j, k, l) + div_sf(j + 1, k, l))
+                                        gd_l = acoustic_div_damp*0.5_wp*dx(j - 1)*dx(j - 1)*(div_sf(j - 1, k, l) + div_sf(j, k, l))
+                                        dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 1) - dtau*sm_r + gd_r)
+                                        dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j - 1, k, l, 1) - dtau*sm_l + gd_l)
+                                        q_cons_vf(momxb)%sf(j, k, l) = q_cons_vf(momxb)%sf(j, k, l) - (dfm_r - dfm_l)/dx(j)
 
-                                    if (p > 0) then
-                                        flg_r = acoustic_flag(j, k, l, 3); flg_l = acoustic_flag(j, k, l - 1, 3)
-                                        sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k, l + 1)); sm_l = 0.5_wp*(p_sf(j, k, &
-                                                       & l - 1) + p_sf(j, k, l))
-                                        gd_r = acoustic_div_damp*0.5_wp*dz(l)*dz(l)*(div_sf(j, k, l) + div_sf(j, k, l + 1))
-                                        gd_l = acoustic_div_damp*0.5_wp*dz(l - 1)*dz(l - 1)*(div_sf(j, k, l - 1) + div_sf(j, k, l))
-                                        dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 3) - dtau*sm_r + gd_r)
-                                        dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k, l - 1, 3) - dtau*sm_l + gd_l)
-                                        q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) - (dfm_r - dfm_l)/dz(l)
-                                    end if
+                                        if (n > 0) then
+                                            flg_r = acoustic_flag(j, k, l, 2); flg_l = acoustic_flag(j, k - 1, l, 2)
+                                            sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k + 1, l)); sm_l = 0.5_wp*(p_sf(j, k - 1, &
+                                                           & l) + p_sf(j, k, l))
+                                            gd_r = acoustic_div_damp*0.5_wp*dy(k)*dy(k)*(div_sf(j, k, l) + div_sf(j, k + 1, l))
+                                            gd_l = acoustic_div_damp*0.5_wp*dy(k - 1)*dy(k - 1)*(div_sf(j, k - 1, l) + div_sf(j, &
+                                                                               & k, l))
+                                            dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 2) - dtau*sm_r + gd_r)
+                                            dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k - 1, l, 2) - dtau*sm_l + gd_l)
+                                            q_cons_vf(momxb + 1)%sf(j, k, l) = q_cons_vf(momxb + 1)%sf(j, k, &
+                                                      & l) - (dfm_r - dfm_l)/dy(k)
+                                        end if
 
-                                    ! Robust-tier convective-momentum correction: -dtau*div(dmomflux), where dmomflux(:,:,:,dir,d) =
-                                    ! live HLLC
-                                    ! convective momentum flux (normal + transverse) MINUS the frozen stage-entry HLLC convective
-                                    ! momentum flux
-                                    ! at flagged faces (0 at smooth faces). The frozen part cancels the convective momentum already
-                                    ! carried by
-                                    ! the frozen slow forcing rhs_slow_vf(mom), so the NET convective momentum becomes live full
-                                    ! HLLC while the
-                                    ! viscous/source momentum stays frozen-slow (correct). The divergence is single-valued per face
-                                    ! (cell j
-                                    ! right
-                                    ! face = cell j+1 left face) so momentum telescopes/conserves; at smooth faces it adds exactly
-                                    ! zero so the
-                                    ! centered tier (pressure gradient + grad-div damping) is left bit-identical.
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do d = 1, num_dims
-                                        i = momxb + d - 1
-                                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 1, &
-                                                  & d) - dmomflux(j - 1, k, l, 1, d))/dx(j)
-                                        if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, &
-                                            & 2, d) - dmomflux(j, k - 1, l, 2, d))/dy(k)
-                                        if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, &
-                                            & 3, d) - dmomflux(j, k, l - 1, 3, d))/dz(l)
-                                    end do
+                                        if (p > 0) then
+                                            flg_r = acoustic_flag(j, k, l, 3); flg_l = acoustic_flag(j, k, l - 1, 3)
+                                            sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k, l + 1)); sm_l = 0.5_wp*(p_sf(j, k, &
+                                                           & l - 1) + p_sf(j, k, l))
+                                            gd_r = acoustic_div_damp*0.5_wp*dz(l)*dz(l)*(div_sf(j, k, l) + div_sf(j, k, l + 1))
+                                            gd_l = acoustic_div_damp*0.5_wp*dz(l - 1)*dz(l - 1)*(div_sf(j, k, l - 1) + div_sf(j, &
+                                                                               & k, l))
+                                            dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 3) - dtau*sm_r + gd_r)
+                                            dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k, l - 1, 3) - dtau*sm_l + gd_l)
+                                            q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) - (dfm_r - dfm_l)/dz(l)
+                                        end if
+
+                                        ! Robust-tier convective-momentum correction: -dtau*div(dmomflux), where
+                                        ! dmomflux(:,:,:,dir,d) = live HLLC
+                                        ! convective momentum flux (normal + transverse) MINUS the frozen stage-entry HLLC
+                                        ! convective
+                                        ! momentum flux
+                                        ! at flagged faces (0 at smooth faces). The frozen part cancels the convective momentum
+                                        ! already carried by
+                                        ! the frozen slow forcing rhs_slow_vf(mom), so the NET convective momentum becomes live full
+                                        ! HLLC while the
+                                        ! viscous/source momentum stays frozen-slow (correct). The divergence is single-valued per
+                                        ! face (cell j
+                                        ! right
+                                        ! face = cell j+1 left face) so momentum telescopes/conserves; at smooth faces it adds
+                                        ! exactly
+                                        ! zero so the
+                                        ! centered tier (pressure gradient + grad-div damping) is left bit-identical.
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do d = 1, num_dims
+                                            i = momxb + d - 1
+                                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 1, &
+                                                      & d) - dmomflux(j - 1, k, l, 1, d))/dx(j)
+                                            if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, &
+                                                & l, 2, d) - dmomflux(j, k - 1, l, 2, d))/dy(k)
+                                            if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, &
+                                                & l, 3, d) - dmomflux(j, k, l - 1, 3, d))/dz(l)
+                                        end do
+                                    end if
                                 end do
                             end do
                         end do
