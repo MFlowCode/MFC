@@ -109,7 +109,8 @@ contains
             @:PROHIBIT(igr, "acoustic_substepping is incompatible with the information geometric regularization (igr) solver")
             @:PROHIBIT(.not. cfl_dt, "acoustic_substepping requires CFL-based time stepping (set cfl_adap_dt or cfl_const_dt)")
             @:PROHIBIT(time_stepper /= time_stepper_rk3, "acoustic_substepping requires time_stepper = 3 (SSP-RK3)")
-            @:PROHIBIT(recon_type /= recon_type_weno, "acoustic_substepping requires WENO reconstruction; the substep reconstructs with s_weno")
+            @:PROHIBIT(recon_type /= recon_type_weno, &
+                       & "acoustic_substepping requires WENO reconstruction; the substep reconstructs with s_weno")
             @:PROHIBIT(n_acoustic_substeps < 0, "n_acoustic_substeps must be >= 0 (0 = auto)")
             @:PROHIBIT(acoustic_div_damp < 0._wp, "acoustic_div_damp must be >= 0")
         end if
