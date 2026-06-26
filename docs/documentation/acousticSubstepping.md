@@ -71,6 +71,47 @@ only the compressive/acoustic content. The forward sweep computes flux divergenc
 frozen snapshot of the conserved state and applies them afterward, which keeps the scheme
 species-mass conservative.
 
+### Two-tier flux at discontinuities
+
+A purely centered acoustic substep rings at a sharp jump. To handle embedded
+discontinuities the substep runs **two tiers**, selected per face each RK stage by a
+discontinuity criterion:
+
+- **Smooth tier (default).** The cheap 2nd-order centered transport above, used wherever
+  the flow is smooth. This is the low-Mach-accurate, low-cost path and is bit-identical to
+  the pre-shock-capture scheme on a smooth field.
+- **Robust tier (flagged faces).** At a flagged face the centered mass and energy
+  convective fluxes are replaced by the **full HLLC** flux (the convective Riemann flux
+  `s_convective_face_flux` plus the acoustic star-pressure flux `s_acoustic_face_flux`)
+  built on one consistently WENO-reconstructed left/right state. The per-component delta is
+  applied through the same single-valued telescoping structure, so species mass and total
+  energy remain exactly conservative. Total energy at the face is rebuilt from the
+  reconstructed primitives via the stiffened-gas mixture EOS.
+
+The robust tier replaces the **mass and energy** convective transport with full HLLC, but
+the **convective momentum** flux at a flagged face stays frozen at its stage-entry (slow)
+value — only the acoustic star-pressure momentum is made live. This is exact for a material
+interface (where the convective-momentum jump is sub-dominant) and is what makes sharp
+material interfaces, including a 1-cell-sharp contact, stable and non-oscillatory in split
+mode (validated: per-species mass conserved to machine precision, bounded ~few-percent
+pressure ringing). At a **propagating shock**, however, convective momentum transport is
+leading order, and the frozen (first-order-in-time) momentum is not merely inaccurate but
+destabilizing — split mode is currently **unstable on shocks** (see *Scope and
+limitations*). Making the convective momentum live at flagged faces is the remaining work to
+bring shocks into scope.
+
+The criterion (`s_acoustic_flag`) flags a face when either
+- the largest per-cell pressure jump over the 4-point stencil exceeds \f$\sim 1\%\f$ of the
+  local pressure scale (a scale-invariant, `weno_eps`-independent max-indicator test), or
+- the volume-fraction variation \f$|\Delta\alpha|\f$ across the face exceeds a small
+  threshold (the material-interface flag).
+
+The flag mask is computed once from the stage-entry state and held fixed for that stage's
+microsteps; the reconstruction is **conditional** (skipped entirely when no face on the
+rank is flagged), so the smooth-flow cost — and the \f$O(1/M)\f$ speedup — is preserved.
+Because both flux entries hardcode the direct wave-speed estimate, the robust tier requires
+``wave_speeds = 'direct'`` (enforced at input checking).
+
 ### Time step
 
 `s_compute_dt` sets \f$\Delta t\f$ from the advective CFL (using \f$|u|\f$, not
@@ -127,8 +168,25 @@ backend-agnostic `GPU_*` macros (see @ref gpuParallelization "GPU Parallelizatio
 
 ## Scope and limitations
 
-- Intended for **smooth** low-Mach flow. The acoustic substep is centered (non-upwinded),
-  so flows with embedded shocks are out of scope.
+- **Smooth low-Mach flow** and **material interfaces** are in scope. On a smooth field the
+  scheme is bit-identical to the standard solver on the smooth tier and recovers the full
+  \f$O(1/M)\f$ per-step speedup (a smooth 2D \f$M=0.1\f$ case measures \f$\approx 5.9\times\f$
+  overall, with the blended cost ratio back near the all-smooth value once the conditional
+  reconstruction skips the unflagged field). At a material interface — resolved or
+  1-cell-sharp — the robust tier keeps the solution non-oscillatory (bounded few-percent
+  pressure ringing) and species mass exactly conservative (drift \f$\sim 10^{-16}\f$), with
+  the interface slightly more diffused than full HLLC.
+- **Propagating shocks are not yet in scope.** The robust tier makes the mass and energy
+  convective transport full HLLC, but the convective *momentum* flux at a flagged face stays
+  frozen at the stage-entry value (a first-order temporal lag). Where momentum advection is
+  leading order — i.e. at a moving shock — this is destabilizing: split mode goes unstable
+  (NaN for `num_fluids > 1`, adaptive-\f$\Delta t\f$ collapse for `num_fluids = 1`) once a
+  shock forms, even at a modest pressure ratio, and refining the acoustic CFL (more
+  substeps) only delays the failure. For shock-dominated flow use the standard solver
+  (`acoustic_substepping = F`). Bringing shocks into scope requires making the convective
+  momentum live at flagged faces (storing a per-face stage-entry slow-momentum to subtract);
+  for `num_fluids > 1` it additionally requires reconstructing the mixture EOS coefficients
+  at the face rather than reusing the cell volume fractions.
 - The macro (WS-RK3) coupling is second-order in the advective step at fixed acoustic CFL;
   with auto substeps (\f$\Delta\tau \propto \Delta t\f$) the symplectic-Euler micro-step
   makes the practical convergence first order (see *Temporal accuracy* above). Spatial

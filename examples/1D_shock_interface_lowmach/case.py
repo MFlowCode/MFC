@@ -15,19 +15,20 @@ Physics:
     this a genuinely discontinuity-rich, moderate-Mach blended-cost case.
   - This is the discontinuity-rich stress case for the two-tier substep.
 
-FINDING (task A5 validation; see .superpowers/sdd/task-5-report.md): the BASELINE full-HLLC
+FINDING (task B5 validation; see .superpowers/sdd/task-b5-report.md): the BASELINE full-HLLC
 solver (acoustic_substepping='F', the default here) captures this shock-interface
 interaction cleanly. SPLIT mode (acoustic_substepping='T') is UNSTABLE on it (NaN within
-~8 steps), for two compounding reasons: (1) the shipped WENO-Z pressure-jump criterion does
-NOT fire on a sharp shock — tau_z=|beta_p-beta_m|=0 at the face that straddles a 1-cell
-jump, so the robust tier never engages on the shock core; (2) more fundamentally, the
-substep's convective transport of mass (partial densities) and total energy is centered
-(2nd-order, non-upwinded) and is NOT protected by the robust tier (which only replaces the
-acoustic pressure-work and normal-momentum flux). A sharp density discontinuity (the 8:1 Sod
-jump, or a 1-cell material interface) therefore rings in that unprotected centered transport
-and destabilizes regardless of whether the criterion fires. Sharp shocks/contacts are out of
-the documented "smooth low-Mach" scope; capturing them needs upwinded/limited mass+energy
-convection in the substep, not just an acoustic Riemann flux. Run in split mode only to
+~40 steps). The two-tier robust flux (task B3) now makes the mass and energy convective
+transport full HLLC at flagged faces — that fixed the sharp material-interface ringing, so a
+1-cell-sharp CONTACT (no shock) is stable and species-mass conservative. But the convective
+MOMENTUM flux at a flagged face stays frozen at the stage-entry value (a first-order
+temporal lag). At a propagating SHOCK momentum advection is leading order, so the frozen
+momentum is destabilizing — split mode NaNs once a shock forms, independent of boundary
+condition, dt mode, or damping, and refining the acoustic CFL only delays it. (For
+num_fluids=1 the same physics shows up as adaptive-dt collapse rather than a hard NaN; the
+num_fluids>1 cell-volume-fraction EOS rebuild makes the multifluid failure sharper.)
+Propagating shocks are therefore out of scope until the convective momentum is made live at
+flagged faces; use the standard solver for shock-dominated flow. Run in split mode only to
 reproduce the limitation.
 
 Diagnostics:
