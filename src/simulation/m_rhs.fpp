@@ -36,7 +36,6 @@ module m_rhs
     use m_igr
     use m_thinc
     use m_pressure_relaxation
-
     use m_acoustic_substep, only: frozen_conv_mom_face
 
     implicit none
@@ -484,7 +483,7 @@ contains
         integer, intent(in) :: stage
         real(wp) :: t_start, t_finish
         integer :: id
-        integer :: fb_x, fb_y, fb_z  !< Slow-flux snapshot lower bounds (one ghost below interior on the normal axis)
+        integer :: fb_x, fb_y, fb_z       !< Slow-flux snapshot lower bounds (one ghost below interior on the normal axis)
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms

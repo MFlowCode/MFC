@@ -50,8 +50,8 @@ module m_acoustic_substep
     use m_boundary_common
     use m_weno, only: s_weno
     use m_riemann_solver_hllc, only: s_acoustic_face_flux, s_convective_face_flux
-    use m_constants, only: BC_GHOST_EXTRAP, BC_RIEMANN_EXTRAP, BC_CHAR_NR_SUB_OUTFLOW, &
-                           BC_CHAR_FF_SUB_OUTFLOW, BC_CHAR_CP_SUB_OUTFLOW, BC_CHAR_SUP_OUTFLOW, BC_DIRICHLET
+    use m_constants, only: BC_GHOST_EXTRAP, BC_RIEMANN_EXTRAP, BC_CHAR_NR_SUB_OUTFLOW, BC_CHAR_FF_SUB_OUTFLOW, &
+        & BC_CHAR_CP_SUB_OUTFLOW, BC_CHAR_SUP_OUTFLOW, BC_DIRICHLET
 
     implicit none
 
@@ -105,34 +105,33 @@ module m_acoustic_substep
     $:GPU_DECLARE(create='[acoustic_flag]')
 
     !> Robust-tier face-flux deltas at flagged faces, stored per face-normal direction so the per-direction WENO buffers
-    !! (qL_rs_vf/qR_rs_vf, overwritten each direction) can be reused. dEflux = full live HLLC energy face flux
-    !! (convective E*u + acoustic pressure work) MINUS the full centered energy face flux (the energy delta consumed by the forward
-    !! sweep); dmassflux(:,:,:,dir,f) = live HLLC partial-density (alpha*rho_k) face flux MINUS the centered convective mass flux,
-    !! per fluid (the mass delta consumed by the forward sweep). flux_mom_rob = robust normal-momentum (acoustic star-pressure) flux
-    !! consumed by the backward sweep; the convective normal+transverse momentum transport stays in the frozen slow forcing
-    !! rhs_slow_vf (already contact-upwinded HLLC, frozen at stage entry). All are addressed at cell (j,k,l) for the +dir face and
-    !! are exactly zero at unflagged (smooth) faces, so the centered tier is left bit-identical there.
+    !! (qL_rs_vf/qR_rs_vf, overwritten each direction) can be reused. dEflux = full live HLLC energy face flux (convective E*u +
+    !! acoustic pressure work) MINUS the full centered energy face flux (the energy delta consumed by the forward sweep);
+    !! dmassflux(:,:,:,dir,f) = live HLLC partial-density (alpha*rho_k) face flux MINUS the centered convective mass flux, per fluid
+    !! (the mass delta consumed by the forward sweep). flux_mom_rob = robust normal-momentum (acoustic star-pressure) flux consumed
+    !! by the backward sweep; the convective normal+transverse momentum transport stays in the frozen slow forcing rhs_slow_vf
+    !! (already contact-upwinded HLLC, frozen at stage entry). All are addressed at cell (j,k,l) for the +dir face and are exactly
+    !! zero at unflagged (smooth) faces, so the centered tier is left bit-identical there.
     real(wp), allocatable, dimension(:,:,:,:) :: dEflux, flux_mom_rob
     $:GPU_DECLARE(create='[dEflux, flux_mom_rob]')
     real(wp), allocatable, dimension(:,:,:,:,:) :: dmassflux
     $:GPU_DECLARE(create='[dmassflux]')
 
-    !> Live momentum machinery at flagged faces (per face-normal direction, per velocity component). frozen_conv_mom_face
-    !! = the EXACT per-face slow momentum flux the slow (advective) HLLC path computed at the RK stage state U^(s-1) --
-    !! whose divergence IS the momentum part of the frozen slow forcing rhs_slow_vf(mom). Under acoustic_substepping the HLLC
-    !! slow variant emits a CONVECTIVE-ONLY momentum flux (contact-upwinded rho*u_n*u_d, with NO star-pressure p_Star, no
-    !! acoustic dissipation, no pcorr -- those are deferred to the acoustic tier), so frozen_conv_mom_face is a faithful copy of
-    !! that convective flux, NOT a full slow flux. The star-pressure (acoustic) momentum is supplied LIVE and separately by
-    !! flux_mom_rob, so it must NOT also be present here. The LOAD-BEARING invariant is that frozen_conv_mom_face EXACTLY mirrors
-    !! the flux_n(mom) whose divergence is rhs_slow_vf(mom), so the two divergences cancel on every RK stage.
-    !! It is PUBLIC and populated by m_rhs (s_compute_rhs) directly from flux_n(dir)%vf(mom) each stage, in GLOBAL
-    !! momentum-component layout (component d = flux_n(dir)%vf(mom%beg+d-1)), addressed at cell (j,k,l) for the +dir face -- the same
-    !! convention as dmomflux below. Storing the slow path's actual flux (not a reconstruction from U^n) makes the cancellation
-    !! exact on EVERY RK stage. dmomflux = live HLLC convective momentum flux (re-evaluated each microstep, mapped from flux_mom's
-    !! rotated slots: slot 1 = face-normal, 2..nv = transverse) MINUS frozen_conv_mom_face, the per-face delta consumed by the
-    !! backward sweep so the NET convective momentum becomes live full-HLLC (the frozen part cancels the slow-forcing convective
-    !! momentum) while viscous/source momentum stays frozen-slow. dmomflux is exactly zero at smooth faces so the centered tier is
-    !! left bit-identical there.
+    !> Live momentum machinery at flagged faces (per face-normal direction, per velocity component). frozen_conv_mom_face = the
+    !! EXACT per-face slow momentum flux the slow (advective) HLLC path computed at the RK stage state U^(s-1) -- whose divergence
+    !! IS the momentum part of the frozen slow forcing rhs_slow_vf(mom). Under acoustic_substepping the HLLC slow variant emits a
+    !! CONVECTIVE-ONLY momentum flux (contact-upwinded rho*u_n*u_d, with NO star-pressure p_Star, no acoustic dissipation, no pcorr
+    !! -- those are deferred to the acoustic tier), so frozen_conv_mom_face is a faithful copy of that convective flux, NOT a full
+    !! slow flux. The star-pressure (acoustic) momentum is supplied LIVE and separately by flux_mom_rob, so it must NOT also be
+    !! present here. The LOAD-BEARING invariant is that frozen_conv_mom_face EXACTLY mirrors the flux_n(mom) whose divergence is
+    !! rhs_slow_vf(mom), so the two divergences cancel on every RK stage. It is PUBLIC and populated by m_rhs (s_compute_rhs)
+    !! directly from flux_n(dir)%vf(mom) each stage, in GLOBAL momentum-component layout (component d =
+    !! flux_n(dir)%vf(mom%beg+d-1)), addressed at cell (j,k,l) for the +dir face -- the same convention as dmomflux below. Storing
+    !! the slow path's actual flux (not a reconstruction from U^n) makes the cancellation exact on EVERY RK stage. dmomflux = live
+    !! HLLC convective momentum flux (re-evaluated each microstep, mapped from flux_mom's rotated slots: slot 1 = face-normal, 2..nv
+    !! = transverse) MINUS frozen_conv_mom_face, the per-face delta consumed by the backward sweep so the NET convective momentum
+    !! becomes live full-HLLC (the frozen part cancels the slow-forcing convective momentum) while viscous/source momentum stays
+    !! frozen-slow. dmomflux is exactly zero at smooth faces so the centered tier is left bit-identical there.
     real(wp), allocatable, dimension(:,:,:,:,:) :: frozen_conv_mom_face, dmomflux
     $:GPU_DECLARE(create='[frozen_conv_mom_face, dmomflux]')
 
@@ -417,545 +416,615 @@ contains
                                 if (i == 1) then
                                     if (j == idwint(1)%beg - 1) then; bcc = bc_x%beg; else if (j == idwint(1)%end) then
                                         bcc = bc_x%end; end if
-                                else if (i == 2) then
-                                    if (k == idwint(2)%beg - 1) then; bcc = bc_y%beg; else if (k == idwint(2)%end) then
-                                        bcc = bc_y%end; end if
-                                else
-                                    if (l == idwint(3)%beg - 1) then; bcc = bc_z%beg; else if (l == idwint(3)%end) then
-                                        bcc = bc_z%end; end if
-                                end if
-                                if (bcc == BC_GHOST_EXTRAP .or. bcc == BC_RIEMANN_EXTRAP .or. bcc == BC_CHAR_NR_SUB_OUTFLOW &
-                                    & .or. bcc == BC_CHAR_FF_SUB_OUTFLOW .or. bcc == BC_CHAR_CP_SUB_OUTFLOW .or. &
-                                    & bcc == BC_CHAR_SUP_OUTFLOW .or. bcc == BC_DIRICHLET) then
-                                    flag_disc = .true.
-                                end if
+                                    else if (i == 2) then
+                                        if (k == idwint(2)%beg - 1) then; bcc = bc_y%beg; else if (k == idwint(2)%end) then
+                                            bcc = bc_y%end; end if
+                                        else
+                                            if (l == idwint(3)%beg - 1) then; bcc = bc_z%beg; else if (l == idwint(3)%end) then
+                                                bcc = bc_z%end; end if
+                                            end if
+                                            if (bcc == BC_GHOST_EXTRAP .or. bcc == BC_RIEMANN_EXTRAP &
+                                                & .or. bcc == BC_CHAR_NR_SUB_OUTFLOW .or. bcc == BC_CHAR_FF_SUB_OUTFLOW &
+                                                & .or. bcc == BC_CHAR_CP_SUB_OUTFLOW .or. bcc == BC_CHAR_SUP_OUTFLOW &
+                                                & .or. bcc == BC_DIRICHLET) then
+                                                flag_disc = .true.
+                                            end if
 
-                                if (flag_disc) then
-                                    acoustic_flag(j, k, l, i) = 1
-                                else
-                                    acoustic_flag(j, k, l, i) = 0
-                                end if
-                                dEflux(j, k, l, i) = 0._wp
-                                flux_mom_rob(j, k, l, i) = 0._wp
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do f = 1, num_fluids
-                                    dmassflux(j, k, l, i, f) = 0._wp
+                                            if (flag_disc) then
+                                                acoustic_flag(j, k, l, i) = 1
+                                            else
+                                                acoustic_flag(j, k, l, i) = 0
+                                            end if
+                                            dEflux(j, k, l, i) = 0._wp
+                                            flux_mom_rob(j, k, l, i) = 0._wp
+                                            $:GPU_LOOP(parallelism='[seq]')
+                                            do f = 1, num_fluids
+                                                dmassflux(j, k, l, i, f) = 0._wp
+                                            end do
+                                            $:GPU_LOOP(parallelism='[seq]')
+                                            do d = 1, num_dims
+                                                dmomflux(j, k, l, i, d) = 0._wp
+                                            end do
+                                            any_flag_max = max(any_flag_max, acoustic_flag(j, k, l, i))
+                                        end do
+                                    end do
                                 end do
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do d = 1, num_dims
-                                    dmomflux(j, k, l, i, d) = 0._wp
-                                end do
-                                any_flag_max = max(any_flag_max, acoustic_flag(j, k, l, i))
+                                $:END_GPU_PARALLEL_LOOP()
                             end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end do
-                any_flagged = any_flag_max > 0
-            end if
+                            any_flagged = any_flag_max > 0
+                        end if
 
-            ! FLUX PASS (only when the stage has any flagged face; runs LIVE each microstep so the deltas track the evolving shock):
-            ! build the full primitive vector, reconstruct both the acoustic sub-vector and the full primitive state per direction,
-            ! and at each flagged face assemble the FULL live HLLC face flux F_full = s_convective_face_flux + s_acoustic_face_flux
-            ! into the robust-tier deltas (smooth faces stay at the zeros set in the FLAG PASS). The net flagged-face update per
-            ! microstep is pure live full HLLC: for MASS and ENERGY the slow flux is exactly zero (the HLLC slow flux zeroes the
-            ! mass
-            ! and total-energy faces), so the delta replaces the full CENTERED flux with the live HLLC flux (dmassflux for each
-            ! alpha*rho_k, dEflux for convective E*u + acoustic pressure work). For MOMENTUM the convective normal+transverse
-            ! transport already rides the frozen slow forcing (rhs_slow_vf, contact-upwinded HLLC frozen at stage entry), so only
-            ! the
-            ! CENTERED acoustic momentum is replaced by the live HLLC acoustic star-pressure flux flux_mom_rob -- the frozen-slow
-            ! convective momentum is the inherent split lag (< 1 cell/stage), not retransported here.
-            if (any_flagged) then
-                ! Full primitive vector over the buffered domain in m_rhs slot order: partial densities at %cont (= conserved for
-                ! the
-                ! 5-equation model), ALL velocity components at %mom (mom/rho), pressure at %E. Rebuilt each flagged microstep.
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f]')
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do f = 1, num_fluids
-                                q_prim_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l) = q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                        ! FLUX PASS (only when the stage has any flagged face; runs LIVE each microstep so the deltas track the
+                        ! evolving shock):
+                        ! build the full primitive vector, reconstruct both the acoustic sub-vector and the full primitive state per
+                        ! direction,
+                        ! and at each flagged face assemble the FULL live HLLC face flux F_full = s_convective_face_flux +
+                        ! s_acoustic_face_flux
+                        ! into the robust-tier deltas (smooth faces stay at the zeros set in the FLAG PASS). The net flagged-face
+                        ! update per
+                        ! microstep is pure live full HLLC: for MASS and ENERGY the slow flux is exactly zero (the HLLC slow flux
+                        ! zeroes the
+                        ! mass
+                        ! and total-energy faces), so the delta replaces the full CENTERED flux with the live HLLC flux (dmassflux
+                        ! for each
+                        ! alpha*rho_k, dEflux for convective E*u + acoustic pressure work). For MOMENTUM the convective
+                        ! normal+transverse
+                        ! transport already rides the frozen slow forcing (rhs_slow_vf, contact-upwinded HLLC frozen at stage
+                        ! entry), so only
+                        ! the
+                        ! CENTERED acoustic momentum is replaced by the live HLLC acoustic star-pressure flux flux_mom_rob -- the
+                        ! frozen-slow
+                        ! convective momentum is the inherent split lag (< 1 cell/stage), not retransported here.
+                        if (any_flagged) then
+                            ! Full primitive vector over the buffered domain in m_rhs slot order: partial densities at %cont (=
+                            ! conserved for
+                            ! the
+                            ! 5-equation model), ALL velocity components at %mom (mom/rho), pressure at %E. Rebuilt each flagged
+                            ! microstep.
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f]')
+                            do l = idwbuff(3)%beg, idwbuff(3)%end
+                                do k = idwbuff(2)%beg, idwbuff(2)%end
+                                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do f = 1, num_fluids
+                                            q_prim_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, &
+                                                      & l) = q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                                        end do
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = q_cons_vf(momxb + i - 1)%sf(j, k, &
+                                                      & l)/q_acoustic_vf(acou_rho)%sf(j, k, l)
+                                        end do
+                                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = p_sf(j, k, l)
+                                    end do
+                                end do
                             end do
-                            $:GPU_LOOP(parallelism='[seq]')
+                            $:END_GPU_PARALLEL_LOOP()
+
                             do i = 1, num_dims
-                                q_prim_vf(momxb + i - 1)%sf(j, k, l) = q_cons_vf(momxb + i - 1)%sf(j, k, &
-                                          & l)/q_acoustic_vf(acou_rho)%sf(j, k, l)
+                                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                                do l = idwbuff(3)%beg, idwbuff(3)%end
+                                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                                            q_acoustic_vf(acou_u)%sf(j, k, l) = q_cons_vf(momxb + i - 1)%sf(j, k, &
+                                                          & l)/q_acoustic_vf(acou_rho)%sf(j, k, l)
+                                        end do
+                                    end do
+                                end do
+                                $:END_GPU_PARALLEL_LOOP()
+
+                                call s_reconstruct_boundary_values(q_prim_vf, qL_rs_vf, qR_rs_vf, i)
+
+                                joff = 0; koff = 0; loff = 0
+                                if (i == 1) then; joff = 1; else if (i == 2) then; koff = 1; else; loff = 1; end if
+                                fb_x = idwint(1)%beg; fb_y = idwint(2)%beg; fb_z = idwint(3)%beg
+                                if (i == 1) then; fb_x = idwint(1)%beg - 1; else if (i == 2) then; fb_y = idwint(2)%beg &
+                                    & - 1; else; fb_z = idwint(3)%beg - 1; end if
+                                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, d, ic, gam_a, pin_a, gam_b, pin_b, pres_a, &
+                                                    & rho_a, c_a, pres_b, rho_b, c_b, qv_a, qv_b, ke_a, ke_b, E_a, E_b, flmom, &
+                                                    & flE, flux_E_c, se_face, se_conv, u_a, u_b, cm, rhoYks_a, rhoYks_b, &
+                                                    & vel_a_arr, vel_b_arr, flux_cont, flux_mom_c]')
+                                do l = fb_z, idwint(3)%end
+                                    do k = fb_y, idwint(2)%end
+                                        do j = fb_x, idwint(1)%end
+                                            if (acoustic_flag(j, k, l, i) == 1) then
+                                                ! Mixture stiffened-gas coefficients of the two cells straddling the face (frozen
+                                                ! volume
+                                                ! fractions); sound speed and total-energy density rebuilt from the SAME EOS as the
+                                                ! pressure
+                                                ! recompute: c^2 = (1/gamma + 1)(p + pi_inf/(gamma+1))/rho and
+                                                ! rho*E = gamma*p + pi_inf + qv + 0.5*rho*|u|^2.
+                                                gam_a = 0._wp; pin_a = 0._wp; gam_b = 0._wp; pin_b = 0._wp
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do f = 1, num_fluids
+                                                    gam_a = gam_a + q_cons_vf(advb + f - 1)%sf(j, k, l)*gammas(f)
+                                                    pin_a = pin_a + q_cons_vf(advb + f - 1)%sf(j, k, l)*pi_infs(f)
+                                                    gam_b = gam_b + q_cons_vf(advb + f - 1)%sf(j + joff, k + koff, &
+                                                                              & l + loff)*gammas(f)
+                                                    pin_b = pin_b + q_cons_vf(advb + f - 1)%sf(j + joff, k + koff, &
+                                                                              & l + loff)*pi_infs(f)
+                                                end do
+
+                                                ! Reconstructed L/R partial densities (qL/qR_rs_vf %cont slots) and the
+                                                ! qv-coefficient sums.
+                                                rho_a = 0._wp; rho_b = 0._wp; qv_a = 0._wp; qv_b = 0._wp
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do f = 1, num_fluids
+                                                    rhoYks_a(f) = qL_rs_vf(j, k, l, contb + f - 1)
+                                                    rhoYks_b(f) = qR_rs_vf(j + joff, k + koff, l + loff, contb + f - 1)
+                                                    rho_a = rho_a + rhoYks_a(f); rho_b = rho_b + rhoYks_b(f)
+                                                    qv_a = qv_a + rhoYks_a(f)*qvs(f); qv_b = qv_b + rhoYks_b(f)*qvs(f)
+                                                end do
+                                                rho_a = max(rho_a, sgm_eps); rho_b = max(rho_b, sgm_eps)
+
+                                                ! Velocity arrays with slot 1 = face-normal (component i), 2..nv = transverse (any
+                                                ! order; only
+                                                ! flux_cont and flux_E -- which read slot 1 -- are consumed, but the full kinetic
+                                                ! energy below
+                                                ! sums all components).
+                                                vel_a_arr(1) = qL_rs_vf(j, k, l, momxb + i - 1)
+                                                vel_b_arr(1) = qR_rs_vf(j + joff, k + koff, l + loff, momxb + i - 1)
+                                                ic = 1
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do d = 1, num_dims
+                                                    if (d /= i) then
+                                                        ic = ic + 1
+                                                        vel_a_arr(ic) = qL_rs_vf(j, k, l, momxb + d - 1)
+                                                        vel_b_arr(ic) = qR_rs_vf(j + joff, k + koff, l + loff, momxb + d - 1)
+                                                    end if
+                                                end do
+
+                                                pres_a = qL_rs_vf(j, k, l, eqn_idx%E)
+                                                pres_b = qR_rs_vf(j + joff, k + koff, l + loff, eqn_idx%E)
+                                                c_a = sqrt(max((1._wp/gam_a + 1._wp)*(pres_a + pin_a/(gam_a + 1._wp))/rho_a, &
+                                                           & sgm_eps))
+                                                c_b = sqrt(max((1._wp/gam_b + 1._wp)*(pres_b + pin_b/(gam_b + 1._wp))/rho_b, &
+                                                           & sgm_eps))
+                                                ke_a = 0._wp; ke_b = 0._wp
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do d = 1, nv
+                                                    ke_a = ke_a + 0.5_wp*rho_a*vel_a_arr(d)*vel_a_arr(d)
+                                                    ke_b = ke_b + 0.5_wp*rho_b*vel_b_arr(d)*vel_b_arr(d)
+                                                end do
+                                                E_a = gam_a*pres_a + pin_a + qv_a + ke_a
+                                                E_b = gam_b*pres_b + pin_b + qv_b + ke_b
+
+                                                ! Full live HLLC face flux = convective (mass alpha*rho_k*u, energy E*u) + acoustic
+                                                ! (normal-mom
+                                                ! star pressure, energy pressure work), on a single consistent reconstructed L/R
+                                                ! state.
+                                                call s_acoustic_face_flux(pres_a, vel_a_arr(1), rho_a, c_a, pres_b, vel_b_arr(1), &
+                                                                          & rho_b, c_b, flmom, flE)
+                                                call s_convective_face_flux(num_fluids, nv, rhoYks_a, vel_a_arr, rho_a, c_a, &
+                                                                            & pres_a, E_a, rhoYks_b, vel_b_arr, rho_b, c_b, &
+                                                                            & pres_b, E_b, flux_cont, flux_mom_c, flux_E_c)
+
+                                                ! Centered face fluxes the forward sweep applies, from the same frozen snapshot
+                                                ! (q_snap),
+                                                ! pre-forward pressure and cell normal velocity u = mom_i/rho the sweep uses:
+                                                ! convective mass 0.5*(arho_j u_j + arho_{j+1} u_{j+1}), convective energy 0.5*(E_j
+                                                ! u_j +
+                                                ! E_{j+1} u_{j+1}), pressure work 0.5*(p_j u_j + p_{j+1} u_{j+1}). Each delta
+                                                ! replaces that
+                                                ! centered face flux with the live HLLC flux; smooth faces (zeroed in the FLAG PASS)
+                                                ! stay
+                                                ! bit-identical, and each delta is single-valued per face so mass and energy
+                                                ! telescope.
+                                                u_a = q_acoustic_vf(acou_u)%sf(j, k, l)
+                                                u_b = q_acoustic_vf(acou_u)%sf(j + joff, k + koff, l + loff)
+                                                se_face = 0.5_wp*(q_acoustic_vf(acou_p)%sf(j, k, &
+                                                                  & l)*u_a + q_acoustic_vf(acou_p)%sf(j + joff, k + koff, &
+                                                                  & l + loff)*u_b)
+                                                se_conv = 0.5_wp*(q_snap(j, k, l, esnap)*u_a + q_snap(j + joff, k + koff, &
+                                                                  & l + loff, esnap)*u_b)
+                                                flux_mom_rob(j, k, l, i) = flmom
+                                                dEflux(j, k, l, i) = (flux_E_c + flE) - (se_conv + se_face)
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do f = 1, num_fluids
+                                                    cm = 0.5_wp*(q_snap(j, k, l, f)*u_a + q_snap(j + joff, k + koff, l + loff, &
+                                                                 & f)*u_b)
+                                                    dmassflux(j, k, l, i, f) = flux_cont(f) - cm
+                                                end do
+
+                                                ! Live convective-momentum delta = live HLLC convective momentum flux (flux_mom_c)
+                                                ! MINUS the
+                                                ! frozen slow per-face flux frozen_conv_mom_face (populated by m_rhs from the slow
+                                                ! path's
+                                                ! flux_n(mom) at the RK stage state U^(s-1)), mapping the rotated live flux (slot 1
+                                                ! = face-normal
+                                                ! component i, slots 2..nv = transverse) back to the global velocity component.
+                                                ! Subtracting the
+                                                ! slow path's ACTUAL flux makes the frozen part cancel the convective momentum
+                                                ! carried by
+                                                ! rhs_slow_vf(mom) EXACTLY on every RK stage, so the net convective momentum is live
+                                                ! full HLLC.
+                                                dmomflux(j, k, l, i, i) = flux_mom_c(1) - frozen_conv_mom_face(j, k, l, i, i)
+                                                ic = 1
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do d = 1, num_dims
+                                                    if (d /= i) then
+                                                        ic = ic + 1
+                                                        dmomflux(j, k, l, i, d) = flux_mom_c(ic) - frozen_conv_mom_face(j, k, l, &
+                                                                 & i, d)
+                                                    end if
+                                                end do
+                                            end if
+                                        end do
+                                    end do
+                                end do
+                                $:END_GPU_PARALLEL_LOOP()
                             end do
-                            q_prim_vf(eqn_idx%E)%sf(j, k, l) = p_sf(j, k, l)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
+                        end if
 
-                do i = 1, num_dims
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-                    do l = idwbuff(3)%beg, idwbuff(3)%end
-                        do k = idwbuff(2)%beg, idwbuff(2)%end
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                q_acoustic_vf(acou_u)%sf(j, k, l) = q_cons_vf(momxb + i - 1)%sf(j, k, &
-                                              & l)/q_acoustic_vf(acou_rho)%sf(j, k, l)
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
+                        ! 2b. FORWARD: advance alpha_k*rho_k and rho*E by the centered divergence of
+                        !     (alpha_k*rho_k * u) and ((rho*E + p) * u), plus dtau*rhs_slow. Velocity u
+                        !     is held frozen (computed from the current momentum) for this forward sweep.
+                        inv_2dx = 0._wp; inv_2dy = 0._wp; inv_2dz = 0._wp
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho_n, div, inv_2dx, inv_2dy, inv_2dz, u_xp, &
+                                            & u_xm, u_yp, u_ym, u_zp, u_zm]')
+                        do l = idwint(3)%beg, idwint(3)%end
+                            do k = idwint(2)%beg, idwint(2)%end
+                                do j = idwint(1)%beg, idwint(1)%end
+                                    inv_2dx = 1._wp/(2._wp*dx(j))
 
-                    call s_reconstruct_boundary_values(q_prim_vf, qL_rs_vf, qR_rs_vf, i)
-
-                    joff = 0; koff = 0; loff = 0
-                    if (i == 1) then; joff = 1; else if (i == 2) then; koff = 1; else; loff = 1; end if
-                    fb_x = idwint(1)%beg; fb_y = idwint(2)%beg; fb_z = idwint(3)%beg
-                    if (i == 1) then; fb_x = idwint(1)%beg - 1; else if (i == 2) then; fb_y = idwint(2)%beg &
-                        & - 1; else; fb_z = idwint(3)%beg - 1; end if
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, d, ic, gam_a, pin_a, gam_b, pin_b, pres_a, rho_a, c_a, &
-                                        & pres_b, rho_b, c_b, qv_a, qv_b, ke_a, ke_b, E_a, E_b, flmom, flE, flux_E_c, se_face, &
-                                        & se_conv, u_a, u_b, cm, rhoYks_a, rhoYks_b, vel_a_arr, vel_b_arr, flux_cont, flux_mom_c]')
-                    do l = fb_z, idwint(3)%end
-                        do k = fb_y, idwint(2)%end
-                            do j = fb_x, idwint(1)%end
-                                if (acoustic_flag(j, k, l, i) == 1) then
-                                    ! Mixture stiffened-gas coefficients of the two cells straddling the face (frozen volume
-                                    ! fractions); sound speed and total-energy density rebuilt from the SAME EOS as the pressure
-                                    ! recompute: c^2 = (1/gamma + 1)(p + pi_inf/(gamma+1))/rho and
-                                    ! rho*E = gamma*p + pi_inf + qv + 0.5*rho*|u|^2.
-                                    gam_a = 0._wp; pin_a = 0._wp; gam_b = 0._wp; pin_b = 0._wp
+                                    ! Stencil-neighbour velocities u = mom/rho_mix, formed once per cell from the FROZEN snapshot
+                                    ! mixture density (sum_k alpha_k*rho_k) and reused by the mass and energy fluxes. Momentum is
+                                    ! untouched by the forward sweep, so mom == its frozen value; reading rho from the snapshot
+                                    ! makes u_j a single-valued function of the frozen state, which is what lets the flux telescope.
+                                    rho_n = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do f = 1, num_fluids
-                                        gam_a = gam_a + q_cons_vf(advb + f - 1)%sf(j, k, l)*gammas(f)
-                                        pin_a = pin_a + q_cons_vf(advb + f - 1)%sf(j, k, l)*pi_infs(f)
-                                        gam_b = gam_b + q_cons_vf(advb + f - 1)%sf(j + joff, k + koff, l + loff)*gammas(f)
-                                        pin_b = pin_b + q_cons_vf(advb + f - 1)%sf(j + joff, k + koff, l + loff)*pi_infs(f)
+                                        rho_n = rho_n + q_snap(j + 1, k, l, f)
                                     end do
-
-                                    ! Reconstructed L/R partial densities (qL/qR_rs_vf %cont slots) and the qv-coefficient sums.
-                                    rho_a = 0._wp; rho_b = 0._wp; qv_a = 0._wp; qv_b = 0._wp
+                                    u_xp = q_cons_vf(momxb)%sf(j + 1, k, l)/max(rho_n, sgm_eps)
+                                    rho_n = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do f = 1, num_fluids
-                                        rhoYks_a(f) = qL_rs_vf(j, k, l, contb + f - 1)
-                                        rhoYks_b(f) = qR_rs_vf(j + joff, k + koff, l + loff, contb + f - 1)
-                                        rho_a = rho_a + rhoYks_a(f); rho_b = rho_b + rhoYks_b(f)
-                                        qv_a = qv_a + rhoYks_a(f)*qvs(f); qv_b = qv_b + rhoYks_b(f)*qvs(f)
+                                        rho_n = rho_n + q_snap(j - 1, k, l, f)
                                     end do
-                                    rho_a = max(rho_a, sgm_eps); rho_b = max(rho_b, sgm_eps)
+                                    u_xm = q_cons_vf(momxb)%sf(j - 1, k, l)/max(rho_n, sgm_eps)
+                                    if (n > 0) then
+                                        rho_n = 0._wp
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do f = 1, num_fluids
+                                            rho_n = rho_n + q_snap(j, k + 1, l, f)
+                                        end do
+                                        u_yp = q_cons_vf(momxb + 1)%sf(j, k + 1, l)/max(rho_n, sgm_eps)
+                                        rho_n = 0._wp
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do f = 1, num_fluids
+                                            rho_n = rho_n + q_snap(j, k - 1, l, f)
+                                        end do
+                                        u_ym = q_cons_vf(momxb + 1)%sf(j, k - 1, l)/max(rho_n, sgm_eps)
+                                    end if
+                                    if (p > 0) then
+                                        rho_n = 0._wp
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do f = 1, num_fluids
+                                            rho_n = rho_n + q_snap(j, k, l + 1, f)
+                                        end do
+                                        u_zp = q_cons_vf(momxe)%sf(j, k, l + 1)/max(rho_n, sgm_eps)
+                                        rho_n = 0._wp
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do f = 1, num_fluids
+                                            rho_n = rho_n + q_snap(j, k, l - 1, f)
+                                        end do
+                                        u_zm = q_cons_vf(momxe)%sf(j, k, l - 1)/max(rho_n, sgm_eps)
+                                    end if
 
-                                    ! Velocity arrays with slot 1 = face-normal (component i), 2..nv = transverse (any order; only
-                                    ! flux_cont and flux_E -- which read slot 1 -- are consumed, but the full kinetic energy below
-                                    ! sums all components).
-                                    vel_a_arr(1) = qL_rs_vf(j, k, l, momxb + i - 1)
-                                    vel_b_arr(1) = qR_rs_vf(j + joff, k + koff, l + loff, momxb + i - 1)
-                                    ic = 1
+                                    ! Mass equations: d/dt(alpha_k*rho_k) = -div(alpha_k*rho_k * u) + slow.
+                                    ! Flux stencil reads the frozen snapshot; apply onto the live field from the frozen center
+                                    ! value.
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do f = 1, num_fluids
+                                        div = inv_2dx*(u_xp*q_snap(j + 1, k, l, f) - u_xm*q_snap(j - 1, k, l, f))
+                                        if (n > 0) then
+                                            inv_2dy = 1._wp/(2._wp*dy(k))
+                                            div = div + inv_2dy*(u_yp*q_snap(j, k + 1, l, f) - u_ym*q_snap(j, k - 1, l, f))
+                                        end if
+                                        if (p > 0) then
+                                            inv_2dz = 1._wp/(2._wp*dz(l))
+                                            div = div + inv_2dz*(u_zp*q_snap(j, k, l + 1, f) - u_zm*q_snap(j, k, l - 1, f))
+                                        end if
+                                        i = eqn_idx%cont%beg + f - 1
+                                        q_cons_vf(i)%sf(j, k, l) = q_snap(j, k, l, f) + dtau*(-div + rhs_slow_vf(i)%sf(j, k, l))
+                                    end do
+
+                                    ! Robust-tier mass correction: -dtau*div(dmassflux), where dmassflux(:,:,:,dir,f) = live HLLC
+                                    ! alpha*rho_k
+                                    ! face flux - centered convective mass flux at flagged faces and 0 at smooth faces. This swaps
+                                    ! the centered
+                                    ! convective alpha*rho_k transport just applied for the upwinded HLLC one (the slow mass flux is
+                                    ! zero, so
+                                    ! there is nothing else to subtract); the divergence is single-valued per face so species mass
+                                    ! stays
+                                    ! conserved, and at smooth faces it adds exactly zero -> the centered mass update is
+                                    ! bit-identical.
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do f = 1, num_fluids
+                                        i = eqn_idx%cont%beg + f - 1
+                                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, 1, &
+                                                  & f) - dmassflux(j - 1, k, l, 1, f))/dx(j)
+                                        if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, &
+                                            & 2, f) - dmassflux(j, k - 1, l, 2, f))/dy(k)
+                                        if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, &
+                                            & 3, f) - dmassflux(j, k, l - 1, 3, f))/dz(l)
+                                    end do
+
+                                    ! Total-energy equation: d/dt(rho*E) = -div((rho*E + p) * u) + slow. p_sf is the frozen
+                                    ! cell pressure (built from the same pre-sweep state as q_snap), so the energy flux is
+                                    ! consistent.
+                                    div = inv_2dx*((q_snap(j + 1, k, l, esnap) + p_sf(j + 1, k, l))*u_xp - (q_snap(j - 1, k, l, &
+                                                   & esnap) + p_sf(j - 1, k, l))*u_xm)
+                                    if (n > 0) then
+                                        inv_2dy = 1._wp/(2._wp*dy(k))
+                                        div = div + inv_2dy*((q_snap(j, k + 1, l, esnap) + p_sf(j, k + 1, l))*u_yp - (q_snap(j, &
+                                                             & k - 1, l, esnap) + p_sf(j, k - 1, l))*u_ym)
+                                    end if
+                                    if (p > 0) then
+                                        inv_2dz = 1._wp/(2._wp*dz(l))
+                                        div = div + inv_2dz*((q_snap(j, k, l + 1, esnap) + p_sf(j, k, l + 1))*u_zp - (q_snap(j, &
+                                                             & k, l - 1, esnap) + p_sf(j, k, l - 1))*u_zm)
+                                    end if
+                                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_snap(j, k, l, &
+                                              & esnap) + dtau*(-div + rhs_slow_vf(eqn_idx%E)%sf(j, k, l))
+
+                                    ! Robust-tier energy correction: -dtau*div(dEflux), where dEflux = full live HLLC energy flux
+                                    ! (convective
+                                    ! E*u
+                                    ! + acoustic pressure work) - full centered energy flux at flagged faces and 0 at smooth faces.
+                                    ! This swaps
+                                    ! BOTH the convective rho*E transport and the pressure work just applied (the slow energy flux
+                                    ! is zero) for
+                                    ! the upwinded HLLC energy flux; the divergence is single-valued per face (same value seen by
+                                    ! both adjacent
+                                    ! cells) so energy stays conserved, and at smooth faces it adds exactly zero -> bit-identical.
+                                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, l, &
+                                              & 1) - dEflux(j - 1, k, l, 1))/dx(j)
+                                    if (n > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
+                                        & l) - dtau*(dEflux(j, k, l, 2) - dEflux(j, k - 1, l, 2))/dy(k)
+                                    if (p > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, &
+                                        & l) - dtau*(dEflux(j, k, l, 3) - dEflux(j, k, l - 1, 3))/dz(l)
+
+                                    ! Volume fractions: pure slow (material) advection. The frozen slow forcing
+                                    ! rhs_slow_vf(%adv) already holds the contact-upwinded HLLC volume-fraction
+                                    ! flux, integrating to dt_stage*rhs_slow over the stage. The acoustic div(u)
+                                    ! coupling to alpha is O(M^2) and intentionally dropped in the low-Mach limit.
+                                    if (num_fluids > 1) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + dtau*rhs_slow_vf(i)%sf(j, k, l)
+                                        end do
+                                    end if
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+
+                        ! 3. Halo exchange + EOS on the UPDATED state, so the backward pressure gradient
+                        !    sees the freshly advanced mass and energy.
+                        call s_populate_variables_buffers(bc_type, q_cons_vf)
+
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho, gamma, pinf, qv, dyn_p]')
+                        do l = idwbuff(3)%beg, idwbuff(3)%end
+                            do k = idwbuff(2)%beg, idwbuff(2)%end
+                                do j = idwbuff(1)%beg, idwbuff(1)%end
+                                    rho = 0._wp; gamma = 0._wp; pinf = 0._wp; qv = 0._wp
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do f = 1, num_fluids
+                                        rho = rho + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                                        qv = qv + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)*qvs(f)
+                                        gamma = gamma + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*gammas(f)
+                                        pinf = pinf + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*pi_infs(f)
+                                    end do
+                                    rho = max(rho, sgm_eps)
+
+                                    dyn_p = 0._wp
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = momxb, momxe
+                                        dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
+                                    end do
+
+                                    p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+
+                        ! 4a. DIVERGENCE: build div_sf = centered div(rho*u) over the interior + one ghost
+                        !     layer. The momentum halo is current from the exchange above and was untouched
+                        !     by the forward sweep, so all neighbours are valid.
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, div, inv_2dx, inv_2dy, inv_2dz]')
+                        do l = db_z, de_z
+                            do k = db_y, de_y
+                                do j = db_x, de_x
+                                    inv_2dx = 1._wp/(2._wp*dx(j))
+                                    div = inv_2dx*(q_cons_vf(momxb)%sf(j + 1, k, l) - q_cons_vf(momxb)%sf(j - 1, k, l))
+                                    if (n > 0) then
+                                        inv_2dy = 1._wp/(2._wp*dy(k))
+                                        div = div + inv_2dy*(q_cons_vf(momxb + 1)%sf(j, k + 1, l) - q_cons_vf(momxb + 1)%sf(j, &
+                                                             & k - 1, l))
+                                    end if
+                                    if (p > 0) then
+                                        inv_2dz = 1._wp/(2._wp*dz(l))
+                                        div = div + inv_2dz*(q_cons_vf(momxe)%sf(j, k, l + 1) - q_cons_vf(momxe)%sf(j, k, l - 1))
+                                    end if
+                                    div_sf(j, k, l) = div
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+
+                        ! 4b. BACKWARD: advance rho*u by  -dtau*grad(p_new) + dtau*rhs_slow_mom
+                        !     + acoustic_div_damp*[Dx_i^2 * d/dx_i(div(rho*u))]   (grad-div divergence damping).
+                        !     The damping is the centered gradient of div_sf scaled by Dx_i^2 so that
+                        !     acoustic_div_damp is dimensionless; sharing the divergence stencil makes the
+                        !     operator annihilate divergence-free vortical modes exactly.
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, d, dpdx, damp, inv_2dx, inv_2dy, inv_2dz, flg_r, &
+                                            & flg_l, sm_r, sm_l, gd_r, gd_l, dfm_r, dfm_l]')
+                        do l = idwint(3)%beg, idwint(3)%end
+                            do k = idwint(2)%beg, idwint(2)%end
+                                do j = idwint(1)%beg, idwint(1)%end
+                                    inv_2dx = 1._wp/(2._wp*dx(j))
+
+                                    ! x-momentum
+                                    dpdx = inv_2dx*(p_sf(j + 1, k, l) - p_sf(j - 1, k, l))
+                                    damp = 0.5_wp*dx(j)*(div_sf(j + 1, k, l) - div_sf(j - 1, k, l))
+                                    q_cons_vf(momxb)%sf(j, k, l) = q_cons_vf(momxb)%sf(j, k, &
+                                              & l) + dtau*(-dpdx + rhs_slow_vf(momxb)%sf(j, k, l)) + acoustic_div_damp*damp
+
+                                    ! y-momentum
+                                    if (n > 0) then
+                                        inv_2dy = 1._wp/(2._wp*dy(k))
+                                        dpdx = inv_2dy*(p_sf(j, k + 1, l) - p_sf(j, k - 1, l))
+                                        damp = 0.5_wp*dy(k)*(div_sf(j, k + 1, l) - div_sf(j, k - 1, l))
+                                        q_cons_vf(momxb + 1)%sf(j, k, l) = q_cons_vf(momxb + 1)%sf(j, k, &
+                                                  & l) + dtau*(-dpdx + rhs_slow_vf(momxb + 1)%sf(j, k, l)) + acoustic_div_damp*damp
+                                    end if
+
+                                    ! z-momentum
+                                    if (p > 0) then
+                                        inv_2dz = 1._wp/(2._wp*dz(l))
+                                        dpdx = inv_2dz*(p_sf(j, k, l + 1) - p_sf(j, k, l - 1))
+                                        damp = 0.5_wp*dz(l)*(div_sf(j, k, l + 1) - div_sf(j, k, l - 1))
+                                        q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, &
+                                                  & l) + dtau*(-dpdx + rhs_slow_vf(momxe)%sf(j, k, l)) + acoustic_div_damp*damp
+                                    end if
+
+                                    ! Robust-tier normal-momentum correction. At a flagged face replace the centered acoustic
+                                    ! momentum flux
+                                    ! (dtau*p_centered minus the grad-div damping flux gd) by the HLLC star-pressure flux
+                                    ! dtau*flux_mom_rob and
+                                    ! drop the damping. Written as a single-valued face-flux delta dfm = flag*(dtau*flux_mom_rob -
+                                    ! dtau*p_avg +
+                                    ! gd):
+                                    ! the centered pressure gradient (Sm) and damping (gd) here are the exact face-flux equivalents
+                                    ! of the
+                                    ! centered backward sweep above (using the post-forward p_sf / div_sf it used), so subtracting
+                                    ! them removes
+                                    ! the centered contribution of that face and the -div(dfm) update stays momentum-conservative.
+                                    ! flag and
+                                    ! flux_mom_rob are zero at smooth faces, so this adds exactly zero there (centered tier
+                                    ! bit-identical).
+                                    flg_r = acoustic_flag(j, k, l, 1); flg_l = acoustic_flag(j - 1, k, l, 1)
+                                    sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j + 1, k, l)); sm_l = 0.5_wp*(p_sf(j - 1, k, l) + p_sf(j, &
+                                                   & k, l))
+                                    gd_r = acoustic_div_damp*0.5_wp*dx(j)*dx(j)*(div_sf(j, k, l) + div_sf(j + 1, k, l))
+                                    gd_l = acoustic_div_damp*0.5_wp*dx(j - 1)*dx(j - 1)*(div_sf(j - 1, k, l) + div_sf(j, k, l))
+                                    dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 1) - dtau*sm_r + gd_r)
+                                    dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j - 1, k, l, 1) - dtau*sm_l + gd_l)
+                                    q_cons_vf(momxb)%sf(j, k, l) = q_cons_vf(momxb)%sf(j, k, l) - (dfm_r - dfm_l)/dx(j)
+
+                                    if (n > 0) then
+                                        flg_r = acoustic_flag(j, k, l, 2); flg_l = acoustic_flag(j, k - 1, l, 2)
+                                        sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k + 1, l)); sm_l = 0.5_wp*(p_sf(j, k - 1, &
+                                                       & l) + p_sf(j, k, l))
+                                        gd_r = acoustic_div_damp*0.5_wp*dy(k)*dy(k)*(div_sf(j, k, l) + div_sf(j, k + 1, l))
+                                        gd_l = acoustic_div_damp*0.5_wp*dy(k - 1)*dy(k - 1)*(div_sf(j, k - 1, l) + div_sf(j, k, l))
+                                        dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 2) - dtau*sm_r + gd_r)
+                                        dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k - 1, l, 2) - dtau*sm_l + gd_l)
+                                        q_cons_vf(momxb + 1)%sf(j, k, l) = q_cons_vf(momxb + 1)%sf(j, k, l) - (dfm_r - dfm_l)/dy(k)
+                                    end if
+
+                                    if (p > 0) then
+                                        flg_r = acoustic_flag(j, k, l, 3); flg_l = acoustic_flag(j, k, l - 1, 3)
+                                        sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k, l + 1)); sm_l = 0.5_wp*(p_sf(j, k, &
+                                                       & l - 1) + p_sf(j, k, l))
+                                        gd_r = acoustic_div_damp*0.5_wp*dz(l)*dz(l)*(div_sf(j, k, l) + div_sf(j, k, l + 1))
+                                        gd_l = acoustic_div_damp*0.5_wp*dz(l - 1)*dz(l - 1)*(div_sf(j, k, l - 1) + div_sf(j, k, l))
+                                        dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 3) - dtau*sm_r + gd_r)
+                                        dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k, l - 1, 3) - dtau*sm_l + gd_l)
+                                        q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) - (dfm_r - dfm_l)/dz(l)
+                                    end if
+
+                                    ! Robust-tier convective-momentum correction: -dtau*div(dmomflux), where dmomflux(:,:,:,dir,d) =
+                                    ! live HLLC
+                                    ! convective momentum flux (normal + transverse) MINUS the frozen stage-entry HLLC convective
+                                    ! momentum flux
+                                    ! at flagged faces (0 at smooth faces). The frozen part cancels the convective momentum already
+                                    ! carried by
+                                    ! the frozen slow forcing rhs_slow_vf(mom), so the NET convective momentum becomes live full
+                                    ! HLLC while the
+                                    ! viscous/source momentum stays frozen-slow (correct). The divergence is single-valued per face
+                                    ! (cell j
+                                    ! right
+                                    ! face = cell j+1 left face) so momentum telescopes/conserves; at smooth faces it adds exactly
+                                    ! zero so the
+                                    ! centered tier (pressure gradient + grad-div damping) is left bit-identical.
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do d = 1, num_dims
-                                        if (d /= i) then
-                                            ic = ic + 1
-                                            vel_a_arr(ic) = qL_rs_vf(j, k, l, momxb + d - 1)
-                                            vel_b_arr(ic) = qR_rs_vf(j + joff, k + koff, l + loff, momxb + d - 1)
-                                        end if
+                                        i = momxb + d - 1
+                                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 1, &
+                                                  & d) - dmomflux(j - 1, k, l, 1, d))/dx(j)
+                                        if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, &
+                                            & 2, d) - dmomflux(j, k - 1, l, 2, d))/dy(k)
+                                        if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, &
+                                            & 3, d) - dmomflux(j, k, l - 1, 3, d))/dz(l)
                                     end do
-
-                                    pres_a = qL_rs_vf(j, k, l, eqn_idx%E)
-                                    pres_b = qR_rs_vf(j + joff, k + koff, l + loff, eqn_idx%E)
-                                    c_a = sqrt(max((1._wp/gam_a + 1._wp)*(pres_a + pin_a/(gam_a + 1._wp))/rho_a, sgm_eps))
-                                    c_b = sqrt(max((1._wp/gam_b + 1._wp)*(pres_b + pin_b/(gam_b + 1._wp))/rho_b, sgm_eps))
-                                    ke_a = 0._wp; ke_b = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do d = 1, nv
-                                        ke_a = ke_a + 0.5_wp*rho_a*vel_a_arr(d)*vel_a_arr(d)
-                                        ke_b = ke_b + 0.5_wp*rho_b*vel_b_arr(d)*vel_b_arr(d)
-                                    end do
-                                    E_a = gam_a*pres_a + pin_a + qv_a + ke_a
-                                    E_b = gam_b*pres_b + pin_b + qv_b + ke_b
-
-                                    ! Full live HLLC face flux = convective (mass alpha*rho_k*u, energy E*u) + acoustic (normal-mom
-                                    ! star pressure, energy pressure work), on a single consistent reconstructed L/R state.
-                                    call s_acoustic_face_flux(pres_a, vel_a_arr(1), rho_a, c_a, pres_b, vel_b_arr(1), rho_b, c_b, &
-                                                              & flmom, flE)
-                                    call s_convective_face_flux(num_fluids, nv, rhoYks_a, vel_a_arr, rho_a, c_a, pres_a, E_a, &
-                                                                & rhoYks_b, vel_b_arr, rho_b, c_b, pres_b, E_b, flux_cont, &
-                                                                & flux_mom_c, flux_E_c)
-
-                                    ! Centered face fluxes the forward sweep applies, from the same frozen snapshot (q_snap),
-                                    ! pre-forward pressure and cell normal velocity u = mom_i/rho the sweep uses:
-                                    ! convective mass 0.5*(arho_j u_j + arho_{j+1} u_{j+1}), convective energy 0.5*(E_j u_j +
-                                    ! E_{j+1} u_{j+1}), pressure work 0.5*(p_j u_j + p_{j+1} u_{j+1}). Each delta replaces that
-                                    ! centered face flux with the live HLLC flux; smooth faces (zeroed in the FLAG PASS) stay
-                                    ! bit-identical, and each delta is single-valued per face so mass and energy telescope.
-                                    u_a = q_acoustic_vf(acou_u)%sf(j, k, l)
-                                    u_b = q_acoustic_vf(acou_u)%sf(j + joff, k + koff, l + loff)
-                                    se_face = 0.5_wp*(q_acoustic_vf(acou_p)%sf(j, k, l)*u_a + q_acoustic_vf(acou_p)%sf(j + joff, &
-                                                      & k + koff, l + loff)*u_b)
-                                    se_conv = 0.5_wp*(q_snap(j, k, l, esnap)*u_a + q_snap(j + joff, k + koff, l + loff, esnap)*u_b)
-                                    flux_mom_rob(j, k, l, i) = flmom
-                                    dEflux(j, k, l, i) = (flux_E_c + flE) - (se_conv + se_face)
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do f = 1, num_fluids
-                                        cm = 0.5_wp*(q_snap(j, k, l, f)*u_a + q_snap(j + joff, k + koff, l + loff, f)*u_b)
-                                        dmassflux(j, k, l, i, f) = flux_cont(f) - cm
-                                    end do
-
-                                    ! Live convective-momentum delta = live HLLC convective momentum flux (flux_mom_c) MINUS the
-                                    ! frozen slow per-face flux frozen_conv_mom_face (populated by m_rhs from the slow path's
-                                    ! flux_n(mom) at the RK stage state U^(s-1)), mapping the rotated live flux (slot 1 = face-normal
-                                    ! component i, slots 2..nv = transverse) back to the global velocity component. Subtracting the
-                                    ! slow path's ACTUAL flux makes the frozen part cancel the convective momentum carried by
-                                    ! rhs_slow_vf(mom) EXACTLY on every RK stage, so the net convective momentum is live full HLLC.
-                                    dmomflux(j, k, l, i, i) = flux_mom_c(1) - frozen_conv_mom_face(j, k, l, i, i)
-                                    ic = 1
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do d = 1, num_dims
-                                        if (d /= i) then
-                                            ic = ic + 1
-                                            dmomflux(j, k, l, i, d) = flux_mom_c(ic) - frozen_conv_mom_face(j, k, l, i, d)
-                                        end if
-                                    end do
-                                end if
+                                end do
                             end do
                         end do
+                        $:END_GPU_PARALLEL_LOOP()
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end do
-            end if
 
-            ! 2b. FORWARD: advance alpha_k*rho_k and rho*E by the centered divergence of
-            !     (alpha_k*rho_k * u) and ((rho*E + p) * u), plus dtau*rhs_slow. Velocity u
-            !     is held frozen (computed from the current momentum) for this forward sweep.
-            inv_2dx = 0._wp; inv_2dy = 0._wp; inv_2dz = 0._wp
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho_n, div, inv_2dx, inv_2dy, inv_2dz, u_xp, u_xm, u_yp, &
-                                & u_ym, u_zp, u_zm]')
-            do l = idwint(3)%beg, idwint(3)%end
-                do k = idwint(2)%beg, idwint(2)%end
-                    do j = idwint(1)%beg, idwint(1)%end
-                        inv_2dx = 1._wp/(2._wp*dx(j))
+                end subroutine s_acoustic_substep
 
-                        ! Stencil-neighbour velocities u = mom/rho_mix, formed once per cell from the FROZEN snapshot
-                        ! mixture density (sum_k alpha_k*rho_k) and reused by the mass and energy fluxes. Momentum is
-                        ! untouched by the forward sweep, so mom == its frozen value; reading rho from the snapshot
-                        ! makes u_j a single-valued function of the frozen state, which is what lets the flux telescope.
-                        rho_n = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do f = 1, num_fluids
-                            rho_n = rho_n + q_snap(j + 1, k, l, f)
-                        end do
-                        u_xp = q_cons_vf(momxb)%sf(j + 1, k, l)/max(rho_n, sgm_eps)
-                        rho_n = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do f = 1, num_fluids
-                            rho_n = rho_n + q_snap(j - 1, k, l, f)
-                        end do
-                        u_xm = q_cons_vf(momxb)%sf(j - 1, k, l)/max(rho_n, sgm_eps)
-                        if (n > 0) then
-                            rho_n = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do f = 1, num_fluids
-                                rho_n = rho_n + q_snap(j, k + 1, l, f)
-                            end do
-                            u_yp = q_cons_vf(momxb + 1)%sf(j, k + 1, l)/max(rho_n, sgm_eps)
-                            rho_n = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do f = 1, num_fluids
-                                rho_n = rho_n + q_snap(j, k - 1, l, f)
-                            end do
-                            u_ym = q_cons_vf(momxb + 1)%sf(j, k - 1, l)/max(rho_n, sgm_eps)
-                        end if
-                        if (p > 0) then
-                            rho_n = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do f = 1, num_fluids
-                                rho_n = rho_n + q_snap(j, k, l + 1, f)
-                            end do
-                            u_zp = q_cons_vf(momxe)%sf(j, k, l + 1)/max(rho_n, sgm_eps)
-                            rho_n = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do f = 1, num_fluids
-                                rho_n = rho_n + q_snap(j, k, l - 1, f)
-                            end do
-                            u_zm = q_cons_vf(momxe)%sf(j, k, l - 1)/max(rho_n, sgm_eps)
-                        end if
+                !> WENO-reconstruct a primitive vector's L/R face states for one direction. Mirrors m_rhs's
+                !! s_reconstruct_cell_boundary_values: pick the per-direction reconstruction bounds (interior trimmed by weno_polyn
+                !! on the normal axis) and dispatch to s_weno (which reconstructs ubound(v_vf,1) variables). Used for both the
+                !! acoustic sub-vector and the full primitive vector.
+                !! @param v_vf      Primitive vector (acoustic sub-vector, or full state in m_rhs slot order).
+                !! @param vL/vR     Reconstructed left/right face states (slot index matches v_vf).
+                !! @param norm_dir  Reconstruction direction (1=x, 2=y, 3=z).
+                subroutine s_reconstruct_boundary_values(v_vf, vL, vR, norm_dir)
 
-                        ! Mass equations: d/dt(alpha_k*rho_k) = -div(alpha_k*rho_k * u) + slow.
-                        ! Flux stencil reads the frozen snapshot; apply onto the live field from the frozen center value.
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do f = 1, num_fluids
-                            div = inv_2dx*(u_xp*q_snap(j + 1, k, l, f) - u_xm*q_snap(j - 1, k, l, f))
-                            if (n > 0) then
-                                inv_2dy = 1._wp/(2._wp*dy(k))
-                                div = div + inv_2dy*(u_yp*q_snap(j, k + 1, l, f) - u_ym*q_snap(j, k - 1, l, f))
-                            end if
-                            if (p > 0) then
-                                inv_2dz = 1._wp/(2._wp*dz(l))
-                                div = div + inv_2dz*(u_zp*q_snap(j, k, l + 1, f) - u_zm*q_snap(j, k, l - 1, f))
-                            end if
-                            i = eqn_idx%cont%beg + f - 1
-                            q_cons_vf(i)%sf(j, k, l) = q_snap(j, k, l, f) + dtau*(-div + rhs_slow_vf(i)%sf(j, k, l))
-                        end do
+                    type(scalar_field), dimension(1:), intent(in)                                          :: v_vf
+                    real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL, vR
+                    integer, intent(in)                                                                    :: norm_dir
+                    type(int_bounds_info)                                                                  :: is1, is2, is3
+                    integer                                                                                :: recon_dir
 
-                        ! Robust-tier mass correction: -dtau*div(dmassflux), where dmassflux(:,:,:,dir,f) = live HLLC alpha*rho_k
-                        ! face flux - centered convective mass flux at flagged faces and 0 at smooth faces. This swaps the centered
-                        ! convective alpha*rho_k transport just applied for the upwinded HLLC one (the slow mass flux is zero, so
-                        ! there is nothing else to subtract); the divergence is single-valued per face so species mass stays
-                        ! conserved, and at smooth faces it adds exactly zero -> the centered mass update is bit-identical.
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do f = 1, num_fluids
-                            i = eqn_idx%cont%beg + f - 1
-                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, 1, &
-                                      & f) - dmassflux(j - 1, k, l, 1, f))/dx(j)
-                            if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, 2, &
-                                & f) - dmassflux(j, k - 1, l, 2, f))/dy(k)
-                            if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmassflux(j, k, l, 3, &
-                                & f) - dmassflux(j, k, l - 1, 3, f))/dz(l)
-                        end do
+                    if (norm_dir == 1) then
+                        is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3); recon_dir = 1
+                    else if (norm_dir == 2) then
+                        is1 = idwbuff(2); is2 = idwbuff(1); is3 = idwbuff(3); recon_dir = 2
+                    else
+                        is1 = idwbuff(3); is2 = idwbuff(2); is3 = idwbuff(1); recon_dir = 3
+                    end if
+                    is1%beg = is1%beg + weno_polyn; is1%end = is1%end - weno_polyn
 
-                        ! Total-energy equation: d/dt(rho*E) = -div((rho*E + p) * u) + slow. p_sf is the frozen
-                        ! cell pressure (built from the same pre-sweep state as q_snap), so the energy flux is consistent.
-                        div = inv_2dx*((q_snap(j + 1, k, l, esnap) + p_sf(j + 1, k, l))*u_xp - (q_snap(j - 1, k, l, &
-                                       & esnap) + p_sf(j - 1, k, l))*u_xm)
-                        if (n > 0) then
-                            inv_2dy = 1._wp/(2._wp*dy(k))
-                            div = div + inv_2dy*((q_snap(j, k + 1, l, esnap) + p_sf(j, k + 1, l))*u_yp - (q_snap(j, k - 1, l, &
-                                                 & esnap) + p_sf(j, k - 1, l))*u_ym)
-                        end if
-                        if (p > 0) then
-                            inv_2dz = 1._wp/(2._wp*dz(l))
-                            div = div + inv_2dz*((q_snap(j, k, l + 1, esnap) + p_sf(j, k, l + 1))*u_zp - (q_snap(j, k, l - 1, &
-                                                 & esnap) + p_sf(j, k, l - 1))*u_zm)
-                        end if
-                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_snap(j, k, l, esnap) + dtau*(-div + rhs_slow_vf(eqn_idx%E)%sf(j, k, l))
+                    call s_weno(v_vf, vL, vR, recon_dir, is1, is2, is3)
 
-                        ! Robust-tier energy correction: -dtau*div(dEflux), where dEflux = full live HLLC energy flux (convective
-                        ! E*u
-                        ! + acoustic pressure work) - full centered energy flux at flagged faces and 0 at smooth faces. This swaps
-                        ! BOTH the convective rho*E transport and the pressure work just applied (the slow energy flux is zero) for
-                        ! the upwinded HLLC energy flux; the divergence is single-valued per face (same value seen by both adjacent
-                        ! cells) so energy stays conserved, and at smooth faces it adds exactly zero -> bit-identical.
-                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, l, &
-                                  & 1) - dEflux(j - 1, k, l, 1))/dx(j)
-                        if (n > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, l, &
-                            & 2) - dEflux(j, k - 1, l, 2))/dy(k)
-                        if (p > 0) q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) - dtau*(dEflux(j, k, l, &
-                            & 3) - dEflux(j, k, l - 1, 3))/dz(l)
+                end subroutine s_reconstruct_boundary_values
 
-                        ! Volume fractions: pure slow (material) advection. The frozen slow forcing
-                        ! rhs_slow_vf(%adv) already holds the contact-upwinded HLLC volume-fraction
-                        ! flux, integrating to dt_stage*rhs_slow over the stage. The acoustic div(u)
-                        ! coupling to alpha is O(M^2) and intentionally dropped in the low-Mach limit.
-                        if (num_fluids > 1) then
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + dtau*rhs_slow_vf(i)%sf(j, k, l)
-                            end do
-                        end if
+                !> Deallocate scratch storage.
+                impure subroutine s_finalize_acoustic_substep_module
+
+                    integer :: i  !< Acoustic sub-vector slot iterator
+
+                    @:DEALLOCATE(p_sf)
+                    @:DEALLOCATE(div_sf)
+                    @:DEALLOCATE(q_snap)
+
+                    do i = 1, n_acoustic
+                        @:DEALLOCATE(q_acoustic_vf(i)%sf)
                     end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                    @:DEALLOCATE(q_acoustic_vf)
 
-            ! 3. Halo exchange + EOS on the UPDATED state, so the backward pressure gradient
-            !    sees the freshly advanced mass and energy.
-            call s_populate_variables_buffers(bc_type, q_cons_vf)
-
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho, gamma, pinf, qv, dyn_p]')
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        rho = 0._wp; gamma = 0._wp; pinf = 0._wp; qv = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do f = 1, num_fluids
-                            rho = rho + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
-                            qv = qv + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)*qvs(f)
-                            gamma = gamma + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*gammas(f)
-                            pinf = pinf + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*pi_infs(f)
-                        end do
-                        rho = max(rho, sgm_eps)
-
-                        dyn_p = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = momxb, momxe
-                            dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
-                        end do
-
-                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
+                    do i = 1, size(q_prim_vf)
+                        @:DEALLOCATE(q_prim_vf(i)%sf)
                     end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                    @:DEALLOCATE(q_prim_vf)
+                    @:DEALLOCATE(qL_rs_vf)
+                    @:DEALLOCATE(qR_rs_vf)
 
-            ! 4a. DIVERGENCE: build div_sf = centered div(rho*u) over the interior + one ghost
-            !     layer. The momentum halo is current from the exchange above and was untouched
-            !     by the forward sweep, so all neighbours are valid.
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, div, inv_2dx, inv_2dy, inv_2dz]')
-            do l = db_z, de_z
-                do k = db_y, de_y
-                    do j = db_x, de_x
-                        inv_2dx = 1._wp/(2._wp*dx(j))
-                        div = inv_2dx*(q_cons_vf(momxb)%sf(j + 1, k, l) - q_cons_vf(momxb)%sf(j - 1, k, l))
-                        if (n > 0) then
-                            inv_2dy = 1._wp/(2._wp*dy(k))
-                            div = div + inv_2dy*(q_cons_vf(momxb + 1)%sf(j, k + 1, l) - q_cons_vf(momxb + 1)%sf(j, k - 1, l))
-                        end if
-                        if (p > 0) then
-                            inv_2dz = 1._wp/(2._wp*dz(l))
-                            div = div + inv_2dz*(q_cons_vf(momxe)%sf(j, k, l + 1) - q_cons_vf(momxe)%sf(j, k, l - 1))
-                        end if
-                        div_sf(j, k, l) = div
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                    @:DEALLOCATE(acoustic_flag)
+                    @:DEALLOCATE(dEflux)
+                    @:DEALLOCATE(flux_mom_rob)
+                    @:DEALLOCATE(dmassflux)
+                    @:DEALLOCATE(frozen_conv_mom_face)
+                    @:DEALLOCATE(dmomflux)
 
-            ! 4b. BACKWARD: advance rho*u by  -dtau*grad(p_new) + dtau*rhs_slow_mom
-            !     + acoustic_div_damp*[Dx_i^2 * d/dx_i(div(rho*u))]   (grad-div divergence damping).
-            !     The damping is the centered gradient of div_sf scaled by Dx_i^2 so that
-            !     acoustic_div_damp is dimensionless; sharing the divergence stencil makes the
-            !     operator annihilate divergence-free vortical modes exactly.
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, d, dpdx, damp, inv_2dx, inv_2dy, inv_2dz, flg_r, flg_l, sm_r, &
-                                & sm_l, gd_r, gd_l, dfm_r, dfm_l]')
-            do l = idwint(3)%beg, idwint(3)%end
-                do k = idwint(2)%beg, idwint(2)%end
-                    do j = idwint(1)%beg, idwint(1)%end
-                        inv_2dx = 1._wp/(2._wp*dx(j))
+                end subroutine s_finalize_acoustic_substep_module
 
-                        ! x-momentum
-                        dpdx = inv_2dx*(p_sf(j + 1, k, l) - p_sf(j - 1, k, l))
-                        damp = 0.5_wp*dx(j)*(div_sf(j + 1, k, l) - div_sf(j - 1, k, l))
-                        q_cons_vf(momxb)%sf(j, k, l) = q_cons_vf(momxb)%sf(j, k, l) + dtau*(-dpdx + rhs_slow_vf(momxb)%sf(j, k, &
-                                  & l)) + acoustic_div_damp*damp
-
-                        ! y-momentum
-                        if (n > 0) then
-                            inv_2dy = 1._wp/(2._wp*dy(k))
-                            dpdx = inv_2dy*(p_sf(j, k + 1, l) - p_sf(j, k - 1, l))
-                            damp = 0.5_wp*dy(k)*(div_sf(j, k + 1, l) - div_sf(j, k - 1, l))
-                            q_cons_vf(momxb + 1)%sf(j, k, l) = q_cons_vf(momxb + 1)%sf(j, k, &
-                                      & l) + dtau*(-dpdx + rhs_slow_vf(momxb + 1)%sf(j, k, l)) + acoustic_div_damp*damp
-                        end if
-
-                        ! z-momentum
-                        if (p > 0) then
-                            inv_2dz = 1._wp/(2._wp*dz(l))
-                            dpdx = inv_2dz*(p_sf(j, k, l + 1) - p_sf(j, k, l - 1))
-                            damp = 0.5_wp*dz(l)*(div_sf(j, k, l + 1) - div_sf(j, k, l - 1))
-                            q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) + dtau*(-dpdx + rhs_slow_vf(momxe)%sf(j, &
-                                      & k, l)) + acoustic_div_damp*damp
-                        end if
-
-                        ! Robust-tier normal-momentum correction. At a flagged face replace the centered acoustic momentum flux
-                        ! (dtau*p_centered minus the grad-div damping flux gd) by the HLLC star-pressure flux dtau*flux_mom_rob and
-                        ! drop the damping. Written as a single-valued face-flux delta dfm = flag*(dtau*flux_mom_rob - dtau*p_avg +
-                        ! gd):
-                        ! the centered pressure gradient (Sm) and damping (gd) here are the exact face-flux equivalents of the
-                        ! centered backward sweep above (using the post-forward p_sf / div_sf it used), so subtracting them removes
-                        ! the centered contribution of that face and the -div(dfm) update stays momentum-conservative. flag and
-                        ! flux_mom_rob are zero at smooth faces, so this adds exactly zero there (centered tier bit-identical).
-                        flg_r = acoustic_flag(j, k, l, 1); flg_l = acoustic_flag(j - 1, k, l, 1)
-                        sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j + 1, k, l)); sm_l = 0.5_wp*(p_sf(j - 1, k, l) + p_sf(j, k, l))
-                        gd_r = acoustic_div_damp*0.5_wp*dx(j)*dx(j)*(div_sf(j, k, l) + div_sf(j + 1, k, l))
-                        gd_l = acoustic_div_damp*0.5_wp*dx(j - 1)*dx(j - 1)*(div_sf(j - 1, k, l) + div_sf(j, k, l))
-                        dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 1) - dtau*sm_r + gd_r)
-                        dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j - 1, k, l, 1) - dtau*sm_l + gd_l)
-                        q_cons_vf(momxb)%sf(j, k, l) = q_cons_vf(momxb)%sf(j, k, l) - (dfm_r - dfm_l)/dx(j)
-
-                        if (n > 0) then
-                            flg_r = acoustic_flag(j, k, l, 2); flg_l = acoustic_flag(j, k - 1, l, 2)
-                            sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k + 1, l)); sm_l = 0.5_wp*(p_sf(j, k - 1, l) + p_sf(j, k, l))
-                            gd_r = acoustic_div_damp*0.5_wp*dy(k)*dy(k)*(div_sf(j, k, l) + div_sf(j, k + 1, l))
-                            gd_l = acoustic_div_damp*0.5_wp*dy(k - 1)*dy(k - 1)*(div_sf(j, k - 1, l) + div_sf(j, k, l))
-                            dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 2) - dtau*sm_r + gd_r)
-                            dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k - 1, l, 2) - dtau*sm_l + gd_l)
-                            q_cons_vf(momxb + 1)%sf(j, k, l) = q_cons_vf(momxb + 1)%sf(j, k, l) - (dfm_r - dfm_l)/dy(k)
-                        end if
-
-                        if (p > 0) then
-                            flg_r = acoustic_flag(j, k, l, 3); flg_l = acoustic_flag(j, k, l - 1, 3)
-                            sm_r = 0.5_wp*(p_sf(j, k, l) + p_sf(j, k, l + 1)); sm_l = 0.5_wp*(p_sf(j, k, l - 1) + p_sf(j, k, l))
-                            gd_r = acoustic_div_damp*0.5_wp*dz(l)*dz(l)*(div_sf(j, k, l) + div_sf(j, k, l + 1))
-                            gd_l = acoustic_div_damp*0.5_wp*dz(l - 1)*dz(l - 1)*(div_sf(j, k, l - 1) + div_sf(j, k, l))
-                            dfm_r = real(flg_r, wp)*(dtau*flux_mom_rob(j, k, l, 3) - dtau*sm_r + gd_r)
-                            dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k, l - 1, 3) - dtau*sm_l + gd_l)
-                            q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) - (dfm_r - dfm_l)/dz(l)
-                        end if
-
-                        ! Robust-tier convective-momentum correction: -dtau*div(dmomflux), where dmomflux(:,:,:,dir,d) = live HLLC
-                        ! convective momentum flux (normal + transverse) MINUS the frozen stage-entry HLLC convective momentum flux
-                        ! at flagged faces (0 at smooth faces). The frozen part cancels the convective momentum already carried by
-                        ! the frozen slow forcing rhs_slow_vf(mom), so the NET convective momentum becomes live full HLLC while the
-                        ! viscous/source momentum stays frozen-slow (correct). The divergence is single-valued per face (cell j
-                        ! right
-                        ! face = cell j+1 left face) so momentum telescopes/conserves; at smooth faces it adds exactly zero so the
-                        ! centered tier (pressure gradient + grad-div damping) is left bit-identical.
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do d = 1, num_dims
-                            i = momxb + d - 1
-                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 1, d) - dmomflux(j - 1, &
-                                      & k, l, 1, d))/dx(j)
-                            if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 2, &
-                                & d) - dmomflux(j, k - 1, l, 2, d))/dy(k)
-                            if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 3, &
-                                & d) - dmomflux(j, k, l - 1, 3, d))/dz(l)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end do
-
-    end subroutine s_acoustic_substep
-
-    !> WENO-reconstruct a primitive vector's L/R face states for one direction. Mirrors m_rhs's s_reconstruct_cell_boundary_values:
-    !! pick the per-direction reconstruction bounds (interior trimmed by weno_polyn on the normal axis) and dispatch to s_weno
-    !! (which reconstructs ubound(v_vf,1) variables). Used for both the acoustic sub-vector and the full primitive vector.
-    !! @param v_vf      Primitive vector (acoustic sub-vector, or full state in m_rhs slot order).
-    !! @param vL/vR     Reconstructed left/right face states (slot index matches v_vf).
-    !! @param norm_dir  Reconstruction direction (1=x, 2=y, 3=z).
-    subroutine s_reconstruct_boundary_values(v_vf, vL, vR, norm_dir)
-
-        type(scalar_field), dimension(1:), intent(in)                                          :: v_vf
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL, vR
-        integer, intent(in)                                                                    :: norm_dir
-        type(int_bounds_info)                                                                  :: is1, is2, is3
-        integer                                                                                :: recon_dir
-
-        if (norm_dir == 1) then
-            is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3); recon_dir = 1
-        else if (norm_dir == 2) then
-            is1 = idwbuff(2); is2 = idwbuff(1); is3 = idwbuff(3); recon_dir = 2
-        else
-            is1 = idwbuff(3); is2 = idwbuff(2); is3 = idwbuff(1); recon_dir = 3
-        end if
-        is1%beg = is1%beg + weno_polyn; is1%end = is1%end - weno_polyn
-
-        call s_weno(v_vf, vL, vR, recon_dir, is1, is2, is3)
-
-    end subroutine s_reconstruct_boundary_values
-
-    !> Deallocate scratch storage.
-    impure subroutine s_finalize_acoustic_substep_module
-
-        integer :: i  !< Acoustic sub-vector slot iterator
-
-        @:DEALLOCATE(p_sf)
-        @:DEALLOCATE(div_sf)
-        @:DEALLOCATE(q_snap)
-
-        do i = 1, n_acoustic
-            @:DEALLOCATE(q_acoustic_vf(i)%sf)
-        end do
-        @:DEALLOCATE(q_acoustic_vf)
-
-        do i = 1, size(q_prim_vf)
-            @:DEALLOCATE(q_prim_vf(i)%sf)
-        end do
-        @:DEALLOCATE(q_prim_vf)
-        @:DEALLOCATE(qL_rs_vf)
-        @:DEALLOCATE(qR_rs_vf)
-
-        @:DEALLOCATE(acoustic_flag)
-        @:DEALLOCATE(dEflux)
-        @:DEALLOCATE(flux_mom_rob)
-        @:DEALLOCATE(dmassflux)
-        @:DEALLOCATE(frozen_conv_mom_face)
-        @:DEALLOCATE(dmomflux)
-
-    end subroutine s_finalize_acoustic_substep_module
-
-end module m_acoustic_substep
+            end module m_acoustic_substep
