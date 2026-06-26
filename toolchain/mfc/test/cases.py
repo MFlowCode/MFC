@@ -2230,6 +2230,105 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # 3D flagged-face (robust-tier) golden: a tiny periodic Sod shock with transverse
+        # shear in BOTH y and z. The x-normal driver launches a right-running shock that
+        # fires the discontinuity criterion, and the transverse velocities (vel(2), vel(3))
+        # JUMP across the interface so BOTH off-normal momentum slots (rho*u*v and rho*u*w)
+        # of the live HLLC flux are transported at every flagged x-face -- the genuine 3D
+        # path (a 2D x-face has only one transverse slot). Periodic in all dirs ->
+        # deterministic, no outflow smooth-tier instability. See
+        # examples/3D_shock_periodic_lowmach for the full-resolution validation.
+        c0_3 = _math.sqrt(gamma)
+        Mach_3 = 0.4
+        u0_3 = Mach_3 * c0_3  # background mean flow bounds the advective CFL
+        v0_3 = 0.15 * c0_3  # transverse shear in y (jumps across the interface)
+        w0_3 = 0.10 * c0_3  # transverse shear in z (jumps across the interface)
+        # WENO5 requires (dim+1) >= num_stcls_min*weno_order = 25 cells per dimension, so
+        # 24x24x24 (25^3) is the smallest valid cubic grid (matches the 3D direction tests).
+        Nx_3 = Ny_3 = Nz_3 = 24
+        dx_3 = 1.0 / (Nx_3 + 1)
+        CFL_3 = 0.4
+        umag_3 = _math.sqrt(u0_3**2 + v0_3**2 + w0_3**2)
+        dt_3 = CFL_3 * dx_3 / (umag_3 + _math.sqrt(gamma * 1.0 / 1.0))
+
+        stack.push(
+            "3D -> Acoustic Substepping Shock",
+            {
+                "m": Nx_3,
+                "n": Ny_3,
+                "p": Nz_3,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "z_domain%beg": 0.0,
+                "z_domain%end": 1.0,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -1,
+                "bc_y%end": -1,
+                "bc_z%beg": -1,
+                "bc_z%end": -1,
+                "dt": dt_3,
+                "cfl_adap_dt": "T",
+                "cfl_target": CFL_3,
+                "n_start": 0,
+                "t_stop": 0.02,
+                "t_save": 0.02,
+                "num_patches": 2,
+                "model_eqns": 2,
+                "num_fluids": 1,
+                "alt_soundspeed": "F",
+                "mpp_lim": "F",
+                "mixture_err": "F",
+                "time_stepper": 3,
+                "weno_order": 5,
+                "weno_eps": 1.0e-16,
+                "mapped_weno": "F",
+                "null_weights": "F",
+                "mp_weno": "F",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "acoustic_substepping": "T",
+                "n_acoustic_substeps": 0,
+                "acoustic_div_damp": 0.1,
+                # Patch 1: ambient filling the domain (transverse velocities v0, w0)
+                "patch_icpp(1)%geometry": 9,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%z_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 2.0,
+                "patch_icpp(1)%length_z": 2.0,
+                "patch_icpp(1)%vel(1)": u0_3,
+                "patch_icpp(1)%vel(2)": v0_3,
+                "patch_icpp(1)%vel(3)": w0_3,
+                "patch_icpp(1)%pres": 0.1,
+                "patch_icpp(1)%alpha_rho(1)": 0.125,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # Patch 2: high-pressure driver -> right-running shock; transverse shear flips
+                "patch_icpp(2)%geometry": 9,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%x_centroid": 0.25,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%z_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.2,
+                "patch_icpp(2)%length_y": 2.0,
+                "patch_icpp(2)%length_z": 2.0,
+                "patch_icpp(2)%vel(1)": u0_3,
+                "patch_icpp(2)%vel(2)": -v0_3,
+                "patch_icpp(2)%vel(3)": -w0_3,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+                "fluid_pp(1)%pi_inf": 0.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     acoustic_substepping_cases()
 
     def direction_symmetry_tests():
