@@ -1740,4 +1740,86 @@ contains
 
     end subroutine s_acoustic_face_flux
 
+    !> Convective part of the general 5eq HLLC flux at a single face, for the split-explicit low-Mach (acoustic_substepping) robust
+    !! tier. Returns exactly the contact-speed-advected terms that complement s_acoustic_face_flux: the upwinded mass transport
+    !! (alpha*rho_k*u for each fluid), the convective momentum transport (rho*u*u with the contact-speed dissipation, both normal
+    !! and transverse), and the convective energy transport (E*u with the contact-speed star term). It contains no pressure/acoustic
+    !! work and no (u+-c) acoustic dissipation -- those are in s_acoustic_face_flux. By construction s_convective_face_flux +
+    !! s_acoustic_face_flux reproduces the full non-split HLLC physical flux on the GIVEN (live) L/R state. Device-callable and
+    !! fully self-contained: every input is a scalar or a fixed-shape array passed by value (no module-level state), so flagged
+    !! faces can assemble the full HLLC flux from inside the acoustic substep on host or device. Array layout: velocity index 1 is
+    !! the face-normal component (2,3 transverse); fluid index runs 1..nf over the continuity equations; flux_mom is returned in the
+    !! same component order as the velocities.
+    !! @param nf       Number of fluids / continuity equations (length of the partial-density and continuity-flux arrays)
+    !! @param nv       Number of velocity components (length of the velocity and momentum-flux arrays)
+    !! @param rhoYks_L Left-state partial densities alpha*rho_k (one per fluid)
+    !! @param vel_L    Left-state velocity components (index 1 = face-normal)
+    !! @param rho_L    Left-state mixture density
+    !! @param c_L      Left-state sound speed
+    !! @param pres_L   Left-state pressure (used only for the wave-speed estimates, not transported here)
+    !! @param E_L      Left-state total energy density
+    !! @param rhoYks_R Right-state partial densities alpha*rho_k (one per fluid)
+    !! @param vel_R    Right-state velocity components (index 1 = face-normal)
+    !! @param rho_R    Right-state mixture density
+    !! @param c_R      Right-state sound speed
+    !! @param pres_R   Right-state pressure (used only for the wave-speed estimates, not transported here)
+    !! @param E_R      Right-state total energy density
+    !! @param flux_cont Convective continuity flux, one per fluid (contact-upwinded alpha*rho_k*u)
+    !! @param flux_mom  Convective momentum flux per component (rho*u*u with contact dissipation, no pressure)
+    !! @param flux_E    Convective total-energy flux (E*u with the contact-speed star term, no pressure work)
+    pure subroutine s_convective_face_flux(nf, nv, rhoYks_L, vel_L, rho_L, c_L, pres_L, E_L, rhoYks_R, vel_R, rho_R, c_R, pres_R, &
+                                           & E_R, flux_cont, flux_mom, flux_E)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in)                  :: nf, nv
+        real(wp), dimension(nf), intent(in)  :: rhoYks_L, rhoYks_R
+        real(wp), dimension(nv), intent(in)  :: vel_L, vel_R
+        real(wp), intent(in)                 :: rho_L, c_L, pres_L, E_L
+        real(wp), intent(in)                 :: rho_R, c_R, pres_R, E_R
+        real(wp), dimension(nf), intent(out) :: flux_cont
+        real(wp), dimension(nv), intent(out) :: flux_mom
+        real(wp), intent(out)                :: flux_E
+        real(wp)                             :: s_L, s_R, s_M, s_P, s_S
+        real(wp)                             :: xi_L, xi_R, xi_L_m1, xi_R_m1, xi_M, xi_P
+        integer                              :: i
+
+        ! Direct (Davis/Einfeldt) acoustic wave speeds and contact speed; mirrors wave_speeds_direct in
+        ! s_hllc_riemann_solver restricted to the face-normal state (velocity index 1).
+        s_L = min(vel_L(1) - c_L, vel_R(1) - c_R)
+        s_R = max(vel_R(1) + c_R, vel_L(1) + c_L)
+        s_S = (pres_R - pres_L + rho_L*vel_L(1)*(s_L - vel_L(1)) - rho_R*vel_R(1)*(s_R - vel_R(1)))/(rho_L*(s_L - vel_L(1)) &
+               & - rho_R*(s_R - vel_R(1)))
+
+        ! Einfeldt s_M/s_P = min/max(0, s_L/R); contact-upwind xi factors without cancellation.
+        s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+        xi_L = (s_L - vel_L(1))/min(s_L - s_S, -sgm_eps)
+        xi_R = (s_R - vel_R(1))/max(s_R - s_S, sgm_eps)
+        xi_L_m1 = (s_S - vel_L(1))/min(s_L - s_S, -sgm_eps)
+        xi_R_m1 = (s_S - vel_R(1))/max(s_R - s_S, sgm_eps)
+        xi_M = 5.e-1_wp + sign(5.e-1_wp, s_S)
+        xi_P = 5.e-1_wp - sign(5.e-1_wp, s_S)
+
+        ! MASS: contact-upwinded partial-density advection alpha*rho_k*u (full HLLC mass flux; the acoustic
+        ! part carries no mass transport).
+        do i = 1, nf
+            flux_cont(i) = xi_M*rhoYks_L(i)*(vel_L(1) + s_M*xi_L_m1) + xi_P*rhoYks_R(i)*(vel_R(1) + s_P*xi_R_m1)
+        end do
+
+        ! MOMENTUM: convective rho*u*u transport with the contact-speed dissipation, no pressure term. Equals the
+        ! full HLLC momentum flux minus the star-pressure carried by s_acoustic_face_flux. Component 1 (normal)
+        ! keeps only rho*u*u (its s_M*s_L dissipation went to the acoustic part); transverse components keep the
+        ! rho*u*v advection plus their s_M*v*xi_m1 contact dissipation.
+        flux_mom(1) = xi_M*rho_L*vel_L(1)*vel_L(1) + xi_P*rho_R*vel_R(1)*vel_R(1)
+        do i = 2, nv
+            flux_mom(i) = xi_M*rho_L*(vel_L(1)*vel_L(i) + s_M*vel_L(i)*xi_L_m1) + xi_P*rho_R*(vel_R(1)*vel_R(i) + s_P*vel_R(i) &
+                     & *xi_R_m1)
+        end do
+
+        ! ENERGY: convective E*u transport with the contact-speed star term, no pressure work. Equals the full HLLC
+        ! energy flux minus the pressure work carried by s_acoustic_face_flux, using xi*(s_S-vel)/(s-vel) == xi_m1.
+        flux_E = xi_M*(vel_L(1)*E_L + s_M*(E_L*xi_L_m1 + xi_L*(s_S - vel_L(1))*rho_L*s_S)) + xi_P*(vel_R(1)*E_R &
+                       & + s_P*(E_R*xi_R_m1 + xi_R*(s_S - vel_R(1))*rho_R*s_S))
+
+    end subroutine s_convective_face_flux
+
 end module m_riemann_solver_hllc

@@ -20,7 +20,8 @@ module m_riemann_solvers
     implicit none
 
     private; public :: s_initialize_riemann_solvers_module, s_riemann_solver, s_hll_riemann_solver, s_hllc_riemann_solver, &
-        & s_hlld_riemann_solver, s_lf_riemann_solver, s_acoustic_face_flux, s_finalize_riemann_solvers_module
+        & s_hlld_riemann_solver, s_lf_riemann_solver, s_acoustic_face_flux, s_convective_face_flux, &
+        & s_finalize_riemann_solvers_module
 
 contains
 
