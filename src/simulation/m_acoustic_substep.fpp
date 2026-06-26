@@ -48,6 +48,7 @@ module m_acoustic_substep
     use m_mpi_proxy
     use m_variables_conversion
     use m_boundary_common
+    use m_weno, only: s_weno
 
     implicit none
 
@@ -70,15 +71,44 @@ module m_acoustic_substep
     real(wp), allocatable, dimension(:,:,:,:) :: q_snap
     $:GPU_DECLARE(create='[q_snap]')
 
+    !> Primitive acoustic sub-vector reconstructed at faces: slot 1 = pressure, slot 2 = direction-normal velocity, slot 3 = mixture
+    !! density. These are exactly what the flagged-face acoustic flux consumes (sound speed is derived from p and rho, not
+    !! reconstructed separately).
+    integer, parameter :: n_acoustic = 3
+    integer, parameter :: acou_p = 1, acou_u = 2, acou_rho = 3
+
+    !> Primitive acoustic sub-vector over the buffered domain, rebuilt each microstep as the WENO reconstruction input (pressure and
+    !! density once, normal velocity refreshed per direction).
+    type(scalar_field), allocatable, dimension(:) :: q_acoustic_vf
+    $:GPU_DECLARE(create='[q_acoustic_vf]')
+
+    !> WENO-reconstructed left/right acoustic face states (slots: pressure, normal velocity, mixture density), reused per direction;
+    !! the reconstructed states feed the flagged-face acoustic flux (A4).
+    real(wp), allocatable, dimension(:,:,:,:) :: acL_rs_vf, acR_rs_vf
+    $:GPU_DECLARE(create='[acL_rs_vf, acR_rs_vf]')
+
 contains
 
     !> Allocate scratch storage for the acoustic substep kernel.
     impure subroutine s_initialize_acoustic_substep_module
 
+        integer :: i  !< Acoustic sub-vector slot iterator
+
         @:ALLOCATE(p_sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ALLOCATE(div_sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ALLOCATE(q_snap(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
                    & 1:num_fluids + 1))
+
+        @:ALLOCATE(q_acoustic_vf(1:n_acoustic))
+        do i = 1, n_acoustic
+            @:ALLOCATE(q_acoustic_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_acoustic_vf(i))
+        end do
+        @:ALLOCATE(acL_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
+                   & 1:n_acoustic))
+        @:ALLOCATE(acR_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
+                   & 1:n_acoustic))
 
     end subroutine s_initialize_acoustic_substep_module
 
@@ -306,6 +336,43 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
+            ! 3b. Two-tier acoustic reconstruction: build the primitive acoustic sub-vector (pressure,
+            !     direction-normal velocity, mixture density) over the buffered domain and WENO-reconstruct
+            !     its L/R face states per direction. p_sf and the conserved-field halos are valid here.
+            !     Pressure and density are direction-independent (filled once); the normal velocity is
+            !     refreshed before each directional reconstruction. The reconstructed states are wired but
+            !     not yet consumed by the flux (A4) -- so this leaves the smooth/unflagged answer unchanged.
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, rho]')
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                        rho = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do f = 1, num_fluids
+                            rho = rho + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                        end do
+                        q_acoustic_vf(acou_p)%sf(j, k, l) = p_sf(j, k, l)
+                        q_acoustic_vf(acou_rho)%sf(j, k, l) = max(rho, sgm_eps)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            do i = 1, num_dims
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            q_acoustic_vf(acou_u)%sf(j, k, l) = q_cons_vf(momxb + i - 1)%sf(j, k, &
+                                          & l)/q_acoustic_vf(acou_rho)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+
+                call s_reconstruct_acoustic_boundary_values(q_acoustic_vf, acL_rs_vf, acR_rs_vf, i)
+            end do
+
             ! 4a. DIVERGENCE: build div_sf = centered div(rho*u) over the interior + one ghost
             !     layer. The momentum halo is current from the exchange above and was untouched
             !     by the forward sweep, so all neighbours are valid.
@@ -371,12 +438,48 @@ contains
 
     end subroutine s_acoustic_substep
 
+    !> WENO-reconstruct the acoustic sub-vector's L/R face states for one direction. Mirrors m_rhs's
+    !! s_reconstruct_cell_boundary_values: pick the per-direction reconstruction bounds (interior trimmed by weno_polyn on the
+    !! normal axis) and dispatch to s_weno.
+    !! @param v_vf      Primitive acoustic sub-vector (pressure, normal velocity, mixture density).
+    !! @param vL/vR     Reconstructed left/right face states (slot index matches v_vf).
+    !! @param norm_dir  Reconstruction direction (1=x, 2=y, 3=z).
+    subroutine s_reconstruct_acoustic_boundary_values(v_vf, vL, vR, norm_dir)
+
+        type(scalar_field), dimension(1:n_acoustic), intent(in)                                :: v_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL, vR
+        integer, intent(in)                                                                    :: norm_dir
+        type(int_bounds_info)                                                                  :: is1, is2, is3
+        integer                                                                                :: recon_dir
+
+        if (norm_dir == 1) then
+            is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3); recon_dir = 1
+        else if (norm_dir == 2) then
+            is1 = idwbuff(2); is2 = idwbuff(1); is3 = idwbuff(3); recon_dir = 2
+        else
+            is1 = idwbuff(3); is2 = idwbuff(2); is3 = idwbuff(1); recon_dir = 3
+        end if
+        is1%beg = is1%beg + weno_polyn; is1%end = is1%end - weno_polyn
+
+        call s_weno(v_vf, vL, vR, recon_dir, is1, is2, is3)
+
+    end subroutine s_reconstruct_acoustic_boundary_values
+
     !> Deallocate scratch storage.
     impure subroutine s_finalize_acoustic_substep_module
+
+        integer :: i  !< Acoustic sub-vector slot iterator
 
         @:DEALLOCATE(p_sf)
         @:DEALLOCATE(div_sf)
         @:DEALLOCATE(q_snap)
+
+        do i = 1, n_acoustic
+            @:DEALLOCATE(q_acoustic_vf(i)%sf)
+        end do
+        @:DEALLOCATE(q_acoustic_vf)
+        @:DEALLOCATE(acL_rs_vf)
+        @:DEALLOCATE(acR_rs_vf)
 
     end subroutine s_finalize_acoustic_substep_module
 
