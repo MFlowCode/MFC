@@ -87,6 +87,25 @@ module m_acoustic_substep
     real(wp), allocatable, dimension(:,:,:,:) :: acL_rs_vf, acR_rs_vf
     $:GPU_DECLARE(create='[acL_rs_vf, acR_rs_vf]')
 
+    !> Per-face discontinuity mask (1 = flagged -> robust WENO+HLLC-acoustic tier, 0 = smooth -> cheap centered tier), last index =
+    !! face-normal direction (1=x, 2=y, 3=z), addressed at cell (j,k,l) for the face between (j,k,l) and its +dir neighbour. Produced
+    !! here (A3) and consumed by the flux tier selection (A4); integer is the cheapest GPU-portable form of a per-face boolean.
+    integer, allocatable, dimension(:,:,:,:) :: acoustic_flag
+    $:GPU_DECLARE(create='[acoustic_flag]')
+
+    !> Dimensionless smoothness factor for the WENO-indicator face test (no physical scale). The WENO smoothness indicators are
+    !! squared cell differences; a face is flagged when its across-face indicator (p_{j+1}-p_j)^2 exceeds the larger neighbour
+    !! indicator by more than this factor -- i.e. the gradient across the face is more than twice the steepest neighbouring
+    !! gradient, which a smooth resolved field cannot produce (slopes vary slowly) but a discontinuity does by orders of magnitude.
+    !! 2 is the natural dyadic relative factor and matches the beta-ratio scale at which WENO's nonlinear weights begin to
+    !! discriminate stencils; it sits in the wide gap above the worst smooth value measured (~1.05) and far below any discontinuity.
+    real(wp), parameter :: weno_smooth_factor = 2._wp
+
+    !> Volume-fraction jump tolerance flagging a material interface. alpha in [0,1] is dimensionless, so this is a pure jump in a
+    !! [0,1] field: far above roundoff, far below any real interface jump (O(0.1-1)). For num_fluids==1 alpha==1 everywhere, so the
+    !! jump is ~0 and this flag stays false.
+    real(wp), parameter :: eps_alpha = 1.e-6_wp
+
 contains
 
     !> Allocate scratch storage for the acoustic substep kernel.
@@ -109,6 +128,8 @@ contains
                    & 1:n_acoustic))
         @:ALLOCATE(acR_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
                    & 1:n_acoustic))
+        @:ALLOCATE(acoustic_flag(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
+                   & 1:num_dims))
 
     end subroutine s_initialize_acoustic_substep_module
 
@@ -141,11 +162,21 @@ contains
         integer  :: momxb, momxe, contb                 !< First/last momentum and first continuity equation indices
         integer  :: esnap                               !< Total-energy slot in the q_snap snapshot (= num_fluids + 1)
         integer  :: db_x, de_x, db_y, de_y, db_z, de_z  !< div_sf loop bounds (interior + one ghost layer)
+        integer  :: advb, adve                          !< First/last volume-fraction (advection) equation indices
+        integer  :: joff, koff, loff                    !< +1 face-neighbour offset for the current direction (one nonzero)
+        real(wp) :: eps_w                               !< Local copy of weno_eps (loop-invariant module scalar)
+        real(wp) :: d_m, d_0, d_p                       !< Acoustic-pressure first differences across the face stencil
+        real(wp) :: beta_m, beta_0, beta_p              !< WENO smoothness indicators (squared differences) of the stencil
+        real(wp) :: beta_face, beta_nbr_max             !< Across-face indicator and larger neighbour-stencil indicator (+eps_w)
+        logical  :: flag_disc                           !< Combined per-face discontinuity flag
 
         momxb = eqn_idx%mom%beg
         momxe = eqn_idx%mom%end
         contb = eqn_idx%cont%beg
         esnap = num_fluids + 1
+        advb = eqn_idx%adv%beg
+        adve = eqn_idx%adv%end
+        eps_w = weno_eps
 
         ! div_sf is needed one ghost layer beyond the interior so its centered gradient can be taken
         ! at interior cells; momentum carries >= 2 ghost layers, so this layer is always halo-valid.
@@ -371,6 +402,49 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
 
                 call s_reconstruct_acoustic_boundary_values(q_acoustic_vf, acL_rs_vf, acR_rs_vf, i)
+
+                ! 3c. Per-face discontinuity criterion for direction i: flag the robust acoustic tier (A4) when EITHER the
+                !     reconstructed acoustic pressure is non-smooth across the face OR the volume fraction varies across it.
+                !     The shock test reuses WENO's own smoothness indicators (no new physical threshold): the WENO beta_* are
+                !     squared cell-difference stencils, so beta_0 = (p_{j+1}-p_j)^2 measures the smoothness of the stencil
+                !     STRADDLING the face and beta_m/beta_p the smoothness of the left/right neighbour stencils. A face is smooth
+                !     when its across-face indicator does not exceed the larger neighbour indicator by more than weno_smooth_factor
+                !     (using the LARGER neighbour as the local scale keeps the test finite at smooth extrema / flat shoulders where
+                !     one one-sided difference vanishes -- the failure mode that sinks a min(beta) test). At a discontinuity the
+                !     across-face difference dwarfs the smooth-side differences, exactly the imbalance WENO's nonlinear weights act on.
+                joff = 0; koff = 0; loff = 0
+                if (i == 1) then; joff = 1; else if (i == 2) then; koff = 1; else; loff = 1; end if
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, d_m, d_0, d_p, beta_m, beta_0, beta_p, beta_face, beta_nbr_max, &
+                                    & flag_disc]')
+                do l = idwint(3)%beg, idwint(3)%end
+                    do k = idwint(2)%beg, idwint(2)%end
+                        do j = idwint(1)%beg, idwint(1)%end
+                            d_m = q_acoustic_vf(acou_p)%sf(j, k, l) - q_acoustic_vf(acou_p)%sf(j - joff, k - koff, l - loff)
+                            d_0 = q_acoustic_vf(acou_p)%sf(j + joff, k + koff, l + loff) - q_acoustic_vf(acou_p)%sf(j, k, l)
+                            d_p = q_acoustic_vf(acou_p)%sf(j + 2*joff, k + 2*koff, l + 2*loff) &
+                                  - q_acoustic_vf(acou_p)%sf(j + joff, k + koff, l + loff)
+                            beta_m = d_m*d_m; beta_0 = d_0*d_0; beta_p = d_p*d_p
+                            beta_face = beta_0                       ! across-face smoothness indicator
+                            beta_nbr_max = max(beta_m, beta_p) + eps_w  ! larger neighbour-stencil indicator (finite local scale)
+                            flag_disc = (beta_face > weno_smooth_factor*beta_nbr_max)
+
+                            ! Volume-fraction (material-interface) variation across the face, any fluid.
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do f = advb, adve
+                                if (abs(q_cons_vf(f)%sf(j + joff, k + koff, l + loff) - q_cons_vf(f)%sf(j, k, l)) > eps_alpha) then
+                                    flag_disc = .true.
+                                end if
+                            end do
+
+                            if (flag_disc) then
+                                acoustic_flag(j, k, l, i) = 1
+                            else
+                                acoustic_flag(j, k, l, i) = 0
+                            end if
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
 
             ! 4a. DIVERGENCE: build div_sf = centered div(rho*u) over the interior + one ghost
@@ -480,6 +554,7 @@ contains
         @:DEALLOCATE(q_acoustic_vf)
         @:DEALLOCATE(acL_rs_vf)
         @:DEALLOCATE(acR_rs_vf)
+        @:DEALLOCATE(acoustic_flag)
 
     end subroutine s_finalize_acoustic_substep_module
 
