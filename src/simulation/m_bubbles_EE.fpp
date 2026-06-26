@@ -277,7 +277,7 @@ contains
 
                                 call s_advance_step(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, &
                                                     & bub_adv_src(j, k, l), divu_in%sf(j, k, l), dmBub_id, dmMass_v, dmMass_n, &
-                                                    & dmBeta_c, dmBeta_t, dmCson, adap_dt_stop)
+                                                    & dmBeta_c, dmBeta_t, dmCson, adap_dt_stop, 0.5_wp*dt)
 
                                 q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                                 q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
@@ -322,5 +322,121 @@ contains
         end if
 
     end subroutine s_compute_bubble_EE_source
+
+    !> Advance the Euler-Euler bubble dynamics in place by an explicit step dtau on the given primitive state and velocity
+    !! divergence, reusing the adaptive per-cell s_advance_step integration. Intended for co-subcycling the bubble radial dynamics
+    !! with the acoustic substep (acoustic_substepping).
+    impure subroutine s_advance_bubbles_EE(q_cons_vf, q_prim_vf, divu_in, dtau)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), intent(in)                         :: divu_in  !< matrix for div(u)
+        real(wp), intent(in)                                   :: dtau     !< Step to advance the bubble state over
+        real(wp)                                               :: pb_local, mv_local, vflux, pbdot
+        real(wp)                                               :: n_tait, B_tait
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: Rtmp, Vtmp
+            real(wp), dimension(3) :: myalpha, myalpha_rho
+        #:else
+            real(wp), dimension(nb)         :: Rtmp, Vtmp
+            real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        #:endif
+        real(wp) :: myR, myV, alf, myP, myRho, R3
+        real(wp) :: nbub                            !< Bubble number density
+        integer  :: j, k, l, q, ii                  !< Loop variables
+        integer  :: adap_dt_stop_max, adap_dt_stop  !< Fail-safe exit if max iteration count reached
+        integer  :: dmBub_id                        !< Dummy variables for unified subgrid bubble subroutines
+        real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
+
+        adap_dt_stop_max = 0
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R3, nbub, pb_local, &
+                            & mv_local, vflux, pbdot, n_tait, B_tait]', collapse=3, reduction = '[[adap_dt_stop_max]]', &
+                            & reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (adv_n) then
+                        nbub = q_prim_vf(eqn_idx%n)%sf(j, k, l)
+                    else
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, nb
+                            Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
+                        end do
+
+                        R3 = 0._wp
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, nb
+                            R3 = R3 + weight(q)*Rtmp(q)**3._wp
+                        end do
+
+                        nbub = (3._wp/(4._wp*pi))*q_prim_vf(eqn_idx%alf)%sf(j, k, l)/R3
+                    end if
+
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, nb
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do ii = 1, num_fluids
+                            myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
+                            myalpha(ii) = q_cons_vf(eqn_idx%adv%beg + ii - 1)%sf(j, k, l)
+                        end do
+
+                        if (num_fluids == 1) then
+                            myRho = myalpha_rho(1)
+                            n_tait = gammas(1)
+                            B_tait = pi_infs(1)/pi_fac
+                        else
+                            myRho = 0._wp
+                            n_tait = 0._wp
+                            B_tait = 0._wp
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do ii = 1, num_fluids
+                                myRho = myRho + myalpha_rho(ii)
+                                n_tait = n_tait + myalpha(ii)*gammas(ii)
+                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)/pi_fac
+                            end do
+                        end if
+
+                        n_tait = 1._wp/n_tait + 1._wp  ! make this the usual little 'gamma'
+                        B_tait = B_tait*(n_tait - 1)/n_tait  ! make this the usual pi_inf
+
+                        myP = q_prim_vf(eqn_idx%E)%sf(j, k, l)
+                        alf = q_prim_vf(eqn_idx%alf)%sf(j, k, l)
+                        myR = q_prim_vf(rs(q))%sf(j, k, l)
+                        myV = q_prim_vf(vs(q))%sf(j, k, l)
+
+                        if (alf >= small_alf) then
+                            if (.not. polytropic) then
+                                pb_local = q_prim_vf(ps(q))%sf(j, k, l)
+                                mv_local = q_prim_vf(ms(q))%sf(j, k, l)
+                                call s_bwproperty(pb_local, q, chi_vw, k_mw, rho_mw)
+                                call s_vflux(myR, myV, pb_local, mv_local, q, vflux)
+                                pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q)
+                            else
+                                pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
+                            end if
+
+                            adap_dt_stop = 0
+
+                            call s_advance_step(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, 0._wp, &
+                                                & divu_in%sf(j, k, l), dmBub_id, dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson, &
+                                                & adap_dt_stop, dtau)
+
+                            q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
+                            q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
+
+                            adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
+                        end if
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
+
+    end subroutine s_advance_bubbles_EE
 
 end module m_bubbles_EE

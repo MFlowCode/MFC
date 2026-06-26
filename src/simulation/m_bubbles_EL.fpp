@@ -567,7 +567,7 @@ contains
 
             if (adap_dt) then
                 call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, dmntait, dmBtait, dm_bub_adv_src, &
-                                    & dm_divu, k, myMass_v, myMass_n, myBeta_c, myBeta_t, myCson, adap_dt_stop)
+                                    & dm_divu, k, myMass_v, myMass_n, myBeta_c, myBeta_t, myCson, adap_dt_stop, 0.5_wp*dt)
 
                 ! Update bubble state
                 intfc_rad(k, 1) = myR

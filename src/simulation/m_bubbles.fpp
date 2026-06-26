@@ -333,7 +333,7 @@ contains
     !> Adaptive time stepping routine for subgrid bubbles (See Heirer, E. Hairer S.P.Norsett G. Wanner, Solving Ordinary
     !! Differential Equations I, Chapter II.4)
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, fmass_v, &
-                              & fmass_g, fbeta_c, fbeta_t, fCson, adap_dt_stop)
+                              & fmass_g, fbeta_c, fbeta_t, fCson, adap_dt_stop, fdt)
         $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(inout) :: fR, fV, fpb, fmass_v
@@ -342,6 +342,7 @@ contains
         integer, intent(in)     :: bub_id
         real(wp), intent(in)    :: fmass_g, fbeta_c, fbeta_t, fCson
         integer, intent(inout)  :: adap_dt_stop
+        real(wp), intent(in)    :: fdt    !< Time interval to advance the bubble state over
         real(wp), dimension(5)  :: err    !< Error estimates for adaptive time stepping
         real(wp)                :: t_new  !< Updated time step size
         real(wp)                :: h0, h  !< Time step size
@@ -359,8 +360,8 @@ contains
         adap_dt_stop = 0
 
         do
-            if (t_new + h > 0.5_wp*dt) then
-                h = 0.5_wp*dt - t_new
+            if (t_new + h > fdt) then
+                h = fdt - t_new
             end if
 
             ! Advancing one sub-step
@@ -432,7 +433,7 @@ contains
             end do
 
             ! Exit the loop if the final time reached dt
-            if (f_approx_equal(t_new, 0.5_wp*dt) .or. iter_count >= adap_dt_max_iters) exit
+            if (f_approx_equal(t_new, fdt) .or. iter_count >= adap_dt_max_iters) exit
         end do
 
         if (iter_count >= adap_dt_max_iters) adap_dt_stop = 1
