@@ -1690,4 +1690,54 @@ contains
 
     end subroutine s_hllc_riemann_solver
 
+    !> Acoustic part of the general 5eq HLLC flux at a single face, for the split-explicit low-Mach (acoustic_substepping) robust
+    !! tier. Returns exactly the pressure/acoustic terms the slow-flux variant removes: the star pressure in the normal-momentum
+    !! equation and the pressure work in the total-energy equation, each carrying the s_M/s_P (+-c) acoustic dissipation. The
+    !! rho*u*u convective momentum transport stays in the slow flux and is NOT included here. Device-callable and fully
+    !! self-contained: every input is a scalar passed by value (no module-level state), so it can be evaluated at flagged faces from
+    !! inside the acoustic substep on host or device.
+    !! @param pres_L Left-state pressure
+    !! @param vel_L  Left-state face-normal velocity
+    !! @param rho_L  Left-state mixture density
+    !! @param c_L    Left-state sound speed
+    !! @param pres_R Right-state pressure
+    !! @param vel_R  Right-state face-normal velocity
+    !! @param rho_R  Right-state mixture density
+    !! @param c_R    Right-state sound speed
+    !! @param flux_mom Acoustic normal-momentum flux (star pressure + s_M/s_P dissipation)
+    !! @param flux_E   Acoustic total-energy flux (pressure work + s_M/s_P dissipation)
+    pure subroutine s_acoustic_face_flux(pres_L, vel_L, rho_L, c_L, pres_R, vel_R, rho_R, c_R, flux_mom, flux_E)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in)  :: pres_L, vel_L, rho_L, c_L
+        real(wp), intent(in)  :: pres_R, vel_R, rho_R, c_R
+        real(wp), intent(out) :: flux_mom, flux_E
+        real(wp)              :: s_L, s_R, s_M, s_P, s_S
+        real(wp)              :: xi_L_m1, xi_R_m1, xi_M, xi_P
+
+        ! Direct (Davis/Einfeldt) acoustic wave speeds; mirrors wave_speeds_direct in
+        ! s_hllc_riemann_solver restricted to the face-normal acoustic state.
+        s_L = min(vel_L - c_L, vel_R - c_R)
+        s_R = max(vel_R + c_R, vel_L + c_L)
+        s_S = (pres_R - pres_L + rho_L*vel_L*(s_L - vel_L) - rho_R*vel_R*(s_R - vel_R))/(rho_L*(s_L - vel_L) - rho_R*(s_R - vel_R))
+
+        ! Einfeldt s_M/s_P = min/max(0, s_L/R); xi_L/R - 1 without cancellation; contact upwind.
+        s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+        xi_L_m1 = (s_S - vel_L)/min(s_L - s_S, -sgm_eps)
+        xi_R_m1 = (s_S - vel_R)/max(s_R - s_S, sgm_eps)
+        xi_M = 5.e-1_wp + sign(5.e-1_wp, s_S)
+        xi_P = 5.e-1_wp - sign(5.e-1_wp, s_S)
+
+        ! MOMENTUM: star pressure with the acoustic (+-c) dissipation. This is the pressure
+        ! term dir_flg*pres_{L,R} plus the s_M/s_P*xi_{L,R}_m1 dissipation the slow-flux variant
+        ! drops; the rho*u*u convective part is left in the slow flux.
+        flux_mom = xi_M*(pres_L + rho_L*s_M*s_L*xi_L_m1) + xi_P*(pres_R + rho_R*s_P*s_R*xi_R_m1)
+
+        ! ENERGY: pressure work with the acoustic dissipation. Equals the pressure-bearing part
+        ! of the HLLC energy flux (the u*E convective transport is deferred to the slow flux),
+        ! using the identity xi_{L,R}*(s_S - vel_{L,R})/(s_{L,R} - vel_{L,R}) == xi_{L,R}_m1.
+        flux_E = xi_M*pres_L*(vel_L + s_M*xi_L_m1) + xi_P*pres_R*(vel_R + s_P*xi_R_m1)
+
+    end subroutine s_acoustic_face_flux
+
 end module m_riemann_solver_hllc
