@@ -264,11 +264,11 @@ contains
             real(wp), dimension(num_dims)   :: vel_a_arr, vel_b_arr, flux_mom_c  !< L/R velocities (slot 1 = normal) + conv mom flux
         #:endif
         real(wp) :: sm_r, sm_l, gd_r, gd_l, dfm_r, dfm_l  !< Backward momentum robust-correction face pressures/damping/deltas
-        integer  :: flg_r, flg_l  !< Right/left face discontinuity flags (backward momentum correction)
-        integer  :: fb_x, fb_y, fb_z  !< Flag/flux loop low bounds (one ghost below interior on the normal axis)
-        integer  :: bcc  !< Per-rank boundary code at the boundary-adjacent face (negative only at a physical open edge)
-        integer  :: any_flag_max  !< Per-microstep MAX reduction of acoustic_flag (>0 iff any face flagged); gates reconstruction
-        logical  :: any_flagged  !< .true. iff some interior(+ghost) face is flagged this microstep -> reconstruction must run
+        integer :: flg_r, flg_l  !< Right/left face discontinuity flags (backward momentum correction)
+        integer :: fb_x, fb_y, fb_z  !< Flag/flux loop low bounds (one ghost below interior on the normal axis)
+        integer :: bcc  !< Per-face boundary code (bc_type%sf) at the boundary-adjacent face (negative only at a physical open edge)
+        integer :: any_flag_max  !< Per-microstep MAX reduction of acoustic_flag (>0 iff any face flagged); gates reconstruction
+        logical :: any_flagged  !< .true. iff some interior(+ghost) face is flagged this microstep -> reconstruction must run
 
         momxb = eqn_idx%mom%beg
         momxe = eqn_idx%mom%end
@@ -410,21 +410,28 @@ contains
                                 ! Open/outflow physical boundary faces: the centered smooth tier advects the
                                 ! extrapolated mean-flow ghost with no upwind dissipation (FTCS-at-boundary
                                 ! instability), so flag the boundary-adjacent face onto the robust upwind HLLC
-                                ! tier. bc_{x,y,z} are per-rank (negative only at a physical edge; >= 0 = MPI
-                                ! neighbour or periodic), so interior ranks and periodic/reflective/wall edges are
-                                ! never flagged here -- reading the scalar avoids array-of-derived-type device
-                                ! indexing of bc_type. Only the open/outflow codes (extrapolation, characteristic
-                                ! OUTFLOW, dirichlet) carry an advectable normal mean flow out of the domain.
+                                ! tier. Read the PER-FACE code from bc_type(dir,loc)%sf (loc 1 = -dir/begin
+                                ! face, 2 = +dir/end face; plane indexed exactly as s_populate_bc_direction --
+                                ! x: (0,k,l), y: (j,0,l), z: (j,k,0)) so non-uniform / patch boundaries (a BC
+                                ! type that varies along one edge, e.g. half-wall half-outflow) are covered
+                                ! face-by-face, which the per-rank scalar bc_{x,y,z} could not do. The codes are
+                                ! <= 0 at a physical edge (>= 0 = MPI neighbour or periodic, never flagged), and
+                                ! bc_type is GPU_DECLARE'd so the per-face device read is portable. Only the
+                                ! open/outflow codes (extrapolation, characteristic OUTFLOW, dirichlet) carry an
+                                ! advectable normal mean flow out of the domain.
                                 bcc = 0
                                 if (i == 1) then
-                                    if (j == idwint(1)%beg - 1) then; bcc = bc_x%beg; else if (j == idwint(1)%end) then
-                                        bcc = bc_x%end; end if
+                                    if (j == idwint(1)%beg - 1) then; bcc = bc_type(1, 1)%sf(0, k, &
+                                        & l); else if (j == idwint(1)%end) then
+                                        bcc = bc_type(1, 2)%sf(0, k, l); end if
                                     else if (i == 2) then
-                                        if (k == idwint(2)%beg - 1) then; bcc = bc_y%beg; else if (k == idwint(2)%end) then
-                                            bcc = bc_y%end; end if
+                                        if (k == idwint(2)%beg - 1) then; bcc = bc_type(2, 1)%sf(j, 0, &
+                                            & l); else if (k == idwint(2)%end) then
+                                            bcc = bc_type(2, 2)%sf(j, 0, l); end if
                                         else
-                                            if (l == idwint(3)%beg - 1) then; bcc = bc_z%beg; else if (l == idwint(3)%end) then
-                                                bcc = bc_z%end; end if
+                                            if (l == idwint(3)%beg - 1) then; bcc = bc_type(3, 1)%sf(j, k, &
+                                                & 0); else if (l == idwint(3)%end) then
+                                                bcc = bc_type(3, 2)%sf(j, k, 0); end if
                                             end if
                                             if (bcc == BC_GHOST_EXTRAP .or. bcc == BC_RIEMANN_EXTRAP &
                                                 & .or. bcc == BC_CHAR_NR_SUB_OUTFLOW .or. bcc == BC_CHAR_FF_SUB_OUTFLOW &
