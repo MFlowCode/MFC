@@ -224,6 +224,7 @@ contains
         real(wp) :: gamma, pinf, qv
         real(wp) :: rho_n  !< Neighbour-cell mixture density (velocity denominator)
         real(wp) :: dyn_p  !< Dynamic pressure 0.5*rho*|u|^2
+        real(wp) :: alf    !< Void (bubble volume) fraction for the bubbles_euler mixture-pressure correction
         real(wp) :: div  !< Centered flux divergence accumulator
         real(wp) :: dpdx  !< Centered pressure-gradient component
         real(wp) :: damp  !< Grad-div divergence-damping stencil accumulator
@@ -294,7 +295,7 @@ contains
             !     rho*E = gamma*p + pi_inf + 0.5*rho*|u|^2 + qv with frozen mixture coefficients
             !     rho=sum_k alpha_rho_k, gamma=sum_k alpha_k*gammas(k), pi_inf=sum_k alpha_k*pi_infs(k),
             !     qv=sum_k alpha_rho_k*qvs(k) (matches s_convert_species_to_mixture_variables_acc).
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho, gamma, pinf, qv, dyn_p]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho, gamma, pinf, qv, dyn_p, alf]')
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -306,6 +307,12 @@ contains
                             gamma = gamma + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*gammas(f)
                             pinf = pinf + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*pi_infs(f)
                         end do
+                        ! Single-fluid Euler-Euler bubbles: the lone advection slot is the void fraction (not a
+                        ! material alpha summing to 1), so the mixture coefficients are the liquid's directly --
+                        ! mirrors s_convert_species_to_mixture_variables_acc's (num_fluids==1 .and. bubbles_euler) branch.
+                        if (num_fluids == 1 .and. bubbles_euler) then
+                            gamma = gammas(1); pinf = pi_infs(1); qv = qvs(1)
+                        end if
                         rho = max(rho, sgm_eps)
 
                         dyn_p = 0._wp
@@ -314,7 +321,15 @@ contains
                             dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
                         end do
 
-                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
+                        ! Bubble-aware mixture pressure: the void fraction (eqn_idx%alf) dilutes the liquid energy,
+                        ! p = ((rho*E - dyn_p)/(1 - alf) - pi_inf - qv)/gamma -- the same EOS branch s_compute_pressure
+                        ! uses when bubbles_euler, so the pressure driving the acoustics tracks the current void fraction.
+                        if (bubbles_euler) then
+                            alf = q_cons_vf(eqn_idx%alf)%sf(j, k, l)
+                            p_sf(j, k, l) = ((q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p)/(1._wp - alf) - pinf - qv)/gamma
+                        else
+                            p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
+                        end if
 
                         ! Freeze the transported conserved state for the forward sweep's flux stencil. Reading the
                         ! divergence from this snapshot (never an in-place-updated neighbour) makes it telescope, so
@@ -828,7 +843,7 @@ contains
                         !    sees the freshly advanced mass and energy.
                         call s_populate_variables_buffers(bc_type, q_cons_vf)
 
-                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho, gamma, pinf, qv, dyn_p]')
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho, gamma, pinf, qv, dyn_p, alf]')
                         do l = idwbuff(3)%beg, idwbuff(3)%end
                             do k = idwbuff(2)%beg, idwbuff(2)%end
                                 do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -840,6 +855,9 @@ contains
                                         gamma = gamma + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*gammas(f)
                                         pinf = pinf + q_cons_vf(eqn_idx%adv%beg + f - 1)%sf(j, k, l)*pi_infs(f)
                                     end do
+                                    if (num_fluids == 1 .and. bubbles_euler) then
+                                        gamma = gammas(1); pinf = pi_infs(1); qv = qvs(1)
+                                    end if
                                     rho = max(rho, sgm_eps)
 
                                     dyn_p = 0._wp
@@ -848,7 +866,12 @@ contains
                                         dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/rho
                                     end do
 
-                                    p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
+                                    if (bubbles_euler) then
+                                        alf = q_cons_vf(eqn_idx%alf)%sf(j, k, l)
+                                        p_sf(j, k, l) = ((q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p)/(1._wp - alf) - pinf - qv)/gamma
+                                    else
+                                        p_sf(j, k, l) = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p - pinf - qv)/gamma
+                                    end if
                                 end do
                             end do
                         end do
