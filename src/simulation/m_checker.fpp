@@ -12,7 +12,7 @@ module m_checker
     use m_mpi_proxy
     use m_helper
     use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3
+    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3, wave_speeds_direct
 
     implicit none
 
@@ -109,6 +109,8 @@ contains
             @:PROHIBIT(igr, "acoustic_substepping is incompatible with the information geometric regularization (igr) solver")
             @:PROHIBIT(.not. cfl_dt, "acoustic_substepping requires CFL-based time stepping (set cfl_adap_dt or cfl_const_dt)")
             @:PROHIBIT(time_stepper /= time_stepper_rk3, "acoustic_substepping requires time_stepper = 3 (SSP-RK3)")
+            @:PROHIBIT(wave_speeds /= wave_speeds_direct, &
+                       & "acoustic_substepping requires wave_speeds = 1 (direct); the substep robust tier uses the direct-wave-speed HLLC flux")
             @:PROHIBIT(recon_type /= recon_type_weno, &
                        & "acoustic_substepping requires WENO reconstruction; the substep reconstructs with s_weno")
             @:PROHIBIT(n_acoustic_substeps < 0, "n_acoustic_substeps must be >= 0 (0 = auto)")
