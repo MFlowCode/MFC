@@ -77,6 +77,24 @@ species-mass conservative.
 \f$|u|+c\f$) and computes \f$n_s\f$ from a domain-maximum reduction of
 \f$(|u|+c)/|u|\f$. The only global collective is that existing time-step reduction.
 
+### Temporal accuracy
+
+The Wicker–Skamarock RK3 macro coupling is **second-order accurate in the advective
+step** \f$\Delta t\f$ when the acoustic micro-step \f$\Delta\tau\f$ is held fixed (i.e.
+\f$n_s\f$ scaled with \f$\Delta t\f$ so the acoustic CFL is constant). A fixed-grid
+\f$\Delta t\f$-refinement of a smooth translating low-Mach vortex gives an \f$L_2\f$
+convergence rate of the conserved vector of \f$\approx 2.0\f$ in this regime
+(see `examples/2D_isentropic_vortex_lowmach_tconv`).
+
+The forward–backward acoustic micro-step is itself a symplectic-Euler update, which is
+first-order accurate in \f$\Delta\tau\f$. With the recommended auto substep count
+(\f$n_s \approx (|u|+c)/|u|\f$ set by the Mach number), \f$\Delta\tau \propto \Delta t\f$,
+so refining \f$\Delta t\f$ refines \f$\Delta\tau\f$ in lockstep and the practical
+convergence rate is first order — the standard behaviour of a split-explicit /
+forward-backward scheme. The acoustic substep is therefore well suited to its design
+purpose (resolving the fast waves cheaply at a fixed acoustic CFL) rather than to
+asymptotic \f$\Delta t \to 0\f$ refinement.
+
 ## Usage
 
 | Parameter | Type | Description |
@@ -111,7 +129,10 @@ backend-agnostic `GPU_*` macros (see @ref gpuParallelization "GPU Parallelizatio
 
 - Intended for **smooth** low-Mach flow. The acoustic substep is centered (non-upwinded),
   so flows with embedded shocks are out of scope.
-- First-order accurate in time (operator splitting); spatial order is unaffected.
+- The macro (WS-RK3) coupling is second-order in the advective step at fixed acoustic CFL;
+  with auto substeps (\f$\Delta\tau \propto \Delta t\f$) the symplectic-Euler micro-step
+  makes the practical convergence first order (see *Temporal accuracy* above). Spatial
+  order is unaffected.
 - Restricted to `model_eqns = 2`.
 
 ## Source files
