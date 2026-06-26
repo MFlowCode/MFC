@@ -85,13 +85,14 @@ module m_acoustic_substep
     type(scalar_field), allocatable, dimension(:) :: q_acoustic_vf
     $:GPU_DECLARE(create='[q_acoustic_vf]')
 
-    !> Full primitive face-reconstruction vector over the buffered domain, slots 1..eqn_idx%E in the standard primitive layout
-    !! (partial densities at %cont, ALL velocity components at %mom, pressure at %E) -- mirrors m_rhs's q_prim_qp%vf(1:E) so the
-    !! flagged-face convective HLLC flux consumes states in the same slot order. Rebuilt only on flagged microsteps.
+    !> Full primitive face-reconstruction vector over the buffered domain, slots 1..eqn_idx%adv%end in the standard primitive layout
+    !! (partial densities at %cont, ALL velocity components at %mom, pressure at %E, volume fractions at %adv) -- mirrors m_rhs's
+    !! q_prim_qp%vf so the flagged-face convective HLLC flux consumes states in the same slot order, and the flagged-face mixture
+    !! EOS rebuild reads the volume fractions reconstructed AT the face (not the cell). Rebuilt only on flagged microsteps.
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf
     $:GPU_DECLARE(create='[q_prim_vf]')
 
-    !> WENO-reconstructed left/right FULL primitive face states (slots 1..eqn_idx%E, layout matching q_prim_vf and m_rhs's
+    !> WENO-reconstructed left/right FULL primitive face states (slots 1..eqn_idx%adv%end, layout matching q_prim_vf and m_rhs's
     !! qL_rsx_vf/qR_rsx_vf), reused per direction; consumed by the flagged-face convective HLLC flux. Reconstruction is gated by
     !! any_flagged so it is skipped entirely on smooth flow.
     real(wp), allocatable, dimension(:,:,:,:) :: qL_rs_vf, qR_rs_vf
@@ -165,10 +166,12 @@ contains
     !> Allocate scratch storage for the acoustic substep kernel.
     impure subroutine s_initialize_acoustic_substep_module
 
-        integer :: i      !< Acoustic sub-vector / primitive slot iterator
-        integer :: nfull  !< Number of reconstructed full-primitive variables (= eqn_idx%E: partial densities, velocities, pressure)
+        integer :: i  !< Acoustic sub-vector / primitive slot iterator
+        !> Number of reconstructed full-primitive variables (= eqn_idx%adv%end: partial densities, velocities, pressure, volume
+        !! fractions)
+        integer :: nfull
 
-        nfull = eqn_idx%E
+        nfull = eqn_idx%adv%end
 
         @:ALLOCATE(p_sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ALLOCATE(div_sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -479,8 +482,10 @@ contains
                             ! Full primitive vector over the buffered domain in m_rhs slot order: partial densities at %cont (=
                             ! conserved for
                             ! the
-                            ! 5-equation model), ALL velocity components at %mom (mom/rho), pressure at %E. Rebuilt each flagged
-                            ! microstep.
+                            ! 5-equation model), ALL velocity components at %mom (mom/rho), pressure at %E, volume fractions at %adv
+                            ! (= conserved for the 5-equation model) so the EOS rebuild can use face-reconstructed alpha. Rebuilt
+                            ! each
+                            ! flagged microstep.
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f]')
                             do l = idwbuff(3)%beg, idwbuff(3)%end
                                 do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -496,6 +501,10 @@ contains
                                                       & l)/q_acoustic_vf(acou_rho)%sf(j, k, l)
                                         end do
                                         q_prim_vf(eqn_idx%E)%sf(j, k, l) = p_sf(j, k, l)
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do f = 1, num_fluids
+                                            q_prim_vf(advb + f - 1)%sf(j, k, l) = q_cons_vf(advb + f - 1)%sf(j, k, l)
+                                        end do
                                     end do
                                 end do
                             end do
@@ -528,21 +537,21 @@ contains
                                     do k = fb_y, idwint(2)%end
                                         do j = fb_x, idwint(1)%end
                                             if (acoustic_flag(j, k, l, i) == 1) then
-                                                ! Mixture stiffened-gas coefficients of the two cells straddling the face (frozen
-                                                ! volume
-                                                ! fractions); sound speed and total-energy density rebuilt from the SAME EOS as the
-                                                ! pressure
-                                                ! recompute: c^2 = (1/gamma + 1)(p + pi_inf/(gamma+1))/rho and
+                                                ! Mixture stiffened-gas coefficients of the two states straddling the face, built
+                                                ! from the volume fractions reconstructed AT the face (qL/qR_rs_vf %adv slots)
+                                                ! rather
+                                                ! than the cell values, so a material interface is not smeared for num_fluids>1 (for
+                                                ! num_fluids==1 alpha==1 reconstructs to 1, so this is bit-identical to the cell
+                                                ! value); sound speed and total-energy density rebuilt from the SAME EOS as the
+                                                ! pressure recompute: c^2 = (1/gamma + 1)(p + pi_inf/(gamma+1))/rho and
                                                 ! rho*E = gamma*p + pi_inf + qv + 0.5*rho*|u|^2.
                                                 gam_a = 0._wp; pin_a = 0._wp; gam_b = 0._wp; pin_b = 0._wp
                                                 $:GPU_LOOP(parallelism='[seq]')
                                                 do f = 1, num_fluids
-                                                    gam_a = gam_a + q_cons_vf(advb + f - 1)%sf(j, k, l)*gammas(f)
-                                                    pin_a = pin_a + q_cons_vf(advb + f - 1)%sf(j, k, l)*pi_infs(f)
-                                                    gam_b = gam_b + q_cons_vf(advb + f - 1)%sf(j + joff, k + koff, &
-                                                                              & l + loff)*gammas(f)
-                                                    pin_b = pin_b + q_cons_vf(advb + f - 1)%sf(j + joff, k + koff, &
-                                                                              & l + loff)*pi_infs(f)
+                                                    gam_a = gam_a + qL_rs_vf(j, k, l, advb + f - 1)*gammas(f)
+                                                    pin_a = pin_a + qL_rs_vf(j, k, l, advb + f - 1)*pi_infs(f)
+                                                    gam_b = gam_b + qR_rs_vf(j + joff, k + koff, l + loff, advb + f - 1)*gammas(f)
+                                                    pin_b = pin_b + qR_rs_vf(j + joff, k + koff, l + loff, advb + f - 1)*pi_infs(f)
                                                 end do
 
                                                 ! Reconstructed L/R partial densities (qL/qR_rs_vf %cont slots) and the
