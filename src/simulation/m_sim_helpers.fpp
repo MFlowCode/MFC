@@ -14,7 +14,7 @@ module m_sim_helpers
 
     implicit none
 
-    private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl
+    private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl, f_compute_multidim_cfl_terms
 
 contains
 
@@ -218,11 +218,10 @@ contains
     end subroutine s_compute_stability_from_dt
 
     !> Computes dt for a specified CFL number. When acoustic_substepping is true, icfl_dt is the per-dimension advective CFL limit
-    !! (dropping the sound speed c), and acou_dt_sf (if present) is filled with the per-cell acoustic CFL dt limit min_i
-    !! dx_i/(|u_i|+c) -- the SAME quantity that sets dt in the .not. acoustic_substepping path. The caller reduces acou_dt_sf with a
-    !! global MIN and divides the (already globally reduced) advective dt by cfl_target*acou_dt_min to get the substep count,
-    !! guaranteeing the acoustic microstep CFL (|u_i|+c)*dtau/dx_i <= cfl_target everywhere (see s_compute_dt).
-    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l, acou_dt_sf, acoustic_sub)
+    !! (dropping the sound speed c); the caller (s_compute_dt) separately fills acou_dt_sf with the per-cell acoustic CFL dt limit
+    !! min_i dx_i/(|u_i|+c) inline (keeping a single 3-D array, max_dt, in this routine's signature). Only the scalar acoustic_sub
+    !! selects the advective-vs-acoustic inviscid speed here.
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l, acoustic_sub)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in)       :: vel
@@ -230,7 +229,6 @@ contains
         real(wp), dimension(0:m,0:n,0:p), intent(inout) :: max_dt
         real(wp), dimension(2), intent(in)              :: Re_l
         integer, intent(in)                             :: j, k, l
-        real(wp), dimension(0:m,0:n,0:p), intent(inout) :: acou_dt_sf
         ! Passed by value (not read from the module) so this `acc routine seq` does not require the
         ! acoustic_substepping module variable to be in `acc declare create` (nvfortran W-1054 -> nvlink undefined ref).
         logical, intent(in) :: acoustic_sub
@@ -249,17 +247,6 @@ contains
                 ! 1D case
                 adv_speed = sum(abs(vel(1:num_vels)))
                 icfl_dt = cfl_target*(dx(j)/max(adv_speed, sgm_eps))
-            end if
-            if (acoustic_sub) then
-                ! Per-cell acoustic CFL dt limit min_i dx_i/(|u_i|+c). The caller reduces this with a GLOBAL MIN
-                ! (NOT a per-cell ratio with the advective dt -- that would blow up at near-stagnation cells, where
-                ! adv_dt is huge but the cell does not limit dt). Using independently reduced minima of the advective
-                ! and acoustic dt limits is what makes n_substeps the correct field-wide microstep count.
-                if (p > 0 .or. n > 0) then
-                    acou_dt_sf(j, k, l) = f_compute_multidim_cfl_terms(vel, c, j, k, l)
-                else
-                    acou_dt_sf(j, k, l) = dx(j)/(abs(vel(1)) + c)
-                end if
             end if
         else
             if (p > 0 .or. n > 0) then

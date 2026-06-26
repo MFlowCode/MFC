@@ -406,9 +406,9 @@ contains
 
         if (cfl_dt) then
             @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
-            ! acou_dt_sf is always allocated under cfl_dt (it is a required, non-optional arg of
-            ! s_compute_dt_from_cfl so that routine generates valid GPU device code; written only when
-            ! acoustic_substepping). nvfortran `acc routine seq` cannot handle optional arguments.
+            ! acou_dt_sf is always allocated under cfl_dt; it is written directly in s_compute_dt's GPU loop
+            ! (only when acoustic_substepping) and reduced afterwards, rather than being passed into the
+            ! s_compute_dt_from_cfl device routine.
             @:ALLOCATE(acou_dt_sf(0:m, 0:n, 0:p))
         end if
 
@@ -764,12 +764,19 @@ contains
         real(wp)               :: dt_local
         real(wp)               :: acou_dt_local  !< Local min acoustic CFL dt limit (acoustic substepping)
         real(wp)               :: acou_dt_min    !< Global min acoustic CFL dt limit (acoustic substepping)
+        logical                :: acou_sub       !< Firstprivate copy of acoustic_substepping for the device loop
         integer                :: j, k, l        !< Generic loop iterators
         integer                :: fl             !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
+
+        ! Capture acoustic_substepping into a firstprivate local. The module logical is deliberately NOT in
+        ! `acc declare create` (see s_compute_dt_from_cfl: avoids nvfortran W-1054 -> nvlink undefined ref), so
+        ! referencing it directly inside the device loop segfaults nvhpc OMP-offload codegen (fort2). A loop-local
+        ! scalar is firstprivate-captured at region entry and is device-safe under both OpenACC and OpenMP.
+        acou_sub = acoustic_substepping
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl]')
         do l = 0, p
@@ -796,7 +803,21 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l, acou_dt_sf, acoustic_substepping)
+                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l, acou_sub)
+
+                    if (acou_sub) then
+                        ! Per-cell acoustic CFL dt limit min_i dx_i/(|u_i|+c), the SAME quantity that sets dt in the
+                        ! .not. acoustic_substepping path. Computed inline (not inside s_compute_dt_from_cfl) so
+                        ! acou_dt_sf stays out of that device routine's signature, keeping the per-step macro-step
+                        ! limit (max_dt) the only 3-D array it touches. Reduced with a GLOBAL MIN below (not a
+                        ! per-cell ratio with adv_dt, which would blow up at near-stagnation cells); the separately
+                        ! reduced advective/acoustic minima give the correct field-wide microstep count.
+                        if (p > 0 .or. n > 0) then
+                            acou_dt_sf(j, k, l) = f_compute_multidim_cfl_terms(vel, c, j, k, l)
+                        else
+                            acou_dt_sf(j, k, l) = dx(j)/(abs(vel(1)) + c)
+                        end if
+                    end if
                 end do
             end do
         end do
