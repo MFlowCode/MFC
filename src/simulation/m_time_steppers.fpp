@@ -981,9 +981,6 @@ contains
         @:DEALLOCATE(mv_ts(2)%sf)
         @:DEALLOCATE(rhs_mv)
         @:DEALLOCATE(mv_ts)
-        if (cfl_dt) then
-            @:DEALLOCATE(max_dt)
-        end if
         do i = 1, num_dims
             @:DEALLOCATE(bc_type(i,1)%sf)
             @:DEALLOCATE(bc_type(i,2)%sf)
