@@ -87,19 +87,19 @@ module m_acoustic_substep
 
     !> Full primitive face-reconstruction vector over the buffered domain, slots 1..eqn_idx%E in the standard primitive layout
     !! (partial densities at %cont, ALL velocity components at %mom, pressure at %E) -- mirrors m_rhs's q_prim_qp%vf(1:E) so the
-    !! flagged-face convective HLLC flux (next task) consumes states in the same slot order. Rebuilt only on flagged microsteps.
+    !! flagged-face convective HLLC flux consumes states in the same slot order. Rebuilt only on flagged microsteps.
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf
     $:GPU_DECLARE(create='[q_prim_vf]')
 
     !> WENO-reconstructed left/right FULL primitive face states (slots 1..eqn_idx%E, layout matching q_prim_vf and m_rhs's
-    !! qL_rsx_vf/qR_rsx_vf), reused per direction; wired here for the convective HLLC flux but not yet consumed (B2). Reconstruction
-    !! is gated by any_flagged so it is skipped entirely on smooth flow.
+    !! qL_rsx_vf/qR_rsx_vf), reused per direction; consumed by the flagged-face convective HLLC flux. Reconstruction is gated by
+    !! any_flagged so it is skipped entirely on smooth flow.
     real(wp), allocatable, dimension(:,:,:,:) :: qL_rs_vf, qR_rs_vf
     $:GPU_DECLARE(create='[qL_rs_vf, qR_rs_vf]')
 
     !> Per-face discontinuity mask (1 = flagged -> robust WENO+HLLC-acoustic tier, 0 = smooth -> cheap centered tier), last index =
     !! face-normal direction (1=x, 2=y, 3=z), addressed at cell (j,k,l) for the face between (j,k,l) and its +dir neighbour.
-    !! Produced here (A3) and consumed by the flux tier selection (A4); integer is the cheapest GPU-portable form of a per-face
+    !! Produced in the flag pass and consumed by the flux tier selection; integer is the cheapest GPU-portable form of a per-face
     !! boolean.
     integer, allocatable, dimension(:,:,:,:) :: acoustic_flag
     $:GPU_DECLARE(create='[acoustic_flag]')
