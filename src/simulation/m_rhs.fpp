@@ -37,6 +37,8 @@ module m_rhs
     use m_thinc
     use m_pressure_relaxation
 
+    use m_acoustic_substep, only: frozen_conv_mom_face
+
     implicit none
 
     private; public :: s_initialize_rhs_module, s_compute_rhs, s_finalize_rhs_module
@@ -482,6 +484,7 @@ contains
         integer, intent(in) :: stage
         real(wp) :: t_start, t_finish
         integer :: id
+        integer :: fb_x, fb_y, fb_z  !< Slow-flux snapshot lower bounds (one ghost below interior on the normal axis)
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
@@ -721,6 +724,34 @@ contains
                                       & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
                                       & flux_gsrc_n(id)%vf, id, irx, iry, irz)
                 call nvtxEndRange
+
+                ! Split-explicit low-Mach: snapshot the per-face slow momentum flux just computed by the HLLC slow path, whose
+                ! divergence is the momentum part of rhs_vf(mom), for the acoustic substep's live-minus-frozen momentum delta.
+                ! NOTE: despite the "conv" in the array name this is the FULL slow momentum flux, INCLUDING the star-pressure
+                ! p_Star on the normal component (m_riemann_solver_hllc star-state) -- NOT a convective-only rho*u_n*u_d flux.
+                ! Storing p_Star here is LOAD-BEARING: it cancels the slow path's pressure in rhs_slow(mom) so the acoustic tier
+                ! (flux_mom_rob) re-adds pressure live without double-counting; a future "make it convective-only" cleanup would
+                ! silently break that cancellation. flux_n(id)%vf(mom%beg+d-1) is global momentum component d at the +id face of
+                ! cell (j,k,l); stored in the same layout/convention as the substep's dmomflux so the cancellation is exact on
+                ! every RK stage. Bounds match the substep's flag/flux passes (one ghost below the interior on the normal axis).
+                ! Guarded so the standard solver path is byte-for-byte untouched.
+                if (acoustic_substepping) then
+                    fb_x = idwint(1)%beg; fb_y = idwint(2)%beg; fb_z = idwint(3)%beg
+                    if (id == 1) then; fb_x = idwint(1)%beg - 1; else if (id == 2) then; fb_y = idwint(2)%beg &
+                        & - 1; else; fb_z = idwint(3)%beg - 1; end if
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                    do l = fb_z, idwint(3)%end
+                        do k = fb_y, idwint(2)%end
+                            do j = fb_x, idwint(1)%end
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    frozen_conv_mom_face(j, k, l, id, i) = flux_n(id)%vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
 
                 ! Additional physics and source terms RHS addition for advection source
                 call nvtxStartRange("RHS-ADVECTION-SRC")

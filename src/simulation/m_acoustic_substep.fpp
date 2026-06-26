@@ -54,7 +54,7 @@ module m_acoustic_substep
     implicit none
 
     private
-    public :: s_initialize_acoustic_substep_module, s_acoustic_substep, s_finalize_acoustic_substep_module
+    public :: s_initialize_acoustic_substep_module, s_acoustic_substep, s_finalize_acoustic_substep_module, frozen_conv_mom_face
 
     !> Cell pressure scratch (working precision), spanning the buffered domain.
     real(wp), allocatable, dimension(:,:,:) :: p_sf
@@ -119,6 +119,23 @@ module m_acoustic_substep
     $:GPU_DECLARE(create='[dEflux, flux_mom_rob]')
     real(wp), allocatable, dimension(:,:,:,:,:) :: dmassflux
     $:GPU_DECLARE(create='[dmassflux]')
+
+    !> Live momentum machinery at flagged faces (per face-normal direction, per velocity component). frozen_conv_mom_face
+    !! = the EXACT per-face slow momentum flux the slow (advective) HLLC path computed at the RK stage state U^(s-1) --
+    !! whose divergence IS the momentum part of the frozen slow forcing rhs_slow_vf(mom). NOTE: despite the "conv" in the name
+    !! this is the FULL slow momentum flux INCLUDING the star-pressure p_Star on the normal component, not a convective-only
+    !! rho*u_n*u_d flux; storing p_Star is LOAD-BEARING (it cancels the slow pressure so the acoustic tier flux_mom_rob re-adds
+    !! it live without double-counting -- a "convective-only" cleanup would silently break this).
+    !! It is PUBLIC and populated by m_rhs (s_compute_rhs) directly from flux_n(dir)%vf(mom) each stage, in GLOBAL
+    !! momentum-component layout (component d = flux_n(dir)%vf(mom%beg+d-1)), addressed at cell (j,k,l) for the +dir face -- the same
+    !! convention as dmomflux below. Storing the slow path's actual flux (not a reconstruction from U^n) makes the cancellation
+    !! exact on EVERY RK stage. dmomflux = live HLLC convective momentum flux (re-evaluated each microstep, mapped from flux_mom's
+    !! rotated slots: slot 1 = face-normal, 2..nv = transverse) MINUS frozen_conv_mom_face, the per-face delta consumed by the
+    !! backward sweep so the NET convective momentum becomes live full-HLLC (the frozen part cancels the slow-forcing convective
+    !! momentum) while viscous/source momentum stays frozen-slow. dmomflux is exactly zero at smooth faces so the centered tier is
+    !! left bit-identical there.
+    real(wp), allocatable, dimension(:,:,:,:,:) :: frozen_conv_mom_face, dmomflux
+    $:GPU_DECLARE(create='[frozen_conv_mom_face, dmomflux]')
 
     !> Dimensionless max-indicator-dominance ratio above which a face's pressure stencil is judged discontinuous. The face test
     !! compares the LARGEST WENO smoothness indicator beta_max = max(beta_m, beta_0, beta_p) (squared cell differences of the
@@ -186,6 +203,10 @@ contains
                    & 1:num_dims))
         @:ALLOCATE(dmassflux(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
                    & 1:num_dims, 1:num_fluids))
+        @:ALLOCATE(frozen_conv_mom_face(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                   & idwbuff(3)%beg:idwbuff(3)%end, 1:num_dims, 1:num_vels))
+        @:ALLOCATE(dmomflux(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
+                   & 1:num_dims, 1:num_vels))
 
     end subroutine s_initialize_acoustic_substep_module
 
@@ -363,8 +384,8 @@ contains
                     fb_x = idwint(1)%beg; fb_y = idwint(2)%beg; fb_z = idwint(3)%beg
                     if (i == 1) then; fb_x = idwint(1)%beg - 1; else if (i == 2) then; fb_y = idwint(2)%beg &
                         & - 1; else; fb_z = idwint(3)%beg - 1; end if
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, p_m4, p_0c, p_p1, p_p2, p_scale, beta_floor, d_m, d_0, &
-                                        & d_p, beta_m, beta_0, beta_p, beta_max, flag_disc]', reduction='[[any_flag_max]]', &
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, f, d, p_m4, p_0c, p_p1, p_p2, p_scale, beta_floor, d_m, &
+                                        & d_0, d_p, beta_m, beta_0, beta_p, beta_max, flag_disc]', reduction='[[any_flag_max]]', &
                                         & reductionOp='[MAX]', copy='[any_flag_max]')
                     do l = fb_z, idwint(3)%end
                         do k = fb_y, idwint(2)%end
@@ -399,6 +420,10 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do f = 1, num_fluids
                                     dmassflux(j, k, l, i, f) = 0._wp
+                                end do
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do d = 1, num_dims
+                                    dmomflux(j, k, l, i, d) = 0._wp
                                 end do
                                 any_flag_max = max(any_flag_max, acoustic_flag(j, k, l, i))
                             end do
@@ -548,6 +573,22 @@ contains
                                     do f = 1, num_fluids
                                         cm = 0.5_wp*(q_snap(j, k, l, f)*u_a + q_snap(j + joff, k + koff, l + loff, f)*u_b)
                                         dmassflux(j, k, l, i, f) = flux_cont(f) - cm
+                                    end do
+
+                                    ! Live convective-momentum delta = live HLLC convective momentum flux (flux_mom_c) MINUS the
+                                    ! frozen slow per-face flux frozen_conv_mom_face (populated by m_rhs from the slow path's
+                                    ! flux_n(mom) at the RK stage state U^(s-1)), mapping the rotated live flux (slot 1 = face-normal
+                                    ! component i, slots 2..nv = transverse) back to the global velocity component. Subtracting the
+                                    ! slow path's ACTUAL flux makes the frozen part cancel the convective momentum carried by
+                                    ! rhs_slow_vf(mom) EXACTLY on every RK stage, so the net convective momentum is live full HLLC.
+                                    dmomflux(j, k, l, i, i) = flux_mom_c(1) - frozen_conv_mom_face(j, k, l, i, i)
+                                    ic = 1
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do d = 1, num_dims
+                                        if (d /= i) then
+                                            ic = ic + 1
+                                            dmomflux(j, k, l, i, d) = flux_mom_c(ic) - frozen_conv_mom_face(j, k, l, i, d)
+                                        end if
                                     end do
                                 end if
                             end do
@@ -748,8 +789,8 @@ contains
             !     The damping is the centered gradient of div_sf scaled by Dx_i^2 so that
             !     acoustic_div_damp is dimensionless; sharing the divergence stencil makes the
             !     operator annihilate divergence-free vortical modes exactly.
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, dpdx, damp, inv_2dx, inv_2dy, inv_2dz, flg_r, flg_l, sm_r, sm_l, &
-                                & gd_r, gd_l, dfm_r, dfm_l]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, d, dpdx, damp, inv_2dx, inv_2dy, inv_2dz, flg_r, flg_l, sm_r, &
+                                & sm_l, gd_r, gd_l, dfm_r, dfm_l]')
             do l = idwint(3)%beg, idwint(3)%end
                 do k = idwint(2)%beg, idwint(2)%end
                     do j = idwint(1)%beg, idwint(1)%end
@@ -814,6 +855,25 @@ contains
                             dfm_l = real(flg_l, wp)*(dtau*flux_mom_rob(j, k, l - 1, 3) - dtau*sm_l + gd_l)
                             q_cons_vf(momxe)%sf(j, k, l) = q_cons_vf(momxe)%sf(j, k, l) - (dfm_r - dfm_l)/dz(l)
                         end if
+
+                        ! Robust-tier convective-momentum correction: -dtau*div(dmomflux), where dmomflux(:,:,:,dir,d) = live HLLC
+                        ! convective momentum flux (normal + transverse) MINUS the frozen stage-entry HLLC convective momentum flux
+                        ! at flagged faces (0 at smooth faces). The frozen part cancels the convective momentum already carried by
+                        ! the frozen slow forcing rhs_slow_vf(mom), so the NET convective momentum becomes live full HLLC while the
+                        ! viscous/source momentum stays frozen-slow (correct). The divergence is single-valued per face (cell j
+                        ! right
+                        ! face = cell j+1 left face) so momentum telescopes/conserves; at smooth faces it adds exactly zero so the
+                        ! centered tier (pressure gradient + grad-div damping) is left bit-identical.
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do d = 1, num_dims
+                            i = momxb + d - 1
+                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 1, d) - dmomflux(j - 1, &
+                                      & k, l, 1, d))/dx(j)
+                            if (n > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 2, &
+                                & d) - dmomflux(j, k - 1, l, 2, d))/dy(k)
+                            if (p > 0) q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) - dtau*(dmomflux(j, k, l, 3, &
+                                & d) - dmomflux(j, k, l - 1, 3, d))/dz(l)
+                        end do
                     end do
                 end do
             end do
@@ -876,6 +936,8 @@ contains
         @:DEALLOCATE(dEflux)
         @:DEALLOCATE(flux_mom_rob)
         @:DEALLOCATE(dmassflux)
+        @:DEALLOCATE(frozen_conv_mom_face)
+        @:DEALLOCATE(dmomflux)
 
     end subroutine s_finalize_acoustic_substep_module
 
