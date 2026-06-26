@@ -15,21 +15,19 @@ Physics:
     this a genuinely discontinuity-rich, moderate-Mach blended-cost case.
   - This is the discontinuity-rich stress case for the two-tier substep.
 
-FINDING (task B5 validation; see .superpowers/sdd/task-b5-report.md): the BASELINE full-HLLC
-solver (acoustic_substepping='F', the default here) captures this shock-interface
-interaction cleanly. SPLIT mode (acoustic_substepping='T') is UNSTABLE on it (NaN within
-~40 steps). The two-tier robust flux (task B3) now makes the mass and energy convective
-transport full HLLC at flagged faces — that fixed the sharp material-interface ringing, so a
-1-cell-sharp CONTACT (no shock) is stable and species-mass conservative. But the convective
-MOMENTUM flux at a flagged face stays frozen at the stage-entry value (a first-order
-temporal lag). At a propagating SHOCK momentum advection is leading order, so the frozen
-momentum is destabilizing — split mode NaNs once a shock forms, independent of boundary
-condition, dt mode, or damping, and refining the acoustic CFL only delays it. (For
-num_fluids=1 the same physics shows up as adaptive-dt collapse rather than a hard NaN; the
-num_fluids>1 cell-volume-fraction EOS rebuild makes the multifluid failure sharper.)
-Propagating shocks are therefore out of scope until the convective momentum is made live at
-flagged faces; use the standard solver for shock-dominated flow. Run in split mode only to
-reproduce the limitation.
+Two-tier robust flux: both the BASELINE full-HLLC solver (acoustic_substepping='F', the
+default here) and SPLIT mode (acoustic_substepping='T') capture this shock-interface
+interaction. The robust tier makes the mass, energy, AND convective-momentum transport full
+HLLC at flagged faces; the convective momentum is made live through a live-minus-frozen delta
+(the slow path's stored stage-entry convective flux is subtracted and the live HLLC flux
+added), which keeps the slow/frozen cancellation exact on every RK stage and stays stable
+when momentum advection is leading order — i.e. at a propagating shock. See
+docs/documentation/acousticSubstepping.md.
+
+Note on boundaries: the centered SMOOTH tier is unstable at extrapolation/outflow boundaries
+carrying a mean flow (independent of shock capture; see the docs). This case uses
+non-reflecting BCs (bc_x=-3), so for a clean split-mode run keep the structure interior over
+the test window, or prefer a stable-BC case such as examples/1D_shock_periodic_lowmach.
 
 Diagnostics:
   - Read from <case>/D/ ASCII (1D): prim.4 = pressure, prim.3 = velocity,

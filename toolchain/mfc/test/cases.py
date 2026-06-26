@@ -2160,6 +2160,76 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # Flagged-face (robust-tier) golden: a small periodic Sod shock tube that fires
+        # the discontinuity criterion and exercises the full-HLLC convective delta. Based
+        # on examples/1D_shock_periodic_lowmach (periodic BCs -> deterministic, no outflow
+        # smooth-tier instability), shrunk to a tiny grid and short window for the suite.
+        c0_s = _math.sqrt(gamma)
+        Mach_s = 0.4
+        u0_s = Mach_s * c0_s  # background mean flow bounds the advective CFL
+        Nx_s = 49  # m=49 -> 50 cells
+        dx_s = 1.0 / (Nx_s + 1)
+        CFL_s = 0.4
+        dt_s = CFL_s * dx_s / (u0_s + _math.sqrt(gamma * 1.0 / 1.0))
+
+        stack.push(
+            "1D -> Acoustic Substepping Shock",
+            {
+                "m": Nx_s,
+                "n": 0,
+                "p": 0,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "dt": dt_s,
+                "cfl_adap_dt": "T",
+                "cfl_target": CFL_s,
+                "n_start": 0,
+                "t_stop": 0.02,
+                "t_save": 0.02,
+                "num_patches": 2,
+                "model_eqns": 2,
+                "num_fluids": 1,
+                "alt_soundspeed": "F",
+                "mpp_lim": "F",
+                "mixture_err": "F",
+                "time_stepper": 3,
+                "weno_order": 5,
+                "weno_eps": 1.0e-16,
+                "mapped_weno": "F",
+                "null_weights": "F",
+                "mp_weno": "F",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "acoustic_substepping": "T",
+                "n_acoustic_substeps": 0,
+                "acoustic_div_damp": 0.1,
+                # Patch 1: ambient filling the domain
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%vel(1)": u0_s,
+                "patch_icpp(1)%pres": 0.1,
+                "patch_icpp(1)%alpha_rho(1)": 0.125,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # Patch 2: high-pressure driver -> launches a right-running shock
+                "patch_icpp(2)%geometry": 1,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%x_centroid": 0.25,
+                "patch_icpp(2)%length_x": 0.2,
+                "patch_icpp(2)%vel(1)": u0_s,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+                "fluid_pp(1)%pi_inf": 0.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     acoustic_substepping_cases()
 
     def direction_symmetry_tests():

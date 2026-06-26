@@ -85,11 +85,6 @@ module m_acoustic_substep
     type(scalar_field), allocatable, dimension(:) :: q_acoustic_vf
     $:GPU_DECLARE(create='[q_acoustic_vf]')
 
-    !> WENO-reconstructed left/right acoustic face states (slots: pressure, normal velocity, mixture density), reused per direction;
-    !! the reconstructed states feed the flagged-face acoustic flux (A4).
-    real(wp), allocatable, dimension(:,:,:,:) :: acL_rs_vf, acR_rs_vf
-    $:GPU_DECLARE(create='[acL_rs_vf, acR_rs_vf]')
-
     !> Full primitive face-reconstruction vector over the buffered domain, slots 1..eqn_idx%E in the standard primitive layout
     !! (partial densities at %cont, ALL velocity components at %mom, pressure at %E) -- mirrors m_rhs's q_prim_qp%vf(1:E) so the
     !! flagged-face convective HLLC flux (next task) consumes states in the same slot order. Rebuilt only on flagged microsteps.
@@ -110,7 +105,7 @@ module m_acoustic_substep
     $:GPU_DECLARE(create='[acoustic_flag]')
 
     !> Robust-tier face-flux deltas at flagged faces, stored per face-normal direction so the per-direction WENO buffers
-    !! (acL_rs_vf/acR_rs_vf/qL_rs_vf/qR_rs_vf, overwritten each direction) can be reused. dEflux = full live HLLC energy face flux
+    !! (qL_rs_vf/qR_rs_vf, overwritten each direction) can be reused. dEflux = full live HLLC energy face flux
     !! (convective E*u + acoustic pressure work) MINUS the full centered energy face flux (the energy delta consumed by the forward
     !! sweep); dmassflux(:,:,:,dir,f) = live HLLC partial-density (alpha*rho_k) face flux MINUS the centered convective mass flux,
     !! per fluid (the mass delta consumed by the forward sweep). flux_mom_rob = robust normal-momentum (acoustic star-pressure) flux
@@ -124,10 +119,12 @@ module m_acoustic_substep
 
     !> Live momentum machinery at flagged faces (per face-normal direction, per velocity component). frozen_conv_mom_face
     !! = the EXACT per-face slow momentum flux the slow (advective) HLLC path computed at the RK stage state U^(s-1) --
-    !! whose divergence IS the momentum part of the frozen slow forcing rhs_slow_vf(mom). NOTE: despite the "conv" in the name
-    !! this is the FULL slow momentum flux INCLUDING the star-pressure p_Star on the normal component, not a convective-only
-    !! rho*u_n*u_d flux; storing p_Star is LOAD-BEARING (it cancels the slow pressure so the acoustic tier flux_mom_rob re-adds
-    !! it live without double-counting -- a "convective-only" cleanup would silently break this).
+    !! whose divergence IS the momentum part of the frozen slow forcing rhs_slow_vf(mom). Under acoustic_substepping the HLLC
+    !! slow variant emits a CONVECTIVE-ONLY momentum flux (contact-upwinded rho*u_n*u_d, with NO star-pressure p_Star, no
+    !! acoustic dissipation, no pcorr -- those are deferred to the acoustic tier), so frozen_conv_mom_face is a faithful copy of
+    !! that convective flux, NOT a full slow flux. The star-pressure (acoustic) momentum is supplied LIVE and separately by
+    !! flux_mom_rob, so it must NOT also be present here. The LOAD-BEARING invariant is that frozen_conv_mom_face EXACTLY mirrors
+    !! the flux_n(mom) whose divergence is rhs_slow_vf(mom), so the two divergences cancel on every RK stage.
     !! It is PUBLIC and populated by m_rhs (s_compute_rhs) directly from flux_n(dir)%vf(mom) each stage, in GLOBAL
     !! momentum-component layout (component d = flux_n(dir)%vf(mom%beg+d-1)), addressed at cell (j,k,l) for the +dir face -- the same
     !! convention as dmomflux below. Storing the slow path's actual flux (not a reconstruction from U^n) makes the cancellation
@@ -185,11 +182,6 @@ contains
                        & idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_acoustic_vf(i))
         end do
-        @:ALLOCATE(acL_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                   & 1:n_acoustic))
-        @:ALLOCATE(acR_rs_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                   & 1:n_acoustic))
-
         @:ALLOCATE(q_prim_vf(1:nfull))
         do i = 1, nfull
             @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -509,7 +501,6 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    call s_reconstruct_boundary_values(q_acoustic_vf, acL_rs_vf, acR_rs_vf, i)
                     call s_reconstruct_boundary_values(q_prim_vf, qL_rs_vf, qR_rs_vf, i)
 
                     joff = 0; koff = 0; loff = 0
@@ -950,8 +941,6 @@ contains
             @:DEALLOCATE(q_acoustic_vf(i)%sf)
         end do
         @:DEALLOCATE(q_acoustic_vf)
-        @:DEALLOCATE(acL_rs_vf)
-        @:DEALLOCATE(acR_rs_vf)
 
         do i = 1, size(q_prim_vf)
             @:DEALLOCATE(q_prim_vf(i)%sf)

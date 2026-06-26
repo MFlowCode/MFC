@@ -727,13 +727,16 @@ contains
 
                 ! Split-explicit low-Mach: snapshot the per-face slow momentum flux just computed by the HLLC slow path, whose
                 ! divergence is the momentum part of rhs_vf(mom), for the acoustic substep's live-minus-frozen momentum delta.
-                ! NOTE: despite the "conv" in the array name this is the FULL slow momentum flux, INCLUDING the star-pressure
-                ! p_Star on the normal component (m_riemann_solver_hllc star-state) -- NOT a convective-only rho*u_n*u_d flux.
-                ! Storing p_Star here is LOAD-BEARING: it cancels the slow path's pressure in rhs_slow(mom) so the acoustic tier
-                ! (flux_mom_rob) re-adds pressure live without double-counting; a future "make it convective-only" cleanup would
-                ! silently break that cancellation. flux_n(id)%vf(mom%beg+d-1) is global momentum component d at the +id face of
-                ! cell (j,k,l); stored in the same layout/convention as the substep's dmomflux so the cancellation is exact on
-                ! every RK stage. Bounds match the substep's flag/flux passes (one ghost below the interior on the normal axis).
+                ! Under acoustic_substepping the HLLC slow variant (m_riemann_solver_hllc) emits a momentum face flux that is
+                ! CONVECTIVE-ONLY -- contact-upwinded rho*u_n*u_d, with NO star-pressure p_Star, no acoustic (u+-c) dissipation,
+                ! and no low-Mach pcorr (those are deferred to the acoustic tier). frozen_conv_mom_face is therefore a faithful
+                ! per-face copy of that convective flux_n(mom); the substep's live convective delta is flux_mom_c(live) minus
+                ! frozen_conv_mom_face, and the star-pressure (acoustic) momentum is supplied LIVE and separately by flux_mom_rob,
+                ! so it must NOT also be present in this frozen/convective flux. The LOAD-BEARING invariant is that
+                ! frozen_conv_mom_face EXACTLY mirrors the flux_n(mom) whose divergence is rhs_slow(mom), so the two divergences
+                ! cancel on every RK stage. flux_n(id)%vf(mom%beg+d-1) is global momentum component d at the +id face of
+                ! cell (j,k,l); stored in the same layout/convention as the substep's dmomflux. Bounds match the substep's
+                ! flag/flux passes (one ghost below the interior on the normal axis).
                 ! Guarded so the standard solver path is byte-for-byte untouched.
                 if (acoustic_substepping) then
                     fb_x = idwint(1)%beg; fb_y = idwint(2)%beg; fb_z = idwint(3)%beg
