@@ -88,17 +88,25 @@ discontinuity criterion:
   energy remain exactly conservative. Total energy at the face is rebuilt from the
   reconstructed primitives via the stiffened-gas mixture EOS.
 
-The robust tier replaces the **mass and energy** convective transport with full HLLC, but
-the **convective momentum** flux at a flagged face stays frozen at its stage-entry (slow)
-value — only the acoustic star-pressure momentum is made live. This is exact for a material
-interface (where the convective-momentum jump is sub-dominant) and is what makes sharp
-material interfaces, including a 1-cell-sharp contact, stable and non-oscillatory in split
-mode (validated: per-species mass conserved to machine precision, bounded ~few-percent
-pressure ringing). At a **propagating shock**, however, convective momentum transport is
-leading order, and the frozen (first-order-in-time) momentum is not merely inaccurate but
-destabilizing — split mode is currently **unstable on shocks** (see *Scope and
-limitations*). Making the convective momentum live at flagged faces is the remaining work to
-bring shocks into scope.
+The robust tier replaces the **mass, energy, and momentum** convective transport with full
+HLLC. Mass and energy are made live directly from the reconstructed left/right state. The
+**convective momentum** flux is also made live, but through a live-minus-frozen delta: the
+slow (HLLC) path already computes an exact per-face convective-momentum flux at the RK stage
+state, which `s_compute_rhs` stores; the substep subtracts that stored flux and adds the
+live `s_convective_face_flux` value. Subtracting the *stored* stage-entry flux (rather than a
+reconstruction of it) makes the slow/frozen cancellation exact on every RK stage, which is
+what keeps the scheme stable when convective momentum transport is leading order — i.e. at a
+**propagating shock**. The transverse (off-normal) momentum slots of the rotated HLLC flux
+are mapped back into the stored global-component flux through the same single-valued
+telescoping delta, so transverse momentum is transported consistently in multiple
+dimensions (validated in 2D, below). Only the acoustic star-pressure momentum, which the
+slow path omits under `acoustic_substepping`, is added on top.
+
+With this, **propagating shocks and shock–interface interactions are captured** in split
+mode, not merely material contacts. The per-component delta is applied through a
+single-valued telescoping face flux, so species mass and total energy remain exactly
+conservative (drift \f$\sim 10^{-16}\f$). Total energy at the face is rebuilt from the
+reconstructed primitives via the stiffened-gas mixture EOS.
 
 The criterion (`s_acoustic_flag`) flags a face when either
 - the largest per-cell pressure jump over the 4-point stencil exceeds \f$\sim 1\%\f$ of the
@@ -176,17 +184,37 @@ backend-agnostic `GPU_*` macros (see @ref gpuParallelization "GPU Parallelizatio
   1-cell-sharp — the robust tier keeps the solution non-oscillatory (bounded few-percent
   pressure ringing) and species mass exactly conservative (drift \f$\sim 10^{-16}\f$), with
   the interface slightly more diffused than full HLLC.
-- **Propagating shocks are not yet in scope.** The robust tier makes the mass and energy
-  convective transport full HLLC, but the convective *momentum* flux at a flagged face stays
-  frozen at the stage-entry value (a first-order temporal lag). Where momentum advection is
-  leading order — i.e. at a moving shock — this is destabilizing: split mode goes unstable
-  (NaN for `num_fluids > 1`, adaptive-\f$\Delta t\f$ collapse for `num_fluids = 1`) once a
-  shock forms, even at a modest pressure ratio, and refining the acoustic CFL (more
-  substeps) only delays the failure. For shock-dominated flow use the standard solver
-  (`acoustic_substepping = F`). Bringing shocks into scope requires making the convective
-  momentum live at flagged faces (storing a per-face stage-entry slow-momentum to subtract);
-  for `num_fluids > 1` it additionally requires reconstructing the mixture EOS coefficients
-  at the face rather than reusing the cell volume fractions.
+- **Propagating shocks and shock–interface interactions are now captured** at flagged faces
+  via the live full-HLLC two-tier flux (mass, energy, and convective momentum all live; see
+  *Two-tier flux at discontinuities*). Validated cases (all with stable BCs, see below):
+  - A 1D periodic shock tube (`examples/1D_shock_periodic_lowmach`): stable, non-oscillatory,
+    species mass conserved to \f$\sim 10^{-16}\f$, matching full HLLC at the same resolution
+    to \f$\approx 3\text{–}5\%\f$ \f$L_2\f$ on the conserved fields.
+  - A 2D periodic shock with transverse shear (`examples/2D_shock_transverse_lowmach`),
+    which exercises the off-normal momentum path: **both** momentum components match full
+    HLLC to \f$\approx 5\text{–}7\%\f$ \f$L_2\f$, the transverse velocity stays uniform in
+    the homogeneous direction to \f$\sim 10^{-15}\f$ (no spurious transverse momentum from
+    the rotated-flux mapping), mass drift \f$\sim 10^{-16}\f$, no overshoot.
+  - A 2D periodic multifluid shock–droplet (`examples/2D_shockdroplet_lowmach`,
+    `num_fluids = 2`): stable, non-oscillatory, per-species mass conserved to
+    \f$\sim 10^{-16}\f$, volume fraction bounded, matching full HLLC to \f$\approx 4\text{–}7\%\f$
+    \f$L_2\f$.
+  Accuracy caveat: because each acoustic micro-step is first-order in \f$\Delta\tau\f$ (the
+  forward–backward update is symplectic-Euler; the macro coupling is 2nd-order — see
+  *Temporal accuracy*), the captured front is a few cells more dissipative than full HLLC,
+  and the dissipation accumulates over a long run (the multifluid droplet, run for many more
+  steps, shows the largest peak-amplitude loss). For `num_fluids > 1` the face EOS is rebuilt
+  from the **cell** volume fractions (exact only for `num_fluids = 1`); this does not
+  destabilize or introduce oscillations at the tested multifluid shock, but it adds
+  dissipation there — reconstructing the mixture EOS coefficients at the face is a future
+  accuracy refinement.
+- **The centered smooth tier is unstable at extrapolation/outflow boundaries with a
+  background flow.** A uniform outflow cell carrying a mean flow can go NaN, because the
+  centered (non-upwind) acoustic transport has no boundary dissipation there. This is
+  independent of the shock-capture machinery. Keep discontinuities away from outflow
+  boundaries, or use stable BCs (periodic, or reflecting/slip walls) near them; all of the
+  validated cases above are periodic for this reason. Robustifying the smooth tier at
+  outflow boundaries is future work.
 - The macro (WS-RK3) coupling is second-order in the advective step at fixed acoustic CFL;
   with auto substeps (\f$\Delta\tau \propto \Delta t\f$) the symplectic-Euler micro-step
   makes the practical convergence first order (see *Temporal accuracy* above). Spatial
