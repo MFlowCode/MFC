@@ -862,7 +862,7 @@ contains
         offset_y%beg = buff_size; offset_y%end = buff_size
         offset_z%beg = buff_size; offset_z%end = buff_size
 
-        ! Global domain bounds (#1290): grid-derived global extent for Lagrangian-bubble exchange
+        ! Global domain bounds
 #ifdef MFC_MPI
         call s_mpi_allreduce_min(x_cb(-1), glb_bounds(1)%beg)
         call s_mpi_allreduce_max(x_cb(m), glb_bounds(1)%end)

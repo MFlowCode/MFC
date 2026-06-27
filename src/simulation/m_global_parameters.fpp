@@ -54,7 +54,6 @@ module m_global_parameters
     !> @{
     real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-    type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz

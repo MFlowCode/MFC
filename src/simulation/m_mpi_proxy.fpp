@@ -134,8 +134,6 @@ contains
             & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3',           &
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out',               &
             & 'bc_z%pres_in','bc_z%pres_out',                                               &
-            & 'x_domain%beg', 'x_domain%end', 'y_domain%beg', 'y_domain%end',              &
-            & 'z_domain%beg', 'z_domain%end',                                               &
             & 'bc_x%Twall_in', 'bc_x%Twall_out', 'bc_y%Twall_in', 'bc_y%Twall_out',       &
             & 'bc_z%Twall_in', 'bc_z%Twall_out']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
