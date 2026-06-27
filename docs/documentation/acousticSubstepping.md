@@ -154,8 +154,9 @@ asymptotic \f$\Delta t \to 0\f$ refinement.
 
 The mode requires `model_eqns = 2` (5-equation model), a CFL-based time step
 (`cfl_adap_dt` or `cfl_const_dt`), and `time_stepper = 3` (SSP-RK3). These constraints are
-enforced at input checking. It is incompatible with bubbles, immersed boundaries,
-(hypo/hyper)elasticity, chemistry, and phase change.
+enforced at input checking. It is incompatible with Lagrangian bubbles, QBMM, immersed
+boundaries, (hypo/hyper)elasticity, chemistry, and phase change. Euler-Euler bubbles are
+supported in a restricted regime (`adv_n = T`); see *Euler-Euler bubbles* below.
 
 ```python
 "model_eqns": 2,
@@ -220,6 +221,43 @@ backend-agnostic `GPU_*` macros (see @ref gpuParallelization "GPU Parallelizatio
   makes the practical convergence first order (see *Temporal accuracy* above). Spatial
   order is unaffected.
 - Restricted to `model_eqns = 2`.
+
+### Euler-Euler bubbles
+
+Euler-Euler (volume-averaged) bubbles are supported in a **restricted regime**. When
+`bubbles_euler = T`, the bubble dynamics are **co-subcycled** with the acoustic substep:
+each acoustic micro-step advances the bubble Rayleigh-Plesset/Keller-Miksis state on the
+*live* (post-substep) pressure using the live velocity divergence, and the bubble-aware
+equation of state feeds the void fraction back before the next micro-step. The co-subcycle
+requires `adv_n = T` (the void fraction is recovered from the transported number density);
+this is enforced at input checking. A worked case is
+`examples/1D_bubble_acoustic_lowmach` (run it with `MFC_SPLIT=T` vs `MFC_SPLIT=F`).
+
+Intended use is **moderately driven, spatially smooth, dilute bubbly low-Mach flow**.
+Within that regime the scheme is stable, keeps the void fraction bounded and positive, and
+conserves carrier mass and total energy to machine precision (the substep transport is
+telescoping, so conservation is unaffected by the bubbles). The acoustically driven
+**equivalent radius** \f$R(t)\f$ tracks the standard adaptive bubble solver in sign,
+magnitude, and time-trend.
+
+Known limitations (validated, not yet addressed):
+- **Violent single-bubble collapse is out of scope.** Strong forcing drives the adaptive
+  bubble sub-integrator to a stiffness convergence failure (`Adaptive time stepping failed
+  to converge`) regardless of the acoustic substep count — raising `n_acoustic_substeps`
+  does not cure it, because the failure is bubble-ODE stiffness, not an acoustic-CFL issue.
+- **Sharp void-fraction discontinuities (bubble screens) are out of scope.** A bubbly
+  layer with a step change in void fraction drives the co-subcycle to non-convergence on
+  the first large advective step, even at gentle forcing and high substep counts. Keep the
+  void fraction spatially smooth.
+- **Void-fraction response lags.** The bubble *radius* is co-subcycled, but the bubble
+  *number density* rides only the slow advective transport, so the part of the void-fraction
+  response that comes from carrier compression is under-resolved at the acoustic rate; the
+  co-subcycled \f$\alpha(t)\f$ therefore under-responds relative to the standard solver
+  while \f$R(t)\f$ tracks it. Co-subcycling the number-density compression is future work.
+- **No per-step speedup for bubbly flow.** The per-micro-step bubble integration (plus the
+  bubble-only halo refresh and primitive rebuild) dominates the cost, so the split step is
+  much more expensive than a standard step; the \f$O(1/M)\f$ reduction in step count does
+  not survive it. The acoustic-substep speedup is a bubble-free-flow result.
 
 ## Source files
 

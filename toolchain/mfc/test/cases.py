@@ -2329,6 +2329,89 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # Euler-Euler bubble golden: a tiny dilute bubbly background (adv_n='T') with a
+        # small Gaussian pressure pulse. In split mode the EE bubble dynamics are
+        # co-subcycled with the acoustic substep (each micro-step advances the bubble
+        # Rayleigh-Plesset state on the live pressure; the bubble-aware EOS feeds the void
+        # fraction back). Moderate forcing + short window keep the adaptive bubble
+        # sub-integrator well inside its convergence regime (violent collapse is out of
+        # scope -- ODE stiffness). Periodic, CPU, deterministic. See
+        # examples/1D_bubble_acoustic_lowmach for the validation case.
+        c0_b = _math.sqrt(gamma)
+        Mach_b = 0.1
+        u0_b = Mach_b * c0_b
+        Nx_b = 31  # m=31 -> 32 cells
+        dx_b = 1.0 / (Nx_b + 1)
+        CFL_b = 0.5
+        dt_b = CFL_b * dx_b / c0_b
+        vf0_b = 1.0e-3  # dilute background void fraction
+
+        stack.push(
+            "1D -> Acoustic Substepping Bubbles",
+            {
+                "m": Nx_b,
+                "n": 0,
+                "p": 0,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "dt": dt_b,
+                "cfl_adap_dt": "T",
+                "cfl_target": CFL_b,
+                "n_start": 0,
+                "t_stop": 0.05,
+                "t_save": 0.05,
+                "num_patches": 1,
+                "model_eqns": 2,
+                "num_fluids": 1,
+                "alt_soundspeed": "F",
+                "mpp_lim": "F",
+                "mixture_err": "F",
+                "time_stepper": 3,
+                "weno_order": 5,
+                "weno_eps": 1.0e-16,
+                "mapped_weno": "F",
+                "null_weights": "F",
+                "mp_weno": "F",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "acoustic_substepping": "T",
+                "n_acoustic_substeps": 20,
+                "acoustic_div_damp": 0.4,
+                # Patch 1: uniform dilute bubbly background + Gaussian pressure pulse
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%vel(1)": u0_b,
+                "patch_icpp(1)%pres": "1.0 + 5e-3 * exp(-((x - 0.5) / 0.15)**2)",
+                "patch_icpp(1)%alpha_rho(1)": (1.0 - vf0_b) * 1.0,
+                "patch_icpp(1)%alpha(1)": vf0_b,
+                "patch_icpp(1)%r0": 1.0,
+                "patch_icpp(1)%v0": 0.0,
+                "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+                "fluid_pp(1)%pi_inf": 0.0,
+                # Euler-Euler bubbles, co-subcycled with the acoustic substep
+                "bubbles_euler": "T",
+                "bubble_model": 2,
+                "polytropic": "T",
+                "adv_n": "T",
+                "polydisperse": "F",
+                "thermal": 3,
+                "nb": 1,
+                "bub_pp%R0ref": 1.0,
+                "bub_pp%p0ref": 1.0,
+                "bub_pp%rho0ref": 1.0,
+                "bub_pp%ss": 0.0,
+                "bub_pp%pv": 0.0,
+                "bub_pp%mu_l": 0.1,
+                "bub_pp%gam_g": 1.4,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     acoustic_substepping_cases()
 
     def direction_symmetry_tests():
