@@ -1288,6 +1288,7 @@ class CaseValidator:
         model_eqns = self.get("model_eqns")
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        adv_n = self.get("adv_n", "F") == "T"
         qbmm = self.get("qbmm", "F") == "T"
         ib = self.get("ib", "F") == "T"
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
@@ -1298,7 +1299,8 @@ class CaseValidator:
         acoustic_div_damp = self.get("acoustic_div_damp", 0.1)
 
         self.prohibit(model_eqns is not None and model_eqns != 2, "acoustic_substepping requires model_eqns = 2")
-        self.prohibit(bubbles_euler or bubbles_lagrange, "acoustic_substepping is incompatible with bubbles")
+        self.prohibit(bubbles_lagrange, "acoustic_substepping is incompatible with Lagrangian bubbles")
+        self.prohibit(bubbles_euler and not adv_n, "acoustic_substepping with Euler-Euler bubbles requires adv_n = T (the co-subcycle recovers void fraction from number density)")
         self.prohibit(qbmm, "acoustic_substepping is incompatible with qbmm")
         self.prohibit(ib, "acoustic_substepping is incompatible with immersed boundaries")
         self.prohibit(hypoelasticity or hyperelasticity, "acoustic_substepping is incompatible with elasticity")

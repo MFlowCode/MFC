@@ -100,7 +100,9 @@ contains
 
         if (acoustic_substepping) then
             @:PROHIBIT(model_eqns /= 2, "acoustic_substepping requires model_eqns = 2")
-            @:PROHIBIT(bubbles_euler .or. bubbles_lagrange, "acoustic_substepping is incompatible with bubbles")
+            @:PROHIBIT(bubbles_lagrange, "acoustic_substepping is incompatible with Lagrangian bubbles")
+            @:PROHIBIT(bubbles_euler .and. .not. adv_n, &
+                       & "acoustic_substepping with Euler-Euler bubbles requires adv_n = T (the co-subcycle recovers void fraction from number density)")
             @:PROHIBIT(qbmm, "acoustic_substepping is incompatible with qbmm")
             @:PROHIBIT(ib, "acoustic_substepping is incompatible with immersed boundaries")
             @:PROHIBIT(hypoelasticity .or. hyperelasticity, "acoustic_substepping is incompatible with elasticity")

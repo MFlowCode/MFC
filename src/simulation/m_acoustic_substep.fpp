@@ -52,6 +52,8 @@ module m_acoustic_substep
     use m_riemann_solver_hllc, only: s_acoustic_face_flux, s_convective_face_flux
     use m_constants, only: BC_GHOST_EXTRAP, BC_RIEMANN_EXTRAP, BC_CHAR_NR_SUB_OUTFLOW, BC_CHAR_FF_SUB_OUTFLOW, &
         & BC_CHAR_CP_SUB_OUTFLOW, BC_CHAR_SUP_OUTFLOW, BC_DIRICHLET
+    use m_bubbles_EE, only: divu, rs, s_advance_bubbles_EE, s_comp_alpha_from_n, s_compute_bubbles_EE_rhs
+    use m_helper, only: s_comp_n_from_cons
 
     implicit none
 
@@ -91,6 +93,13 @@ module m_acoustic_substep
     !! EOS rebuild reads the volume fractions reconstructed AT the face (not the cell). Rebuilt only on flagged microsteps.
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf
     $:GPU_DECLARE(create='[q_prim_vf]')
+
+    !> Live primitive view consumed by the EE bubble co-subcycle (s_advance_bubbles_EE): cell velocities (for the velocity
+    !! divergence div(u)), live bubble-aware pressure, void fraction, number density, and the bubble moments (R, V, and pb/mv when
+    !! non-polytropic). Only the slots the bubble integrator and the reused div(u) builder read are allocated; built (and the array
+    !! allocated) only when bubbles_euler, so the no-bubble path never touches it.
+    type(scalar_field), allocatable, dimension(:) :: q_prim_bub_vf
+    $:GPU_DECLARE(create='[q_prim_bub_vf]')
 
     !> WENO-reconstructed left/right FULL primitive face states (slots 1..eqn_idx%adv%end, layout matching q_prim_vf and m_rhs's
     !! qL_rsx_vf/qR_rsx_vf), reused per direction; consumed by the flagged-face convective HLLC flux. Reconstruction is gated by
@@ -204,6 +213,32 @@ contains
         @:ALLOCATE(dmomflux(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
                    & 1:num_dims, 1:num_vels))
 
+        ! Bubble co-subcycle primitive view (only the slots the integrator and the div(u) builder read).
+        if (bubbles_euler) then
+            @:ALLOCATE(q_prim_bub_vf(1:sys_size))
+            do i = eqn_idx%mom%beg, eqn_idx%mom%end
+                @:ALLOCATE(q_prim_bub_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_bub_vf(i))
+            end do
+            @:ALLOCATE(q_prim_bub_vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_prim_bub_vf(eqn_idx%E))
+            @:ALLOCATE(q_prim_bub_vf(eqn_idx%alf)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_prim_bub_vf(eqn_idx%alf))
+            if (adv_n) then
+                @:ALLOCATE(q_prim_bub_vf(eqn_idx%n)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_bub_vf(eqn_idx%n))
+            end if
+            do i = eqn_idx%bub%beg, eqn_idx%bub%end
+                @:ALLOCATE(q_prim_bub_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_bub_vf(i))
+            end do
+        end if
+
     end subroutine s_initialize_acoustic_substep_module
 
     !> Advance the conserved field in place by `n_micro` forward-backward acoustic microsteps.
@@ -224,13 +259,15 @@ contains
         real(wp) :: gamma, pinf, qv
         real(wp) :: rho_n  !< Neighbour-cell mixture density (velocity denominator)
         real(wp) :: dyn_p  !< Dynamic pressure 0.5*rho*|u|^2
-        real(wp) :: alf    !< Void (bubble volume) fraction for the bubbles_euler mixture-pressure correction
+        real(wp) :: alf  !< Void (bubble volume) fraction for the bubbles_euler mixture-pressure correction
+        real(wp) :: nbub  !< Bubble number density for the co-subcycle conserved-to-primitive moment recovery
         real(wp) :: div  !< Centered flux divergence accumulator
         real(wp) :: dpdx  !< Centered pressure-gradient component
         real(wp) :: damp  !< Grad-div divergence-damping stencil accumulator
         real(wp) :: inv_2dx, inv_2dy, inv_2dz  !< 1/(2*dx) etc. for centered first differences
         real(wp) :: u_xp, u_xm, u_yp, u_ym, u_zp, u_zm  !< Stencil-neighbour cell-center velocities (computed once per cell)
         integer  :: q  !< Microstep iterator
+        integer  :: qb  !< Bubble-bin / bubble-equation-slot iterator for the co-subcycle
         integer  :: f  !< Fluid iterator (mixture sums)
         integer  :: i, j, k, l  !< Generic / spatial iterators
         integer  :: momxb, momxe, contb  !< First/last momentum and first continuity equation indices
@@ -259,10 +296,12 @@ contains
             real(wp), dimension(3) :: rhoYks_a, rhoYks_b, flux_cont
             !> L/R velocities (slot 1 = normal) + HLLC convective mom flux
             real(wp), dimension(3) :: vel_a_arr, vel_b_arr, flux_mom_c
+            real(wp), dimension(3) :: nRtmp  !< Conserved bubble-radii moments for the per-cell number-density recovery
         #:else
             !> Reconstructed L/R partial densities + conv mass flux
             real(wp), dimension(num_fluids) :: rhoYks_a, rhoYks_b, flux_cont
             real(wp), dimension(num_dims)   :: vel_a_arr, vel_b_arr, flux_mom_c  !< L/R velocities (slot 1 = normal) + conv mom flux
+            real(wp), dimension(nb)         :: nRtmp  !< Conserved bubble-radii moments for the per-cell number-density recovery
         #:endif
         real(wp) :: sm_r, sm_l, gd_r, gd_l, dfm_r, dfm_l  !< Backward momentum robust-correction face pressures/damping/deltas
         integer :: flg_r, flg_l  !< Right/left face discontinuity flags (backward momentum correction)
@@ -1024,6 +1063,84 @@ contains
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()
+
+                        ! 5. Co-subcycle the Euler-Euler bubble dynamics by the FULL microstep dtau on the LIVE state
+                        !    (operator-split Lie step, once per microstep). Run AFTER the acoustic mass/energy/momentum
+                        !    update and the bubble-aware pressure recompute, so the bubble radial dynamics see the live
+                        !    acoustic pressure and the updated void fraction feeds the NEXT microstep's bubble-aware EOS.
+                        !    Across the stage's n_micro microsteps the bubble state advances the full stage time (the
+                        !    WS-RK3 stages restart from U^n via the 1:sys_size save/restore). The advance is cell-local
+                        !    (no flux/conservation change) and does not touch the conservative face fluxes. The whole
+                        !    block is guarded by bubbles_euler so the no-bubble path is bit-identical.
+                        if (bubbles_euler) then
+                            ! Refresh the conserved halo so the velocity-divergence stencil is valid at the
+                            ! boundary-adjacent interior cells (the backward sweep updated only the interior momentum).
+                            call s_populate_variables_buffers(bc_type, q_cons_vf)
+
+                            ! Cell velocities u = mom/rho_mix over the buffered domain into the bubble primitive view, plus
+                            ! the live bubble-aware pressure. The velocity slots let the reused s_compute_bubbles_EE_rhs
+                            ! build the SAME div(u) the standard bubble source consumes -- div(u), NOT the momentum
+                            ! divergence div(rho*u) carried by div_sf (the bubble model wants the velocity divergence).
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, f, rho]')
+                            do l = idwbuff(3)%beg, idwbuff(3)%end
+                                do k = idwbuff(2)%beg, idwbuff(2)%end
+                                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                                        rho = 0._wp
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do f = 1, num_fluids
+                                            rho = rho + q_cons_vf(eqn_idx%cont%beg + f - 1)%sf(j, k, l)
+                                        end do
+                                        rho = max(rho, sgm_eps)
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            q_prim_bub_vf(momxb + i - 1)%sf(j, k, l) = q_cons_vf(momxb + i - 1)%sf(j, k, l)/rho
+                                        end do
+                                        q_prim_bub_vf(eqn_idx%E)%sf(j, k, l) = p_sf(j, k, l)
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+
+                            ! Recover the bubble primitive moments (R, V, and pb/mv when non-polytropic) and the number
+                            ! density over the interior, mirroring the bubbles branch of
+                            ! s_convert_conservative_to_primitive_variables: divide the carried conserved bubble moments by
+                            ! the bubble number density nbub.
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, qb, nbub, nRtmp]')
+                            do l = 0, p
+                                do k = 0, n
+                                    do j = 0, m
+                                        q_prim_bub_vf(eqn_idx%alf)%sf(j, k, l) = q_cons_vf(eqn_idx%alf)%sf(j, k, l)
+                                        if (adv_n) then
+                                            nbub = q_cons_vf(eqn_idx%n)%sf(j, k, l)
+                                            q_prim_bub_vf(eqn_idx%n)%sf(j, k, l) = nbub
+                                        else
+                                            $:GPU_LOOP(parallelism='[seq]')
+                                            do qb = 1, nb
+                                                nRtmp(qb) = q_cons_vf(rs(qb))%sf(j, k, l)
+                                            end do
+                                            call s_comp_n_from_cons(q_cons_vf(eqn_idx%alf)%sf(j, k, l), nRtmp, nbub, weight)
+                                        end if
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do qb = eqn_idx%bub%beg, eqn_idx%bub%end
+                                            q_prim_bub_vf(qb)%sf(j, k, l) = q_cons_vf(qb)%sf(j, k, l)/nbub
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+
+                            ! Live velocity divergence (reuses the standard bubble-source div(u) builder per direction).
+                            do i = 1, num_dims
+                                call s_compute_bubbles_EE_rhs(i, q_prim_bub_vf, divu)
+                            end do
+
+                            ! Advance the bubble dynamics by the full microstep dtau, then refresh the void fraction from the
+                            ! transported number density so the next microstep's bubble-aware EOS reads the updated alpha.
+                            ! s_comp_alpha_from_n recovers alpha from the number-density equation (q_cons(eqn_idx%n)), so --
+                            ! like the standard solver (m_time_steppers ~L563) -- it is gated on adv_n.
+                            call s_advance_bubbles_EE(q_cons_vf, q_prim_bub_vf, divu, dtau)
+                            if (adv_n) call s_comp_alpha_from_n(q_cons_vf)
+                        end if
                     end do
 
                 end subroutine s_acoustic_substep
@@ -1083,6 +1200,21 @@ contains
                     @:DEALLOCATE(dmassflux)
                     @:DEALLOCATE(frozen_conv_mom_face)
                     @:DEALLOCATE(dmomflux)
+
+                    if (bubbles_euler) then
+                        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+                            @:DEALLOCATE(q_prim_bub_vf(i)%sf)
+                        end do
+                        @:DEALLOCATE(q_prim_bub_vf(eqn_idx%E)%sf)
+                        @:DEALLOCATE(q_prim_bub_vf(eqn_idx%alf)%sf)
+                        if (adv_n) then
+                            @:DEALLOCATE(q_prim_bub_vf(eqn_idx%n)%sf)
+                        end if
+                        do i = eqn_idx%bub%beg, eqn_idx%bub%end
+                            @:DEALLOCATE(q_prim_bub_vf(i)%sf)
+                        end do
+                        @:DEALLOCATE(q_prim_bub_vf)
+                    end if
 
                 end subroutine s_finalize_acoustic_substep_module
 

@@ -336,10 +336,10 @@ contains
         real(wp)                                               :: n_tait, B_tait
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: Rtmp, Vtmp
+            real(wp), dimension(3) :: Rtmp
             real(wp), dimension(3) :: myalpha, myalpha_rho
         #:else
-            real(wp), dimension(nb)         :: Rtmp, Vtmp
+            real(wp), dimension(nb)         :: Rtmp
             real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         #:endif
         real(wp) :: myR, myV, alf, myP, myRho, R3
@@ -350,7 +350,7 @@ contains
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R3, nbub, pb_local, &
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R3, nbub, pb_local, &
                             & mv_local, vflux, pbdot, n_tait, B_tait]', collapse=3, reduction = '[[adap_dt_stop_max]]', &
                             & reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
         do l = 0, p
