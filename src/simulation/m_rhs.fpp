@@ -83,12 +83,16 @@ module m_rhs
     !> @}
 
     type(vector_field), allocatable, dimension(:) :: nc_iface_vel_n
+#if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[nc_iface_vel_n]')
+#endif
 
     !> hat_R-pass interface velocities for fused dual-pass HLLD: the axisymmetric geometric source consumes both passes' face
     !! velocities after the direction loop, so the hat_R values need their own field set (hat_L uses nc_iface_vel_n).
     type(vector_field), allocatable, dimension(:) :: nc_iface_vel_hatR_n
+#if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[nc_iface_vel_hatR_n]')
+#endif
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
 #if defined(MFC_OpenACC)
