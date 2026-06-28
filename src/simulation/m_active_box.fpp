@@ -107,10 +107,29 @@ contains
 
     end subroutine s_initialize_active_box
 
-    !> Stub in Task 1: no-op. Filled in Task 3.
-    impure subroutine s_grow_active_box(dt_in)
+    !> Grow the active box by one light-cone step and refresh the device copy.
+    impure subroutine s_grow_active_box()
 
-        real(wp), intent(in) :: dt_in
+        integer :: g
+
+        if (.not. ab_active) return
+
+        ! Fixed light-cone growth: g = buff_size cells/step provably exceeds the per-step
+        ! front advance (CFL <= ~1.4 < buff_size for any stable SSP-RK3 + WENO5 run), so the
+        ! buff_size reconstruction margin established at init only grows. Under-growth would
+        ! require CFL > buff_size, i.e. an unstable run that diverges regardless.
+        g = buff_size
+
+        ab_x%beg = max(0, ab_x%beg - g); ab_x%end = min(m, ab_x%end + g)
+        ab_y%beg = max(0, ab_y%beg - g); ab_y%end = min(n, ab_y%end + g)
+        ab_z%beg = max(0, ab_z%beg - g); ab_z%end = min(p, ab_z%end + g)
+
+        ! Once the box fills the domain, disable the optimization (full-domain is correct and avoids the bookkeeping).
+        if (ab_x%beg == 0 .and. ab_x%end == m .and. ab_y%beg == 0 .and. ab_y%end == n .and. ab_z%beg == 0 .and. ab_z%end == p) then
+            ab_active = .false.
+        end if
+
+        $:GPU_UPDATE(device='[ab_x, ab_y, ab_z, ab_active]')
 
     end subroutine s_grow_active_box
 

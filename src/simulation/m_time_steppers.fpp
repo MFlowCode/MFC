@@ -27,6 +27,7 @@ module m_time_steppers
     use m_body_forces
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
+    use m_active_box, only: s_grow_active_box
 
     implicit none
 
@@ -462,6 +463,8 @@ contains
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
+
+        call s_grow_active_box()
 
         ! Adaptive dt: initial stage
         if (adap_dt) call s_adaptive_dt_bubble(1)
