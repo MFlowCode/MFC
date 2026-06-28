@@ -12,7 +12,7 @@ module m_checker
     use m_mpi_proxy
     use m_helper
     use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order
+    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3
 
     implicit none
 
@@ -39,6 +39,17 @@ contains
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
+
+        if (active_box) then
+            @:PROHIBIT(recon_type /= recon_type_weno, "active_box requires WENO reconstruction")
+            @:PROHIBIT(ib, "active_box is incompatible with immersed boundaries")
+            @:PROHIBIT(acoustic_source, "active_box is incompatible with acoustic sources")
+            @:PROHIBIT(bodyForces, "active_box is incompatible with body forces")
+            @:PROHIBIT(bubbles_lagrange, "active_box is incompatible with Lagrangian bubbles")
+            @:PROHIBIT(relax, "active_box is incompatible with phase change")
+            @:PROHIBIT(igr, "active_box is incompatible with the IGR solver")
+            @:PROHIBIT(time_stepper /= time_stepper_rk3, "active_box requires time_stepper = 3 (SSP-RK3)")
+        end if
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds

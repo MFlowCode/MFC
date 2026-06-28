@@ -3,6 +3,7 @@
         "category": "Solver Core",
         "modules": [
             "m_rhs",
+            "m_active_box",
             "m_time_steppers",
             "m_weno",
             "m_riemann_solvers",

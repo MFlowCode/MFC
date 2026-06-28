@@ -447,6 +447,7 @@ contains
         #:endif
 
         adv_n = .false.
+        active_box = .false.
         adap_dt = .false.
         adap_dt_tol = dflt_adap_dt_tol
         adap_dt_max_iters = dflt_adap_dt_max_iters

@@ -163,6 +163,7 @@ DESCRIPTIONS = {
     "Bx0": "Background magnetic field in x-direction",
     "relax": "Enable relaxation terms",
     "adv_n": "Enable advection of number density",
+    "active_box": "Enable causal-envelope active-box restriction of the RHS compute window",
     "cont_damage": "Enable continuum damage model",
     "igr": "Enable implicit gradient reconstruction",
     "down_sample": "Enable output downsampling",

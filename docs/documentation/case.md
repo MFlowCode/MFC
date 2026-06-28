@@ -109,6 +109,7 @@ is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's
 | ---:             |    :----:      |          :---                             |
 | `run_time_info`  | Logical        | Output run-time information               |
 | `rdma_mpi`       | Logical        | (GPUs) Enable RDMA for MPI communication. |
+| `active_box`     | Logical        | Enable causal-envelope active-box restriction of the RHS compute window. |
 | `case_dir`       | String         | Case directory path                       |
 | `old_grid`       | Logical        | Use grid from previous simulation         |
 | `old_ic`         | Logical        | Use initial conditions from previous simulation |
@@ -116,6 +117,7 @@ is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's
 | `n_start_old`    | Integer        | Starting index from previous simulation   |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
+- `active_box` enables the causal-envelope active-box optimization, restricting the RHS compute window to the region where the solution deviates from a uniform ambient state. Requires WENO reconstruction (`recon_type = 1`) and SSP-RK3 time stepping (`time_stepper = 3`). Incompatible with immersed boundaries, acoustic sources, body forces, Lagrangian bubbles, phase change, and the IGR solver.
 - `rdma_mpi` optimizes data transfers between GPUs using Remote Direct Memory Access (RDMA).
 The underlying MPI implementation and communication infrastructure must support this
 feature, detecting GPU pointers and performing RDMA accordingly.

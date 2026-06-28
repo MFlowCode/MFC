@@ -194,6 +194,17 @@ PHYSICS_DOCS = {
         "references": ["Papanastasiou87"],
         "docs_section": "sec-non-newtonian",
     },
+    # Active-Box Optimization
+    "check_active_box": {
+        "title": "Active-Box RHS Restriction",
+        "category": "Active-Box Optimization",
+        "explanation": (
+            "Causal-envelope active-box optimization restricts the RHS compute window. "
+            "Requires WENO reconstruction (recon_type = 1) and SSP-RK3 time stepping (time_stepper = 3). "
+            "Incompatible with immersed boundaries, acoustic sources, body forces, "
+            "Lagrangian bubbles, phase change (relax), and the IGR solver."
+        ),
+    },
     # Acoustic Sources
     "check_acoustic_source": {
         "title": "Acoustic Sources",
@@ -1245,6 +1256,31 @@ class CaseValidator:
                 self.prohibit(element_polygon_ratio is None, f"acoustic({jstr})%element_polygon_ratio must be specified for support = 11 (3D transducer)")
                 self.prohibit(element_polygon_ratio is not None and element_polygon_ratio <= 0, f"acoustic({jstr})%element_polygon_ratio must be positive for support = 11")
 
+    def check_active_box(self):
+        """Checks active-box optimization compatibility (simulation)"""
+        active_box = self.get("active_box", "F") == "T"
+
+        if not active_box:
+            return
+
+        recon_type = self.get("recon_type")
+        time_stepper = self.get("time_stepper")
+        ib = self.get("ib", "F") == "T"
+        acoustic_source = self.get("acoustic_source", "F") == "T"
+        bodyForces = any(self.get(f"bf_{d}", "F") == "T" for d in ["x", "y", "z"])
+        bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        relax = self.get("relax", "F") == "T"
+        igr = self.get("igr", "F") == "T"
+
+        self.prohibit(recon_type is not None and recon_type != 1, "active_box requires WENO reconstruction (recon_type = 1)")
+        self.prohibit(time_stepper is not None and time_stepper != 3, "active_box requires time_stepper = 3 (SSP-RK3)")
+        self.prohibit(ib, "active_box is incompatible with immersed boundaries")
+        self.prohibit(acoustic_source, "active_box is incompatible with acoustic sources")
+        self.prohibit(bodyForces, "active_box is incompatible with body forces")
+        self.prohibit(bubbles_lagrange, "active_box is incompatible with Lagrangian bubbles")
+        self.prohibit(relax, "active_box is incompatible with phase change")
+        self.prohibit(igr, "active_box is incompatible with the IGR solver")
+
     def check_adaptive_time_stepping(self):
         """Checks adaptive time stepping parameters (simulation)"""
         adap_dt = self.get("adap_dt", "F") == "T"
@@ -2261,6 +2297,7 @@ class CaseValidator:
         self.check_mhd_simulation()
         self.check_igr_simulation()
         self.check_acoustic_source()
+        self.check_active_box()
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()
         self.check_bubbles_lagrange()
