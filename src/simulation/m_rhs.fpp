@@ -36,6 +36,7 @@ module m_rhs
     use m_igr
     use m_thinc
     use m_pressure_relaxation
+    use m_active_box, only: ab_x, ab_y, ab_z, ab_active
 
     implicit none
 
@@ -482,7 +483,9 @@ contains
         integer, intent(in) :: stage
         real(wp) :: t_start, t_finish
         integer :: id
-        integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
+        integer(kind=8) :: i, j, k, l, q                     !< Generic loop iterators
+        integer :: cbjlo, cbjhi, cbklo, cbkhi, cbllo, cblli  !< Active-box + halo copy bounds
+        type(int_bounds_info) :: ab_int(1:3)                 !< Active-box interior bounds for convert call
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
@@ -490,13 +493,32 @@ contains
 
         call cpu_time(t_start)
 
+        if (ab_active) then
+            cbjlo = max(idwbuff(1)%beg, ab_x%beg - buff_size)
+            cbjhi = min(idwbuff(1)%end, ab_x%end + buff_size)
+            cbklo = max(idwbuff(2)%beg, ab_y%beg - buff_size)
+            cbkhi = min(idwbuff(2)%end, ab_y%end + buff_size)
+            cbllo = max(idwbuff(3)%beg, ab_z%beg - buff_size)
+            cblli = min(idwbuff(3)%end, ab_z%end + buff_size)
+            ! Convert over the same footprint as the copy (clamped to interior) so that
+            ! q_prim_qp is valid for reconstruction stencils at the box boundary.
+            ab_int(1)%beg = max(0, ab_x%beg - buff_size); ab_int(1)%end = min(m, ab_x%end + buff_size)
+            ab_int(2)%beg = max(0, ab_y%beg - buff_size); ab_int(2)%end = min(n, ab_y%end + buff_size)
+            ab_int(3)%beg = max(0, ab_z%beg - buff_size); ab_int(3)%end = min(p, ab_z%end + buff_size)
+        else
+            cbjlo = idwbuff(1)%beg; cbjhi = idwbuff(1)%end
+            cbklo = idwbuff(2)%beg; cbkhi = idwbuff(2)%end
+            cbllo = idwbuff(3)%beg; cblli = idwbuff(3)%end
+            ab_int = idwint
+        end if
+
         if (.not. igr) then
             ! Association/Population of Working Variables
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
             do i = 1, sys_size
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                do l = cbllo, cblli
+                    do k = cbklo, cbkhi
+                        do j = cbjlo, cbjhi
                             q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
                         end do
                     end do
@@ -535,7 +557,7 @@ contains
         end if
         if (.not. igr) then
             call nvtxStartRange("RHS-CONVERT")
-            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
+            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, ab_int)
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")

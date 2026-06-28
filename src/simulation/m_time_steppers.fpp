@@ -27,7 +27,7 @@ module m_time_steppers
     use m_body_forces
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
-    use m_active_box, only: s_grow_active_box
+    use m_active_box, only: s_grow_active_box, ab_x, ab_y, ab_z, ab_active
 
     implicit none
 
@@ -458,7 +458,8 @@ contains
         integer, intent(in)     :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
-        integer                 :: i, j, k, l, q, s  !< Generic loop iterator
+        integer                 :: i, j, k, l, q, s              !< Generic loop iterator
+        integer                 :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
         real(wp)                :: start, finish
 
         call cpu_time(start)
@@ -496,11 +497,18 @@ contains
             end if
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
+            if (ab_active) then
+                jlo = ab_x%beg; jhi = ab_x%end
+                klo = ab_y%beg; khi = ab_y%end
+                llo = ab_z%beg; lhi = ab_z%end
+            else
+                jlo = 0; jhi = m; klo = 0; khi = n; llo = 0; lhi = p
+            end if
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
+                do l = llo, lhi
+                    do k = klo, khi
+                        do j = jlo, jhi
                             if (s == 1 .and. nstage > 1) then
                                 q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
                             end if
