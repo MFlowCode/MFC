@@ -43,13 +43,67 @@ contains
 
     end subroutine s_finalize_active_box_module
 
-    !> Stub in Task 1: leaves ab_active=.false. (full-domain). Filled in Task 2.
+    !> Detect the ambient state and set the initial active-box bounds from the IC support.
     impure subroutine s_initialize_active_box(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        integer                                             :: i, j, k, l
+        integer                                             :: ib, ie, jb, je, kb, ke
+        logical                                             :: deviates
 
-        ab_active = .false.
-        $:GPU_UPDATE(device='[ab_active]')
+        if (.not. active_box .or. num_procs /= 1) then
+            ab_active = .false.
+            $:GPU_UPDATE(device='[ab_active]')
+            return
+        end if
+
+        ! Ambient = the (0,0,0) interior corner cell, assumed in the undisturbed region.
+        do i = 1, sys_size
+            ab_ambient(i) = q_cons_vf(i)%sf(0, 0, 0)
+        end do
+
+        ! Bounding box of cells deviating from ambient.
+        ib = m + 1; ie = -1; jb = n + 1; je = -1; kb = p + 1; ke = -1
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    deviates = .false.
+                    do i = 1, sys_size
+                        if (abs(q_cons_vf(i)%sf(j, k, l) - ab_ambient(i)) > tol_ab) then
+                            deviates = .true.; exit
+                        end if
+                    end do
+                    if (deviates) then
+                        ib = min(ib, j); ie = max(ie, j)
+                        jb = min(jb, k); je = max(je, k)
+                        kb = min(kb, l); ke = max(ke, l)
+                    end if
+                end do
+            end do
+        end do
+
+        ! Empty deviation set -> nothing to do; disable.
+        if (ie < ib) then
+            ab_active = .false.
+            $:GPU_UPDATE(device='[ab_active]')
+            return
+        end if
+
+        ! Dilate by the reconstruction stencil and clamp to the interior.
+        ab_x%beg = max(0, ib - buff_size); ab_x%end = min(m, ie + buff_size)
+        ab_y%beg = max(0, jb - buff_size); ab_y%end = min(n, je + buff_size)
+        ab_z%beg = max(0, kb - buff_size); ab_z%end = min(p, ke + buff_size)
+
+        ! If the box already covers the whole domain there is no benefit; disable.
+        ab_active = .not. (ab_x%beg == 0 .and. ab_x%end == m .and. ab_y%beg == 0 .and. ab_y%end == n .and. ab_z%beg == 0 &
+                           & .and. ab_z%end == p)
+
+        $:GPU_UPDATE(device='[ab_x, ab_y, ab_z, ab_active]')
+
+        if (ab_active) then
+            print *, '[active_box] init box x[', ab_x%beg, ':', ab_x%end, '] y[', ab_y%beg, ':', ab_y%end, '] z[', ab_z%beg, ':', &
+                & ab_z%end, ']'
+        end if
 
     end subroutine s_initialize_active_box
 

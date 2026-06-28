@@ -925,6 +925,8 @@ contains
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
+        if (active_box) call s_initialize_active_box(q_cons_ts(1)%vf)
+
     end subroutine s_initialize_modules
 
     !> Set up the MPI execution environment, bind GPUs, and decompose the computational domain
