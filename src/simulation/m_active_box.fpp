@@ -15,7 +15,7 @@ module m_active_box
 
     private
     public :: s_initialize_active_box_module, s_finalize_active_box_module, s_initialize_active_box, s_grow_active_box, &
-        & s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
+        & s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active, ab_ambient
 
     type(int_bounds_info) :: ab_x, ab_y, ab_z    !< Active-box interior cell ranges
     logical               :: ab_active           !< Whether the optimization is engaged
