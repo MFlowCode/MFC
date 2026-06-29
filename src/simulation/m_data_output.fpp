@@ -63,6 +63,12 @@ contains
         type(scalar_field), intent(inout), optional                 :: beta
         type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
 
+        if (load_weight_wrt) then
+            call s_compute_load_weight(q_cons_vf)
+            call s_report_load_imbalance
+            $:GPU_UPDATE(host='[load_weight%sf]')
+        end if
+
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
         else
@@ -405,12 +411,6 @@ contains
             if (qbmm) then
                 q_prim_vf(eqn_idx%bub%beg)%sf = 1._wp
             end if
-        end if
-
-        if (load_weight_wrt) then
-            call s_compute_load_weight(q_cons_vf, q_prim_vf)
-            call s_report_load_imbalance
-            $:GPU_UPDATE(host='[load_weight%sf]')
         end if
 
         if (n == 0 .and. p == 0) then

@@ -48,9 +48,9 @@ contains
     end subroutine s_finalize_load_weight_module
 
     !> Base cost 1 everywhere; cells outside the active box get 0 (frozen).
-    impure subroutine s_compute_load_weight(q_cons_vf, q_prim_vf)
+    impure subroutine s_compute_load_weight(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer                                             :: j, k, l
         integer                                             :: jlo, jhi, klo, khi, llo, lhi
         integer                                             :: n_bub_idx
@@ -93,7 +93,7 @@ contains
                 do k = 0, n
                     do j = 0, m
                         if (j >= jlo .and. j <= jhi .and. k >= klo .and. k <= khi .and. l >= llo .and. l <= lhi) then
-                            load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*real(q_prim_vf(n_bub_idx)%sf(j, k, l), wp)
+                            load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*real(q_cons_vf(n_bub_idx)%sf(j, k, l), wp)
                         end if
                     end do
                 end do
