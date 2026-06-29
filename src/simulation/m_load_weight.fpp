@@ -77,8 +77,35 @@ contains
 
     end subroutine s_compute_load_weight
 
-    !> Task 1 stub: no-op. Filled in Task 3.
+    !> Print per-rank load-imbalance metric: max/mean of per-rank weight sums.
     impure subroutine s_report_load_imbalance
+
+        real(wp) :: w_local, w_sum, w_max, w_mean, imbalance
+        integer  :: j, k, l, ierr
+
+        if (.not. load_weight_wrt) return
+        w_local = 0._wp
+        $:GPU_PARALLEL_LOOP(collapse=3, reduction='[[w_local]]', reductionOp='[+]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    w_local = w_local + real(load_weight%sf(j, k, l), wp)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(w_local, w_sum, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(w_local, w_max, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+#else
+        w_sum = w_local; w_max = w_local
+#endif
+        w_mean = w_sum/real(num_procs, wp)
+        imbalance = w_max/max(w_mean, tiny(1._wp))
+        if (proc_rank == 0) then
+            print '(A,F8.3,A,ES12.5,A,ES12.5)', '[load_weight] imbalance(max/mean)=', imbalance, '  w_max=', w_max, '  w_mean=', &
+                & w_mean
+        end if
 
     end subroutine s_report_load_imbalance
 

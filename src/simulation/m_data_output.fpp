@@ -20,7 +20,7 @@ module m_data_output
     use m_ibm
     use m_boundary_common
     use m_constants, only: model_eqns_5eq, model_eqns_4eq, precision_single
-    use m_load_weight, only: load_weight, s_compute_load_weight
+    use m_load_weight, only: load_weight, s_compute_load_weight, s_report_load_imbalance
 
     implicit none
 
@@ -409,6 +409,7 @@ contains
 
         if (load_weight_wrt) then
             call s_compute_load_weight(q_cons_vf, q_prim_vf)
+            call s_report_load_imbalance
             $:GPU_UPDATE(host='[load_weight%sf]')
         end if
 
