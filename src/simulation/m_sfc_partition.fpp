@@ -90,57 +90,101 @@ contains
 
         call s_build_sfc_order(sfc_order)
 
-    end subroutine s_compute_sfc_partition
+        block
+            real(wp), allocatable :: wsfc(:)
+            real(wp)              :: lo, hi, mid, acc
+            integer               :: i, r, it
+            allocate (wsfc(n_tiles))
+            do i = 1, n_tiles; wsfc(i) = tile_weight(sfc_order(i)); end do
+                ! binary search the smallest feasible max-load bound
+                lo = maxval(wsfc); hi = sum(wsfc)
+                do it = 1, 200
+                    if (hi - lo <= 1.e-12_wp*max(hi, 1._wp)) exit
+                    mid = 0.5_wp*(lo + hi)
+                    if (f_segments_needed(wsfc, mid) <= num_procs) then; hi = mid; else; lo = mid; end if
+                end do
+                ! assign ranks greedily with bound=hi, capping at num_procs-1 for the tail
+                r = 0; acc = 0._wp
+                do i = 1, n_tiles
+                    if (acc + wsfc(i) > hi .and. acc > 0._wp .and. r < num_procs - 1) then
+                        r = r + 1; acc = wsfc(i)
+                    else
+                        acc = acc + wsfc(i)
+                    end if
+                    tile_rank(sfc_order(i)) = r
+                end do
+                deallocate (wsfc)
+            end block
 
-    !> Returns the 63-bit Morton code for tile coordinates (tx, ty, tz).
-    pure function f_morton(tx, ty, tz) result(code)
+        end subroutine s_compute_sfc_partition
 
-        integer, intent(in) :: tx, ty, tz
-        integer(kind=8)     :: code, x, y, z
-        integer             :: b
+        !> Greedy count of contiguous segments (each <= bound) over SFC-ordered weights.
+        pure integer function f_segments_needed(wsfc, bound) result(nseg)
 
-        x = int(tx, 8); y = int(ty, 8); z = int(tz, 8); code = 0_8
-        do b = 0, 20
-            code = ior(code, ishft(iand(ishft(x, -b), 1_8), 3*b))
-            code = ior(code, ishft(iand(ishft(y, -b), 1_8), 3*b + 1))
-            code = ior(code, ishft(iand(ishft(z, -b), 1_8), 3*b + 2))
-        end do
+            real(wp), intent(in) :: wsfc(:)
+            real(wp), intent(in) :: bound
+            real(wp)             :: acc; integer :: i
 
-    end function f_morton
+            nseg = 1; acc = 0._wp
+            do i = 1, size(wsfc)
+                if (acc + wsfc(i) > bound .and. acc > 0._wp) then
+                    nseg = nseg + 1; acc = wsfc(i)
+                else
+                    acc = acc + wsfc(i)
+                end if
+            end do
 
-    !> Fills order(1:n_tiles) with tile linear indices sorted by Morton code.
-    impure subroutine s_build_sfc_order(order)
+        end function f_segments_needed
 
-        integer, intent(out)         :: order(:)
-        integer(kind=8), allocatable :: code(:)
-        integer                      :: tx, ty, tz, t, i, jmin
-        integer(kind=8)              :: cmin
-        logical, allocatable         :: used(:)
+        !> Returns the 63-bit Morton code for tile coordinates (tx, ty, tz).
+        pure function f_morton(tx, ty, tz) result(code)
 
-        allocate (code(0:n_tiles - 1), used(0:n_tiles - 1)); used = .false.
-        do tz = 0, n_tiles_z - 1
-            do ty = 0, n_tiles_y - 1
-                do tx = 0, n_tiles_x - 1
-                    t = (tz*n_tiles_y + ty)*n_tiles_x + tx
-                    code(t) = f_morton(tx, ty, tz)
+            integer, intent(in) :: tx, ty, tz
+            integer(kind=8)     :: code, x, y, z
+            integer             :: b
+
+            x = int(tx, 8); y = int(ty, 8); z = int(tz, 8); code = 0_8
+            do b = 0, 20
+                code = ior(code, ishft(iand(ishft(x, -b), 1_8), 3*b))
+                code = ior(code, ishft(iand(ishft(y, -b), 1_8), 3*b + 1))
+                code = ior(code, ishft(iand(ishft(z, -b), 1_8), 3*b + 2))
+            end do
+
+        end function f_morton
+
+        !> Fills order(1:n_tiles) with tile linear indices sorted by Morton code.
+        impure subroutine s_build_sfc_order(order)
+
+            integer, intent(out)         :: order(:)
+            integer(kind=8), allocatable :: code(:)
+            integer                      :: tx, ty, tz, t, i, jmin
+            integer(kind=8)              :: cmin
+            logical, allocatable         :: used(:)
+
+            allocate (code(0:n_tiles - 1), used(0:n_tiles - 1)); used = .false.
+            do tz = 0, n_tiles_z - 1
+                do ty = 0, n_tiles_y - 1
+                    do tx = 0, n_tiles_x - 1
+                        t = (tz*n_tiles_y + ty)*n_tiles_x + tx
+                        code(t) = f_morton(tx, ty, tz)
+                    end do
                 end do
             end do
-        end do
-        ! selection by min code (n_tiles is modest; O(n_tiles^2) acceptable, or replace with a sort)
-        do i = 1, n_tiles
-            cmin = huge(0_8); jmin = -1
-            do t = 0, n_tiles - 1
-                if (.not. used(t) .and. code(t) < cmin) then; cmin = code(t); jmin = t; end if
+            ! selection by min code (n_tiles is modest; O(n_tiles^2) acceptable, or replace with a sort)
+            do i = 1, n_tiles
+                cmin = huge(0_8); jmin = -1
+                do t = 0, n_tiles - 1
+                    if (.not. used(t) .and. code(t) < cmin) then; cmin = code(t); jmin = t; end if
+                end do
+                order(i) = jmin; used(jmin) = .true.
             end do
-            order(i) = jmin; used(jmin) = .true.
-        end do
-        deallocate (code, used)
+            deallocate (code, used)
 
-    end subroutine s_build_sfc_order
+        end subroutine s_build_sfc_order
 
-    !> Task 5 fills this. Stub: no-op.
-    impure subroutine s_report_sfc_partition
+        !> Task 5 fills this. Stub: no-op.
+        impure subroutine s_report_sfc_partition
 
-    end subroutine s_report_sfc_partition
+        end subroutine s_report_sfc_partition
 
-end module m_sfc_partition
+    end module m_sfc_partition
