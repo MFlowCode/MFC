@@ -21,6 +21,7 @@ module m_data_output
     use m_boundary_common
     use m_constants, only: model_eqns_5eq, model_eqns_4eq, precision_single
     use m_load_weight, only: load_weight, s_compute_load_weight, s_report_load_imbalance
+    use m_sfc_partition, only: s_compute_sfc_partition, s_report_sfc_partition
 
     implicit none
 
@@ -67,6 +68,11 @@ contains
             call s_compute_load_weight(q_cons_vf)
             call s_report_load_imbalance
             $:GPU_UPDATE(host='[load_weight%sf]')
+        end if
+
+        if (sfc_partition_wrt) then
+            call s_compute_sfc_partition(q_cons_vf)
+            call s_report_sfc_partition
         end if
 
         if (.not. parallel_io) then

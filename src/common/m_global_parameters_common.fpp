@@ -346,6 +346,11 @@ contains
 
         allocate (proc_coords(1:num_dims))
 
+#ifdef MFC_MPI
+        ! start_idx is always needed (e.g. for sfc_partition_wrt); parallel I/O setup below is optional.
+        allocate (start_idx(1:num_dims))
+#endif
+
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
@@ -357,8 +362,6 @@ contains
 
         ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
         ! MPI_INFO_NULL
-
-        allocate (start_idx(1:num_dims))
 #endif
 
     end subroutine s_initialize_parallel_io_common
@@ -371,9 +374,7 @@ contains
         deallocate (proc_coords)
 
 #ifdef MFC_MPI
-        if (parallel_io) then
-            deallocate (start_idx)
-        end if
+        deallocate (start_idx)
 #endif
 
     end subroutine s_finalize_global_parameters_common

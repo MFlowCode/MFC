@@ -1037,7 +1037,7 @@ contains
             recon_order = muscl_order
         end if
 
-        if (num_procs == 1 .and. parallel_io) then
+        if (num_procs == 1) then
             do i = 1, num_dims
                 start_idx(i) = 0
             end do
@@ -1209,13 +1209,12 @@ contains
 #endif
 
                 ! Beginning and end sub-domain boundary locations
-                if (parallel_io) then
-                    if (proc_coords(3) < rem_cells) then
-                        start_idx(3) = (p + 1)*proc_coords(3)
-                    else
-                        start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
-                    end if
+                if (proc_coords(3) < rem_cells) then
+                    start_idx(3) = (p + 1)*proc_coords(3)
                 else
+                    start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
+                end if
+                if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
                     if (old_grid .neqv. .true.) then
                         dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
@@ -1321,13 +1320,12 @@ contains
 #endif
 
             ! Beginning and end sub-domain boundary locations
-            if (parallel_io) then
-                if (proc_coords(2) < rem_cells) then
-                    start_idx(2) = (n + 1)*proc_coords(2)
-                else
-                    start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
-                end if
+            if (proc_coords(2) < rem_cells) then
+                start_idx(2) = (n + 1)*proc_coords(2)
             else
+                start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
+            end if
+            if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
                 if (old_grid .neqv. .true.) then
                     dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
@@ -1404,13 +1402,12 @@ contains
 #endif
 
         ! Beginning and end sub-domain boundary locations
-        if (parallel_io) then
-            if (proc_coords(1) < rem_cells) then
-                start_idx(1) = (m + 1)*proc_coords(1)
-            else
-                start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
-            end if
+        if (proc_coords(1) < rem_cells) then
+            start_idx(1) = (m + 1)*proc_coords(1)
         else
+            start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
+        end if
+        if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
             if (old_grid .neqv. .true.) then
                 dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
