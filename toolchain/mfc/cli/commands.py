@@ -547,6 +547,8 @@ VALIDATE_COMMAND = Command(
         Positional(
             name="input",
             help="Path to case file to validate.",
+            nargs="?",
+            default=None,
             completion=Completion(type=CompletionType.FILES_PY),
         ),
     ],
@@ -557,14 +559,22 @@ VALIDATE_COMMAND = Command(
             action=ArgAction.STORE_TRUE,
             default=False,
         ),
+        Argument(
+            name="all",
+            short="a",
+            help="Validate all example case files instead of a single file.",
+            action=ArgAction.STORE_TRUE,
+        ),
     ],
     examples=[
         Example("./mfc.sh validate case.py", "Check syntax and constraints"),
         Example("./mfc.sh validate case.py -d", "Validate with toolchain debug output"),
         Example("./mfc.sh validate case.py --migrate", "Rewrite integer codes to named values"),
+        Example("./mfc.sh validate --all", "Validate every example case file"),
     ],
     key_options=[
         ("-d, --debug-log", "Enable toolchain debug logging"),
+        ("-a, --all", "Validate all example case files"),
     ],
 )
 
