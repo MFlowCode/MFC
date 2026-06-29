@@ -90,7 +90,9 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*real(q_prim_vf(n_bub_idx)%sf(j, k, l), wp)
+                        if (j >= jlo .and. j <= jhi .and. k >= klo .and. k <= khi .and. l >= llo .and. l <= lhi) then
+                            load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*real(q_prim_vf(n_bub_idx)%sf(j, k, l), wp)
+                        end if
                     end do
                 end do
             end do
@@ -105,7 +107,9 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*(1.0_wp - real(q_beta(1)%sf(j, k, l), wp))
+                        if (j >= jlo .and. j <= jhi .and. k >= klo .and. k <= khi .and. l >= llo .and. l <= lhi) then
+                            load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*(1.0_wp - real(q_beta(1)%sf(j, k, l), wp))
+                        end if
                     end do
                 end do
             end do
