@@ -14,6 +14,7 @@ module m_load_weight
     use m_active_box, only: ab_active, ab_x, ab_y, ab_z
     use m_bubbles_EL, only: q_beta
     use m_ibm, only: ib_markers
+    use m_phase_change, only: pc_iter_count
 
     implicit none
 
@@ -127,6 +128,21 @@ contains
                             if (ib_markers%sf(j, k, l) /= 0) then
                                 load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + real(K_ib, stp)
                             end if
+                        end if
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        ! Phase-change contributor: K_pc * per-cell Newton-iteration count from s_infinite_relaxation_k.
+        if (relax) then
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (j >= jlo .and. j <= jhi .and. k >= klo .and. k <= khi .and. l >= llo .and. l <= lhi) then
+                            load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + real(K_pc*real(pc_iter_count(j, k, l), wp), stp)
                         end if
                     end do
                 end do

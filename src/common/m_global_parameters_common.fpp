@@ -80,6 +80,7 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[hyperelasticity, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[cont_damage, hyper_cleaning]')
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
+    $:GPU_DECLARE(create='[load_weight_wrt]')
     $:GPU_DECLARE(create='[down_sample]')
     $:GPU_DECLARE(create='[fd_order]')
     $:GPU_DECLARE(create='[rhoref, pref]')
