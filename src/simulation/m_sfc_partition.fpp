@@ -23,6 +23,7 @@ module m_sfc_partition
     real(wp), allocatable :: tile_weight(:)  !< global per-tile aggregated cost (linear index)
     integer, allocatable  :: tile_rank(:)    !< proposed owning rank per tile
     integer, allocatable  :: sfc_order(:)    !< tile linear indices in Morton order
+    real(wp)              :: cur_w_max       !< current static per-rank max weight (existing decomposition)
 
 contains
 
@@ -54,6 +55,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), allocatable                               :: tile_local(:)
         integer                                             :: j, k, l, gx, gy, gz, tx, ty, tz, t, ierr
+        real(wp)                                            :: my_w
         integer                                             :: sfc_start(3)  !< bounds-safe copy of start_idx (0 for inactive dims)
 
         if (.not. sfc_partition_wrt) return
@@ -85,6 +87,12 @@ contains
         call MPI_ALLREDUCE(tile_local, tile_weight, n_tiles, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
         tile_weight = tile_local
+#endif
+        my_w = sum(tile_local)
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(my_w, cur_w_max, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+#else
+        cur_w_max = my_w
 #endif
         deallocate (tile_local)
 
@@ -182,11 +190,11 @@ contains
 
         end subroutine s_build_sfc_order
 
-        !> Print the predicted post-balance imbalance (max/mean rank weight).
+        !> Print current static imbalance, predicted post-balance imbalance, and gain ratio.
         impure subroutine s_report_sfc_partition
 
             real(wp), allocatable :: rank_w(:)
-            real(wp)              :: w_sum, w_max, w_mean, imb_new
+            real(wp)              :: w_sum, w_max, w_mean, imb_new, imb_cur, gain
             integer               :: t
 
             if (.not. sfc_partition_wrt) return
@@ -196,9 +204,11 @@ contains
             end do
             w_sum = sum(rank_w); w_max = maxval(rank_w); w_mean = w_sum/real(num_procs, wp)
             imb_new = w_max/max(w_mean, tiny(1._wp))
+            imb_cur = cur_w_max/max(w_mean, tiny(1._wp))
+            gain = imb_cur/max(imb_new, tiny(1._wp))
             if (proc_rank == 0) then
-                print '(A,F8.3,A,I0,A,I0,A)', '[sfc_partition] predicted imbalance(max/mean)=', imb_new, '  (', n_tiles, &
-                    & ' tiles over ', num_procs, ' ranks)'
+                print '(A,F8.3,A,F8.3,A,F8.3,A,I0,A,I0,A)', '[sfc_partition] imbalance current=', imb_cur, ' predicted=', &
+                    & imb_new, ' gain=', gain, '  (', n_tiles, ' tiles over ', num_procs, ' ranks)'
             end if
             deallocate (rank_w)
 
