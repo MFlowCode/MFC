@@ -140,6 +140,7 @@ contains
 
 #ifdef MFC_DEBUG
         integer :: i, j, k, l
+        logical :: in_margin
         if (.not. ab_active) return
 #ifdef MFC_GPU
         ! Refresh host copy before reading conserved fields on CPU.
@@ -147,12 +148,17 @@ contains
             $:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
         end do
 #endif
-        ! Check the one-cell layer just outside the box (x faces shown; repeat for y,z).
-        do l = max(0, ab_z%beg - 1), min(p, ab_z%end + 1)
-            do k = max(0, ab_y%beg - 1), min(n, ab_y%end + 1)
-                do j = max(0, ab_x%beg - 1), min(m, ab_x%end + 1)
-                    if (j >= ab_x%beg .and. j <= ab_x%end .and. k >= ab_y%beg .and. k <= ab_y%end .and. l >= ab_z%beg &
-                        & .and. l <= ab_z%end) cycle
+        ! Check the buff_size-thick layer just INSIDE each box face. Those cells are updated by
+        ! the RK loop, so if the disturbance front reaches them the reconstruction margin is
+        ! compromised (box under-grown). The exterior layer is frozen-ambient by construction and
+        ! cannot detect under-growth. Degenerate dimensions (n=0/p=0) contribute no faces.
+        do l = ab_z%beg, ab_z%end
+            do k = ab_y%beg, ab_y%end
+                do j = ab_x%beg, ab_x%end
+                    in_margin = (j <= ab_x%beg + buff_size - 1 .or. j >= ab_x%end - buff_size + 1)
+                    if (n > 0) in_margin = in_margin .or. (k <= ab_y%beg + buff_size - 1 .or. k >= ab_y%end - buff_size + 1)
+                    if (p > 0) in_margin = in_margin .or. (l <= ab_z%beg + buff_size - 1 .or. l >= ab_z%end - buff_size + 1)
+                    if (.not. in_margin) cycle
                     do i = 1, sys_size
                         @:ASSERT(abs(q_cons_vf(i)%sf(j, k, l) - ab_ambient(i)) <= tol_ab, &
                                  & "active_box: disturbance reached the box boundary (under-grown)")
