@@ -98,6 +98,9 @@ module m_rhs
 
     type(int_bounds_info) :: is1, is2, is3
     !> @}
+
+    type(int_bounds_info) :: ab_int(1:3)  !< Active-box interior bounds for convert call (device-resident)
+    $:GPU_DECLARE(create='[ab_int]')
     $:GPU_DECLARE(create='[is1, is2, is3]')
 
     !> @name Saved fluxes for testing
@@ -485,7 +488,6 @@ contains
         integer :: id
         integer(kind=8) :: i, j, k, l, q                     !< Generic loop iterators
         integer :: cbjlo, cbjhi, cbklo, cbkhi, cbllo, cblli  !< Active-box + halo copy bounds
-        type(int_bounds_info) :: ab_int(1:3)                 !< Active-box interior bounds for convert call
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
@@ -511,6 +513,8 @@ contains
             cbllo = idwbuff(3)%beg; cblli = idwbuff(3)%end
             ab_int = idwint
         end if
+
+        $:GPU_UPDATE(device='[ab_int]')
 
         if (.not. igr) then
             ! Association/Population of Working Variables
