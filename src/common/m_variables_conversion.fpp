@@ -46,13 +46,13 @@ module m_variables_conversion
 #endif
 
 #ifndef MFC_SIMULATION
-    type(integer_field), public :: ghost_points_index
-    type(scalar_field), public  :: pressure_ghost_point
-    $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
+  !  type(integer_field), public :: ghost_points_index
+  !  type(scalar_field), public  :: pressure_ghost_point
+   ! $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
 #else
-    type(integer_field), public :: ghost_points_index
-    type(scalar_field), public  :: pressure_ghost_point
-    $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
+   !! type(integer_field), public :: ghost_points_index
+   ! type(scalar_field), public  :: pressure_ghost_point
+   ! $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
 #endif
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
@@ -372,19 +372,23 @@ contains
             $:GPU_UPDATE(device='[Res_vc, Re_idx, Re_size]')
         end if
 
-        if (p > 0) then
-            @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:p))
-            @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:p))
-        else
-            @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:0))
-            @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:0))
-        end if
+      !  if (chemistry) then
+      !  if (p > 0) then
+        !    @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:p))
+        !    @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:p))
+     !   else if (n > 0) then
+         !!   @:ALLOCATE(ghost_points_index%sf(0:m, 0:n, 0:0))
+         !   @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:n, 0:0))
+   ! else                     ! 1D
+       !! @:ALLOCATE(ghost_points_index%sf(0:m, 0:0, 0:0))
+    !    @:ALLOCATE(pressure_ghost_point%sf(0:m, 0:0, 0:0))
+   ! end if
+    !    ghost_points_index%sf = 0
+    !    pressure_ghost_point%sf = 0.0_wp
 
-        ghost_points_index%sf = 0
-        pressure_ghost_point%sf = 0.0_wp
-
-        @:ACC_SETUP_SFs(ghost_points_index)
-        @:ACC_SETUP_SFs(pressure_ghost_point)
+     !   @:ACC_SETUP_SFs(ghost_points_index)
+     !   @:ACC_SETUP_SFs(pressure_ghost_point)
+    !    end if
 #endif
 
         if (bubbles_euler) then
@@ -701,11 +705,15 @@ contains
                                             & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
 
 #ifdef MFC_SIMULATION
-                    if (.not. (t_step == 0 .and. stage == 1)) then
-                        if (ghost_points_index%sf(j, k, l) == 1) then
-                            pres = pressure_ghost_point%sf(j, k, l)
-                        end if
-                    end if
+                    !if (chemistry) then
+                   ! if (n > 0 ) then
+                   ! if (.not. (t_step == 0 .and. stage == 1)) then
+                   !     if (ghost_points_index%sf(j, k, l) == 1) then
+                   !         pres = pressure_ghost_point%sf(j, k, l)
+                  !      end if
+                  !  end if
+                  !  end if
+                 !   end if
 #endif
 
                     qK_prim_vf(eqn_idx%E)%sf(j, k, l) = pres
@@ -1267,8 +1275,8 @@ contains
 
 #ifdef MFC_SIMULATION
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
-        @:DEALLOCATE(ghost_points_index%sf)
-        @:DEALLOCATE(pressure_ghost_point%sf)
+     !   @:DEALLOCATE(ghost_points_index%sf)
+     !   @:DEALLOCATE(pressure_ghost_point%sf)
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
