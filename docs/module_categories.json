@@ -60,7 +60,8 @@
             "m_data_output",
             "m_data_input",
             "m_delay_file_access",
-            "m_load_weight"
+            "m_load_weight",
+            "m_sfc_partition"
         ]
     },
     {

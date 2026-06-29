@@ -113,6 +113,8 @@ DESCRIPTIONS = {
     "run_time_info": "Output run-time information",
     "prim_vars_wrt": "Write primitive variables",
     "load_weight_wrt": "Write per-cell load-weight diagnostic field",
+    "sfc_partition_wrt": "Report SFC-weighted load-balance partition",
+    "partition_tile_size": "Tile side for the SFC partitioner",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",
     "integral_wrt": "Write integral data",
