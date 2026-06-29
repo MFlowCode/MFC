@@ -1301,6 +1301,16 @@ class CaseValidator:
         self.prohibit(mhd, "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
         self.prohibit(chemistry, "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
 
+    def check_sfc_partition(self):
+        """Checks SFC partitioner tile-size guard (simulation)"""
+        sfc_partition_wrt = self.get("sfc_partition_wrt", "F") == "T"
+
+        if not sfc_partition_wrt:
+            return
+
+        partition_tile_size = self.get("partition_tile_size")
+        self.prohibit(partition_tile_size is not None and partition_tile_size < 1, "partition_tile_size must be >= 1")
+
     def check_adaptive_time_stepping(self):
         """Checks adaptive time stepping parameters (simulation)"""
         adap_dt = self.get("adap_dt", "F") == "T"
@@ -2318,6 +2328,7 @@ class CaseValidator:
         self.check_igr_simulation()
         self.check_acoustic_source()
         self.check_active_box()
+        self.check_sfc_partition()
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()
         self.check_bubbles_lagrange()

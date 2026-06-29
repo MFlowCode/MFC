@@ -64,6 +64,8 @@ contains
                        & "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
         end if
 
+        @:PROHIBIT(sfc_partition_wrt .and. partition_tile_size < 1, "partition_tile_size must be >= 1")
+
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
         end if

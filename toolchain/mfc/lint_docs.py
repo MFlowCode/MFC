@@ -433,6 +433,7 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         "check_bc_patches",  # boundary patch geometry
         "check_grid_stretching",  # grid stretching parameters
         "check_qbmm_pre_process",  # QBMM pre-process settings
+        "check_sfc_partition",  # tile-size divide-by-zero guard (no physics meaning)
         "check_probe_integral_output",  # probe/integral output settings
         "check_finite_difference",  # fd_order value validation
         "check_flux_limiter",  # output dimension requirements
