@@ -133,10 +133,34 @@ contains
 
     end subroutine s_grow_active_box
 
-    !> Stub in Task 1: no-op. Filled in Task 6.
+    !> Abort in debug builds if the disturbance has reached the active-box boundary (under-growth).
     impure subroutine s_check_active_box_envelope(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+
+#ifdef MFC_DEBUG
+        integer :: i, j, k, l
+        if (.not. ab_active) return
+#ifdef MFC_GPU
+        ! Refresh host copy before reading conserved fields on CPU.
+        do i = 1, sys_size
+            $:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
+        end do
+#endif
+        ! Check the one-cell layer just outside the box (x faces shown; repeat for y,z).
+        do l = max(0, ab_z%beg - 1), min(p, ab_z%end + 1)
+            do k = max(0, ab_y%beg - 1), min(n, ab_y%end + 1)
+                do j = max(0, ab_x%beg - 1), min(m, ab_x%end + 1)
+                    if (j >= ab_x%beg .and. j <= ab_x%end .and. k >= ab_y%beg .and. k <= ab_y%end .and. l >= ab_z%beg &
+                        & .and. l <= ab_z%end) cycle
+                    do i = 1, sys_size
+                        @:ASSERT(abs(q_cons_vf(i)%sf(j, k, l) - ab_ambient(i)) <= tol_ab, &
+                                 & "active_box: disturbance reached the box boundary (under-grown)")
+                    end do
+                end do
+            end do
+        end do
+#endif
 
     end subroutine s_check_active_box_envelope
 

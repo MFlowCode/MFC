@@ -27,7 +27,7 @@ module m_time_steppers
     use m_body_forces
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
-    use m_active_box, only: s_grow_active_box, ab_x, ab_y, ab_z, ab_active
+    use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
 
     implicit none
 
@@ -574,6 +574,10 @@ contains
                 end if
             end if
         end do
+
+#ifdef MFC_DEBUG
+        call s_check_active_box_envelope(q_cons_ts(1)%vf)
+#endif
 
         if (ib) then
             if (moving_immersed_boundary_flag) then
