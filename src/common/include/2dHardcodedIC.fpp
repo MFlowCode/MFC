@@ -251,7 +251,7 @@
             ! q_prim_vf(eqn_idx%B%beg)%sf(i,j,0) = 1._wp/(4._wp*pi) * (alpha**8 - 2._wp*alpha**4 + 1._wp)
             ! q_prim_vf(eqn_idx%E)%sf(i,j,0) = 6._wp - q_prim_vf(eqn_idx%B%beg)%sf(i,j,0)**2/2._wp
         end if
-    case (262)  ! Tilted 2D MHD shock‐tube at α = arctan2 (≈63.4°)
+    case (262)  ! Tilted 2D MHD shock-tube at \alpha = arctan2 (\approx63.4 deg)
         ! rotate by \alpha = atan(2)
         alpha = atan(2._wp)
         cosA = cos(alpha)

@@ -464,8 +464,7 @@ contains
 
     !> Compute the right-hand side of the semi-discrete governing equations for a single time stage
     impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-
-        & time_avg, stage)
+                                    & time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
         type(scalar_field), intent(inout)                                                          :: q_T_sf
@@ -1347,7 +1346,6 @@ contains
         integer                                                :: i, j, k, l
 
         if (idir == 1) then  ! x-direction
-
             if (surface_tension) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
@@ -1796,8 +1794,7 @@ contains
         end if
 
         if (mpp_lim .and. bubbles_euler) then
-            $:GPU_EXIT_DATA(delete='[alf_sum%sf]')
-            deallocate (alf_sum%sf)
+            @:DEALLOCATE(alf_sum%sf)
         end if
 
         if (.not. igr) then
@@ -1841,6 +1838,32 @@ contains
             end do
 
             @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
+            do i = 1, num_dims
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
+                    @:DEALLOCATE(qL_prim(i)%vf(l)%sf)
+                    @:DEALLOCATE(qR_prim(i)%vf(l)%sf)
+                end do
+                @:DEALLOCATE(qL_prim(i)%vf, qR_prim(i)%vf)
+            end do
+            @:DEALLOCATE(qL_prim, qR_prim)
+        end if
+
+        if (alt_soundspeed) then
+            @:DEALLOCATE(blkmod1)
+        end if
+
+        if (qbmm) then
+            do i = 0, 2
+                do j = 0, 2
+                    do l = 1, nb
+                        @:DEALLOCATE(mom_3d(i, j, l)%sf)
+                    end do
+                end do
+            end do
+            do i = 1, nmomsp
+                @:DEALLOCATE(mom_sp(i)%sf)
+            end do
+            @:DEALLOCATE(mom_sp, mom_3d)
         end if
 
     end subroutine s_finalize_rhs_module
