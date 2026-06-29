@@ -2471,15 +2471,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # 3D active_box: localized central blast with a uniform ambient exterior so
         # the active-box initialization detects a strict subset of the domain
-        # (corner cell (0,0,0) is ambient; blast occupies the central ~7 cells/dim).
+        # (corner cell (0,0,0) is ambient; blast occupies the central ~12 cells/dim).
+        # The box grows by buff_size=4 cells/side each step, so on a 48^3 grid with
+        # init box ~[14:33] it is still a strict subset after t_step_stop=3 grows
+        # (-> ~[2:45]); the save at step 3 therefore pins a genuinely bounded state.
         # Requires single rank and the model_eqns=2 / WENO5 / HLLC / direct /
         # RK3 configuration that gates the optimization (all BASE_CFG defaults).
         stack.push(
             "Kernel -> 3D -> active_box",
             {
-                "m": 24,
-                "n": 24,
-                "p": 24,
+                "m": 47,
+                "n": 47,
+                "p": 47,
+                "dt": 0.005,
+                "t_step_stop": 3,
+                "t_step_save": 3,
                 "x_domain%beg": 0.0,
                 "x_domain%end": 1.0,
                 "y_domain%beg": 0.0,
@@ -2509,9 +2515,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(1)%alpha_rho(1)": 0.125,
                 "patch_icpp(1)%pres": 0.1,
                 "patch_icpp(1)%alpha(1)": 1.0,
-                # Patch 2: high-pressure blast at center (~7 cells/dim out of 25).
+                # Patch 2: high-pressure blast at center (~12 cells/dim out of 48).
                 # alter_patch(1)=T overwrites the ambient in the blast region only.
-                # Active-box initial beg=max(0,9-4)=5, end=min(24,15+4)=19 -- strict subset.
                 "patch_icpp(2)%geometry": 9,
                 "patch_icpp(2)%x_centroid": 0.5,
                 "patch_icpp(2)%length_x": 0.25,
