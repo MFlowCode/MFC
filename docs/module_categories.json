@@ -59,7 +59,8 @@
             "m_start_up",
             "m_data_output",
             "m_data_input",
-            "m_delay_file_access"
+            "m_delay_file_access",
+            "m_load_weight"
         ]
     },
     {

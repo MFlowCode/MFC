@@ -52,6 +52,7 @@ module m_start_up
     use m_sim_helpers
     use m_igr
     use m_active_box
+    use m_load_weight
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
 
     implicit none
@@ -835,6 +836,7 @@ contains
         call s_initialize_rhs_module()
 
         if (active_box) call s_initialize_active_box_module()
+        call s_initialize_load_weight_module()
 
         if (surface_tension) call s_initialize_surface_tension_module()
 
@@ -1082,6 +1084,7 @@ contains
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()
         if (active_box) call s_finalize_active_box_module()
+        call s_finalize_load_weight_module()
         if (igr) then
             call s_finalize_igr_module()
         else

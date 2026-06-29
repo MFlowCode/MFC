@@ -672,6 +672,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `file_per_process`      | Logical | Whether or not to write one IO file per process |
 | `cons_vars_wrt`         | Logical | Write conservative variables |
 | `prim_vars_wrt`         | Logical | Write primitive variables	|
+| `load_weight_wrt`       | Logical | Write per-cell load-weight diagnostic field |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
 | `mom_wrt(i)`            | Logical | Add the $i$-direction momentum to the database	 |
