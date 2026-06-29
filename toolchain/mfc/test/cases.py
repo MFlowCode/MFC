@@ -2469,6 +2469,69 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # 3D active_box: localized central blast with a uniform ambient exterior so
+        # the active-box initialization detects a strict subset of the domain
+        # (corner cell (0,0,0) is ambient; blast occupies the central ~7 cells/dim).
+        # Requires single rank and the model_eqns=2 / WENO5 / HLLC / direct /
+        # RK3 configuration that gates the optimization (all BASE_CFG defaults).
+        stack.push(
+            "Kernel -> 3D -> active_box",
+            {
+                "m": 24,
+                "n": 24,
+                "p": 24,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "z_domain%beg": 0.0,
+                "z_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "bc_z%beg": -3,
+                "bc_z%end": -3,
+                "num_patches": 2,
+                "num_fluids": 1,
+                # Patch 1: uniform ambient that fills the whole domain.
+                # Corner cell (0,0,0) samples this state as ab_ambient.
+                "patch_icpp(1)%geometry": 9,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%z_centroid": 0.5,
+                "patch_icpp(1)%length_z": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%vel(3)": 0.0,
+                "patch_icpp(1)%alpha_rho(1)": 0.125,
+                "patch_icpp(1)%pres": 0.1,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # Patch 2: high-pressure blast at center (~7 cells/dim out of 25).
+                # alter_patch(1)=T overwrites the ambient in the blast region only.
+                # Active-box initial beg=max(0,9-4)=5, end=min(24,15+4)=19 -- strict subset.
+                "patch_icpp(2)%geometry": 9,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.25,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%length_y": 0.25,
+                "patch_icpp(2)%z_centroid": 0.5,
+                "patch_icpp(2)%length_z": 0.25,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%vel(3)": 0.0,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "active_box": "T",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     kernel_golden_tests()
 
     add_convergence_cases(cases)
