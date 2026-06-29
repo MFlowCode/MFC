@@ -182,8 +182,25 @@ contains
 
         end subroutine s_build_sfc_order
 
-        !> Task 5 fills this. Stub: no-op.
+        !> Print the predicted post-balance imbalance (max/mean rank weight).
         impure subroutine s_report_sfc_partition
+
+            real(wp), allocatable :: rank_w(:)
+            real(wp)              :: w_sum, w_max, w_mean, imb_new
+            integer               :: t
+
+            if (.not. sfc_partition_wrt) return
+            allocate (rank_w(0:num_procs - 1)); rank_w = 0._wp
+            do t = 0, n_tiles - 1
+                rank_w(tile_rank(t)) = rank_w(tile_rank(t)) + tile_weight(t)
+            end do
+            w_sum = sum(rank_w); w_max = maxval(rank_w); w_mean = w_sum/real(num_procs, wp)
+            imb_new = w_max/max(w_mean, tiny(1._wp))
+            if (proc_rank == 0) then
+                print '(A,F8.3,A,I0,A,I0,A)', '[sfc_partition] predicted imbalance(max/mean)=', imb_new, '  (', n_tiles, &
+                    & ' tiles over ', num_procs, ' ranks)'
+            end if
+            deallocate (rank_w)
 
         end subroutine s_report_sfc_partition
 
