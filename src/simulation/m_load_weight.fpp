@@ -12,6 +12,7 @@ module m_load_weight
     use m_mpi_proxy
     use m_mpi_common
     use m_active_box, only: ab_active, ab_x, ab_y, ab_z
+    use m_bubbles_EL, only: q_beta
 
     implicit none
 
@@ -50,6 +51,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         integer                                             :: j, k, l
         integer                                             :: jlo, jhi, klo, khi, llo, lhi
+        integer                                             :: n_bub_idx
 
         if (.not. load_weight_wrt) return
 
@@ -74,6 +76,41 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        ! EE bubble contributor: K_bub * per-cell bubble proxy.
+        ! adv_n=T: number-density at eqn_idx%n (conserved n field, units = bubbles/vol^2);
+        ! adv_n=F: void fraction (alpha) at eqn_idx%alf = eqn_idx%adv%end.
+        if (bubbles_euler) then
+            if (adv_n) then
+                n_bub_idx = eqn_idx%n
+            else
+                n_bub_idx = eqn_idx%alf
+            end if
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*real(q_prim_vf(n_bub_idx)%sf(j, k, l), wp)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        ! EL bubble contributor: K_bub * per-cell bubble void fraction.
+        ! q_beta(1)%sf holds the liquid volume fraction (1 - alpha_bub) after s_smear_voidfraction;
+        ! 1 - q_beta(1)%sf gives the smeared bubble void fraction as a per-cell count proxy.
+        if (bubbles_lagrange) then
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*(1.0_wp - real(q_beta(1)%sf(j, k, l), wp))
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
     end subroutine s_compute_load_weight
 
