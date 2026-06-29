@@ -487,7 +487,7 @@ contains
         real(wp) :: t_start, t_finish
         integer :: id
         integer(kind=8) :: i, j, k, l, q                     !< Generic loop iterators
-        integer :: cbjlo, cbjhi, cbklo, cbkhi, cbllo, cblli  !< Active-box + halo copy bounds
+        integer :: cbjlo, cbjhi, cbklo, cbkhi, cbllo, cblhi  !< Active-box + halo copy bounds
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
@@ -501,7 +501,7 @@ contains
             cbklo = max(idwbuff(2)%beg, ab_y%beg - buff_size)
             cbkhi = min(idwbuff(2)%end, ab_y%end + buff_size)
             cbllo = max(idwbuff(3)%beg, ab_z%beg - buff_size)
-            cblli = min(idwbuff(3)%end, ab_z%end + buff_size)
+            cblhi = min(idwbuff(3)%end, ab_z%end + buff_size)
             ! Convert over the same footprint as the copy (clamped to interior) so that
             ! q_prim_qp is valid for reconstruction stencils at the box boundary.
             ab_int(1)%beg = max(0, ab_x%beg - buff_size); ab_int(1)%end = min(m, ab_x%end + buff_size)
@@ -510,7 +510,7 @@ contains
         else
             cbjlo = idwbuff(1)%beg; cbjhi = idwbuff(1)%end
             cbklo = idwbuff(2)%beg; cbkhi = idwbuff(2)%end
-            cbllo = idwbuff(3)%beg; cblli = idwbuff(3)%end
+            cbllo = idwbuff(3)%beg; cblhi = idwbuff(3)%end
             ab_int = idwint
         end if
 
@@ -520,7 +520,7 @@ contains
             ! Association/Population of Working Variables
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
             do i = 1, sys_size
-                do l = cbllo, cblli
+                do l = cbllo, cblhi
                     do k = cbklo, cbkhi
                         do j = cbjlo, cbjhi
                             q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)

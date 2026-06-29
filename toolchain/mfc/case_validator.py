@@ -199,10 +199,16 @@ PHYSICS_DOCS = {
         "title": "Active-Box RHS Restriction",
         "category": "Active-Box Optimization",
         "explanation": (
-            "Causal-envelope active-box optimization restricts the RHS compute window. "
+            "Causal-envelope active-box optimization restricts the RHS compute window to the "
+            "causal support of the initial disturbance, assuming a static uniform exterior. "
             "Requires WENO reconstruction (recon_type = 1) and SSP-RK3 time stepping (time_stepper = 3). "
             "Incompatible with immersed boundaries, acoustic sources, body forces, "
-            "Lagrangian bubbles, phase change (relax), and the IGR solver."
+            "Lagrangian bubbles, phase change (relax), and the IGR solver. "
+            "Also incompatible with viscous (diffusion has no finite domain of dependence), "
+            "surface_tension (nonlocal curvature coupling), cyl_coord (geometric source terms "
+            "are nonzero for uniform flow, so the exterior is not static), "
+            "hypoelasticity, hyperelasticity (stress source terms), "
+            "mhd (magnetic field source terms), and chemistry (reactive source terms)."
         ),
     },
     # Acoustic Sources
@@ -1271,6 +1277,13 @@ class CaseValidator:
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         relax = self.get("relax", "F") == "T"
         igr = self.get("igr", "F") == "T"
+        viscous = self.get("viscous", "F") == "T"
+        surface_tension = self.get("surface_tension", "F") == "T"
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
+        hyperelasticity = self.get("hyperelasticity", "F") == "T"
+        mhd = self.get("mhd", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
 
         self.prohibit(recon_type is not None and recon_type != 1, "active_box requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "active_box requires time_stepper = 3 (SSP-RK3)")
@@ -1280,6 +1293,13 @@ class CaseValidator:
         self.prohibit(bubbles_lagrange, "active_box is incompatible with Lagrangian bubbles")
         self.prohibit(relax, "active_box is incompatible with phase change")
         self.prohibit(igr, "active_box is incompatible with the IGR solver")
+        self.prohibit(viscous, "active_box is incompatible with viscous (no finite domain of dependence for the frozen exterior)")
+        self.prohibit(surface_tension, "active_box is incompatible with surface_tension (nonlocal curvature coupling violates the static-uniform-exterior assumption)")
+        self.prohibit(cyl_coord, "active_box is incompatible with cyl_coord (geometric source terms are nonzero for uniform flow; exterior is not static)")
+        self.prohibit(hypoelasticity, "active_box is incompatible with hypoelasticity (stress source terms violate the static-uniform-exterior assumption)")
+        self.prohibit(hyperelasticity, "active_box is incompatible with hyperelasticity (stress source terms violate the static-uniform-exterior assumption)")
+        self.prohibit(mhd, "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
+        self.prohibit(chemistry, "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
 
     def check_adaptive_time_stepping(self):
         """Checks adaptive time stepping parameters (simulation)"""

@@ -49,6 +49,19 @@ contains
             @:PROHIBIT(relax, "active_box is incompatible with phase change")
             @:PROHIBIT(igr, "active_box is incompatible with the IGR solver")
             @:PROHIBIT(time_stepper /= time_stepper_rk3, "active_box requires time_stepper = 3 (SSP-RK3)")
+            @:PROHIBIT(viscous, "active_box is incompatible with viscous (no finite domain of dependence for the frozen exterior)")
+            @:PROHIBIT(surface_tension, &
+                       & "active_box is incompatible with surface_tension (nonlocal curvature coupling violates the static-uniform-exterior assumption)")
+            @:PROHIBIT(cyl_coord, &
+                       & "active_box is incompatible with cyl_coord (geometric source terms are nonzero for uniform flow; exterior is not static)")
+            @:PROHIBIT(hypoelasticity, &
+                       & "active_box is incompatible with hypoelasticity (stress source terms violate the static-uniform-exterior assumption)")
+            @:PROHIBIT(hyperelasticity, &
+                       & "active_box is incompatible with hyperelasticity (stress source terms violate the static-uniform-exterior assumption)")
+            @:PROHIBIT(mhd, &
+                       & "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
+            @:PROHIBIT(chemistry, &
+                       & "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
         end if
 
         if (num_particle_clouds > 0) then

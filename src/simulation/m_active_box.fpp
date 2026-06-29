@@ -17,10 +17,10 @@ module m_active_box
     public :: s_initialize_active_box_module, s_finalize_active_box_module, s_initialize_active_box, s_grow_active_box, &
         & s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active, ab_ambient
 
-    type(int_bounds_info) :: ab_x, ab_y, ab_z    !< Active-box interior cell ranges
-    logical               :: ab_active           !< Whether the optimization is engaged
-    real(wp), allocatable :: ab_ambient(:)       !< Uniform ambient conserved state
-    real(wp), parameter   :: tol_ab = 1.e-10_wp  !< Ambient-deviation threshold
+    type(int_bounds_info) :: ab_x, ab_y, ab_z     !< Active-box interior cell ranges
+    logical               :: ab_active = .false.  !< Whether the optimization is engaged
+    real(wp), allocatable :: ab_ambient(:)        !< Uniform ambient conserved state
+    real(wp), parameter   :: tol_ab = 1.e-10_wp   !< Ambient-deviation threshold
 
     $:GPU_DECLARE(create='[ab_x, ab_y, ab_z, ab_active]')
 
@@ -100,10 +100,12 @@ contains
 
         $:GPU_UPDATE(device='[ab_x, ab_y, ab_z, ab_active]')
 
+#ifdef MFC_DEBUG
         if (ab_active) then
             print *, '[active_box] init box x[', ab_x%beg, ':', ab_x%end, '] y[', ab_y%beg, ':', ab_y%end, '] z[', ab_z%beg, ':', &
                 & ab_z%end, ']'
         end if
+#endif
 
     end subroutine s_initialize_active_box
 
@@ -114,10 +116,14 @@ contains
 
         if (.not. ab_active) return
 
-        ! Fixed light-cone growth: g = buff_size cells/step provably exceeds the per-step
-        ! front advance (CFL <= ~1.4 < buff_size for any stable SSP-RK3 + WENO5 run), so the
-        ! buff_size reconstruction margin established at init only grows. Under-growth would
-        ! require CFL > buff_size, i.e. an unstable run that diverges regardless.
+        ! Growth by buff_size cells/step outruns the physical front: a stable run has CFL <= ~1.4
+        ! cells/step, so the box edge progressively leads the physical disturbance and sits in the
+        ! exponentially-decaying, sub-tolerance numerical precursor. This gives agreement to
+        ! round-off (~1e-14), not bit-identical, which is what the spec requires.
+        ! Caveat: this is a finite-horizon round-off guarantee, not a strict numerical-light-cone
+        ! containment. A bit-identical variant would grow by nstage*(weno_polyn+1) = ~9 cells/step
+        ! (the full numerical domain of dependence) at the cost of a looser box and lower speedup -
+        ! left as a future option. Under-growth (CFL > buff_size) implies an already-diverging run.
         g = buff_size
 
         ab_x%beg = max(0, ab_x%beg - g); ab_x%end = min(m, ab_x%end + g)
