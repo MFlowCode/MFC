@@ -13,6 +13,7 @@ module m_load_weight
     use m_mpi_common
     use m_active_box, only: ab_active, ab_x, ab_y, ab_z
     use m_bubbles_EL, only: q_beta
+    use m_ibm, only: ib_markers
 
     implicit none
 
@@ -109,6 +110,23 @@ contains
                     do j = 0, m
                         if (j >= jlo .and. j <= jhi .and. k >= klo .and. k <= khi .and. l >= llo .and. l <= lhi) then
                             load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*(1.0_wp - real(q_beta(1)%sf(j, k, l), wp))
+                        end if
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        ! IB contributor: K_ib per IB-marked interior cell.
+        if (ib) then
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (j >= jlo .and. j <= jhi .and. k >= klo .and. k <= khi .and. l >= llo .and. l <= lhi) then
+                            if (ib_markers%sf(j, k, l) /= 0) then
+                                load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + real(K_ib, stp)
+                            end if
                         end if
                     end do
                 end do
