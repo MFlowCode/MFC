@@ -20,6 +20,7 @@ module m_data_output
     use m_ibm
     use m_boundary_common
     use m_constants, only: model_eqns_5eq, model_eqns_4eq, precision_single
+    use m_load_weight, only: load_weight, s_compute_load_weight
 
     implicit none
 
@@ -406,6 +407,11 @@ contains
             end if
         end if
 
+        if (load_weight_wrt) then
+            call s_compute_load_weight(q_cons_vf, q_prim_vf)
+            $:GPU_UPDATE(host='[load_weight%sf]')
+        end if
+
         if (n == 0 .and. p == 0) then
             if (model_eqns == model_eqns_5eq .and. (.not. igr)) then
                 do i = 1, sys_size
@@ -459,6 +465,15 @@ contains
                         close (2)
                     end do
                 end do
+            end if
+
+            if (load_weight_wrt) then
+                write (file_path, '(A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/load_weight.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    write (2, FMT) x_cb(j), load_weight%sf(j, 0, 0)
+                end do
+                close (2)
             end if
         end if
 
@@ -543,6 +558,18 @@ contains
                     end do
                     close (2)
                 end do
+            end if
+
+            if (load_weight_wrt) then
+                write (file_path, '(A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/load_weight.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    do k = 0, n
+                        write (2, FMT) x_cb(j), y_cb(k), load_weight%sf(j, k, 0)
+                    end do
+                    write (2, *)
+                end do
+                close (2)
             end if
         end if
 
@@ -641,6 +668,21 @@ contains
                     end do
                     close (2)
                 end do
+            end if
+
+            if (load_weight_wrt) then
+                write (file_path, '(A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/load_weight.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    do k = 0, n
+                        do l = 0, p
+                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), load_weight%sf(j, k, l)
+                        end do
+                        write (2, *)
+                    end do
+                    write (2, *)
+                end do
+                close (2)
             end if
         end if
 

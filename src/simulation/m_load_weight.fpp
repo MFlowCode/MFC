@@ -11,6 +11,7 @@ module m_load_weight
     use m_global_parameters
     use m_mpi_proxy
     use m_mpi_common
+    use m_active_box, only: ab_active, ab_x, ab_y, ab_z
 
     implicit none
 
@@ -43,18 +44,32 @@ contains
 
     end subroutine s_finalize_load_weight_module
 
-    !> Task 1 stub: base cost 1 everywhere. Contributors added in Tasks 2,4,5,6.
+    !> Base cost 1 everywhere; cells outside the active box get 0 (frozen).
     impure subroutine s_compute_load_weight(q_cons_vf, q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         integer                                             :: j, k, l
+        integer                                             :: jlo, jhi, klo, khi, llo, lhi
 
         if (.not. load_weight_wrt) return
+
+        if (ab_active) then
+            jlo = ab_x%beg; jhi = ab_x%end
+            klo = ab_y%beg; khi = ab_y%end
+            llo = ab_z%beg; lhi = ab_z%end
+        else
+            jlo = 0; jhi = m; klo = 0; khi = n; llo = 0; lhi = p
+        end if
+
         $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    load_weight%sf(j, k, l) = 1._wp
+                    if (j >= jlo .and. j <= jhi .and. k >= klo .and. k <= khi .and. l >= llo .and. l <= lhi) then
+                        load_weight%sf(j, k, l) = 1._wp
+                    else
+                        load_weight%sf(j, k, l) = 0._wp
+                    end if
                 end do
             end do
         end do
