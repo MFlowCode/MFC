@@ -125,8 +125,9 @@ contains
         var_MOK = int(v, MPI_OFFSET_KIND)
         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-        sizes_glb(1:num_dims) = [m_glb + 1, n_glb + 1, p_glb + 1]
-        sizes_loc(1:num_dims) = [m + 1, n + 1, p + 1]
+        ! Full 3-element assignment (conforming for all num_dims); MPI calls slice (1:num_dims).
+        sizes_glb = [m_glb + 1, n_glb + 1, p_glb + 1]
+        sizes_loc = [m + 1, n + 1, p + 1]
 
         call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb(1:num_dims), sizes_loc(1:num_dims), start_idx(1:num_dims), &
                                       & MPI_ORDER_FORTRAN, mpi_io_p, view, ierr)
