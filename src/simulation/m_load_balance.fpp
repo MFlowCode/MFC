@@ -195,9 +195,11 @@ contains
         lmin = num_stcls_min*recon_order
         call s_probe_field_marginals(wx, wy, wz)
 
-        @:PROHIBIT((m_glb + 1) < num_procs_x*lmin, "load_balance: x-axis too small for min cells per rank")
-        @:PROHIBIT((n_glb + 1) < num_procs_y*lmin, "load_balance: y-axis too small for min cells per rank")
-        @:PROHIBIT((p_glb + 1) < num_procs_z*lmin, "load_balance: z-axis too small for min cells per rank")
+        ! Only axes actually split across >1 ranks must satisfy the min-cells floor;
+        ! a single-rank (incl. collapsed 1D/2D) axis owns all its cells and is always feasible.
+        @:PROHIBIT(num_procs_x > 1 .and. (m_glb + 1) < num_procs_x*lmin, "load_balance: x-axis too small for min cells per rank")
+        @:PROHIBIT(num_procs_y > 1 .and. (n_glb + 1) < num_procs_y*lmin, "load_balance: y-axis too small for min cells per rank")
+        @:PROHIBIT(num_procs_z > 1 .and. (p_glb + 1) < num_procs_z*lmin, "load_balance: z-axis too small for min cells per rank")
 
         allocate (ox(0:num_procs_x), oy(0:num_procs_y), oz(0:num_procs_z))
         ox = f_weighted_splits(wx, num_procs_x, lmin)
