@@ -654,7 +654,7 @@ def _load():
     # Output
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "load_weight_wrt", "sfc_partition_wrt", "load_balance"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "load_weight_wrt", "sfc_partition_wrt", "load_balance", "rank_time_wrt"]:
         _r(n, LOG, {"output"})
     _r("partition_tile_size", INT, {"output"})
     for n in [
@@ -1234,6 +1234,7 @@ _nv(
     "load_weight_wrt",
     "sfc_partition_wrt",
     "load_balance",
+    "rank_time_wrt",
     "partition_tile_size",
     "alt_soundspeed",
     "mixture_err",

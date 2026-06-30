@@ -115,6 +115,7 @@ DESCRIPTIONS = {
     "load_weight_wrt": "Write per-cell load-weight diagnostic field",
     "sfc_partition_wrt": "Report SFC-weighted load-balance partition",
     "load_balance": "Apply weighted static Cartesian decomposition at init",
+    "rank_time_wrt": "Report per-rank RHS compute-time imbalance (max/mean)",
     "partition_tile_size": "Tile side for the SFC partitioner",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",
