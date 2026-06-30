@@ -24,7 +24,7 @@ module m_start_up
     use m_chemistry
     use m_data_output
     use m_time_steppers
-    use m_rank_timing, only: t_rank_compute
+    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_qbmm
     use m_derived_variables
     use m_hypoelastic
@@ -571,7 +571,6 @@ contains
         real(wp), intent(inout) :: time_avg
         integer                 :: i, eta_hh, eta_mm, eta_ss
         real(wp)                :: eta_sec
-        real                    :: t_relax0, t_relax1  !< rank-timing wrap for phase-change relaxation (cpu_time, default real)
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
@@ -635,12 +634,9 @@ contains
         mytime = mytime + dt
 
         if (relax) then
-            if (rank_time_wrt) call cpu_time(t_relax0)
+            if (rank_time_wrt) call s_rank_time_tic()
             call s_infinite_relaxation_k(q_cons_ts(1)%vf)
-            if (rank_time_wrt) then
-                call cpu_time(t_relax1)
-                t_rank_compute = t_rank_compute + real(t_relax1 - t_relax0, wp)
-            end if
+            if (rank_time_wrt) call s_rank_time_toc()
         end if
 
         ! Time-stepping loop controls

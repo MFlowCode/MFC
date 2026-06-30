@@ -14,14 +14,40 @@ module m_rank_timing
     implicit none
 
     private
-    public :: t_rank_compute, s_report_rank_time
+    public :: s_rank_time_tic, s_rank_time_toc, s_report_rank_time
 
-    !> accumulated per-rank compute cpu_time (RHS + phase-change relaxation) this report interval (rank-local)
+    !> accumulated per-rank wall time over the timed regions this report interval (rank-local)
     real(wp) :: t_rank_compute = 0._wp
+    !> system_clock tick captured at the most recent tic
+    integer(8) :: tic_count
 
 contains
 
-    !> Reduce per-rank accumulated RHS time to a max/mean imbalance and print on rank 0, then reset the accumulator for the next
+    !> Start a per-rank wall-clock timing region. The device sync first ensures any prior GPU work has completed, so the interval
+    !! that follows measures only the timed region.
+    impure subroutine s_rank_time_tic
+
+        if (.not. rank_time_wrt) return
+        $:GPU_WAIT()
+        call system_clock(tic_count)
+
+    end subroutine s_rank_time_tic
+
+    !> End a per-rank wall-clock timing region and accumulate its wall duration. The device sync first forces the timed GPU kernels
+    !! to complete, so the wall interval reflects real compute time (cpu_time would capture only host-side launch overhead on the
+    !! GPU backend).
+    impure subroutine s_rank_time_toc
+
+        integer(8) :: toc_count, rate
+
+        if (.not. rank_time_wrt) return
+        $:GPU_WAIT()
+        call system_clock(toc_count, rate)
+        t_rank_compute = t_rank_compute + real(toc_count - tic_count, wp)/real(rate, wp)
+
+    end subroutine s_rank_time_toc
+
+    !> Reduce per-rank accumulated compute time to a max/mean imbalance and print on rank 0, then reset the accumulator for the next
     !! interval.
     impure subroutine s_report_rank_time
 

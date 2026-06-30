@@ -28,7 +28,6 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
-    use m_rank_timing, only: t_rank_compute
 
     implicit none
 
@@ -462,7 +461,6 @@ contains
         integer                 :: i, j, k, l, q, s              !< Generic loop iterator
         integer                 :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
         real(wp)                :: start, finish
-        real                    :: t_rhs0, t_rhs1
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
@@ -473,13 +471,8 @@ contains
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         do s = 1, nstage
-            if (rank_time_wrt) call cpu_time(t_rhs0)
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, time_avg, s)
-            if (rank_time_wrt) then
-                call cpu_time(t_rhs1)
-                t_rank_compute = t_rank_compute + real(t_rhs1 - t_rhs0, wp)
-            end if
 
             if (s == 1) then
                 if (run_time_info) then

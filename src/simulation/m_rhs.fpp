@@ -11,6 +11,7 @@ module m_rhs
 
     use m_derived_types
     use m_global_parameters
+    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
@@ -579,6 +580,12 @@ contains
             if (t_step == t_step_stop) return
         end if
 
+        ! Per-rank compute timing starts here: AFTER the halo exchange (s_populate_variables_buffers)
+        ! and the early-return guards above, so it captures only the local compute work
+        ! (reconstruct/Riemann/flux/source) and excludes the cross-rank halo wait that would
+        ! otherwise mask compute imbalance.
+        if (rank_time_wrt) call s_rank_time_tic()
+
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
             & idwbuff(2), idwbuff(3))
 
@@ -889,6 +896,10 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         end if
+
+        ! Per-rank compute timing ends here (brackets only the local compute above; excludes
+        ! the trailing time_avg bookkeeping and the halo exchange near the top of the routine).
+        if (rank_time_wrt) call s_rank_time_toc()
 
         call cpu_time(t_finish)
 
