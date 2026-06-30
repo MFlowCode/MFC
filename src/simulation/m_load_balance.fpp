@@ -15,7 +15,7 @@ module m_load_balance
     implicit none
 
     private
-    public :: f_weighted_splits
+    public :: f_weighted_splits, s_compute_load_marginals
 
 contains
 
@@ -57,5 +57,49 @@ contains
         end do
 
     end function f_weighted_splits
+
+    !> Compute global per-axis marginals of the per-cell load weight. Allocates wx(0:m_glb), wy(0:n_glb), wz(0:p_glb); caller
+    !! deallocates.
+    impure subroutine s_compute_load_marginals(q_cons_vf, wx, wy, wz)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(wp), allocatable, dimension(:), intent(out)    :: wx, wy, wz
+        real(wp), allocatable, dimension(:)                 :: lx, ly, lz
+        integer                                             :: lb_start(3)  !< bounds-safe copy of start_idx (0 for inactive dims)
+        integer                                             :: j, k, l, ierr
+
+        call s_compute_load_weight(q_cons_vf)
+        $:GPU_UPDATE(host='[load_weight%sf]')
+
+        ! Build a 3-element start offset safe to access regardless of num_dims.
+        ! start_idx is allocated (1:num_dims) only; higher dims are always 0.
+        lb_start = 0
+        lb_start(1) = start_idx(1)
+        if (num_dims >= 2) lb_start(2) = start_idx(2)
+        if (num_dims >= 3) lb_start(3) = start_idx(3)
+
+        allocate (wx(0:m_glb), lx(0:m_glb)); lx = 0._wp
+        allocate (wy(0:n_glb), ly(0:n_glb)); ly = 0._wp
+        allocate (wz(0:p_glb), lz(0:p_glb)); lz = 0._wp
+
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    lx(lb_start(1) + j) = lx(lb_start(1) + j) + real(load_weight%sf(j, k, l), wp)
+                    ly(lb_start(2) + k) = ly(lb_start(2) + k) + real(load_weight%sf(j, k, l), wp)
+                    lz(lb_start(3) + l) = lz(lb_start(3) + l) + real(load_weight%sf(j, k, l), wp)
+                end do
+            end do
+        end do
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(lx, wx, m_glb + 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(ly, wy, n_glb + 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(lz, wz, p_glb + 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+#else
+        wx = lx; wy = ly; wz = lz
+#endif
+        deallocate (lx, ly, lz)
+
+    end subroutine s_compute_load_marginals
 
 end module m_load_balance
