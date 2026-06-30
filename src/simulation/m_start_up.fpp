@@ -1006,6 +1006,40 @@ contains
 
         call s_mpi_decompose_computational_domain()
 
+        ! TEMPORARY SPIKE (Task 1): prove the weighted re-decompose + re-read
+        ! mechanism with HARD-CODED offsets. Mutating m/n/p and start_idx here,
+        ! AFTER the equal decomposition but BEFORE s_initialize_modules, makes
+        ! every local-extent-dependent allocation (grid arrays, idwint/idwbuff,
+        ! q_cons_ts) and the single parallel_io read happen at the new layout.
+        ! Flip load_balance to .false. (and rebuild) for the byte-identical
+        ! off-path. 1D-only spike: all ranks split along x. Remove in Task 4+.
+        block
+            logical, parameter                 :: load_balance = .false.
+            integer, allocatable, dimension(:) :: off_x, off_y, off_z
+            integer                            :: glb_x, cnt, r
+
+            if (load_balance .and. num_procs > 1 .and. n == 0 .and. p == 0) then
+                glb_x = m_glb + 1
+                @:ALLOCATE(off_x(0:num_procs), off_y(0:1), off_z(0:1))
+                off_x(0) = 0
+                do r = 0, num_procs - 1
+                    cnt = glb_x/num_procs
+                    if (r < mod(glb_x, num_procs)) cnt = cnt + 1
+                    off_x(r + 1) = off_x(r) + cnt
+                end do
+                ! Move the first split plane off-center: rank 0 gets two extra
+                ! cells, the last rank two fewer; interior planes unchanged.
+                off_x(1) = off_x(1) + 2
+                off_y = [0, 1]; off_z = [0, 1]
+
+                call s_apply_weighted_offsets(off_x, off_y, off_z)
+                print '(" [load_balance] rank ", I0, " coord ", I0, ": m = ", I0, ", start_idx(1) = ", I0)', proc_rank, &
+                    & proc_coords(1), m, start_idx(1)
+
+                @:DEALLOCATE(off_x, off_y, off_z)
+            end if
+        end block
+
     end subroutine s_initialize_mpi_domain
 
     !> Transfer initial conservative variable and model parameter data to the GPU device

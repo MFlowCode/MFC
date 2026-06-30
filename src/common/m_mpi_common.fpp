@@ -1426,6 +1426,28 @@ contains
 
     end subroutine s_mpi_decompose_computational_domain
 
+    !> Override this rank's local extents and starting indices from cumulative Cartesian split-plane offsets, leaving the MPI_CART
+    !! topology and BC neighbors (which stay proc_coords-derived) untouched. Each off_d is a cumulative cell-boundary array
+    !! (off_d(0)=0, off_d(num_procs_d)=G_d).
+    subroutine s_apply_weighted_offsets(off_x, off_y, off_z)
+
+        integer, dimension(0:), intent(in) :: off_x, off_y, off_z
+
+#ifdef MFC_MPI
+        m = off_x(proc_coords(1) + 1) - off_x(proc_coords(1)) - 1
+        start_idx(1) = off_x(proc_coords(1))
+        if (num_dims >= 2) then
+            n = off_y(proc_coords(2) + 1) - off_y(proc_coords(2)) - 1
+            start_idx(2) = off_y(proc_coords(2))
+        end if
+        if (num_dims >= 3) then
+            p = off_z(proc_coords(3) + 1) - off_z(proc_coords(3)) - 1
+            start_idx(3) = off_z(proc_coords(3))
+        end if
+#endif
+
+    end subroutine s_apply_weighted_offsets
+
     !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
     !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of
     !! cell-boundary locations may be calculated directly from those of the cell-width distributions.
