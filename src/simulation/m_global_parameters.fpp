@@ -436,6 +436,7 @@ contains
         ib_state_wrt = .false.
         load_weight_wrt = .false.
         sfc_partition_wrt = .false.
+        load_balance = .false.
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.
 

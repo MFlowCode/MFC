@@ -26,7 +26,7 @@ contains
         real(wp), dimension(0:), intent(in) :: w
         integer, intent(in)                 :: n_parts, l_min
         integer, dimension(0:n_parts)       :: off
-        real(wp)                            :: csum, total, target_w
+        real(wp)                            :: csum, total
         integer                             :: g, i, r
 
         g = size(w)
