@@ -99,7 +99,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (bf_x) then  ! x-direction body forces
-
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
                 do k = 0, n
@@ -114,7 +113,6 @@ contains
         end if
 
         if (bf_y) then  ! y-direction body forces
-
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
                 do k = 0, n
@@ -130,7 +128,6 @@ contains
         end if
 
         if (bf_z) then  ! z-direction body forces
-
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
                 do k = 0, n
