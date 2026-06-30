@@ -53,7 +53,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer                                             :: j, k, l
         integer                                             :: jlo, jhi, klo, khi, llo, lhi
-        integer                                             :: n_bub_idx
 
         if (.not. load_weight_wrt .and. .not. sfc_partition_wrt) return
 
@@ -79,27 +78,15 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! EE bubble contributor: K_bub * per-cell bubble proxy.
-        ! adv_n=T: number-density at eqn_idx%n (conserved n field, units = bubbles/vol^2);
-        ! adv_n=F: void fraction (alpha) at eqn_idx%alf = eqn_idx%adv%end.
-        if (bubbles_euler) then
-            if (adv_n) then
-                n_bub_idx = eqn_idx%n
-            else
-                n_bub_idx = eqn_idx%alf
-            end if
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        if (j >= jlo .and. j <= jhi .and. k >= klo .and. k <= khi .and. l >= llo .and. l <= lhi) then
-                            load_weight%sf(j, k, l) = load_weight%sf(j, k, l) + K_bub*real(q_cons_vf(n_bub_idx)%sf(j, k, l), wp)
-                        end if
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        ! EE bubbles: NO weight contribution. Calibration (rank_time_wrt vs load_weight_wrt,
+        ! bubblescreen -n 4) showed measured RHS-time imbalance is flat (~1.02-1.03) across
+        ! vf0 = 4e-5 -> 0.1 (2500x void range), while a K_bub*void term manufactured up to
+        ! 1.59x modeled imbalance. The EE bubble source (s_compute_bubble_EE_source, inside
+        ! s_compute_rhs) is a roughly-uniform per-cell term whose cost does NOT scale with void
+        ! magnitude -- so it is not a load-imbalance driver and gets no weight. (K_bub is an EL
+        ! per-bubble-ODE constant; it does not apply to EE.) If a future EE regime -- QBMM,
+        ! adv_n number-density, very high resolution -- shows real EE imbalance, re-add with an
+        ! EE-specific coefficient calibrated against measured rank_time.
 
         ! EL bubble contributor: K_bub * per-cell bubble void fraction.
         ! q_beta(1)%sf holds the liquid volume fraction (1 - alpha_bub) after s_smear_voidfraction;
