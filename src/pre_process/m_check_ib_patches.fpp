@@ -81,8 +81,8 @@ contains
 
         if (.not. patch_ib(patch_id)%isothermal) return
 
-        @:PROHIBIT(f_is_default(patch_ib(patch_id)%Twall) .or. patch_ib(patch_id)%Twall <= 0._wp, &
-                   & 'in immersed boundary patch ' // trim(iStr) // ': patch_ib('//trim(iStr)//')%Twall must be set and > 0')
+        @:PROHIBIT(f_is_default(patch_ib(patch_id)%twall) .or. patch_ib(patch_id)%twall <= 0._wp, &
+                   & 'in immersed boundary patch ' // trim(iStr) // ': patch_ib('//trim(iStr)//')%twall must be set and > 0')
 
     end subroutine s_check_ib_patch_thermal
 
@@ -247,7 +247,7 @@ contains
                    & .or. (.not. f_is_default(patch_ib(patch_id)%z_centroid)) &
                    & .or. (.not. f_is_default(patch_ib(patch_id)%length_x)) .or. (.not. f_is_default(patch_ib(patch_id)%length_y)) &
                    & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)) .or. (.not. f_is_default(patch_ib(patch_id)%radius)) &
-                   & .or. patch_ib(patch_id)%isothermal .or. (.not. f_is_default(patch_ib(patch_id)%Twall)), &
+                   & .or. patch_ib(patch_id)%isothermal .or. (.not. f_is_default(patch_ib(patch_id)%twall)), &
                    & 'in inactive IB patch ' // trim(iStr))
 
     end subroutine s_check_inactive_ib_patch_geometry

@@ -1545,10 +1545,10 @@ class CaseValidator:
                 not chemistry or not diffusion, f"Isothermal immersed boundary patch_ib({patch_id})%isothermal requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction."
             )
 
-            twall = self.get(f"patch_ib({patch_id})%Twall")
-            self.prohibit(twall is None, f"Isothermal immersed boundary patch_ib({patch_id})%isothermal requires patch_ib({patch_id})%Twall to be set.")
+            twall = self.get(f"patch_ib({patch_id})%twall")
+            self.prohibit(twall is None, f"Isothermal immersed boundary patch_ib({patch_id})%isothermal requires patch_ib({patch_id})%twall to be set.")
             if twall is not None and self._is_numeric(twall):
-                self.prohibit(twall <= 0.0, f"Wall temperature patch_ib({patch_id})%Twall must be strictly positive for thermodynamics (got {twall}).")
+                self.prohibit(twall <= 0.0, f"Wall temperature patch_ib({patch_id})%twall must be strictly positive for thermodynamics (got {twall}).")
 
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""

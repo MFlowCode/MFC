@@ -216,9 +216,9 @@ contains
 
         if (p > 0) then
             ! Parallel loop or simple assignment if compiler supports it Typically simpler to just do:
-       !     ghost_points_index%sf = 0
+            ghost_points_index%sf = 0
         else
-       !     ghost_points_index%sf(0:m,0:n,0:0) = 0
+            ghost_points_index%sf(0:m,0:n,0:0) = 0
         end if
 
         if (num_gps > 0) then
@@ -233,7 +233,7 @@ contains
                 l = gp%loc(3)
                 patch_id = ghost_points(i)%ib_patch_id
 
-            !    ghost_points_index%sf(j, k, l) = 1
+                ghost_points_index%sf(j, k, l) = 1
 
                 ! Calculate physical location of GP
                 if (p > 0) then
@@ -274,7 +274,7 @@ contains
                 end if
 
                 if (patch_ib(patch_id)%isothermal) then
-                    T_GP = 2.0_wp*patch_ib(patch_id)%Twall - T_IP
+                    T_GP = 2.0_wp*patch_ib(patch_id)%twall - T_IP
                 else
                     T_GP = T_IP
                 end if
@@ -287,7 +287,7 @@ contains
                 ! set the pressure
                 if (patch_ib(patch_id)%moving_ibm <= 1) then
                     q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
-                !    pressure_ghost_point%sf(j, k, l) = pres_IP
+                    pressure_ghost_point%sf(j, k, l) = pres_IP
                 else
                     q_prim_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')

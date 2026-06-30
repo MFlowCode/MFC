@@ -590,7 +590,7 @@ contains
             patch_ib(i)%model_id = 0
             patch_ib(i)%slip = .false.
             patch_ib(i)%isothermal = .false.
-            patch_ib(i)%Twall = dflt_real
+            patch_ib(i)%twall = dflt_real
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
