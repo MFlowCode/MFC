@@ -28,7 +28,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
-    use m_rank_timing, only: t_rank_rhs
+    use m_rank_timing, only: t_rank_compute
 
     implicit none
 
@@ -478,7 +478,7 @@ contains
                                & t_step, time_avg, s)
             if (rank_time_wrt) then
                 call cpu_time(t_rhs1)
-                t_rank_rhs = t_rank_rhs + real(t_rhs1 - t_rhs0, wp)
+                t_rank_compute = t_rank_compute + real(t_rhs1 - t_rhs0, wp)
             end if
 
             if (s == 1) then

@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Per-rank RHS compute-time imbalance diagnostic (Tier-2 calibration support).
+!> @brief Per-rank compute-time (RHS + phase-change relaxation) imbalance diagnostic (Tier-2 calibration support).
 module m_rank_timing
 
     use m_derived_types
@@ -14,9 +14,10 @@ module m_rank_timing
     implicit none
 
     private
-    public :: t_rank_rhs, s_report_rank_time
+    public :: t_rank_compute, s_report_rank_time
 
-    real(wp) :: t_rank_rhs = 0._wp  !< accumulated RHS cpu_time this report interval (rank-local)
+    !> accumulated per-rank compute cpu_time (RHS + phase-change relaxation) this report interval (rank-local)
+    real(wp) :: t_rank_compute = 0._wp
 
 contains
 
@@ -29,17 +30,17 @@ contains
 
         if (.not. rank_time_wrt) return
 #ifdef MFC_MPI
-        call MPI_ALLREDUCE(t_rank_rhs, t_max, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
-        call MPI_ALLREDUCE(t_rank_rhs, t_sum, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(t_rank_compute, t_max, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(t_rank_compute, t_sum, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
         t_mean = t_sum/real(num_procs, wp)
 #else
-        t_max = t_rank_rhs; t_mean = t_rank_rhs
+        t_max = t_rank_compute; t_mean = t_rank_compute
 #endif
         imb = t_max/max(t_mean, tiny(1._wp))
         if (proc_rank == 0) then
             print '(A,F8.3,A,ES12.5,A,ES12.5)', '[rank_time] imbalance(max/mean)= ', imb, '  t_max= ', t_max, '  t_mean= ', t_mean
         end if
-        t_rank_rhs = 0._wp
+        t_rank_compute = 0._wp
 
     end subroutine s_report_rank_time
 
