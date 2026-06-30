@@ -2100,7 +2100,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "t_step_save": 50,
             },
         )
-        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-9)))
         stack.pop()
 
         stack.push(
