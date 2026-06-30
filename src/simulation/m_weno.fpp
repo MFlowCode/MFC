@@ -16,7 +16,8 @@ module m_weno
     use m_thinc, only: s_thinc_compression
     use m_nvtx
 
-    private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr
+    private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr, s_compute_weno_sensor, &
+        & weno_full
 
     !> @name The cell-average variables that will be WENO-reconstructed unpacked into an array for performance
     !> @{
@@ -69,6 +70,9 @@ module m_weno
     integer :: v_size  !< Number of WENO-reconstructed cell-average variables
     $:GPU_DECLARE(create='[v_size]')
 
+    logical, allocatable, dimension(:,:,:) :: weno_full  !< per-cell: use full WENO (discontinuity in stencil)
+    $:GPU_DECLARE(create='[weno_full]')
+
     logical :: uniform_grid(3)  !< True if grid spacing is uniform in each direction
     $:GPU_DECLARE(create='[uniform_grid]')
 
@@ -120,6 +124,10 @@ contains
         call s_compute_weno_coefficients(1, is1_weno)
 
         @:ALLOCATE(v_rs_weno(is1_weno%beg:is1_weno%end, is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
+
+        if (hybrid_weno) then
+            @:ALLOCATE(weno_full(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        end if
 
         ! Allocating/Computing WENO Coefficients in y-direction
         if (n == 0) return
@@ -1582,6 +1590,10 @@ contains
 
         @:DEALLOCATE(v_rs_weno)
 
+        if (hybrid_weno) then
+            @:DEALLOCATE(weno_full)
+        end if
+
         ! Deallocating WENO coefficients in x-direction
         @:DEALLOCATE(poly_coef_cbL_x, poly_coef_cbR_x)
         @:DEALLOCATE(d_cbL_x, d_cbR_x)
@@ -1602,5 +1614,117 @@ contains
         @:DEALLOCATE(beta_coef_z)
 
     end subroutine s_finalize_weno_module
+
+    !> Compute the per-cell discontinuity flag weno_full using the Jameson sensor on density and pressure (Pass 1), then dilate by
+    !! weno_polyn cells along each active direction (Pass 2). Must only be called when hybrid_weno is true.
+    impure subroutine s_compute_weno_sensor(q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        logical, allocatable, dimension(:,:,:)              :: disc
+        integer                                             :: j, k, l, jj, kk, ll, rho_i, p_i
+        real(wp)                                            :: phi, c0, cm, cp, num, den
+
+        rho_i = eqn_idx%cont%beg; p_i = eqn_idx%E
+
+        @:ALLOCATE(disc(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+
+        ! Pass 1: initialise disc to .false. over full idwbuff domain
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[phi, c0, cm, cp, num, den]')
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    disc(j, k, l) = .false.
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! Pass 1 cont: Jameson sensor on density and pressure, max over active directions
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[phi, c0, cm, cp, num, den]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    phi = 0._wp
+                    ! density (eqn_idx%cont%beg)
+                    c0 = real(q_prim_vf(rho_i)%sf(j, k, l), wp)
+                    cm = real(q_prim_vf(rho_i)%sf(j - 1, k, l), wp)
+                    cp = real(q_prim_vf(rho_i)%sf(j + 1, k, l), wp)
+                    num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                    phi = max(phi, num/max(den, tiny(1._wp)))
+                    if (n > 0) then
+                        cm = real(q_prim_vf(rho_i)%sf(j, k - 1, l), wp)
+                        cp = real(q_prim_vf(rho_i)%sf(j, k + 1, l), wp)
+                        num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                        phi = max(phi, num/max(den, tiny(1._wp)))
+                    end if
+                    if (p > 0) then
+                        cm = real(q_prim_vf(rho_i)%sf(j, k, l - 1), wp)
+                        cp = real(q_prim_vf(rho_i)%sf(j, k, l + 1), wp)
+                        num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                        phi = max(phi, num/max(den, tiny(1._wp)))
+                    end if
+                    ! pressure (eqn_idx%E)
+                    c0 = real(q_prim_vf(p_i)%sf(j, k, l), wp)
+                    cm = real(q_prim_vf(p_i)%sf(j - 1, k, l), wp)
+                    cp = real(q_prim_vf(p_i)%sf(j + 1, k, l), wp)
+                    num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                    phi = max(phi, num/max(den, tiny(1._wp)))
+                    if (n > 0) then
+                        cm = real(q_prim_vf(p_i)%sf(j, k - 1, l), wp)
+                        cp = real(q_prim_vf(p_i)%sf(j, k + 1, l), wp)
+                        num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                        phi = max(phi, num/max(den, tiny(1._wp)))
+                    end if
+                    if (p > 0) then
+                        cm = real(q_prim_vf(p_i)%sf(j, k, l - 1), wp)
+                        cp = real(q_prim_vf(p_i)%sf(j, k, l + 1), wp)
+                        num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                        phi = max(phi, num/max(den, tiny(1._wp)))
+                    end if
+                    disc(j, k, l) = phi > hybrid_weno_eps
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! Pass 2: initialise weno_full to .false. over full idwbuff domain, then dilate
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[jj, kk, ll]')
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    weno_full(j, k, l) = .false.
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[jj, kk, ll]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    weno_full(j, k, l) = .false.
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do jj = max(j - weno_polyn, idwbuff(1)%beg), min(j + weno_polyn, idwbuff(1)%end)
+                        if (disc(jj, k, l)) weno_full(j, k, l) = .true.
+                    end do
+                    if (n > 0) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do kk = max(k - weno_polyn, idwbuff(2)%beg), min(k + weno_polyn, idwbuff(2)%end)
+                            if (disc(j, kk, l)) weno_full(j, k, l) = .true.
+                        end do
+                    end if
+                    if (p > 0) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do ll = max(l - weno_polyn, idwbuff(3)%beg), min(l + weno_polyn, idwbuff(3)%end)
+                            if (disc(j, k, ll)) weno_full(j, k, l) = .true.
+                        end do
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        @:DEALLOCATE(disc)
+
+    end subroutine s_compute_weno_sensor
 
 end module m_weno
