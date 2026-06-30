@@ -438,6 +438,8 @@ contains
         sfc_partition_wrt = .false.
         load_balance = .false.
         rank_time_wrt = .false.
+        hybrid_weno = .false.
+        hybrid_weno_eps = 1.0e-2_wp
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.
 

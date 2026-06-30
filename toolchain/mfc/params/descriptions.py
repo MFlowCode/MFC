@@ -116,6 +116,8 @@ DESCRIPTIONS = {
     "sfc_partition_wrt": "Report SFC-weighted load-balance partition",
     "load_balance": "Apply weighted static Cartesian decomposition at init",
     "rank_time_wrt": "Report per-rank RHS compute-time imbalance (max/mean)",
+    "hybrid_weno": "Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities",
+    "hybrid_weno_eps": "Smoothness threshold for hybrid WENO shock flagging (must be > 0)",
     "partition_tile_size": "Tile side for the SFC partitioner",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",

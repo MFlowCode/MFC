@@ -676,6 +676,8 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `sfc_partition_wrt`     | Logical | Report SFC-weighted load-balance partition |
 | `rank_time_wrt`         | Logical | Report per-rank RHS compute-time imbalance (max/mean) |
 | `load_balance`          | Logical | Apply weighted static Cartesian decomposition at init (requires `parallel_io = T`) |
+| `hybrid_weno`           | Logical | Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities (requires WENO reconstruction) |
+| `hybrid_weno_eps`       | Real    | Smoothness threshold for hybrid WENO shock flagging; must be > 0 (default 1e-2) |
 | `partition_tile_size`   | Integer | Tile side for the SFC partitioner (default 8) |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
