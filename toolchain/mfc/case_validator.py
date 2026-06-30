@@ -1301,6 +1301,17 @@ class CaseValidator:
         self.prohibit(mhd, "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
         self.prohibit(chemistry, "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
 
+    def check_load_balance(self):
+        """Checks load_balance requirements (simulation)"""
+        # PHYSICS_DOCS: load_balance requires parallel_io=T and more than one MPI rank.
+        load_balance = self.get("load_balance", "F") == "T"
+
+        if not load_balance:
+            return
+
+        parallel_io = self.get("parallel_io", "F") == "T"
+        self.prohibit(not parallel_io, "load_balance requires parallel_io = T")
+
     def check_sfc_partition(self):
         """Checks SFC partitioner tile-size guard (simulation)"""
         sfc_partition_wrt = self.get("sfc_partition_wrt", "F") == "T"
@@ -2329,6 +2340,7 @@ class CaseValidator:
         self.check_acoustic_source()
         self.check_active_box()
         self.check_sfc_partition()
+        self.check_load_balance()
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()
         self.check_bubbles_lagrange()

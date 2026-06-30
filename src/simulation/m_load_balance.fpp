@@ -15,7 +15,7 @@ module m_load_balance
     implicit none
 
     private
-    public :: f_weighted_splits, s_compute_load_marginals
+    public :: f_weighted_splits, s_compute_load_marginals, s_load_balance_rebalance
 
 contains
 
@@ -101,5 +101,70 @@ contains
         deallocate (lx, ly, lz)
 
     end subroutine s_compute_load_marginals
+
+    !> Returns true if the cumulative offsets off(0:parts) differ from the equal-split boundaries for a global extent of g cells
+    !! distributed over parts ranks (matching the remainder distribution used by s_mpi_decompose_computational_domain).
+    pure function f_offsets_differ_from_equal(off, g, parts) result(differs)
+
+        integer, dimension(0:), intent(in) :: off
+        integer, intent(in)                :: g, parts
+        logical                            :: differs
+        integer                            :: r
+
+        differs = .false.
+        do r = 0, parts
+            if (off(r) /= r*(g/parts) + min(r, mod(g, parts))) then
+                differs = .true.
+                return
+            end if
+        end do
+
+    end function f_offsets_differ_from_equal
+
+    !> One-shot weighted re-decomposition at init (no-op if load_balance is off or the weighted splits match the equal splits on
+    !! every axis).
+    impure subroutine s_load_balance_rebalance(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(wp), allocatable, dimension(:)                 :: wx, wy, wz
+        integer, allocatable, dimension(:)                  :: ox, oy, oz
+        integer                                             :: lmin, recon_order
+        logical                                             :: changed
+
+        if (.not. load_balance) return
+
+        if (recon_type == recon_type_weno) then
+            recon_order = weno_order
+        else
+            recon_order = muscl_order
+        end if
+        if (igr) recon_order = igr_order
+
+        lmin = num_stcls_min*recon_order
+        call s_compute_load_marginals(q_cons_vf, wx, wy, wz)
+
+        @:PROHIBIT((m_glb + 1) < num_procs_x*lmin, "load_balance: x-axis too small for min cells per rank")
+        @:PROHIBIT((n_glb + 1) < num_procs_y*lmin, "load_balance: y-axis too small for min cells per rank")
+        @:PROHIBIT((p_glb + 1) < num_procs_z*lmin, "load_balance: z-axis too small for min cells per rank")
+
+        allocate (ox(0:num_procs_x), oy(0:num_procs_y), oz(0:num_procs_z))
+        ox = f_weighted_splits(wx, num_procs_x, lmin)
+        oy = f_weighted_splits(wy, num_procs_y, lmin)
+        oz = f_weighted_splits(wz, num_procs_z, lmin)
+
+        changed = f_offsets_differ_from_equal(ox, m_glb + 1, num_procs_x) .or. f_offsets_differ_from_equal(oy, n_glb + 1, &
+                                              & num_procs_y) .or. f_offsets_differ_from_equal(oz, p_glb + 1, num_procs_z)
+
+        if (proc_rank == 0) then
+            print *, '[load_balance] x-offsets:', ox
+            if (num_dims >= 2) print *, '[load_balance] y-offsets:', oy
+            if (num_dims >= 3) print *, '[load_balance] z-offsets:', oz
+        end if
+
+        if (changed) call s_apply_weighted_offsets(ox, oy, oz)
+
+        deallocate (wx, wy, wz, ox, oy, oz)
+
+    end subroutine s_load_balance_rebalance
 
 end module m_load_balance

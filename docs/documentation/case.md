@@ -674,6 +674,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `prim_vars_wrt`         | Logical | Write primitive variables	|
 | `load_weight_wrt`       | Logical | Write per-cell load-weight diagnostic field |
 | `sfc_partition_wrt`     | Logical | Report SFC-weighted load-balance partition |
+| `load_balance`          | Logical | Apply weighted static Cartesian decomposition at init (requires `parallel_io = T`) |
 | `partition_tile_size`   | Integer | Tile side for the SFC partitioner (default 8) |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |

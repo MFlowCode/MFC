@@ -65,6 +65,8 @@ contains
         end if
 
         @:PROHIBIT(sfc_partition_wrt .and. partition_tile_size < 1, "partition_tile_size must be >= 1")
+        @:PROHIBIT(load_balance .and. .not. parallel_io, "load_balance requires parallel_io = T")
+        @:PROHIBIT(load_balance .and. num_procs == 1, "load_balance requires more than one MPI rank")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds

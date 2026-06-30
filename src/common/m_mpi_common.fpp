@@ -33,6 +33,10 @@ module m_mpi_common
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
+    integer :: num_procs_x = 1  !< Number of ranks in the x-direction (set by s_mpi_decompose_computational_domain)
+    integer :: num_procs_y = 1  !< Number of ranks in the y-direction (set by s_mpi_decompose_computational_domain)
+    integer :: num_procs_z = 1  !< Number of ranks in the z-direction (set by s_mpi_decompose_computational_domain)
+
 contains
 
     !> Initialize the module.
@@ -1021,7 +1025,7 @@ contains
     subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
-        integer :: num_procs_x, num_procs_y, num_procs_z  !< Optimal number of processors in the x-, y- and z-directions
+        ! num_procs_x/y/z are module-level; no local redeclaration needed
         !> Non-optimal number of processors in the x-, y- and z-directions
         real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
         real(wp) :: fct_min        !< Processor factorization (fct) minimization parameter
@@ -1444,6 +1448,7 @@ contains
             p = off_z(proc_coords(3) + 1) - off_z(proc_coords(3)) - 1
             start_idx(3) = off_z(proc_coords(3))
         end if
+        call s_update_cell_bounds(cells_bounds, m, n, p)
 #endif
 
     end subroutine s_apply_weighted_offsets

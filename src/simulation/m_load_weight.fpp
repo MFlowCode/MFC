@@ -34,7 +34,7 @@ contains
 
     impure subroutine s_initialize_load_weight_module
 
-        if (.not. load_weight_wrt .and. .not. sfc_partition_wrt) return
+        if (.not. load_weight_wrt .and. .not. sfc_partition_wrt .and. .not. load_balance) return
         @:ALLOCATE(load_weight%sf(idwint(1)%beg:idwint(1)%end, idwint(2)%beg:idwint(2)%end, idwint(3)%beg:idwint(3)%end))
         @:ACC_SETUP_SFs(load_weight)
 
@@ -42,7 +42,7 @@ contains
 
     impure subroutine s_finalize_load_weight_module
 
-        if (.not. load_weight_wrt .and. .not. sfc_partition_wrt) return
+        if (.not. load_weight_wrt .and. .not. sfc_partition_wrt .and. .not. load_balance) return
         @:DEALLOCATE(load_weight%sf)
 
     end subroutine s_finalize_load_weight_module
@@ -55,7 +55,7 @@ contains
         integer                                             :: jlo, jhi, klo, khi, llo, lhi
         integer                                             :: n_bub_idx
 
-        if (.not. load_weight_wrt .and. .not. sfc_partition_wrt) return
+        if (.not. load_weight_wrt .and. .not. sfc_partition_wrt .and. .not. load_balance) return
 
         if (ab_active) then
             jlo = ab_x%beg; jhi = ab_x%end
