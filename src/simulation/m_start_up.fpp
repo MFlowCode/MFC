@@ -876,14 +876,6 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
-        ! load_balance: use the freshly-read field to compute per-axis marginals and
-        ! determine whether the weighted splits differ from the equal split. This is a
-        ! no-op when load_balance = F. Note: at this insertion point the layout (m/n/p,
-        ! extent arrays) is already set from the equal decomposition; s_apply_weighted_offsets
-        ! here mutates only the m/n/p scalars and start_idx - a full re-init pass for the
-        ! non-trivial changed=T case is left to a future task.
-        call s_load_balance_rebalance(q_cons_ts(1)%vf)
-
         call s_populate_grid_variables_buffers()
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
@@ -1014,6 +1006,11 @@ contains
         call s_initialize_parallel_io()
 
         call s_mpi_decompose_computational_domain()
+
+        ! Weighted static decomposition: probe one field from the restart file at the equal
+        ! layout and re-split axes toward the load concentration. Must run here, before
+        ! s_initialize_modules allocates extent-dependent arrays at the equal layout.
+        call s_load_balance_rebalance()
 
     end subroutine s_initialize_mpi_domain
 
