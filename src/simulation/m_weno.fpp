@@ -71,7 +71,8 @@ module m_weno
     $:GPU_DECLARE(create='[v_size]')
 
     logical, allocatable, dimension(:,:,:) :: weno_full  !< per-cell: use full WENO (discontinuity in stencil)
-    $:GPU_DECLARE(create='[weno_full]')
+    logical, allocatable, dimension(:,:,:) :: weno_disc  !< raw per-cell discontinuity flag (pre-dilation sensor scratch)
+    $:GPU_DECLARE(create='[weno_full, weno_disc]')
 
     logical :: uniform_grid(3)  !< True if grid spacing is uniform in each direction
     $:GPU_DECLARE(create='[uniform_grid]')
@@ -127,6 +128,7 @@ contains
 
         if (hybrid_weno) then
             @:ALLOCATE(weno_full(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(weno_disc(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
         ! Allocating/Computing WENO Coefficients in y-direction
@@ -1839,6 +1841,7 @@ contains
 
         if (hybrid_weno) then
             @:DEALLOCATE(weno_full)
+            @:DEALLOCATE(weno_disc)
         end if
 
         ! Deallocating WENO coefficients in x-direction
@@ -1867,20 +1870,18 @@ contains
     impure subroutine s_compute_weno_sensor(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        logical, allocatable, dimension(:,:,:)              :: disc
         integer                                             :: j, k, l, jj, kk, ll, rho_i, p_i
         real(wp)                                            :: phi, c0, cm, cp, num, den
 
         rho_i = eqn_idx%cont%beg; p_i = eqn_idx%E
 
-        @:ALLOCATE(disc(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-
-        ! Pass 1: initialise disc to .false. over full idwbuff domain
+        ! weno_disc is module-level (allocated once at init) to avoid per-call device malloc/free.
+        ! Pass 1: initialise weno_disc to .false. over full idwbuff domain
         $:GPU_PARALLEL_LOOP(collapse=3, private='[phi, c0, cm, cp, num, den]')
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
-                    disc(j, k, l) = .false.
+                    weno_disc(j, k, l) = .false.
                 end do
             end do
         end do
@@ -1928,7 +1929,7 @@ contains
                         num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
                         phi = max(phi, num/max(den, tiny(1._wp)))
                     end if
-                    disc(j, k, l) = phi > hybrid_weno_eps
+                    weno_disc(j, k, l) = phi > hybrid_weno_eps
                 end do
             end do
         end do
@@ -1951,26 +1952,24 @@ contains
                     weno_full(j, k, l) = .false.
                     $:GPU_LOOP(parallelism='[seq]')
                     do jj = max(j - weno_polyn, idwbuff(1)%beg), min(j + weno_polyn, idwbuff(1)%end)
-                        if (disc(jj, k, l)) weno_full(j, k, l) = .true.
+                        if (weno_disc(jj, k, l)) weno_full(j, k, l) = .true.
                     end do
                     if (n > 0) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do kk = max(k - weno_polyn, idwbuff(2)%beg), min(k + weno_polyn, idwbuff(2)%end)
-                            if (disc(j, kk, l)) weno_full(j, k, l) = .true.
+                            if (weno_disc(j, kk, l)) weno_full(j, k, l) = .true.
                         end do
                     end if
                     if (p > 0) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do ll = max(l - weno_polyn, idwbuff(3)%beg), min(l + weno_polyn, idwbuff(3)%end)
-                            if (disc(j, k, ll)) weno_full(j, k, l) = .true.
+                            if (weno_disc(j, k, ll)) weno_full(j, k, l) = .true.
                         end do
                     end if
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-
-        @:DEALLOCATE(disc)
 
     end subroutine s_compute_weno_sensor
 
