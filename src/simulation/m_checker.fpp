@@ -68,9 +68,13 @@ contains
         @:PROHIBIT(load_balance .and. .not. parallel_io, "load_balance requires parallel_io = T")
         @:PROHIBIT(load_balance .and. num_procs == 1, "load_balance requires more than one MPI rank")
         @:PROHIBIT(hybrid_weno .and. recon_type /= recon_type_weno, "hybrid_weno requires WENO reconstruction")
+        @:PROHIBIT(hybrid_weno .and. weno_order == 1, "hybrid_weno requires weno_order > 1")
         @:PROHIBIT(hybrid_weno .and. hybrid_weno_eps <= 0._wp, "hybrid_weno_eps must be > 0")
         @:PROHIBIT(hybrid_weno .and. igr, "hybrid_weno is incompatible with the IGR solver")
         @:PROHIBIT(hybrid_riemann .and. riemann_solver /= riemann_solver_hllc, "hybrid_riemann requires riemann_solver = 2 (HLLC)")
+        @:PROHIBIT(hybrid_riemann .and. recon_type /= recon_type_weno, &
+                   & "hybrid_riemann requires WENO reconstruction (the shared sensor lives in the WENO module)")
+        @:PROHIBIT(hybrid_riemann .and. weno_order == 1, "hybrid_riemann requires weno_order > 1")
         @:PROHIBIT(hybrid_riemann .and. .not. (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq), &
                    & "hybrid_riemann supports only the 5- and 6-equation models")
         @:PROHIBIT(hybrid_riemann .and. (hybrid_smooth_flux < 1 .or. hybrid_smooth_flux > 2), &
@@ -82,6 +86,8 @@ contains
                    & "hybrid_riemann does not support bubble models")
         @:PROHIBIT(hybrid_riemann .and. chemistry, "hybrid_riemann does not support chemistry")
         @:PROHIBIT(hybrid_riemann .and. (cyl_coord .or. mhd), "hybrid_riemann does not support cylindrical/axisymmetric or MHD")
+        @:PROHIBIT(hybrid_riemann .and. low_Mach /= 0, &
+                   & "hybrid_riemann (cheap central/Rusanov flux) is incompatible with the low_Mach correction")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
