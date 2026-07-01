@@ -1360,17 +1360,19 @@ contains
             integer, allocatable :: off_x(:), off_y(:), off_z(:)
             integer              :: coords3(3)
             type(t_box)          :: box
-            off_x = f_equal_splits(m_glb + 1, num_procs_x)
-            ! Guard collapsed dims: num_procs_y/z are uninitialized locals (pre/post) when n/p_glb==0
+            ! Explicit allocate before assignment (not allocate-on-assignment): Intel defaults to
+            ! -assume norealloc_lhs, under which assigning to an unallocated allocatable is undefined.
+            ! Guard collapsed dims: num_procs_y/z are uninitialized locals (pre/post) when n/p_glb==0.
+            allocate (off_x(0:num_procs_x)); off_x = f_equal_splits(m_glb + 1, num_procs_x)
             if (n_glb > 0) then
-                off_y = f_equal_splits(n_glb + 1, num_procs_y)
+                allocate (off_y(0:num_procs_y)); off_y = f_equal_splits(n_glb + 1, num_procs_y)
             else
-                off_y = [integer::0,1]
+                allocate (off_y(0:1)); off_y = [integer::0,1]
             end if
             if (p_glb > 0) then
-                off_z = f_equal_splits(p_glb + 1, num_procs_z)
+                allocate (off_z(0:num_procs_z)); off_z = f_equal_splits(p_glb + 1, num_procs_z)
             else
-                off_z = [integer::0,1]
+                allocate (off_z(0:1)); off_z = [integer::0,1]
             end if
             coords3 = 0
             coords3(1:num_dims) = proc_coords
@@ -1378,8 +1380,8 @@ contains
             rem_cells = mod(m_glb + 1, num_procs_x)
             m = box%hi(1) - box%lo(1)
             start_idx(1) = box%lo(1)
-            if (n > 0) then; n = box%hi(2) - box%lo(2); start_idx(2) = box%lo(2); end if
-            if (p > 0) then; p = box%hi(3) - box%lo(3); start_idx(3) = box%lo(3); end if
+            if (n_glb > 0) then; n = box%hi(2) - box%lo(2); start_idx(2) = box%lo(2); end if
+            if (p_glb > 0) then; p = box%hi(3) - box%lo(3); start_idx(3) = box%lo(3); end if
         end block
 
         call s_update_cell_bounds(cells_bounds, m, n, p)
