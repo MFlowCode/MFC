@@ -38,3 +38,13 @@ Challenges Faced: The main challenge was understanding the codebase.
 Testing Strategy: I tested the flag method itself to ensure it correctly return a bool for all possible params (T, F, null). I also test to see that the old broken code fails and the new code works. 
 
 Branch Link: https://github.com/mansibrahman03/MFlowCode/tree/main
+
+# PR
+
+PR Link: [Direct link to your submitted pull request](https://github.com/MFlowCode/MFC/pull/1622)
+
+PR Description: I added a flag() method in toolchain/mfc/case_validator.py that functions to replace the verbose idiom "self.get(x,F)==T" repeated in 134 places across the file. I also updated ast_analyzer.py to recognize calls made to flag().
+
+Maintainer Feedback: I am currently waiting for maintainer to respond.
+
+Status: Awaiting review
