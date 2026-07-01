@@ -18,6 +18,7 @@ module m_mpi_common
     use ieee_arithmetic
     use m_nvtx
     use m_constants, only: recon_type_weno, format_silo
+    use m_box, only: t_box, f_equal_splits, f_box_from_splits
 
     implicit none
 
@@ -1220,12 +1221,6 @@ contains
                 end if
 #endif
 
-                ! Beginning and end sub-domain boundary locations
-                if (proc_coords(3) < rem_cells) then
-                    start_idx(3) = (p + 1)*proc_coords(3)
-                else
-                    start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
-                end if
                 if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
                     if (old_grid .neqv. .true.) then
@@ -1331,12 +1326,6 @@ contains
             end if
 #endif
 
-            ! Beginning and end sub-domain boundary locations
-            if (proc_coords(2) < rem_cells) then
-                start_idx(2) = (n + 1)*proc_coords(2)
-            else
-                start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
-            end if
             if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
                 if (old_grid .neqv. .true.) then
@@ -1366,20 +1355,32 @@ contains
             call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, proc_coords, ierr)
         end if
 
-        ! Global Parameters for x-direction
-
-        ! Number of remaining cells
-        rem_cells = mod(m + 1, num_procs_x)
-
-        ! Optimal number of cells per processor
-        m = (m + 1)/num_procs_x - 1
-
-        ! Distributing the remaining cells
-        do i = 1, rem_cells
-            if (proc_coords(1) == i - 1) then
-                m = m + 1; exit
+        ! Global Parameters for x-direction - equal split via the box layer (byte-identical with inline arithmetic)
+        block
+            integer, allocatable :: off_x(:), off_y(:), off_z(:)
+            integer              :: coords3(3)
+            type(t_box)          :: box
+            off_x = f_equal_splits(m_glb + 1, num_procs_x)
+            ! Guard collapsed dims: num_procs_y/z are uninitialized locals (pre/post) when n/p_glb==0
+            if (n_glb > 0) then
+                off_y = f_equal_splits(n_glb + 1, num_procs_y)
+            else
+                off_y = [integer::0,1]
             end if
-        end do
+            if (p_glb > 0) then
+                off_z = f_equal_splits(p_glb + 1, num_procs_z)
+            else
+                off_z = [integer::0,1]
+            end if
+            coords3 = 0
+            coords3(1:num_dims) = proc_coords
+            box = f_box_from_splits(off_x, off_y, off_z, coords3)
+            rem_cells = mod(m_glb + 1, num_procs_x)
+            m = box%hi(1) - box%lo(1)
+            start_idx(1) = box%lo(1)
+            if (n > 0) then; n = box%hi(2) - box%lo(2); start_idx(2) = box%lo(2); end if
+            if (p > 0) then; p = box%hi(3) - box%lo(3); start_idx(3) = box%lo(3); end if
+        end block
 
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
@@ -1413,12 +1414,6 @@ contains
         end if
 #endif
 
-        ! Beginning and end sub-domain boundary locations
-        if (proc_coords(1) < rem_cells) then
-            start_idx(1) = (m + 1)*proc_coords(1)
-        else
-            start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
-        end if
         if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
             if (old_grid .neqv. .true.) then
