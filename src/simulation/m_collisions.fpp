@@ -350,8 +350,8 @@ contains
         do pid1 = 1, num_ibs - 1
             centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
             if (num_dims == 3) centroid_1(3) = patch_ib(pid1)%z_centroid
-            collision_partner_loop: do pid2 = pid1 + 1, num_ibs
-                do xp = xp_lower, xp_upper
+            do pid2 = pid1 + 1, num_ibs
+                periodic_search: do xp = xp_lower, xp_upper
                     do yp = yp_lower, yp_upper
                         do zp = zp_lower, zp_upper
                             centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
@@ -372,12 +372,12 @@ contains
                                 collision_lookup(current_collisions, 2) = pid2
                                 collision_lookup(current_collisions, 3) = patch_ib(pid1)%gbl_patch_id
                                 collision_lookup(current_collisions, 4) = encoded_pid2
-                                cycle collision_partner_loop
+                                exit periodic_search
                             end if
                         end do
                     end do
-                end do
-            end do collision_partner_loop
+                end do periodic_search
+            end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 

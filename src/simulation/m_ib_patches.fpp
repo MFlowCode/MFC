@@ -679,7 +679,7 @@ contains
         #:endfor
 
         ! z only if 3D
-        if (present(zp_lower) .and. p /= 0) then
+        if (present(zp_lower) .and. num_dims == 3) then
             if (ib_bc_z%beg == BC_PERIODIC) then
                 zp_lower = -1
                 zp_upper = 1
@@ -687,6 +687,9 @@ contains
                 zp_lower = 0
                 zp_upper = 0
             end if
+        else if (present(zp_lower)) then
+            zp_lower = 0
+            zp_upper = 0
         end if
 
     end subroutine s_get_periodicities
