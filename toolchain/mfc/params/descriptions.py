@@ -118,6 +118,8 @@ DESCRIPTIONS = {
     "rank_time_wrt": "Report per-rank RHS compute-time imbalance (max/mean)",
     "hybrid_weno": "Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities",
     "hybrid_weno_eps": "Smoothness threshold for hybrid WENO shock flagging (must be > 0)",
+    "hybrid_riemann": "Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq)",
+    "hybrid_smooth_flux": "Smooth-region flux for hybrid Riemann: 1 = central, 2 = Rusanov",
     "partition_tile_size": "Tile side for the SFC partitioner",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",

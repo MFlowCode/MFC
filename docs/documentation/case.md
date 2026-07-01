@@ -199,7 +199,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 
 The Table lists the patch parameters.
 The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition.
-Note that the domain must be fully filled with patche(s).
+Note that the domain must be fully filled with patches.
 The code outputs error messages when an empty region is left in the domain.
 
 - `tau_e(i)` is the `i`-th component of the elastic stress tensor, ordered as `tau_xx`, `tau_xy`, `tau_yy`, `tau_xz`, `tau_yz`, and `tau_zz`. 1D simulation requires `tau(1)`, 2D `tau(1:3)`, and 3D `tau(1:6)`.
@@ -678,6 +678,8 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `load_balance`          | Logical | Apply weighted static Cartesian decomposition at init (requires `parallel_io = T`) |
 | `hybrid_weno`           | Logical | Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities (requires WENO reconstruction) |
 | `hybrid_weno_eps`       | Real    | Smoothness threshold for hybrid WENO shock flagging; must be > 0 (default 1e-2) |
+| `hybrid_riemann`        | Logical | Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq) |
+| `hybrid_smooth_flux`    | Integer | Smooth-region flux for hybrid Riemann: 1 = central, 2 = Rusanov (default 2) |
 | `partition_tile_size`   | Integer | Tile side for the SFC partitioner (default 8) |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |

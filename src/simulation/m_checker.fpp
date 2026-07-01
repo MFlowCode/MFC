@@ -12,7 +12,7 @@ module m_checker
     use m_mpi_proxy
     use m_helper
     use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3
+    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3, riemann_solver_hllc
 
     implicit none
 
@@ -70,6 +70,18 @@ contains
         @:PROHIBIT(hybrid_weno .and. recon_type /= recon_type_weno, "hybrid_weno requires WENO reconstruction")
         @:PROHIBIT(hybrid_weno .and. hybrid_weno_eps <= 0._wp, "hybrid_weno_eps must be > 0")
         @:PROHIBIT(hybrid_weno .and. igr, "hybrid_weno is incompatible with the IGR solver")
+        @:PROHIBIT(hybrid_riemann .and. riemann_solver /= riemann_solver_hllc, "hybrid_riemann requires riemann_solver = 2 (HLLC)")
+        @:PROHIBIT(hybrid_riemann .and. .not. (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq), &
+                   & "hybrid_riemann supports only the 5- and 6-equation models")
+        @:PROHIBIT(hybrid_riemann .and. (hybrid_smooth_flux < 1 .or. hybrid_smooth_flux > 2), &
+                   & "hybrid_smooth_flux must be 1 (central) or 2 (Rusanov)")
+        @:PROHIBIT(hybrid_riemann .and. igr, "hybrid_riemann is incompatible with the IGR solver")
+        @:PROHIBIT(hybrid_riemann .and. (viscous .or. surface_tension .or. hypoelasticity .or. hyperelasticity .or. elasticity), &
+                   & "hybrid_riemann does not support viscous/elastic/surface-tension physics")
+        @:PROHIBIT(hybrid_riemann .and. (bubbles_euler .or. bubbles_lagrange .or. qbmm), &
+                   & "hybrid_riemann does not support bubble models")
+        @:PROHIBIT(hybrid_riemann .and. chemistry, "hybrid_riemann does not support chemistry")
+        @:PROHIBIT(hybrid_riemann .and. (cyl_coord .or. mhd), "hybrid_riemann does not support cylindrical/axisymmetric or MHD")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
