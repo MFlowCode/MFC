@@ -15,6 +15,7 @@ module m_phase_change
     use m_variables_conversion
     use ieee_arithmetic
     use m_helper_basic
+    use m_constants, only: model_eqns_6eq
 
     implicit none
 
@@ -235,7 +236,7 @@ contains
                         q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rhok(i)
 
                         ! alpha*rho*e
-                        if (model_eqns == 3) then
+                        if (model_eqns == model_eqns_6eq) then
                             q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
                                       & l)*ek(i)
                         end if

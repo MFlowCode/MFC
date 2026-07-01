@@ -156,9 +156,19 @@ jobs:
       # Replaces the container: directive so we can free disk space first.
       # Uses "docker run -d ... sleep infinity" + "docker exec" to preserve
       # installed packages and env vars across steps.
+      # Retry the pull: nvcr.io intermittently times out ("context deadline
+      # exceeded") under load, and ~30 matrix jobs hit it at once. Pulls
+      # resume completed layers, so retries are cheap.
       - name: Pull NVHPC container
         if:   matrix.nvhpc
-        run:  docker pull "$NVHPC_IMAGE"
+        run: |
+          for attempt in 1 2 3 4 5; do
+            docker pull "$NVHPC_IMAGE" && exit 0
+            echo "docker pull failed (attempt $attempt/5); retrying in $((attempt * 30))s..."
+            sleep $((attempt * 30))
+          done
+          echo "::error::Failed to pull $NVHPC_IMAGE after 5 attempts"
+          exit 1
 
       - name: Start NVHPC container
         if:   matrix.nvhpc
@@ -392,6 +402,13 @@ jobs:
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'cpu'
+            interface: 'none'
+            shard: '2/2'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.runner }}
@@ -410,7 +427,7 @@ jobs:
 
       - name: Fetch Dependencies
         if:   matrix.cluster != 'phoenix'
-        timeout-minutes: 60
+        timeout-minutes: 120
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
@@ -513,7 +530,22 @@ jobs:
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'frontier_amd'
-        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }}
+        # AMD flang is slow enough that one serial pre-build job exceeds its
+        # walltime, so split the case list across two concurrent SLURM jobs.
+        # The shards share this workspace and skip their in-job staging clean,
+        # so clean once here on the login node before submitting.
+        run:  |
+          find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+          find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+          rm -f build/.prebuild-shared-targets-done
+          bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }} 1/2 &
+          pid1=$!
+          bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }} 2/2 &
+          pid2=$!
+          rc=0
+          wait "$pid1" || rc=1
+          wait "$pid2" || rc=1
+          exit $rc
 
       - name: Build & Run Case-Optimization Tests
         if:   matrix.cluster != 'phoenix' && matrix.cluster != 'frontier_amd'
@@ -536,6 +568,8 @@ jobs:
         if:   always()
         run:  |
           for f in prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out \
+                   prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}-1-of-2.out \
+                   prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}-2-of-2.out \
                    run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out; do
             [ -f "$f" ] && echo "=== $f ===" && cat "$f"
           done
@@ -546,5 +580,5 @@ jobs:
         with:
           name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
           path: |
-            prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+            prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}*.out
             run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out

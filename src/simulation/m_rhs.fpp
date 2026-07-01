@@ -14,6 +14,8 @@ module m_rhs
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
+        & recon_type_muscl
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -211,7 +213,7 @@ contains
                     @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
 
-                    if (riemann_solver == 1 .or. riemann_solver == 4) then
+                    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
@@ -239,7 +241,7 @@ contains
                 @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
 
                 if (i == 1) then
-                    if (riemann_solver /= 1) then
+                    if (riemann_solver /= riemann_solver_hll) then
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(eqn_idx%adv%beg)%sf
                             $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
@@ -462,8 +464,7 @@ contains
 
     !> Compute the right-hand side of the semi-discrete governing equations for a single time stage
     impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-
-        & time_avg, stage)
+                                    & time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
         type(scalar_field), intent(inout)                                                          :: q_T_sf
@@ -569,7 +570,7 @@ contains
             call nvtxEndRange
         end if
 
-        if (int_comp == 2 .and. n > 0) then
+        if (int_comp == int_comp_mthinc .and. n > 0) then
             call nvtxStartRange("RHS-COMPRESSION-NORMALS")
             call s_compute_mthinc_normals(q_prim_qp%vf)
             call nvtxEndRange
@@ -925,7 +926,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k_loop, l_loop, q_loop, inv_ds, advected_qty_val, &
                                     & pressure_val, flux_face1, flux_face2]')
                 do q_loop = 0, p
@@ -971,7 +972,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
                                     & flux_face1, flux_face2]')
                 do l = 0, p
@@ -1069,7 +1070,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (model_eqns == 3) then
+            if (model_eqns == model_eqns_6eq) then
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop, k, l, q, inv_ds, advected_qty_val, pressure_val, &
                                     & flux_face1, flux_face2]')
                 do k = 0, p
@@ -1113,7 +1114,7 @@ contains
 
             select case (current_idir)
             case (1)  ! x-direction
-                use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
+                use_standard_riemann = (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld)
                 if (use_standard_riemann) then
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
@@ -1181,7 +1182,7 @@ contains
                 end if
             case (2)
                 ! y-direction: loops q_idx (x), k_idx (y), l_idx (z); sf(q_idx, k_idx, l_idx); dy(k_idx); Kterm(q_idx,k_idx,l_idx)
-                use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
+                use_standard_riemann = (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld)
                 if (use_standard_riemann) then
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                         & local_flux1, local_flux2]')
@@ -1258,9 +1259,9 @@ contains
             case (3)
                 ! z-direction: loops l_idx (x), q_idx (y), k_idx (z); sf(l_idx, q_idx, k_idx); dz(k_idx); Kterm(l_idx,q_idx,k_idx)
                 if (grid_geometry == 3) then
-                    use_standard_riemann = (riemann_solver == 1)
+                    use_standard_riemann = (riemann_solver == riemann_solver_hll)
                 else
-                    use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
+                    use_standard_riemann = (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld)
                 end if
 
                 if (use_standard_riemann) then
@@ -1345,7 +1346,6 @@ contains
         integer                                                :: i, j, k, l
 
         if (idir == 1) then  ! x-direction
-
             if (surface_tension) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
@@ -1599,7 +1599,7 @@ contains
         integer :: recon_dir  !< Coordinate direction of the reconstruction
         integer :: i, j, k, l
 
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+        #:for SCHEME, TYPE in [('weno','recon_type_weno'), ('muscl','recon_type_muscl')]
             if (recon_type == ${TYPE}$) then
                 ! Reconstruction in s1-direction
                 if (norm_dir == 1) then
@@ -1634,7 +1634,7 @@ contains
         integer :: i, j, k, l
         ! Reconstruction in s1-direction
 
-        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl', 'MUSCL_TYPE')]
+        #:for SCHEME, TYPE in [('weno','recon_type_weno'), ('muscl', 'recon_type_muscl')]
             if (recon_type == ${TYPE}$) then
                 if (norm_dir == 1) then
                     is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)
@@ -1794,8 +1794,7 @@ contains
         end if
 
         if (mpp_lim .and. bubbles_euler) then
-            $:GPU_EXIT_DATA(delete='[alf_sum%sf]')
-            deallocate (alf_sum%sf)
+            @:DEALLOCATE(alf_sum%sf)
         end if
 
         if (.not. igr) then
@@ -1822,7 +1821,7 @@ contains
                         @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
                     end if
 
-                    if (riemann_solver == 1 .or. riemann_solver == 4) then
+                    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
@@ -1839,6 +1838,32 @@ contains
             end do
 
             @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
+            do i = 1, num_dims
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
+                    @:DEALLOCATE(qL_prim(i)%vf(l)%sf)
+                    @:DEALLOCATE(qR_prim(i)%vf(l)%sf)
+                end do
+                @:DEALLOCATE(qL_prim(i)%vf, qR_prim(i)%vf)
+            end do
+            @:DEALLOCATE(qL_prim, qR_prim)
+        end if
+
+        if (alt_soundspeed) then
+            @:DEALLOCATE(blkmod1)
+        end if
+
+        if (qbmm) then
+            do i = 0, 2
+                do j = 0, 2
+                    do l = 1, nb
+                        @:DEALLOCATE(mom_3d(i, j, l)%sf)
+                    end do
+                end do
+            end do
+            do i = 1, nmomsp
+                @:DEALLOCATE(mom_sp(i)%sf)
+            end do
+            @:DEALLOCATE(mom_sp, mom_3d)
         end if
 
     end subroutine s_finalize_rhs_module

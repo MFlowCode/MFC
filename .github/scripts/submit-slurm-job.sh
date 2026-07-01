@@ -52,7 +52,10 @@ case "$cluster" in
         account="CFD154"
         job_prefix="MFC"
         qos="hackathon"
-        extra_sbatch=""
+        # Let each job's slurmstepd broker its own steps instead of routing
+        # every srun through slurmctld. The in-job test suite launches ~1700+
+        # srun steps per allocation, which congests the Frontier controller.
+        extra_sbatch="#SBATCH --stepmgr"
         test_time="01:59:00"
         bench_time="01:59:00"
         gpu_partition_dynamic=false
@@ -62,7 +65,7 @@ case "$cluster" in
         account="CFD154"
         job_prefix="MFC"
         qos="hackathon"
-        extra_sbatch=""
+        extra_sbatch="#SBATCH --stepmgr"
         test_time="01:59:00"
         bench_time="01:59:00"
         gpu_partition_dynamic=false

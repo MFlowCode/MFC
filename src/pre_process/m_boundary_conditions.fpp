@@ -12,7 +12,6 @@ module m_boundary_conditions
 #endif
     use m_delay_file_access
     use m_compile_specific
-    use m_boundary_common
 
     implicit none
 

@@ -51,9 +51,7 @@
         molar_mass_inv = y1/31.998_wp + y2/18.01508_wp + y3/16.04256_wp + y4/28.0134_wp
 
         q_prim_vf(eqn_idx%cont%beg)%sf(i, 0, 0) = 1.01325_wp*(10.0_wp)**5/(temp*8.3144626_wp*1000.0_wp*molar_mass_inv)
-
     case(191)  ! 1D Dual Isothermal case
-
         q_prim_vf(eqn_idx%E)%sf(i, 0, 0) = 101325.0_wp
         q_prim_vf(eqn_idx%mom%beg)%sf(i, 0, 0) = 0.0_wp
         q_prim_vf(eqn_idx%species%beg)%sf(i, 0, 0) = 1.0_wp

@@ -10,6 +10,8 @@ module m_muscl
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_constants, only: muscl_order_first_order, muscl_order_second_order, muscl_lim_unlimited, muscl_lim_minmod, &
+        & muscl_lim_mc, muscl_lim_van_albada, muscl_lim_van_leer, muscl_lim_superbee
 #ifdef MFC_OpenACC
     use openacc
 #endif
@@ -82,9 +84,7 @@ contains
     end subroutine s_initialize_muscl_module
 
     !> Perform MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables
-    subroutine s_muscl(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, &
-
-        & is2_muscl_d, is3_muscl_d)
+    subroutine s_muscl(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, is2_muscl_d, is3_muscl_d)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vR_rs_vf_x
@@ -99,7 +99,7 @@ contains
 
         $:GPU_UPDATE(device='[is1_muscl, is2_muscl, is3_muscl]')
 
-        if (muscl_order == 1) then
+        if (muscl_order == muscl_order_first_order) then
             if (muscl_dir == 1) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
@@ -145,7 +145,7 @@ contains
         v_size = ubound(v_vf, 1)
         $:GPU_UPDATE(device='[v_size]')
 
-        if (muscl_order /= 1) then
+        if (muscl_order /= muscl_order_first_order) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l, i]', collapse=4)
             do i = 1, v_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -159,7 +159,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (muscl_order == 2) then
+        if (muscl_order == muscl_order_second_order) then
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1_muscl', 'is2_muscl', 'is3_muscl'), &
@@ -177,28 +177,28 @@ contains
                                     slopeR = v_rs_ws_muscl(${SF('')}$, i) - v_rs_ws_muscl(${SF(' - 1')}$, i)
                                     slope = 0._wp
 
-                                    if (muscl_lim == 0) then  ! unlimited (central difference)
+                                    if (muscl_lim == muscl_lim_unlimited) then  ! unlimited (central difference)
                                         slope = 5e-1_wp*(slopeL + slopeR)
-                                    else if (muscl_lim == 1) then  ! minmod
+                                    else if (muscl_lim == muscl_lim_minmod) then  ! minmod
                                         if (slopeL*slopeR > muscl_eps) then
                                             slope = min(abs(slopeL), abs(slopeR))
                                         end if
                                         if (slopeL < 0._wp) slope = -slope
-                                    else if (muscl_lim == 2) then  ! MC
+                                    else if (muscl_lim == muscl_lim_mc) then  ! MC
                                         if (slopeL*slopeR > muscl_eps) then
                                             slope = min(2._wp*abs(slopeL), 2._wp*abs(slopeR))
                                             slope = min(slope, 5e-1_wp*(abs(slopeL) + abs(slopeR)))
                                         end if
                                         if (slopeL < 0._wp) slope = -slope
-                                    else if (muscl_lim == 3) then  ! Van Albada
+                                    else if (muscl_lim == muscl_lim_van_albada) then  ! Van Albada
                                         if (slopeL*slopeR > muscl_eps) then
                                             slope = ((slopeL + slopeR)*slopeL*slopeR)/(slopeL**2._wp + slopeR**2._wp)
                                         end if
-                                    else if (muscl_lim == 4) then  ! Van Leer
+                                    else if (muscl_lim == muscl_lim_van_leer) then  ! Van Leer
                                         if (slopeL*slopeR > muscl_eps) then
                                             slope = 2._wp*slopeL*slopeR/(slopeL + slopeR)
                                         end if
-                                    else if (muscl_lim == 5) then  ! SUPERBEE
+                                    else if (muscl_lim == muscl_lim_superbee) then  ! SUPERBEE
                                         if (slopeL*slopeR > muscl_eps) then
                                             slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), &
                                                                & 2._wp*abs(slopeR)))
