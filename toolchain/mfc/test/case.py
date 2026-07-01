@@ -477,7 +477,7 @@ def create_input_lagrange(path_test):
         file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0")
 
 
-def copy_input_lagrange(path_examplse_input, path_test):
+def copy_input_lagrange(path_example_input, path_test):
     folder_path_dest = path_test + "/input/"
     file_path_dest = folder_path_dest + "lag_bubbles.dat"
     file_path_src = common.MFC_EXAMPLE_DIRPATH + path_example_input + "/input/lag_bubbles.dat"
