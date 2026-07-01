@@ -74,6 +74,7 @@
             "m_global_parameters_common",
             "m_mpi_common",
             "m_mpi_proxy",
+            "m_box",
             "m_constants",
             "m_precision_select",
             "m_helper",

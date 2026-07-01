@@ -537,4 +537,11 @@ module m_derived_types
         real(wp), dimension(1:num_fluids_max)   :: perturb_dens_scale
         real(wp), dimension(1:num_fluids_max,3) :: perturb_dens_offset
     end type simplex_noise_params
+
+    !> An index-space rectangle in global cell indices. In v1, one t_box = one rank's subdomain. Flat leaf: no allocatable/pointer
+    !! components, host-only, never namelist/broadcast.
+    type t_box
+        integer :: lo(3)  !< global low cell index per axis (x,y,z)
+        integer :: hi(3)  !< global high cell index per axis
+    end type t_box
 end module m_derived_types
