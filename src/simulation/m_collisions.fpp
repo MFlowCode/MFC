@@ -81,7 +81,7 @@ contains
         integer :: i, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, l  ! iterators and patch IDs
         real(wp) :: overlap_distance
         real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2
-        real(wp), dimension(3) :: normal_velocity, tangental_vector, normal_force, tangental_force, torque, radial_vector, &
+        real(wp), dimension(3) :: normal_velocity, tangential_vector, normal_force, tangential_force, torque, radial_vector, &
              & rotation_velocity, vel1, vel2
         real(wp) :: k, eta, effective_mass  ! the spring stiffness and damping coefficient and mass of a specific interaction
 
@@ -92,7 +92,7 @@ contains
         ! Iterate over all collisions detected
         $:GPU_PARALLEL_LOOP(private='[i, l, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, centroid_1, &
                             & centroid_2, normal_vector, overlap_distance, effective_mass, k, eta, normal_velocity, &
-                            & tangental_vector, normal_force, tangental_force, torque, radial_vector, rotation_velocity, vel1, &
+                            & tangential_vector, normal_force, tangential_force, torque, radial_vector, rotation_velocity, vel1, &
                             & vel2]', copy='[forces, torques]')
         do i = 1, num_considered_collisions
             encoded_pid1 = collision_lookup(i, 3)
@@ -132,25 +132,25 @@ contains
                     vel2 = patch_ib(pid2)%vel + rotation_velocity
 
                     normal_velocity = dot_product(vel1 - vel2, normal_vector)*normal_vector
-                    tangental_vector = (vel1 - vel2) - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangental_vector), &
-                        & 0._wp)) tangental_vector = tangental_vector/norm2(tangental_vector)
+                    tangential_vector = (vel1 - vel2) - normal_velocity
+                    if (.not. f_approx_equal(norm2(tangential_vector), &
+                        & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
 
                     ! compute force and torque
                     normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
-                    tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector
-                    call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangental_force, torque)
+                    tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
+                    call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangential_force, torque)
 
                     do l = 1, num_dims
                         ! update the first IB
                         $:GPU_ATOMIC(atomic='update')
-                        forces(pid1, l) = forces(pid1, l) + (normal_force(l) + tangental_force(l))
+                        forces(pid1, l) = forces(pid1, l) + (normal_force(l) + tangential_force(l))
                         $:GPU_ATOMIC(atomic='update')
                         torques(pid1, l) = torques(pid1, l) + torque(l)
 
                         ! apply equal and opposite force/torque to second IB
                         $:GPU_ATOMIC(atomic='update')
-                        forces(pid2, l) = forces(pid2, l) - (normal_force(l) + tangental_force(l))
+                        forces(pid2, l) = forces(pid2, l) - (normal_force(l) + tangential_force(l))
                         $:GPU_ATOMIC(atomic='update')
                         torques(pid2, l) = torques(pid2, l) + torque(l)*patch_ib(pid2)%radius/patch_ib(pid1)%radius
                     end do
@@ -166,12 +166,12 @@ contains
 
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
         integer :: patch_id, i, l
-        real(wp), dimension(3) :: normal_force, tangental_force, normal_vector, normal_velocity, tangental_vector, &
+        real(wp), dimension(3) :: normal_force, tangential_force, normal_vector, normal_velocity, tangential_vector, &
              & collision_location, torque, radial_vector, rotation_velocity, velocity
         real(wp) :: k, eta  ! the spring stiffness and damping coefficient for a specific IB
 
         $:GPU_PARALLEL_LOOP(private='[patch_id, i, l, collision_location, normal_vector, k, eta, normal_velocity, &
-                            & tangental_vector, normal_force, tangental_force, torque, radial_vector, rotation_velocity, &
+                            & tangential_vector, normal_force, tangential_force, torque, radial_vector, rotation_velocity, &
                             & velocity]', copy='[forces, torques]', collapse=2)
         do patch_id = 1, num_ibs
             do i = 1, num_dims*2
@@ -208,16 +208,16 @@ contains
 
                     ! standard soft-sphere collision  with the wall
                     normal_velocity = dot_product(velocity, normal_vector)*normal_vector
-                    tangental_vector = velocity - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangental_vector), &
-                        & 0._wp)) tangental_vector = tangental_vector/norm2(tangental_vector)
+                    tangential_vector = velocity - normal_velocity
+                    if (.not. f_approx_equal(norm2(tangential_vector), &
+                        & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
                     normal_force = -k*wall_overlap_distances(patch_id, i)*normal_vector - eta*normal_velocity
-                    tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector
-                    call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangental_force, torque)
+                    tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
+                    call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangential_force, torque)
 
                     do l = 1, num_dims
                         $:GPU_ATOMIC(atomic='update')
-                        forces(patch_id, l) = forces(patch_id, l) + (normal_force(l) + tangental_force(l))
+                        forces(patch_id, l) = forces(patch_id, l) + (normal_force(l) + tangential_force(l))
                         $:GPU_ATOMIC(atomic='update')
                         torques(patch_id, l) = torques(patch_id, l) + torque(l)
                     end do
