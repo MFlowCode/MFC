@@ -78,6 +78,43 @@ Key data structures (defined in `src/common/m_derived_types.fpp`):
 
 See @ref parameters for the full list of ~3,400 simulation parameters. See @ref case_constraints for feature compatibility and example configurations.
 
+### How the Build Fits Together
+
+The build pipeline has four layers. Each layer has a single responsibility; the handoff
+between them is narrow.
+
+```
+mfc.sh (env bootstrap, venv, module loading, lock)
+  └─ toolchain/mfc/build.py (config slugs, cmake invocation)
+       └─ CMakeLists.txt + cmake/{GPU,Fypp,ParamsCodegen,MFCTargets}.cmake
+            └─ toolchain/mfc/params/generators/cmake_gen.py (writes 15 generated .fpp includes)
+```
+
+**`mfc.sh` → `build.py`.**  `mfc.sh` is a thin shell wrapper that activates the Python
+virtual environment, loads HPC modules, and delegates to `build.py`.  `build.py` calls
+`get_slug` to compute a human-readable variant identifier (`<prefix>-<10-hex>`, e.g.
+`gpu-acc-chem-f93aa400b9`) that encodes every build-affecting flag: GPU backend, precision
+mode, debug, chemistry, MPI.  Staging and install trees are namespaced by slug under
+`build/staging/` and `build/install/`, so multiple variants coexist without interfering.
+
+**CMake layer.**  `cmake/Fypp.cmake` defines `HANDLE_SOURCES`, which sets up one
+`add_custom_command` per `.fpp` file to run Fypp at build time.  `cmake/ParamsCodegen.cmake`
+registers a single ninja-tracked `add_custom_command` (DEPENDS all `params/*.py`) that
+invokes `cmake_gen.py` and writes the 15 generated includes under
+`build/include/<target>/`.  There is no configure-time generation: all 15 files are build
+outputs, so changing any `params/*.py` triggers only a targeted rebuild, not a full
+reconfigure.
+
+**Fypp and per-target stubs.**  Fypp resolves `#:include` at parse time, so every `.fpp`
+file sees exactly the include path for the target being compiled.  `src/common/` is
+compiled once per executable with the `MFC_<TARGET>` preprocessor define
+(`MFC_PRE_PROCESS`, `MFC_SIMULATION`, or `MFC_POST_PROCESS`) — this is intentional.
+It is what lets common modules include per-target generated files and gate
+simulation-only code with `#ifdef MFC_SIMULATION` without duplication.
+
+For which of the 15 files is manual vs. generated and what each contains, see the
+"How to Add a New Simulation Parameter" section below.
+
 ## Development Workflow
 
 | Step | Command / Action |
@@ -276,35 +313,31 @@ def check_my_feature(self):
 
 If your check enforces a physics constraint, also add a `PHYSICS_DOCS` entry (see [How to Document Physics Constraints](#how-to-document-physics-constraints) below).
 
-**Step 5: Declare in Fortran** (`src/<target>/m_global_parameters.fpp`)
+**Step 5: Fortran declaration and namelist binding (auto-generated)**
 
-Add the variable declaration in the appropriate target's global parameters module. Choose the target(s) where the parameter is used:
+Scalar declarations, GPU declare lines, Doxygen descriptions, and namelist bindings are
+auto-generated at build time (ninja-tracked custom command) from the `TYPED_DECLS` and `FORTRAN_ARRAY_DIMS`
+tables in `toolchain/mfc/params/definitions.py`. For a plain scalar registered with
+`_r()` / `_nv()` above, no manual Fortran edit is needed — the next build regenerates the
+include in `m_global_parameters_common.fpp` (compiled per target) automatically: the
+generation command is ninja-tracked against every file under `toolchain/mfc/params/`.
 
-- `src/pre_process/m_global_parameters.fpp`
-- `src/simulation/m_global_parameters.fpp`
-- `src/post_process/m_global_parameters.fpp`
+Still manual (not auto-generated):
 
-```fortran
-real(wp) :: my_param    !< Description of the parameter
-```
+- `TYPE` member definitions inside derived types in `src/common/m_derived_types.fpp`
+- Default-value assignments in `s_assign_default_values_to_user_inputs`
+- Multi-variable declaration lines (`bc_x/y/z`, `x/y/z_domain`, `x/y/z_output`)
+- MPI broadcast residue in `src/*/m_mpi_proxy.fpp` (computed/non-namelist variables such
+  as `m_glb`/`n_glb`/`p_glb`, `cfl_dt`, `bc_io`, and complex struct-member array loops;
+  namelist-registry scalars are broadcast via the auto-generated `generated_bcast.fpp`
+  include)
+- `CASE_OPT_EXTRA_LINES` in `toolchain/mfc/params/generators/fortran_gen.py` for case-optimization constants
 
-If the parameter is used in GPU kernels, add a GPU declaration:
+Editing any existing file under `toolchain/mfc/params/` (tables or generators) triggers
+regeneration on the next build automatically. Only *adding a new file* there requires one
+reconfigure — the dependency list is globbed at configure time.
 
-```fortran
-$:GPU_DECLARE(create='[my_param]')
-```
-
-**Step 6: Add to Fortran namelist** (`src/<target>/m_start_up.fpp`)
-
-Add the parameter name to the `namelist /user_inputs/` declaration:
-
-```fortran
-namelist /user_inputs/ ... , my_param, ...
-```
-
-The toolchain writes the parameter to the input file and Fortran reads it via this namelist. No other I/O code is needed.
-
-**Step 7: Use in Fortran code**
+**Step 6: Use in Fortran code**
 
 Reference `my_param` anywhere in the target's modules. It is available as a global after the namelist is read at startup.
 

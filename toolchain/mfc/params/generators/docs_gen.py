@@ -113,8 +113,14 @@ def _format_constraints(param) -> str:
     c = param.constraints
     if "choices" in c:
         labels = c.get("value_labels", {})
-        if labels:
-            items = [f"{v}={labels[v]}" if v in labels else str(v) for v in c["choices"]]
+        by_value = {v: n for n, v in c.get("names", {}).items()}
+        if labels or by_value:
+            items = []
+            for v in c["choices"]:
+                item = f"{v} (`{by_value[v]}`)" if v in by_value else str(v)
+                if v in labels:
+                    item += f"={labels[v]}"
+                items.append(item)
             parts.append(", ".join(items))
         else:
             parts.append(f"Values: {c['choices']}")

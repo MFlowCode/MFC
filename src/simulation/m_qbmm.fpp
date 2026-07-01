@@ -14,6 +14,7 @@ module m_qbmm
     use m_variables_conversion
     use m_helper_basic
     use m_helper
+    use m_constants, only: bubble_model_keller_miksis, bubble_model_rayleigh_plesset
 
     implicit none
 
@@ -43,10 +44,10 @@ contains
         integer :: i1, i2, q, i, j
 
         #:if not MFC_CASE_OPTIMIZATION
-            if (bubble_model == 2) then
+            if (bubble_model == bubble_model_keller_miksis) then
                 ! Keller-Miksis without viscosity/surface tension
                 nterms = 32
-            else if (bubble_model == 3) then
+            else if (bubble_model == bubble_model_rayleigh_plesset) then
                 ! Rayleigh-Plesset with viscosity/surface tension
                 nterms = 7
             end if
@@ -64,7 +65,7 @@ contains
             do q = 1, nb
                 do i1 = 0, 2; do i2 = 0, 2
                     if ((i1 + i2) <= 2) then
-                        if (bubble_model == 3) then
+                        if (bubble_model == bubble_model_rayleigh_plesset) then
                             momrhs(1, i1, i2, 1, q) = -1._wp + i1
                             momrhs(2, i1, i2, 1, q) = -1._wp + i2
                             momrhs(3, i1, i2, 1, q) = 0._wp
@@ -98,7 +99,7 @@ contains
                             momrhs(1, i1, i2, 7, q) = -1._wp + i1
                             momrhs(2, i1, i2, 7, q) = -1._wp + i2
                             momrhs(3, i1, i2, 7, q) = 0._wp
-                        else if (bubble_model == 2) then
+                        else if (bubble_model == bubble_model_keller_miksis) then
                             ! KM with approximation of 1/(1-V/C) = 1+V/C
                             momrhs(1, i1, i2, 1, q) = -1._wp + i1
                             momrhs(2, i1, i2, 1, q) = 1._wp + i2
@@ -235,7 +236,7 @@ contains
             do q = 1, nb
                 do i1 = 0, 2; do i2 = 0, 2
                     if ((i1 + i2) <= 2) then
-                        if (bubble_model == 3) then
+                        if (bubble_model == bubble_model_rayleigh_plesset) then
                             momrhs(1, i1, i2, 1, q) = -1._wp + i1
                             momrhs(2, i1, i2, 1, q) = -1._wp + i2
                             momrhs(3, i1, i2, 1, q) = 0._wp
@@ -269,7 +270,7 @@ contains
                             momrhs(1, i1, i2, 7, q) = -1._wp + i1
                             momrhs(2, i1, i2, 7, q) = -1._wp + i2
                             momrhs(3, i1, i2, 7, q) = 0._wp
-                        else if (bubble_model == 2) then
+                        else if (bubble_model == bubble_model_keller_miksis) then
                             ! KM with approximation of 1/(1-V/C) = 1+V/C
                             momrhs(1, i1, i2, 1, q) = -1._wp + i1
                             momrhs(2, i1, i2, 1, q) = 1._wp + i2
@@ -599,7 +600,7 @@ contains
 
         do i2 = 0, 2; do i1 = 0, 2
             if ((i1 + i2) <= 2) then
-                if (bubble_model == 3) then
+                if (bubble_model == bubble_model_rayleigh_plesset) then
                     #:if not MFC_CASE_OPTIMIZATION or nterms > 1
                         ! RPE
                         coeffs(1, i1, i2) = -1._wp*i2*pres/rho
@@ -610,7 +611,7 @@ contains
                         if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
                         coeffs(7, i1, i2) = 0._wp
                     #:endif
-                else if (bubble_model == 2) then
+                else if (bubble_model == bubble_model_keller_miksis) then
                     ! KM with approximation of 1/(1-V/C) = 1+V/C
                     #:if not MFC_CASE_OPTIMIZATION or nterms > 7
                         coeffs(1, i1, i2) = -3._wp*i2/2._wp
@@ -678,7 +679,7 @@ contains
 
         do i2 = 0, 2; do i1 = 0, 2
             if ((i1 + i2) <= 2) then
-                if (bubble_model == 3) then
+                if (bubble_model == bubble_model_rayleigh_plesset) then
                     ! RPE
                     #:if not MFC_CASE_OPTIMIZATION or nterms > 1
                         coeffs(1, i1, i2) = -1._wp*i2*pres/rho
@@ -689,7 +690,7 @@ contains
                         if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
                         coeffs(7, i1, i2) = i2*pv/rho
                     #:endif
-                else if (bubble_model == 2) then
+                else if (bubble_model == bubble_model_keller_miksis) then
                     ! KM with approximation of 1/(1-V/C) = 1+V/C
                     #:if not MFC_CASE_OPTIMIZATION or nterms > 7
                         coeffs(1, i1, i2) = -3._wp*i2/2._wp
@@ -770,7 +771,7 @@ contains
                     pres = q_prim_vf(eqn_idx%E)%sf(id1, id2, id3)
                     rho = q_prim_vf(eqn_idx%cont%beg)%sf(id1, id2, id3)
 
-                    if (bubble_model == 2) then
+                    if (bubble_model == bubble_model_keller_miksis) then
                         n_tait = 1._wp/gammas(1) + 1._wp
                         B_tait = pi_infs(1)*(n_tait - 1)/n_tait
                         c = n_tait*(pres + B_tait)*(1._wp - alf)/(rho)
@@ -829,7 +830,7 @@ contains
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do j = 1, nterms
                                             select case (bubble_model)
-                                            case (3)
+                                            case (bubble_model_rayleigh_plesset)
                                                 if (j == 3) then
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &
                                                                             & q))*f_quad2D(abscX(:,q), abscY(:,q), wght_pb(:,q), &
@@ -839,7 +840,7 @@ contains
                                                                             & q))*f_quad2D(abscX(:,q), abscY(:,q), wght(:,q), &
                                                                             & momrhs(:,i1, i2, j, q))
                                                 end if
-                                            case (2)
+                                            case (bubble_model_keller_miksis)
                                                 if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) .or. (j >= 10 &
                                                     & .and. j <= 11) .or. (j == 26)) then
                                                     momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, &

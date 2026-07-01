@@ -17,6 +17,7 @@ module m_mpi_common
     use m_helper
     use ieee_arithmetic
     use m_nvtx
+    use m_constants, only: recon_type_weno, format_silo
 
     implicit none
 
@@ -290,7 +291,6 @@ contains
     !! single process, within its assigned section of the computational domain. Finally, note that the global extrema values are
     !! only bookkeept on the rank 0 processor.
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
-
         & Rc_min_glb)
 
         real(wp), intent(in)  :: icfl_max_loc
@@ -366,13 +366,13 @@ contains
     !> Reduce a local integer value to its global sum across all MPI ranks.
     impure subroutine s_mpi_allreduce_integer_sum(var_loc, var_glb)
 
-        integer, intent(in)  :: var_loc
-        integer, intent(out) :: var_glb
+        integer(kind=8), intent(in)  :: var_loc
+        integer(kind=8), intent(out) :: var_glb
 
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
-        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
         var_glb = var_loc
 #endif
@@ -1031,7 +1031,7 @@ contains
         integer  :: i, j           !< Generic loop iterators
         integer  :: ierr           !< Generic flag used to identify and report MPI errors
 
-        if (recon_type == WENO_TYPE) then
+        if (recon_type == recon_type_weno) then
             recon_order = weno_order
         else
             recon_order = muscl_order
@@ -1194,14 +1194,14 @@ contains
 
 #ifdef MFC_POST_PROCESS
                 ! Ghost zone at the beginning
-                if (proc_coords(3) > 0 .and. format == 1) then
+                if (proc_coords(3) > 0 .and. format == format_silo) then
                     offset_z%beg = 2
                 else
                     offset_z%beg = 0
                 end if
 
                 ! Ghost zone at the end
-                if (proc_coords(3) < num_procs_z - 1 .and. format == 1) then
+                if (proc_coords(3) < num_procs_z - 1 .and. format == format_silo) then
                     offset_z%end = 2
                 else
                     offset_z%end = 0
@@ -1306,14 +1306,14 @@ contains
 
 #ifdef MFC_POST_PROCESS
             ! Ghost zone at the beginning
-            if (proc_coords(2) > 0 .and. format == 1) then
+            if (proc_coords(2) > 0 .and. format == format_silo) then
                 offset_y%beg = 2
             else
                 offset_y%beg = 0
             end if
 
             ! Ghost zone at the end
-            if (proc_coords(2) < num_procs_y - 1 .and. format == 1) then
+            if (proc_coords(2) < num_procs_y - 1 .and. format == format_silo) then
                 offset_y%end = 2
             else
                 offset_y%end = 0
@@ -1389,14 +1389,14 @@ contains
 
 #ifdef MFC_POST_PROCESS
         ! Ghost zone at the beginning
-        if (proc_coords(1) > 0 .and. format == 1) then
+        if (proc_coords(1) > 0 .and. format == format_silo) then
             offset_x%beg = 2
         else
             offset_x%beg = 0
         end if
 
         ! Ghost zone at the end
-        if (proc_coords(1) < num_procs_x - 1 .and. format == 1) then
+        if (proc_coords(1) < num_procs_x - 1 .and. format == format_silo) then
             offset_x%end = 2
         else
             offset_x%end = 0
@@ -1443,7 +1443,6 @@ contains
 
         if (mpi_dir == 1) then
             if (pbc_loc == -1) then  ! PBC at the beginning
-
                 if (bc_x%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
                                       & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -1462,7 +1461,6 @@ contains
             end if
         else if (mpi_dir == 2) then
             if (pbc_loc == -1) then  ! PBC at the beginning
-
                 if (bc_y%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
                                       & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -1481,7 +1479,6 @@ contains
             end if
         else
             if (pbc_loc == -1) then  ! PBC at the beginning
-
                 if (bc_z%end >= 0) then  ! PBC at the beginning and end
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
                                       & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -1508,7 +1505,12 @@ contains
     impure subroutine s_finalize_mpi_common_module
 
 #ifdef MFC_MPI
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+        @:DEALLOCATE(buff_send, buff_recv)
+#else
+        $:GPU_EXIT_DATA(delete='[buff_send, buff_recv]')
         deallocate (buff_send, buff_recv)
+#endif
 #endif
 
     end subroutine s_finalize_mpi_common_module

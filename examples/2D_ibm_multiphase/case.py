@@ -30,27 +30,27 @@ print(
             # Only one patches are necessary, the air tube
             "num_patches": 1,
             # Use the 6 equation model
-            "model_eqns": 3,
+            "model_eqns": "6eq",
             "alt_soundspeed": "F",
             "num_fluids": 2,
             "mpp_lim": "T",
             # Correct errors when computing speed of sound
             "mixture_err": "T",
             # Use TVD RK3 for time marching
-            "time_stepper": 3,
+            "time_stepper": "rk3",
             # Use WENO5
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
             "weno_avg": "T",
-            "avg_state": 2,
+            "avg_state": "arithmetic",
             # Use the mapped WENO weights to maintain monotinicity
             "mapped_weno": "T",
             "null_weights": "F",
             "mp_weno": "T",
             # Use the HLLC  Riemann solver
-            "riemann_solver": 2,
-            "wave_speeds": 1,
+            "riemann_solver": "hllc",
+            "wave_speeds": "direct",
             # We use ghost-cell extrapolation at every side
             "bc_x%beg": -3,
             "bc_x%end": -3,
@@ -59,9 +59,10 @@ print(
             # Set IB to True and add 1 patch
             "ib": "T",
             "num_ibs": 1,
+            "fd_order": 2,
             # Formatted Database Files Structure Parameters
-            "format": 1,
-            "precision": 2,
+            "format": "silo",
+            "precision": "double",
             "prim_vars_wrt": "T",
             "E_wrt": "T",
             "parallel_io": "T",

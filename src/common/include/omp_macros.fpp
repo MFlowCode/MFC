@@ -141,7 +141,7 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
 
     #:set omp_clause_val = omp_clause_val.strip('\n')
-    #:set omp_directive = '!$omp target teams ' + omp_clause_val + extraOmpArgs_val.strip('\n')
+    #:set omp_directive = FOLD_DIRECTIVE('!$omp target teams ' + omp_clause_val + extraOmpArgs_val.strip('\n'), '!$omp').strip('\n')
 
     #:set omp_end_directive = '!$omp end target teams'
     $:omp_directive
@@ -179,14 +179,14 @@
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
     #:elif MFC_COMPILER == CCE_COMPILER_ID
-        #:set omp_start_directive = '!$omp target teams distribute parallel do simd defaultmap(firstprivate:scalar) '
+        #:set omp_start_directive = '!$omp target teams distribute parallel do defaultmap(firstprivate:scalar) '
     #:elif MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams distribute parallel do '
     #:else
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
     #:endif
 
-    #:set omp_directive = omp_start_directive + clause_val + extraOmpArgs_val.strip('\n')
+    #:set omp_directive = FOLD_DIRECTIVE(omp_start_directive + clause_val + extraOmpArgs_val.strip('\n'), '!$omp').strip('\n')
     $:omp_directive
 #:enddef
 
@@ -194,7 +194,7 @@
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_end_directive = '!$omp end target teams loop'
     #:elif MFC_COMPILER == CCE_COMPILER_ID
-        #:set omp_end_directive = '!$omp end target teams distribute parallel do simd'
+        #:set omp_end_directive = '!$omp end target teams distribute parallel do'
     #:elif MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_end_directive = '!$omp end target teams distribute parallel do'
     #:else

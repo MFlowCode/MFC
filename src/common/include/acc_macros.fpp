@@ -121,8 +121,8 @@
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
-    #:set acc_directive = '!$acc parallel ' + &
-        & acc_clause_val + extraAccArgs_val.strip('\n')
+    #:set acc_directive = FOLD_DIRECTIVE('!$acc parallel ' + &
+        & acc_clause_val + extraAccArgs_val.strip('\n'), '!$acc').strip('\n')
     #:set end_acc_directive = '!$acc end parallel'
     $:acc_directive
     $:code
@@ -153,8 +153,8 @@
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
-    #:set acc_directive = '!$acc parallel loop ' + &
-        & clause_val + extraAccArgs_val.strip('\n')
+    #:set acc_directive = FOLD_DIRECTIVE('!$acc parallel loop ' + &
+        & clause_val + extraAccArgs_val.strip('\n'), '!$acc').strip('\n')
     $:acc_directive
 #:enddef
 

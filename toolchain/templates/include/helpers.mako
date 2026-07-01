@@ -87,6 +87,10 @@ END
 
     t_${target.name}_stop=$(python3 -c 'import time; print(time.time())')
 
+% if target.name == 'post_process':
+    python3 "${MFC_ROOT_DIR}/toolchain/templates/include/generate_silo_series.py" '${os.path.dirname(input)}'
+% endif
+
     if [ $code -eq 22 ]; then
         echo
         error "$YELLOW CASE FILE ERROR$COLOR_RESET > $YELLOW Case file has prohibited conditions as stated above.$COLOR_RESET"
@@ -98,10 +102,6 @@ END
         echo
         exit 1
     fi
-
-% if target.name == 'post_process':
-    python3 "${MFC_ROOT_DIR}/toolchain/templates/include/generate_silo_series.py" '${os.path.dirname(input)}'
-% endif
 
     % if output_summary:
 

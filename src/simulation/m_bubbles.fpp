@@ -12,6 +12,7 @@ module m_bubbles
     use m_mpi_proxy
     use m_variables_conversion
     use m_helper_basic
+    use m_constants, only: bubble_model_gilmore, bubble_model_keller_miksis, bubble_model_rayleigh_plesset
 
     implicit none
 
@@ -32,7 +33,7 @@ contains
         real(wp)             :: fCpbw, fCpinf, fCpinf_dot, fH, fHdot, c_gas, c_liquid
         real(wp)             :: f_rddot
 
-        if (bubble_model == 1) then
+        if (bubble_model == bubble_model_gilmore) then
             ! Gilmore bubbles
             fCpinf = fP - Eu
             fCpbw = f_cpbw(fR0, fR, fV, fpb)
@@ -41,7 +42,7 @@ contains
             fCpinf_dot = f_cpinfdot(fRho, fP, alf, fntait, fBtait, f_bub_adv_src, f_divu)
             fHdot = f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
             f_rddot = f_rddot_G(fCpbw, fR, fV, fH, fHdot, c_gas, fntait, fBtait)
-        else if (bubble_model == 2) then
+        else if (bubble_model == bubble_model_keller_miksis) then
             ! Keller-Miksis bubbles
             fCpinf = fP
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
@@ -51,7 +52,7 @@ contains
                 c_liquid = fCson
             end if
             f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, fRho, fR, fV, fR0, c_liquid)
-        else if (bubble_model == 3) then
+        else if (bubble_model == bubble_model_rayleigh_plesset) then
             ! Rayleigh-Plesset bubbles
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
             f_rddot = f_rddot_RP(fP, fRho, fR, fV, fCpbw)
@@ -332,8 +333,7 @@ contains
     !> Adaptive time stepping routine for subgrid bubbles (See Heirer, E. Hairer S.P.Norsett G. Wanner, Solving Ordinary
     !! Differential Equations I, Chapter II.4)
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, fmass_v, &
-
-        & fmass_g, fbeta_c, fbeta_t, fCson, adap_dt_stop)
+                              & fmass_g, fbeta_c, fbeta_t, fCson, adap_dt_stop)
         $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(inout) :: fR, fV, fpb, fmass_v
@@ -487,8 +487,7 @@ contains
 
     !> Integrate bubble variables over the given time step size, h, using a third-order accurate embedded Runge-Kutta scheme.
     subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, bub_id, &
-
-        & fmass_v, fmass_g, fbeta_c, fbeta_t, fCson, h, myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
+                                 & fmass_v, fmass_g, fbeta_c, fbeta_t, fCson, h, myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
         $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(out)               :: err
