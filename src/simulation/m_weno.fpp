@@ -16,8 +16,7 @@ module m_weno
     use m_thinc, only: s_thinc_compression
     use m_nvtx
 
-    private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr, s_compute_weno_sensor, &
-        & weno_full
+    private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr, s_compute_weno_sensor
 
     !> @name The cell-average variables that will be WENO-reconstructed unpacked into an array for performance
     !> @{
@@ -1876,8 +1875,8 @@ contains
         rho_i = eqn_idx%cont%beg; p_i = eqn_idx%E
 
         ! weno_disc is module-level (allocated once at init) to avoid per-call device malloc/free.
-        ! Pass 1: initialise weno_disc to .false. over full idwbuff domain
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[phi, c0, cm, cp, num, den]')
+        ! Pass 1a: initialise weno_disc to .false. over full idwbuff domain
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -1887,11 +1886,13 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! Pass 1 cont: Jameson sensor on density and pressure, max over active directions
+        ! Pass 1b: Jameson sensor on density and pressure, max over active directions.
+        ! Bounds shrunk by 1 per active direction so that the +/-1 stencil stays in-bounds.
+        ! min(1,n)/min(1,p): offset is 0 for collapsed directions (n=0/p=0), 1 for active.
         $:GPU_PARALLEL_LOOP(collapse=3, private='[phi, c0, cm, cp, num, den]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = idwbuff(3)%beg + min(1, p), idwbuff(3)%end - min(1, p)
+            do k = idwbuff(2)%beg + min(1, n), idwbuff(2)%end - min(1, n)
+                do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
                     phi = 0._wp
                     ! density (eqn_idx%cont%beg)
                     c0 = real(q_prim_vf(rho_i)%sf(j, k, l), wp)
@@ -1935,20 +1936,25 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! Pass 2: initialise weno_full to .false. over full idwbuff domain, then dilate
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[jj, kk, ll]')
+        ! Pass 2: initialise weno_full to .true. (conservative default) over full idwbuff
+        ! domain; cells not covered by the dilation loop below (outermost ghost layers)
+        ! default to full WENO - safe and negligible cost.
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
-                    weno_full(j, k, l) = .false.
+                    weno_full(j, k, l) = .true.
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        ! Dilation: for cells where the full +/-weno_polyn window is within the computed-weno_disc
+        ! region, evaluate the dilated flag explicitly. Bounds shrunk by weno_polyn per active dir
+        ! (min(1,n)*weno_polyn: offset is 0 for collapsed dirs, weno_polyn for active dirs).
         $:GPU_PARALLEL_LOOP(collapse=3, private='[jj, kk, ll]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = idwbuff(3)%beg + min(1, p)*weno_polyn, idwbuff(3)%end - min(1, p)*weno_polyn
+            do k = idwbuff(2)%beg + min(1, n)*weno_polyn, idwbuff(2)%end - min(1, n)*weno_polyn
+                do j = idwbuff(1)%beg + weno_polyn, idwbuff(1)%end - weno_polyn
                     weno_full(j, k, l) = .false.
                     $:GPU_LOOP(parallelism='[seq]')
                     do jj = max(j - weno_polyn, idwbuff(1)%beg), min(j + weno_polyn, idwbuff(1)%end)

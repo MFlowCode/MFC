@@ -69,6 +69,7 @@ contains
         @:PROHIBIT(load_balance .and. num_procs == 1, "load_balance requires more than one MPI rank")
         @:PROHIBIT(hybrid_weno .and. recon_type /= recon_type_weno, "hybrid_weno requires WENO reconstruction")
         @:PROHIBIT(hybrid_weno .and. hybrid_weno_eps <= 0._wp, "hybrid_weno_eps must be > 0")
+        @:PROHIBIT(hybrid_weno .and. igr, "hybrid_weno is incompatible with the IGR solver")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
