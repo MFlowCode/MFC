@@ -609,7 +609,7 @@ contains
             call nvtxEndRange
         end if
 
-        if (hybrid_weno) call s_compute_weno_sensor(q_prim_qp%vf)
+        if (hybrid_weno .or. hybrid_riemann) call s_compute_weno_sensor(q_prim_qp%vf)
 
         ! Loop over coordinate directions for dimensional splitting
         do id = 1, num_dims

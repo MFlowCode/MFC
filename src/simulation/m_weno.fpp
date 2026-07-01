@@ -16,7 +16,8 @@ module m_weno
     use m_thinc, only: s_thinc_compression
     use m_nvtx
 
-    private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr, s_compute_weno_sensor
+    private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr, s_compute_weno_sensor, &
+        & weno_full
 
     !> @name The cell-average variables that will be WENO-reconstructed unpacked into an array for performance
     !> @{
@@ -125,7 +126,7 @@ contains
 
         @:ALLOCATE(v_rs_weno(is1_weno%beg:is1_weno%end, is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
-        if (hybrid_weno) then
+        if (hybrid_weno .or. hybrid_riemann) then
             @:ALLOCATE(weno_full(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ALLOCATE(weno_disc(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
@@ -1838,7 +1839,7 @@ contains
 
         @:DEALLOCATE(v_rs_weno)
 
-        if (hybrid_weno) then
+        if (hybrid_weno .or. hybrid_riemann) then
             @:DEALLOCATE(weno_full)
             @:DEALLOCATE(weno_disc)
         end if
@@ -1864,12 +1865,13 @@ contains
 
     end subroutine s_finalize_weno_module
 
-    !> Compute the per-cell discontinuity flag weno_full using the Jameson sensor on density and pressure (Pass 1), then dilate by
-    !! weno_polyn cells along each active direction (Pass 2). Must only be called when hybrid_weno is true.
+    !> Compute the per-cell discontinuity flag weno_full using the Jameson sensor on density, pressure, velocity, and volume
+    !! fractions (Pass 1), then dilate by weno_polyn cells along each active direction (Pass 2). Must only be called when
+    !! hybrid_weno or hybrid_riemann is true.
     impure subroutine s_compute_weno_sensor(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer                                             :: j, k, l, jj, kk, ll, rho_i, p_i
+        integer                                             :: j, k, l, jj, kk, ll, rho_i, p_i, ivar
         real(wp)                                            :: phi, c0, cm, cp, num, den
 
         rho_i = eqn_idx%cont%beg; p_i = eqn_idx%E
@@ -1889,7 +1891,7 @@ contains
         ! Pass 1b: Jameson sensor on density and pressure, max over active directions.
         ! Bounds shrunk by 1 per active direction so that the +/-1 stencil stays in-bounds.
         ! min(1,n)/min(1,p): offset is 0 for collapsed directions (n=0/p=0), 1 for active.
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[phi, c0, cm, cp, num, den]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[phi, c0, cm, cp, num, den, ivar]')
         do l = idwbuff(3)%beg + min(1, p), idwbuff(3)%end - min(1, p)
             do k = idwbuff(2)%beg + min(1, n), idwbuff(2)%end - min(1, n)
                 do j = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
@@ -1930,6 +1932,46 @@ contains
                         num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
                         phi = max(phi, num/max(den, tiny(1._wp)))
                     end if
+                    ! velocity components
+                    do ivar = eqn_idx%mom%beg, eqn_idx%mom%end
+                        c0 = real(q_prim_vf(ivar)%sf(j, k, l), wp)
+                        cm = real(q_prim_vf(ivar)%sf(j - 1, k, l), wp)
+                        cp = real(q_prim_vf(ivar)%sf(j + 1, k, l), wp)
+                        num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                        phi = max(phi, num/max(den, tiny(1._wp)))
+                        if (n > 0) then
+                            cm = real(q_prim_vf(ivar)%sf(j, k - 1, l), wp)
+                            cp = real(q_prim_vf(ivar)%sf(j, k + 1, l), wp)
+                            num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                            phi = max(phi, num/max(den, tiny(1._wp)))
+                        end if
+                        if (p > 0) then
+                            cm = real(q_prim_vf(ivar)%sf(j, k, l - 1), wp)
+                            cp = real(q_prim_vf(ivar)%sf(j, k, l + 1), wp)
+                            num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                            phi = max(phi, num/max(den, tiny(1._wp)))
+                        end if
+                    end do
+                    ! volume fractions
+                    do ivar = eqn_idx%adv%beg, eqn_idx%adv%end
+                        c0 = real(q_prim_vf(ivar)%sf(j, k, l), wp)
+                        cm = real(q_prim_vf(ivar)%sf(j - 1, k, l), wp)
+                        cp = real(q_prim_vf(ivar)%sf(j + 1, k, l), wp)
+                        num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                        phi = max(phi, num/max(den, tiny(1._wp)))
+                        if (n > 0) then
+                            cm = real(q_prim_vf(ivar)%sf(j, k - 1, l), wp)
+                            cp = real(q_prim_vf(ivar)%sf(j, k + 1, l), wp)
+                            num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                            phi = max(phi, num/max(den, tiny(1._wp)))
+                        end if
+                        if (p > 0) then
+                            cm = real(q_prim_vf(ivar)%sf(j, k, l - 1), wp)
+                            cp = real(q_prim_vf(ivar)%sf(j, k, l + 1), wp)
+                            num = abs(cp - 2._wp*c0 + cm); den = abs(cp) + 2._wp*abs(c0) + abs(cm)
+                            phi = max(phi, num/max(den, tiny(1._wp)))
+                        end if
+                    end do
                     weno_disc(j, k, l) = phi > hybrid_weno_eps
                 end do
             end do
