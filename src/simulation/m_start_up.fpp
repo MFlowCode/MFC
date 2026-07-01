@@ -19,6 +19,7 @@ module m_start_up
     use m_riemann_solvers
     use m_cbc
     use m_boundary_common
+    use m_boundary_io
     use m_acoustic_src
     use m_rhs
     use m_chemistry
