@@ -18,7 +18,7 @@ module m_amr
     public :: t_level, amr_fine, amr_maxc, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
         & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_amr_conservation_defect, &
-        & s_set_amr_fine_geometry
+        & s_set_amr_fine_geometry, s_amr_regrid
 
     !> One refined level: its own grid + conservative fields. Host-only (no GPU in SP1).
     type t_level
@@ -145,6 +145,7 @@ contains
         integer, intent(in) :: lo(3), hi(3)
 
         amr_fine%region%lo = lo; amr_fine%region%hi = hi
+        amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
         amr_fine%m = 2*(hi(1) - lo(1) + 1) - 1
         amr_fine%n = 0; amr_fine%p = 0
         if (n_glb > 0) amr_fine%n = 2*(hi(2) - lo(2) + 1) - 1
@@ -440,6 +441,91 @@ contains
         end do
 
     end subroutine s_advance_amr_fine_stage
+
+    !> Regrid: tag by relative density gradient, form the padded/clamped bounding box, rebuild the fine level (copy old-fine on
+    !! overlap via q_cons_stor bounce; prolong new cells). Called between steps only. No-op if nothing is tagged or the box is
+    !! unchanged.
+    impure subroutine s_amr_regrid(q_cons_base)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
+        integer                                             :: lo(3), hi(3), old_lo(3), old_m1, old_n1, old_p1
+        integer                                             :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, sh(3), i
+        real(wp)                                            :: r0, g
+        logical                                             :: tagged
+
+        ! 1) tag + bounding box (interior sweep away from edges; ghosts not needed)
+
+        lo = huge(1); hi = -huge(1); tagged = .false.
+        do ck = merge(1, 0, p_glb > 0), merge(p - 1, 0, p_glb > 0)
+            do cj = merge(1, 0, n_glb > 0), merge(n - 1, 0, n_glb > 0)
+                do ci = 1, m - 1
+                    r0 = max(abs(real(q_cons_base(1)%sf(ci, cj, ck), wp)), 1.e-30_wp)
+                    g = abs(real(q_cons_base(1)%sf(ci + 1, cj, ck), wp) - real(q_cons_base(1)%sf(ci - 1, cj, ck), wp))
+                    if (n_glb > 0) g = max(g, abs(real(q_cons_base(1)%sf(ci, cj + 1, ck), wp) - real(q_cons_base(1)%sf(ci, &
+                        & cj - 1, ck), wp)))
+                    if (p_glb > 0) g = max(g, abs(real(q_cons_base(1)%sf(ci, cj, ck + 1), wp) - real(q_cons_base(1)%sf(ci, cj, &
+                        & ck - 1), wp)))
+                    if (g/(2._wp*r0) > amr_tag_eps) then
+                        tagged = .true.
+                        lo(1) = min(lo(1), ci); hi(1) = max(hi(1), ci)
+                        lo(2) = min(lo(2), cj); hi(2) = max(hi(2), cj)
+                        lo(3) = min(lo(3), ck); hi(3) = max(hi(3), ck)
+                    end if
+                end do
+            end do
+        end do
+        if (.not. tagged) return
+
+        ! 2) pad + clamp (margin and max-extent); collapsed dims pinned to 0
+        lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
+        if (hi(1) - lo(1) + 1 > amr_maxc(1)) then
+            if (proc_rank == 0) print '(A)', ' [amr] WARNING: tagged region exceeds max patch; clamping'
+            hi(1) = lo(1) + amr_maxc(1) - 1
+        end if
+        if (n_glb > 0) then
+            lo(2) = max(lo(2) - amr_buf, buff_size); hi(2) = min(hi(2) + amr_buf, n_glb - buff_size)
+            if (hi(2) - lo(2) + 1 > amr_maxc(2)) hi(2) = lo(2) + amr_maxc(2) - 1
+        else
+            lo(2) = 0; hi(2) = 0
+        end if
+        if (p_glb > 0) then
+            lo(3) = max(lo(3) - amr_buf, buff_size); hi(3) = min(hi(3) + amr_buf, p_glb - buff_size)
+            if (hi(3) - lo(3) + 1 > amr_maxc(3)) hi(3) = lo(3) + amr_maxc(3) - 1
+        else
+            lo(3) = 0; hi(3) = 0
+        end if
+        if (all(lo == amr_fine%region%lo) .and. all(hi == amr_fine%region%hi)) return
+
+        ! 3) stash old fine interior in the (dead-between-steps) RK bounce buffer
+        old_lo = amr_fine%region%lo
+        old_m1 = amr_fine%m; old_n1 = amr_fine%n; old_p1 = amr_fine%p
+        do i = 1, sys_size
+            amr_fine%q_cons_stor(i)%sf(0:old_m1,0:old_n1,0:old_p1) = amr_fine%q_cons(i)%sf(0:old_m1,0:old_n1,0:old_p1)
+        end do
+
+        ! 4) rebuild geometry, prolong the whole new patch, then overwrite the overlap with old fine data
+        call s_set_amr_fine_geometry(lo, hi)
+        call s_interpolate_coarse_to_fine(q_cons_base)
+        sh = 2*(lo - old_lo)  ! old fine index = new fine index + sh (per dim; collapsed dims sh=0)
+        do i = 1, sys_size
+            do fk = 0, amr_fine%p
+                ofk = fk + sh(3)
+                if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_p1)) cycle
+                do fj = 0, amr_fine%n
+                    ofj = fj + sh(2)
+                    if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_n1)) cycle
+                    do fi = 0, amr_fine%m
+                        ofi = fi + sh(1)
+                        if (ofi < 0 .or. ofi > old_m1) cycle
+                        amr_fine%q_cons(i)%sf(fi, fj, fk) = amr_fine%q_cons_stor(i)%sf(ofi, ofj, ofk)
+                    end do
+                end do
+            end do
+        end do
+        if (proc_rank == 0) print '(A,I0,A,I0,A,I0,A)', ' [amr] regrid: box x ', lo(1), ':', hi(1), ' (', (hi(1) - lo(1) + 1), &
+            & ' coarse cells)'
+
+    end subroutine s_amr_regrid
 
     !> Global Sum(dV*U) for continuity (var 1) and energy (eqn_idx%E) over the level-0 interior. First call (finalize_report=F)
     !! stores the baseline; the finalize call prints the relative drift (expected small nonzero until SP4 refluxing).

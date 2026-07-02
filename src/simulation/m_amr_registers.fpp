@@ -6,10 +6,10 @@
 
 !> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine patch boundary (SP4). Depends only on m_derived_types +
 !! m_global_parameters so both m_rhs (capture) and m_time_steppers (apply) can use it without cycles. NOTE: m_amr uses m_rhs which
-!! uses m_amr_registers, so adding "use m_amr" here would create a compilation cycle. Region info (lo/hi) is therefore obtained from
-!! amr_patch_beg/end (m_global_parameters) which equal region%lo/hi in the static case. creg uses relative 0-based transverse
-!! indexing for regrid readiness; freg uses 0-based fine indexing. All arrays are preallocated at max size so regrid requires no
-!! reallocation.
+!! uses m_amr_registers, so adding "use m_amr" here would create a compilation cycle. Region info is therefore read from
+!! amr_region_lo/hi (m_global_parameters), which s_set_amr_fine_geometry keeps mirroring amr_fine%region across regrids. creg uses
+!! relative 0-based transverse indexing for regrid readiness; freg uses 0-based fine indexing. All arrays are preallocated at max
+!! size so regrid requires no reallocation.
 module m_amr_registers
 
     use m_derived_types
@@ -95,25 +95,25 @@ contains
             end do
         else
             ! coarse branch: jlo/jhi = patch boundary faces; t1/t2 relative 0-based transverse
-            jlo = amr_patch_beg(id) - 1; jhi = amr_patch_end(id)
+            jlo = amr_region_lo(id) - 1; jhi = amr_region_hi(id)
             select case (id)
-            case (1); t1_hi = amr_patch_end(2) - amr_patch_beg(2); t2_hi = amr_patch_end(3) - amr_patch_beg(3)
-            case (2); t1_hi = amr_patch_end(1) - amr_patch_beg(1); t2_hi = amr_patch_end(3) - amr_patch_beg(3)
-            case (3); t1_hi = amr_patch_end(1) - amr_patch_beg(1); t2_hi = amr_patch_end(2) - amr_patch_beg(2)
+            case (1); t1_hi = amr_region_hi(2) - amr_region_lo(2); t2_hi = amr_region_hi(3) - amr_region_lo(3)
+            case (2); t1_hi = amr_region_hi(1) - amr_region_lo(1); t2_hi = amr_region_hi(3) - amr_region_lo(3)
+            case (3); t1_hi = amr_region_hi(1) - amr_region_lo(1); t2_hi = amr_region_hi(2) - amr_region_lo(2)
             end select
             do t2 = 0, t2_hi
                 do t1 = 0, t1_hi
                     do eq = 1, sys_size
                         select case (id)
                         case (1)
-                            creg(1)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(jlo, amr_patch_beg(2) + t1, amr_patch_beg(3) + t2), wp)
-                            creg(1)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(jhi, amr_patch_beg(2) + t1, amr_patch_beg(3) + t2), wp)
+                            creg(1)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(jlo, amr_region_lo(2) + t1, amr_region_lo(3) + t2), wp)
+                            creg(1)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(jhi, amr_region_lo(2) + t1, amr_region_lo(3) + t2), wp)
                         case (2)
-                            creg(2)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_patch_beg(1) + t1, jlo, amr_patch_beg(3) + t2), wp)
-                            creg(2)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_patch_beg(1) + t1, jhi, amr_patch_beg(3) + t2), wp)
+                            creg(2)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jlo, amr_region_lo(3) + t2), wp)
+                            creg(2)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jhi, amr_region_lo(3) + t2), wp)
                         case (3)
-                            creg(3)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_patch_beg(1) + t1, amr_patch_beg(2) + t2, jlo), wp)
-                            creg(3)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_patch_beg(1) + t1, amr_patch_beg(2) + t2, jhi), wp)
+                            creg(3)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, amr_region_lo(2) + t2, jlo), wp)
+                            creg(3)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, amr_region_lo(2) + t2, jhi), wp)
                         end select
                     end do
                 end do
@@ -135,10 +135,10 @@ contains
 
         if (.not. amr) return
         ! current coarse patch extents (relative, 0-based): 0..n{x,y,z}_c
-        nx_c = amr_patch_end(1) - amr_patch_beg(1)
+        nx_c = amr_region_hi(1) - amr_region_lo(1)
         ny_c = 0; nz_c = 0
-        if (n_glb > 0) ny_c = amr_patch_end(2) - amr_patch_beg(2)
-        if (p_glb > 0) nz_c = amr_patch_end(3) - amr_patch_beg(3)
+        if (n_glb > 0) ny_c = amr_region_hi(2) - amr_region_lo(2)
+        if (p_glb > 0) nz_c = amr_region_hi(3) - amr_region_lo(3)
         ! x-faces: transverse dims (y, z); children in each active transverse dim
         nch = 1
         if (n_glb > 0) nch = nch*2
@@ -156,12 +156,12 @@ contains
                         end do
                     end do
                     fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                    rhs_vf(eq)%sf(amr_patch_beg(1) - 1, amr_patch_beg(2) + c1, &
-                           & amr_patch_beg(3) + c2) = rhs_vf(eq)%sf(amr_patch_beg(1) - 1, amr_patch_beg(2) + c1, &
-                           & amr_patch_beg(3) + c2) + (creg(1)%lo(eq, c1, c2) - fblo)/dx(amr_patch_beg(1) - 1)
-                    rhs_vf(eq)%sf(amr_patch_end(1) + 1, amr_patch_beg(2) + c1, &
-                           & amr_patch_beg(3) + c2) = rhs_vf(eq)%sf(amr_patch_end(1) + 1, amr_patch_beg(2) + c1, &
-                           & amr_patch_beg(3) + c2) + (fbhi - creg(1)%hi(eq, c1, c2))/dx(amr_patch_end(1) + 1)
+                    rhs_vf(eq)%sf(amr_region_lo(1) - 1, amr_region_lo(2) + c1, &
+                           & amr_region_lo(3) + c2) = rhs_vf(eq)%sf(amr_region_lo(1) - 1, amr_region_lo(2) + c1, &
+                           & amr_region_lo(3) + c2) + (creg(1)%lo(eq, c1, c2) - fblo)/dx(amr_region_lo(1) - 1)
+                    rhs_vf(eq)%sf(amr_region_hi(1) + 1, amr_region_lo(2) + c1, &
+                           & amr_region_lo(3) + c2) = rhs_vf(eq)%sf(amr_region_hi(1) + 1, amr_region_lo(2) + c1, &
+                           & amr_region_lo(3) + c2) + (fbhi - creg(1)%hi(eq, c1, c2))/dx(amr_region_hi(1) + 1)
                 end do
             end do
         end do
@@ -182,12 +182,12 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        rhs_vf(eq)%sf(amr_patch_beg(1) + c1, amr_patch_beg(2) - 1, &
-                               & amr_patch_beg(3) + c2) = rhs_vf(eq)%sf(amr_patch_beg(1) + c1, amr_patch_beg(2) - 1, &
-                               & amr_patch_beg(3) + c2) + (creg(2)%lo(eq, c1, c2) - fblo)/dy(amr_patch_beg(2) - 1)
-                        rhs_vf(eq)%sf(amr_patch_beg(1) + c1, amr_patch_end(2) + 1, &
-                               & amr_patch_beg(3) + c2) = rhs_vf(eq)%sf(amr_patch_beg(1) + c1, amr_patch_end(2) + 1, &
-                               & amr_patch_beg(3) + c2) + (fbhi - creg(2)%hi(eq, c1, c2))/dy(amr_patch_end(2) + 1)
+                        rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) - 1, &
+                               & amr_region_lo(3) + c2) = rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) - 1, &
+                               & amr_region_lo(3) + c2) + (creg(2)%lo(eq, c1, c2) - fblo)/dy(amr_region_lo(2) - 1)
+                        rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_hi(2) + 1, &
+                               & amr_region_lo(3) + c2) = rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_hi(2) + 1, &
+                               & amr_region_lo(3) + c2) + (fbhi - creg(2)%hi(eq, c1, c2))/dy(amr_region_hi(2) + 1)
                     end do
                 end do
             end do
@@ -208,12 +208,12 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        rhs_vf(eq)%sf(amr_patch_beg(1) + c1, amr_patch_beg(2) + c2, &
-                               & amr_patch_beg(3) - 1) = rhs_vf(eq)%sf(amr_patch_beg(1) + c1, amr_patch_beg(2) + c2, &
-                               & amr_patch_beg(3) - 1) + (creg(3)%lo(eq, c1, c2) - fblo)/dz(amr_patch_beg(3) - 1)
-                        rhs_vf(eq)%sf(amr_patch_beg(1) + c1, amr_patch_beg(2) + c2, &
-                               & amr_patch_end(3) + 1) = rhs_vf(eq)%sf(amr_patch_beg(1) + c1, amr_patch_beg(2) + c2, &
-                               & amr_patch_end(3) + 1) + (fbhi - creg(3)%hi(eq, c1, c2))/dz(amr_patch_end(3) + 1)
+                        rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
+                               & amr_region_lo(3) - 1) = rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
+                               & amr_region_lo(3) - 1) + (creg(3)%lo(eq, c1, c2) - fblo)/dz(amr_region_lo(3) - 1)
+                        rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
+                               & amr_region_hi(3) + 1) = rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
+                               & amr_region_hi(3) + 1) + (fbhi - creg(3)%hi(eq, c1, c2))/dz(amr_region_hi(3) + 1)
                     end do
                 end do
             end do

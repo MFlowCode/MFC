@@ -644,6 +644,10 @@ contains
         ! Time-stepping loop controls
         t_step = t_step + 1
 
+        if (amr .and. amr_regrid_int > 0) then
+            if (mod(t_step, amr_regrid_int) == 0) call s_amr_regrid(q_cons_ts(1)%vf)
+        end if
+
     end subroutine s_perform_time_step
 
     !> Collect per-process wall-clock times and write aggregate performance metrics to file

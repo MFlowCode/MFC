@@ -277,6 +277,10 @@ module m_global_parameters
 
     logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
 
+    !> Current AMR fine-patch box in level-0 cell indices; mirrors amr_fine%region at all times (kept by s_set_amr_fine_geometry) so
+    !! m_amr_registers can read it without a use-cycle through m_amr.
+    integer :: amr_region_lo(3) = 0, amr_region_hi(3) = 0
+
 contains
 
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
@@ -446,6 +450,9 @@ contains
         amr = .false.
         amr_patch_beg(:) = 0
         amr_patch_end(:) = 0
+        amr_regrid_int = 0
+        amr_tag_eps = 0.1_wp
+        amr_buf = 3
         hybrid_smooth_flux = 2
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.

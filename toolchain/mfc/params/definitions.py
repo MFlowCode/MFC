@@ -674,6 +674,9 @@ def _load():
     for j in range(1, 4):
         for a in ["amr_patch_beg", "amr_patch_end"]:
             _r(f"{a}({j})", INT)
+    _r("amr_regrid_int", INT)
+    _r("amr_tag_eps", REAL)
+    _r("amr_buf", INT)
     _r("hybrid_weno_eps", REAL, {"output"})
     _r("hybrid_smooth_flux", INT, {"output"})
     _r("partition_tile_size", INT, {"output"})
@@ -1355,6 +1358,9 @@ _nv(
     "amr",
     "amr_patch_beg",
     "amr_patch_end",
+    "amr_regrid_int",
+    "amr_tag_eps",
+    "amr_buf",
     "alf_factor",
     "num_igr_iters",
     "num_igr_warm_start_iters",

@@ -679,6 +679,9 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `amr`                   | Logical | (Experimental, SP1) Carry a static refined level-1 patch alongside the base solve (inert; base solve unchanged). Requires single rank, WENO reconstruction, SSP-RK3, model_eqns=2, single fluid. |
 | `amr_patch_beg(i)`      | Integer | Refined-patch start cell index in direction $i$ (level-0 index space) |
 | `amr_patch_end(i)`      | Integer | Refined-patch end cell index in direction $i$ (level-0 index space) |
+| `amr_regrid_int`        | Integer | Steps between AMR regrid events (0 = static patch) |
+| `amr_tag_eps`           | Real    | Relative density-gradient threshold for AMR refinement tagging (default 0.1) |
+| `amr_buf`               | Integer | Coarse-cell padding around tagged cells when regridding (default 3) |
 | `hybrid_weno`           | Logical | Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities (requires WENO reconstruction) |
 | `hybrid_weno_eps`       | Real    | Smoothness threshold for hybrid WENO shock flagging; must be > 0 (default 1e-2) |
 | `hybrid_riemann`        | Logical | Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq) |

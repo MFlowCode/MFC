@@ -113,7 +113,11 @@ contains
                        & "amr fine y-extent exceeds the base grid")
             @:PROHIBIT(num_dims >= 3 .and. 2*(amr_patch_end(3) - amr_patch_beg(3) + 1) - 1 > p_glb, &
                        & "amr fine z-extent exceeds the base grid")
+            @:PROHIBIT(amr_regrid_int < 0, "amr_regrid_int must be >= 0")
+            @:PROHIBIT(amr_regrid_int > 0 .and. amr_tag_eps <= 0._wp, "amr_tag_eps must be > 0 when regridding")
+            @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
         end if
+        @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
 #ifdef MFC_GPU
         @:PROHIBIT(amr, "amr is not supported on GPU builds yet (SP7)")
 #endif
