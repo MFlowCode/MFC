@@ -668,8 +668,12 @@ def _load():
         "rank_time_wrt",
         "hybrid_weno",
         "hybrid_riemann",
+        "amr",
     ]:
         _r(n, LOG, {"output"})
+    for j in range(1, 4):
+        for a in ["amr_patch_beg", "amr_patch_end"]:
+            _r(f"{a}({j})", INT)
     _r("hybrid_weno_eps", REAL, {"output"})
     _r("hybrid_smooth_flux", INT, {"output"})
     _r("partition_tile_size", INT, {"output"})
@@ -1150,6 +1154,8 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "mom_wrt": "3",
     "omega_wrt": "3",
     "vel_wrt": "3",
+    "amr_patch_beg": "3",
+    "amr_patch_end": "3",
 }
 
 # Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
@@ -1346,6 +1352,9 @@ _nv(
     "alpha_bar",
     "rdma_mpi",
     "active_box",
+    "amr",
+    "amr_patch_beg",
+    "amr_patch_end",
     "alf_factor",
     "num_igr_iters",
     "num_igr_warm_start_iters",

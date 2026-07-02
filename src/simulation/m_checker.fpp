@@ -89,6 +89,26 @@ contains
         @:PROHIBIT(hybrid_riemann .and. low_Mach /= 0, &
                    & "hybrid_riemann (cheap central/Rusanov flux) is incompatible with the low_Mach correction")
 
+        if (amr) then
+            @:PROHIBIT(num_procs /= 1, "amr (SP1) requires a single MPI rank")
+            @:PROHIBIT(recon_type /= recon_type_weno, "amr (SP1) requires WENO reconstruction")
+            @:PROHIBIT(time_stepper /= time_stepper_rk3, "amr (SP1) requires time_stepper = 3 (SSP-RK3)")
+            @:PROHIBIT(model_eqns /= 2, "amr (SP1) requires model_eqns = 2 (5-equation)")
+            @:PROHIBIT(num_fluids /= 1, "amr (SP1) requires a single fluid")
+            @:PROHIBIT(viscous .or. surface_tension .or. hypoelasticity .or. hyperelasticity .or. mhd .or. chemistry, &
+                       & "amr (SP1) does not support viscous/elastic/surface-tension/MHD/chemistry")
+            @:PROHIBIT(bubbles_euler .or. bubbles_lagrange .or. qbmm .or. relax .or. ib .or. igr .or. cyl_coord, &
+                       & "amr (SP1) does not support bubbles/phase-change/IB/IGR/cylindrical")
+            @:PROHIBIT(any(amr_patch_beg(1:num_dims) < 0), "amr_patch_beg must be >= 0")
+            @:PROHIBIT(amr_patch_end(1) > m_glb .or. (num_dims >= 2 .and. amr_patch_end(2) > n_glb) .or. (num_dims >= 3 &
+                       & .and. amr_patch_end(3) > p_glb), "amr_patch_end must be <= global cell max per axis")
+            @:PROHIBIT(any(amr_patch_end(1:num_dims) <= amr_patch_beg(1:num_dims)), &
+                       & "amr_patch_end must exceed amr_patch_beg on each active axis")
+        end if
+#ifdef MFC_GPU
+        @:PROHIBIT(amr, "amr is not supported on GPU builds yet (SP7)")
+#endif
+
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
         end if

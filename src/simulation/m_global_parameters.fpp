@@ -441,6 +441,9 @@ contains
         hybrid_weno = .false.
         hybrid_weno_eps = 1.0e-2_wp
         hybrid_riemann = .false.
+        amr = .false.
+        amr_patch_beg(:) = 0
+        amr_patch_end(:) = 0
         hybrid_smooth_flux = 2
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.
