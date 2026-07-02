@@ -10,13 +10,14 @@ module m_amr
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort
+    use m_rhs, only: s_compute_rhs
 
     implicit none
 
     private
     public :: t_level, amr_fine, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
-        & s_amr_fill_fine_ghosts, s_amr_operator_checks
+        & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_amr_conservation_defect
 
     !> One refined level: its own grid + conservative fields. Host-only (no GPU in SP1).
     type t_level
@@ -39,6 +40,9 @@ module m_amr
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
+
+    !> Conservation-defect baselines (level-0 interior integrals at init)
+    real(wp) :: amr_mass0 = 0._wp, amr_energy0 = 0._wp
 
 contains
 
@@ -69,9 +73,16 @@ contains
         if (n_glb > 0) amr_fine%n = amr_fine%ref_ratio*(amr_patch_end(2) - amr_patch_beg(2) + 1) - 1
         if (p_glb > 0) amr_fine%p = amr_fine%ref_ratio*(amr_patch_end(3) - amr_patch_beg(3) + 1) - 1
 
+        ! collapsed dims keep the coarse 0:0 convention (s_configure_coordinate_bounds)
         amr_fine%idwbuff(1)%beg = -buff_size; amr_fine%idwbuff(1)%end = amr_fine%m + buff_size
-        amr_fine%idwbuff(2)%beg = -buff_size; amr_fine%idwbuff(2)%end = amr_fine%n + buff_size
-        amr_fine%idwbuff(3)%beg = -buff_size; amr_fine%idwbuff(3)%end = amr_fine%p + buff_size
+        amr_fine%idwbuff(2)%beg = 0; amr_fine%idwbuff(2)%end = 0
+        amr_fine%idwbuff(3)%beg = 0; amr_fine%idwbuff(3)%end = 0
+        if (n_glb > 0) then
+            amr_fine%idwbuff(2)%beg = -buff_size; amr_fine%idwbuff(2)%end = amr_fine%n + buff_size
+        end if
+        if (p_glb > 0) then
+            amr_fine%idwbuff(3)%beg = -buff_size; amr_fine%idwbuff(3)%end = amr_fine%p + buff_size
+        end if
 
         ! level-1 coordinates by bisecting each covered coarse cell (handles stretched grids)
         call s_build_level_coords(x_cb, lbound(x_cb, 1), amr_patch_beg(1), amr_fine%m, amr_fine%x_cb, amr_fine%x_cc, amr_fine%dx)
@@ -352,6 +363,89 @@ contains
         end do
 
     end subroutine s_amr_fill_fine_ghosts
+
+    !> Advance the fine level through RK stage s (same dt as level-0, no subcycling). Called BETWEEN the coarse RHS and the coarse
+    !! RK update, so q_cons_coarse is the coarse STAGE-ENTRY state. Fine prim ghosts are obtained by widening idwint to the fine
+    !! buffer so the cons->prim conversion inside s_compute_rhs covers the (prolonged) cons ghost shell; the BC populate is skipped
+    !! via amr_in_fine_advance. The update mirrors the coarse non-IGR rk_coef form in s_tvd_rk.
+    impure subroutine s_advance_amr_fine_stage(s, coefs, q_cons_coarse, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
+        & time_avg)
+
+        integer, intent(in)                                        :: s, t_step
+        real(wp), intent(in)                                       :: coefs(4)
+        type(scalar_field), dimension(sys_size), intent(in)        :: q_cons_coarse
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+        real(wp), intent(inout)                                    :: time_avg
+        integer                                                    :: i, fi, fj, fk
+
+        if (.not. amr) return
+
+        ! ghost prolongation from the coarse stage-entry conservative state
+        call s_amr_fill_fine_ghosts(q_cons_coarse, amr_fine%q_cons)
+
+        ! step-entry backup for the SSP-RK combination
+        if (s == 1) then
+            do i = 1, sys_size
+                amr_fine%q_cons_stor(i)%sf(:,:,:) = amr_fine%q_cons(i)%sf(:,:,:)
+            end do
+        end if
+
+        amr_in_fine_advance = .true.
+        call s_amr_swap_to_fine()
+        idwint = amr_fine%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
+        call s_compute_rhs(amr_fine%q_cons, q_T_sf, amr_fine%q_prim, bc_type, amr_fine%rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
+                           & time_avg, s)
+        call s_amr_restore_coarse()
+        amr_in_fine_advance = .false.
+
+        ! RK stage update (mirror of the coarse non-IGR form; compute in wp, store stp)
+        do i = 1, sys_size
+            do fk = 0, amr_fine%p
+                do fj = 0, amr_fine%n
+                    do fi = 0, amr_fine%m
+                        amr_fine%q_cons(i)%sf(fi, fj, fk) = (coefs(1)*real(amr_fine%q_cons(i)%sf(fi, fj, fk), &
+                                        & wp) + coefs(2)*real(amr_fine%q_cons_stor(i)%sf(fi, fj, fk), &
+                                        & wp) + coefs(3)*dt*real(amr_fine%rhs(i)%sf(fi, fj, fk), wp))/coefs(4)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_advance_amr_fine_stage
+
+    !> Global Sum(dV*U) for continuity (var 1) and energy (eqn_idx%E) over the level-0 interior. First call (finalize_report=F)
+    !! stores the baseline; the finalize call prints the relative drift (expected small nonzero until SP4 refluxing).
+    impure subroutine s_amr_conservation_defect(q_cons_base, finalize_report)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
+        logical, intent(in)                                 :: finalize_report
+        real(wp)                                            :: sm, se, dv
+        integer                                             :: ci, cj, ck
+
+        if (.not. amr) return
+        sm = 0._wp; se = 0._wp
+        do ck = 0, p
+            do cj = 0, n
+                do ci = 0, m
+                    dv = dx(ci)
+                    if (n_glb > 0) dv = dv*dy(cj)
+                    if (p_glb > 0) dv = dv*dz(ck)
+                    sm = sm + dv*real(q_cons_base(1)%sf(ci, cj, ck), wp)
+                    se = se + dv*real(q_cons_base(eqn_idx%E)%sf(ci, cj, ck), wp)
+                end do
+            end do
+        end do
+        if (.not. finalize_report) then
+            amr_mass0 = sm; amr_energy0 = se
+        else if (proc_rank == 0) then
+            print '(A,ES12.4,A,ES12.4)', ' [amr] conservation defect: mass drift = ', abs(sm - amr_mass0)/max(abs(amr_mass0), &
+                & 1.e-30_wp), '  energy drift = ', abs(se - amr_energy0)/max(abs(amr_energy0), 1.e-30_wp)
+        end if
+
+    end subroutine s_amr_conservation_defect
 
     !> Init-time operator verification: (b) linear reproduction, (c) restriction of an independent field. Uses amr_fine%q_cons(1) as
     !! scratch; called before s_populate_amr_fine overwrites it.

@@ -28,6 +28,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
+    use m_amr, only: s_advance_amr_fine_stage, s_restrict_fine_to_coarse
 
     implicit none
 
@@ -496,6 +497,11 @@ contains
                 end if
             end if
 
+            ! AMR fine-level stage advance: q_cons_ts(1)%vf still holds the coarse stage-entry
+            ! state here (the stage-1 backup and RK update below have not run yet)
+            if (amr) call s_advance_amr_fine_stage(s, rk_coef(s,:), q_cons_ts(1)%vf, bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, &
+                & mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
             if (ab_active) then
                 jlo = ab_x%beg; jhi = ab_x%end
@@ -574,6 +580,9 @@ contains
                 end if
             end if
         end do
+
+        ! AMR: fine solution -> level-0 covered cells (the only deliberate level-0 write)
+        if (amr) call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
 
 #ifdef MFC_DEBUG
         call s_check_active_box_envelope(q_cons_ts(1)%vf)

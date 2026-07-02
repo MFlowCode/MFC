@@ -888,6 +888,7 @@ contains
         call s_amr_operator_checks()
         call s_populate_amr_fine(q_cons_ts(1)%vf)
         call s_amr_conservation_check(q_cons_ts(1)%vf)
+        call s_amr_conservation_defect(q_cons_ts(1)%vf, .false.)
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
@@ -1096,6 +1097,7 @@ contains
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
 
+        call s_amr_conservation_defect(q_cons_ts(1)%vf, .true.)
         call s_finalize_amr_module()
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
