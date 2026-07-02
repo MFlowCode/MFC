@@ -15,9 +15,10 @@ module m_amr
     implicit none
 
     private
-    public :: t_level, amr_fine, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
+    public :: t_level, amr_fine, amr_maxc, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
-        & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_amr_conservation_defect
+        & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_amr_conservation_defect, &
+        & s_set_amr_fine_geometry
 
     !> One refined level: its own grid + conservative fields. Host-only (no GPU in SP1).
     type t_level
@@ -36,6 +37,7 @@ module m_amr
     end type t_level
 
     type(t_level) :: amr_fine
+    integer       :: amr_maxc(3)  !< max coarse patch cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
@@ -47,10 +49,11 @@ module m_amr
 contains
 
     !> Build the static refined level-1 patch. No-op unless amr. Called after level-0 grid (x_cb/dx ready) and time-steppers
-    !! (sys_size/buff_size set).
+    !! (sys_size/buff_size set). Preallocates all fine arrays at max size so regrid only needs to call s_set_amr_fine_geometry.
     impure subroutine s_initialize_amr_module()
 
-        integer :: i
+        integer :: i, max_f1, max_f2, max_f3
+        integer :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
 
         if (.not. amr) return
 
@@ -63,64 +66,58 @@ contains
         end if
 
         amr_fine%ref_ratio = 2
-        amr_fine%region%lo = amr_patch_beg
-        amr_fine%region%hi = amr_patch_end
         amr_fine%buff_size = buff_size
 
-        ! interior extents: ref_ratio*(coarse cells in patch) - 1 per active dim; collapsed dims stay 0
-        amr_fine%m = amr_fine%ref_ratio*(amr_patch_end(1) - amr_patch_beg(1) + 1) - 1
-        amr_fine%n = 0; amr_fine%p = 0
-        if (n_glb > 0) amr_fine%n = amr_fine%ref_ratio*(amr_patch_end(2) - amr_patch_beg(2) + 1) - 1
-        if (p_glb > 0) amr_fine%p = amr_fine%ref_ratio*(amr_patch_end(3) - amr_patch_beg(3) + 1) - 1
+        ! max coarse patch cells per dim (upper bound for any future regrid box); 1 for collapsed dims
+        amr_maxc(1) = (m_glb + 1)/2
+        amr_maxc(2) = 1; amr_maxc(3) = 1
+        if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/2
+        if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/2
 
-        ! collapsed dims keep the coarse 0:0 convention (s_configure_coordinate_bounds)
-        amr_fine%idwbuff(1)%beg = -buff_size; amr_fine%idwbuff(1)%end = amr_fine%m + buff_size
-        amr_fine%idwbuff(2)%beg = 0; amr_fine%idwbuff(2)%end = 0
-        amr_fine%idwbuff(3)%beg = 0; amr_fine%idwbuff(3)%end = 0
-        if (n_glb > 0) then
-            amr_fine%idwbuff(2)%beg = -buff_size; amr_fine%idwbuff(2)%end = amr_fine%n + buff_size
-        end if
-        if (p_glb > 0) then
-            amr_fine%idwbuff(3)%beg = -buff_size; amr_fine%idwbuff(3)%end = amr_fine%p + buff_size
-        end if
+        ! max fine extents and buffered bounds for preallocation
+        max_f1 = 2*amr_maxc(1) - 1
+        max_f2 = 0; max_f3 = 0
+        if (n_glb > 0) max_f2 = 2*amr_maxc(2) - 1
+        if (p_glb > 0) max_f3 = 2*amr_maxc(3) - 1
+        mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
+        mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
+        if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
+        if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
 
-        ! level-1 coordinates by bisecting each covered coarse cell (handles stretched grids)
-        call s_build_level_coords(x_cb, lbound(x_cb, 1), amr_patch_beg(1), amr_fine%m, amr_fine%x_cb, amr_fine%x_cc, amr_fine%dx)
-        if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), amr_patch_beg(2), amr_fine%n, amr_fine%y_cb, &
-            & amr_fine%y_cc, amr_fine%dy)
-        if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), amr_patch_beg(3), amr_fine%p, amr_fine%z_cb, &
-            & amr_fine%z_cc, amr_fine%dz)
+        ! preallocate coordinates at max fine extents
+        allocate (amr_fine%x_cb(-1:max_f1), amr_fine%x_cc(0:max_f1), amr_fine%dx(0:max_f1))
+        if (n_glb > 0) allocate (amr_fine%y_cb(-1:max_f2), amr_fine%y_cc(0:max_f2), amr_fine%dy(0:max_f2))
+        if (p_glb > 0) allocate (amr_fine%z_cb(-1:max_f3), amr_fine%z_cc(0:max_f3), amr_fine%dz(0:max_f3))
 
-        ! Allocate fine conservative fields (idwbuff shape for q_cons/q_cons_stor/q_prim; interior for rhs)
+        ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p
         allocate (amr_fine%q_cons(1:sys_size))
         allocate (amr_fine%q_cons_stor(1:sys_size))
         allocate (amr_fine%q_prim(1:sys_size))
         allocate (amr_fine%rhs(1:sys_size))
         do i = 1, sys_size
-            allocate (amr_fine%q_cons(i)%sf(amr_fine%idwbuff(1)%beg:amr_fine%idwbuff(1)%end, &
-                      & amr_fine%idwbuff(2)%beg:amr_fine%idwbuff(2)%end,amr_fine%idwbuff(3)%beg:amr_fine%idwbuff(3)%end))
-            allocate (amr_fine%q_cons_stor(i)%sf(amr_fine%idwbuff(1)%beg:amr_fine%idwbuff(1)%end, &
-                      & amr_fine%idwbuff(2)%beg:amr_fine%idwbuff(2)%end,amr_fine%idwbuff(3)%beg:amr_fine%idwbuff(3)%end))
-            allocate (amr_fine%q_prim(i)%sf(amr_fine%idwbuff(1)%beg:amr_fine%idwbuff(1)%end, &
-                      & amr_fine%idwbuff(2)%beg:amr_fine%idwbuff(2)%end,amr_fine%idwbuff(3)%beg:amr_fine%idwbuff(3)%end))
-            allocate (amr_fine%rhs(i)%sf(0:amr_fine%m,0:amr_fine%n,0:amr_fine%p))
+            allocate (amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+            allocate (amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+            allocate (amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+            allocate (amr_fine%rhs(i)%sf(0:max_f1,0:max_f2,0:max_f3))
         end do
+
+        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial patch
+        call s_set_amr_fine_geometry(amr_patch_beg, amr_patch_end)
 
     end subroutine s_initialize_amr_module
 
     !> Fill level-1 fcb/fcc/fdx by bisecting parent cells; pcb_lb is lbound(parent_cb, 1). Passing pcb as assumed-shape resets
-    !! lbound to 1; pcb_lb + idx_offset recovers original indexing.
+    !! lbound to 1; pcb_lb + idx_offset recovers original indexing. Arrays must be preallocated at max size; only 0..nfine filled.
     subroutine s_build_level_coords(pcb, pcb_lb, lo, nfine, fcb, fcc, fdx)
 
-        real(wp), intent(in)               :: pcb(:)
-        integer, intent(in)                :: pcb_lb, lo, nfine
-        real(wp), allocatable, intent(out) :: fcb(:), fcc(:), fdx(:)
-        integer                            :: fi, c, idx_offset
-        real(wp)                           :: xl, xr, xm
+        real(wp), intent(in)                 :: pcb(:)
+        integer, intent(in)                  :: pcb_lb, lo, nfine
+        real(wp), allocatable, intent(inout) :: fcb(:), fcc(:), fdx(:)
+        integer                              :: fi, c, idx_offset
+        real(wp)                             :: xl, xr, xm
         ! pcb(k) = parent_cb(k + pcb_lb - 1); to access parent_cb(j): k = j - pcb_lb + 1
 
         idx_offset = 1 - pcb_lb
-        allocate (fcb(-1:nfine), fcc(0:nfine), fdx(0:nfine))
         ! fine cell fi (0..nfine) bisects coarse cell c = lo + fi/2
         do fi = 0, nfine
             c = lo + fi/2
@@ -141,6 +138,34 @@ contains
 
     end subroutine s_build_level_coords
 
+    !> Set the fine level's geometry (region, extents, bounds, coordinates) for the box lo:hi. Arrays are preallocated at max size;
+    !! this only updates metadata and refills coords.
+    impure subroutine s_set_amr_fine_geometry(lo, hi)
+
+        integer, intent(in) :: lo(3), hi(3)
+
+        amr_fine%region%lo = lo; amr_fine%region%hi = hi
+        amr_fine%m = 2*(hi(1) - lo(1) + 1) - 1
+        amr_fine%n = 0; amr_fine%p = 0
+        if (n_glb > 0) amr_fine%n = 2*(hi(2) - lo(2) + 1) - 1
+        if (p_glb > 0) amr_fine%p = 2*(hi(3) - lo(3) + 1) - 1
+        amr_fine%idwbuff(1)%beg = -buff_size; amr_fine%idwbuff(1)%end = amr_fine%m + buff_size
+        amr_fine%idwbuff(2)%beg = 0; amr_fine%idwbuff(2)%end = 0
+        amr_fine%idwbuff(3)%beg = 0; amr_fine%idwbuff(3)%end = 0
+        if (n_glb > 0) then
+            amr_fine%idwbuff(2)%beg = -buff_size; amr_fine%idwbuff(2)%end = amr_fine%n + buff_size
+        end if
+        if (p_glb > 0) then
+            amr_fine%idwbuff(3)%beg = -buff_size; amr_fine%idwbuff(3)%end = amr_fine%p + buff_size
+        end if
+        call s_build_level_coords(x_cb, lbound(x_cb, 1), lo(1), amr_fine%m, amr_fine%x_cb, amr_fine%x_cc, amr_fine%dx)
+        if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), lo(2), amr_fine%n, amr_fine%y_cb, amr_fine%y_cc, &
+            & amr_fine%dy)
+        if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), lo(3), amr_fine%p, amr_fine%z_cb, amr_fine%z_cc, &
+            & amr_fine%dz)
+
+    end subroutine s_set_amr_fine_geometry
+
     !> Conservative-linear prolongation for a single variable pair. Reads coarse interior/ghost from qc; writes fine interior to qf.
     !! Minmod-limited slopes.
     impure subroutine s_prolong_one_var(qc, qf)
@@ -151,13 +176,13 @@ contains
         real(wp)                          :: u0, sx, sy, sz, xix, xiy, xiz
 
         do fk = 0, amr_fine%p
-            ck = amr_patch_beg(3) + fk/amr_fine%ref_ratio; if (p_glb == 0) ck = 0
+            ck = amr_fine%region%lo(3) + fk/amr_fine%ref_ratio; if (p_glb == 0) ck = 0
             xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
             do fj = 0, amr_fine%n
-                cj = amr_patch_beg(2) + fj/amr_fine%ref_ratio; if (n_glb == 0) cj = 0
+                cj = amr_fine%region%lo(2) + fj/amr_fine%ref_ratio; if (n_glb == 0) cj = 0
                 xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                 do fi = 0, amr_fine%m
-                    ci = amr_patch_beg(1) + fi/amr_fine%ref_ratio
+                    ci = amr_fine%region%lo(1) + fi/amr_fine%ref_ratio
                     xix = (real(mod(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                     u0 = real(qc%sf(ci, cj, ck), wp)
                     sx = minmod(real(qc%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc%sf(ci - 1, cj, ck), wp))
@@ -207,12 +232,12 @@ contains
         nchild = amr_fine%ref_ratio
         if (n_glb > 0) nchild = nchild*amr_fine%ref_ratio
         if (p_glb > 0) nchild = nchild*amr_fine%ref_ratio
-        do ck = amr_patch_beg(3), merge(amr_patch_end(3), amr_patch_beg(3), p_glb > 0)
-            fk0 = (ck - amr_patch_beg(3))*amr_fine%ref_ratio
-            do cj = amr_patch_beg(2), merge(amr_patch_end(2), amr_patch_beg(2), n_glb > 0)
-                fj0 = (cj - amr_patch_beg(2))*amr_fine%ref_ratio
-                do ci = amr_patch_beg(1), amr_patch_end(1)
-                    fi0 = (ci - amr_patch_beg(1))*amr_fine%ref_ratio
+        do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
+            fk0 = (ck - amr_fine%region%lo(3))*amr_fine%ref_ratio
+            do cj = amr_fine%region%lo(2), merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
+                fj0 = (cj - amr_fine%region%lo(2))*amr_fine%ref_ratio
+                do ci = amr_fine%region%lo(1), amr_fine%region%hi(1)
+                    fi0 = (ci - amr_fine%region%lo(1))*amr_fine%ref_ratio
                     acc = 0._wp
                     do ddk = 0, merge(amr_fine%ref_ratio - 1, 0, p_glb > 0)
                         do ddj = 0, merge(amr_fine%ref_ratio - 1, 0, n_glb > 0)
@@ -256,9 +281,9 @@ contains
         call s_restrict_fine_to_coarse(scratch)
         err = 0._wp
         do i = 1, sys_size
-            do ck = amr_patch_beg(3), merge(amr_patch_end(3), amr_patch_beg(3), p_glb > 0)
-                do cj = amr_patch_beg(2), merge(amr_patch_end(2), amr_patch_beg(2), n_glb > 0)
-                    do ci = amr_patch_beg(1), amr_patch_end(1)
+            do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
+                do cj = amr_fine%region%lo(2), merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
+                    do ci = amr_fine%region%lo(1), amr_fine%region%hi(1)
                         e = abs(real(scratch(i)%sf(ci, cj, ck), wp) - real(q_cons_base(i)%sf(ci, cj, ck), wp))
                         if (e > err) err = e
                     end do
@@ -333,20 +358,20 @@ contains
             do fk = amr_fine%idwbuff(3)%beg, amr_fine%idwbuff(3)%end
                 ck = 0; xiz = 0._wp
                 if (p_glb > 0) then
-                    ck = amr_patch_beg(3) + floor(real(fk, wp)/real(amr_fine%ref_ratio, wp))
+                    ck = amr_fine%region%lo(3) + floor(real(fk, wp)/real(amr_fine%ref_ratio, wp))
                     xiz = (real(modulo(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                 end if
                 do fj = amr_fine%idwbuff(2)%beg, amr_fine%idwbuff(2)%end
                     cj = 0; xiy = 0._wp
                     if (n_glb > 0) then
-                        cj = amr_patch_beg(2) + floor(real(fj, wp)/real(amr_fine%ref_ratio, wp))
+                        cj = amr_fine%region%lo(2) + floor(real(fj, wp)/real(amr_fine%ref_ratio, wp))
                         xiy = (real(modulo(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                     end if
                     do fi = amr_fine%idwbuff(1)%beg, amr_fine%idwbuff(1)%end
                         ! skip the interior: only the ghost shell is filled
                         if (fi >= 0 .and. fi <= amr_fine%m .and. fj >= 0 .and. fj <= amr_fine%n .and. fk >= 0 &
                             & .and. fk <= amr_fine%p) cycle
-                        ci = amr_patch_beg(1) + floor(real(fi, wp)/real(amr_fine%ref_ratio, wp))
+                        ci = amr_fine%region%lo(1) + floor(real(fi, wp)/real(amr_fine%ref_ratio, wp))
                         xix = (real(modulo(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                         u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
                         sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
@@ -505,9 +530,9 @@ contains
                 end do
             end do
         end do
-        do ck = amr_patch_beg(3), merge(amr_patch_end(3), amr_patch_beg(3), p_glb > 0)
-            do cj = amr_patch_beg(2), merge(amr_patch_end(2), amr_patch_beg(2), n_glb > 0)
-                do ci = amr_patch_beg(1), amr_patch_end(1)
+        do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
+            do cj = amr_fine%region%lo(2), merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
+                do ci = amr_fine%region%lo(1), amr_fine%region%hi(1)
                     dvc = dx(ci)
                     if (n_glb > 0) dvc = dvc*dy(cj)
                     if (p_glb > 0) dvc = dvc*dz(ck)
