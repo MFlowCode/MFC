@@ -28,8 +28,8 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
-    use m_amr, only: s_advance_amr_fine_stage, s_restrict_fine_to_coarse
-    use m_amr_registers, only: s_amr_apply_reflux
+    use m_amr, only: s_advance_amr_fine_stage, s_advance_amr_fine_substeps, s_restrict_fine_to_coarse
+    use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
 
@@ -498,11 +498,11 @@ contains
                 end if
             end if
 
-            ! AMR fine-level stage advance: q_cons_ts(1)%vf still holds the coarse stage-entry
-            ! state here (the stage-1 backup and RK update below have not run yet)
-            if (amr) call s_advance_amr_fine_stage(s, rk_coef(s,:), q_cons_ts(1)%vf, bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, &
-                & mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-            if (amr) call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
+            ! AMR fine-level stage advance (interleaved, non-subcycled): q_cons_ts(1)%vf still holds
+            ! the coarse stage-entry state here (the stage-1 backup and RK update below have not run yet)
+            if (amr .and. .not. amr_subcycle) call s_advance_amr_fine_stage(s, rk_coef(s,:), q_cons_ts(1)%vf, bc_type, q_T_sf, &
+                & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            if (amr .and. .not. amr_subcycle) call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
             if (ab_active) then
@@ -583,8 +583,18 @@ contains
             end if
         end do
 
-        ! AMR: fine solution -> level-0 covered cells (the only deliberate level-0 write)
-        if (amr) call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
+        ! AMR: (subcycle) two dt/2 fine substeps between the coarse t^n backup (q_cons_ts(stor), written
+        ! at stage 1 and read-only afterwards) and the coarse t^{n+1} state; then fine solution ->
+        ! level-0 covered cells (the only deliberate level-0 write); then (subcycle) the time-accumulated
+        ! Berger-Colella state reflux on the first coarse cells outside the patch
+        if (amr) then
+            if (amr_subcycle) then
+                call s_advance_amr_fine_substeps(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, pb_ts(1)%sf, &
+                                                 & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            end if
+            call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
+            if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
+        end if
 
 #ifdef MFC_DEBUG
         call s_check_active_box_envelope(q_cons_ts(1)%vf)

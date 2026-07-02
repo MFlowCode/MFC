@@ -11,6 +11,7 @@ module m_amr
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort
     use m_rhs, only: s_compute_rhs
+    use m_amr_registers, only: s_amr_zero_fine_registers
 
     implicit none
 
@@ -18,7 +19,7 @@ module m_amr
     public :: t_level, amr_fine, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
         & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
         & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, &
-        & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid
+        & s_advance_amr_fine_substeps, s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -37,6 +38,8 @@ module m_amr
         type(scalar_field), allocatable :: q_cons_stor(:)  !< stage storage (fine advance, same bounds as q_cons)
         type(scalar_field), allocatable :: q_prim(:)       !< primitive stage (fine advance, same bounds as q_cons)
         type(scalar_field), allocatable :: rhs(:)          !< RHS (fine interior only: 0:m, 0:n, 0:p)
+        type(scalar_field), allocatable :: q_ghost_a(:)    !< subcycle ghost-lerp source at coarse t^n (ghost shell only)
+        type(scalar_field), allocatable :: q_ghost_b(:)    !< subcycle ghost-lerp source at coarse t^{n+1} (ghost shell only)
     end type t_level
 
     type(t_level) :: amr_fine
@@ -99,11 +102,15 @@ contains
         allocate (amr_fine%q_cons_stor(1:sys_size))
         allocate (amr_fine%q_prim(1:sys_size))
         allocate (amr_fine%rhs(1:sys_size))
+        allocate (amr_fine%q_ghost_a(1:sys_size))
+        allocate (amr_fine%q_ghost_b(1:sys_size))
         do i = 1, sys_size
             allocate (amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
             allocate (amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
             allocate (amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
             allocate (amr_fine%rhs(i)%sf(0:max_f1,0:max_f2,0:max_f3))
+            allocate (amr_fine%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+            allocate (amr_fine%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
         end do
 
         ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial patch
@@ -447,6 +454,83 @@ contains
 
     end subroutine s_advance_amr_fine_stage
 
+    !> Subcycled fine advance (amr_subcycle): two dt/2 SSP-RK3 substeps AFTER the coarse step. q_old/q_new are the coarse t^n and
+    !! t^{n+1} states; each stage's ghosts are the linear time interpolation at the stage time theta = (substep-1 + c_s)/2 with
+    !! SSP-RK3 abscissae c = [0, 1, 1/2]. Fine flux registers are zeroed here and accumulate over all six stages (0.5*rk3_w each) so
+    !! the end-of-step state reflux sees the time-averaged effective fine flux.
+    impure subroutine s_advance_amr_fine_substeps(q_old, q_new, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
+        & time_avg)
+
+        type(scalar_field), dimension(sys_size), intent(in)        :: q_old, q_new
+        real(wp), dimension(:,:), intent(in)                       :: coefs  !< rk_coef(1:3, 1:4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+        integer, intent(in)                                        :: t_step
+        real(wp), intent(inout)                                    :: time_avg
+        real(wp), parameter                                        :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
+        integer                                                    :: sub, s, i, fi, fj, fk
+        real(wp)                                                   :: th
+
+        if (.not. amr) return
+
+        ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1}
+        call s_amr_fill_fine_ghosts(q_old, amr_fine%q_ghost_a)
+        call s_amr_fill_fine_ghosts(q_new, amr_fine%q_ghost_b)
+        call s_amr_zero_fine_registers()
+
+        do sub = 1, 2
+            do s = 1, 3
+                th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
+
+                ! lerp the ghost shell into q_cons at the stage time (interior untouched)
+                do i = 1, sys_size
+                    do fk = amr_fine%idwbuff(3)%beg, amr_fine%idwbuff(3)%end
+                        do fj = amr_fine%idwbuff(2)%beg, amr_fine%idwbuff(2)%end
+                            do fi = amr_fine%idwbuff(1)%beg, amr_fine%idwbuff(1)%end
+                                if (fi >= 0 .and. fi <= amr_fine%m .and. fj >= 0 .and. fj <= amr_fine%n .and. fk >= 0 &
+                                    & .and. fk <= amr_fine%p) cycle
+                                amr_fine%q_cons(i)%sf(fi, fj, fk) = (1._wp - th)*real(amr_fine%q_ghost_a(i)%sf(fi, fj, fk), &
+                                                & wp) + th*real(amr_fine%q_ghost_b(i)%sf(fi, fj, fk), wp)
+                            end do
+                        end do
+                    end do
+                end do
+
+                ! substep-entry backup for the SSP-RK combination
+                if (s == 1) then
+                    do i = 1, sys_size
+                        amr_fine%q_cons_stor(i)%sf(0:amr_fine%m,0:amr_fine%n,0:amr_fine%p) = amr_fine%q_cons(i)%sf(0:amr_fine%m, &
+                                             & 0:amr_fine%n,0:amr_fine%p)
+                    end do
+                end if
+
+                amr_in_fine_advance = .true.
+                call s_amr_swap_to_fine()
+                idwint = amr_fine%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
+                call s_compute_rhs(amr_fine%q_cons, q_T_sf, amr_fine%q_prim, bc_type, amr_fine%rhs, pb_in, rhs_pb, mv_in, rhs_mv, &
+                                   & t_step, time_avg, s)
+                call s_amr_restore_coarse()
+                amr_in_fine_advance = .false.
+
+                ! RK stage update at the FINE time step (compute in wp, store stp)
+                do i = 1, sys_size
+                    do fk = 0, amr_fine%p
+                        do fj = 0, amr_fine%n
+                            do fi = 0, amr_fine%m
+                                amr_fine%q_cons(i)%sf(fi, fj, fk) = (coefs(s, 1)*real(amr_fine%q_cons(i)%sf(fi, fj, fk), &
+                                                & wp) + coefs(s, 2)*real(amr_fine%q_cons_stor(i)%sf(fi, fj, fk), wp) + coefs(s, &
+                                                & 3)*amr_dt_fine*real(amr_fine%rhs(i)%sf(fi, fj, fk), wp))/coefs(s, 4)
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_advance_amr_fine_substeps
+
     !> Regrid: tag by relative density gradient, form the padded/clamped bounding box, rebuild the fine level (copy old-fine on
     !! overlap via q_cons_stor bounce; prolong new cells). Called between steps only. No-op if nothing is tagged or the box is
     !! unchanged.
@@ -666,11 +750,15 @@ contains
             if (associated(amr_fine%q_cons_stor(i)%sf)) deallocate (amr_fine%q_cons_stor(i)%sf)
             if (associated(amr_fine%q_prim(i)%sf)) deallocate (amr_fine%q_prim(i)%sf)
             if (associated(amr_fine%rhs(i)%sf)) deallocate (amr_fine%rhs(i)%sf)
+            if (associated(amr_fine%q_ghost_a(i)%sf)) deallocate (amr_fine%q_ghost_a(i)%sf)
+            if (associated(amr_fine%q_ghost_b(i)%sf)) deallocate (amr_fine%q_ghost_b(i)%sf)
         end do
         deallocate (amr_fine%q_cons)
         deallocate (amr_fine%q_cons_stor)
         deallocate (amr_fine%q_prim)
         deallocate (amr_fine%rhs)
+        deallocate (amr_fine%q_ghost_a)
+        deallocate (amr_fine%q_ghost_b)
         if (allocated(amr_fine%x_cb)) deallocate (amr_fine%x_cb, amr_fine%x_cc, amr_fine%dx)
         if (allocated(amr_fine%y_cb)) deallocate (amr_fine%y_cb, amr_fine%y_cc, amr_fine%dy)
         if (allocated(amr_fine%z_cb)) deallocate (amr_fine%z_cb, amr_fine%z_cc, amr_fine%dz)
