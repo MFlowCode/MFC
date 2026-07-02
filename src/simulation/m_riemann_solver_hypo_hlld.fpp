@@ -5,6 +5,7 @@
 !> @brief Dual-pass HLLD approximate Riemann solver for hypoelastic flows, with non-conservative interface-velocity coupling
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'inline_riemann.fpp'
 
 module m_riemann_solver_hypo_hlld
 
@@ -281,16 +282,9 @@ contains
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                ! Elastic energy (guard skips when G near zero)
-                                if (.not. hypo_energy_guard .or. ((G_L > verysmall) .and. (G_R > verysmall))) then
-                                    E%L = E%L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-                                    E%R = E%R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
-                                    ! Shear terms doubled: 2D/2D-axisym i==2 only; 3D i==2,4,5
-                                    if ((n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))) then
-                                        E%L = E%L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-                                        E%R = E%R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
-                                    end if
-                                end if
+                                @:compute_hypo_elastic_energy(E%L, E%R, &
+                                                              & (n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 &
+                                                              & .or. i == 4 .or. i == 5)))
                             end do
 
                             H%L = (E%L + pres%L)/rho%L

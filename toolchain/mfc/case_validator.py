@@ -1074,6 +1074,7 @@ class CaseValidator:
         self.prohibit(mhd and wave_speeds is not None and wave_speeds == 2, "MHD requires wave_speeds = 1")
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
         self.prohibit(riemann_solver == 4 and not mhd and not hypoelasticity, "HLLD (riemann_solver = 4) requires MHD or hypoelasticity")
+        self.prohibit(riemann_solver == 4 and mhd and hypoelasticity, "HLLD does not support combined MHD and hypoelasticity")
         self.prohibit(riemann_solver == 4 and relativity, "HLLD is not available for RMHD (relativity)")
         self.prohibit(hyper_cleaning and not mhd, "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0, "Hyperbolic cleaning is not supported for 1D simulations")

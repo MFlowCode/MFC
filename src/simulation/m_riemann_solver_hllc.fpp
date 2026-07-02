@@ -305,16 +305,7 @@ contains
                                     end do
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        ! Elastic energy (guard skips when G near zero)
-                                        if (.not. hypo_energy_guard .or. ((G_L > verysmall) .and. (G_R > verysmall))) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
-                                            end if
-                                        end if
+                                        @:compute_hypo_elastic_energy(E_L, E_R, any(eqn_idx%stress%beg - 1 + i == shear_indices))
                                     end do
                                 end if
 
@@ -376,14 +367,7 @@ contains
                                 if (wave_speeds == wave_speeds_direct) then
                                     if (elasticity) then
                                         ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                        s_L = min(vel_L(dir_idx(1)) - sqrt(max(verysmall, &
-                                                  & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)), &
-                                                  & vel_R(dir_idx(1)) - sqrt(max(verysmall, &
-                                                  & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)))
-                                        s_R = max(vel_R(dir_idx(1)) + sqrt(max(verysmall, &
-                                                  & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)), &
-                                                  & vel_L(dir_idx(1)) + sqrt(max(verysmall, &
-                                                  & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)))
+                                        @:compute_elastic_wave_speeds_lr()
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
                                                & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
                                                & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &
@@ -1413,16 +1397,7 @@ contains
                                     end do
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        ! Elastic energy (guard skips when G near zero)
-                                        if (.not. hypo_energy_guard .or. ((G_L > verysmall) .and. (G_R > verysmall))) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
-                                            end if
-                                        end if
+                                        @:compute_hypo_elastic_energy(E_L, E_R, any(eqn_idx%stress%beg - 1 + i == shear_indices))
                                     end do
                                 end if
 
@@ -1487,14 +1462,7 @@ contains
                                 if (wave_speeds == wave_speeds_direct) then
                                     if (elasticity) then
                                         ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                        s_L = min(vel_L(dir_idx(1)) - sqrt(max(verysmall, &
-                                                  & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)), &
-                                                  & vel_R(dir_idx(1)) - sqrt(max(verysmall, &
-                                                  & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)))
-                                        s_R = max(vel_R(dir_idx(1)) + sqrt(max(verysmall, &
-                                                  & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)), &
-                                                  & vel_L(dir_idx(1)) + sqrt(max(verysmall, &
-                                                  & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)))
+                                        @:compute_elastic_wave_speeds_lr()
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
                                                & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
                                                & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &

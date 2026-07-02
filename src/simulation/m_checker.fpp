@@ -138,6 +138,7 @@ contains
                    & "HLLD hypoelasticity requires at least 2D (n must be > 0)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
                    & "HLLD hypoelasticity currently requires exactly 2 fluid components")
+        @:PROHIBIT(riemann_solver == 4 .and. mhd .and. hypoelasticity, "HLLD does not support combined MHD and hypoelasticity")
         @:PROHIBIT(hypoelasticity .and. (riemann_solver == 1 .or. riemann_solver == 2) .and. num_fluids > 2, &
                    & "HLL/HLLC hypoelasticity supports at most 2 fluid components (blkmod uses fluid_pp(1:2) only)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. viscous, &

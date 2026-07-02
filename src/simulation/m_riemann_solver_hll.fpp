@@ -344,16 +344,7 @@ contains
                                 do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
                                     tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
                                     tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    ! Elastic energy (guard skips when G near zero)
-                                    if (.not. hypo_energy_guard .or. ((G_L > verysmall) .and. (G_R > verysmall))) then
-                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
-                                        ! Double for shear stresses
-                                        if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
-                                        end if
-                                    end if
+                                    @:compute_hypo_elastic_energy(E_L, E_R, any(eqn_idx%stress%beg - 1 + i == shear_indices))
                                 end do
                             end if
 
@@ -394,14 +385,7 @@ contains
                                     s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 else if (hypoelasticity) then
                                     ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(max(verysmall, &
-                                              & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)), &
-                                              & vel_R(dir_idx(1)) - sqrt(max(verysmall, &
-                                              & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(max(verysmall, &
-                                              & c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)), &
-                                              & vel_L(dir_idx(1)) + sqrt(max(verysmall, &
-                                              & c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)))
+                                    @:compute_elastic_wave_speeds_lr()
                                 else if (hyperelasticity) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L), &
                                               & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
