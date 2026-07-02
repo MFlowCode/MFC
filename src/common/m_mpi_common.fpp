@@ -389,6 +389,38 @@ contains
 
     end subroutine s_mpi_allreduce_integer_sum
 
+    !> Reduce a local integer value to its global minimum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_integer_min(var_loc, var_glb)
+
+        integer, intent(in)  :: var_loc
+        integer, intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_integer_min
+
+    !> Reduce a local integer value to its global maximum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_integer_max(var_loc, var_glb)
+
+        integer, intent(in)  :: var_loc
+        integer, intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_integer_max
+
     !> Reduce a local real value to its global minimum across all MPI ranks.
     impure subroutine s_mpi_allreduce_min(var_loc, var_glb)
 

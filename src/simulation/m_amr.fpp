@@ -10,6 +10,7 @@ module m_amr
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort
+    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum
     use m_rhs, only: s_compute_rhs
     use m_amr_registers, only: s_amr_zero_fine_registers
 
@@ -19,7 +20,8 @@ module m_amr
     public :: t_level, amr_fine, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
         & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
         & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, &
-        & s_advance_amr_fine_substeps, s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid
+        & s_advance_amr_fine_substeps, s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, amr_owner_win_lo, &
+        & amr_owner_win_hi
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -45,6 +47,10 @@ module m_amr
     type(t_level) :: amr_fine
     integer       :: amr_maxc(3)  !< max coarse patch cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
+    !> Owner containment window in GLOBAL coarse indices (fixed for the run, known on all ranks; 0 in collapsed dims): a patch is
+    !! owner-contained iff amr_owner_win_lo(d) <= beg(d) and end(d) <= amr_owner_win_hi(d) per active dim.
+    integer :: amr_owner_win_lo(3) = 0, amr_owner_win_hi(3) = 0
+
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
@@ -58,20 +64,54 @@ contains
     !! (sys_size/buff_size set). Preallocates all fine arrays at max size so regrid only needs to call s_set_amr_fine_geometry.
     impure subroutine s_initialize_amr_module()
 
-        integer :: i, max_f1, max_f2, max_f3
+        integer :: i, d, max_f1, max_f2, max_f3
         integer :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
+        integer :: sidx(3), ext(3), owner_count, bad_loc, bad_glb
 
         if (.not. amr) return
 
         amr_dt_fine = 0.5_wp*dt
 
-        ! Runtime margin abort: patch must be at least buff_size coarse cells from every boundary.
+        ! Containment (owner model): the patch + a buff_size shell must lie within THIS rank's subdomain.
+        ! (np=1: start_idx=0, m=m_glb - degenerates to the old domain-margin rule.)
         ! buff_size is not available at checker time, so this check must be here.
-        if (amr_patch_beg(1) < buff_size .or. amr_patch_end(1) > m_glb - buff_size .or. (n_glb > 0 .and. (amr_patch_beg(2) &
-            & < buff_size .or. amr_patch_end(2) > n_glb - buff_size)) .or. (p_glb > 0 .and. (amr_patch_beg(3) < buff_size &
-            & .or. amr_patch_end(3) > p_glb - buff_size))) then
-            call s_mpi_abort('amr patch must be at least buff_size cells from every domain boundary')
+        sidx = 0
+        sidx(1) = start_idx(1)
+        if (n_glb > 0) sidx(2) = start_idx(2)
+        if (p_glb > 0) sidx(3) = start_idx(3)
+        amr_rank_owns_patch = amr_patch_beg(1) >= sidx(1) + buff_size .and. amr_patch_end(1) <= sidx(1) + m - buff_size
+        if (n_glb > 0) amr_rank_owns_patch = amr_rank_owns_patch .and. amr_patch_beg(2) >= sidx(2) + buff_size &
+            & .and. amr_patch_end(2) <= sidx(2) + n - buff_size
+        if (p_glb > 0) amr_rank_owns_patch = amr_rank_owns_patch .and. amr_patch_beg(3) >= sidx(3) + buff_size &
+            & .and. amr_patch_end(3) <= sidx(3) + p - buff_size
+        call s_mpi_allreduce_integer_max(merge(1, 0, amr_rank_owns_patch), owner_count)
+        if (owner_count == 0) then
+            call s_mpi_abort('amr patch must lie within a single rank subdomain (>= buff_size from its edges); ' &
+                             & // 'move the patch, use fewer ranks, or await SP7b')
         end if
+
+        ! The fine advance reuses the solver scratch (m_rhs/WENO/Riemann work arrays), which is sized to the
+        ! owner's LOCAL grid, so every fine extent must fit the owner's local extent. (np=1: the checker's
+        ! 2*patch-1 <= m_glb bound makes this a no-op.)
+        bad_loc = 0
+        if (amr_rank_owns_patch) then
+            if (2*(amr_patch_end(1) - amr_patch_beg(1) + 1) - 1 > m) bad_loc = 1
+            if (n_glb > 0 .and. 2*(amr_patch_end(2) - amr_patch_beg(2) + 1) - 1 > n) bad_loc = 1
+            if (p_glb > 0 .and. 2*(amr_patch_end(3) - amr_patch_beg(3) + 1) - 1 > p) bad_loc = 1
+        end if
+        call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
+        if (bad_glb == 1) then
+            call s_mpi_abort('amr fine extent exceeds the owner rank local grid (solver scratch is local-sized); ' &
+                             & // 'shrink the patch or use fewer ranks')
+        end if
+
+        ! Owner containment window in global indices, distributed to all ranks (fixed for the run; 0 in collapsed dims).
+        ext(1) = m; ext(2) = n; ext(3) = p
+        amr_owner_win_lo = 0; amr_owner_win_hi = 0
+        do d = 1, num_dims
+            call s_mpi_allreduce_integer_max(merge(sidx(d) + buff_size, -huge(1), amr_rank_owns_patch), amr_owner_win_lo(d))
+            call s_mpi_allreduce_integer_min(merge(sidx(d) + ext(d) - buff_size, huge(1), amr_rank_owns_patch), amr_owner_win_hi(d))
+        end do
 
         amr_fine%ref_ratio = 2
         amr_fine%buff_size = buff_size
@@ -92,26 +132,29 @@ contains
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
 
-        ! preallocate coordinates at max fine extents
-        allocate (amr_fine%x_cb(-1:max_f1), amr_fine%x_cc(0:max_f1), amr_fine%dx(0:max_f1))
-        if (n_glb > 0) allocate (amr_fine%y_cb(-1:max_f2), amr_fine%y_cc(0:max_f2), amr_fine%dy(0:max_f2))
-        if (p_glb > 0) allocate (amr_fine%z_cb(-1:max_f3), amr_fine%z_cc(0:max_f3), amr_fine%dz(0:max_f3))
+        ! owner-only storage: non-owner ranks run pure coarse and never touch the fine level
+        if (amr_rank_owns_patch) then
+            ! preallocate coordinates at max fine extents
+            allocate (amr_fine%x_cb(-1:max_f1), amr_fine%x_cc(0:max_f1), amr_fine%dx(0:max_f1))
+            if (n_glb > 0) allocate (amr_fine%y_cb(-1:max_f2), amr_fine%y_cc(0:max_f2), amr_fine%dy(0:max_f2))
+            if (p_glb > 0) allocate (amr_fine%z_cb(-1:max_f3), amr_fine%z_cc(0:max_f3), amr_fine%dz(0:max_f3))
 
-        ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p
-        allocate (amr_fine%q_cons(1:sys_size))
-        allocate (amr_fine%q_cons_stor(1:sys_size))
-        allocate (amr_fine%q_prim(1:sys_size))
-        allocate (amr_fine%rhs(1:sys_size))
-        allocate (amr_fine%q_ghost_a(1:sys_size))
-        allocate (amr_fine%q_ghost_b(1:sys_size))
-        do i = 1, sys_size
-            allocate (amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-            allocate (amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-            allocate (amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-            allocate (amr_fine%rhs(i)%sf(0:max_f1,0:max_f2,0:max_f3))
-            allocate (amr_fine%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-            allocate (amr_fine%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-        end do
+            ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p
+            allocate (amr_fine%q_cons(1:sys_size))
+            allocate (amr_fine%q_cons_stor(1:sys_size))
+            allocate (amr_fine%q_prim(1:sys_size))
+            allocate (amr_fine%rhs(1:sys_size))
+            allocate (amr_fine%q_ghost_a(1:sys_size))
+            allocate (amr_fine%q_ghost_b(1:sys_size))
+            do i = 1, sys_size
+                allocate (amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+                allocate (amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+                allocate (amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+                allocate (amr_fine%rhs(i)%sf(0:max_f1,0:max_f2,0:max_f3))
+                allocate (amr_fine%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+                allocate (amr_fine%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+            end do
+        end if
 
         ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial patch
         call s_set_amr_fine_geometry(amr_patch_beg, amr_patch_end)
@@ -171,11 +214,16 @@ contains
         if (p_glb > 0) then
             amr_fine%idwbuff(3)%beg = -buff_size; amr_fine%idwbuff(3)%end = amr_fine%p + buff_size
         end if
-        call s_build_level_coords(x_cb, lbound(x_cb, 1), lo(1), amr_fine%m, amr_fine%x_cb, amr_fine%x_cc, amr_fine%dx)
-        if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), lo(2), amr_fine%n, amr_fine%y_cb, amr_fine%y_cc, &
-            & amr_fine%dy)
-        if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), lo(3), amr_fine%p, amr_fine%z_cb, amr_fine%z_cc, &
-            & amr_fine%dz)
+        ! coord building is owner-only (non-owner coord arrays are unallocated); the parent origin is
+        ! converted to LOCAL indexing so the bisection reads the owner's local x_cb slice
+        if (amr_rank_owns_patch) then
+            call s_build_level_coords(x_cb, lbound(x_cb, 1), lo(1) - start_idx(1), amr_fine%m, amr_fine%x_cb, amr_fine%x_cc, &
+                                      & amr_fine%dx)
+            if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), lo(2) - start_idx(2), amr_fine%n, amr_fine%y_cb, &
+                & amr_fine%y_cc, amr_fine%dy)
+            if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), lo(3) - start_idx(3), amr_fine%p, amr_fine%z_cb, &
+                & amr_fine%z_cc, amr_fine%dz)
+        end if
 
     end subroutine s_set_amr_fine_geometry
 
@@ -185,17 +233,22 @@ contains
 
         type(scalar_field), intent(in)    :: qc
         type(scalar_field), intent(inout) :: qf
-        integer                           :: fi, fj, fk, ci, cj, ck
+        integer                           :: fi, fj, fk, ci, cj, ck, ox, oy, oz
         real(wp)                          :: u0, sx, sy, sz, xix, xiy, xiz
 
+        ! region indices are GLOBAL; the coarse source qc is rank-LOCAL (identical at np=1: start_idx=0)
+
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
         do fk = 0, amr_fine%p
-            ck = amr_fine%region%lo(3) + fk/amr_fine%ref_ratio; if (p_glb == 0) ck = 0
+            ck = amr_fine%region%lo(3) + fk/amr_fine%ref_ratio - oz; if (p_glb == 0) ck = 0
             xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
             do fj = 0, amr_fine%n
-                cj = amr_fine%region%lo(2) + fj/amr_fine%ref_ratio; if (n_glb == 0) cj = 0
+                cj = amr_fine%region%lo(2) + fj/amr_fine%ref_ratio - oy; if (n_glb == 0) cj = 0
                 xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                 do fi = 0, amr_fine%m
-                    ci = amr_fine%region%lo(1) + fi/amr_fine%ref_ratio
+                    ci = amr_fine%region%lo(1) + fi/amr_fine%ref_ratio - ox
                     xix = (real(mod(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                     u0 = real(qc%sf(ci, cj, ck), wp)
                     sx = minmod(real(qc%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc%sf(ci - 1, cj, ck), wp))
@@ -229,6 +282,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
         call s_interpolate_coarse_to_fine(q_cons_base)
 
     end subroutine s_populate_amr_fine
@@ -239,9 +293,14 @@ contains
 
         type(scalar_field), intent(in)    :: qf
         type(scalar_field), intent(inout) :: qc
-        integer                           :: ci, cj, ck, fi0, fj0, fk0, ddj, ddk, nchild
+        integer                           :: ci, cj, ck, fi0, fj0, fk0, ddj, ddk, nchild, ox, oy, oz
         real(wp)                          :: acc
 
+        ! region loop indices are GLOBAL; the coarse target qc is rank-LOCAL
+
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
         nchild = amr_fine%ref_ratio
         if (n_glb > 0) nchild = nchild*amr_fine%ref_ratio
         if (p_glb > 0) nchild = nchild*amr_fine%ref_ratio
@@ -257,7 +316,7 @@ contains
                             acc = acc + real(qf%sf(fi0, fj0 + ddj, fk0 + ddk), wp) + real(qf%sf(fi0 + 1, fj0 + ddj, fk0 + ddk), wp)
                         end do
                     end do
-                    qc%sf(ci, cj, ck) = acc/real(nchild, wp)
+                    qc%sf(ci - ox, cj - oy, ck - oz) = acc/real(nchild, wp)
                 end do
             end do
         end do
@@ -271,6 +330,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
         integer                                                :: i
 
+        if (.not. amr_rank_owns_patch) return
         do i = 1, sys_size
             call s_restrict_one_var(amr_fine%q_cons(i), coarse_tgt(i))
         end do
@@ -283,10 +343,14 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         type(scalar_field), dimension(:), allocatable       :: scratch
-        integer                                             :: i, ci, cj, ck
+        integer                                             :: i, ci, cj, ck, ox, oy, oz
         real(wp)                                            :: err, e
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
         allocate (scratch(1:sys_size))
         do i = 1, sys_size
             allocate (scratch(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
@@ -297,13 +361,14 @@ contains
             do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
                 do cj = amr_fine%region%lo(2), merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
                     do ci = amr_fine%region%lo(1), amr_fine%region%hi(1)
-                        e = abs(real(scratch(i)%sf(ci, cj, ck), wp) - real(q_cons_base(i)%sf(ci, cj, ck), wp))
+                        e = abs(real(scratch(i)%sf(ci - ox, cj - oy, ck - oz), wp) - real(q_cons_base(i)%sf(ci - ox, cj - oy, &
+                                & ck - oz), wp))
                         if (e > err) err = e
                     end do
                 end do
             end do
         end do
-        if (proc_rank == 0) print '(A,ES12.4)', ' [amr] restrict-prolong conservation err = ', err
+        print '(A,ES12.4)', ' [amr] restrict-prolong conservation err = ', err  ! owner rank only
         do i = 1, sys_size
             deallocate (scratch(i)%sf)
         end do
@@ -364,27 +429,32 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_coarse
         type(scalar_field), dimension(sys_size), intent(inout) :: q_fine
-        integer                                                :: i, fi, fj, fk, ci, cj, ck
+        integer                                                :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
         real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz
 
+        ! region indices are GLOBAL; the coarse source q_coarse is rank-LOCAL
+
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
         do i = 1, sys_size
             do fk = amr_fine%idwbuff(3)%beg, amr_fine%idwbuff(3)%end
                 ck = 0; xiz = 0._wp
                 if (p_glb > 0) then
-                    ck = amr_fine%region%lo(3) + floor(real(fk, wp)/real(amr_fine%ref_ratio, wp))
+                    ck = amr_fine%region%lo(3) + floor(real(fk, wp)/real(amr_fine%ref_ratio, wp)) - oz
                     xiz = (real(modulo(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                 end if
                 do fj = amr_fine%idwbuff(2)%beg, amr_fine%idwbuff(2)%end
                     cj = 0; xiy = 0._wp
                     if (n_glb > 0) then
-                        cj = amr_fine%region%lo(2) + floor(real(fj, wp)/real(amr_fine%ref_ratio, wp))
+                        cj = amr_fine%region%lo(2) + floor(real(fj, wp)/real(amr_fine%ref_ratio, wp)) - oy
                         xiy = (real(modulo(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                     end if
                     do fi = amr_fine%idwbuff(1)%beg, amr_fine%idwbuff(1)%end
                         ! skip the interior: only the ghost shell is filled
                         if (fi >= 0 .and. fi <= amr_fine%m .and. fj >= 0 .and. fj <= amr_fine%n .and. fk >= 0 &
                             & .and. fk <= amr_fine%p) cycle
-                        ci = amr_fine%region%lo(1) + floor(real(fi, wp)/real(amr_fine%ref_ratio, wp))
+                        ci = amr_fine%region%lo(1) + floor(real(fi, wp)/real(amr_fine%ref_ratio, wp)) - ox
                         xix = (real(modulo(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                         u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
                         sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
@@ -420,6 +490,7 @@ contains
         integer                                                    :: i, fi, fj, fk
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
 
         ! ghost prolongation from the coarse stage-entry conservative state
         call s_amr_fill_fine_ghosts(q_cons_coarse, amr_fine%q_cons)
@@ -474,6 +545,7 @@ contains
         real(wp)                                                   :: th
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
 
         ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1}
         call s_amr_fill_fine_ghosts(q_old, amr_fine%q_ghost_a)
@@ -622,7 +694,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         logical, intent(in)                                 :: finalize_report
-        real(wp)                                            :: sm, se, dv
+        real(wp)                                            :: sm, se, dv, sm_glb, se_glb
         integer                                             :: ci, cj, ck
 
         if (.not. amr) return
@@ -638,6 +710,10 @@ contains
                 end do
             end do
         end do
+        if (num_procs > 1) then
+            call s_mpi_allreduce_sum(sm, sm_glb); sm = sm_glb
+            call s_mpi_allreduce_sum(se, se_glb); se = se_glb
+        end if
         if (.not. finalize_report) then
             amr_mass0 = sm; amr_energy0 = se
         else if (proc_rank == 0) then
@@ -652,10 +728,14 @@ contains
     impure subroutine s_amr_operator_checks()
 
         type(scalar_field), allocatable :: cscr(:)
-        integer                         :: fi, fj, fk, ci, cj, ck
+        integer                         :: fi, fj, fk, ci, cj, ck, ox, oy, oz
         real(wp)                        :: e, errb, errc, si_f, si_c, dvf, dvc, want
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
 
         ! (b) fill a coarse scratch with an exactly-linear field, prolong, compare pointwise
         allocate (cscr(1:1))
@@ -708,18 +788,17 @@ contains
         do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
             do cj = amr_fine%region%lo(2), merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
                 do ci = amr_fine%region%lo(1), amr_fine%region%hi(1)
-                    dvc = dx(ci)
-                    if (n_glb > 0) dvc = dvc*dy(cj)
-                    if (p_glb > 0) dvc = dvc*dz(ck)
-                    si_c = si_c + dvc*real(cscr(1)%sf(ci, cj, ck), wp)
+                    dvc = dx(ci - ox)
+                    if (n_glb > 0) dvc = dvc*dy(cj - oy)
+                    if (p_glb > 0) dvc = dvc*dz(ck - oz)
+                    si_c = si_c + dvc*real(cscr(1)%sf(ci - ox, cj - oy, ck - oz), wp)
                 end do
             end do
         end do
         errc = abs(si_f - si_c)/max(abs(si_f), 1.e-30_wp)
-        if (proc_rank == 0) then
-            print '(A,ES12.4)', ' [amr] prolong linear-reproduction err = ', errb
-            print '(A,ES12.4)', ' [amr] restrict independent-integral err = ', errc
-        end if
+        ! owner rank only
+        print '(A,ES12.4)', ' [amr] prolong linear-reproduction err = ', errb
+        print '(A,ES12.4)', ' [amr] restrict independent-integral err = ', errc
         deallocate (cscr(1)%sf); deallocate (cscr)
 
     end subroutine s_amr_operator_checks
@@ -745,6 +824,7 @@ contains
         integer :: i
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return  ! non-owner ranks never allocated the fine level
         do i = 1, sys_size
             if (associated(amr_fine%q_cons(i)%sf)) deallocate (amr_fine%q_cons(i)%sf)
             if (associated(amr_fine%q_cons_stor(i)%sf)) deallocate (amr_fine%q_cons_stor(i)%sf)

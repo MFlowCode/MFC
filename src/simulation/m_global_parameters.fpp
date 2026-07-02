@@ -276,6 +276,7 @@ module m_global_parameters
     !> @}
 
     logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
+    logical :: amr_rank_owns_patch = .true.   !< true on the rank whose subdomain contains the AMR patch (all ranks at np=1)
 
     !> Current AMR fine-patch box in level-0 cell indices; mirrors amr_fine%region at all times (kept by s_set_amr_fine_geometry) so
     !! m_amr_registers can read it without a use-cycle through m_amr.

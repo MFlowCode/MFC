@@ -90,7 +90,6 @@ contains
                    & "hybrid_riemann (cheap central/Rusanov flux) is incompatible with the low_Mach correction")
 
         if (amr) then
-            @:PROHIBIT(num_procs /= 1, "amr (SP1) requires a single MPI rank")
             @:PROHIBIT(recon_type /= recon_type_weno, "amr (SP1) requires WENO reconstruction")
             @:PROHIBIT(time_stepper /= time_stepper_rk3, "amr (SP1) requires time_stepper = 3 (SSP-RK3)")
             @:PROHIBIT(model_eqns /= 2, "amr (SP1) requires model_eqns = 2 (5-equation)")
@@ -116,6 +115,8 @@ contains
             @:PROHIBIT(num_dims >= 3 .and. 2*(amr_patch_end(3) - amr_patch_beg(3) + 1) - 1 > p_glb, &
                        & "amr fine z-extent exceeds the base grid")
             @:PROHIBIT(amr_regrid_int < 0, "amr_regrid_int must be >= 0")
+            @:PROHIBIT(amr_regrid_int > 0 .and. num_procs /= 1, &
+                       & "amr dynamic regrid requires a single MPI rank (multi-rank amr is static until SP7b)")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_tag_eps <= 0._wp, "amr_tag_eps must be > 0 when regridding")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
         end if

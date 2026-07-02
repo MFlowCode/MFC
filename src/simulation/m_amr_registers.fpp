@@ -39,6 +39,7 @@ contains
         integer :: maxc1, maxc2, maxc3, max_f1, max_f2, max_f3
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return  ! registers are owner-only (like the fine level itself)
         ! max coarse patch cells per dim (must match m_amr's amr_maxc)
         maxc1 = (m_glb + 1)/2
         maxc2 = 1; maxc3 = 1
@@ -71,11 +72,12 @@ contains
         integer, intent(in)            :: id
         type(vector_field), intent(in) :: flux_dir
         integer, intent(in)            :: stage
-        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi
+        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, al1, al2, al3
         real(wp)                       :: coef
         logical                        :: accum
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
         if (amr_subcycle) then
             if (amr_in_fine_advance) then
                 coef = 0.5_wp*rk3_w(stage); accum = .true.  ! zeroed by s_amr_zero_fine_registers before substep 1
@@ -125,12 +127,19 @@ contains
                 end do
             end do
         else
-            ! coarse branch: jlo/jhi = patch boundary faces; t1/t2 relative 0-based transverse
-            jlo = amr_region_lo(id) - 1; jhi = amr_region_hi(id)
+            ! coarse branch: jlo/jhi = patch boundary faces; t1/t2 relative 0-based transverse.
+            ! amr_region_lo/hi are GLOBAL; the coarse flux array is rank-LOCAL, so index via the
+            ! local patch origin al1/al2/al3 (= global origin - start_idx; identical at np=1)
+            al1 = amr_region_lo(1) - start_idx(1)
+            al2 = amr_region_lo(2); if (n_glb > 0) al2 = al2 - start_idx(2)
+            al3 = amr_region_lo(3); if (p_glb > 0) al3 = al3 - start_idx(3)
             select case (id)
-            case (1); t1_hi = amr_region_hi(2) - amr_region_lo(2); t2_hi = amr_region_hi(3) - amr_region_lo(3)
-            case (2); t1_hi = amr_region_hi(1) - amr_region_lo(1); t2_hi = amr_region_hi(3) - amr_region_lo(3)
-            case (3); t1_hi = amr_region_hi(1) - amr_region_lo(1); t2_hi = amr_region_hi(2) - amr_region_lo(2)
+            case (1); jlo = al1 - 1; jhi = al1 + amr_region_hi(1) - amr_region_lo(1)
+                t1_hi = amr_region_hi(2) - amr_region_lo(2); t2_hi = amr_region_hi(3) - amr_region_lo(3)
+            case (2); jlo = al2 - 1; jhi = al2 + amr_region_hi(2) - amr_region_lo(2)
+                t1_hi = amr_region_hi(1) - amr_region_lo(1); t2_hi = amr_region_hi(3) - amr_region_lo(3)
+            case (3); jlo = al3 - 1; jhi = al3 + amr_region_hi(3) - amr_region_lo(3)
+                t1_hi = amr_region_hi(1) - amr_region_lo(1); t2_hi = amr_region_hi(2) - amr_region_lo(2)
             end select
             do t2 = 0, t2_hi
                 do t1 = 0, t1_hi
@@ -138,39 +147,33 @@ contains
                         select case (id)
                         case (1)
                             if (accum) then
-                                creg(1)%lo(eq, t1, t2) = creg(1)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jlo, &
-                                     & amr_region_lo(2) + t1, amr_region_lo(3) + t2), wp)
-                                creg(1)%hi(eq, t1, t2) = creg(1)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jhi, &
-                                     & amr_region_lo(2) + t1, amr_region_lo(3) + t2), wp)
+                                creg(1)%lo(eq, t1, t2) = creg(1)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jlo, al2 + t1, &
+                                     & al3 + t2), wp)
+                                creg(1)%hi(eq, t1, t2) = creg(1)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jhi, al2 + t1, &
+                                     & al3 + t2), wp)
                             else
-                                creg(1)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jlo, amr_region_lo(2) + t1, &
-                                     & amr_region_lo(3) + t2), wp)
-                                creg(1)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jhi, amr_region_lo(2) + t1, &
-                                     & amr_region_lo(3) + t2), wp)
+                                creg(1)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jlo, al2 + t1, al3 + t2), wp)
+                                creg(1)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jhi, al2 + t1, al3 + t2), wp)
                             end if
                         case (2)
                             if (accum) then
-                                creg(2)%lo(eq, t1, t2) = creg(2)%lo(eq, t1, &
-                                     & t2) + coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jlo, amr_region_lo(3) + t2), wp)
-                                creg(2)%hi(eq, t1, t2) = creg(2)%hi(eq, t1, &
-                                     & t2) + coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jhi, amr_region_lo(3) + t2), wp)
+                                creg(2)%lo(eq, t1, t2) = creg(2)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(al1 + t1, jlo, &
+                                     & al3 + t2), wp)
+                                creg(2)%hi(eq, t1, t2) = creg(2)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(al1 + t1, jhi, &
+                                     & al3 + t2), wp)
                             else
-                                creg(2)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jlo, &
-                                     & amr_region_lo(3) + t2), wp)
-                                creg(2)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jhi, &
-                                     & amr_region_lo(3) + t2), wp)
+                                creg(2)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(al1 + t1, jlo, al3 + t2), wp)
+                                creg(2)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(al1 + t1, jhi, al3 + t2), wp)
                             end if
                         case (3)
                             if (accum) then
-                                creg(3)%lo(eq, t1, t2) = creg(3)%lo(eq, t1, &
-                                     & t2) + coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, amr_region_lo(2) + t2, jlo), wp)
-                                creg(3)%hi(eq, t1, t2) = creg(3)%hi(eq, t1, &
-                                     & t2) + coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, amr_region_lo(2) + t2, jhi), wp)
+                                creg(3)%lo(eq, t1, t2) = creg(3)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(al1 + t1, &
+                                     & al2 + t2, jlo), wp)
+                                creg(3)%hi(eq, t1, t2) = creg(3)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(al1 + t1, &
+                                     & al2 + t2, jhi), wp)
                             else
-                                creg(3)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, &
-                                     & amr_region_lo(2) + t2, jlo), wp)
-                                creg(3)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, &
-                                     & amr_region_lo(2) + t2, jhi), wp)
+                                creg(3)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(al1 + t1, al2 + t2, jlo), wp)
+                                creg(3)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(al1 + t1, al2 + t2, jhi), wp)
                             end if
                         end select
                     end do
@@ -188,15 +191,21 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch
-        integer                                                :: nx_c, ny_c, nz_c
+        integer                                                :: nx_c, ny_c, nz_c, al1, al2, al3, ah1, ah2, ah3
         real(wp)                                               :: fblo, fbhi
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
         ! current coarse patch extents (relative, 0-based): 0..n{x,y,z}_c
         nx_c = amr_region_hi(1) - amr_region_lo(1)
         ny_c = 0; nz_c = 0
         if (n_glb > 0) ny_c = amr_region_hi(2) - amr_region_lo(2)
         if (p_glb > 0) nz_c = amr_region_hi(3) - amr_region_lo(3)
+        ! LOCAL patch bounds (rhs_vf/dx are rank-local; amr_region_lo/hi are global)
+        al1 = amr_region_lo(1) - start_idx(1); ah1 = al1 + nx_c
+        al2 = amr_region_lo(2); if (n_glb > 0) al2 = al2 - start_idx(2)
+        al3 = amr_region_lo(3); if (p_glb > 0) al3 = al3 - start_idx(3)
+        ah2 = al2 + ny_c; ah3 = al3 + nz_c
         ! x-faces: transverse dims (y, z); children in each active transverse dim
         nch = 1
         if (n_glb > 0) nch = nch*2
@@ -214,12 +223,10 @@ contains
                         end do
                     end do
                     fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                    rhs_vf(eq)%sf(amr_region_lo(1) - 1, amr_region_lo(2) + c1, &
-                           & amr_region_lo(3) + c2) = rhs_vf(eq)%sf(amr_region_lo(1) - 1, amr_region_lo(2) + c1, &
-                           & amr_region_lo(3) + c2) + (creg(1)%lo(eq, c1, c2) - fblo)/dx(amr_region_lo(1) - 1)
-                    rhs_vf(eq)%sf(amr_region_hi(1) + 1, amr_region_lo(2) + c1, &
-                           & amr_region_lo(3) + c2) = rhs_vf(eq)%sf(amr_region_hi(1) + 1, amr_region_lo(2) + c1, &
-                           & amr_region_lo(3) + c2) + (fbhi - creg(1)%hi(eq, c1, c2))/dx(amr_region_hi(1) + 1)
+                    rhs_vf(eq)%sf(al1 - 1, al2 + c1, al3 + c2) = rhs_vf(eq)%sf(al1 - 1, al2 + c1, al3 + c2) + (creg(1)%lo(eq, c1, &
+                           & c2) - fblo)/dx(al1 - 1)
+                    rhs_vf(eq)%sf(ah1 + 1, al2 + c1, al3 + c2) = rhs_vf(eq)%sf(ah1 + 1, al2 + c1, &
+                           & al3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2))/dx(ah1 + 1)
                 end do
             end do
         end do
@@ -240,12 +247,10 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) - 1, &
-                               & amr_region_lo(3) + c2) = rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) - 1, &
-                               & amr_region_lo(3) + c2) + (creg(2)%lo(eq, c1, c2) - fblo)/dy(amr_region_lo(2) - 1)
-                        rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_hi(2) + 1, &
-                               & amr_region_lo(3) + c2) = rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_hi(2) + 1, &
-                               & amr_region_lo(3) + c2) + (fbhi - creg(2)%hi(eq, c1, c2))/dy(amr_region_hi(2) + 1)
+                        rhs_vf(eq)%sf(al1 + c1, al2 - 1, al3 + c2) = rhs_vf(eq)%sf(al1 + c1, al2 - 1, al3 + c2) + (creg(2)%lo(eq, &
+                               & c1, c2) - fblo)/dy(al2 - 1)
+                        rhs_vf(eq)%sf(al1 + c1, ah2 + 1, al3 + c2) = rhs_vf(eq)%sf(al1 + c1, ah2 + 1, &
+                               & al3 + c2) + (fbhi - creg(2)%hi(eq, c1, c2))/dy(ah2 + 1)
                     end do
                 end do
             end do
@@ -266,12 +271,10 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
-                               & amr_region_lo(3) - 1) = rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
-                               & amr_region_lo(3) - 1) + (creg(3)%lo(eq, c1, c2) - fblo)/dz(amr_region_lo(3) - 1)
-                        rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
-                               & amr_region_hi(3) + 1) = rhs_vf(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
-                               & amr_region_hi(3) + 1) + (fbhi - creg(3)%hi(eq, c1, c2))/dz(amr_region_hi(3) + 1)
+                        rhs_vf(eq)%sf(al1 + c1, al2 + c2, al3 - 1) = rhs_vf(eq)%sf(al1 + c1, al2 + c2, al3 - 1) + (creg(3)%lo(eq, &
+                               & c1, c2) - fblo)/dz(al3 - 1)
+                        rhs_vf(eq)%sf(al1 + c1, al2 + c2, ah3 + 1) = rhs_vf(eq)%sf(al1 + c1, al2 + c2, &
+                               & ah3 + 1) + (fbhi - creg(3)%hi(eq, c1, c2))/dz(ah3 + 1)
                     end do
                 end do
             end do
@@ -285,6 +288,7 @@ contains
         integer :: d
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
         do d = 1, 3
             if (allocated(freg(d)%lo)) then
                 freg(d)%lo = 0._wp; freg(d)%hi = 0._wp
@@ -300,14 +304,20 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
         integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch
-        integer                                                :: nx_c, ny_c, nz_c
+        integer                                                :: nx_c, ny_c, nz_c, al1, al2, al3, ah1, ah2, ah3
         real(wp)                                               :: fblo, fbhi
 
         if (.not. amr) return
+        if (.not. amr_rank_owns_patch) return
         nx_c = amr_region_hi(1) - amr_region_lo(1)
         ny_c = 0; nz_c = 0
         if (n_glb > 0) ny_c = amr_region_hi(2) - amr_region_lo(2)
         if (p_glb > 0) nz_c = amr_region_hi(3) - amr_region_lo(3)
+        ! LOCAL patch bounds (q_cons/dx are rank-local; amr_region_lo/hi are global)
+        al1 = amr_region_lo(1) - start_idx(1); ah1 = al1 + nx_c
+        al2 = amr_region_lo(2); if (n_glb > 0) al2 = al2 - start_idx(2)
+        al3 = amr_region_lo(3); if (p_glb > 0) al3 = al3 - start_idx(3)
+        ah2 = al2 + ny_c; ah3 = al3 + nz_c
         nch = 1
         if (n_glb > 0) nch = nch*2
         if (p_glb > 0) nch = nch*2
@@ -324,12 +334,10 @@ contains
                         end do
                     end do
                     fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                    q_cons(eq)%sf(amr_region_lo(1) - 1, amr_region_lo(2) + c1, &
-                           & amr_region_lo(3) + c2) = q_cons(eq)%sf(amr_region_lo(1) - 1, amr_region_lo(2) + c1, &
-                           & amr_region_lo(3) + c2) + dt*(creg(1)%lo(eq, c1, c2) - fblo)/dx(amr_region_lo(1) - 1)
-                    q_cons(eq)%sf(amr_region_hi(1) + 1, amr_region_lo(2) + c1, &
-                           & amr_region_lo(3) + c2) = q_cons(eq)%sf(amr_region_hi(1) + 1, amr_region_lo(2) + c1, &
-                           & amr_region_lo(3) + c2) + dt*(fbhi - creg(1)%hi(eq, c1, c2))/dx(amr_region_hi(1) + 1)
+                    q_cons(eq)%sf(al1 - 1, al2 + c1, al3 + c2) = q_cons(eq)%sf(al1 - 1, al2 + c1, al3 + c2) + dt*(creg(1)%lo(eq, &
+                           & c1, c2) - fblo)/dx(al1 - 1)
+                    q_cons(eq)%sf(ah1 + 1, al2 + c1, al3 + c2) = q_cons(eq)%sf(ah1 + 1, al2 + c1, &
+                           & al3 + c2) + dt*(fbhi - creg(1)%hi(eq, c1, c2))/dx(ah1 + 1)
                 end do
             end do
         end do
@@ -349,12 +357,10 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) - 1, &
-                               & amr_region_lo(3) + c2) = q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) - 1, &
-                               & amr_region_lo(3) + c2) + dt*(creg(2)%lo(eq, c1, c2) - fblo)/dy(amr_region_lo(2) - 1)
-                        q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_hi(2) + 1, &
-                               & amr_region_lo(3) + c2) = q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_hi(2) + 1, &
-                               & amr_region_lo(3) + c2) + dt*(fbhi - creg(2)%hi(eq, c1, c2))/dy(amr_region_hi(2) + 1)
+                        q_cons(eq)%sf(al1 + c1, al2 - 1, al3 + c2) = q_cons(eq)%sf(al1 + c1, al2 - 1, &
+                               & al3 + c2) + dt*(creg(2)%lo(eq, c1, c2) - fblo)/dy(al2 - 1)
+                        q_cons(eq)%sf(al1 + c1, ah2 + 1, al3 + c2) = q_cons(eq)%sf(al1 + c1, ah2 + 1, &
+                               & al3 + c2) + dt*(fbhi - creg(2)%hi(eq, c1, c2))/dy(ah2 + 1)
                     end do
                 end do
             end do
@@ -374,12 +380,10 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
-                               & amr_region_lo(3) - 1) = q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
-                               & amr_region_lo(3) - 1) + dt*(creg(3)%lo(eq, c1, c2) - fblo)/dz(amr_region_lo(3) - 1)
-                        q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
-                               & amr_region_hi(3) + 1) = q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
-                               & amr_region_hi(3) + 1) + dt*(fbhi - creg(3)%hi(eq, c1, c2))/dz(amr_region_hi(3) + 1)
+                        q_cons(eq)%sf(al1 + c1, al2 + c2, al3 - 1) = q_cons(eq)%sf(al1 + c1, al2 + c2, &
+                               & al3 - 1) + dt*(creg(3)%lo(eq, c1, c2) - fblo)/dz(al3 - 1)
+                        q_cons(eq)%sf(al1 + c1, al2 + c2, ah3 + 1) = q_cons(eq)%sf(al1 + c1, al2 + c2, &
+                               & ah3 + 1) + dt*(fbhi - creg(3)%hi(eq, c1, c2))/dz(ah3 + 1)
                     end do
                 end do
             end do
