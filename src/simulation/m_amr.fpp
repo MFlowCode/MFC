@@ -13,7 +13,8 @@ module m_amr
     implicit none
 
     private
-    public :: t_level, amr_fine, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module
+    public :: t_level, amr_fine, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
+        & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module
 
     !> One refined level: its own grid + conservative fields. Host-only (no GPU in SP1).
     type t_level
@@ -103,30 +104,133 @@ contains
 
     end subroutine s_build_level_coords
 
-    !> Piecewise-constant injection: each fine interior cell copies its covering coarse cell (level-0 read-only). Level-0 is never
-    !! modified; the level-1 patch is inert and never fed back into the base solve.
-    impure subroutine s_populate_amr_fine(q_cons_base)
+    !> Conservative-linear prolongation: fill amr_fine interior from coarse (level-0), minmod-limited. Symmetric child offsets
+    !! (+/-1/4 of a coarse cell) => the ref_ratio^d children average to the coarse value.
+    impure subroutine s_interpolate_coarse_to_fine(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         integer                                             :: i, fi, fj, fk, ci, cj, ck
+        real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz
 
-        if (.not. amr) return
         do i = 1, sys_size
             do fk = 0, amr_fine%p
-                ck = amr_patch_beg(3) + fk/amr_fine%ref_ratio
-                if (p_glb == 0) ck = 0
+                ck = amr_patch_beg(3) + fk/amr_fine%ref_ratio; if (p_glb == 0) ck = 0
+                xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                 do fj = 0, amr_fine%n
-                    cj = amr_patch_beg(2) + fj/amr_fine%ref_ratio
-                    if (n_glb == 0) cj = 0
+                    cj = amr_patch_beg(2) + fj/amr_fine%ref_ratio; if (n_glb == 0) cj = 0
+                    xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                     do fi = 0, amr_fine%m
                         ci = amr_patch_beg(1) + fi/amr_fine%ref_ratio
-                        amr_fine%q_cons(i)%sf(fi, fj, fk) = q_cons_base(i)%sf(ci, cj, ck)
+                        xix = (real(mod(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                        u0 = real(q_cons_base(i)%sf(ci, cj, ck), wp)
+                        sx = minmod(real(q_cons_base(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_cons_base(i)%sf(ci - 1, cj, &
+                                    & ck), wp))
+                        sy = 0._wp
+                        if (n_glb > 0) sy = minmod(real(q_cons_base(i)%sf(ci, cj + 1, ck), wp) - u0, &
+                            & u0 - real(q_cons_base(i)%sf(ci, cj - 1, ck), wp))
+                        sz = 0._wp
+                        if (p_glb > 0) sz = minmod(real(q_cons_base(i)%sf(ci, cj, ck + 1), wp) - u0, &
+                            & u0 - real(q_cons_base(i)%sf(ci, cj, ck - 1), wp))
+                        amr_fine%q_cons(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
                     end do
                 end do
             end do
         end do
 
+    end subroutine s_interpolate_coarse_to_fine
+
+    !> Dispatch prolongation. Guard: no-op unless amr.
+    impure subroutine s_populate_amr_fine(q_cons_base)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
+
+        if (.not. amr) return
+        call s_interpolate_coarse_to_fine(q_cons_base)
+
     end subroutine s_populate_amr_fine
+
+    !> Volume-weighted restriction: each covered coarse cell = average of its ref_ratio^d fine children. Writes ONLY the caller's
+    !! coarse target (SP2: a scratch buffer) - never level-0.
+    impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+        integer                                                :: i, ci, cj, ck, fi0, fj0, fk0, ddj, ddk, nchild
+        real(wp)                                               :: acc
+
+        nchild = amr_fine%ref_ratio
+        if (n_glb > 0) nchild = nchild*amr_fine%ref_ratio
+        if (p_glb > 0) nchild = nchild*amr_fine%ref_ratio
+        do i = 1, sys_size
+            do ck = amr_patch_beg(3), merge(amr_patch_end(3), amr_patch_beg(3), p_glb > 0)
+                fk0 = (ck - amr_patch_beg(3))*amr_fine%ref_ratio
+                do cj = amr_patch_beg(2), merge(amr_patch_end(2), amr_patch_beg(2), n_glb > 0)
+                    fj0 = (cj - amr_patch_beg(2))*amr_fine%ref_ratio
+                    do ci = amr_patch_beg(1), amr_patch_end(1)
+                        fi0 = (ci - amr_patch_beg(1))*amr_fine%ref_ratio
+                        acc = 0._wp
+                        do ddk = 0, merge(amr_fine%ref_ratio - 1, 0, p_glb > 0)
+                            do ddj = 0, merge(amr_fine%ref_ratio - 1, 0, n_glb > 0)
+                                acc = acc + real(amr_fine%q_cons(i)%sf(fi0, fj0 + ddj, fk0 + ddk), &
+                                                 & wp) + real(amr_fine%q_cons(i)%sf(fi0 + 1, fj0 + ddj, fk0 + ddk), wp)
+                            end do
+                        end do
+                        coarse_tgt(i)%sf(ci, cj, ck) = acc/real(nchild, wp)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_restrict_fine_to_coarse
+
+    !> SP2 gate: restrict(prolong(coarse)) must reproduce coarse over the patch interior (conservation). Init-only diagnostic;
+    !! allocates a scratch coarse target, never touches level-0 or the solve.
+    impure subroutine s_amr_conservation_check(q_cons_base)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
+        type(scalar_field), dimension(:), allocatable       :: scratch
+        integer                                             :: i, ci, cj, ck
+        real(wp)                                            :: err, e
+
+        if (.not. amr) return
+        allocate (scratch(1:sys_size))
+        do i = 1, sys_size
+            allocate (scratch(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
+        end do
+        call s_restrict_fine_to_coarse(scratch)
+        err = 0._wp
+        do i = 1, sys_size
+            do ck = amr_patch_beg(3), merge(amr_patch_end(3), amr_patch_beg(3), p_glb > 0)
+                do cj = amr_patch_beg(2), merge(amr_patch_end(2), amr_patch_beg(2), n_glb > 0)
+                    do ci = amr_patch_beg(1), amr_patch_end(1)
+                        e = abs(real(scratch(i)%sf(ci, cj, ck), wp) - real(q_cons_base(i)%sf(ci, cj, ck), wp))
+                        if (e > err) err = e
+                    end do
+                end do
+            end do
+        end do
+        if (proc_rank == 0) print '(A,ES12.4)', ' [amr] restrict-prolong conservation err = ', err
+        do i = 1, sys_size
+            deallocate (scratch(i)%sf)
+        end do
+        deallocate (scratch)
+
+    end subroutine s_amr_conservation_check
+
+    !> minmod slope limiter: 0 if a,b differ in sign, else the smaller-magnitude argument.
+    pure elemental function minmod(a, b) result(m)
+
+        real(wp), intent(in) :: a, b
+        real(wp)             :: m
+
+        if (a*b <= 0._wp) then
+            m = 0._wp
+        else if (abs(a) < abs(b)) then
+            m = a
+        else
+            m = b
+        end if
+
+    end function minmod
 
     impure subroutine s_finalize_amr_module()
 

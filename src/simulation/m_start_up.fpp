@@ -886,6 +886,7 @@ contains
 
         call s_initialize_amr_module()
         call s_populate_amr_fine(q_cons_ts(1)%vf)
+        call s_amr_conservation_check(q_cons_ts(1)%vf)
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
