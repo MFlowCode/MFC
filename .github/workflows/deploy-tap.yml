@@ -112,8 +112,19 @@ jobs:
       - name: Copy formula and README into tap
         if: github.event_name != 'pull_request'
         run: |
+          set -euo pipefail
           mkdir -p tap-repo/Formula
-          cp packaging/homebrew/mfc.rb tap-repo/Formula/mfc.rb
+          # If the release URL is unchanged, keep the tap's existing bottle block so a
+          # formula-only push to master doesn't delete bottles already built for this version.
+          NEW_URL="$(grep -E '^  url ' packaging/homebrew/mfc.rb || true)"
+          OLD_URL="$(grep -E '^  url ' tap-repo/Formula/mfc.rb 2>/dev/null || true)"
+          if [[ -n "${NEW_URL}" && "${NEW_URL}" == "${OLD_URL}" ]] && grep -q '^  bottle do' tap-repo/Formula/mfc.rb; then
+            awk '/^  bottle do/,/^  end$/' tap-repo/Formula/mfc.rb > /tmp/bottle.block
+            awk '{ print } /^  head / { print ""; while ((getline line < "/tmp/bottle.block") > 0) print line }' \
+              packaging/homebrew/mfc.rb > tap-repo/Formula/mfc.rb
+          else
+            cp packaging/homebrew/mfc.rb tap-repo/Formula/mfc.rb
+          fi
           cp packaging/homebrew/README.md tap-repo/README.md
 
       - name: Commit & push if changed
