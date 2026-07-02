@@ -102,6 +102,8 @@ contains
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
             @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
             @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")
+            @:PROHIBIT(acoustic_source, &
+                       & "amr is incompatible with acoustic_source (dt-dependent RHS source; unvalidated with the fine-level advance)")
             @:PROHIBIT(any(amr_patch_beg(1:num_dims) < 0), "amr_patch_beg must be >= 0")
             @:PROHIBIT(amr_patch_end(1) > m_glb .or. (num_dims >= 2 .and. amr_patch_end(2) > n_glb) .or. (num_dims >= 3 &
                        & .and. amr_patch_end(3) > p_glb), "amr_patch_end must be <= global cell max per axis")
