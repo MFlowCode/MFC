@@ -13,8 +13,7 @@ on:
     paths:
       - 'packaging/homebrew/mfc.rb'
       - 'packaging/homebrew/README.md'
-  # Deploy to tap when a tag is created (no paths filter on tag creation)
-  create:
+  # Note: tag releases are deployed to the tap by homebrew-release.yml, not here.
   workflow_dispatch:
 
 permissions:
@@ -24,7 +23,6 @@ jobs:
   deploy-tap:
     name: Audit and deploy formula
     runs-on: macos-14
-    if: github.event_name != 'create' || github.event.ref_type == 'tag'
     permissions:
       contents: write
       pull-requests: write
@@ -44,12 +42,8 @@ jobs:
           EVENT_NAME="${{ github.event_name }}"
           REF_NAME="${{ github.ref_name }}"
           
-          if [[ "${EVENT_NAME}" == "create" ]]; then
-            # Tag creation event
-            VERSION="${REF_NAME#v}"
-            URL="https://github.com/${{ github.repository }}/archive/refs/tags/v${VERSION}.tar.gz"
-          elif [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
-            # Tag push event
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            # Manual dispatch from a tag ref
             VERSION="${REF_NAME#v}"
             URL="https://github.com/${{ github.repository }}/archive/refs/tags/v${VERSION}.tar.gz"
           else
@@ -71,7 +65,7 @@ jobs:
           fi
 
       - name: Update formula (for tag events)
-        if: github.event_name == 'create' || github.ref_type == 'tag'
+        if: github.ref_type == 'tag'
         run: |
           /usr/bin/sed -i '' "s@^  url \".*\"@  url \"${{ steps.meta.outputs.url }}\"@" packaging/homebrew/mfc.rb
           /usr/bin/sed -i '' "s@^  sha256 \".*\"@  sha256 \"${{ steps.meta.outputs.sha256 }}\"@" packaging/homebrew/mfc.rb
@@ -110,22 +104,41 @@ jobs:
           fi
 
       - name: Copy formula and README into tap
+        id: merge
         if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           mkdir -p tap-repo/Formula
-          # If the release URL is unchanged, keep the tap's existing bottle block so a
-          # formula-only push to master doesn't delete bottles already built for this version.
-          NEW_URL="$(grep -E '^  url ' packaging/homebrew/mfc.rb || true)"
-          OLD_URL="$(grep -E '^  url ' tap-repo/Formula/mfc.rb 2>/dev/null || true)"
-          if [[ -n "${NEW_URL}" && "${NEW_URL}" == "${OLD_URL}" ]] && grep -q '^  bottle do' tap-repo/Formula/mfc.rb; then
-            awk '/^  bottle do/,/^  end$/' tap-repo/Formula/mfc.rb > /tmp/bottle.block
-            awk '{ print } /^  head / { print ""; while ((getline line < "/tmp/bottle.block") > 0) print line }' \
-              packaging/homebrew/mfc.rb > tap-repo/Formula/mfc.rb
-          else
-            cp packaging/homebrew/mfc.rb tap-repo/Formula/mfc.rb
+          SRC=packaging/homebrew/mfc.rb
+          TAP=tap-repo/Formula/mfc.rb
+          get_ver() { grep -Eo '/archive/refs/tags/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' "$1" | head -n 1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+'; }
+          MERGED="$(mktemp)"
+          cp "${SRC}" "${MERGED}"
+          if [[ -f "${TAP}" ]]; then
+            SRC_VER="$(get_ver "${SRC}" || true)"
+            TAP_VER="$(get_ver "${TAP}" || true)"
+            # homebrew-release.yml bumps the tap directly on releases, so the in-repo
+            # formula can lag behind. Never downgrade: if the tap pins a newer release,
+            # keep the tap's url/sha256 while still syncing the rest of the formula.
+            if [[ -n "${SRC_VER}" && -n "${TAP_VER}" && "${SRC_VER}" != "${TAP_VER}" ]] \
+               && [[ "$(printf '%s\n%s\n' "${SRC_VER}" "${TAP_VER}" | sort -V | tail -n 1)" == "${TAP_VER}" ]]; then
+              TAP_URL_LINE="$(grep -E '^  url ' "${TAP}")"
+              TAP_SHA_LINE="$(grep -E '^  sha256 "' "${TAP}" | head -n 1)"
+              awk -v url="${TAP_URL_LINE}" -v sha="${TAP_SHA_LINE}" \
+                '/^  url / { print url; next } /^  sha256 "/ { print sha; next } { print }' \
+                "${SRC}" > "${MERGED}"
+            fi
+            # If the pinned release is unchanged, keep the tap's existing bottle block so a
+            # formula-only push to master doesn't delete bottles already built for this version.
+            if [[ "$(grep -E '^  url ' "${MERGED}")" == "$(grep -E '^  url ' "${TAP}")" ]] && grep -q '^  bottle do' "${TAP}"; then
+              awk '/^  bottle do/,/^  end$/' "${TAP}" > /tmp/bottle.block
+              awk '{ print } /^  head / { print ""; while ((getline line < "/tmp/bottle.block") > 0) print line }' \
+                "${MERGED}" > "${MERGED}.tmp" && mv "${MERGED}.tmp" "${MERGED}"
+            fi
           fi
+          mv "${MERGED}" "${TAP}"
           cp packaging/homebrew/README.md tap-repo/README.md
+          echo "version=$(get_ver "${TAP}" || true)" >> "$GITHUB_OUTPUT"
 
       - name: Commit & push if changed
         if: github.event_name != 'pull_request'
@@ -139,6 +152,6 @@ jobs:
             exit 0
           fi
           git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
-            commit -m "mfc: v${{ steps.meta.outputs.version }}"
+            commit -m "mfc: v${{ steps.merge.outputs.version || steps.meta.outputs.version }}"
           git push origin HEAD:main
 
