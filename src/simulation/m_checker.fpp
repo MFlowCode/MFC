@@ -118,6 +118,8 @@ contains
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
         end if
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
+        @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")
+        @:PROHIBIT(amr_subcycle .and. cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
 #ifdef MFC_GPU
         @:PROHIBIT(amr, "amr is not supported on GPU builds yet (SP7)")
 #endif

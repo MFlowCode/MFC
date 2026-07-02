@@ -122,6 +122,7 @@ DESCRIPTIONS = {
     "amr_regrid_int": "Steps between AMR regrid events (0 = static patch)",
     "amr_tag_eps": "Relative density-gradient threshold for AMR refinement tagging",
     "amr_buf": "Coarse-cell padding around tagged cells when regridding",
+    "amr_subcycle": "Advance the coarse level at the case dt and the fine level at dt/2 (two substeps; Berger-Colella refluxing)",
     "hybrid_weno": "Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities",
     "hybrid_weno_eps": "Smoothness threshold for hybrid WENO shock flagging (must be > 0)",
     "hybrid_riemann": "Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq)",

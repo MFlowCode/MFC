@@ -453,6 +453,7 @@ contains
         amr_regrid_int = 0
         amr_tag_eps = 0.1_wp
         amr_buf = 3
+        amr_subcycle = .false.
         hybrid_smooth_flux = 2
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.

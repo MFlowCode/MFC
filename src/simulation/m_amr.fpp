@@ -15,10 +15,13 @@ module m_amr
     implicit none
 
     private
-    public :: t_level, amr_fine, amr_maxc, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
-        & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
-        & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_amr_conservation_defect, &
-        & s_set_amr_fine_geometry, s_amr_regrid
+    public :: t_level, amr_fine, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
+        & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
+        & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, &
+        & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid
+
+    !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
+    real(wp) :: amr_dt_fine = 0._wp
 
     !> One refined level: its own grid + conservative fields. Host-only (no GPU in SP1).
     type t_level
@@ -56,6 +59,8 @@ contains
         integer :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
 
         if (.not. amr) return
+
+        amr_dt_fine = 0.5_wp*dt
 
         ! Runtime margin abort: patch must be at least buff_size coarse cells from every boundary.
         ! buff_size is not available at checker time, so this check must be here.

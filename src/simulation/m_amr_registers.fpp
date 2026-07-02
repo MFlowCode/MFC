@@ -17,7 +17,11 @@ module m_amr_registers
 
     implicit none
 
-    private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_finalize_amr_registers
+    private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_amr_zero_fine_registers, &
+        & s_amr_apply_reflux_state, s_finalize_amr_registers
+
+    !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
+    real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
 
     !> Registers for the two patch faces normal to one direction: (1:sys_size, transverse-1, transverse-2).
     type t_face_reg
@@ -62,13 +66,25 @@ contains
     !! call (amr_in_fine_advance false, coarse globals) fills creg at the patch boundary faces; fine call (flag true, globals
     !! swapped to the fine patch) fills freg at fine faces -1 and m/n/p. creg uses relative 0-based transverse; freg uses 0-based
     !! fine.
-    impure subroutine s_amr_capture_boundary_flux(id, flux_dir)
+    impure subroutine s_amr_capture_boundary_flux(id, flux_dir, stage)
 
         integer, intent(in)            :: id
         type(vector_field), intent(in) :: flux_dir
+        integer, intent(in)            :: stage
         integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi
+        real(wp)                       :: coef
+        logical                        :: accum
 
         if (.not. amr) return
+        if (amr_subcycle) then
+            if (amr_in_fine_advance) then
+                coef = 0.5_wp*rk3_w(stage); accum = .true.  ! zeroed by s_amr_zero_fine_registers before substep 1
+            else
+                coef = rk3_w(stage); accum = (stage > 1)  ! stage 1 overwrites = implicit zero per coarse step
+            end if
+        else
+            coef = 1._wp; accum = .false.  ! overwrite each stage - default behavior, byte-identical
+        end if
         if (amr_in_fine_advance) then
             ! fine branch: globals swapped; jlo=-1, jhi=current fine extent in direction id
             select case (id)
@@ -81,14 +97,29 @@ contains
                     do eq = 1, sys_size
                         select case (id)
                         case (1)
-                            freg(1)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(jlo, t1, t2), wp)
-                            freg(1)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(jhi, t1, t2), wp)
+                            if (accum) then
+                                freg(1)%lo(eq, t1, t2) = freg(1)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jlo, t1, t2), wp)
+                                freg(1)%hi(eq, t1, t2) = freg(1)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jhi, t1, t2), wp)
+                            else
+                                freg(1)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jlo, t1, t2), wp)
+                                freg(1)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jhi, t1, t2), wp)
+                            end if
                         case (2)
-                            freg(2)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(t1, jlo, t2), wp)
-                            freg(2)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(t1, jhi, t2), wp)
+                            if (accum) then
+                                freg(2)%lo(eq, t1, t2) = freg(2)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(t1, jlo, t2), wp)
+                                freg(2)%hi(eq, t1, t2) = freg(2)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(t1, jhi, t2), wp)
+                            else
+                                freg(2)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(t1, jlo, t2), wp)
+                                freg(2)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(t1, jhi, t2), wp)
+                            end if
                         case (3)
-                            freg(3)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(t1, t2, jlo), wp)
-                            freg(3)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(t1, t2, jhi), wp)
+                            if (accum) then
+                                freg(3)%lo(eq, t1, t2) = freg(3)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(t1, t2, jlo), wp)
+                                freg(3)%hi(eq, t1, t2) = freg(3)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(t1, t2, jhi), wp)
+                            else
+                                freg(3)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(t1, t2, jlo), wp)
+                                freg(3)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(t1, t2, jhi), wp)
+                            end if
                         end select
                     end do
                 end do
@@ -106,14 +137,41 @@ contains
                     do eq = 1, sys_size
                         select case (id)
                         case (1)
-                            creg(1)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(jlo, amr_region_lo(2) + t1, amr_region_lo(3) + t2), wp)
-                            creg(1)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(jhi, amr_region_lo(2) + t1, amr_region_lo(3) + t2), wp)
+                            if (accum) then
+                                creg(1)%lo(eq, t1, t2) = creg(1)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jlo, &
+                                     & amr_region_lo(2) + t1, amr_region_lo(3) + t2), wp)
+                                creg(1)%hi(eq, t1, t2) = creg(1)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jhi, &
+                                     & amr_region_lo(2) + t1, amr_region_lo(3) + t2), wp)
+                            else
+                                creg(1)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jlo, amr_region_lo(2) + t1, &
+                                     & amr_region_lo(3) + t2), wp)
+                                creg(1)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jhi, amr_region_lo(2) + t1, &
+                                     & amr_region_lo(3) + t2), wp)
+                            end if
                         case (2)
-                            creg(2)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jlo, amr_region_lo(3) + t2), wp)
-                            creg(2)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jhi, amr_region_lo(3) + t2), wp)
+                            if (accum) then
+                                creg(2)%lo(eq, t1, t2) = creg(2)%lo(eq, t1, &
+                                     & t2) + coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jlo, amr_region_lo(3) + t2), wp)
+                                creg(2)%hi(eq, t1, t2) = creg(2)%hi(eq, t1, &
+                                     & t2) + coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jhi, amr_region_lo(3) + t2), wp)
+                            else
+                                creg(2)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jlo, &
+                                     & amr_region_lo(3) + t2), wp)
+                                creg(2)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, jhi, &
+                                     & amr_region_lo(3) + t2), wp)
+                            end if
                         case (3)
-                            creg(3)%lo(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, amr_region_lo(2) + t2, jlo), wp)
-                            creg(3)%hi(eq, t1, t2) = real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, amr_region_lo(2) + t2, jhi), wp)
+                            if (accum) then
+                                creg(3)%lo(eq, t1, t2) = creg(3)%lo(eq, t1, &
+                                     & t2) + coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, amr_region_lo(2) + t2, jlo), wp)
+                                creg(3)%hi(eq, t1, t2) = creg(3)%hi(eq, t1, &
+                                     & t2) + coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, amr_region_lo(2) + t2, jhi), wp)
+                            else
+                                creg(3)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, &
+                                     & amr_region_lo(2) + t2, jlo), wp)
+                                creg(3)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(amr_region_lo(1) + t1, &
+                                     & amr_region_lo(2) + t2, jhi), wp)
+                            end if
                         end select
                     end do
                 end do
@@ -220,6 +278,114 @@ contains
         end if
 
     end subroutine s_amr_apply_reflux
+
+    !> Zero the fine registers (called by the subcycle driver before substep 1 - stage-1 overwrite cannot work across two substeps).
+    impure subroutine s_amr_zero_fine_registers()
+
+        integer :: d
+
+        if (.not. amr) return
+        do d = 1, 3
+            if (allocated(freg(d)%lo)) then
+                freg(d)%lo = 0._wp; freg(d)%hi = 0._wp
+            end if
+        end do
+
+    end subroutine s_amr_zero_fine_registers
+
+    !> Berger-Colella state correction (subcycle mode only): after restriction, correct the first coarse cell OUTSIDE each patch
+    !! face with the time-accumulated flux mismatch: low face: q += dt*(F_c_eff - Fbar_f_eff)/dx ; high face: q += dt*(Fbar_f_eff -
+    !! F_c_eff)/dx. Registers hold EFFECTIVE (rk3_w-weighted, substep-averaged) fluxes in subcycle mode.
+    impure subroutine s_amr_apply_reflux_state(q_cons)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
+        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch
+        integer                                                :: nx_c, ny_c, nz_c
+        real(wp)                                               :: fblo, fbhi
+
+        if (.not. amr) return
+        nx_c = amr_region_hi(1) - amr_region_lo(1)
+        ny_c = 0; nz_c = 0
+        if (n_glb > 0) ny_c = amr_region_hi(2) - amr_region_lo(2)
+        if (p_glb > 0) nz_c = amr_region_hi(3) - amr_region_lo(3)
+        nch = 1
+        if (n_glb > 0) nch = nch*2
+        if (p_glb > 0) nch = nch*2
+        do eq = 1, sys_size
+            do c2 = 0, nz_c
+                f20 = 0; if (p_glb > 0) f20 = 2*c2
+                do c1 = 0, ny_c
+                    f10 = 0; if (n_glb > 0) f10 = 2*c1
+                    fblo = 0._wp; fbhi = 0._wp
+                    do dd2 = 0, merge(1, 0, p_glb > 0)
+                        do dd1 = 0, merge(1, 0, n_glb > 0)
+                            fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2)
+                            fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2)
+                        end do
+                    end do
+                    fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                    q_cons(eq)%sf(amr_region_lo(1) - 1, amr_region_lo(2) + c1, &
+                           & amr_region_lo(3) + c2) = q_cons(eq)%sf(amr_region_lo(1) - 1, amr_region_lo(2) + c1, &
+                           & amr_region_lo(3) + c2) + dt*(creg(1)%lo(eq, c1, c2) - fblo)/dx(amr_region_lo(1) - 1)
+                    q_cons(eq)%sf(amr_region_hi(1) + 1, amr_region_lo(2) + c1, &
+                           & amr_region_lo(3) + c2) = q_cons(eq)%sf(amr_region_hi(1) + 1, amr_region_lo(2) + c1, &
+                           & amr_region_lo(3) + c2) + dt*(fbhi - creg(1)%hi(eq, c1, c2))/dx(amr_region_hi(1) + 1)
+                end do
+            end do
+        end do
+        if (n_glb > 0) then
+            nch = 2
+            if (p_glb > 0) nch = nch*2
+            do eq = 1, sys_size
+                do c2 = 0, nz_c
+                    f20 = 0; if (p_glb > 0) f20 = 2*c2
+                    do c1 = 0, nx_c
+                        f10 = 2*c1
+                        fblo = 0._wp; fbhi = 0._wp
+                        do dd2 = 0, merge(1, 0, p_glb > 0)
+                            do dd1 = 0, 1
+                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2)
+                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2)
+                            end do
+                        end do
+                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                        q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) - 1, &
+                               & amr_region_lo(3) + c2) = q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) - 1, &
+                               & amr_region_lo(3) + c2) + dt*(creg(2)%lo(eq, c1, c2) - fblo)/dy(amr_region_lo(2) - 1)
+                        q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_hi(2) + 1, &
+                               & amr_region_lo(3) + c2) = q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_hi(2) + 1, &
+                               & amr_region_lo(3) + c2) + dt*(fbhi - creg(2)%hi(eq, c1, c2))/dy(amr_region_hi(2) + 1)
+                    end do
+                end do
+            end do
+        end if
+        if (p_glb > 0) then
+            nch = 4
+            do eq = 1, sys_size
+                do c2 = 0, ny_c
+                    f20 = 2*c2
+                    do c1 = 0, nx_c
+                        f10 = 2*c1
+                        fblo = 0._wp; fbhi = 0._wp
+                        do dd2 = 0, 1
+                            do dd1 = 0, 1
+                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2)
+                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2)
+                            end do
+                        end do
+                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                        q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
+                               & amr_region_lo(3) - 1) = q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
+                               & amr_region_lo(3) - 1) + dt*(creg(3)%lo(eq, c1, c2) - fblo)/dz(amr_region_lo(3) - 1)
+                        q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
+                               & amr_region_hi(3) + 1) = q_cons(eq)%sf(amr_region_lo(1) + c1, amr_region_lo(2) + c2, &
+                               & amr_region_hi(3) + 1) + dt*(fbhi - creg(3)%hi(eq, c1, c2))/dz(amr_region_hi(3) + 1)
+                    end do
+                end do
+            end do
+        end if
+
+    end subroutine s_amr_apply_reflux_state
 
     impure subroutine s_finalize_amr_registers()
 
