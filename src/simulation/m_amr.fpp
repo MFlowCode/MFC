@@ -55,6 +55,9 @@ module m_amr
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
+    real(wp), allocatable :: sw_x_cb(:), sw_x_cc(:), sw_dx(:)
+    real(wp), allocatable :: sw_y_cb(:), sw_y_cc(:), sw_dy(:)
+    real(wp), allocatable :: sw_z_cb(:), sw_z_cc(:), sw_dz(:)
 
     !> Conservation-defect baselines (level-0 interior integrals at init)
     real(wp) :: amr_mass0 = 0._wp, amr_energy0 = 0._wp
@@ -139,6 +142,21 @@ contains
             allocate (amr_fine%x_cb(-1:max_f1), amr_fine%x_cc(0:max_f1), amr_fine%dx(0:max_f1))
             if (n_glb > 0) allocate (amr_fine%y_cb(-1:max_f2), amr_fine%y_cc(0:max_f2), amr_fine%dy(0:max_f2))
             if (p_glb > 0) allocate (amr_fine%z_cb(-1:max_f3), amr_fine%z_cc(0:max_f3), amr_fine%dz(0:max_f3))
+
+            ! bounce buffers for copy-based coord swap (GPU-safe; same bounds as the base-level global arrays)
+            allocate (sw_x_cb(-1 - buff_size:m + buff_size))
+            allocate (sw_x_cc(-buff_size:m + buff_size))
+            allocate (sw_dx(-buff_size:m + buff_size))
+            if (n_glb > 0) then
+                allocate (sw_y_cb(-1 - buff_size:n + buff_size))
+                allocate (sw_y_cc(-buff_size:n + buff_size))
+                allocate (sw_dy(-buff_size:n + buff_size))
+            end if
+            if (p_glb > 0) then
+                allocate (sw_z_cb(-1 - buff_size:p + buff_size))
+                allocate (sw_z_cc(-buff_size:p + buff_size))
+                allocate (sw_dz(-buff_size:p + buff_size))
+            end if
 
             ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p
             allocate (amr_fine%q_cons(1:sys_size))
@@ -387,7 +405,23 @@ contains
         idwint(2)%beg = 0; idwint(2)%end = n
         idwint(3)%beg = 0; idwint(3)%end = p
         idwbuff = amr_fine%idwbuff
-        call s_swap_coords()
+        ! save coarse coords to bounce buffers, then copy fine coords into global arrays
+        sw_x_cb = x_cb; sw_x_cc = x_cc; sw_dx = dx
+        if (n_glb > 0) then; sw_y_cb = y_cb; sw_y_cc = y_cc; sw_dy = dy; end if
+        if (p_glb > 0) then; sw_z_cb = z_cb; sw_z_cc = z_cc; sw_dz = dz; end if
+        x_cb(-1:amr_fine%m) = amr_fine%x_cb(-1:amr_fine%m)
+        x_cc(0:amr_fine%m) = amr_fine%x_cc(0:amr_fine%m)
+        dx(0:amr_fine%m) = amr_fine%dx(0:amr_fine%m)
+        if (n_glb > 0) then
+            y_cb(-1:amr_fine%n) = amr_fine%y_cb(-1:amr_fine%n)
+            y_cc(0:amr_fine%n) = amr_fine%y_cc(0:amr_fine%n)
+            dy(0:amr_fine%n) = amr_fine%dy(0:amr_fine%n)
+        end if
+        if (p_glb > 0) then
+            z_cb(-1:amr_fine%p) = amr_fine%z_cb(-1:amr_fine%p)
+            z_cc(0:amr_fine%p) = amr_fine%z_cc(0:amr_fine%p)
+            dz(0:amr_fine%p) = amr_fine%dz(0:amr_fine%p)
+        end if
 
     end subroutine s_amr_swap_to_fine
 
@@ -396,33 +430,12 @@ contains
 
         m = sw_m; n = sw_n; p = sw_p
         idwint = sw_idwint; idwbuff = sw_idwbuff
-        call s_swap_coords()
+        ! restore full coarse coords from bounce buffers
+        x_cb = sw_x_cb; x_cc = sw_x_cc; dx = sw_dx
+        if (n_glb > 0) then; y_cb = sw_y_cb; y_cc = sw_y_cc; dy = sw_dy; end if
+        if (p_glb > 0) then; z_cb = sw_z_cb; z_cc = sw_z_cc; dz = sw_dz; end if
 
     end subroutine s_amr_restore_coarse
-
-    !> Exchange global x/y/z coordinate arrays with amr_fine's via move_alloc (symmetric swap). Strategy: move_alloc. Pointer scan
-    !! shows only local-scope pointers (s_cb in m_weno, s_cc in m_ibm); these are re-associated at each call entry and do not
-    !! persist across subroutine calls. t_level coord arrays carry the target attribute to match the global declarations for
-    !! portability.
-    impure subroutine s_swap_coords()
-
-        real(wp), allocatable :: tmp(:)
-
-        call move_alloc(x_cb, tmp); call move_alloc(amr_fine%x_cb, x_cb); call move_alloc(tmp, amr_fine%x_cb)
-        call move_alloc(x_cc, tmp); call move_alloc(amr_fine%x_cc, x_cc); call move_alloc(tmp, amr_fine%x_cc)
-        call move_alloc(dx, tmp); call move_alloc(amr_fine%dx, dx); call move_alloc(tmp, amr_fine%dx)
-        if (n_glb > 0) then
-            call move_alloc(y_cb, tmp); call move_alloc(amr_fine%y_cb, y_cb); call move_alloc(tmp, amr_fine%y_cb)
-            call move_alloc(y_cc, tmp); call move_alloc(amr_fine%y_cc, y_cc); call move_alloc(tmp, amr_fine%y_cc)
-            call move_alloc(dy, tmp); call move_alloc(amr_fine%dy, dy); call move_alloc(tmp, amr_fine%dy)
-        end if
-        if (p_glb > 0) then
-            call move_alloc(z_cb, tmp); call move_alloc(amr_fine%z_cb, z_cb); call move_alloc(tmp, amr_fine%z_cb)
-            call move_alloc(z_cc, tmp); call move_alloc(amr_fine%z_cc, z_cc); call move_alloc(tmp, amr_fine%z_cc)
-            call move_alloc(dz, tmp); call move_alloc(amr_fine%dz, dz); call move_alloc(tmp, amr_fine%dz)
-        end if
-
-    end subroutine s_swap_coords
 
     !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse. floor/modulo mapping is valid for
     !! negative fine indices (ghosts). Interior untouched.
@@ -878,6 +891,9 @@ contains
         if (allocated(amr_fine%x_cb)) deallocate (amr_fine%x_cb, amr_fine%x_cc, amr_fine%dx)
         if (allocated(amr_fine%y_cb)) deallocate (amr_fine%y_cb, amr_fine%y_cc, amr_fine%dy)
         if (allocated(amr_fine%z_cb)) deallocate (amr_fine%z_cb, amr_fine%z_cc, amr_fine%dz)
+        if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
+        if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
+        if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
 
     end subroutine s_finalize_amr_module
 
