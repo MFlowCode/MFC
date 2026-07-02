@@ -38,6 +38,7 @@ module m_rhs
     use m_thinc
     use m_pressure_relaxation
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
+    use m_amr_registers, only: s_amr_capture_boundary_flux
 
     implicit none
 
@@ -776,6 +777,11 @@ contains
                 call nvtxStartRange("RHS-ADVECTION-SRC")
                 call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))
                 call nvtxEndRange
+
+                ! AMR refluxing: record the c/f boundary-face fluxes exactly as the assembly above
+                ! used them (after s_cbc may have modified flux_n inside the advection source call);
+                ! must run before the next direction's sweep reuses the aliased flux_n storage
+                if (amr) call s_amr_capture_boundary_flux(id, flux_n(id))
 
                 ! RHS additions for hypoelasticity
                 call nvtxStartRange("RHS-HYPOELASTICITY")

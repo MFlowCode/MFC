@@ -76,6 +76,7 @@
             "m_mpi_proxy",
             "m_box",
             "m_amr",
+            "m_amr_registers",
             "m_constants",
             "m_precision_select",
             "m_helper",

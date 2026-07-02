@@ -99,6 +99,9 @@ contains
                        & "amr (SP1) does not support viscous/elastic/surface-tension/MHD/chemistry")
             @:PROHIBIT(bubbles_euler .or. bubbles_lagrange .or. qbmm .or. relax .or. ib .or. igr .or. cyl_coord, &
                        & "amr (SP1) does not support bubbles/phase-change/IB/IGR/cylindrical")
+            @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
+            @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
+            @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")
             @:PROHIBIT(any(amr_patch_beg(1:num_dims) < 0), "amr_patch_beg must be >= 0")
             @:PROHIBIT(amr_patch_end(1) > m_glb .or. (num_dims >= 2 .and. amr_patch_end(2) > n_glb) .or. (num_dims >= 3 &
                        & .and. amr_patch_end(3) > p_glb), "amr_patch_end must be <= global cell max per axis")
