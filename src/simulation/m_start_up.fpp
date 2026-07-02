@@ -56,6 +56,7 @@ module m_start_up
     use m_load_weight
     use m_load_balance, only: s_load_balance_rebalance
     use m_sfc_partition
+    use m_amr
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
 
     implicit none
@@ -883,6 +884,9 @@ contains
 
         call s_populate_grid_variables_buffers()
 
+        call s_initialize_amr_module()
+        call s_populate_amr_fine(q_cons_ts(1)%vf)
+
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
             block
@@ -1090,6 +1094,7 @@ contains
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
 
+        call s_finalize_amr_module()
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
         if (hyperelasticity) call s_finalize_hyperelastic_module()
