@@ -50,6 +50,7 @@ module m_amr
     !> Owner containment window in GLOBAL coarse indices (fixed for the run, known on all ranks; 0 in collapsed dims): a patch is
     !! owner-contained iff amr_owner_win_lo(d) <= beg(d) and end(d) <= amr_owner_win_hi(d) per active dim.
     integer :: amr_owner_win_lo(3) = 0, amr_owner_win_hi(3) = 0
+    logical :: amr_win_clamp_warned = .false.  !< one-shot regrid warning (SP7a mobility limit)
 
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
@@ -610,12 +611,18 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         integer                                             :: lo(3), hi(3), old_lo(3), old_m1, old_n1, old_p1
-        integer                                             :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, sh(3), i
+        integer                                             :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, sh(3), i, d
+        integer                                             :: sidx(3), lo_r, hi_r, maxc_eff
         real(wp)                                            :: r0, g
-        logical                                             :: tagged
+        logical                                             :: tagged, win_cut
 
-        ! 1) tag + bounding box (interior sweep away from edges; ghosts not needed)
+        ! 1) tag + bounding box over the LOCAL interior (sweep away from local edges; ghosts not needed), emitting
+        !    GLOBAL indices. No rank-dependent branching before the reductions: every rank reaches both allreduces.
 
+        sidx = 0
+        sidx(1) = start_idx(1)
+        if (n_glb > 0) sidx(2) = start_idx(2)
+        if (p_glb > 0) sidx(3) = start_idx(3)
         lo = huge(1); hi = -huge(1); tagged = .false.
         do ck = merge(1, 0, p_glb > 0), merge(p - 1, 0, p_glb > 0)
             do cj = merge(1, 0, n_glb > 0), merge(n - 1, 0, n_glb > 0)
@@ -628,44 +635,73 @@ contains
                         & ck - 1), wp)))
                     if (g/(2._wp*r0) > amr_tag_eps) then
                         tagged = .true.
-                        lo(1) = min(lo(1), ci); hi(1) = max(hi(1), ci)
-                        lo(2) = min(lo(2), cj); hi(2) = max(hi(2), cj)
-                        lo(3) = min(lo(3), ck); hi(3) = max(hi(3), ck)
+                        lo(1) = min(lo(1), ci + sidx(1)); hi(1) = max(hi(1), ci + sidx(1))
+                        lo(2) = min(lo(2), cj + sidx(2)); hi(2) = max(hi(2), cj + sidx(2))
+                        lo(3) = min(lo(3), ck + sidx(3)); hi(3) = max(hi(3), ck + sidx(3))
                     end if
                 end do
             end do
         end do
-        if (.not. tagged) return
+        ! reduce the box per active dim; the result is identical on all ranks
+        do d = 1, num_dims
+            call s_mpi_allreduce_integer_min(merge(lo(d), huge(1), tagged), lo_r)
+            call s_mpi_allreduce_integer_max(merge(hi(d), -huge(1), tagged), hi_r)
+            lo(d) = lo_r; hi(d) = hi_r
+        end do
+        if (hi(1) < lo(1)) return  ! nothing tagged on any rank (all ranks agree)
 
-        ! 2) pad + clamp (margin and max-extent); collapsed dims pinned to 0
+        ! 2) pad + clamp: domain margin, owner containment window (the SP7a mobility limit: the patch cannot leave its
+        !    owner rank; at np=1 the window equals the domain margin), and max extent (also bounded so the fine grid
+        !    fits the owner's LOCAL solver scratch, whose extent = window + its two buff_size margins); collapsed dims
+        !    pinned to 0. All inputs are globally identical, so every rank computes the same box.
+        win_cut = .false.
         lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
-        if (hi(1) - lo(1) + 1 > amr_maxc(1)) then
-            if (proc_rank == 0) print '(A)', ' [amr] WARNING: tagged region exceeds max patch; clamping'
-            hi(1) = lo(1) + amr_maxc(1) - 1
+        if (lo(1) < amr_owner_win_lo(1) .or. hi(1) > amr_owner_win_hi(1)) win_cut = .true.
+        lo(1) = max(lo(1), amr_owner_win_lo(1)); hi(1) = min(hi(1), amr_owner_win_hi(1))
+        maxc_eff = min(amr_maxc(1), (amr_owner_win_hi(1) - amr_owner_win_lo(1) + 2*buff_size + 1)/2)
+        if (hi(1) - lo(1) + 1 > maxc_eff) then
+            if (amr_rank_owns_patch) print '(A)', ' [amr] WARNING: tagged region exceeds max patch; clamping'
+            hi(1) = lo(1) + maxc_eff - 1
         end if
         if (n_glb > 0) then
             lo(2) = max(lo(2) - amr_buf, buff_size); hi(2) = min(hi(2) + amr_buf, n_glb - buff_size)
-            if (hi(2) - lo(2) + 1 > amr_maxc(2)) hi(2) = lo(2) + amr_maxc(2) - 1
+            if (lo(2) < amr_owner_win_lo(2) .or. hi(2) > amr_owner_win_hi(2)) win_cut = .true.
+            lo(2) = max(lo(2), amr_owner_win_lo(2)); hi(2) = min(hi(2), amr_owner_win_hi(2))
+            maxc_eff = min(amr_maxc(2), (amr_owner_win_hi(2) - amr_owner_win_lo(2) + 2*buff_size + 1)/2)
+            if (hi(2) - lo(2) + 1 > maxc_eff) hi(2) = lo(2) + maxc_eff - 1
         else
             lo(2) = 0; hi(2) = 0
         end if
         if (p_glb > 0) then
             lo(3) = max(lo(3) - amr_buf, buff_size); hi(3) = min(hi(3) + amr_buf, p_glb - buff_size)
-            if (hi(3) - lo(3) + 1 > amr_maxc(3)) hi(3) = lo(3) + amr_maxc(3) - 1
+            if (lo(3) < amr_owner_win_lo(3) .or. hi(3) > amr_owner_win_hi(3)) win_cut = .true.
+            lo(3) = max(lo(3), amr_owner_win_lo(3)); hi(3) = min(hi(3), amr_owner_win_hi(3))
+            maxc_eff = min(amr_maxc(3), (amr_owner_win_hi(3) - amr_owner_win_lo(3) + 2*buff_size + 1)/2)
+            if (hi(3) - lo(3) + 1 > maxc_eff) hi(3) = lo(3) + maxc_eff - 1
         else
             lo(3) = 0; hi(3) = 0
         end if
+        if (win_cut .and. amr_rank_owns_patch .and. .not. amr_win_clamp_warned) then
+            print '(A)', ' [amr] WARNING: regrid box clamped to the owner rank window (SP7a: the patch cannot migrate ranks)'
+            amr_win_clamp_warned = .true.
+        end if
+        if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return  ! tag box fully outside the window; keep the old region
         if (all(lo == amr_fine%region%lo) .and. all(hi == amr_fine%region%hi)) return
 
-        ! 3) stash old fine interior in the (dead-between-steps) RK bounce buffer
+        ! 3) owner-only: stash old fine interior in the (dead-between-steps) RK bounce buffer; non-owner field arrays
+        !    are unallocated (metadata below is still updated on ALL ranks)
         old_lo = amr_fine%region%lo
         old_m1 = amr_fine%m; old_n1 = amr_fine%n; old_p1 = amr_fine%p
-        do i = 1, sys_size
-            amr_fine%q_cons_stor(i)%sf(0:old_m1,0:old_n1,0:old_p1) = amr_fine%q_cons(i)%sf(0:old_m1,0:old_n1,0:old_p1)
-        end do
+        if (amr_rank_owns_patch) then
+            do i = 1, sys_size
+                amr_fine%q_cons_stor(i)%sf(0:old_m1,0:old_n1,0:old_p1) = amr_fine%q_cons(i)%sf(0:old_m1,0:old_n1,0:old_p1)
+            end do
+        end if
 
-        ! 4) rebuild geometry, prolong the whole new patch, then overwrite the overlap with old fine data
+        ! 4) rebuild geometry (region/mirrors/extents on all ranks; coord fill owner-guarded inside), then owner-only:
+        !    prolong the whole new patch and overwrite the overlap with old fine data
         call s_set_amr_fine_geometry(lo, hi)
+        if (.not. amr_rank_owns_patch) return
         call s_interpolate_coarse_to_fine(q_cons_base)
         sh = 2*(lo - old_lo)  ! old fine index = new fine index + sh (per dim; collapsed dims sh=0)
         do i = 1, sys_size
@@ -683,8 +719,8 @@ contains
                 end do
             end do
         end do
-        if (proc_rank == 0) print '(A,I0,A,I0,A,I0,A)', ' [amr] regrid: box x ', lo(1), ':', hi(1), ' (', (hi(1) - lo(1) + 1), &
-            & ' coarse cells)'
+        ! owner-only code path (the unique owner prints)
+        print '(A,I0,A,I0,A,I0,A)', ' [amr] regrid: box x ', lo(1), ':', hi(1), ' (', (hi(1) - lo(1) + 1), ' coarse cells)'
 
     end subroutine s_amr_regrid
 
