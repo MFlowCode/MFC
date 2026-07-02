@@ -885,6 +885,7 @@ contains
         call s_populate_grid_variables_buffers()
 
         call s_initialize_amr_module()
+        call s_amr_operator_checks()
         call s_populate_amr_fine(q_cons_ts(1)%vf)
         call s_amr_conservation_check(q_cons_ts(1)%vf)
 

@@ -73,6 +73,10 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in)                                           :: bc_type
         type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
 
+#ifdef MFC_SIMULATION
+        if (amr_in_fine_advance) return  ! AMR fine patch: ghosts pre-filled from the coarse level
+#endif
+
         call s_populate_bc_direction(1, -1, bc_x, bc_type(1, 1), q_prim_vf, pb_in, mv_in, q_T_sf)
         call s_populate_bc_direction(1, 1, bc_x, bc_type(1, 2), q_prim_vf, pb_in, mv_in, q_T_sf)
 

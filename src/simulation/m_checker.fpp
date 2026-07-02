@@ -104,6 +104,12 @@ contains
                        & .and. amr_patch_end(3) > p_glb), "amr_patch_end must be <= global cell max per axis")
             @:PROHIBIT(any(amr_patch_end(1:num_dims) <= amr_patch_beg(1:num_dims)), &
                        & "amr_patch_end must exceed amr_patch_beg on each active axis")
+            @:PROHIBIT(2*(amr_patch_end(1) - amr_patch_beg(1) + 1) - 1 > m_glb, &
+                       & "amr fine x-extent exceeds the base grid (module scratch is sized to the base)")
+            @:PROHIBIT(num_dims >= 2 .and. 2*(amr_patch_end(2) - amr_patch_beg(2) + 1) - 1 > n_glb, &
+                       & "amr fine y-extent exceeds the base grid")
+            @:PROHIBIT(num_dims >= 3 .and. 2*(amr_patch_end(3) - amr_patch_beg(3) + 1) - 1 > p_glb, &
+                       & "amr fine z-extent exceeds the base grid")
         end if
 #ifdef MFC_GPU
         @:PROHIBIT(amr, "amr is not supported on GPU builds yet (SP7)")

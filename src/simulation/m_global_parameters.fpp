@@ -275,6 +275,8 @@ module m_global_parameters
     !> @{!
     !> @}
 
+    logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
+
 contains
 
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
