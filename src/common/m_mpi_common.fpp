@@ -34,15 +34,6 @@ module m_mpi_common
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
-#ifdef MFC_SIMULATION
-    ! Per-axis rank counts, shared with sim-only m_load_balance. Module-scope only for
-    ! simulation; pre/post keep them subroutine-local in s_mpi_decompose (they declare
-    ! their own num_procs_x/y/z elsewhere, so a public copy here would collide).
-    integer :: num_procs_x = 1  !< Number of ranks in the x-direction (set by s_mpi_decompose_computational_domain)
-    integer :: num_procs_y = 1  !< Number of ranks in the y-direction (set by s_mpi_decompose_computational_domain)
-    integer :: num_procs_z = 1  !< Number of ranks in the z-direction (set by s_mpi_decompose_computational_domain)
-#endif
-
 contains
 
     !> Initialize the module.
@@ -1063,10 +1054,6 @@ contains
     subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
-#ifndef MFC_SIMULATION
-        !> per-axis rank counts (subroutine-local for pre/post; sim shares the module-scope copies)
-        integer :: num_procs_x, num_procs_y, num_procs_z
-#endif
         !> Non-optimal number of processors in the x-, y- and z-directions
         real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z
         real(wp) :: fct_min        !< Processor factorization (fct) minimization parameter
