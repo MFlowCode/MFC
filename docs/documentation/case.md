@@ -197,7 +197,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 
 The Table lists the patch parameters.
 The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition.
-Note that the domain must be fully filled with patche(s).
+Note that the domain must be fully filled with patches.
 The code outputs error messages when an empty region is left in the domain.
 
 - `tau_e(i)` is the `i`-th component of the elastic stress tensor, ordered as `tau_xx`, `tau_xy`, `tau_yy`, `tau_xz`, `tau_yz`, and `tau_zz`. 1D simulation requires `tau(1)`, 2D `tau(1:3)`, and 3D `tau(1:6)`.

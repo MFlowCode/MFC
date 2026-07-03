@@ -6,8 +6,8 @@
 class Mfc < Formula
   desc "Exascale multiphase/multiphysics compressible flow solver"
   homepage "https://mflowcode.github.io/"
-  url "https://github.com/MFlowCode/MFC/archive/refs/tags/v5.2.0.tar.gz"
-  sha256 "aaee855302950cb6bd8497170a6737214ed9a47ad3d109258f5b27ee2b78fe3d"
+  url "https://github.com/MFlowCode/MFC/archive/refs/tags/v5.5.0.tar.gz"
+  sha256 "05499f28291654ee5cc7f4344c85b5b12707e43e8408e7a28b96e43020e42959"
   license "MIT"
   head "https://github.com/MFlowCode/MFC.git", branch: "master"
 
@@ -28,7 +28,7 @@ class Mfc < Formula
   def install
     # Create Python virtual environment inside libexec (inside Cellar for proper bottling)
     venv = libexec/"venv"
-    system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
+    system formula_opt_bin("python@3.12")/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade",
            "pip", "setuptools", "wheel",
            "setuptools-scm",

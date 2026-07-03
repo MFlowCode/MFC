@@ -256,6 +256,7 @@ contains
         do i = 1, b_size
             @:DEALLOCATE(btensor%vf(i)%sf)
         end do
+        @:DEALLOCATE(Gs_hyper)
         @:DEALLOCATE(fd_coeff_x_hyper)
         if (n > 0) then
             @:DEALLOCATE(fd_coeff_y_hyper)

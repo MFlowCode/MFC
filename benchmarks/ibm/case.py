@@ -68,6 +68,7 @@ print(
             "riemann_solver": 2,
             "wave_speeds": 1,
             "avg_state": 2,
+            "fd_order": 2,
             "bc_x%beg": -3,
             "bc_x%end": -3,
             "bc_y%beg": -3,
