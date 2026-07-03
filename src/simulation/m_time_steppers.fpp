@@ -588,29 +588,14 @@ contains
         ! level-0 covered cells (the only deliberate level-0 write); then (subcycle) the time-accumulated
         ! Berger-Colella state reflux on the first coarse cells outside the patch
         if (amr) then
-            ! coarse state to host: sources for the (subcycle) fine ghost lerp, target of the
-            ! restriction, and target of the state reflux all run on host; pushed back below.
-            ! M2: kernel-port removes this transfer
-            if (amr_rank_owns_patch) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(host='[q_cons_ts(1)%vf(i)%sf]')
-                    if (amr_subcycle) then
-                        $:GPU_UPDATE(host='[q_cons_ts(stor)%vf(i)%sf]')
-                    end if
-                end do
-            end if
+            ! ghost lerp sources, restriction target, and state-reflux target are all device-resident:
+            ! the substep/restriction/reflux machinery runs as device kernels (M2)
             if (amr_subcycle) then
                 call s_advance_amr_fine_substeps(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, pb_ts(1)%sf, &
                                                  & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
             end if
             call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
             if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
-            ! restricted (+ state-refluxed) coarse state back to the device. M2: kernel-port removes this transfer
-            if (amr_rank_owns_patch) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[q_cons_ts(1)%vf(i)%sf]')
-                end do
-            end if
         end if
 
 #ifdef MFC_DEBUG

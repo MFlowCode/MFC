@@ -305,10 +305,15 @@ contains
     impure subroutine s_populate_amr_fine(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
+        integer                                             :: i
 
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return
         call s_interpolate_coarse_to_fine(q_cons_base)
+        ! prolonged fine state to the device (host prolongation; device consumers: ghost-fill/RK/RHS kernels)
+        do i = 1, sys_size
+            $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
+        end do
 
     end subroutine s_populate_amr_fine
 
@@ -349,18 +354,60 @@ contains
     end subroutine s_restrict_one_var
 
     !> Volume-weighted restriction: each covered coarse cell = average of its ref_ratio^d fine children. Writes ONLY the caller's
-    !! coarse target (SP2: a scratch buffer) - never level-0.
+    !! coarse target (SP2: a scratch buffer) - never level-0. Device kernel (per-cell arithmetic identical to s_restrict_one_var,
+    !! which remains the host path for the init-time diagnostics).
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
-        integer                                                :: i
 
         if (.not. amr_rank_owns_patch) return
-        do i = 1, sys_size
-            call s_restrict_one_var(amr_fine%q_cons(i), coarse_tgt(i))
-        end do
+        call s_restrict_all_vars(amr_fine%q_cons, coarse_tgt)
 
     end subroutine s_restrict_fine_to_coarse
+
+    !> Device restriction kernel over all sys_size variable pairs (fine source qf -> coarse target qc).
+    impure subroutine s_restrict_all_vars(qf, qc)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: qf
+        type(scalar_field), dimension(sys_size), intent(inout) :: qc
+        integer                                                :: i, ci, cj, ck, fi0, fj0, fk0, ddj, ddk, nchild, ox, oy, oz, rr
+        integer                                                :: c1lo, c1hi, c2lo, c2hi, c3lo, c3hi, dj_hi, dk_hi
+        real(wp)                                               :: acc
+
+        ! region loop indices are GLOBAL; the coarse target is rank-LOCAL
+
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
+        rr = amr_fine%ref_ratio
+        nchild = rr
+        if (n_glb > 0) nchild = nchild*rr
+        if (p_glb > 0) nchild = nchild*rr
+        c1lo = amr_fine%region%lo(1); c1hi = amr_fine%region%hi(1)
+        c2lo = amr_fine%region%lo(2); c2hi = merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
+        c3lo = amr_fine%region%lo(3); c3hi = merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
+        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, acc, ddj, ddk]')
+        do i = 1, sys_size
+            do ck = c3lo, c3hi
+                do cj = c2lo, c2hi
+                    do ci = c1lo, c1hi
+                        fi0 = (ci - c1lo)*rr; fj0 = (cj - c2lo)*rr; fk0 = (ck - c3lo)*rr
+                        acc = 0._wp
+                        do ddk = 0, dk_hi
+                            do ddj = 0, dj_hi
+                                acc = acc + real(qf(i)%sf(fi0, fj0 + ddj, fk0 + ddk), wp) + real(qf(i)%sf(fi0 + 1, fj0 + ddj, &
+                                                 & fk0 + ddk), wp)
+                            end do
+                        end do
+                        qc(i)%sf(ci - ox, cj - oy, ck - oz) = acc/real(nchild, wp)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_restrict_all_vars
 
     !> SP2 gate: restrict(prolong(coarse)) must reproduce coarse over the patch interior (conservation). Init-only diagnostic;
     !! allocates a scratch coarse target, never touches level-0 or the solve.
@@ -380,7 +427,10 @@ contains
         do i = 1, sys_size
             allocate (scratch(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
         end do
-        call s_restrict_fine_to_coarse(scratch)
+        ! host restriction path: the scratch target is host-only and the fine state is host-current at init
+        do i = 1, sys_size
+            call s_restrict_one_var(amr_fine%q_cons(i), scratch(i))
+        end do
         err = 0._wp
         do i = 1, sys_size
             do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
@@ -463,13 +513,16 @@ contains
 
     end subroutine s_amr_sync_grid_state_to_device
 
-    !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse. floor/modulo mapping is valid for
-    !! negative fine indices (ghosts). Interior untouched.
+    !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse (device kernel: reads the coarse source
+    !! and writes the fine target in device memory). floor/modulo mapping is valid for negative fine indices (ghosts). Interior
+    !! untouched.
     impure subroutine s_amr_fill_fine_ghosts(q_coarse, q_fine)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_coarse
         type(scalar_field), dimension(sys_size), intent(inout) :: q_fine
         integer                                                :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
+        integer                                                :: rr, lo1, lo2, lo3, fm, fn, fp, b1, e1, b2, e2, b3, e3
+        logical                                                :: d2, d3
         real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz
 
         ! region indices are GLOBAL; the coarse source q_coarse is rank-LOCAL
@@ -477,40 +530,127 @@ contains
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
+        d2 = n_glb > 0; d3 = p_glb > 0
+        rr = amr_fine%ref_ratio
+        lo1 = amr_fine%region%lo(1); lo2 = amr_fine%region%lo(2); lo3 = amr_fine%region%lo(3)
+        fm = amr_fine%m; fn = amr_fine%n; fp = amr_fine%p
+        b1 = amr_fine%idwbuff(1)%beg; e1 = amr_fine%idwbuff(1)%end
+        b2 = amr_fine%idwbuff(2)%beg; e2 = amr_fine%idwbuff(2)%end
+        b3 = amr_fine%idwbuff(3)%beg; e3 = amr_fine%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
         do i = 1, sys_size
-            do fk = amr_fine%idwbuff(3)%beg, amr_fine%idwbuff(3)%end
-                ck = 0; xiz = 0._wp
-                if (p_glb > 0) then
-                    ck = amr_fine%region%lo(3) + floor(real(fk, wp)/real(amr_fine%ref_ratio, wp)) - oz
-                    xiz = (real(modulo(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
-                end if
-                do fj = amr_fine%idwbuff(2)%beg, amr_fine%idwbuff(2)%end
-                    cj = 0; xiy = 0._wp
-                    if (n_glb > 0) then
-                        cj = amr_fine%region%lo(2) + floor(real(fj, wp)/real(amr_fine%ref_ratio, wp)) - oy
-                        xiy = (real(modulo(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
-                    end if
-                    do fi = amr_fine%idwbuff(1)%beg, amr_fine%idwbuff(1)%end
+            do fk = b3, e3
+                do fj = b2, e2
+                    do fi = b1, e1
                         ! skip the interior: only the ghost shell is filled
-                        if (fi >= 0 .and. fi <= amr_fine%m .and. fj >= 0 .and. fj <= amr_fine%n .and. fk >= 0 &
-                            & .and. fk <= amr_fine%p) cycle
-                        ci = amr_fine%region%lo(1) + floor(real(fi, wp)/real(amr_fine%ref_ratio, wp)) - ox
-                        xix = (real(modulo(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
-                        u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                        sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
-                        sy = 0._wp
-                        if (n_glb > 0) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
-                            & cj - 1, ck), wp))
-                        sz = 0._wp
-                        if (p_glb > 0) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
-                            & cj, ck - 1), wp))
-                        q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
+                        if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
+                            ck = 0; xiz = 0._wp
+                            if (d3) then
+                                ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                                xiz = (real(modulo(fk, rr), wp) - 0.5_wp)*0.5_wp
+                            end if
+                            cj = 0; xiy = 0._wp
+                            if (d2) then
+                                cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                                xiy = (real(modulo(fj, rr), wp) - 0.5_wp)*0.5_wp
+                            end if
+                            ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                            xix = (real(modulo(fi, rr), wp) - 0.5_wp)*0.5_wp
+                            u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                            sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
+                                        & wp))
+                            sy = 0._wp
+                            if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
+                                & cj - 1, ck), wp))
+                            sz = 0._wp
+                            if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
+                                & ck - 1), wp))
+                            q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
+                        end if
                     end do
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_fill_fine_ghosts
+
+    !> Lerp the fine ghost shell of q_tgt between q_a (coarse t^n) and q_b (coarse t^{n+1}) at time fraction th (device kernel).
+    !! Interior untouched.
+    impure subroutine s_amr_lerp_fine_ghosts(q_a, q_b, q_tgt, th)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_a, q_b
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_tgt
+        real(wp), intent(in)                                   :: th
+        integer                                                :: i, fi, fj, fk, fm, fn, fp, b1, e1, b2, e2, b3, e3
+
+        fm = amr_fine%m; fn = amr_fine%n; fp = amr_fine%p
+        b1 = amr_fine%idwbuff(1)%beg; e1 = amr_fine%idwbuff(1)%end
+        b2 = amr_fine%idwbuff(2)%beg; e2 = amr_fine%idwbuff(2)%end
+        b3 = amr_fine%idwbuff(3)%beg; e3 = amr_fine%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do fk = b3, e3
+                do fj = b2, e2
+                    do fi = b1, e1
+                        if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
+                            q_tgt(i)%sf(fi, fj, fk) = (1._wp - th)*real(q_a(i)%sf(fi, fj, fk), wp) + th*real(q_b(i)%sf(fi, fj, &
+                                  & fk), wp)
+                        end if
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_lerp_fine_ghosts
+
+    !> Device copy q_src -> q_dst over [b1:e1, b2:e2, b3:e3] for all sys_size fields (RK step-entry backup).
+    impure subroutine s_amr_copy_fine_fields(q_src, q_dst, b1, e1, b2, e2, b3, e3)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_src
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_dst
+        integer, intent(in)                                    :: b1, e1, b2, e2, b3, e3
+        integer                                                :: i, fi, fj, fk
+
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do fk = b3, e3
+                do fj = b2, e2
+                    do fi = b1, e1
+                        q_dst(i)%sf(fi, fj, fk) = q_src(i)%sf(fi, fj, fk)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_copy_fine_fields
+
+    !> Device RK stage update over the fine interior: q = (c1*q + c2*q_stor + c3*dt_in*rhs)/c4 (compute in wp, store stp). Mirrors
+    !! the coarse non-IGR rk_coef form in s_tvd_rk.
+    impure subroutine s_amr_fine_rk_update(q_upd, q_stor, q_rhs, c1, c2, c3, c4, dt_in)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_upd
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_stor, q_rhs
+        real(wp), intent(in)                                   :: c1, c2, c3, c4, dt_in
+        integer                                                :: i, fi, fj, fk, fm, fn, fp
+
+        fm = amr_fine%m; fn = amr_fine%n; fp = amr_fine%p
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do fk = 0, fp
+                do fj = 0, fn
+                    do fi = 0, fm
+                        q_upd(i)%sf(fi, fj, fk) = (c1*real(q_upd(i)%sf(fi, fj, fk), wp) + c2*real(q_stor(i)%sf(fi, fj, fk), &
+                              & wp) + c3*dt_in*real(q_rhs(i)%sf(fi, fj, fk), wp))/c4
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_fine_rk_update
 
     !> Advance the fine level through RK stage s (same dt as level-0, no subcycling). Called BETWEEN the coarse RHS and the coarse
     !! RK update, so q_cons_coarse is the coarse STAGE-ENTRY state. Fine prim ghosts are obtained by widening idwint to the fine
@@ -527,56 +667,32 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
         real(wp), intent(inout)                                    :: time_avg
-        integer                                                    :: i, fi, fj, fk
 
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return
 
-        ! coarse stage-entry state to host for the ghost prolongation. M2: kernel-port removes this transfer
-        do i = 1, sys_size
-            $:GPU_UPDATE(host='[q_cons_coarse(i)%sf]')
-        end do
-
-        ! ghost prolongation from the coarse stage-entry conservative state
+        ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the
+        ! device-current coarse stage-entry state directly)
         call s_amr_fill_fine_ghosts(q_cons_coarse, amr_fine%q_cons)
 
-        ! step-entry backup for the SSP-RK combination
+        ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
-            do i = 1, sys_size
-                amr_fine%q_cons_stor(i)%sf(:,:,:) = amr_fine%q_cons(i)%sf(:,:,:)
-            end do
+            call s_amr_copy_fine_fields(amr_fine%q_cons, amr_fine%q_cons_stor, amr_fine%idwbuff(1)%beg, amr_fine%idwbuff(1)%end, &
+                                        & amr_fine%idwbuff(2)%beg, amr_fine%idwbuff(2)%end, amr_fine%idwbuff(3)%beg, &
+                                        & amr_fine%idwbuff(3)%end)
         end if
 
         amr_in_fine_advance = .true.
         call s_amr_swap_to_fine()
         idwint = amr_fine%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
         $:GPU_UPDATE(device='[idwint]')
-        ! fine state (host ghost fill + host RK update) to device for the RHS kernels. M2: kernel-port removes this transfer
-        do i = 1, sys_size
-            $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
-        end do
         call s_compute_rhs(amr_fine%q_cons, q_T_sf, amr_fine%q_prim, bc_type, amr_fine%rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
                            & time_avg, s)
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
 
-        ! fine RHS (device kernels) to host for the host RK update. M2: kernel-port removes this transfer
-        do i = 1, sys_size
-            $:GPU_UPDATE(host='[amr_fine%rhs(i)%sf]')
-        end do
-
-        ! RK stage update (mirror of the coarse non-IGR form; compute in wp, store stp)
-        do i = 1, sys_size
-            do fk = 0, amr_fine%p
-                do fj = 0, amr_fine%n
-                    do fi = 0, amr_fine%m
-                        amr_fine%q_cons(i)%sf(fi, fj, fk) = (coefs(1)*real(amr_fine%q_cons(i)%sf(fi, fj, fk), &
-                                        & wp) + coefs(2)*real(amr_fine%q_cons_stor(i)%sf(fi, fj, fk), &
-                                        & wp) + coefs(3)*dt*real(amr_fine%rhs(i)%sf(fi, fj, fk), wp))/coefs(4)
-                    end do
-                end do
-            end do
-        end do
+        ! RK stage update (device kernel; mirror of the coarse non-IGR form)
+        call s_amr_fine_rk_update(amr_fine%q_cons, amr_fine%q_cons_stor, amr_fine%rhs, coefs(1), coefs(2), coefs(3), coefs(4), dt)
 
     end subroutine s_advance_amr_fine_stage
 
@@ -596,16 +712,14 @@ contains
         integer, intent(in)                                        :: t_step
         real(wp), intent(inout)                                    :: time_avg
         real(wp), parameter                                        :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
-        integer                                                    :: sub, s, i, fi, fj, fk
+        integer                                                    :: sub, s
         real(wp)                                                   :: th
 
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return
 
-        ! q_old/q_new host copies are made current by the caller's bracket in s_tvd_rk
-        ! (m_time_steppers pulls q_cons_ts(stor)/q_cons_ts(1) to host before this call)
-
-        ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1}
+        ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1} (device kernels
+        ! read the device-current coarse states directly)
         call s_amr_fill_fine_ghosts(q_old, amr_fine%q_ghost_a)
         call s_amr_fill_fine_ghosts(q_new, amr_fine%q_ghost_b)
         call s_amr_zero_fine_registers()
@@ -614,58 +728,26 @@ contains
             do s = 1, 3
                 th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
 
-                ! lerp the ghost shell into q_cons at the stage time (interior untouched)
-                do i = 1, sys_size
-                    do fk = amr_fine%idwbuff(3)%beg, amr_fine%idwbuff(3)%end
-                        do fj = amr_fine%idwbuff(2)%beg, amr_fine%idwbuff(2)%end
-                            do fi = amr_fine%idwbuff(1)%beg, amr_fine%idwbuff(1)%end
-                                if (fi >= 0 .and. fi <= amr_fine%m .and. fj >= 0 .and. fj <= amr_fine%n .and. fk >= 0 &
-                                    & .and. fk <= amr_fine%p) cycle
-                                amr_fine%q_cons(i)%sf(fi, fj, fk) = (1._wp - th)*real(amr_fine%q_ghost_a(i)%sf(fi, fj, fk), &
-                                                & wp) + th*real(amr_fine%q_ghost_b(i)%sf(fi, fj, fk), wp)
-                            end do
-                        end do
-                    end do
-                end do
+                ! lerp the ghost shell into q_cons at the stage time (device kernel; interior untouched)
+                call s_amr_lerp_fine_ghosts(amr_fine%q_ghost_a, amr_fine%q_ghost_b, amr_fine%q_cons, th)
 
-                ! substep-entry backup for the SSP-RK combination
+                ! substep-entry backup for the SSP-RK combination (device copy, interior only)
                 if (s == 1) then
-                    do i = 1, sys_size
-                        amr_fine%q_cons_stor(i)%sf(0:amr_fine%m,0:amr_fine%n,0:amr_fine%p) = amr_fine%q_cons(i)%sf(0:amr_fine%m, &
-                                             & 0:amr_fine%n,0:amr_fine%p)
-                    end do
+                    call s_amr_copy_fine_fields(amr_fine%q_cons, amr_fine%q_cons_stor, 0, amr_fine%m, 0, amr_fine%n, 0, amr_fine%p)
                 end if
 
                 amr_in_fine_advance = .true.
                 call s_amr_swap_to_fine()
                 idwint = amr_fine%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
                 $:GPU_UPDATE(device='[idwint]')
-                ! fine state (host ghost lerp + host RK update) to device for the RHS kernels. M2: kernel-port removes this transfer
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
-                end do
                 call s_compute_rhs(amr_fine%q_cons, q_T_sf, amr_fine%q_prim, bc_type, amr_fine%rhs, pb_in, rhs_pb, mv_in, rhs_mv, &
                                    & t_step, time_avg, s)
                 call s_amr_restore_coarse()
                 amr_in_fine_advance = .false.
 
-                ! fine RHS (device kernels) to host for the host RK update. M2: kernel-port removes this transfer
-                do i = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_fine%rhs(i)%sf]')
-                end do
-
-                ! RK stage update at the FINE time step (compute in wp, store stp)
-                do i = 1, sys_size
-                    do fk = 0, amr_fine%p
-                        do fj = 0, amr_fine%n
-                            do fi = 0, amr_fine%m
-                                amr_fine%q_cons(i)%sf(fi, fj, fk) = (coefs(s, 1)*real(amr_fine%q_cons(i)%sf(fi, fj, fk), &
-                                                & wp) + coefs(s, 2)*real(amr_fine%q_cons_stor(i)%sf(fi, fj, fk), wp) + coefs(s, &
-                                                & 3)*amr_dt_fine*real(amr_fine%rhs(i)%sf(fi, fj, fk), wp))/coefs(s, 4)
-                            end do
-                        end do
-                    end do
-                end do
+                ! RK stage update at the FINE time step (device kernel)
+                call s_amr_fine_rk_update(amr_fine%q_cons, amr_fine%q_cons_stor, amr_fine%rhs, coefs(s, 1), coefs(s, 2), coefs(s, &
+                                          & 3), coefs(s, 4), amr_dt_fine)
             end do
         end do
 
@@ -683,8 +765,8 @@ contains
         real(wp)                                            :: r0, g
         logical                                             :: tagged, win_cut
 
-        ! coarse state to host for the tag sweep + rebuild prolongation (ALL ranks tag their local
-        ! interior, so this is unguarded). M2: kernel-port removes this transfer
+        ! host consumer: regrid (tag sweep + rebuild prolongation run on host every regrid_int steps;
+        ! ALL ranks tag their local interior, so this is unguarded)
 
         do i = 1, sys_size
             $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
@@ -767,6 +849,10 @@ contains
         old_lo = amr_fine%region%lo
         old_m1 = amr_fine%m; old_n1 = amr_fine%n; old_p1 = amr_fine%p
         if (amr_rank_owns_patch) then
+            ! host consumer: regrid stash + rebuild run on host; the rebuilt state is pushed back below
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_fine%q_cons(i)%sf]')
+            end do
             do i = 1, sys_size
                 amr_fine%q_cons_stor(i)%sf(0:old_m1,0:old_n1,0:old_p1) = amr_fine%q_cons(i)%sf(0:old_m1,0:old_n1,0:old_p1)
             end do
@@ -793,6 +879,10 @@ contains
                 end do
             end do
         end do
+        ! rebuilt fine state back to the device for the stepping kernels
+        do i = 1, sys_size
+            $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
+        end do
         ! owner-only code path (the unique owner prints)
         print '(A,I0,A,I0,A,I0,A)', ' [amr] regrid: box x ', lo(1), ':', hi(1), ' (', (hi(1) - lo(1) + 1), ' coarse cells)'
 
@@ -808,9 +898,9 @@ contains
         integer                                             :: ci, cj, ck
 
         if (.not. amr) return
-        ! summed fields to host at the finalize report (device-current after the run). The baseline call
-        ! runs at init BEFORE s_initialize_gpu_vars pushes the ICs to the device, so it must NOT pull the
-        ! (uninitialized) device copies. M2: kernel-port removes this transfer
+        ! host consumer: diagnostics (host sum over exactly the two summed fields). The init baseline call
+        ! runs BEFORE s_initialize_gpu_vars pushes the ICs to the device, so it must NOT pull the
+        ! (uninitialized) device copies.
         if (finalize_report) then
             $:GPU_UPDATE(host='[q_cons_base(1)%sf, q_cons_base(eqn_idx%E)%sf]')
         end if
@@ -922,6 +1012,7 @@ contains
     !> minmod slope limiter: 0 if a,b differ in sign, else the smaller-magnitude argument.
     pure elemental function minmod(a, b) result(m)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a, b
         real(wp)             :: m
 
