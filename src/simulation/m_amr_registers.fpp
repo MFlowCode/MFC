@@ -78,6 +78,11 @@ contains
 
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return
+        ! flux data was just written by device kernels; the face reads below run on host.
+        ! M2: kernel-port removes this transfer (or shrinks it to the boundary faces)
+        do eq = 1, sys_size
+            $:GPU_UPDATE(host='[flux_dir%vf(eq)%sf]')
+        end do
         if (amr_subcycle) then
             if (amr_in_fine_advance) then
                 coef = 0.5_wp*rk3_w(stage); accum = .true.  ! zeroed by s_amr_zero_fine_registers before substep 1
@@ -196,6 +201,11 @@ contains
 
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return
+        ! coarse rhs to host for the boundary correction; pushed back below for the coarse RK
+        ! update kernel. M2: kernel-port removes this transfer
+        do eq = 1, sys_size
+            $:GPU_UPDATE(host='[rhs_vf(eq)%sf]')
+        end do
         ! current coarse patch extents (relative, 0-based): 0..n{x,y,z}_c
         nx_c = amr_region_hi(1) - amr_region_lo(1)
         ny_c = 0; nz_c = 0
@@ -279,6 +289,10 @@ contains
                 end do
             end do
         end if
+        ! corrected rhs back to the device for the coarse RK update kernel. M2: kernel-port removes this transfer
+        do eq = 1, sys_size
+            $:GPU_UPDATE(device='[rhs_vf(eq)%sf]')
+        end do
 
     end subroutine s_amr_apply_reflux
 

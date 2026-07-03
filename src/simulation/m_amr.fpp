@@ -26,7 +26,8 @@ module m_amr
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
 
-    !> One refined level: its own grid + conservative fields. Host-only (no GPU in SP1).
+    !> One refined level: its own grid + conservative fields. Field arrays are device-resident (@:ALLOCATE); coords/metadata
+    !! host-only.
     type t_level
         integer                         :: ref_ratio
         type(t_box)                     :: region          !< patch extent in parent (level-0) cell indices
@@ -158,20 +159,25 @@ contains
                 allocate (sw_dz(-buff_size:p + buff_size))
             end if
 
-            ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p
-            allocate (amr_fine%q_cons(1:sys_size))
-            allocate (amr_fine%q_cons_stor(1:sys_size))
-            allocate (amr_fine%q_prim(1:sys_size))
-            allocate (amr_fine%rhs(1:sys_size))
-            allocate (amr_fine%q_ghost_a(1:sys_size))
-            allocate (amr_fine%q_ghost_b(1:sys_size))
+            ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p.
+            ! Device-resident (@:ALLOCATE) so s_compute_rhs kernels can run on the fine patch;
+            ! q_cons/q_prim/rhs get the Cray pointer setup mirroring m_time_steppers' field vectors.
+            @:ALLOCATE(amr_fine%q_cons(1:sys_size))
+            @:ALLOCATE(amr_fine%q_cons_stor(1:sys_size))
+            @:ALLOCATE(amr_fine%q_prim(1:sys_size))
+            @:ALLOCATE(amr_fine%rhs(1:sys_size))
+            @:ALLOCATE(amr_fine%q_ghost_a(1:sys_size))
+            @:ALLOCATE(amr_fine%q_ghost_b(1:sys_size))
             do i = 1, sys_size
-                allocate (amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-                allocate (amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-                allocate (amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-                allocate (amr_fine%rhs(i)%sf(0:max_f1,0:max_f2,0:max_f3))
-                allocate (amr_fine%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
-                allocate (amr_fine%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_fine%rhs(i)%sf(0:max_f1, 0:max_f2, 0:max_f3))
+                @:ALLOCATE(amr_fine%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_fine%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ACC_SETUP_SFs(amr_fine%q_cons(i))
+                @:ACC_SETUP_SFs(amr_fine%q_prim(i))
+                @:ACC_SETUP_SFs(amr_fine%rhs(i))
             end do
         end if
 
@@ -422,6 +428,9 @@ contains
             z_cc(0:amr_fine%p) = amr_fine%z_cc(0:amr_fine%p)
             dz(0:amr_fine%p) = amr_fine%dz(0:amr_fine%p)
         end if
+        ! sync the swapped extents/bounds/coordinates to the device: RHS kernels read the
+        ! device copies of these GPU_DECLARE'd globals (stale coarse bounds = OOB kernels)
+        call s_amr_sync_grid_state_to_device()
 
     end subroutine s_amr_swap_to_fine
 
@@ -434,8 +443,25 @@ contains
         x_cb = sw_x_cb; x_cc = sw_x_cc; dx = sw_dx
         if (n_glb > 0) then; y_cb = sw_y_cb; y_cc = sw_y_cc; dy = sw_dy; end if
         if (p_glb > 0) then; z_cb = sw_z_cb; z_cc = sw_z_cc; dz = sw_dz; end if
+        ! sync the restored coarse extents/bounds/coordinates back to the device
+        call s_amr_sync_grid_state_to_device()
 
     end subroutine s_amr_restore_coarse
+
+    !> Push the (host-side) global grid state to its device copies after a swap/restore. m/n/p, idwint/idwbuff, and the coordinate
+    !! arrays are GPU_DECLARE'd; kernels read the device copies. No-op on CPU builds.
+    impure subroutine s_amr_sync_grid_state_to_device()
+
+        $:GPU_UPDATE(device='[m, n, p, idwint, idwbuff]')
+        $:GPU_UPDATE(device='[x_cb, x_cc, dx]')
+        if (n_glb > 0) then
+            $:GPU_UPDATE(device='[y_cb, y_cc, dy]')
+        end if
+        if (p_glb > 0) then
+            $:GPU_UPDATE(device='[z_cb, z_cc, dz]')
+        end if
+
+    end subroutine s_amr_sync_grid_state_to_device
 
     !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse. floor/modulo mapping is valid for
     !! negative fine indices (ghosts). Interior untouched.
@@ -506,6 +532,11 @@ contains
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return
 
+        ! coarse stage-entry state to host for the ghost prolongation. M2: kernel-port removes this transfer
+        do i = 1, sys_size
+            $:GPU_UPDATE(host='[q_cons_coarse(i)%sf]')
+        end do
+
         ! ghost prolongation from the coarse stage-entry conservative state
         call s_amr_fill_fine_ghosts(q_cons_coarse, amr_fine%q_cons)
 
@@ -519,10 +550,20 @@ contains
         amr_in_fine_advance = .true.
         call s_amr_swap_to_fine()
         idwint = amr_fine%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
+        $:GPU_UPDATE(device='[idwint]')
+        ! fine state (host ghost fill + host RK update) to device for the RHS kernels. M2: kernel-port removes this transfer
+        do i = 1, sys_size
+            $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
+        end do
         call s_compute_rhs(amr_fine%q_cons, q_T_sf, amr_fine%q_prim, bc_type, amr_fine%rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
                            & time_avg, s)
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
+
+        ! fine RHS (device kernels) to host for the host RK update. M2: kernel-port removes this transfer
+        do i = 1, sys_size
+            $:GPU_UPDATE(host='[amr_fine%rhs(i)%sf]')
+        end do
 
         ! RK stage update (mirror of the coarse non-IGR form; compute in wp, store stp)
         do i = 1, sys_size
@@ -561,6 +602,9 @@ contains
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return
 
+        ! q_old/q_new host copies are made current by the caller's bracket in s_tvd_rk
+        ! (m_time_steppers pulls q_cons_ts(stor)/q_cons_ts(1) to host before this call)
+
         ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1}
         call s_amr_fill_fine_ghosts(q_old, amr_fine%q_ghost_a)
         call s_amr_fill_fine_ghosts(q_new, amr_fine%q_ghost_b)
@@ -595,10 +639,20 @@ contains
                 amr_in_fine_advance = .true.
                 call s_amr_swap_to_fine()
                 idwint = amr_fine%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
+                $:GPU_UPDATE(device='[idwint]')
+                ! fine state (host ghost lerp + host RK update) to device for the RHS kernels. M2: kernel-port removes this transfer
+                do i = 1, sys_size
+                    $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
+                end do
                 call s_compute_rhs(amr_fine%q_cons, q_T_sf, amr_fine%q_prim, bc_type, amr_fine%rhs, pb_in, rhs_pb, mv_in, rhs_mv, &
                                    & t_step, time_avg, s)
                 call s_amr_restore_coarse()
                 amr_in_fine_advance = .false.
+
+                ! fine RHS (device kernels) to host for the host RK update. M2: kernel-port removes this transfer
+                do i = 1, sys_size
+                    $:GPU_UPDATE(host='[amr_fine%rhs(i)%sf]')
+                end do
 
                 ! RK stage update at the FINE time step (compute in wp, store stp)
                 do i = 1, sys_size
@@ -628,6 +682,13 @@ contains
         integer                                             :: sidx(3), lo_r, hi_r, maxc_eff
         real(wp)                                            :: r0, g
         logical                                             :: tagged, win_cut
+
+        ! coarse state to host for the tag sweep + rebuild prolongation (ALL ranks tag their local
+        ! interior, so this is unguarded). M2: kernel-port removes this transfer
+
+        do i = 1, sys_size
+            $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
+        end do
 
         ! 1) tag + bounding box over the LOCAL interior (sweep away from local edges; ghosts not needed), emitting
         !    GLOBAL indices. No rank-dependent branching before the reductions: every rank reaches both allreduces.
@@ -747,6 +808,12 @@ contains
         integer                                             :: ci, cj, ck
 
         if (.not. amr) return
+        ! summed fields to host at the finalize report (device-current after the run). The baseline call
+        ! runs at init BEFORE s_initialize_gpu_vars pushes the ICs to the device, so it must NOT pull the
+        ! (uninitialized) device copies. M2: kernel-port removes this transfer
+        if (finalize_report) then
+            $:GPU_UPDATE(host='[q_cons_base(1)%sf, q_cons_base(eqn_idx%E)%sf]')
+        end if
         sm = 0._wp; se = 0._wp
         do ck = 0, p
             do cj = 0, n
@@ -875,19 +942,19 @@ contains
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return  ! non-owner ranks never allocated the fine level
         do i = 1, sys_size
-            if (associated(amr_fine%q_cons(i)%sf)) deallocate (amr_fine%q_cons(i)%sf)
-            if (associated(amr_fine%q_cons_stor(i)%sf)) deallocate (amr_fine%q_cons_stor(i)%sf)
-            if (associated(amr_fine%q_prim(i)%sf)) deallocate (amr_fine%q_prim(i)%sf)
-            if (associated(amr_fine%rhs(i)%sf)) deallocate (amr_fine%rhs(i)%sf)
-            if (associated(amr_fine%q_ghost_a(i)%sf)) deallocate (amr_fine%q_ghost_a(i)%sf)
-            if (associated(amr_fine%q_ghost_b(i)%sf)) deallocate (amr_fine%q_ghost_b(i)%sf)
+            @:DEALLOCATE(amr_fine%q_cons(i)%sf)
+            @:DEALLOCATE(amr_fine%q_cons_stor(i)%sf)
+            @:DEALLOCATE(amr_fine%q_prim(i)%sf)
+            @:DEALLOCATE(amr_fine%rhs(i)%sf)
+            @:DEALLOCATE(amr_fine%q_ghost_a(i)%sf)
+            @:DEALLOCATE(amr_fine%q_ghost_b(i)%sf)
         end do
-        deallocate (amr_fine%q_cons)
-        deallocate (amr_fine%q_cons_stor)
-        deallocate (amr_fine%q_prim)
-        deallocate (amr_fine%rhs)
-        deallocate (amr_fine%q_ghost_a)
-        deallocate (amr_fine%q_ghost_b)
+        @:DEALLOCATE(amr_fine%q_cons)
+        @:DEALLOCATE(amr_fine%q_cons_stor)
+        @:DEALLOCATE(amr_fine%q_prim)
+        @:DEALLOCATE(amr_fine%rhs)
+        @:DEALLOCATE(amr_fine%q_ghost_a)
+        @:DEALLOCATE(amr_fine%q_ghost_b)
         if (allocated(amr_fine%x_cb)) deallocate (amr_fine%x_cb, amr_fine%x_cc, amr_fine%dx)
         if (allocated(amr_fine%y_cb)) deallocate (amr_fine%y_cb, amr_fine%y_cc, amr_fine%dy)
         if (allocated(amr_fine%z_cb)) deallocate (amr_fine%z_cb, amr_fine%z_cc, amr_fine%dz)

@@ -121,9 +121,6 @@ contains
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")
         @:PROHIBIT(amr_subcycle .and. cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
-#ifdef MFC_GPU
-        @:PROHIBIT(amr, "amr is not supported on GPU builds yet (SP7)")
-#endif
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
