@@ -1352,7 +1352,6 @@ class CaseValidator:
         time_stepper = self.get("time_stepper")
         model_eqns = self.get("model_eqns")
         num_fluids = self.get("num_fluids")
-        viscous = self.get("viscous", "F") == "T"
         surface_tension = self.get("surface_tension", "F") == "T"
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
@@ -1381,8 +1380,8 @@ class CaseValidator:
             "amr with num_fluids > 1 requires mpp_lim " "(its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)",
         )
         self.prohibit(
-            viscous or surface_tension or hypoelasticity or hyperelasticity or mhd or chemistry,
-            "amr does not support viscous/elastic/surface-tension/MHD/chemistry",
+            surface_tension or hypoelasticity or hyperelasticity or mhd or chemistry,
+            "amr does not support elastic/surface-tension/MHD/chemistry",
         )
         self.prohibit(
             bubbles_euler or bubbles_lagrange or qbmm or relax or ib or igr or cyl_coord,

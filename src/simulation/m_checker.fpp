@@ -95,8 +95,8 @@ contains
             @:PROHIBIT(model_eqns /= 2, "amr requires model_eqns = 2 (5-equation)")
             @:PROHIBIT(num_fluids > 1 .and. .not. mpp_lim, &
                        & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)")
-            @:PROHIBIT(viscous .or. surface_tension .or. hypoelasticity .or. hyperelasticity .or. mhd .or. chemistry, &
-                       & "amr does not support viscous/elastic/surface-tension/MHD/chemistry")
+            @:PROHIBIT(surface_tension .or. hypoelasticity .or. hyperelasticity .or. mhd .or. chemistry, &
+                       & "amr does not support elastic/surface-tension/MHD/chemistry")
             @:PROHIBIT(bubbles_euler .or. bubbles_lagrange .or. qbmm .or. relax .or. ib .or. igr .or. cyl_coord, &
                        & "amr does not support bubbles/phase-change/IB/IGR/cylindrical")
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")

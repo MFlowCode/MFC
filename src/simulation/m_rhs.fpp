@@ -781,7 +781,7 @@ contains
                 ! AMR refluxing: record the c/f boundary-face fluxes exactly as the assembly above
                 ! used them (after s_cbc may have modified flux_n inside the advection source call);
                 ! must run before the next direction's sweep reuses the aliased flux_n storage
-                if (amr) call s_amr_capture_boundary_flux(id, flux_n(id), stage)
+                if (amr) call s_amr_capture_boundary_flux(id, flux_n(id), flux_src_n(id), stage)
 
                 ! RHS additions for hypoelasticity
                 call nvtxStartRange("RHS-HYPOELASTICITY")
