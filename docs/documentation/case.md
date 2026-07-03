@@ -676,7 +676,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `sfc_partition_wrt`     | Logical | Report SFC-weighted load-balance partition |
 | `rank_time_wrt`         | Logical | Report per-rank RHS compute-time imbalance (max/mean) |
 | `load_balance`          | Logical | (Experimental/diagnostic) Weighted static Cartesian decomposition at init (requires `parallel_io = T`, >1 rank). Measured gain is small on CPU (~5%) and can be slower on GPU due to the occupancy floor; equal decomposition is near-optimal for uniform-cost workloads. |
-| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 patch with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2, single fluid. |
+| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 patch with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2; num_fluids > 1 requires mpp_lim. |
 | `amr_patch_beg(i)`      | Integer | Refined-patch start cell index in direction $i$ (level-0 index space) |
 | `amr_patch_end(i)`      | Integer | Refined-patch end cell index in direction $i$ (level-0 index space) |
 | `amr_regrid_int`        | Integer | Steps between AMR regrid events (0 = static patch) |
@@ -782,8 +782,11 @@ and flux refluxing at the coarse–fine interface.
 
 **Restrictions.**
 AMR requires WENO reconstruction (`recon_type = 1`, any order), SSP-RK3 time-stepping
-(`time_stepper = 3`), the 5-equation model (`model_eqns = 2`), and a single fluid
-(`num_fluids = 1`).
+(`time_stepper = 3`), and the 5-equation model (`model_eqns = 2`).
+Multiple fluids (`num_fluids > 1`) are supported and additionally require `mpp_lim`,
+whose volume-fraction clamp+renormalize maintains coarse/fine alpha consistency; the
+per-fluid masses are refluxed exactly, and volume fractions are prolonged with a
+sum-preserving closure (fine-level volume fractions sum to one by construction).
 It is incompatible with viscosity, surface tension, bubble models, phase-change (relax),
 immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, `hybrid_weno`,
 `hybrid_riemann`, and `acoustic_source`.

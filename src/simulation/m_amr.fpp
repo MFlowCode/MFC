@@ -9,6 +9,7 @@ module m_amr
 
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
+    use m_constants, only: num_fluids_max
     use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers, s_mpi_sendrecv_amr_fine_halo
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, &
         & s_mpi_sendrecv_variables_buffers
@@ -61,8 +62,8 @@ module m_amr
     real(wp), allocatable :: sw_y_cb(:), sw_y_cc(:), sw_dy(:)
     real(wp), allocatable :: sw_z_cb(:), sw_z_cc(:), sw_dz(:)
 
-    !> Conservation-defect baselines (level-0 interior integrals at init)
-    real(wp) :: amr_mass0 = 0._wp, amr_energy0 = 0._wp
+    !> Conservation-defect baselines (level-0 interior integrals at init; per-fluid masses + energy)
+    real(wp) :: amr_mass0(num_fluids_max) = 0._wp, amr_energy0 = 0._wp
 
     !> True (identically on all ranks) iff some rank's fine ghost-fill stencil reads its coarse GHOST cells - the solver populates
     !! only PRIM ghosts, so the CONS ghosts the fill prolongs from must be halo-exchanged first. Never true at np=1 (patch faces sit
@@ -351,17 +352,93 @@ contains
     end subroutine s_prolong_one_var
 
     !> Conservative-linear prolongation: fill amr_fine interior from coarse (level-0), minmod-limited. Symmetric child offsets
-    !! (+/-1/4 of a coarse cell) => the ref_ratio^d children average to the coarse value.
+    !! (+/-1/4 of a coarse cell) => the ref_ratio^d children average to the coarse value. Multi-fluid volume fractions take the
+    !! sum-preserving closure path instead (single-fluid runs never branch, so their prolongation is untouched).
     impure subroutine s_interpolate_coarse_to_fine(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         integer                                             :: i
 
         do i = 1, sys_size
+            if (num_fluids > 1 .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
             call s_prolong_one_var(q_cons_base(i), amr_fine%q_cons(i))
         end do
+        if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_fine%q_cons)
 
     end subroutine s_interpolate_coarse_to_fine
+
+    !> Sum-preserving volume-fraction prolongation (num_fluids > 1): fluids adv%beg..adv%end-1 are interpolated with minmod slopes
+    !! under a SHARED per-cell limiter switch (a sign change for ANY fluid in a dim zeroes that dim's slope for ALL fluids, so the
+    !! closure fluid's effective slope is limited consistently) and clamped to [0,1]; the last fluid closes alpha_n = 1 -
+    !! sum(others), so sum(alpha) = 1 on the fine level by construction. For two fluids the closure is also in [0,1]; for >2 fluids
+    !! any residual closure undershoot is handled by mpp_lim (required by the checker). Same fine/coarse index mapping as
+    !! s_prolong_one_var.
+    impure subroutine s_prolong_alphas_closure(qc, qf)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: qc
+        type(scalar_field), dimension(sys_size), intent(inout) :: qf
+        integer                                                :: fi, fj, fk, ci, cj, ck, ox, oy, oz, i
+        real(wp)                                               :: xix, xiy, xiz, u0, sx, sy, sz, av, asum
+        logical                                                :: shx, shy, shz
+
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
+        do fk = 0, amr_fine%p
+            ck = amr_isect_lo(3) + fk/amr_fine%ref_ratio - oz; if (p_glb == 0) ck = 0
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
+            do fj = 0, amr_fine%n
+                cj = amr_isect_lo(2) + fj/amr_fine%ref_ratio - oy; if (n_glb == 0) cj = 0
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                do fi = 0, amr_fine%m
+                    ci = amr_isect_lo(1) + fi/amr_fine%ref_ratio - ox
+                    xix = (real(mod(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                    call s_alpha_shared_switch(qc, ci, cj, ck, shx, shy, shz)
+                    asum = 0._wp
+                    do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
+                        u0 = real(qc(i)%sf(ci, cj, ck), wp)
+                        sx = 0._wp
+                        if (shx) sx = minmod(real(qc(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc(i)%sf(ci - 1, cj, ck), wp))
+                        sy = 0._wp
+                        if (n_glb > 0 .and. shy) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, &
+                            & cj - 1, ck), wp))
+                        sz = 0._wp
+                        if (p_glb > 0 .and. shz) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, &
+                            & ck - 1), wp))
+                        av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
+                        qf(i)%sf(fi, fj, fk) = av
+                        asum = asum + av
+                    end do
+                    qf(eqn_idx%adv%end)%sf(fi, fj, fk) = 1._wp - asum
+                end do
+            end do
+        end do
+
+    end subroutine s_prolong_alphas_closure
+
+    !> Shared per-cell limiter switch for the volume-fraction closure prolongation: per dim, slopes stay on only if NO fluid's
+    !! centered differences change sign there (symmetric in the fluids, including the closure fluid).
+    pure subroutine s_alpha_shared_switch(qc, ci, cj, ck, shx, shy, shz)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: qc
+        integer, intent(in)                                 :: ci, cj, ck
+        logical, intent(out)                                :: shx, shy, shz
+        integer                                             :: i
+        real(wp)                                            :: u0
+
+        shx = .true.; shy = n_glb > 0; shz = p_glb > 0
+        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+            u0 = real(qc(i)%sf(ci, cj, ck), wp)
+            if ((real(qc(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(qc(i)%sf(ci - 1, cj, ck), wp)) <= 0._wp) shx = .false.
+            if (n_glb > 0) then
+                if ((real(qc(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(qc(i)%sf(ci, cj - 1, ck), wp)) <= 0._wp) shy = .false.
+            end if
+            if (p_glb > 0) then
+                if ((real(qc(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(qc(i)%sf(ci, cj, ck - 1), wp)) <= 0._wp) shz = .false.
+            end if
+        end do
+
+    end subroutine s_alpha_shared_switch
 
     !> Dispatch prolongation. Guard: no-op unless amr.
     impure subroutine s_populate_amr_fine(q_cons_base)
@@ -592,15 +669,16 @@ contains
 
     !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse (device kernel: reads the coarse source
     !! and writes the fine target in device memory). floor/modulo mapping is valid for negative fine indices (ghosts). Interior
-    !! untouched.
+    !! untouched. Multi-fluid volume fractions get the same sum-preserving closure as the interior prolongation (second kernel).
     impure subroutine s_amr_fill_fine_ghosts(q_coarse, q_fine)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_coarse
         type(scalar_field), dimension(sys_size), intent(inout) :: q_fine
         integer                                                :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
         integer                                                :: rr, lo1, lo2, lo3, fm, fn, fp, b1, e1, b2, e2, b3, e3
-        logical                                                :: d2, d3
-        real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz
+        integer                                                :: advb, adve
+        logical                                                :: d2, d3, multi, shx, shy, shz
+        real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
 
         ! fine indices are LOCAL to this rank's intersection; amr_isect_lo is GLOBAL; the coarse source q_coarse is rank-LOCAL
 
@@ -614,13 +692,17 @@ contains
         b1 = amr_fine%idwbuff(1)%beg; e1 = amr_fine%idwbuff(1)%end
         b2 = amr_fine%idwbuff(2)%beg; e2 = amr_fine%idwbuff(2)%end
         b3 = amr_fine%idwbuff(3)%beg; e3 = amr_fine%idwbuff(3)%end
+        multi = num_fluids > 1
+        advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
         $:GPU_PARALLEL_LOOP(collapse=4, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
         do i = 1, sys_size
             do fk = b3, e3
                 do fj = b2, e2
                     do fi = b1, e1
-                        ! skip the interior: only the ghost shell is filled
-                        if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
+                        ! skip the interior (only the ghost shell is filled) and, multi-fluid, the volume
+                        ! fractions (closure kernel below)
+                        if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp) &
+                            & .and. .not. (multi .and. i >= advb .and. i <= adve)) then
                             ck = 0; xiz = 0._wp
                             if (d3) then
                                 ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
@@ -649,6 +731,66 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (shared
+        ! limiter switch over all fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
+        if (multi) then
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
+            do fk = b3, e3
+                do fj = b2, e2
+                    do fi = b1, e1
+                        if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
+                            ck = 0; xiz = 0._wp
+                            if (d3) then
+                                ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                                xiz = (real(modulo(fk, rr), wp) - 0.5_wp)*0.5_wp
+                            end if
+                            cj = 0; xiy = 0._wp
+                            if (d2) then
+                                cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                                xiy = (real(modulo(fj, rr), wp) - 0.5_wp)*0.5_wp
+                            end if
+                            ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                            xix = (real(modulo(fi, rr), wp) - 0.5_wp)*0.5_wp
+                            shx = .true.; shy = d2; shz = d3
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = advb, adve
+                                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                                if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
+                                    & wp)) <= 0._wp) shx = .false.
+                                if (d2) then
+                                    if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, &
+                                        & ck), wp)) <= 0._wp) shy = .false.
+                                end if
+                                if (d3) then
+                                    if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, &
+                                        & ck - 1), wp)) <= 0._wp) shz = .false.
+                                end if
+                            end do
+                            asum = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = advb, adve - 1
+                                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                                sx = 0._wp
+                                if (shx) sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, &
+                                    & u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
+                                sy = 0._wp
+                                if (shy) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
+                                    & cj - 1, ck), wp))
+                                sz = 0._wp
+                                if (shz) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
+                                    & cj, ck - 1), wp))
+                                av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
+                                q_fine(i)%sf(fi, fj, fk) = av
+                                asum = asum + av
+                            end do
+                            q_fine(adve)%sf(fi, fj, fk) = 1._wp - asum
+                        end if
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
     end subroutine s_amr_fill_fine_ghosts
 
@@ -920,12 +1062,16 @@ contains
         do ck = tg_lo(3), tg_hi(3)
             do cj = tg_lo(2), tg_hi(2)
                 do ci = tg_lo(1), tg_hi(1)
-                    r0 = max(abs(real(q_cons_base(1)%sf(ci, cj, ck), wp)), 1.e-30_wp)
-                    g = abs(real(q_cons_base(1)%sf(ci + 1, cj, ck), wp) - real(q_cons_base(1)%sf(ci - 1, cj, ck), wp))
-                    if (n_glb > 0) g = max(g, abs(real(q_cons_base(1)%sf(ci, cj + 1, ck), wp) - real(q_cons_base(1)%sf(ci, &
-                        & cj - 1, ck), wp)))
-                    if (p_glb > 0) g = max(g, abs(real(q_cons_base(1)%sf(ci, cj, ck + 1), wp) - real(q_cons_base(1)%sf(ci, cj, &
-                        & ck - 1), wp)))
+                    ! tag on the TOTAL density gradient (sum of the continuity variables): degenerates exactly
+                    ! to the single-fluid tagger, and is immune to the trace-fluid noise blowup a per-fluid
+                    ! relative gradient would have where alpha_rho_i is vanishingly small. Matched-density
+                    ! composition-only interfaces are invisible to it (documented limitation).
+                    r0 = max(abs(f_amr_rho_tot(q_cons_base, ci, cj, ck)), 1.e-30_wp)
+                    g = abs(f_amr_rho_tot(q_cons_base, ci + 1, cj, ck) - f_amr_rho_tot(q_cons_base, ci - 1, cj, ck))
+                    if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj + 1, ck) - f_amr_rho_tot(q_cons_base, ci, &
+                        & cj - 1, ck)))
+                    if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj, ck + 1) - f_amr_rho_tot(q_cons_base, ci, cj, &
+                        & ck - 1)))
                     if (g/(2._wp*r0) > amr_tag_eps) then
                         tagged = .true.
                         lo(1) = min(lo(1), ci + sidx(1)); hi(1) = max(hi(1), ci + sidx(1))
@@ -1014,21 +1160,24 @@ contains
 
     end subroutine s_amr_regrid
 
-    !> Global Sum(dV*U) for continuity (var 1) and energy (eqn_idx%E) over the level-0 interior. First call (finalize_report=F)
-    !! stores the baseline; the finalize call prints the relative drift (expected small nonzero until SP4 refluxing).
+    !> Global Sum(dV*U) for the per-fluid masses (continuity variables) and energy (eqn_idx%E) over the level-0 interior. First call
+    !! (finalize_report=F) stores the baselines; the finalize call prints the relative drifts (~roundoff with refluxing).
     impure subroutine s_amr_conservation_defect(q_cons_base, finalize_report)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         logical, intent(in)                                 :: finalize_report
-        real(wp)                                            :: sm, se, dv, sm_glb, se_glb
-        integer                                             :: ci, cj, ck
+        real(wp)                                            :: sm(num_fluids_max), se, dv, s_glb
+        integer                                             :: ci, cj, ck, f
 
         if (.not. amr) return
-        ! host consumer: diagnostics (host sum over exactly the two summed fields). The init baseline call
+        ! host consumer: diagnostics (host sum over exactly the summed fields). The init baseline call
         ! runs BEFORE s_initialize_gpu_vars pushes the ICs to the device, so it must NOT pull the
         ! (uninitialized) device copies.
         if (finalize_report) then
-            $:GPU_UPDATE(host='[q_cons_base(1)%sf, q_cons_base(eqn_idx%E)%sf]')
+            do f = 1, num_fluids
+                $:GPU_UPDATE(host='[q_cons_base(f)%sf]')
+            end do
+            $:GPU_UPDATE(host='[q_cons_base(eqn_idx%E)%sf]')
         end if
         sm = 0._wp; se = 0._wp
         do ck = 0, p
@@ -1037,20 +1186,28 @@ contains
                     dv = dx(ci)
                     if (n_glb > 0) dv = dv*dy(cj)
                     if (p_glb > 0) dv = dv*dz(ck)
-                    sm = sm + dv*real(q_cons_base(1)%sf(ci, cj, ck), wp)
+                    do f = 1, num_fluids
+                        sm(f) = sm(f) + dv*real(q_cons_base(f)%sf(ci, cj, ck), wp)
+                    end do
                     se = se + dv*real(q_cons_base(eqn_idx%E)%sf(ci, cj, ck), wp)
                 end do
             end do
         end do
         if (num_procs > 1) then
-            call s_mpi_allreduce_sum(sm, sm_glb); sm = sm_glb
-            call s_mpi_allreduce_sum(se, se_glb); se = se_glb
+            do f = 1, num_fluids
+                call s_mpi_allreduce_sum(sm(f), s_glb); sm(f) = s_glb
+            end do
+            call s_mpi_allreduce_sum(se, s_glb); se = s_glb
         end if
         if (.not. finalize_report) then
-            amr_mass0 = sm; amr_energy0 = se
+            amr_mass0(1:num_fluids) = sm(1:num_fluids); amr_energy0 = se
         else if (proc_rank == 0) then
-            print '(A,ES12.4,A,ES12.4)', ' [amr] conservation defect: mass drift = ', abs(sm - amr_mass0)/max(abs(amr_mass0), &
-                & 1.e-30_wp), '  energy drift = ', abs(se - amr_energy0)/max(abs(amr_energy0), 1.e-30_wp)
+            do f = 1, num_fluids
+                print '(A,I0,A,ES12.4)', ' [amr] conservation defect: mass(', f, ') drift = ', &
+                    & abs(sm(f) - amr_mass0(f))/max(abs(amr_mass0(f)), 1.e-30_wp)
+            end do
+            print '(A,ES12.4)', ' [amr] conservation defect: energy drift = ', abs(se - amr_energy0)/max(abs(amr_energy0), &
+                & 1.e-30_wp)
         end if
 
     end subroutine s_amr_conservation_defect
@@ -1134,6 +1291,21 @@ contains
         deallocate (cscr(1)%sf); deallocate (cscr)
 
     end subroutine s_amr_operator_checks
+
+    !> Total density (sum of the continuity variables) at one cell: the regrid tag field. Reduces to variable 1 for one fluid.
+    pure function f_amr_rho_tot(q, ci, cj, ck) result(r)
+
+        type(scalar_field), dimension(:), intent(in) :: q
+        integer, intent(in)                          :: ci, cj, ck
+        real(wp)                                     :: r
+        integer                                      :: f
+
+        r = 0._wp
+        do f = eqn_idx%cont%beg, eqn_idx%cont%end
+            r = r + real(q(f)%sf(ci, cj, ck), wp)
+        end do
+
+    end function f_amr_rho_tot
 
     !> minmod slope limiter: 0 if a,b differ in sign, else the smaller-magnitude argument.
     pure elemental function minmod(a, b) result(m)

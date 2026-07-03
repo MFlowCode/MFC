@@ -93,7 +93,8 @@ contains
             @:PROHIBIT(recon_type /= recon_type_weno, "amr requires WENO reconstruction")
             @:PROHIBIT(time_stepper /= time_stepper_rk3, "amr requires time_stepper = 3 (SSP-RK3)")
             @:PROHIBIT(model_eqns /= 2, "amr requires model_eqns = 2 (5-equation)")
-            @:PROHIBIT(num_fluids /= 1, "amr requires a single fluid")
+            @:PROHIBIT(num_fluids > 1 .and. .not. mpp_lim, &
+                       & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)")
             @:PROHIBIT(viscous .or. surface_tension .or. hypoelasticity .or. hyperelasticity .or. mhd .or. chemistry, &
                        & "amr does not support viscous/elastic/surface-tension/MHD/chemistry")
             @:PROHIBIT(bubbles_euler .or. bubbles_lagrange .or. qbmm .or. relax .or. ib .or. igr .or. cyl_coord, &
