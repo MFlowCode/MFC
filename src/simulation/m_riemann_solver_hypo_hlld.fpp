@@ -25,6 +25,31 @@ module m_riemann_solver_hypo_hlld
 
 contains
 
+    !> Classify the position of the interface (xi = 0) in the five-wave HLLD fan: 0 left of S_L, 1..4 for the four inner wedges, 5
+    !! right of S_R. Single definition of the wave-fan geometry shared by the flux fold, the NC face-velocity export, and the
+    !! axisymmetric face-state pick, which must stay consistent. In the degenerate-fan branch it is called on the fallback wave
+    !! speeds and reproduces their one-sided selection.
+    integer function f_hlld_wave_zone(S_L, S_Lstar, s_M, S_Rstar, S_R) result(zone)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: S_L, S_Lstar, s_M, S_Rstar, S_R
+
+        if (0._wp <= S_L) then
+            zone = 0
+        else if (0._wp <= S_Lstar) then
+            zone = 1
+        else if (0._wp <= s_M) then
+            zone = 2
+        else if (0._wp <= S_Rstar) then
+            zone = 3
+        else if (0._wp <= S_R) then
+            zone = 4
+        else
+            zone = 5
+        end if
+
+    end function f_hlld_wave_zone
+
     !> HLLD Riemann solver resolves all 5 waves for the hypoelastic equations: 1 entropy wave, 2 shear stress waves, 2 fast waves.
     subroutine s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
                                           & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
@@ -580,6 +605,7 @@ contains
                                     tau_nn_R_star = tau_nn_R
                                     tau_qq_L_star = tau_qq_L
                                     tau_qq_R_star = tau_qq_R
+                                    zone = f_hlld_wave_zone(S_L, S_Lstar, s_M, S_Rstar, S_R)
                                 else
                                     C_NC = rho_hat*(G_hat + tau_nn_hat)
 
@@ -657,19 +683,7 @@ contains
                                     ! re-expand into per-region temp arrays (or reorder the fold) without re-checking
                                     ! GPU register spill and the -O0 exactness gate.
 
-                                    if (0.0_wp <= S_L) then
-                                        zone = 0
-                                    else if (0.0_wp <= S_Lstar) then
-                                        zone = 1
-                                    else if (0.0_wp <= s_M) then
-                                        zone = 2
-                                    else if (0.0_wp <= S_Rstar) then
-                                        zone = 3
-                                    else if (0.0_wp <= S_R) then
-                                        zone = 4
-                                    else
-                                        zone = 5
-                                    end if
+                                    zone = f_hlld_wave_zone(S_L, S_Lstar, s_M, S_Rstar, S_R)
 
                                     if (zone == 0) then
                                         F_hlld(1:ncomp) = F_L(1:ncomp)
@@ -813,15 +827,16 @@ contains
 
                                 ! Export face velocities for axisym hypo source terms
                                 if (grid_geometry == 2) then
-                                    if (0._wp <= S_L) then
+                                    ! Upwind by wave-fan wedge: the inner zones ride the contact (u_n = S_M) and the
+                                    ! tangential state switches L -> star -> R across the shear waves (zones 2 and 3
+                                    ! share the tangential star state)
+                                    if (zone == 0) then
                                         u_n_face = u_n_L; u_t_face = u_t_L
-                                    else if (0._wp <= S_Lstar) then
+                                    else if (zone == 1) then
                                         u_n_face = S_M; u_t_face = u_t_L
-                                    else if (0._wp <= S_M) then
+                                    else if (zone <= 3) then
                                         u_n_face = S_M; u_t_face = u_t_star
-                                    else if (0._wp <= S_Rstar) then
-                                        u_n_face = S_M; u_t_face = u_t_star
-                                    else if (0._wp <= S_R) then
+                                    else if (zone == 4) then
                                         u_n_face = S_M; u_t_face = u_t_R
                                     else
                                         u_n_face = u_n_R; u_t_face = u_t_R
@@ -855,12 +870,12 @@ contains
                                                 do i = 1, sys_size
                                                     ${GSRC}$_vf(${SF('')}$, i) = ${FLUX}$_vf(${SF('')}$, i)
                                                 end do
-                                                ! Pure HLLD face state
-                                                if (0._wp <= S_L) then
+                                                ! Pure HLLD face state, upwinded by wave-fan wedge (left/right of the contact)
+                                                if (zone == 0) then
                                                     p_face = pres%L; tau_qq_face = tau_qq_L
-                                                else if (0._wp <= S_Lstar .or. 0._wp <= S_M) then
+                                                else if (zone <= 2) then
                                                     p_face = pTot_star + tau_nn_L_star; tau_qq_face = tau_qq_L_star
-                                                else if (0._wp <= S_Rstar .or. 0._wp <= S_R) then
+                                                else if (zone <= 4) then
                                                     p_face = pTot_star + tau_nn_R_star; tau_qq_face = tau_qq_R_star
                                                 else
                                                     p_face = pres%R; tau_qq_face = tau_qq_R
