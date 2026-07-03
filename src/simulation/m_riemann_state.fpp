@@ -1030,158 +1030,182 @@ contains
 
     end subroutine s_calculate_bulk_stress_tensor
 
-    !> Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver
-    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir)
+    !> Reshape and copy the Riemann-solver flux buffers back to the physical-space output arrays for the selected sweep direction,
+    !! finalizing the Riemann solve. Two variants are emitted from one template so the shared unpermute logic cannot drift apart:
+    !! the plain routine also copies the advection flux_src set and the grid_geometry==3 z-sweep geometric source flux, while the
+    !! _hatR variant unpermutes the hat_R-anchored flux_hatR_rs* set of the fused dual-pass HLLD solve (called between the two RHS
+    !! assemblies) and is a strict subset: flux_src is anchor-independent (already finalized with the hat_L set) and its geometric
+    !! source flux only exists for the axisymmetric y-sweep.
+    #:for SUFFIX in ['', '_hatR']
+        #:set INFIX = 'hatR_' if SUFFIX else ''
+        #:if SUFFIX == ''
+            subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
-        integer, intent(in)                                    :: norm_dir
-        integer                                                :: i, j, k, l  !< Generic loop iterators
-        ! Reshaping Outputted Data in y-direction
+                type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
 
-        if (norm_dir == 2) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = is3%beg, is3%end
-                    do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                            flux_vf(i)%sf(k, j, l) = flux_rsx_vf(k, j, l, i)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+            #:else
+                subroutine s_finalize_riemann_solver_hatR(flux_vf, flux_gsrc_vf, norm_dir)
 
-            if (cyl_coord) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do j = is1%beg, is1%end
-                            do k = is2%beg, is2%end
-                                flux_gsrc_vf(i)%sf(k, j, l) = flux_gsrc_rsx_vf(k, j, l, i)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+                    type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_gsrc_vf
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = is3%beg, is3%end
-                do j = is1%beg, is1%end
-                    do k = is2%beg, is2%end
-                        flux_src_vf(eqn_idx%adv%beg)%sf(k, j, l) = flux_src_rsx_vf(k, j, l, eqn_idx%adv%beg)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                #:endif
+                integer, intent(in) :: norm_dir
+                integer             :: i, j, k, l  !< Generic loop iterators
+                ! Reshaping Outputted Data in y-direction
 
-            ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these entries are kept
-            ! for consistency.
-            if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
-                    do l = is3%beg, is3%end
-                        do j = is1%beg, is1%end
-                            do k = is2%beg, is2%end
-                                flux_src_vf(i)%sf(k, j, l) = flux_src_rsx_vf(k, j, l, i)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-            ! Reshaping Outputted Data in z-direction
-        else if (norm_dir == 3) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do j = is1%beg, is1%end
-                    do k = is2%beg, is2%end
+                if (norm_dir == 2) then
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = 1, sys_size
                         do l = is3%beg, is3%end
-                            flux_vf(i)%sf(l, k, j) = flux_rsx_vf(l, k, j, i)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-            if (grid_geometry == 3) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                            do l = is3%beg, is3%end
-                                flux_gsrc_vf(i)%sf(l, k, j) = flux_gsrc_rsx_vf(l, k, j, i)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do j = is1%beg, is1%end
-                do k = is2%beg, is2%end
-                    do l = is3%beg, is3%end
-                        flux_src_vf(eqn_idx%adv%beg)%sf(l, k, j) = flux_src_rsx_vf(l, k, j, eqn_idx%adv%beg)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these entries are kept
-            ! for consistency.
-            if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
-                    do j = is1%beg, is1%end
-                        do k = is2%beg, is2%end
-                            do l = is3%beg, is3%end
-                                flux_src_vf(i)%sf(l, k, j) = flux_src_rsx_vf(l, k, j, i)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        else if (norm_dir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = is1%beg, is1%end
-                            flux_vf(i)%sf(j, k, l) = flux_rsx_vf(j, k, l, i)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = is1%beg, is1%end
-                        flux_src_vf(eqn_idx%adv%beg)%sf(j, k, l) = flux_src_rsx_vf(j, k, l, eqn_idx%adv%beg)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these entries are kept
-            ! for consistency.
-            if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                                flux_src_vf(i)%sf(j, k, l) = flux_src_rsx_vf(j, k, l, i)
+                                do k = is2%beg, is2%end
+                                    flux_vf(i)%sf(k, j, l) = flux_${INFIX}$rsx_vf(k, j, l, i)
+                                end do
                             end do
                         end do
                     end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        end if
+                    $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_finalize_riemann_solver
+                    if (cyl_coord) then
+                        $:GPU_PARALLEL_LOOP(collapse=4)
+                        do i = 1, sys_size
+                            do l = is3%beg, is3%end
+                                do j = is1%beg, is1%end
+                                    do k = is2%beg, is2%end
+                                        flux_gsrc_vf(i)%sf(k, j, l) = flux_gsrc_${INFIX}$rsx_vf(k, j, l, i)
+                                    end do
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
 
-end module m_riemann_state
+                    #:if SUFFIX == ''
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do l = is3%beg, is3%end
+                            do j = is1%beg, is1%end
+                                do k = is2%beg, is2%end
+                                    flux_src_vf(eqn_idx%adv%beg)%sf(k, j, l) = flux_src_rsx_vf(k, j, l, eqn_idx%adv%beg)
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+
+                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these
+                        ! entries
+                        ! are kept for consistency.
+                        if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
+                                do l = is3%beg, is3%end
+                                    do j = is1%beg, is1%end
+                                        do k = is2%beg, is2%end
+                                            flux_src_vf(i)%sf(k, j, l) = flux_src_rsx_vf(k, j, l, i)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
+                    #:endif
+                    ! Reshaping Outputted Data in z-direction
+                else if (norm_dir == 3) then
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = 1, sys_size
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                do l = is3%beg, is3%end
+                                    flux_vf(i)%sf(l, k, j) = flux_${INFIX}$rsx_vf(l, k, j, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                    #:if SUFFIX == ''
+                        if (grid_geometry == 3) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = 1, sys_size
+                                do j = is1%beg, is1%end
+                                    do k = is2%beg, is2%end
+                                        do l = is3%beg, is3%end
+                                            flux_gsrc_vf(i)%sf(l, k, j) = flux_gsrc_rsx_vf(l, k, j, i)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
+
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                do l = is3%beg, is3%end
+                                    flux_src_vf(eqn_idx%adv%beg)%sf(l, k, j) = flux_src_rsx_vf(l, k, j, eqn_idx%adv%beg)
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+
+                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these
+                        ! entries
+                        ! are kept for consistency.
+                        if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
+                                do j = is1%beg, is1%end
+                                    do k = is2%beg, is2%end
+                                        do l = is3%beg, is3%end
+                                            flux_src_vf(i)%sf(l, k, j) = flux_src_rsx_vf(l, k, j, i)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
+                    #:endif
+                else if (norm_dir == 1) then
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = 1, sys_size
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    flux_vf(i)%sf(j, k, l) = flux_${INFIX}$rsx_vf(j, k, l, i)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                    #:if SUFFIX == ''
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    flux_src_vf(eqn_idx%adv%beg)%sf(j, k, l) = flux_src_rsx_vf(j, k, l, eqn_idx%adv%beg)
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+
+                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these
+                        ! entries
+                        ! are kept for consistency.
+                        if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
+                                do l = is3%beg, is3%end
+                                    do k = is2%beg, is2%end
+                                        do j = is1%beg, is1%end
+                                            flux_src_vf(i)%sf(j, k, l) = flux_src_rsx_vf(j, k, l, i)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
+                    #:endif
+                end if
+
+            end subroutine s_finalize_riemann_solver${SUFFIX}$
+        #:endfor
+    end module m_riemann_state
