@@ -637,6 +637,42 @@ contains
             z_cc(0:amr_fine%p) = amr_fine%z_cc(0:amr_fine%p)
             dz(0:amr_fine%p) = amr_fine%dz(0:amr_fine%p)
         end if
+        ! Extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m).
+        ! The viscous velocity gradient divides by ghost cell-center spacings (x_cc(j+-1) - x_cc(j)), so at
+        ! a rank seam the fine subdomain-edge cell would otherwise use a stale coarse spacing and diverge
+        ! from the np=1 (fully-owned) result. Uniform 2:1 continuation of the (locally-uniform) base region.
+        block
+            integer  :: jg
+            real(wp) :: sp
+            sp = amr_fine%dx(amr_fine%m)
+            do jg = amr_fine%m + 1, amr_fine%m + buff_size
+                dx(jg) = sp; x_cb(jg) = x_cb(jg - 1) + sp; x_cc(jg) = x_cc(jg - 1) + sp
+            end do
+            sp = amr_fine%dx(0)
+            do jg = -1, -buff_size, -1
+                dx(jg) = sp; x_cb(jg - 1) = x_cb(jg) - sp; x_cc(jg) = x_cc(jg + 1) - sp
+            end do
+            if (n_glb > 0) then
+                sp = amr_fine%dy(amr_fine%n)
+                do jg = amr_fine%n + 1, amr_fine%n + buff_size
+                    dy(jg) = sp; y_cb(jg) = y_cb(jg - 1) + sp; y_cc(jg) = y_cc(jg - 1) + sp
+                end do
+                sp = amr_fine%dy(0)
+                do jg = -1, -buff_size, -1
+                    dy(jg) = sp; y_cb(jg - 1) = y_cb(jg) - sp; y_cc(jg) = y_cc(jg + 1) - sp
+                end do
+            end if
+            if (p_glb > 0) then
+                sp = amr_fine%dz(amr_fine%p)
+                do jg = amr_fine%p + 1, amr_fine%p + buff_size
+                    dz(jg) = sp; z_cb(jg) = z_cb(jg - 1) + sp; z_cc(jg) = z_cc(jg - 1) + sp
+                end do
+                sp = amr_fine%dz(0)
+                do jg = -1, -buff_size, -1
+                    dz(jg) = sp; z_cb(jg - 1) = z_cb(jg) - sp; z_cc(jg) = z_cc(jg + 1) - sp
+                end do
+            end if
+        end block
         ! sync the swapped extents/bounds/coordinates to the device: RHS kernels read the
         ! device copies of these GPU_DECLARE'd globals (stale coarse bounds = OOB kernels)
         call s_amr_sync_grid_state_to_device()
