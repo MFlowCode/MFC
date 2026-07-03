@@ -211,6 +211,22 @@ PHYSICS_DOCS = {
             "mhd (magnetic field source terms), and chemistry (reactive source terms)."
         ),
     },
+    # Adaptive Mesh Refinement
+    "check_amr": {
+        "title": "Adaptive Mesh Refinement (AMR)",
+        "category": "Adaptive Mesh Refinement",
+        "explanation": (
+            "Block-structured AMR (Experimental) adds a single 2:1 refined level-1 patch. "
+            "Requires WENO reconstruction (recon_type = 1), SSP-RK3 (time_stepper = 3), "
+            "the 5-equation model (model_eqns = 2), and a single fluid (num_fluids = 1). "
+            "Incompatible with viscous, surface tension, bubble models, phase change, "
+            "immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, "
+            "hybrid_weno, hybrid_riemann, active_box, and acoustic_source. "
+            "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
+            "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
+            "incompatible with cfl_dt."
+        ),
+    },
     # Acoustic Sources
     "check_acoustic_source": {
         "title": "Acoustic Sources",
@@ -1312,6 +1328,71 @@ class CaseValidator:
         parallel_io = self.get("parallel_io", "F") == "T"
         self.prohibit(not parallel_io, "load_balance requires parallel_io = T")
 
+    def check_amr(self):
+        """Checks AMR parameter constraints (simulation)"""
+        amr = self.get("amr", "F") == "T"
+        amr_subcycle = self.get("amr_subcycle", "F") == "T"
+        amr_regrid_int = self.get("amr_regrid_int")
+        cfl_dt = self.get("cfl_dt", "F") == "T"
+
+        # Standalone checks that apply regardless of amr=T
+        self.prohibit(amr_subcycle and not amr, "amr_subcycle requires amr = T")
+        self.prohibit(amr_subcycle and cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
+        self.prohibit(not amr and amr_regrid_int is not None and amr_regrid_int > 0, "amr_regrid_int requires amr = T")
+
+        if not amr:
+            return
+
+        recon_type = self.get("recon_type")
+        time_stepper = self.get("time_stepper")
+        model_eqns = self.get("model_eqns")
+        num_fluids = self.get("num_fluids")
+        viscous = self.get("viscous", "F") == "T"
+        surface_tension = self.get("surface_tension", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
+        hyperelasticity = self.get("hyperelasticity", "F") == "T"
+        mhd = self.get("mhd", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        qbmm = self.get("qbmm", "F") == "T"
+        relax = self.get("relax", "F") == "T"
+        ib = self.get("ib", "F") == "T"
+        igr = self.get("igr", "F") == "T"
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+        active_box = self.get("active_box", "F") == "T"
+        hybrid_weno = self.get("hybrid_weno", "F") == "T"
+        hybrid_riemann = self.get("hybrid_riemann", "F") == "T"
+        acoustic_source = self.get("acoustic_source", "F") == "T"
+        amr_tag_eps = self.get("amr_tag_eps")
+        amr_buf = self.get("amr_buf")
+
+        self.prohibit(recon_type is not None and recon_type != 1, "amr requires WENO reconstruction (recon_type = 1)")
+        self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
+        self.prohibit(model_eqns is not None and model_eqns != 2, "amr requires model_eqns = 2 (5-equation)")
+        self.prohibit(num_fluids is not None and num_fluids != 1, "amr requires num_fluids = 1")
+        self.prohibit(
+            viscous or surface_tension or hypoelasticity or hyperelasticity or mhd or chemistry,
+            "amr does not support viscous/elastic/surface-tension/MHD/chemistry",
+        )
+        self.prohibit(
+            bubbles_euler or bubbles_lagrange or qbmm or relax or ib or igr or cyl_coord,
+            "amr does not support bubbles/phase-change/IB/IGR/cylindrical",
+        )
+        self.prohibit(active_box, "amr is incompatible with active_box")
+        self.prohibit(hybrid_weno, "amr is incompatible with hybrid_weno")
+        self.prohibit(hybrid_riemann, "amr is incompatible with hybrid_riemann")
+        self.prohibit(acoustic_source, "amr is incompatible with acoustic_source")
+        self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
+        self.prohibit(
+            amr_regrid_int is not None and amr_regrid_int > 0 and (amr_tag_eps is None or amr_tag_eps <= 0),
+            "amr_tag_eps must be > 0 when amr_regrid_int > 0",
+        )
+        self.prohibit(
+            amr_regrid_int is not None and amr_regrid_int > 0 and (amr_buf is None or amr_buf < 1),
+            "amr_buf must be >= 1 when amr_regrid_int > 0",
+        )
+
     def check_sfc_partition(self):
         """Checks SFC partitioner tile-size guard (simulation)"""
         sfc_partition_wrt = self.get("sfc_partition_wrt", "F") == "T"
@@ -2339,6 +2420,7 @@ class CaseValidator:
         self.check_igr_simulation()
         self.check_acoustic_source()
         self.check_active_box()
+        self.check_amr()
         self.check_sfc_partition()
         self.check_load_balance()
         self.check_adaptive_time_stepping()

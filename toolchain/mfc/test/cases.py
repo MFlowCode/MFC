@@ -2539,6 +2539,80 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     kernel_golden_tests()
 
+    def amr_golden_tests():
+        """Golden tests for the block-structured AMR module.
+
+        Three minimal 1D cases built on the BASE_CFG Sod IC:
+        (a) static patch  – amr_regrid_int=0, no regrid, cheapest sanity check
+        (b) dynamic regrid – amr_regrid_int=2, exercises the tag/rebuild path
+        (c) subcycling    – amr_subcycle=T, exercises the dt/2 two-substep path
+
+        Grid: m=63 (indices 0..63); fine patch beg=16, end=47 so that
+        2*(47-16+1)-1 = 63 <= 63 satisfies the extent guard.
+        """
+        # Common 1D domain + Sod IC setup shared by all three AMR cases
+        amr_1d_base = {
+            "m": 63,
+            "n": 0,
+            "p": 0,
+            "dt": 5.0e-4,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            # 1D geometry for the three BASE_CFG patches
+            "patch_icpp(1)%geometry": 1,
+            "patch_icpp(1)%x_centroid": 0.05,
+            "patch_icpp(1)%length_x": 0.1,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(2)%geometry": 1,
+            "patch_icpp(2)%x_centroid": 0.45,
+            "patch_icpp(2)%length_x": 0.7,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(3)%geometry": 1,
+            "patch_icpp(3)%x_centroid": 0.9,
+            "patch_icpp(3)%length_x": 0.2,
+            "patch_icpp(3)%vel(1)": 0.0,
+            # AMR: 2:1 fine patch spanning coarse indices 16..47
+            "amr": "T",
+            "amr_patch_beg(1)": 16,
+            "amr_patch_end(1)": 47,
+        }
+
+        # (a) static patch
+        stack.push("AMR -> 1D -> static patch", {**amr_1d_base, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (b) dynamic regrid
+        stack.push(
+            "AMR -> 1D -> dynamic regrid",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (c) subcycling
+        stack.push(
+            "AMR -> 1D -> subcycle",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_subcycle": "T",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+    amr_golden_tests()
+
     add_convergence_cases(cases)
 
     # Sanity Check 1

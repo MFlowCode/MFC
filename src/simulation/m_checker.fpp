@@ -90,14 +90,14 @@ contains
                    & "hybrid_riemann (cheap central/Rusanov flux) is incompatible with the low_Mach correction")
 
         if (amr) then
-            @:PROHIBIT(recon_type /= recon_type_weno, "amr (SP1) requires WENO reconstruction")
-            @:PROHIBIT(time_stepper /= time_stepper_rk3, "amr (SP1) requires time_stepper = 3 (SSP-RK3)")
-            @:PROHIBIT(model_eqns /= 2, "amr (SP1) requires model_eqns = 2 (5-equation)")
-            @:PROHIBIT(num_fluids /= 1, "amr (SP1) requires a single fluid")
+            @:PROHIBIT(recon_type /= recon_type_weno, "amr requires WENO reconstruction")
+            @:PROHIBIT(time_stepper /= time_stepper_rk3, "amr requires time_stepper = 3 (SSP-RK3)")
+            @:PROHIBIT(model_eqns /= 2, "amr requires model_eqns = 2 (5-equation)")
+            @:PROHIBIT(num_fluids /= 1, "amr requires a single fluid")
             @:PROHIBIT(viscous .or. surface_tension .or. hypoelasticity .or. hyperelasticity .or. mhd .or. chemistry, &
-                       & "amr (SP1) does not support viscous/elastic/surface-tension/MHD/chemistry")
+                       & "amr does not support viscous/elastic/surface-tension/MHD/chemistry")
             @:PROHIBIT(bubbles_euler .or. bubbles_lagrange .or. qbmm .or. relax .or. ib .or. igr .or. cyl_coord, &
-                       & "amr (SP1) does not support bubbles/phase-change/IB/IGR/cylindrical")
+                       & "amr does not support bubbles/phase-change/IB/IGR/cylindrical")
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
             @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
             @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")

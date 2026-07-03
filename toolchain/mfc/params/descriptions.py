@@ -116,7 +116,7 @@ DESCRIPTIONS = {
     "sfc_partition_wrt": "Report SFC-weighted load-balance partition",
     "load_balance": "Apply weighted static Cartesian decomposition at init",
     "rank_time_wrt": "Report per-rank RHS compute-time imbalance (max/mean)",
-    "amr": "(Experimental, SP1) Carry a static refined level-1 patch alongside the base solve (inert; base solve unchanged)",
+    "amr": "(Experimental) Block-structured AMR: 2:1 refined level-1 patch with gradient-based dynamic regrid, dt/2 subcycling, and conservative coupling with refluxing.",
     "amr_patch_beg": "Refined-patch start cell index per axis (level-0 index space)",
     "amr_patch_end": "Refined-patch end cell index per axis (level-0 index space)",
     "amr_regrid_int": "Steps between AMR regrid events (0 = static patch)",

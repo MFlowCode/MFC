@@ -676,7 +676,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `sfc_partition_wrt`     | Logical | Report SFC-weighted load-balance partition |
 | `rank_time_wrt`         | Logical | Report per-rank RHS compute-time imbalance (max/mean) |
 | `load_balance`          | Logical | (Experimental/diagnostic) Weighted static Cartesian decomposition at init (requires `parallel_io = T`, >1 rank). Measured gain is small on CPU (~5%) and can be slower on GPU due to the occupancy floor; equal decomposition is near-optimal for uniform-cost workloads. |
-| `amr`                   | Logical | (Experimental, SP1) Carry a static refined level-1 patch alongside the base solve (inert; base solve unchanged). Requires single rank, WENO reconstruction, SSP-RK3, model_eqns=2, single fluid. |
+| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 patch with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2, single fluid. |
 | `amr_patch_beg(i)`      | Integer | Refined-patch start cell index in direction $i$ (level-0 index space) |
 | `amr_patch_end(i)`      | Integer | Refined-patch end cell index in direction $i$ (level-0 index space) |
 | `amr_regrid_int`        | Integer | Steps between AMR regrid events (0 = static patch) |
@@ -771,6 +771,51 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 This is useful for large domains where only a portion of the domain is of interest.
 It is not supported when `precision = 1` and `format = 1`.
 It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, `qm_wrt`, or 'liutex_wrt'.
+
+### 7.1. Adaptive Mesh Refinement (AMR) {#sec-amr}
+
+MFC supports block-structured AMR (Experimental) via a single 2:1 refined level-1 patch
+that coexists with the base-level solve.
+The fine patch is initialized from the base grid by piecewise-linear interpolation and
+remains continuously coupled to the base solve through conservative ghost-cell exchange
+and flux refluxing at the coarse–fine interface.
+
+**Restrictions.**
+AMR requires WENO reconstruction (`recon_type = 1`, any order), SSP-RK3 time-stepping
+(`time_stepper = 3`), the 5-equation model (`model_eqns = 2`), and a single fluid
+(`num_fluids = 1`).
+It is incompatible with viscosity, surface tension, bubble models, phase-change (relax),
+immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, `hybrid_weno`,
+`hybrid_riemann`, and `acoustic_source`.
+Multi-rank runs are supported; the fine patch is owned by a single rank determined at
+init but ghost-fill transfers cross rank boundaries as needed.
+
+**Static vs. dynamic patch.**
+Setting `amr_regrid_int = 0` fixes the patch at the initial `amr_patch_beg`/`amr_patch_end`
+position for the entire run (useful for convergence studies or GPU correctness testing).
+Setting `amr_regrid_int > 0` triggers dynamic regrid every that many coarse steps:
+cells whose normalized density gradient exceeds `amr_tag_eps` are tagged, grown by
+`amr_buf` coarse cells of buffer padding, and the fine patch is rebuilt to span the
+resulting bounding box.
+A positive `amr_tag_eps` and `amr_buf >= 1` are required whenever regridding is active.
+
+**Subcycling.**
+`amr_subcycle = T` enables Berger–Colella dt/2 subcycling: the coarse level advances
+one full step at the case `dt`, while the fine level takes two half-steps at `dt/2` with
+time-interpolated ghost values at the intermediate stage.
+Accumulated fine-level fluxes are applied back to the coarse level (reflux correction)
+after each coarse step.
+`amr_subcycle` is incompatible with `cfl_dt` (variable time step) and requires `amr = T`.
+
+| Parameter               | Type    | Description                                    |
+| ---:                    | :----:  |          :---                                  |
+| `amr`                   | Logical | Enable AMR (see prose above for requirements and restrictions) |
+| `amr_patch_beg(i)`      | Integer | Initial refined-patch start cell index in direction $i$ (level-0 index space) |
+| `amr_patch_end(i)`      | Integer | Initial refined-patch end cell index in direction \f$i\f$ (level-0 index space); must satisfy \f$2\,(e_i - b_i + 1) - 1 \le N_i\f$ |
+| `amr_regrid_int`        | Integer | Coarse steps between regrid events (0 = static patch) |
+| `amr_tag_eps`           | Real    | Normalized density-gradient threshold for refinement tagging; must be > 0 when `amr_regrid_int > 0` (default 0.1) |
+| `amr_buf`               | Integer | Coarse-cell padding around tagged cells; must be >= 1 when `amr_regrid_int > 0` (default 3) |
+| `amr_subcycle`          | Logical | Advance fine level at dt/2 (two substeps per coarse step) with Berger–Colella refluxing |
 
 ### 8. Acoustic Source {#sec-acoustic-source}
 
