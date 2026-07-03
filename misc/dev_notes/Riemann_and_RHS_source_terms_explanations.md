@@ -90,7 +90,7 @@ physical order. Finalized to `nc_iface_vel_n(dir)%vf(...)` via its own path.
 It exists because `flux_src` cannot always carry the velocity traces that the
 NC source terms need:
 
-1. **Interface-consistent hypo RHS** (`hypo_nc_interface`): the stress evolution
+1. **Interface-consistent hypo RHS** (`hypo_nc_mode_interface`): the stress evolution
    equation needs velocity gradients in all directions (e.g., $\partial_x v$
    from the x-sweep). `flux_src` only exports one scalar per face, so the
    full velocity vector goes here.
@@ -99,7 +99,7 @@ NC source terms need:
    `flux_src(adv*)` is already occupied by per-fluid $\Psi_\alpha$, so the
    velocity trace needed for K*div(u) must go in a separate channel.
 
-3. **HLLD + axisymmetric** (`hypo_nc_dual_pass .and. grid_geometry == 2`):
+3. **HLLD + axisymmetric** (`hypo_nc_mode_dual_pass .and. grid_geometry == 2`):
    the axisymmetric geometric source needs face velocities exported from the
    dual-pass solver.
 
@@ -153,17 +153,17 @@ which requires $\Psi_u$ in that slot — so it is only meaningful with
 
 Three NC modes for the stress evolution equation, selected by solver:
 
-| Solver | User parameter | Derived flag | Velocity source for $\nabla u$ |
+| Solver | User parameter | Derived mode (`hypo_nc_mode`) | Velocity source for $\nabla u$ |
 |--------|---------------|--------------|-------------------------------|
-| HLL (default) | `hypo_hll_interface_rhs = F` | `hypo_nc_finite_diff` | Cell-center FD stencil (`s_compute_hypoelastic_rhs_finite_diff_per_sweep`) |
-| HLL (optional) | `hypo_hll_interface_rhs = T` | `hypo_nc_interface` | `nc_iface_vel_n` (`s_compute_hypoelastic_rhs_iface`) |
-| HLLC | — | `hypo_nc_interface` | `nc_iface_vel_n` (`s_compute_hypoelastic_rhs_iface`) |
-| HLLD | — | `hypo_nc_dual_pass` | Built into Riemann flux (no separate RHS routine) |
+| HLL (default) | `hypo_hll_interface_rhs = F` | `hypo_nc_mode_finite_diff` | Cell-center FD stencil (`s_compute_hypoelastic_rhs_finite_diff_per_sweep`) |
+| HLL (optional) | `hypo_hll_interface_rhs = T` | `hypo_nc_mode_interface` | `nc_iface_vel_n` (`s_compute_hypoelastic_rhs_iface`) |
+| HLLC | — | `hypo_nc_mode_interface` | `nc_iface_vel_n` (`s_compute_hypoelastic_rhs_iface`) |
+| HLLD | — | `hypo_nc_mode_dual_pass` | Built into Riemann flux (no separate RHS routine) |
 
 **Code organization (three shapes).** These three stress treatments also live in three
 different code *shapes*: HLLC and HLL add their hypoelastic handling as inline
 `if (hypoelasticity)` branches inside `s_hllc_riemann_solver` / `s_hll_riemann_solver`;
-HLLD is a separate module `m_riemann_solver_hypo_hlld`, reached via the `hypo_nc_dual_pass`
+HLLD is a separate module `m_riemann_solver_hypo_hlld`, reached via the `hypo_nc_mode_dual_pass`
 path in `s_riemann_solver`. HLLD is separate because its anchored dual pass produces both the
 hat_L and hat_R anchored flux sets in one fused solve (whose partial RHS are summed in
 `m_rhs`), a different control flow from the single-pass inline branches the other two use.
@@ -171,13 +171,13 @@ hat_L and hat_R anchored flux sets in one fused solve (whose partial RHS are sum
 ### 5.4 `use_nc_iface_vel` — allocation condition
 
 ```
-use_nc_iface_vel = hypo_nc_interface
-                   .or. (hypo_nc_dual_pass .and. grid_geometry == 2)
+use_nc_iface_vel = hypo_nc_mode == hypo_nc_mode_interface
+                   .or. (hypo_nc_mode == hypo_nc_mode_dual_pass .and. grid_geometry == 2)
                    .or. (adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed)
 ```
 
 | Case | Why `nc_iface_vel` is needed |
 |------|------------------------------|
-| `hypo_nc_interface` | Stress RHS needs all velocity components ($\partial_x v$, $\partial_y u$, etc.) |
-| `hypo_nc_dual_pass .and. grid_geometry == 2` | HLLD axisym geometric source needs exported face velocities |
+| `hypo_nc_mode_interface` | Stress RHS needs all velocity components ($\partial_x v$, $\partial_y u$, etc.) |
+| `hypo_nc_mode_dual_pass .and. grid_geometry == 2` | HLLD axisym geometric source needs exported face velocities |
 | `adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed` | `flux_src` is occupied by $\Psi_\alpha$; K*div(u) needs $\Psi_u$ elsewhere |
