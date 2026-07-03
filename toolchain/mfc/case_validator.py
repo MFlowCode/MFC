@@ -1370,7 +1370,9 @@ class CaseValidator:
         acoustic_source = self.get("acoustic_source", "F") == "T"
         amr_tag_eps = self.get("amr_tag_eps")
         amr_buf = self.get("amr_buf")
+        amr_max_patches = self.get("amr_max_patches")
 
+        self.prohibit(amr_max_patches is not None and amr_max_patches < 1, "amr_max_patches must be >= 1")
         self.prohibit(recon_type is not None and recon_type != 1, "amr requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(model_eqns is not None and model_eqns != 2, "amr requires model_eqns = 2 (5-equation)")

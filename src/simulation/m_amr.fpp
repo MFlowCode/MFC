@@ -24,11 +24,10 @@ module m_amr
     implicit none
 
     private
-    public :: t_level, amr_fine, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
-        & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
-        & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, &
-        & s_advance_amr_fine_substeps, s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, &
-        & s_read_amr_restart
+    public :: t_level, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
+        & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
+        & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_advance_amr_fine_substeps, &
+        & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -52,8 +51,10 @@ module m_amr
         type(scalar_field), allocatable :: q_ghost_b(:)    !< subcycle ghost-lerp source at coarse t^{n+1} (ghost shell only)
     end type t_level
 
-    type(t_level) :: amr_fine
-    integer       :: amr_maxc(3)  !< max coarse patch cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
+    !> Fixed pool of refined-patch slots (T1: amr_num_patches = 1 active; slots 2..amr_max_patches allocated-inactive). The working
+    !! slot amr_cur (m_global_parameters) selects which slot every per-patch routine operates on.
+    type(t_level), allocatable :: amr_slots(:)
+    integer                    :: amr_maxc(3)  !< max coarse patch cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min over ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
@@ -81,13 +82,18 @@ contains
     !! (sys_size/buff_size set). Preallocates all fine arrays at max size so regrid only needs to call s_set_amr_fine_geometry.
     impure subroutine s_initialize_amr_module()
 
-        integer :: i, d, max_f1, max_f2, max_f3
+        integer :: i, d, max_f1, max_f2, max_f3, islot
         integer :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
         integer :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
 
         if (.not. amr) return
 
         amr_dt_fine = 0.5_wp*dt
+
+        ! fixed pool of amr_max_patches slots; T1 activates exactly one (slot amr_cur = 1)
+        allocate (amr_slots(1:amr_max_patches))
+        amr_num_patches = 1
+        amr_cur = 1
 
         ! Mirror decomposition: each rank holds the fine cells covering patch /\ its own subdomain
         ! (np=1: the intersection is the whole patch). buff_size is not available at checker time,
@@ -121,9 +127,6 @@ contains
                              & // 'may cover at most about half of any rank subdomain per dimension; shrink the patch ' &
                              & // 'or use fewer ranks')
         end if
-
-        amr_fine%ref_ratio = 2
-        amr_fine%buff_size = buff_size
 
         ! max coarse patch cells per dim (upper bound for any future regrid box); 1 for collapsed dims
         amr_maxc(1) = (m_glb + 1)/2
@@ -159,14 +162,6 @@ contains
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
 
-        ! fine-level storage on ALL ranks (pool-sized to MY max intersection): regrid can move the patch onto
-        ! any rank, so allocation state never changes with amr_rank_owns_patch flips; ranks without a current
-        ! intersection have amr_fine%m/n/p = -1 and all fine loops no-op
-        ! preallocate coordinates at max fine extents
-        allocate (amr_fine%x_cb(-1:max_f1), amr_fine%x_cc(0:max_f1), amr_fine%dx(0:max_f1))
-        if (n_glb > 0) allocate (amr_fine%y_cb(-1:max_f2), amr_fine%y_cc(0:max_f2), amr_fine%dy(0:max_f2))
-        if (p_glb > 0) allocate (amr_fine%z_cb(-1:max_f3), amr_fine%z_cc(0:max_f3), amr_fine%dz(0:max_f3))
-
         ! bounce buffers for copy-based coord swap (GPU-safe; same bounds as the base-level global arrays)
         allocate (sw_x_cb(-1 - buff_size:m + buff_size))
         allocate (sw_x_cc(-buff_size:m + buff_size))
@@ -182,28 +177,37 @@ contains
             allocate (sw_dz(-buff_size:p + buff_size))
         end if
 
-        ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p.
-        ! Device-resident (@:ALLOCATE) so s_compute_rhs kernels can run on the fine patch;
-        ! q_cons/q_prim/rhs get the Cray pointer setup mirroring m_time_steppers' field vectors.
-        @:ALLOCATE(amr_fine%q_cons(1:sys_size))
-        @:ALLOCATE(amr_fine%q_cons_stor(1:sys_size))
-        @:ALLOCATE(amr_fine%q_prim(1:sys_size))
-        @:ALLOCATE(amr_fine%rhs(1:sys_size))
-        @:ALLOCATE(amr_fine%q_ghost_a(1:sys_size))
-        @:ALLOCATE(amr_fine%q_ghost_b(1:sys_size))
-        do i = 1, sys_size
-            @:ALLOCATE(amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-            @:ALLOCATE(amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-            @:ALLOCATE(amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-            @:ALLOCATE(amr_fine%rhs(i)%sf(0:max_f1, 0:max_f2, 0:max_f3))
-            @:ALLOCATE(amr_fine%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-            @:ALLOCATE(amr_fine%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-            @:ACC_SETUP_SFs(amr_fine%q_cons(i))
-            @:ACC_SETUP_SFs(amr_fine%q_prim(i))
-            @:ACC_SETUP_SFs(amr_fine%rhs(i))
+        ! preallocate every slot at max buffered extents (each sized exactly as the single legacy patch): coords (host) +
+        ! fields (device-resident @:ALLOCATE so s_compute_rhs kernels can run on the fine patch; q_cons/q_prim/rhs get the
+        ! Cray pointer setup mirroring m_time_steppers' field vectors). Loops always use the current slot's m/n/p.
+        do islot = 1, amr_max_patches
+            amr_slots(islot)%ref_ratio = 2
+            amr_slots(islot)%buff_size = buff_size
+            allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
+            if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), &
+                & amr_slots(islot)%dy(0:max_f2))
+            if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), &
+                & amr_slots(islot)%dz(0:max_f3))
+            @:ALLOCATE(amr_slots(islot)%q_cons(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%q_cons_stor(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%q_ghost_a(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%q_ghost_b(1:sys_size))
+            do i = 1, sys_size
+                @:ALLOCATE(amr_slots(islot)%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(0:max_f1, 0:max_f2, 0:max_f3))
+                @:ALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
+            end do
         end do
 
-        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial patch
+        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial patch (slot amr_cur = 1)
         call s_set_amr_fine_geometry(amr_patch_beg, amr_patch_end)
 
     end subroutine s_initialize_amr_module
@@ -271,32 +275,32 @@ contains
         integer             :: sidx(3), ext(3), nmar, bad_loc, bad_glb
 
         call s_amr_compute_isect(lo, hi)
-        amr_fine%region%lo = lo; amr_fine%region%hi = hi
+        amr_slots(amr_cur)%region%lo = lo; amr_slots(amr_cur)%region%hi = hi
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
         ! LOCAL fine extents cover this rank's intersection (the whole patch at np=1); -1 in a dim whose
         ! intersection is empty, so 0..extent loops are no-ops on ranks without fine cells
-        amr_fine%m = 2*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
-        amr_fine%n = 0; amr_fine%p = 0
-        if (n_glb > 0) amr_fine%n = 2*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
-        if (p_glb > 0) amr_fine%p = 2*max(amr_isect_hi(3) - amr_isect_lo(3) + 1, 0) - 1
-        amr_fine%idwbuff(1)%beg = -buff_size; amr_fine%idwbuff(1)%end = amr_fine%m + buff_size
-        amr_fine%idwbuff(2)%beg = 0; amr_fine%idwbuff(2)%end = 0
-        amr_fine%idwbuff(3)%beg = 0; amr_fine%idwbuff(3)%end = 0
+        amr_slots(amr_cur)%m = 2*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
+        amr_slots(amr_cur)%n = 0; amr_slots(amr_cur)%p = 0
+        if (n_glb > 0) amr_slots(amr_cur)%n = 2*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
+        if (p_glb > 0) amr_slots(amr_cur)%p = 2*max(amr_isect_hi(3) - amr_isect_lo(3) + 1, 0) - 1
+        amr_slots(amr_cur)%idwbuff(1)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(1)%end = amr_slots(amr_cur)%m + buff_size
+        amr_slots(amr_cur)%idwbuff(2)%beg = 0; amr_slots(amr_cur)%idwbuff(2)%end = 0
+        amr_slots(amr_cur)%idwbuff(3)%beg = 0; amr_slots(amr_cur)%idwbuff(3)%end = 0
         if (n_glb > 0) then
-            amr_fine%idwbuff(2)%beg = -buff_size; amr_fine%idwbuff(2)%end = amr_fine%n + buff_size
+            amr_slots(amr_cur)%idwbuff(2)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(2)%end = amr_slots(amr_cur)%n + buff_size
         end if
         if (p_glb > 0) then
-            amr_fine%idwbuff(3)%beg = -buff_size; amr_fine%idwbuff(3)%end = amr_fine%p + buff_size
+            amr_slots(amr_cur)%idwbuff(3)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(3)%end = amr_slots(amr_cur)%p + buff_size
         end if
         ! coord building only on ranks with fine cells (others never read their coord arrays); the parent origin
         ! is this rank's INTERSECTION start, converted to LOCAL indexing so the bisection reads its x_cb slice
         if (amr_rank_owns_patch) then
-            call s_build_level_coords(x_cb, lbound(x_cb, 1), amr_isect_lo(1) - start_idx(1), amr_fine%m, amr_fine%x_cb, &
-                                      & amr_fine%x_cc, amr_fine%dx)
-            if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), amr_isect_lo(2) - start_idx(2), amr_fine%n, &
-                & amr_fine%y_cb, amr_fine%y_cc, amr_fine%dy)
-            if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), amr_isect_lo(3) - start_idx(3), amr_fine%p, &
-                & amr_fine%z_cb, amr_fine%z_cc, amr_fine%dz)
+            call s_build_level_coords(x_cb, lbound(x_cb, 1), amr_isect_lo(1) - start_idx(1), amr_slots(amr_cur)%m, &
+                                      & amr_slots(amr_cur)%x_cb, amr_slots(amr_cur)%x_cc, amr_slots(amr_cur)%dx)
+            if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), amr_isect_lo(2) - start_idx(2), amr_slots(amr_cur)%n, &
+                & amr_slots(amr_cur)%y_cb, amr_slots(amr_cur)%y_cc, amr_slots(amr_cur)%dy)
+            if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), amr_isect_lo(3) - start_idx(3), amr_slots(amr_cur)%p, &
+                & amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, amr_slots(amr_cur)%dz)
         end if
 
         ! Fine ghost prolongation reads up to nmar coarse cells past each face of the intersection; if that
@@ -334,15 +338,15 @@ contains
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
-        do fk = 0, amr_fine%p
-            ck = amr_isect_lo(3) + fk/amr_fine%ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
-            do fj = 0, amr_fine%n
-                cj = amr_isect_lo(2) + fj/amr_fine%ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
-                do fi = 0, amr_fine%m
-                    ci = amr_isect_lo(1) + fi/amr_fine%ref_ratio - ox
-                    xix = (real(mod(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
+        do fk = 0, amr_slots(amr_cur)%p
+            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+            do fj = 0, amr_slots(amr_cur)%n
+                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                do fi = 0, amr_slots(amr_cur)%m
+                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
+                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
                     u0 = real(qc%sf(ci, cj, ck), wp)
                     sx = minmod(real(qc%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc%sf(ci - 1, cj, ck), wp))
                     sy = 0._wp
@@ -366,9 +370,9 @@ contains
 
         do i = 1, sys_size
             if (num_fluids > 1 .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
-            call s_prolong_one_var(q_cons_base(i), amr_fine%q_cons(i))
+            call s_prolong_one_var(q_cons_base(i), amr_slots(amr_cur)%q_cons(i))
         end do
-        if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_fine%q_cons)
+        if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
 
     end subroutine s_interpolate_coarse_to_fine
 
@@ -389,15 +393,15 @@ contains
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
-        do fk = 0, amr_fine%p
-            ck = amr_isect_lo(3) + fk/amr_fine%ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
-            do fj = 0, amr_fine%n
-                cj = amr_isect_lo(2) + fj/amr_fine%ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
-                do fi = 0, amr_fine%m
-                    ci = amr_isect_lo(1) + fi/amr_fine%ref_ratio - ox
-                    xix = (real(mod(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
+        do fk = 0, amr_slots(amr_cur)%p
+            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+            do fj = 0, amr_slots(amr_cur)%n
+                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                do fi = 0, amr_slots(amr_cur)%m
+                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
+                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
                     call s_alpha_shared_switch(qc, ci, cj, ck, shx, shy, shz)
                     asum = 0._wp
                     do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
@@ -469,13 +473,13 @@ contains
         call s_interpolate_coarse_to_fine(q_cons_base)
         ! prolonged fine state to the device (host prolongation; device consumers: ghost-fill/RK/RHS kernels)
         do i = 1, sys_size
-            $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
+            $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
         end do
 
     end subroutine s_populate_amr_fine
 
-    !> Volume-weighted restriction for a single variable pair. Reads from qf (fine, must include interior 0:amr_fine%m etc.); writes
-    !! to qc (coarse, over the patch).
+    !> Volume-weighted restriction for a single variable pair. Reads from qf (fine, must include interior 0:amr_slots(amr_cur)%m
+    !! etc.); writes to qc (coarse, over the patch).
     impure subroutine s_restrict_one_var(qf, qc)
 
         type(scalar_field), intent(in)    :: qf
@@ -488,18 +492,18 @@ contains
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
-        nchild = amr_fine%ref_ratio
-        if (n_glb > 0) nchild = nchild*amr_fine%ref_ratio
-        if (p_glb > 0) nchild = nchild*amr_fine%ref_ratio
+        nchild = amr_slots(amr_cur)%ref_ratio
+        if (n_glb > 0) nchild = nchild*amr_slots(amr_cur)%ref_ratio
+        if (p_glb > 0) nchild = nchild*amr_slots(amr_cur)%ref_ratio
         do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
-            fk0 = (ck - amr_isect_lo(3))*amr_fine%ref_ratio
+            fk0 = (ck - amr_isect_lo(3))*amr_slots(amr_cur)%ref_ratio
             do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
-                fj0 = (cj - amr_isect_lo(2))*amr_fine%ref_ratio
+                fj0 = (cj - amr_isect_lo(2))*amr_slots(amr_cur)%ref_ratio
                 do ci = amr_isect_lo(1), amr_isect_hi(1)
-                    fi0 = (ci - amr_isect_lo(1))*amr_fine%ref_ratio
+                    fi0 = (ci - amr_isect_lo(1))*amr_slots(amr_cur)%ref_ratio
                     acc = 0._wp
-                    do ddk = 0, merge(amr_fine%ref_ratio - 1, 0, p_glb > 0)
-                        do ddj = 0, merge(amr_fine%ref_ratio - 1, 0, n_glb > 0)
+                    do ddk = 0, merge(amr_slots(amr_cur)%ref_ratio - 1, 0, p_glb > 0)
+                        do ddj = 0, merge(amr_slots(amr_cur)%ref_ratio - 1, 0, n_glb > 0)
                             acc = acc + real(qf%sf(fi0, fj0 + ddj, fk0 + ddk), wp) + real(qf%sf(fi0 + 1, fj0 + ddj, fk0 + ddk), wp)
                         end do
                     end do
@@ -519,7 +523,7 @@ contains
 
         if (.not. amr_rank_owns_patch) return
         if (rank_time_wrt) call s_rank_time_tic()
-        call s_restrict_all_vars(amr_fine%q_cons, coarse_tgt)
+        call s_restrict_all_vars(amr_slots(amr_cur)%q_cons, coarse_tgt)
         if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
@@ -538,7 +542,7 @@ contains
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
-        rr = amr_fine%ref_ratio
+        rr = amr_slots(amr_cur)%ref_ratio
         nchild = rr
         if (n_glb > 0) nchild = nchild*rr
         if (p_glb > 0) nchild = nchild*rr
@@ -588,7 +592,7 @@ contains
         end do
         ! host restriction path: the scratch target is host-only and the fine state is host-current at init
         do i = 1, sys_size
-            call s_restrict_one_var(amr_fine%q_cons(i), scratch(i))
+            call s_restrict_one_var(amr_slots(amr_cur)%q_cons(i), scratch(i))
         end do
         err = 0._wp
         do i = 1, sys_size
@@ -615,27 +619,27 @@ contains
 
         sw_m = m; sw_n = n; sw_p = p
         sw_idwint = idwint; sw_idwbuff = idwbuff
-        m = amr_fine%m; n = amr_fine%n; p = amr_fine%p
+        m = amr_slots(amr_cur)%m; n = amr_slots(amr_cur)%n; p = amr_slots(amr_cur)%p
         idwint(1)%beg = 0; idwint(1)%end = m
         idwint(2)%beg = 0; idwint(2)%end = n
         idwint(3)%beg = 0; idwint(3)%end = p
-        idwbuff = amr_fine%idwbuff
+        idwbuff = amr_slots(amr_cur)%idwbuff
         ! save coarse coords to bounce buffers, then copy fine coords into global arrays
         sw_x_cb = x_cb; sw_x_cc = x_cc; sw_dx = dx
         if (n_glb > 0) then; sw_y_cb = y_cb; sw_y_cc = y_cc; sw_dy = dy; end if
         if (p_glb > 0) then; sw_z_cb = z_cb; sw_z_cc = z_cc; sw_dz = dz; end if
-        x_cb(-1:amr_fine%m) = amr_fine%x_cb(-1:amr_fine%m)
-        x_cc(0:amr_fine%m) = amr_fine%x_cc(0:amr_fine%m)
-        dx(0:amr_fine%m) = amr_fine%dx(0:amr_fine%m)
+        x_cb(-1:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%x_cb(-1:amr_slots(amr_cur)%m)
+        x_cc(0:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%x_cc(0:amr_slots(amr_cur)%m)
+        dx(0:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%dx(0:amr_slots(amr_cur)%m)
         if (n_glb > 0) then
-            y_cb(-1:amr_fine%n) = amr_fine%y_cb(-1:amr_fine%n)
-            y_cc(0:amr_fine%n) = amr_fine%y_cc(0:amr_fine%n)
-            dy(0:amr_fine%n) = amr_fine%dy(0:amr_fine%n)
+            y_cb(-1:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%y_cb(-1:amr_slots(amr_cur)%n)
+            y_cc(0:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%y_cc(0:amr_slots(amr_cur)%n)
+            dy(0:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%dy(0:amr_slots(amr_cur)%n)
         end if
         if (p_glb > 0) then
-            z_cb(-1:amr_fine%p) = amr_fine%z_cb(-1:amr_fine%p)
-            z_cc(0:amr_fine%p) = amr_fine%z_cc(0:amr_fine%p)
-            dz(0:amr_fine%p) = amr_fine%dz(0:amr_fine%p)
+            z_cb(-1:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%z_cb(-1:amr_slots(amr_cur)%p)
+            z_cc(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%z_cc(0:amr_slots(amr_cur)%p)
+            dz(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%dz(0:amr_slots(amr_cur)%p)
         end if
         ! Extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m).
         ! The viscous velocity gradient divides by ghost cell-center spacings (x_cc(j+-1) - x_cc(j)), so at
@@ -644,30 +648,30 @@ contains
         block
             integer  :: jg
             real(wp) :: sp
-            sp = amr_fine%dx(amr_fine%m)
-            do jg = amr_fine%m + 1, amr_fine%m + buff_size
+            sp = amr_slots(amr_cur)%dx(amr_slots(amr_cur)%m)
+            do jg = amr_slots(amr_cur)%m + 1, amr_slots(amr_cur)%m + buff_size
                 dx(jg) = sp; x_cb(jg) = x_cb(jg - 1) + sp; x_cc(jg) = x_cc(jg - 1) + sp
             end do
-            sp = amr_fine%dx(0)
+            sp = amr_slots(amr_cur)%dx(0)
             do jg = -1, -buff_size, -1
                 dx(jg) = sp; x_cb(jg - 1) = x_cb(jg) - sp; x_cc(jg) = x_cc(jg + 1) - sp
             end do
             if (n_glb > 0) then
-                sp = amr_fine%dy(amr_fine%n)
-                do jg = amr_fine%n + 1, amr_fine%n + buff_size
+                sp = amr_slots(amr_cur)%dy(amr_slots(amr_cur)%n)
+                do jg = amr_slots(amr_cur)%n + 1, amr_slots(amr_cur)%n + buff_size
                     dy(jg) = sp; y_cb(jg) = y_cb(jg - 1) + sp; y_cc(jg) = y_cc(jg - 1) + sp
                 end do
-                sp = amr_fine%dy(0)
+                sp = amr_slots(amr_cur)%dy(0)
                 do jg = -1, -buff_size, -1
                     dy(jg) = sp; y_cb(jg - 1) = y_cb(jg) - sp; y_cc(jg) = y_cc(jg + 1) - sp
                 end do
             end if
             if (p_glb > 0) then
-                sp = amr_fine%dz(amr_fine%p)
-                do jg = amr_fine%p + 1, amr_fine%p + buff_size
+                sp = amr_slots(amr_cur)%dz(amr_slots(amr_cur)%p)
+                do jg = amr_slots(amr_cur)%p + 1, amr_slots(amr_cur)%p + buff_size
                     dz(jg) = sp; z_cb(jg) = z_cb(jg - 1) + sp; z_cc(jg) = z_cc(jg - 1) + sp
                 end do
-                sp = amr_fine%dz(0)
+                sp = amr_slots(amr_cur)%dz(0)
                 do jg = -1, -buff_size, -1
                     dz(jg) = sp; z_cb(jg - 1) = z_cb(jg) - sp; z_cc(jg) = z_cc(jg + 1) - sp
                 end do
@@ -727,12 +731,12 @@ contains
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
         d2 = n_glb > 0; d3 = p_glb > 0
-        rr = amr_fine%ref_ratio
+        rr = amr_slots(amr_cur)%ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
-        fm = amr_fine%m; fn = amr_fine%n; fp = amr_fine%p
-        b1 = amr_fine%idwbuff(1)%beg; e1 = amr_fine%idwbuff(1)%end
-        b2 = amr_fine%idwbuff(2)%beg; e2 = amr_fine%idwbuff(2)%end
-        b3 = amr_fine%idwbuff(3)%beg; e3 = amr_fine%idwbuff(3)%end
+        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
+        b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
+        b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
+        b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
         multi = num_fluids > 1
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
         $:GPU_PARALLEL_LOOP(collapse=4, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
@@ -844,10 +848,10 @@ contains
         real(wp), intent(in)                                   :: th
         integer                                                :: i, fi, fj, fk, fm, fn, fp, b1, e1, b2, e2, b3, e3
 
-        fm = amr_fine%m; fn = amr_fine%n; fp = amr_fine%p
-        b1 = amr_fine%idwbuff(1)%beg; e1 = amr_fine%idwbuff(1)%end
-        b2 = amr_fine%idwbuff(2)%beg; e2 = amr_fine%idwbuff(2)%end
-        b3 = amr_fine%idwbuff(3)%beg; e3 = amr_fine%idwbuff(3)%end
+        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
+        b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
+        b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
+        b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do fk = b3, e3
@@ -896,7 +900,7 @@ contains
         real(wp), intent(in)                                   :: c1, c2, c3, c4, dt_in
         integer                                                :: i, fi, fj, fk, fm, fn, fp
 
-        fm = amr_fine%m; fn = amr_fine%n; fp = amr_fine%p
+        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do fk = 0, fp
@@ -958,32 +962,35 @@ contains
         ! device-current coarse stage-entry state directly); rank_time brackets cover the fine-advance
         ! compute segments and pause across the MPI exchanges (the inner s_compute_rhs pair nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
-        call s_amr_fill_fine_ghosts(q_cons_coarse, amr_fine%q_cons)
+        call s_amr_fill_fine_ghosts(q_cons_coarse, amr_slots(amr_cur)%q_cons)
         if (rank_time_wrt) call s_rank_time_toc()
 
         ! continuation faces (the patch spans a rank boundary there): overwrite the prolonged ghosts with the
         ! neighbor's true fine data (no exchange fires at np=1 / for fully-contained patches)
-        call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
+        call s_mpi_sendrecv_amr_fine_halo(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%m, amr_slots(amr_cur)%n, &
+                                          & amr_slots(amr_cur)%p)
         if (rank_time_wrt) call s_rank_time_tic()
 
         ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
-            call s_amr_copy_fine_fields(amr_fine%q_cons, amr_fine%q_cons_stor, amr_fine%idwbuff(1)%beg, amr_fine%idwbuff(1)%end, &
-                                        & amr_fine%idwbuff(2)%beg, amr_fine%idwbuff(2)%end, amr_fine%idwbuff(3)%beg, &
-                                        & amr_fine%idwbuff(3)%end)
+            call s_amr_copy_fine_fields(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, &
+                                        & amr_slots(amr_cur)%idwbuff(1)%beg, amr_slots(amr_cur)%idwbuff(1)%end, &
+                                        & amr_slots(amr_cur)%idwbuff(2)%beg, amr_slots(amr_cur)%idwbuff(2)%end, &
+                                        & amr_slots(amr_cur)%idwbuff(3)%beg, amr_slots(amr_cur)%idwbuff(3)%end)
         end if
 
         amr_in_fine_advance = .true.
         call s_amr_swap_to_fine()
-        idwint = amr_fine%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
+        idwint = amr_slots(amr_cur)%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
         $:GPU_UPDATE(device='[idwint]')
-        call s_compute_rhs(amr_fine%q_cons, q_T_sf, amr_fine%q_prim, bc_type, amr_fine%rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-                           & time_avg, s)
+        call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, pb_in, &
+                           & rhs_pb, mv_in, rhs_mv, t_step, time_avg, s)
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
 
         ! RK stage update (device kernel; mirror of the coarse non-IGR form)
-        call s_amr_fine_rk_update(amr_fine%q_cons, amr_fine%q_cons_stor, amr_fine%rhs, coefs(1), coefs(2), coefs(3), coefs(4), dt)
+        call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
+                                  & coefs(2), coefs(3), coefs(4), dt)
         if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_advance_amr_fine_stage
@@ -1020,8 +1027,8 @@ contains
         ! read the device-current coarse states directly); rank_time brackets cover the fine-advance
         ! compute segments and pause across the MPI exchanges (the inner s_compute_rhs pair nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
-        call s_amr_fill_fine_ghosts(q_old, amr_fine%q_ghost_a)
-        call s_amr_fill_fine_ghosts(q_new, amr_fine%q_ghost_b)
+        call s_amr_fill_fine_ghosts(q_old, amr_slots(amr_cur)%q_ghost_a)
+        call s_amr_fill_fine_ghosts(q_new, amr_slots(amr_cur)%q_ghost_b)
         call s_amr_zero_fine_registers()
 
         do sub = 1, 2
@@ -1029,31 +1036,35 @@ contains
                 th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
 
                 ! lerp the ghost shell into q_cons at the stage time (device kernel; interior untouched)
-                call s_amr_lerp_fine_ghosts(amr_fine%q_ghost_a, amr_fine%q_ghost_b, amr_fine%q_cons, th)
+                call s_amr_lerp_fine_ghosts(amr_slots(amr_cur)%q_ghost_a, amr_slots(amr_cur)%q_ghost_b, &
+                                            & amr_slots(amr_cur)%q_cons, th)
                 if (rank_time_wrt) call s_rank_time_toc()
 
                 ! continuation-face ghosts AFTER the lerp: the substeps run in lockstep across ranks, so the
                 ! neighbor's current fine q_cons is the same-time data (the lerp stays patch-boundary-only)
-                call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
+                call s_mpi_sendrecv_amr_fine_halo(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%m, amr_slots(amr_cur)%n, &
+                                                  & amr_slots(amr_cur)%p)
                 if (rank_time_wrt) call s_rank_time_tic()
 
                 ! substep-entry backup for the SSP-RK combination (device copy, interior only)
                 if (s == 1) then
-                    call s_amr_copy_fine_fields(amr_fine%q_cons, amr_fine%q_cons_stor, 0, amr_fine%m, 0, amr_fine%n, 0, amr_fine%p)
+                    call s_amr_copy_fine_fields(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, 0, &
+                                                & amr_slots(amr_cur)%m, 0, amr_slots(amr_cur)%n, 0, amr_slots(amr_cur)%p)
                 end if
 
                 amr_in_fine_advance = .true.
                 call s_amr_swap_to_fine()
-                idwint = amr_fine%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
+                ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
+                idwint = amr_slots(amr_cur)%idwbuff
                 $:GPU_UPDATE(device='[idwint]')
-                call s_compute_rhs(amr_fine%q_cons, q_T_sf, amr_fine%q_prim, bc_type, amr_fine%rhs, pb_in, rhs_pb, mv_in, rhs_mv, &
-                                   & t_step, time_avg, s)
+                call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
+                                   & pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, s)
                 call s_amr_restore_coarse()
                 amr_in_fine_advance = .false.
 
                 ! RK stage update at the FINE time step (device kernel)
-                call s_amr_fine_rk_update(amr_fine%q_cons, amr_fine%q_cons_stor, amr_fine%rhs, coefs(s, 1), coefs(s, 2), coefs(s, &
-                                          & 3), coefs(s, 4), amr_dt_fine)
+                call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, &
+                                          & coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, 4), amr_dt_fine)
             end do
         end do
         if (rank_time_wrt) call s_rank_time_toc()
@@ -1151,19 +1162,20 @@ contains
             lo(3) = 0; hi(3) = 0
         end if
         if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return  ! tag box confined to the domain margin; keep the old region
-        if (all(lo == amr_fine%region%lo) .and. all(hi == amr_fine%region%hi)) return
+        if (all(lo == amr_slots(amr_cur)%region%lo) .and. all(hi == amr_slots(amr_cur)%region%hi)) return
 
         ! 3) ranks with OLD fine cells stash their old fine interior in the (dead-between-steps) RK bounce buffer
         !    (amr_rank_owns_patch still holds the pre-rebuild value here; ranks without get old_m1 = -1 => no-op)
         old_ilo = amr_isect_lo
-        old_m1 = amr_fine%m; old_n1 = amr_fine%n; old_p1 = amr_fine%p
+        old_m1 = amr_slots(amr_cur)%m; old_n1 = amr_slots(amr_cur)%n; old_p1 = amr_slots(amr_cur)%p
         if (amr_rank_owns_patch) then
             ! host consumer: regrid stash + rebuild run on host; the rebuilt state is pushed back below
             do i = 1, sys_size
-                $:GPU_UPDATE(host='[amr_fine%q_cons(i)%sf]')
+                $:GPU_UPDATE(host='[amr_slots(amr_cur)%q_cons(i)%sf]')
             end do
             do i = 1, sys_size
-                amr_fine%q_cons_stor(i)%sf(0:old_m1,0:old_n1,0:old_p1) = amr_fine%q_cons(i)%sf(0:old_m1,0:old_n1,0:old_p1)
+                amr_slots(amr_cur)%q_cons_stor(i)%sf(0:old_m1,0:old_n1,0:old_p1) = amr_slots(amr_cur)%q_cons(i)%sf(0:old_m1, &
+                          & 0:old_n1,0:old_p1)
             end do
         end if
 
@@ -1178,26 +1190,27 @@ contains
         call s_interpolate_coarse_to_fine(q_cons_base)
         sh = 2*(amr_isect_lo - old_ilo)  ! old LOCAL fine index = new LOCAL fine index + sh (per dim; collapsed dims sh=0)
         do i = 1, sys_size
-            do fk = 0, amr_fine%p
+            do fk = 0, amr_slots(amr_cur)%p
                 ofk = fk + sh(3)
                 if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_p1)) cycle
-                do fj = 0, amr_fine%n
+                do fj = 0, amr_slots(amr_cur)%n
                     ofj = fj + sh(2)
                     if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_n1)) cycle
-                    do fi = 0, amr_fine%m
+                    do fi = 0, amr_slots(amr_cur)%m
                         ofi = fi + sh(1)
                         if (ofi < 0 .or. ofi > old_m1) cycle
-                        amr_fine%q_cons(i)%sf(fi, fj, fk) = amr_fine%q_cons_stor(i)%sf(ofi, ofj, ofk)
+                        amr_slots(amr_cur)%q_cons(i)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons_stor(i)%sf(ofi, ofj, ofk)
                     end do
                 end do
             end do
         end do
         ! rebuilt fine state back to the device for the stepping kernels
         do i = 1, sys_size
-            $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
+            $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
         end do
         ! continuation-face ghosts from the neighbors' rebuilt interiors (fresh fine ghosts for the next step)
-        call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
+        call s_mpi_sendrecv_amr_fine_halo(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%m, amr_slots(amr_cur)%n, &
+                                          & amr_slots(amr_cur)%p)
 
     end subroutine s_amr_regrid
 
@@ -1223,7 +1236,7 @@ contains
         ! host consumer: the fine state is device-current during stepping
         if (amr_rank_owns_patch) then
             do i = 1, sys_size
-                $:GPU_UPDATE(host='[amr_fine%q_cons(i)%sf]')
+                $:GPU_UPDATE(host='[amr_slots(amr_cur)%q_cons(i)%sf]')
             end do
         end if
 
@@ -1231,10 +1244,11 @@ contains
             ! per-rank file in the step directory freshly created by the level-0 serial write
             write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step, '/amr_fine.dat'
             open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
-            write (2) num_procs, amr_fine%region%lo, amr_fine%region%hi, amr_fine%m, amr_fine%n, amr_fine%p
+            write (2) num_procs, amr_slots(amr_cur)%region%lo, amr_slots(amr_cur)%region%hi, amr_slots(amr_cur)%m, &
+                   & amr_slots(amr_cur)%n, amr_slots(amr_cur)%p
             if (amr_rank_owns_patch) then
                 do i = 1, sys_size
-                    write (2) amr_fine%q_cons(i)%sf(0:amr_fine%m,0:amr_fine%n,0:amr_fine%p)
+                    write (2) amr_slots(amr_cur)%q_cons(i)%sf(0:amr_slots(amr_cur)%m,0:amr_slots(amr_cur)%n,0:amr_slots(amr_cur)%p)
                 end do
             end if
             close (2)
@@ -1248,25 +1262,25 @@ contains
             end if
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
-            ! rank-order concatenation offset: exclusive prefix sum of the per-rank block sizes
-            cnt = sys_size*(amr_fine%m + 1)*(amr_fine%n + 1)*(amr_fine%p + 1)  ! 0 on ranks without fine cells
+            ! rank-order concatenation offset: exclusive prefix sum of the per-rank block sizes 0 on ranks without fine cells
+            cnt = sys_size*(amr_slots(amr_cur)%m + 1)*(amr_slots(amr_cur)%n + 1)*(amr_slots(amr_cur)%p + 1)
             if (.not. amr_rank_owns_patch) cnt = 0
             my_cnt = int(cnt, MPI_OFFSET_KIND)
             my_off = int(0, MPI_OFFSET_KIND)
             call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
             if (proc_rank == 0) then
                 my_off = int(0, MPI_OFFSET_KIND)
-                hdr(1) = num_procs; hdr(2:4) = amr_fine%region%lo; hdr(5:7) = amr_fine%region%hi
+                hdr(1) = num_procs; hdr(2:4) = amr_slots(amr_cur)%region%lo; hdr(5:7) = amr_slots(amr_cur)%region%hi
                 call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), hdr, 7, MPI_INTEGER, status, ierr)
             end if
             allocate (buf(max(cnt, 1)))
             idx = 0
             do i = 1, sys_size
-                do fk = 0, amr_fine%p
-                    do fj = 0, amr_fine%n
-                        do fi = 0, amr_fine%m
+                do fk = 0, amr_slots(amr_cur)%p
+                    do fj = 0, amr_slots(amr_cur)%n
+                        do fi = 0, amr_slots(amr_cur)%m
                             idx = idx + 1
-                            buf(idx) = amr_fine%q_cons(i)%sf(fi, fj, fk)
+                            buf(idx) = amr_slots(amr_cur)%q_cons(i)%sf(fi, fj, fk)
                         end do
                     end do
                 end do
@@ -1336,13 +1350,13 @@ contains
                 call s_mpi_abort(trim(msg))
             end if
             call s_set_amr_fine_geometry(hdr(2:4), hdr(5:7))
-            if (rm /= amr_fine%m .or. rn /= amr_fine%n .or. rp /= amr_fine%p) then
+            if (rm /= amr_slots(amr_cur)%m .or. rn /= amr_slots(amr_cur)%n .or. rp /= amr_slots(amr_cur)%p) then
                 call s_mpi_abort('amr restart decomposition mismatch: this rank''s fine extents differ from the file' &
                                  & // ' (identical decomposition - rank count and load_balance settings - required)')
             end if
             if (amr_rank_owns_patch) then
                 do i = 1, sys_size
-                    read (2) amr_fine%q_cons(i)%sf(0:amr_fine%m,0:amr_fine%n,0:amr_fine%p)
+                    read (2) amr_slots(amr_cur)%q_cons(i)%sf(0:amr_slots(amr_cur)%m,0:amr_slots(amr_cur)%n,0:amr_slots(amr_cur)%p)
                 end do
             end if
             close (2)
@@ -1356,7 +1370,7 @@ contains
                 call s_mpi_abort(trim(msg))
             end if
             call s_set_amr_fine_geometry(hdr(2:4), hdr(5:7))
-            cnt = sys_size*(amr_fine%m + 1)*(amr_fine%n + 1)*(amr_fine%p + 1)
+            cnt = sys_size*(amr_slots(amr_cur)%m + 1)*(amr_slots(amr_cur)%n + 1)*(amr_slots(amr_cur)%p + 1)
             if (.not. amr_rank_owns_patch) cnt = 0
             my_cnt = int(cnt, MPI_OFFSET_KIND)
             my_off = int(0, MPI_OFFSET_KIND)
@@ -1374,11 +1388,11 @@ contains
             call MPI_FILE_READ_AT_ALL(ifile, disp, buf, cnt*mpi_io_type, mpi_io_p, status, ierr)
             idx = 0
             do i = 1, sys_size
-                do fk = 0, amr_fine%p
-                    do fj = 0, amr_fine%n
-                        do fi = 0, amr_fine%m
+                do fk = 0, amr_slots(amr_cur)%p
+                    do fj = 0, amr_slots(amr_cur)%n
+                        do fi = 0, amr_slots(amr_cur)%m
                             idx = idx + 1
-                            amr_fine%q_cons(i)%sf(fi, fj, fk) = buf(idx)
+                            amr_slots(amr_cur)%q_cons(i)%sf(fi, fj, fk) = buf(idx)
                         end do
                     end do
                 end do
@@ -1391,12 +1405,13 @@ contains
         ! restored fine state to the device (mirrors s_populate_amr_fine's push; host reads above)
         if (amr_rank_owns_patch) then
             do i = 1, sys_size
-                $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
+                $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
             end do
         end if
         restored = .true.
         if (proc_rank == 0) then
-            print '(A,I0,A,I0)', ' [amr] restart: restored fine level, box x ', amr_fine%region%lo(1), ':', amr_fine%region%hi(1)
+            print '(A,I0,A,I0)', ' [amr] restart: restored fine level, box x ', amr_slots(amr_cur)%region%lo(1), ':', &
+                & amr_slots(amr_cur)%region%hi(1)
         end if
 
     end subroutine s_read_amr_restart
@@ -1453,8 +1468,8 @@ contains
 
     end subroutine s_amr_conservation_defect
 
-    !> Init-time operator verification: (b) linear reproduction, (c) restriction of an independent field. Uses amr_fine%q_cons(1) as
-    !! scratch; called before s_populate_amr_fine overwrites it.
+    !> Init-time operator verification: (b) linear reproduction, (c) restriction of an independent field. Uses
+    !! amr_slots(amr_cur)%q_cons(1) as scratch; called before s_populate_amr_fine overwrites it.
     impure subroutine s_amr_operator_checks()
 
         type(scalar_field), allocatable :: cscr(:)
@@ -1479,39 +1494,41 @@ contains
                 end do
             end do
         end do
-        call s_prolong_one_var(cscr(1), amr_fine%q_cons(1))
+        call s_prolong_one_var(cscr(1), amr_slots(amr_cur)%q_cons(1))
         errb = 0._wp
-        do fk = 0, amr_fine%p
-            do fj = 0, amr_fine%n
-                do fi = 0, amr_fine%m
-                    want = 1._wp + 2._wp*amr_fine%x_cc(fi)
-                    if (n_glb > 0) want = want + 3._wp*amr_fine%y_cc(fj)
-                    if (p_glb > 0) want = want + 4._wp*amr_fine%z_cc(fk)
-                    e = abs(real(amr_fine%q_cons(1)%sf(fi, fj, fk), wp) - want)
+        do fk = 0, amr_slots(amr_cur)%p
+            do fj = 0, amr_slots(amr_cur)%n
+                do fi = 0, amr_slots(amr_cur)%m
+                    want = 1._wp + 2._wp*amr_slots(amr_cur)%x_cc(fi)
+                    if (n_glb > 0) want = want + 3._wp*amr_slots(amr_cur)%y_cc(fj)
+                    if (p_glb > 0) want = want + 4._wp*amr_slots(amr_cur)%z_cc(fk)
+                    e = abs(real(amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk), wp) - want)
                     if (e > errb) errb = e
                 end do
             end do
         end do
 
         ! (c) fill the fine patch with a quadratic (NOT from prolongation), restrict, compare integrals
-        do fk = 0, amr_fine%p
-            do fj = 0, amr_fine%n
-                do fi = 0, amr_fine%m
-                    amr_fine%q_cons(1)%sf(fi, fj, fk) = amr_fine%x_cc(fi)**2
-                    if (n_glb > 0) amr_fine%q_cons(1)%sf(fi, fj, fk) = amr_fine%q_cons(1)%sf(fi, fj, fk) + amr_fine%y_cc(fj)**2
-                    if (p_glb > 0) amr_fine%q_cons(1)%sf(fi, fj, fk) = amr_fine%q_cons(1)%sf(fi, fj, fk) + amr_fine%z_cc(fk)**2
+        do fk = 0, amr_slots(amr_cur)%p
+            do fj = 0, amr_slots(amr_cur)%n
+                do fi = 0, amr_slots(amr_cur)%m
+                    amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%x_cc(fi)**2
+                    if (n_glb > 0) amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, &
+                        & fk) + amr_slots(amr_cur)%y_cc(fj)**2
+                    if (p_glb > 0) amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, &
+                        & fk) + amr_slots(amr_cur)%z_cc(fk)**2
                 end do
             end do
         end do
-        call s_restrict_one_var(amr_fine%q_cons(1), cscr(1))
+        call s_restrict_one_var(amr_slots(amr_cur)%q_cons(1), cscr(1))
         si_f = 0._wp; si_c = 0._wp
-        do fk = 0, amr_fine%p
-            do fj = 0, amr_fine%n
-                do fi = 0, amr_fine%m
-                    dvf = amr_fine%dx(fi)
-                    if (n_glb > 0) dvf = dvf*amr_fine%dy(fj)
-                    if (p_glb > 0) dvf = dvf*amr_fine%dz(fk)
-                    si_f = si_f + dvf*real(amr_fine%q_cons(1)%sf(fi, fj, fk), wp)
+        do fk = 0, amr_slots(amr_cur)%p
+            do fj = 0, amr_slots(amr_cur)%n
+                do fi = 0, amr_slots(amr_cur)%m
+                    dvf = amr_slots(amr_cur)%dx(fi)
+                    if (n_glb > 0) dvf = dvf*amr_slots(amr_cur)%dy(fj)
+                    if (p_glb > 0) dvf = dvf*amr_slots(amr_cur)%dz(fk)
+                    si_f = si_f + dvf*real(amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk), wp)
                 end do
             end do
         end do
@@ -1567,26 +1584,29 @@ contains
 
     impure subroutine s_finalize_amr_module()
 
-        integer :: i
+        integer :: i, islot
 
         if (.not. amr) return
-        do i = 1, sys_size
-            @:DEALLOCATE(amr_fine%q_cons(i)%sf)
-            @:DEALLOCATE(amr_fine%q_cons_stor(i)%sf)
-            @:DEALLOCATE(amr_fine%q_prim(i)%sf)
-            @:DEALLOCATE(amr_fine%rhs(i)%sf)
-            @:DEALLOCATE(amr_fine%q_ghost_a(i)%sf)
-            @:DEALLOCATE(amr_fine%q_ghost_b(i)%sf)
+        do islot = 1, amr_max_patches
+            do i = 1, sys_size
+                @:DEALLOCATE(amr_slots(islot)%q_cons(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf)
+            end do
+            @:DEALLOCATE(amr_slots(islot)%q_cons)
+            @:DEALLOCATE(amr_slots(islot)%q_cons_stor)
+            @:DEALLOCATE(amr_slots(islot)%q_prim)
+            @:DEALLOCATE(amr_slots(islot)%rhs)
+            @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
+            @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
+            if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
+            if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)
+            if (allocated(amr_slots(islot)%z_cb)) deallocate (amr_slots(islot)%z_cb, amr_slots(islot)%z_cc, amr_slots(islot)%dz)
         end do
-        @:DEALLOCATE(amr_fine%q_cons)
-        @:DEALLOCATE(amr_fine%q_cons_stor)
-        @:DEALLOCATE(amr_fine%q_prim)
-        @:DEALLOCATE(amr_fine%rhs)
-        @:DEALLOCATE(amr_fine%q_ghost_a)
-        @:DEALLOCATE(amr_fine%q_ghost_b)
-        if (allocated(amr_fine%x_cb)) deallocate (amr_fine%x_cb, amr_fine%x_cc, amr_fine%dx)
-        if (allocated(amr_fine%y_cb)) deallocate (amr_fine%y_cb, amr_fine%y_cc, amr_fine%dy)
-        if (allocated(amr_fine%z_cb)) deallocate (amr_fine%z_cb, amr_fine%z_cc, amr_fine%dz)
+        deallocate (amr_slots)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
         if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
         if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)

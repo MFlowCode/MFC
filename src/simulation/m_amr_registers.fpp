@@ -38,10 +38,11 @@ module m_amr_registers
     !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
 
-    !> Registers for the two patch faces normal to one direction: (1:sys_size, transverse-1, transverse-2).
+    !> Registers for the two patch faces normal to one direction: (1:sys_size, transverse-1, transverse-2, 1:amr_max_patches). The
+    !! trailing dimension is the patch slot (indexed by amr_cur); each slot's registers are captured/applied independently.
     type t_face_reg
-        real(wp), allocatable :: lo(:,:,:)
-        real(wp), allocatable :: hi(:,:,:)
+        real(wp), allocatable :: lo(:,:,:,:)
+        real(wp), allocatable :: hi(:,:,:,:)
     end type t_face_reg
 
     type(t_face_reg) :: creg(3)  !< coarse flux at the patch boundary faces (relative 0-based transverse)
@@ -102,15 +103,21 @@ contains
         if (p_glb > 0) max_f3 = 2*maxc3 - 1
         ! creg: relative 0-based transverse (0:maxc_t-1); freg: 0-based fine (0:max_f_t).
         ! Device-resident (@:ALLOCATE): capture and both applies run as kernels; no host copies are read.
-        @:ALLOCATE(creg(1)%lo(1:sys_size,0:maxc2 - 1,0:maxc3 - 1), creg(1)%hi(1:sys_size,0:maxc2 - 1,0:maxc3 - 1))
-        @:ALLOCATE(freg(1)%lo(1:sys_size,0:max_f2,0:max_f3), freg(1)%hi(1:sys_size,0:max_f2,0:max_f3))
+        @:ALLOCATE(creg(1)%lo(1:sys_size,0:maxc2 - 1,0:maxc3 - 1,1:amr_max_patches), creg(1)%hi(1:sys_size,0:maxc2 - 1, &
+                   & 0:maxc3 - 1,1:amr_max_patches))
+        @:ALLOCATE(freg(1)%lo(1:sys_size,0:max_f2,0:max_f3,1:amr_max_patches), freg(1)%hi(1:sys_size,0:max_f2,0:max_f3, &
+                   & 1:amr_max_patches))
         if (n_glb > 0) then
-            @:ALLOCATE(creg(2)%lo(1:sys_size,0:maxc1 - 1,0:maxc3 - 1), creg(2)%hi(1:sys_size,0:maxc1 - 1,0:maxc3 - 1))
-            @:ALLOCATE(freg(2)%lo(1:sys_size,0:max_f1,0:max_f3), freg(2)%hi(1:sys_size,0:max_f1,0:max_f3))
+            @:ALLOCATE(creg(2)%lo(1:sys_size,0:maxc1 - 1,0:maxc3 - 1,1:amr_max_patches), creg(2)%hi(1:sys_size,0:maxc1 - 1, &
+                       & 0:maxc3 - 1,1:amr_max_patches))
+            @:ALLOCATE(freg(2)%lo(1:sys_size,0:max_f1,0:max_f3,1:amr_max_patches), freg(2)%hi(1:sys_size,0:max_f1,0:max_f3, &
+                       & 1:amr_max_patches))
         end if
         if (p_glb > 0) then
-            @:ALLOCATE(creg(3)%lo(1:sys_size,0:maxc1 - 1,0:maxc2 - 1), creg(3)%hi(1:sys_size,0:maxc1 - 1,0:maxc2 - 1))
-            @:ALLOCATE(freg(3)%lo(1:sys_size,0:max_f1,0:max_f2), freg(3)%hi(1:sys_size,0:max_f1,0:max_f2))
+            @:ALLOCATE(creg(3)%lo(1:sys_size,0:maxc1 - 1,0:maxc2 - 1,1:amr_max_patches), creg(3)%hi(1:sys_size,0:maxc1 - 1, &
+                       & 0:maxc2 - 1,1:amr_max_patches))
+            @:ALLOCATE(freg(3)%lo(1:sys_size,0:max_f1,0:max_f2,1:amr_max_patches), freg(3)%hi(1:sys_size,0:max_f1,0:max_f2, &
+                       & 1:amr_max_patches))
         end if
 
     end subroutine s_initialize_amr_registers
@@ -125,7 +132,7 @@ contains
         type(vector_field), intent(in) :: flux_dir
         type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
-        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2
+        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2, islot
         integer                        :: sidx(3), ext(3)
         logical                        :: own_lo(3), own_hi(3), cap_lo, cap_hi
         real(wp)                       :: coef
@@ -133,6 +140,7 @@ contains
 
         if (.not. amr) return
         if (amr_in_fine_advance .and. .not. amr_rank_owns_patch) return
+        islot = amr_cur  ! working patch slot (local => captured by value in the device kernels below)
         ! flux data was just written by device kernels; the face reads below run as device kernels too
         if (amr_subcycle) then
             if (amr_in_fine_advance) then
@@ -157,27 +165,33 @@ contains
                         select case (id)
                         case (1)
                             if (accum) then
-                                freg(1)%lo(eq, t1, t2) = freg(1)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jlo, t1, t2), wp)
-                                freg(1)%hi(eq, t1, t2) = freg(1)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jhi, t1, t2), wp)
+                                freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(jlo, &
+                                     & t1, t2), wp)
+                                freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(jhi, &
+                                     & t1, t2), wp)
                             else
-                                freg(1)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jlo, t1, t2), wp)
-                                freg(1)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jhi, t1, t2), wp)
+                                freg(1)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jlo, t1, t2), wp)
+                                freg(1)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jhi, t1, t2), wp)
                             end if
                         case (2)
                             if (accum) then
-                                freg(2)%lo(eq, t1, t2) = freg(2)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(t1, jlo, t2), wp)
-                                freg(2)%hi(eq, t1, t2) = freg(2)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(t1, jhi, t2), wp)
+                                freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(t1, &
+                                     & jlo, t2), wp)
+                                freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(t1, &
+                                     & jhi, t2), wp)
                             else
-                                freg(2)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(t1, jlo, t2), wp)
-                                freg(2)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(t1, jhi, t2), wp)
+                                freg(2)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(t1, jlo, t2), wp)
+                                freg(2)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(t1, jhi, t2), wp)
                             end if
                         case (3)
                             if (accum) then
-                                freg(3)%lo(eq, t1, t2) = freg(3)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(t1, t2, jlo), wp)
-                                freg(3)%hi(eq, t1, t2) = freg(3)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(t1, t2, jhi), wp)
+                                freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(t1, &
+                                     & t2, jlo), wp)
+                                freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(t1, &
+                                     & t2, jhi), wp)
                             else
-                                freg(3)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(t1, t2, jlo), wp)
-                                freg(3)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(t1, t2, jhi), wp)
+                                freg(3)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(t1, t2, jlo), wp)
+                                freg(3)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(t1, t2, jhi), wp)
                             end if
                         end select
                     end do
@@ -194,14 +208,20 @@ contains
                         do eq = eqn_idx%mom%beg, eqn_idx%E
                             select case (id)
                             case (1)
-                                freg(1)%lo(eq, t1, t2) = freg(1)%lo(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(jlo, t1, t2), wp)
-                                freg(1)%hi(eq, t1, t2) = freg(1)%hi(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(jhi, t1, t2), wp)
+                                freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(jlo, &
+                                     & t1, t2), wp)
+                                freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(jhi, &
+                                     & t1, t2), wp)
                             case (2)
-                                freg(2)%lo(eq, t1, t2) = freg(2)%lo(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(t1, jlo, t2), wp)
-                                freg(2)%hi(eq, t1, t2) = freg(2)%hi(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(t1, jhi, t2), wp)
+                                freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(t1, &
+                                     & jlo, t2), wp)
+                                freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(t1, &
+                                     & jhi, t2), wp)
                             case (3)
-                                freg(3)%lo(eq, t1, t2) = freg(3)%lo(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(t1, t2, jlo), wp)
-                                freg(3)%hi(eq, t1, t2) = freg(3)%hi(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(t1, t2, jhi), wp)
+                                freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(t1, &
+                                     & t2, jlo), wp)
+                                freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(t1, &
+                                     & t2, jhi), wp)
                             end select
                         end do
                     end do
@@ -237,52 +257,52 @@ contains
                         case (1)
                             if (cap_lo) then
                                 if (accum) then
-                                    creg(1)%lo(eq, t1, t2) = creg(1)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, &
-                                         & o2 + t2), wp)
+                                    creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
+                                         & islot) + coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
                                 else
-                                    creg(1)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                    creg(1)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
                                 end if
                             end if
                             if (cap_hi) then
                                 if (accum) then
-                                    creg(1)%hi(eq, t1, t2) = creg(1)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, &
-                                         & o2 + t2), wp)
+                                    creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
+                                         & islot) + coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
                                 else
-                                    creg(1)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                    creg(1)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
                                 end if
                             end if
                         case (2)
                             if (cap_lo) then
                                 if (accum) then
-                                    creg(2)%lo(eq, t1, t2) = creg(2)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, &
-                                         & o2 + t2), wp)
+                                    creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
+                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
                                 else
-                                    creg(2)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                    creg(2)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
                                 end if
                             end if
                             if (cap_hi) then
                                 if (accum) then
-                                    creg(2)%hi(eq, t1, t2) = creg(2)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, &
-                                         & o2 + t2), wp)
+                                    creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
+                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
                                 else
-                                    creg(2)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                    creg(2)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
                                 end if
                             end if
                         case (3)
                             if (cap_lo) then
                                 if (accum) then
-                                    creg(3)%lo(eq, t1, t2) = creg(3)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, &
-                                         & o2 + t2, jlo), wp)
+                                    creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
+                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
                                 else
-                                    creg(3)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                    creg(3)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
                                 end if
                             end if
                             if (cap_hi) then
                                 if (accum) then
-                                    creg(3)%hi(eq, t1, t2) = creg(3)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, &
-                                         & o2 + t2, jhi), wp)
+                                    creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
+                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
                                 else
-                                    creg(3)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                    creg(3)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
                                 end if
                             end if
                         end select
@@ -299,20 +319,20 @@ contains
                         do eq = eqn_idx%mom%beg, eqn_idx%E
                             select case (id)
                             case (1)
-                                if (cap_lo) creg(1)%lo(eq, t1, t2) = creg(1)%lo(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(jlo, &
-                                    & o1 + t1, o2 + t2), wp)
-                                if (cap_hi) creg(1)%hi(eq, t1, t2) = creg(1)%hi(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(jhi, &
-                                    & o1 + t1, o2 + t2), wp)
+                                if (cap_lo) creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
+                                    & islot) + coef*real(flux_src%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                if (cap_hi) creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
+                                    & islot) + coef*real(flux_src%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
                             case (2)
-                                if (cap_lo) creg(2)%lo(eq, t1, t2) = creg(2)%lo(eq, t1, &
-                                    & t2) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
-                                if (cap_hi) creg(2)%hi(eq, t1, t2) = creg(2)%hi(eq, t1, &
-                                    & t2) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                if (cap_lo) creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
+                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                if (cap_hi) creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
+                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
                             case (3)
-                                if (cap_lo) creg(3)%lo(eq, t1, t2) = creg(3)%lo(eq, t1, &
-                                    & t2) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
-                                if (cap_hi) creg(3)%hi(eq, t1, t2) = creg(3)%hi(eq, t1, &
-                                    & t2) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                if (cap_lo) creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
+                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                if (cap_hi) creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
+                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
                             end select
                         end do
                     end do
@@ -330,13 +350,14 @@ contains
     impure subroutine s_amr_apply_reflux(rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch
+        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch, islot
         integer                                                :: nx_c, ny_c, nz_c, ol1, ol2, ol3, oh1, oh2, oh3, tl1, tl2, tl3
         integer                                                :: dd1_hi, dd2_hi, sidx(3), ext(3)
         logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
         real(wp)                                               :: fblo, fbhi, mlo, mhi
 
         if (.not. amr) return
+        islot = amr_cur  ! working patch slot (local => captured by value in the device kernels below)
         ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer
         ! (all faces at np=1); freg slices from a rank-boundary face's fine side arrive via
         ! s_mpi_sendrecv_amr_reflux_faces before this is called
@@ -373,15 +394,15 @@ contains
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, dd2_hi
                             do dd1 = 0, dd1_hi
-                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2)
-                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2)
+                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
                         if (has_lo) rhs_vf(eq)%sf(ol1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(ol1, tl2 + c1, &
-                            & tl3 + c2) + (creg(1)%lo(eq, c1, c2) - fblo)/mlo
+                            & tl3 + c2) + (creg(1)%lo(eq, c1, c2, islot) - fblo)/mlo
                         if (has_hi) rhs_vf(eq)%sf(oh1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(oh1, tl2 + c1, &
-                            & tl3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2))/mhi
+                            & tl3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2, islot))/mhi
                     end do
                 end do
             end do
@@ -405,15 +426,15 @@ contains
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, dd2_hi
                             do dd1 = 0, 1
-                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2)
-                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2)
+                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
                         if (has_lo) rhs_vf(eq)%sf(tl1 + c1, ol2, tl3 + c2) = rhs_vf(eq)%sf(tl1 + c1, ol2, &
-                            & tl3 + c2) + (creg(2)%lo(eq, c1, c2) - fblo)/mlo
+                            & tl3 + c2) + (creg(2)%lo(eq, c1, c2, islot) - fblo)/mlo
                         if (has_hi) rhs_vf(eq)%sf(tl1 + c1, oh2, tl3 + c2) = rhs_vf(eq)%sf(tl1 + c1, oh2, &
-                            & tl3 + c2) + (fbhi - creg(2)%hi(eq, c1, c2))/mhi
+                            & tl3 + c2) + (fbhi - creg(2)%hi(eq, c1, c2, islot))/mhi
                     end do
                 end do
             end do
@@ -435,15 +456,15 @@ contains
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, 1
                             do dd1 = 0, 1
-                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2)
-                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2)
+                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
                         if (has_lo) rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, ol3) = rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, &
-                            & ol3) + (creg(3)%lo(eq, c1, c2) - fblo)/mlo
+                            & ol3) + (creg(3)%lo(eq, c1, c2, islot) - fblo)/mlo
                         if (has_hi) rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, oh3) = rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, &
-                            & oh3) + (fbhi - creg(3)%hi(eq, c1, c2))/mhi
+                            & oh3) + (fbhi - creg(3)%hi(eq, c1, c2, islot))/mhi
                     end do
                 end do
             end do
@@ -455,10 +476,11 @@ contains
     !> Zero the fine registers (called by the subcycle driver before substep 1 - stage-1 overwrite cannot work across two substeps).
     impure subroutine s_amr_zero_fine_registers()
 
-        integer :: d, eq, t1, t2, t1_hi, t2_hi
+        integer :: d, eq, t1, t2, t1_hi, t2_hi, islot
 
         if (.not. amr) return
         if (.not. amr_rank_owns_patch) return
+        islot = amr_cur  ! working patch slot (local => captured by value in the device kernels below)
         do d = 1, 3
             if (allocated(freg(d)%lo)) then
                 t1_hi = ubound(freg(d)%lo, 2); t2_hi = ubound(freg(d)%lo, 3)
@@ -466,8 +488,8 @@ contains
                 do t2 = 0, t2_hi
                     do t1 = 0, t1_hi
                         do eq = 1, sys_size
-                            freg(d)%lo(eq, t1, t2) = 0._wp
-                            freg(d)%hi(eq, t1, t2) = 0._wp
+                            freg(d)%lo(eq, t1, t2, islot) = 0._wp
+                            freg(d)%hi(eq, t1, t2, islot) = 0._wp
                         end do
                     end do
                 end do
@@ -483,13 +505,14 @@ contains
     impure subroutine s_amr_apply_reflux_state(q_cons)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
-        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch
+        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch, islot
         integer                                                :: nx_c, ny_c, nz_c, ol1, ol2, ol3, oh1, oh2, oh3, tl1, tl2, tl3
         integer                                                :: dd1_hi, dd2_hi, sidx(3), ext(3)
         logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
         real(wp)                                               :: fblo, fbhi, mlo, mhi, dtl
 
         if (.not. amr) return
+        islot = amr_cur  ! working patch slot (local => captured by value in the device kernels below)
         ! per-face participation and index conventions: see s_amr_apply_reflux
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
         if (.not. (any(own_lo) .or. any(own_hi))) return
@@ -522,15 +545,15 @@ contains
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, dd2_hi
                             do dd1 = 0, dd1_hi
-                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2)
-                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2)
+                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
                         if (has_lo) q_cons(eq)%sf(ol1, tl2 + c1, tl3 + c2) = q_cons(eq)%sf(ol1, tl2 + c1, &
-                            & tl3 + c2) + dtl*(creg(1)%lo(eq, c1, c2) - fblo)/mlo
+                            & tl3 + c2) + dtl*(creg(1)%lo(eq, c1, c2, islot) - fblo)/mlo
                         if (has_hi) q_cons(eq)%sf(oh1, tl2 + c1, tl3 + c2) = q_cons(eq)%sf(oh1, tl2 + c1, &
-                            & tl3 + c2) + dtl*(fbhi - creg(1)%hi(eq, c1, c2))/mhi
+                            & tl3 + c2) + dtl*(fbhi - creg(1)%hi(eq, c1, c2, islot))/mhi
                     end do
                 end do
             end do
@@ -553,15 +576,15 @@ contains
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, dd2_hi
                             do dd1 = 0, 1
-                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2)
-                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2)
+                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
                         if (has_lo) q_cons(eq)%sf(tl1 + c1, ol2, tl3 + c2) = q_cons(eq)%sf(tl1 + c1, ol2, &
-                            & tl3 + c2) + dtl*(creg(2)%lo(eq, c1, c2) - fblo)/mlo
+                            & tl3 + c2) + dtl*(creg(2)%lo(eq, c1, c2, islot) - fblo)/mlo
                         if (has_hi) q_cons(eq)%sf(tl1 + c1, oh2, tl3 + c2) = q_cons(eq)%sf(tl1 + c1, oh2, &
-                            & tl3 + c2) + dtl*(fbhi - creg(2)%hi(eq, c1, c2))/mhi
+                            & tl3 + c2) + dtl*(fbhi - creg(2)%hi(eq, c1, c2, islot))/mhi
                     end do
                 end do
             end do
@@ -582,15 +605,15 @@ contains
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, 1
                             do dd1 = 0, 1
-                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2)
-                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2)
+                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
                         if (has_lo) q_cons(eq)%sf(tl1 + c1, tl2 + c2, ol3) = q_cons(eq)%sf(tl1 + c1, tl2 + c2, &
-                            & ol3) + dtl*(creg(3)%lo(eq, c1, c2) - fblo)/mlo
+                            & ol3) + dtl*(creg(3)%lo(eq, c1, c2, islot) - fblo)/mlo
                         if (has_hi) q_cons(eq)%sf(tl1 + c1, tl2 + c2, oh3) = q_cons(eq)%sf(tl1 + c1, tl2 + c2, &
-                            & oh3) + dtl*(fbhi - creg(3)%hi(eq, c1, c2))/mhi
+                            & oh3) + dtl*(fbhi - creg(3)%hi(eq, c1, c2, islot))/mhi
                     end do
                 end do
             end do
