@@ -913,7 +913,7 @@ contains
 
     !> Copy the hypo interface velocities of a fused-solve pass from Riemann-space buffers to physical-space output arrays, called
     !! after the Riemann solver for each sweep direction. The plain routine handles the hat_L-anchored values (nc_iface_vel_rsx;
-    !! used when hypo_nc_interface is active, and as the hat_L pass of the dual-pass HLLD solve); the _hatR routine handles the
+    !! used when hypo_nc_mode_interface is active, and as the hat_L pass of the dual-pass HLLD solve); the _hatR routine handles the
     !! hat_R-anchored values (nc_iface_vel_hatR_rsx) of the dual-pass solve. Both routines are emitted from one template so the two
     !! passes cannot drift apart.
     !! @param nc_iface_vel_vf Output: physical velocity components at interfaces

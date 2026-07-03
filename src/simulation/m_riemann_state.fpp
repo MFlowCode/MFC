@@ -35,7 +35,7 @@ module m_riemann_state
 
     !> Dual-pass HLLD second flux set: the hat_R-anchored fluxes (and, for axisymmetric runs, the hat_R interface velocities)
     !! written by the same fused solve that fills flux_rsx / nc_iface_vel_rsx with the hat_L-anchored values. Allocated only when
-    !! hypo_nc_dual_pass.
+    !! hypo_nc_mode_dual_pass.
     real(wp), allocatable, dimension(:,:,:,:) :: flux_hatR_rsx_vf
     $:GPU_DECLARE(create='[flux_hatR_rsx_vf]')
 

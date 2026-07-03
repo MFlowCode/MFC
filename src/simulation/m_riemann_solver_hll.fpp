@@ -561,7 +561,7 @@ contains
                             end if
 
                             ! Export interface velocity for NC RHS
-                            if (hypo_nc_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
+                            if (hypo_nc_mode == hypo_nc_mode_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     if (0._wp <= s_L) then

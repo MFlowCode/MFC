@@ -503,7 +503,7 @@ contains
             else
                 @:ACC_SETUP_VFs(nc_iface_vel_n(1))
             end if
-            if (hypo_nc_dual_pass) then
+            if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
                 @:ALLOCATE(nc_iface_vel_hatR_n(1:num_dims))
                 do i = 1, num_dims
                     @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(1:num_dims))
@@ -527,7 +527,7 @@ contains
                        & 0:n, 0:p))
         end if
 
-        if (hypo_nc_dual_pass) then
+        if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
             @:ALLOCATE(rhs_hatL_vf(1:sys_size))
             @:ALLOCATE(rhs_hatR_vf(1:sys_size))
             @:PREFER_GPU(rhs_hatL_vf)
@@ -659,7 +659,7 @@ contains
             call nvtxEndRange
         end if
 
-        if (.not. hypo_nc_dual_pass) then
+        if (hypo_nc_mode /= hypo_nc_mode_dual_pass) then
             do id = 1, num_dims
                 if (igr) then
                     if (id == 1) then
@@ -696,7 +696,7 @@ contains
                     call s_compute_directional_rhs(id, rhs_vf, .false.)
 
                     ! RHS additions for hypoelasticity
-                    if (hypo_nc_finite_diff) then
+                    if (hypo_nc_mode == hypo_nc_mode_finite_diff) then
                         call nvtxStartRange("RHS-HYPOELASTICITY-FD-PER-SWEEP")
                         call s_compute_hypoelastic_rhs_finite_diff_per_sweep(id, q_prim_qp%vf, rhs_vf)
                         call nvtxEndRange
@@ -791,7 +791,7 @@ contains
         ! END: Dimensional Splitting Loop
 
         ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
-        if (hypo_nc_interface) then
+        if (hypo_nc_mode == hypo_nc_mode_interface) then
             call nvtxStartRange("RHS-HYPOELASTICITY-IFACE")
             call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, nc_iface_vel_n)
             call nvtxEndRange
@@ -1080,7 +1080,7 @@ contains
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
-            if (.not. hypo_nc_dual_pass) then
+            if (hypo_nc_mode /= hypo_nc_mode_dual_pass) then
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k_loop, l_loop, q_loop, inv_ds, flux_face1, flux_face2]')
                 do j = 1, sys_size
                     do q_loop = 0, p
@@ -1156,7 +1156,7 @@ contains
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
-            if (.not. hypo_nc_dual_pass) then
+            if (hypo_nc_mode /= hypo_nc_mode_dual_pass) then
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1, flux_face2]')
                 do j = 1, sys_size
                     do l = 0, p
@@ -1229,7 +1229,7 @@ contains
             end if
 
             if (cyl_coord) then
-                geom_fac = merge(0.25_wp, 5.e-1_wp, hypo_nc_dual_pass)
+                geom_fac = merge(0.25_wp, 5.e-1_wp, hypo_nc_mode == hypo_nc_mode_dual_pass)
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, flux_face1, flux_face2]')
                 do j = 1, sys_size
                     do l = 0, p
@@ -1284,7 +1284,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             else  ! Cartesian Coordinates
-                if (.not. hypo_nc_dual_pass) then
+                if (hypo_nc_mode /= hypo_nc_mode_dual_pass) then
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1, flux_face2]')
                     do j = 1, sys_size
                         do k = 0, p
@@ -2216,7 +2216,7 @@ contains
                 @:DEALLOCATE(nc_iface_vel_n(i)%vf)
             end do
             @:DEALLOCATE(nc_iface_vel_n)
-            if (hypo_nc_dual_pass) then
+            if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
                 do i = 1, num_dims
                     do l = 1, num_dims
                         @:DEALLOCATE(nc_iface_vel_hatR_n(i)%vf(l)%sf)
@@ -2227,7 +2227,7 @@ contains
             end if
         end if
 
-        if (hypo_nc_dual_pass) then
+        if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
             do i = 1, sys_size
                 @:DEALLOCATE(rhs_hatL_vf(i)%sf)
                 @:DEALLOCATE(rhs_hatR_vf(i)%sf)

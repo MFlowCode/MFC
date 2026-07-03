@@ -64,9 +64,13 @@ module m_global_parameters
     logical :: cfl_dt
     ! Simulation Algorithm Parameters generated_case_opt_decls.fpp: now in m_global_parameters_common
 
-    logical :: hypo_nc_finite_diff
-    logical :: hypo_nc_interface
-    logical :: hypo_nc_dual_pass
+    !> Hypoelastic NC velocity-coupling mode; exactly one value, derived from riemann_solver + hypo_hll_interface_rhs.
+    integer, parameter :: hypo_nc_mode_none = 0         !< no hypoelastic NC velocity coupling
+    integer, parameter :: hypo_nc_mode_finite_diff = 1  !< velocity gradients by finite difference (HLL without interface RHS)
+    !> interface-velocity export for the velocity-gradient tensor (HLL Method 2, HLLC)
+    integer, parameter :: hypo_nc_mode_interface = 2
+    integer, parameter :: hypo_nc_mode_dual_pass = 3  !< anchored dual-pass HLLD; all NC terms stay in the Riemann flux
+    integer            :: hypo_nc_mode
     !> NC volume-fraction advection export mode; exactly one value, derived from riemann_solver + hll_u_interface.
     integer, parameter :: adv_src_mode_unset = 0        !< not yet derived
     integer, parameter :: adv_src_mode_alpha_iface = 1  !< flux_src exports per-fluid interface alpha
@@ -87,7 +91,7 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[hyper_model]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress]')
-    $:GPU_DECLARE(create='[hypo_nc_interface]')
+    $:GPU_DECLARE(create='[hypo_nc_mode]')
 
     logical :: bc_io
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
@@ -358,9 +362,7 @@ contains
         hll_u_interface = .false.
         hypo_hll_interface_rhs = .false.
         hypo_energy_guard = .true.
-        hypo_nc_finite_diff = .false.
-        hypo_nc_interface = .false.
-        hypo_nc_dual_pass = .false.
+        hypo_nc_mode = hypo_nc_mode_none
         adv_src_mode = adv_src_mode_unset
         use_nc_iface_vel = .false.
         low_Mach = 0
@@ -852,20 +854,18 @@ contains
             fd_number = max(1, fd_order/2)
         end if
 
-        hypo_nc_finite_diff = .false.
-        hypo_nc_interface = .false.
-        hypo_nc_dual_pass = .false.
+        hypo_nc_mode = hypo_nc_mode_none
         if (hypoelasticity) then
             if (riemann_solver == 1) then
                 if (hypo_hll_interface_rhs) then
-                    hypo_nc_interface = .true.
+                    hypo_nc_mode = hypo_nc_mode_interface
                 else
-                    hypo_nc_finite_diff = .true.
+                    hypo_nc_mode = hypo_nc_mode_finite_diff
                 end if
             else if (riemann_solver == 2) then
-                hypo_nc_interface = .true.
+                hypo_nc_mode = hypo_nc_mode_interface
             else if (riemann_solver == 4) then
-                hypo_nc_dual_pass = .true.
+                hypo_nc_mode = hypo_nc_mode_dual_pass
             end if
         end if
 
@@ -905,10 +905,10 @@ contains
         ! velocities beyond what flux_src already provides:
         !
         ! 1. adv_src_mode_alpha_iface + alt_soundspeed: face-normal velocity only, for the KdivU correction (flux_src already
-        ! carries alpha in this mode) 2. hypo_nc_interface: all components for the hypoelastic velocity-gradient tensor
-        ! 3. hypo_nc_dual_pass + axisym: normal + tangential velocity for the axisymmetric geometry correction
-        use_nc_iface_vel = hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2) &
-            & .or. (adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed)
+        ! carries alpha in this mode) 2. hypo_nc_mode_interface: all components for the hypoelastic velocity-gradient tensor
+        ! 3. hypo_nc_mode_dual_pass + axisym: normal + tangential velocity for the axisymmetric geometry correction
+        use_nc_iface_vel = hypo_nc_mode == hypo_nc_mode_interface .or. (hypo_nc_mode == hypo_nc_mode_dual_pass &
+            & .and. grid_geometry == 2) .or. (adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed)
 
         $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
         $:GPU_UPDATE(device='[b_size, tensor_size]')
@@ -919,7 +919,7 @@ contains
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
                      & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
                      & hyperelasticity, hyper_model, elasticity, low_Mach]')
-        $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_energy_guard, hypo_nc_interface]')
+        $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_energy_guard, hypo_nc_mode]')
 
         $:GPU_UPDATE(device='[Bx0]')
 
