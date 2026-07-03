@@ -325,15 +325,14 @@ contains
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(wp)                                               :: F_L, vel_L, rho_L, F_R, vel_R, rho_R, sigma_dt
+        real(wp)                                               :: F_L, vel_L, rho_L, F_R, vel_R, rho_R
         #:if not MFC_CASE_OPTIMIZATION
             real(wp), dimension(num_fluids_max) :: alpha_rho_L, alpha_rho_R
         #:else
             real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
         #:endif
 
-        $:GPU_PARALLEL_LOOP(collapse=3, &
-                            & private='[j, k, l, F_L, vel_L, alpha_rho_L, F_R, vel_R, alpha_rho_R, rho_L, rho_R, sigma_dt]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, F_L, vel_L, alpha_rho_L, F_R, vel_R, alpha_rho_R, rho_L, rho_R]')
         do l = 0, p
             do k = 0, n
                 do j = -1, m
@@ -378,22 +377,19 @@ contains
                     vel_L = vel_L/rho_L
                     vel_R = vel_R/rho_R
 
-                    ! Preserve scaled-RHS semantics for the legacy sigma-x path.
-                    sigma_dt = merge(dt, 1._wp, viscous)
-
                     #:for LR in ['L', 'R']
                         $:GPU_ATOMIC(atomic='update')
                         rhs_vf(igr_momxb)%sf(j + 1, k, l) = rhs_vf(igr_momxb)%sf(j + 1, k, &
-                               & l) + real(0.5_wp*sigma_dt*F_${LR}$*(1._wp/dx(j + 1)), kind=stp)
+                               & l) + real(0.5_wp*dt*F_${LR}$*(1._wp/dx(j + 1)), kind=stp)
                         $:GPU_ATOMIC(atomic='update')
                         rhs_vf(igr_E_idx)%sf(j + 1, k, l) = rhs_vf(igr_E_idx)%sf(j + 1, k, &
-                               & l) + real(0.5_wp*sigma_dt*vel_${LR}$*F_${LR}$*(1._wp/dx(j + 1)), kind=stp)
+                               & l) + real(0.5_wp*dt*vel_${LR}$*F_${LR}$*(1._wp/dx(j + 1)), kind=stp)
                         $:GPU_ATOMIC(atomic='update')
-                        rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, &
-                               & l) - real(0.5_wp*sigma_dt*F_${LR}$*(1._wp/dx(j)), kind=stp)
+                        rhs_vf(igr_momxb)%sf(j, k, l) = rhs_vf(igr_momxb)%sf(j, k, l) - real(0.5_wp*dt*F_${LR}$*(1._wp/dx(j)), &
+                               & kind=stp)
                         $:GPU_ATOMIC(atomic='update')
                         rhs_vf(igr_E_idx)%sf(j, k, l) = rhs_vf(igr_E_idx)%sf(j, k, &
-                               & l) - real(0.5_wp*sigma_dt*vel_${LR}$*F_${LR}$*(1._wp/dx(j)), kind=stp)
+                               & l) - real(0.5_wp*dt*vel_${LR}$*F_${LR}$*(1._wp/dx(j)), kind=stp)
                     #:endfor
                 end do
             end do

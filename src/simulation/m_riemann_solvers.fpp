@@ -83,7 +83,11 @@ contains
         is1%end = m; is2%end = n; is3%end = p
 
         @:ALLOCATE(flux_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
-        @:ALLOCATE(flux_gsrc_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+        if (igr) then
+            @:ALLOCATE(flux_gsrc_rsx_vf(0:0, 0:0, 0:0, 1:1))
+        else
+            @:ALLOCATE(flux_gsrc_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+        end if
         @:ALLOCATE(flux_src_rsx_vf(-1:m, -1:n, -1:p, eqn_idx%adv%beg:sys_size))
         @:ALLOCATE(vel_src_rsx_vf(-1:m, -1:n, -1:p, 1:num_vels))
         if (qbmm) then

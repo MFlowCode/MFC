@@ -195,8 +195,12 @@ contains
                 do l = 1, sys_size
                     @:ALLOCATE(flux_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    if (igr) then
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                    else
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                    end if
                 end do
 
                 if ((viscous .or. surface_tension) .or. igr) then
@@ -228,8 +232,12 @@ contains
                 end if
             else
                 do l = 1, sys_size
-                    @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    if (igr) then
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                    else
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                    end if
                 end do
             end if
 
@@ -271,10 +279,15 @@ contains
             @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
             @:ALLOCATE(qR_prim(i)%vf(1:sys_size))
             do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                @:ALLOCATE(qL_prim(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ALLOCATE(qR_prim(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                if (igr) then
+                    @:ALLOCATE(qL_prim(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                    @:ALLOCATE(qR_prim(i)%vf(l)%sf(1:1, 1:1, 1:1))
+                else
+                    @:ALLOCATE(qL_prim(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ALLOCATE(qR_prim(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                               & idwbuff(3)%beg:idwbuff(3)%end))
+                end if
             end do
             @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))
         end do
@@ -409,19 +422,21 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, id]', collapse=4)
-        do id = 1, num_dims
-            do i = 1, sys_size
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
+        if (.not. igr) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, id]', collapse=4)
+            do id = 1, num_dims
+                do i = 1, sys_size
+                    do l = idwbuff(3)%beg, idwbuff(3)%end
+                        do k = idwbuff(2)%beg, idwbuff(2)%end
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
+                            end do
                         end do
                     end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
         ! end if
 
         if (qbmm) then
@@ -695,7 +710,9 @@ contains
 
             ! Match legacy IGR alpha-flux/source semantics before shared RHS accumulation.
             if (igr) then
+                call nvtxStartRange("IGR-CORRECT-LF-FLUXES")
                 call s_igr_correct_lf_fluxes(qR_rsx_vf, qL_rsx_vf, flux_n(id)%vf, flux_src_n(id)%vf, id)
+                call nvtxEndRange
             end if
 
             ! Additional physics and source terms RHS addition for advection source
