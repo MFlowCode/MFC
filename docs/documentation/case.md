@@ -787,8 +787,11 @@ AMR requires WENO reconstruction (`recon_type = 1`, any order), SSP-RK3 time-ste
 It is incompatible with viscosity, surface tension, bubble models, phase-change (relax),
 immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, `hybrid_weno`,
 `hybrid_riemann`, and `acoustic_source`.
-Multi-rank runs are supported; the fine patch is owned by a single rank determined at
-init but ghost-fill transfers cross rank boundaries as needed.
+Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
+holds the fine cells covering the patch's intersection with its own subdomain), so the
+patch may span rank boundaries and move freely across them under dynamic regrid.
+The patch may cover at most about half of any rank's subdomain per dimension (the fine
+advance reuses the rank-local solver scratch).
 
 **Static vs. dynamic patch.**
 Setting `amr_regrid_int = 0` fixes the patch at the initial `amr_patch_beg`/`amr_patch_end`

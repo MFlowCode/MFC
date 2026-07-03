@@ -70,14 +70,11 @@ contains
     impure subroutine s_initialize_amr_registers()
 
         integer :: maxc1, maxc2, maxc3, max_f1, max_f2, max_f3
-        integer :: sidx(3), ext(3)
-        logical :: own_lo(3), own_hi(3)
 
         if (.not. amr) return
-        ! participants: ranks with fine cells (freg capture) and ranks owning an outside face layer (creg
-        ! capture + apply; those also RECEIVE freg slices when a patch face sits on a rank boundary)
-        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
-        if (.not. (amr_rank_owns_patch .or. any(own_lo) .or. any(own_hi))) return
+        ! Registers on ALL ranks: regrid moves the patch faces, so any rank can become a participant (fine
+        ! cells for freg; outside face layer for creg capture + apply and for RECEIVING freg slices when a
+        ! patch face sits on a rank boundary). Participation is re-derived per call from the current box.
         ! max coarse patch cells per dim THIS rank can cover (must match m_amr's preallocation cap). The
         ! transverse extents match the face-neighbor's by construction (cart neighbors share transverse
         ! subdomains), so the whole-array freg sendrecvs in m_mpi_proxy pair up exactly.

@@ -21,8 +21,7 @@ module m_amr
     public :: t_level, amr_fine, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
         & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
         & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, &
-        & s_advance_amr_fine_substeps, s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, amr_owner_win_lo, &
-        & amr_owner_win_hi
+        & s_advance_amr_fine_substeps, s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -49,10 +48,10 @@ module m_amr
     type(t_level) :: amr_fine
     integer       :: amr_maxc(3)  !< max coarse patch cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
-    !> Owner containment window in GLOBAL coarse indices (fixed for the run, known on all ranks; 0 in collapsed dims): a patch is
-    !! owner-contained iff amr_owner_win_lo(d) <= beg(d) and end(d) <= amr_owner_win_hi(d) per active dim.
-    integer :: amr_owner_win_lo(3) = 0, amr_owner_win_hi(3) = 0
-    logical :: amr_win_clamp_warned = .false.  !< one-shot regrid warning (SP7a mobility limit)
+    !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min over ranks
+    !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
+    !! 2*(isect cells) - 1 <= local extent holds by construction. Equals amr_maxc at np=1.
+    integer :: amr_maxc_fit(3) = 1
 
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
@@ -77,7 +76,7 @@ contains
 
         integer :: i, d, max_f1, max_f2, max_f3
         integer :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
-        integer :: sidx(3), ext(3), maxc_loc(3), nmar, bad_loc, bad_glb
+        integer :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
 
         if (.not. amr) return
 
@@ -116,28 +115,6 @@ contains
                              & // 'or use fewer ranks')
         end if
 
-        ! Fine ghost prolongation reads up to nmar coarse cells past each face of the intersection; if that
-        ! stencil leaves ANY rank's interior (patch near/at/across a rank boundary), the coarse CONS ghosts it
-        ! reads must be halo-exchanged before every fill (the solver populates only PRIM ghosts). All ranks
-        ! agree on the flag, so the pairwise exchanges are called consistently.
-        nmar = (buff_size + 1)/2 + 1
-        bad_loc = 0
-        if (amr_rank_owns_patch) then
-            if (amr_isect_lo(1) - sidx(1) < nmar .or. sidx(1) + ext(1) - amr_isect_hi(1) < nmar) bad_loc = 1
-            if (n_glb > 0 .and. (amr_isect_lo(2) - sidx(2) < nmar .or. sidx(2) + ext(2) - amr_isect_hi(2) < nmar)) bad_loc = 1
-            if (p_glb > 0 .and. (amr_isect_lo(3) - sidx(3) < nmar .or. sidx(3) + ext(3) - amr_isect_hi(3) < nmar)) bad_loc = 1
-        end if
-        call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
-        amr_xchg_coarse_ghosts = bad_glb == 1
-
-        ! Owner containment window in global indices (SP7a leftover: read only by the single-rank regrid path;
-        ! meaningless when the patch spans ranks - deleted with the T2 regrid rework).
-        amr_owner_win_lo = 0; amr_owner_win_hi = 0
-        do d = 1, num_dims
-            call s_mpi_allreduce_integer_max(merge(sidx(d) + buff_size, -huge(1), amr_rank_owns_patch), amr_owner_win_lo(d))
-            call s_mpi_allreduce_integer_min(merge(sidx(d) + ext(d) - buff_size, huge(1), amr_rank_owns_patch), amr_owner_win_hi(d))
-        end do
-
         amr_fine%ref_ratio = 2
         amr_fine%buff_size = buff_size
 
@@ -146,6 +123,14 @@ contains
         amr_maxc(2) = 1; amr_maxc(3) = 1
         if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/2
         if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/2
+
+        ! regrid size cap: min over ranks of the local half-extent (see the declaration; = amr_maxc at np=1),
+        ! so any clamped box satisfies every rank's scratch constraint and can move freely across ranks
+        amr_maxc_fit = amr_maxc
+        do d = 1, num_dims
+            call s_mpi_allreduce_integer_min((ext(d) + 1)/2, fit_d)
+            amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
+        end do
 
         ! preallocation cap for MY fine arrays: the largest intersection any patch box can have with this
         ! rank's subdomain (the scratch constraint caps it at about half the local extent; = amr_maxc at np=1)
@@ -167,49 +152,49 @@ contains
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
 
-        ! owner-only storage: non-owner ranks run pure coarse and never touch the fine level
-        if (amr_rank_owns_patch) then
-            ! preallocate coordinates at max fine extents
-            allocate (amr_fine%x_cb(-1:max_f1), amr_fine%x_cc(0:max_f1), amr_fine%dx(0:max_f1))
-            if (n_glb > 0) allocate (amr_fine%y_cb(-1:max_f2), amr_fine%y_cc(0:max_f2), amr_fine%dy(0:max_f2))
-            if (p_glb > 0) allocate (amr_fine%z_cb(-1:max_f3), amr_fine%z_cc(0:max_f3), amr_fine%dz(0:max_f3))
+        ! fine-level storage on ALL ranks (pool-sized to MY max intersection): regrid can move the patch onto
+        ! any rank, so allocation state never changes with amr_rank_owns_patch flips; ranks without a current
+        ! intersection have amr_fine%m/n/p = -1 and all fine loops no-op
+        ! preallocate coordinates at max fine extents
+        allocate (amr_fine%x_cb(-1:max_f1), amr_fine%x_cc(0:max_f1), amr_fine%dx(0:max_f1))
+        if (n_glb > 0) allocate (amr_fine%y_cb(-1:max_f2), amr_fine%y_cc(0:max_f2), amr_fine%dy(0:max_f2))
+        if (p_glb > 0) allocate (amr_fine%z_cb(-1:max_f3), amr_fine%z_cc(0:max_f3), amr_fine%dz(0:max_f3))
 
-            ! bounce buffers for copy-based coord swap (GPU-safe; same bounds as the base-level global arrays)
-            allocate (sw_x_cb(-1 - buff_size:m + buff_size))
-            allocate (sw_x_cc(-buff_size:m + buff_size))
-            allocate (sw_dx(-buff_size:m + buff_size))
-            if (n_glb > 0) then
-                allocate (sw_y_cb(-1 - buff_size:n + buff_size))
-                allocate (sw_y_cc(-buff_size:n + buff_size))
-                allocate (sw_dy(-buff_size:n + buff_size))
-            end if
-            if (p_glb > 0) then
-                allocate (sw_z_cb(-1 - buff_size:p + buff_size))
-                allocate (sw_z_cc(-buff_size:p + buff_size))
-                allocate (sw_dz(-buff_size:p + buff_size))
-            end if
-
-            ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p.
-            ! Device-resident (@:ALLOCATE) so s_compute_rhs kernels can run on the fine patch;
-            ! q_cons/q_prim/rhs get the Cray pointer setup mirroring m_time_steppers' field vectors.
-            @:ALLOCATE(amr_fine%q_cons(1:sys_size))
-            @:ALLOCATE(amr_fine%q_cons_stor(1:sys_size))
-            @:ALLOCATE(amr_fine%q_prim(1:sys_size))
-            @:ALLOCATE(amr_fine%rhs(1:sys_size))
-            @:ALLOCATE(amr_fine%q_ghost_a(1:sys_size))
-            @:ALLOCATE(amr_fine%q_ghost_b(1:sys_size))
-            do i = 1, sys_size
-                @:ALLOCATE(amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_fine%rhs(i)%sf(0:max_f1, 0:max_f2, 0:max_f3))
-                @:ALLOCATE(amr_fine%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_fine%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ACC_SETUP_SFs(amr_fine%q_cons(i))
-                @:ACC_SETUP_SFs(amr_fine%q_prim(i))
-                @:ACC_SETUP_SFs(amr_fine%rhs(i))
-            end do
+        ! bounce buffers for copy-based coord swap (GPU-safe; same bounds as the base-level global arrays)
+        allocate (sw_x_cb(-1 - buff_size:m + buff_size))
+        allocate (sw_x_cc(-buff_size:m + buff_size))
+        allocate (sw_dx(-buff_size:m + buff_size))
+        if (n_glb > 0) then
+            allocate (sw_y_cb(-1 - buff_size:n + buff_size))
+            allocate (sw_y_cc(-buff_size:n + buff_size))
+            allocate (sw_dy(-buff_size:n + buff_size))
         end if
+        if (p_glb > 0) then
+            allocate (sw_z_cb(-1 - buff_size:p + buff_size))
+            allocate (sw_z_cc(-buff_size:p + buff_size))
+            allocate (sw_dz(-buff_size:p + buff_size))
+        end if
+
+        ! preallocate fine fields at max buffered extents; loops always use current amr_fine%m/n/p.
+        ! Device-resident (@:ALLOCATE) so s_compute_rhs kernels can run on the fine patch;
+        ! q_cons/q_prim/rhs get the Cray pointer setup mirroring m_time_steppers' field vectors.
+        @:ALLOCATE(amr_fine%q_cons(1:sys_size))
+        @:ALLOCATE(amr_fine%q_cons_stor(1:sys_size))
+        @:ALLOCATE(amr_fine%q_prim(1:sys_size))
+        @:ALLOCATE(amr_fine%rhs(1:sys_size))
+        @:ALLOCATE(amr_fine%q_ghost_a(1:sys_size))
+        @:ALLOCATE(amr_fine%q_ghost_b(1:sys_size))
+        do i = 1, sys_size
+            @:ALLOCATE(amr_fine%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+            @:ALLOCATE(amr_fine%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+            @:ALLOCATE(amr_fine%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+            @:ALLOCATE(amr_fine%rhs(i)%sf(0:max_f1, 0:max_f2, 0:max_f3))
+            @:ALLOCATE(amr_fine%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+            @:ALLOCATE(amr_fine%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+            @:ACC_SETUP_SFs(amr_fine%q_cons(i))
+            @:ACC_SETUP_SFs(amr_fine%q_prim(i))
+            @:ACC_SETUP_SFs(amr_fine%rhs(i))
+        end do
 
         ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial patch
         call s_set_amr_fine_geometry(amr_patch_beg, amr_patch_end)
@@ -271,10 +256,12 @@ contains
     end subroutine s_amr_compute_isect
 
     !> Set the fine level's geometry (region, intersection, extents, bounds, coordinates) for the box lo:hi. Arrays are preallocated
-    !! at max size; this only updates metadata and refills coords.
+    !! at max size; this only updates metadata and refills coords. Collective: ALL ranks must call together (init and regrid do) -
+    !! it also refreshes the allreduced amr_xchg_coarse_ghosts flag for the new box.
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
+        integer             :: sidx(3), ext(3), nmar, bad_loc, bad_glb
 
         call s_amr_compute_isect(lo, hi)
         amr_fine%region%lo = lo; amr_fine%region%hi = hi
@@ -294,7 +281,7 @@ contains
         if (p_glb > 0) then
             amr_fine%idwbuff(3)%beg = -buff_size; amr_fine%idwbuff(3)%end = amr_fine%p + buff_size
         end if
-        ! coord building only on ranks with fine cells (others' coord arrays are unallocated); the parent origin
+        ! coord building only on ranks with fine cells (others never read their coord arrays); the parent origin
         ! is this rank's INTERSECTION start, converted to LOCAL indexing so the bisection reads its x_cb slice
         if (amr_rank_owns_patch) then
             call s_build_level_coords(x_cb, lbound(x_cb, 1), amr_isect_lo(1) - start_idx(1), amr_fine%m, amr_fine%x_cb, &
@@ -304,6 +291,24 @@ contains
             if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), amr_isect_lo(3) - start_idx(3), amr_fine%p, &
                 & amr_fine%z_cb, amr_fine%z_cc, amr_fine%dz)
         end if
+
+        ! Fine ghost prolongation reads up to nmar coarse cells past each face of the intersection; if that
+        ! stencil leaves ANY rank's interior (patch near/at/across a rank boundary), the coarse CONS ghosts it
+        ! reads must be halo-exchanged before every fill (the solver populates only PRIM ghosts). All ranks
+        ! agree on the flag, so the pairwise exchanges are called consistently.
+        sidx = 0; ext = 0
+        sidx(1) = start_idx(1); ext(1) = m
+        if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
+        if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
+        nmar = (buff_size + 1)/2 + 1
+        bad_loc = 0
+        if (amr_rank_owns_patch) then
+            if (amr_isect_lo(1) - sidx(1) < nmar .or. sidx(1) + ext(1) - amr_isect_hi(1) < nmar) bad_loc = 1
+            if (n_glb > 0 .and. (amr_isect_lo(2) - sidx(2) < nmar .or. sidx(2) + ext(2) - amr_isect_hi(2) < nmar)) bad_loc = 1
+            if (p_glb > 0 .and. (amr_isect_lo(3) - sidx(3) < nmar .or. sidx(3) + ext(3) - amr_isect_hi(3) < nmar)) bad_loc = 1
+        end if
+        call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
+        amr_xchg_coarse_ghosts = bad_glb == 1
 
     end subroutine s_set_amr_fine_geometry
 
@@ -512,7 +517,7 @@ contains
                 end do
             end do
         end do
-        print '(A,ES12.4)', ' [amr] restrict-prolong conservation err = ', err  ! owner rank only
+        print '(A,ES12.4)', ' [amr] restrict-prolong conservation err = ', err  ! every rank with fine cells prints
         do i = 1, sys_size
             deallocate (scratch(i)%sf)
         end do
@@ -859,36 +864,49 @@ contains
 
     end subroutine s_advance_amr_fine_substeps
 
-    !> Regrid: tag by relative density gradient, form the padded/clamped bounding box, rebuild the fine level (copy old-fine on
-    !! overlap via q_cons_stor bounce; prolong new cells). Called between steps only. No-op if nothing is tagged or the box is
-    !! unchanged.
+    !> Regrid: tag by relative density gradient, form the padded/clamped bounding box, then every rank rebuilds its LOCAL piece
+    !! (copy old-fine on overlap via q_cons_stor bounce; prolong new cells). Fine data never migrates: fine cells for coarse cell c
+    !! always live on rank(c), so the overlap copy is rank-local by construction. Called between steps only. No-op if nothing is
+    !! tagged or the box is unchanged.
     impure subroutine s_amr_regrid(q_cons_base)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
-        integer                                             :: lo(3), hi(3), old_lo(3), old_m1, old_n1, old_p1
-        integer                                             :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, sh(3), i, d
-        integer                                             :: sidx(3), lo_r, hi_r, maxc_eff
-        real(wp)                                            :: r0, g
-        logical                                             :: tagged, win_cut
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
+        integer                                                :: lo(3), hi(3), old_ilo(3), old_m1, old_n1, old_p1
+        integer                                                :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, sh(3), i, d
+        integer                                                :: sidx(3), lo_r, hi_r, tg_lo(3), tg_hi(3)
+        real(wp)                                               :: r0, g
+        logical                                                :: tagged
 
         ! host consumer: regrid (tag sweep + rebuild prolongation run on host every regrid_int steps;
         ! ALL ranks tag their local interior, so this is unguarded)
 
+        ! valid coarse CONS ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the
+        ! rebuild prolongation reads past the new intersection (ALL ranks call: pairwise per-direction
+        ! exchange; complete no-op at np=1). The exchange unpacks on the device; the host pull below carries
+        ! the fresh ghosts to the host consumers.
+
+        call s_amr_exchange_coarse_cons_halo(q_cons_base)
         do i = 1, sys_size
             $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
         end do
 
-        ! 1) tag + bounding box over the LOCAL interior (sweep away from local edges; ghosts not needed), emitting
-        !    GLOBAL indices. No rank-dependent branching before the reductions: every rank reaches both allreduces.
+        ! 1) tag + bounding box, emitting GLOBAL indices: sweep every cell except GLOBAL cells 0 and m_glb etc.
+        !    (the np=1 bounds - the swept union is decomposition-invariant, so the reduced box matches np=1
+        !    exactly; seam-adjacent cells read the exchanged ghosts). No rank-dependent branching before the
+        !    reductions: every rank reaches both allreduces.
 
         sidx = 0
         sidx(1) = start_idx(1)
         if (n_glb > 0) sidx(2) = start_idx(2)
         if (p_glb > 0) sidx(3) = start_idx(3)
+        tg_lo = 0; tg_hi = 0
+        tg_lo(1) = merge(1, 0, sidx(1) == 0); tg_hi(1) = merge(m - 1, m, sidx(1) + m == m_glb)
+        if (n_glb > 0) then; tg_lo(2) = merge(1, 0, sidx(2) == 0); tg_hi(2) = merge(n - 1, n, sidx(2) + n == n_glb); end if
+        if (p_glb > 0) then; tg_lo(3) = merge(1, 0, sidx(3) == 0); tg_hi(3) = merge(p - 1, p, sidx(3) + p == p_glb); end if
         lo = huge(1); hi = -huge(1); tagged = .false.
-        do ck = merge(1, 0, p_glb > 0), merge(p - 1, 0, p_glb > 0)
-            do cj = merge(1, 0, n_glb > 0), merge(n - 1, 0, n_glb > 0)
-                do ci = 1, m - 1
+        do ck = tg_lo(3), tg_hi(3)
+            do cj = tg_lo(2), tg_hi(2)
+                do ci = tg_lo(1), tg_hi(1)
                     r0 = max(abs(real(q_cons_base(1)%sf(ci, cj, ck), wp)), 1.e-30_wp)
                     g = abs(real(q_cons_base(1)%sf(ci + 1, cj, ck), wp) - real(q_cons_base(1)%sf(ci - 1, cj, ck), wp))
                     if (n_glb > 0) g = max(g, abs(real(q_cons_base(1)%sf(ci, cj + 1, ck), wp) - real(q_cons_base(1)%sf(ci, &
@@ -912,47 +930,32 @@ contains
         end do
         if (hi(1) < lo(1)) return  ! nothing tagged on any rank (all ranks agree)
 
-        ! 2) pad + clamp: domain margin, owner containment window (the SP7a mobility limit: the patch cannot leave its
-        !    owner rank; at np=1 the window equals the domain margin), and max extent (also bounded so the fine grid
-        !    fits the owner's LOCAL solver scratch, whose extent = window + its two buff_size margins); collapsed dims
-        !    pinned to 0. All inputs are globally identical, so every rank computes the same box.
-        win_cut = .false.
+        ! 2) pad + clamp: domain margin and the rank-fit size cap (amr_maxc_fit: any box that small intersects
+        !    EVERY rank within its scratch constraint, so the patch moves freely across rank boundaries);
+        !    collapsed dims pinned to 0. All inputs are globally identical, so every rank computes the same box.
         lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
-        if (lo(1) < amr_owner_win_lo(1) .or. hi(1) > amr_owner_win_hi(1)) win_cut = .true.
-        lo(1) = max(lo(1), amr_owner_win_lo(1)); hi(1) = min(hi(1), amr_owner_win_hi(1))
-        maxc_eff = min(amr_maxc(1), (amr_owner_win_hi(1) - amr_owner_win_lo(1) + 2*buff_size + 1)/2)
-        if (hi(1) - lo(1) + 1 > maxc_eff) then
-            if (amr_rank_owns_patch) print '(A)', ' [amr] WARNING: tagged region exceeds max patch; clamping'
-            hi(1) = lo(1) + maxc_eff - 1
+        if (hi(1) - lo(1) + 1 > amr_maxc_fit(1)) then
+            if (proc_rank == 0) print '(A)', ' [amr] WARNING: tagged region exceeds max patch; clamping'
+            hi(1) = lo(1) + amr_maxc_fit(1) - 1
         end if
         if (n_glb > 0) then
             lo(2) = max(lo(2) - amr_buf, buff_size); hi(2) = min(hi(2) + amr_buf, n_glb - buff_size)
-            if (lo(2) < amr_owner_win_lo(2) .or. hi(2) > amr_owner_win_hi(2)) win_cut = .true.
-            lo(2) = max(lo(2), amr_owner_win_lo(2)); hi(2) = min(hi(2), amr_owner_win_hi(2))
-            maxc_eff = min(amr_maxc(2), (amr_owner_win_hi(2) - amr_owner_win_lo(2) + 2*buff_size + 1)/2)
-            if (hi(2) - lo(2) + 1 > maxc_eff) hi(2) = lo(2) + maxc_eff - 1
+            if (hi(2) - lo(2) + 1 > amr_maxc_fit(2)) hi(2) = lo(2) + amr_maxc_fit(2) - 1
         else
             lo(2) = 0; hi(2) = 0
         end if
         if (p_glb > 0) then
             lo(3) = max(lo(3) - amr_buf, buff_size); hi(3) = min(hi(3) + amr_buf, p_glb - buff_size)
-            if (lo(3) < amr_owner_win_lo(3) .or. hi(3) > amr_owner_win_hi(3)) win_cut = .true.
-            lo(3) = max(lo(3), amr_owner_win_lo(3)); hi(3) = min(hi(3), amr_owner_win_hi(3))
-            maxc_eff = min(amr_maxc(3), (amr_owner_win_hi(3) - amr_owner_win_lo(3) + 2*buff_size + 1)/2)
-            if (hi(3) - lo(3) + 1 > maxc_eff) hi(3) = lo(3) + maxc_eff - 1
+            if (hi(3) - lo(3) + 1 > amr_maxc_fit(3)) hi(3) = lo(3) + amr_maxc_fit(3) - 1
         else
             lo(3) = 0; hi(3) = 0
         end if
-        if (win_cut .and. amr_rank_owns_patch .and. .not. amr_win_clamp_warned) then
-            print '(A)', ' [amr] WARNING: regrid box clamped to the owner rank window (SP7a: the patch cannot migrate ranks)'
-            amr_win_clamp_warned = .true.
-        end if
-        if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return  ! tag box fully outside the window; keep the old region
+        if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return  ! tag box confined to the domain margin; keep the old region
         if (all(lo == amr_fine%region%lo) .and. all(hi == amr_fine%region%hi)) return
 
-        ! 3) owner-only: stash old fine interior in the (dead-between-steps) RK bounce buffer; non-owner field arrays
-        !    are unallocated (metadata below is still updated on ALL ranks)
-        old_lo = amr_fine%region%lo
+        ! 3) ranks with OLD fine cells stash their old fine interior in the (dead-between-steps) RK bounce buffer
+        !    (amr_rank_owns_patch still holds the pre-rebuild value here; ranks without get old_m1 = -1 => no-op)
+        old_ilo = amr_isect_lo
         old_m1 = amr_fine%m; old_n1 = amr_fine%n; old_p1 = amr_fine%p
         if (amr_rank_owns_patch) then
             ! host consumer: regrid stash + rebuild run on host; the rebuilt state is pushed back below
@@ -964,12 +967,16 @@ contains
             end do
         end if
 
-        ! 4) rebuild geometry (region/mirrors/extents on all ranks; coord fill owner-guarded inside), then owner-only:
-        !    prolong the whole new patch and overwrite the overlap with old fine data
+        ! 4) rebuild geometry (region/mirrors/extents/xchg flag on all ranks; coord fill owner-guarded inside), then
+        !    every rank with a NEW intersection prolongs its local piece and overwrites the overlap with its own old
+        !    fine data (rank-local by construction)
         call s_set_amr_fine_geometry(lo, hi)
+        if (proc_rank == 0) then
+            print '(A,I0,A,I0,A,I0,A)', ' [amr] regrid: box x ', lo(1), ':', hi(1), ' (', (hi(1) - lo(1) + 1), ' coarse cells)'
+        end if
         if (.not. amr_rank_owns_patch) return
         call s_interpolate_coarse_to_fine(q_cons_base)
-        sh = 2*(lo - old_lo)  ! old fine index = new fine index + sh (per dim; collapsed dims sh=0)
+        sh = 2*(amr_isect_lo - old_ilo)  ! old LOCAL fine index = new LOCAL fine index + sh (per dim; collapsed dims sh=0)
         do i = 1, sys_size
             do fk = 0, amr_fine%p
                 ofk = fk + sh(3)
@@ -989,8 +996,8 @@ contains
         do i = 1, sys_size
             $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
         end do
-        ! owner-only code path (the unique owner prints)
-        print '(A,I0,A,I0,A,I0,A)', ' [amr] regrid: box x ', lo(1), ':', hi(1), ' (', (hi(1) - lo(1) + 1), ' coarse cells)'
+        ! continuation-face ghosts from the neighbors' rebuilt interiors (fresh fine ghosts for the next step)
+        call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
 
     end subroutine s_amr_regrid
 
@@ -1108,7 +1115,7 @@ contains
             end do
         end do
         errc = abs(si_f - si_c)/max(abs(si_f), 1.e-30_wp)
-        ! owner rank only
+        ! every rank with fine cells prints
         print '(A,ES12.4)', ' [amr] prolong linear-reproduction err = ', errb
         print '(A,ES12.4)', ' [amr] restrict independent-integral err = ', errc
         deallocate (cscr(1)%sf); deallocate (cscr)
@@ -1137,7 +1144,6 @@ contains
         integer :: i
 
         if (.not. amr) return
-        if (.not. amr_rank_owns_patch) return  ! non-owner ranks never allocated the fine level
         do i = 1, sys_size
             @:DEALLOCATE(amr_fine%q_cons(i)%sf)
             @:DEALLOCATE(amr_fine%q_cons_stor(i)%sf)

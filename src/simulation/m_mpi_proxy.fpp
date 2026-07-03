@@ -257,13 +257,13 @@ contains
                     dst = MPI_PROC_NULL; src = MPI_PROC_NULL
                     if (snd) then
                         dst = ${BCD}$%beg
-                        $:GPU_UPDATE(host='[freg(${D}$)%lo]')
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo]')
                     end if
                     if (rcv) src = ${BCD}$%end
                     call MPI_SENDRECV_REPLACE(freg(${D}$)%lo, size(freg(${D}$)%lo), mpi_p, dst, ${2*D}$, src, ${2*D}$, &
                                               & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     if (rcv) then
-                        $:GPU_UPDATE(device='[freg(${D}$)%lo]')
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo]')
                     end if
                 end if
                 ! high face of the patch in dim ${D}$: fine side = rank whose subdomain ENDS at the face
@@ -273,13 +273,13 @@ contains
                     dst = MPI_PROC_NULL; src = MPI_PROC_NULL
                     if (snd) then
                         dst = ${BCD}$%end
-                        $:GPU_UPDATE(host='[freg(${D}$)%hi]')
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi]')
                     end if
                     if (rcv) src = ${BCD}$%beg
                     call MPI_SENDRECV_REPLACE(freg(${D}$)%hi, size(freg(${D}$)%hi), mpi_p, dst, ${2*D + 1}$, src, ${2*D + 1}$, &
                                               & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     if (rcv) then
-                        $:GPU_UPDATE(device='[freg(${D}$)%hi]')
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi]')
                     end if
                 end if
             end if
