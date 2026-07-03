@@ -1091,9 +1091,8 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
-                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these
-                        ! entries
-                        ! are kept for consistency.
+                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros
+                        ! here; these entries are kept for consistency.
                         if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
@@ -1146,9 +1145,8 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
-                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these
-                        ! entries
-                        ! are kept for consistency.
+                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros
+                        ! here; these entries are kept for consistency.
                         if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end
@@ -1187,9 +1185,8 @@ contains
                         end do
                         $:END_GPU_PARALLEL_LOOP()
 
-                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros here; these
-                        ! entries
-                        ! are kept for consistency.
+                        ! Copy the per-fluid flux_src entries when they are structurally present. HLLD writes zeros
+                        ! here; these entries are kept for consistency.
                         if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do i = eqn_idx%adv%beg + 1, eqn_idx%adv%end

@@ -31,7 +31,7 @@ contains
     !! speeds and reproduces their one-sided selection.
     integer function f_hlld_wave_zone(S_L, S_Lstar, s_M, S_Rstar, S_R) result(zone)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
+        $:GPU_ROUTINE(function_name='f_hlld_wave_zone', parallelism='[seq]', cray_inline=True)
         real(wp), intent(in) :: S_L, S_Lstar, s_M, S_Rstar, S_R
 
         if (0._wp <= S_L) then
