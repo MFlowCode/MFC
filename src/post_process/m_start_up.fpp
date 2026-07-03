@@ -42,7 +42,6 @@ module m_start_up
     complex(c_double_complex), allocatable  :: data_cmplx(:,:,:), data_cmplx_y(:,:,:), data_cmplx_z(:,:,:)
     real(wp), allocatable, dimension(:,:,:) :: En_real
     real(wp), allocatable, dimension(:)     :: En
-    integer                                 :: num_procs_x, num_procs_y, num_procs_z
     integer                                 :: Nx, Ny, Nz, Nxloc, Nyloc, Nyloc2, Nzloc, Nf
     integer                                 :: ierr
     integer                                 :: MPI_COMM_CART, MPI_COMM_CART12, MPI_COMM_CART13
