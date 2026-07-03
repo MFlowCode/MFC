@@ -827,12 +827,10 @@ contains
             call s_initialize_acoustic_src()
         end if
 
-        ! TODO: first igr divergence point
         if (viscous .and. (.not. igr)) then
             call s_initialize_viscous_module()
         end if
 
-        ! TODO: second igr divergence point (inside module)
         call s_initialize_rhs_module()
 
         if (surface_tension) call s_initialize_surface_tension_module()
@@ -843,7 +841,6 @@ contains
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
 
-        ! TODO: may need to alter for igr integration
         call s_initialize_boundary_common_module()
 
         if (down_sample) then
@@ -906,15 +903,10 @@ contains
 
         ! Computation of parameters, allocation of memory, association of pointers, and/or execution of any other tasks that are
         ! needed to properly configure the modules. The preparations below DO DEPEND on the grid being complete.
-        ! TODO: main igr divergence point
         if (igr) then
             call s_initialize_igr_module()
-            ! initialize riemann solvers module for inviscid igr branch
             call s_initialize_riemann_solvers_module()
         end if
-        ! non-igr implementation uses WENO, MUSCL reconstruction modules and riemann solvers module
-        ! goal is to initialize these modules alongside igr and make igr a flux modifier
-        ! To be determined
         if (.not. igr) then
             if (recon_type == recon_type_weno) then
                 call s_initialize_weno_module()
@@ -1070,7 +1062,6 @@ contains
         if (ib) then
             $:GPU_UPDATE(device='[ib_markers%sf]')
         end if
-        ! TODO: may need to copy data for igr integration
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[igr, nb, igr_order]')
         #:endif
@@ -1085,12 +1076,9 @@ contains
         if (hyperelasticity) call s_finalize_hyperelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
-        ! TODO: potential igr divergence point
         call s_finalize_rhs_module()
-        ! TODO: igr divergence point, the same way they diverged in s_initialize_modules
         if (igr) then
             call s_finalize_igr_module()
-            ! finalize riemann solvers module for inviscid igr branch
             call s_finalize_riemann_solvers_module()
         else
             call s_finalize_cbc_module()
@@ -1109,7 +1097,6 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
-        ! TODO: igr divergence point, mirroring s_initialize_modules
         if (viscous .and. (.not. igr)) then
             call s_finalize_viscous_module()
         end if

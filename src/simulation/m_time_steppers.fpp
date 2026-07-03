@@ -462,7 +462,7 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
-                    ! TODO: route IGR runtime information through q_prim_vf once primitive workspace semantics are fully integrated.
+                    ! IGR runtime information still uses conservative variables until primitive workspaces are fully integrated
                     if (igr) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
                     end if
@@ -625,8 +625,7 @@ contains
         integer                :: j, k, l  !< Generic loop iterators
         integer                :: fl       !< Fluid loop iterator
 
-        ! TODO: use the normal primitive workspace for IGR dt calculation once
-        ! q_prim_vf is authoritative for IGR diagnostics and stability checks.
+        ! IGR dt calculation still uses its custom conservative-variable path.
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if

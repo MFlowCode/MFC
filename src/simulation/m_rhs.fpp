@@ -520,7 +520,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! TODO: Native IGR reconstruction still reads conservative ghost cells directly.
+        ! IGR reconstruction still reads conservative ghost-cell data directly.
         if (igr) then
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
@@ -548,7 +548,7 @@ contains
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
             & idwbuff(2), idwbuff(3))
 
-        ! TODO: IGR viscous terms are still evaluated by legacy IGR logic.
+        ! IGR fills its viscous source fluxes during custom reconstruction.
         if ((viscous .and. .not. igr)) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, dqR_prim_dx_n, &
