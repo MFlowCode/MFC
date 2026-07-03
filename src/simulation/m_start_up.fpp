@@ -791,6 +791,9 @@ contains
         ! Write IB kinematic state for restart
         if (ib) call s_write_ib_state_file(save_count)
 
+        ! Fine-level AMR restart file (current box + intersection-local fine state) alongside the level-0 restart
+        if (amr) call s_write_amr_restart(save_count)
+
         call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
@@ -812,6 +815,7 @@ contains
 
         integer :: m_ds, n_ds, p_ds
         integer :: i
+        logical :: amr_restored
 
         call s_initialize_global_parameters_module()
         #:if USING_AMD
@@ -892,7 +896,9 @@ contains
         call s_initialize_amr_module()
         call s_initialize_amr_registers()
         call s_amr_operator_checks()
-        call s_populate_amr_fine(q_cons_ts(1)%vf)
+        ! restarts restore the saved (possibly regridded) box and fine state; otherwise prolong from coarse
+        call s_read_amr_restart(amr_restored)
+        if (.not. amr_restored) call s_populate_amr_fine(q_cons_ts(1)%vf)
         call s_amr_conservation_check(q_cons_ts(1)%vf)
         call s_amr_conservation_defect(q_cons_ts(1)%vf, .false.)
 

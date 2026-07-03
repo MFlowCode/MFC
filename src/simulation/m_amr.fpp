@@ -7,6 +7,10 @@
 !> @brief AMR hierarchy (SP1: one static, inert refined level-1 patch alongside the base solve).
 module m_amr
 
+#ifdef MFC_MPI
+    use mpi  !< MPI-IO for the parallel_io AMR restart file
+#endif
+
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
     use m_constants, only: num_fluids_max
@@ -23,7 +27,8 @@ module m_amr
     public :: t_level, amr_fine, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
         & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
         & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, &
-        & s_advance_amr_fine_substeps, s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid
+        & s_advance_amr_fine_substeps, s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, &
+        & s_read_amr_restart
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -1159,6 +1164,206 @@ contains
         call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
 
     end subroutine s_amr_regrid
+
+    !> Write the fine-level restart file for save step t_step alongside the level-0 restart (whose format stays untouched): the
+    !! CURRENT patch box (it moves under regrid), the writing rank count, and each rank's intersection-local fine conservative
+    !! state. Serial mode: one unformatted file per rank inside its level-0 step directory. Parallel mode: one shared MPI-IO file
+    !! with a 7-integer header (np, box lo, box hi) followed by the ranks' fine blocks concatenated in rank order.
+    impure subroutine s_write_amr_restart(t_step)
+
+        integer, intent(in)                  :: t_step
+        character(LEN=path_len + 3*name_len) :: file_loc
+        integer                              :: i
+
+#ifdef MFC_MPI
+        integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, hdr(7)
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, disp
+        logical                             :: file_exist
+        real(stp), allocatable              :: buf(:)
+#endif
+
+        if (.not. amr) return
+        ! host consumer: the fine state is device-current during stepping
+        if (amr_rank_owns_patch) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_fine%q_cons(i)%sf]')
+            end do
+        end if
+
+        if (.not. parallel_io) then
+            ! per-rank file in the step directory freshly created by the level-0 serial write
+            write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step, '/amr_fine.dat'
+            open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
+            write (2) num_procs, amr_fine%region%lo, amr_fine%region%hi, amr_fine%m, amr_fine%n, amr_fine%p
+            if (amr_rank_owns_patch) then
+                do i = 1, sys_size
+                    write (2) amr_fine%q_cons(i)%sf(0:amr_fine%m,0:amr_fine%n,0:amr_fine%p)
+                end do
+            end if
+            close (2)
+        else
+#ifdef MFC_MPI
+            write (file_loc, '(A,I0,A)') 'amr_', t_step, '.dat'
+            file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist .and. proc_rank == 0) then
+                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            end if
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+
+            ! rank-order concatenation offset: exclusive prefix sum of the per-rank block sizes
+            cnt = sys_size*(amr_fine%m + 1)*(amr_fine%n + 1)*(amr_fine%p + 1)  ! 0 on ranks without fine cells
+            if (.not. amr_rank_owns_patch) cnt = 0
+            my_cnt = int(cnt, MPI_OFFSET_KIND)
+            my_off = int(0, MPI_OFFSET_KIND)
+            call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
+            if (proc_rank == 0) then
+                my_off = int(0, MPI_OFFSET_KIND)
+                hdr(1) = num_procs; hdr(2:4) = amr_fine%region%lo; hdr(5:7) = amr_fine%region%hi
+                call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), hdr, 7, MPI_INTEGER, status, ierr)
+            end if
+            allocate (buf(max(cnt, 1)))
+            idx = 0
+            do i = 1, sys_size
+                do fk = 0, amr_fine%p
+                    do fj = 0, amr_fine%n
+                        do fi = 0, amr_fine%m
+                            idx = idx + 1
+                            buf(idx) = amr_fine%q_cons(i)%sf(fi, fj, fk)
+                        end do
+                    end do
+                end do
+            end do
+            disp = int(7*storage_size(0)/8, MPI_OFFSET_KIND) + my_off*int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
+            call MPI_FILE_WRITE_AT_ALL(ifile, disp, buf, cnt*mpi_io_type, mpi_io_p, status, ierr)
+            deallocate (buf)
+            call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+        end if
+
+    end subroutine s_write_amr_restart
+
+    !> Restore the fine level from the AMR restart file at t_step_start (n_start under cfl_dt), if one exists: rebuild the saved
+    !! (possibly regridded) box via s_set_amr_fine_geometry, then read each rank's intersection-local fine state (exact stp
+    !! round-trip). Requires the rank count that wrote the file (np-flexible restart is a follow-up). restored = false on a fresh
+    !! start, or - with a one-line warning - on a legacy restart without the file; the caller then re-prolongs from coarse.
+    !! Collective: ALL ranks must call together (the existence decision is allreduced).
+    impure subroutine s_read_amr_restart(restored)
+
+        logical, intent(out)                 :: restored
+        character(LEN=path_len + 3*name_len) :: file_loc
+        character(LEN=200)                   :: msg
+        logical                              :: file_exist
+        integer                              :: i, ts, have_loc, have_glb, hdr(7), rm, rn, rp
+
+#ifdef MFC_MPI
+        integer                             :: ifile, ierr, cnt, idx, fi, fj, fk
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, tot_cnt, disp, file_sz
+        real(stp), allocatable              :: buf(:)
+#endif
+
+        restored = .false.
+        if (.not. amr) return
+        if (cfl_dt) then
+            ts = n_start
+        else
+            ts = t_step_start
+        end if
+        if (ts == 0) return  ! fresh start: the fine level is prolonged from the pre_process ICs
+
+        if (.not. parallel_io) then
+            write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', ts, '/amr_fine.dat'
+        else
+            write (file_loc, '(A,I0,A)') 'amr_', ts, '.dat'
+            file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+        end if
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        have_loc = merge(1, 0, file_exist)
+        call s_mpi_allreduce_integer_min(have_loc, have_glb)
+        if (have_glb == 0) then
+            if (proc_rank == 0) then
+                print '(A)', &
+                    & ' [amr] WARNING: no AMR restart file at this step; the fine level is re-initialized by ' &
+                    & // 'prolongation from coarse (fine-level accuracy is lost across this restart)'
+            end if
+            return
+        end if
+
+        if (.not. parallel_io) then
+            open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
+            read (2) hdr, rm, rn, rp
+            if (hdr(1) /= num_procs) then
+                write (msg, '(A,I0,A,I0,A)') 'amr restart rank-count mismatch: the AMR restart file was written with ', hdr(1), &
+                       & ' ranks but this run has ', num_procs, '; restart with the same rank count'
+                call s_mpi_abort(trim(msg))
+            end if
+            call s_set_amr_fine_geometry(hdr(2:4), hdr(5:7))
+            if (rm /= amr_fine%m .or. rn /= amr_fine%n .or. rp /= amr_fine%p) then
+                call s_mpi_abort('amr restart decomposition mismatch: this rank''s fine extents differ from the file' &
+                                 & // ' (identical decomposition - rank count and load_balance settings - required)')
+            end if
+            if (amr_rank_owns_patch) then
+                do i = 1, sys_size
+                    read (2) amr_fine%q_cons(i)%sf(0:amr_fine%m,0:amr_fine%n,0:amr_fine%p)
+                end do
+            end if
+            close (2)
+        else
+#ifdef MFC_MPI
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), hdr, 7, MPI_INTEGER, status, ierr)
+            if (hdr(1) /= num_procs) then
+                write (msg, '(A,I0,A,I0,A)') 'amr restart rank-count mismatch: the AMR restart file was written with ', hdr(1), &
+                       & ' ranks but this run has ', num_procs, '; restart with the same rank count'
+                call s_mpi_abort(trim(msg))
+            end if
+            call s_set_amr_fine_geometry(hdr(2:4), hdr(5:7))
+            cnt = sys_size*(amr_fine%m + 1)*(amr_fine%n + 1)*(amr_fine%p + 1)
+            if (.not. amr_rank_owns_patch) cnt = 0
+            my_cnt = int(cnt, MPI_OFFSET_KIND)
+            my_off = int(0, MPI_OFFSET_KIND)
+            call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
+            if (proc_rank == 0) my_off = int(0, MPI_OFFSET_KIND)
+            call MPI_ALLREDUCE(my_cnt, tot_cnt, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
+            call MPI_FILE_GET_SIZE(ifile, file_sz, ierr)
+            if (file_sz /= int(7*storage_size(0)/8, MPI_OFFSET_KIND) + tot_cnt*int(storage_size(0._stp)/8, MPI_OFFSET_KIND)) then
+                call s_mpi_abort('amr restart decomposition mismatch: the AMR restart file size differs from this run''s' &
+                                 & // ' fine intersections (identical decomposition - rank count and load_balance settings' &
+                                 & // ' - required)')
+            end if
+            allocate (buf(max(cnt, 1)))
+            disp = int(7*storage_size(0)/8, MPI_OFFSET_KIND) + my_off*int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
+            call MPI_FILE_READ_AT_ALL(ifile, disp, buf, cnt*mpi_io_type, mpi_io_p, status, ierr)
+            idx = 0
+            do i = 1, sys_size
+                do fk = 0, amr_fine%p
+                    do fj = 0, amr_fine%n
+                        do fi = 0, amr_fine%m
+                            idx = idx + 1
+                            amr_fine%q_cons(i)%sf(fi, fj, fk) = buf(idx)
+                        end do
+                    end do
+                end do
+            end do
+            deallocate (buf)
+            call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+        end if
+
+        ! restored fine state to the device (mirrors s_populate_amr_fine's push; host reads above)
+        if (amr_rank_owns_patch) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(device='[amr_fine%q_cons(i)%sf]')
+            end do
+        end if
+        restored = .true.
+        if (proc_rank == 0) then
+            print '(A,I0,A,I0)', ' [amr] restart: restored fine level, box x ', amr_fine%region%lo(1), ':', amr_fine%region%hi(1)
+        end if
+
+    end subroutine s_read_amr_restart
 
     !> Global Sum(dV*U) for the per-fluid masses (continuity variables) and energy (eqn_idx%E) over the level-0 interior. First call
     !! (finalize_report=F) stores the baselines; the finalize call prints the relative drifts (~roundoff with refluxing).

@@ -813,6 +813,21 @@ Accumulated fine-level fluxes are applied back to the coarse level (reflux corre
 after each coarse step.
 `amr_subcycle` is incompatible with `cfl_dt` (variable time step) and requires `amr = T`.
 
+**Restart.**
+Each save step writes a fine-level AMR restart file alongside the level-0 restart data
+(whose format is unchanged): the current — possibly regridded — patch box and the fine
+solution, per rank (an `amr_fine.dat` in each rank's step directory, or a single shared
+`amr_*.dat` next to the level-0 MPI-IO restart file when `parallel_io` is on).
+Restarting (`t_step_start > 0`) restores the saved box and fine state seamlessly; it
+requires the same rank count (and decomposition) as the run that wrote the file, and
+aborts with a clear message otherwise.
+If the AMR file is absent (e.g., data from an older run), the run proceeds with a
+warning and re-initializes the fine level by prolongation from the coarse restart data,
+losing the accumulated fine-level accuracy.
+Note that level-0 output already contains the restricted (coarse-resolution) fine
+solution over the patch, so existing visualization works unchanged; fine-resolution
+visualization output is future work.
+
 | Parameter               | Type    | Description                                    |
 | ---:                    | :----:  |          :---                                  |
 | `amr`                   | Logical | Enable AMR (see prose above for requirements and restrictions) |
