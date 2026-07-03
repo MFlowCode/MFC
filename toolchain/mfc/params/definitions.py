@@ -678,6 +678,7 @@ def _load():
     _r("amr_tag_eps", REAL)
     _r("amr_buf", INT)
     _r("amr_subcycle", LOG)
+    _r("amr_max_patches", INT)
     _r("hybrid_weno_eps", REAL, {"output"})
     _r("hybrid_smooth_flux", INT, {"output"})
     _r("partition_tile_size", INT, {"output"})
@@ -1363,6 +1364,7 @@ _nv(
     "amr_tag_eps",
     "amr_buf",
     "amr_subcycle",
+    "amr_max_patches",
     "alf_factor",
     "num_igr_iters",
     "num_igr_warm_start_iters",

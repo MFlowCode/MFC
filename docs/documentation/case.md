@@ -683,6 +683,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `amr_tag_eps`           | Real    | Relative density-gradient threshold for AMR refinement tagging (default 0.1) |
 | `amr_buf`               | Integer | Coarse-cell padding around tagged cells when regridding (default 3) |
 | `amr_subcycle`          | Logical | Advance the coarse level at the case dt and the fine level at dt/2 (two substeps; Berger-Colella refluxing). Requires `amr`; incompatible with `cfl_dt`. |
+| `amr_max_patches`       | Integer | Number of fixed refined-patch slots preallocated (each max-patch sized; ~N x device memory); must be >= 1 (default 4) |
 | `hybrid_weno`           | Logical | Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities (requires WENO reconstruction) |
 | `hybrid_weno_eps`       | Real    | Smoothness threshold for hybrid WENO shock flagging; must be > 0 (default 1e-2) |
 | `hybrid_riemann`        | Logical | Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq) |
@@ -823,6 +824,14 @@ Accumulated fine-level fluxes are applied back to the coarse level (reflux corre
 after each coarse step.
 `amr_subcycle` is incompatible with `cfl_dt` (variable time step) and requires `amr = T`.
 
+**Patch slots.**
+`amr_max_patches` (default 4) sets the number of fixed refined-patch slots preallocated
+for the run. Each slot is sized to the maximum patch extent, so `N` slots require roughly
+`N` times the device memory of a single patch; the goal is the compute win of refining
+separated features independently, and memory efficiency (compact per-patch pools) is a
+follow-up. The current release populates a single slot; multi-patch clustering is
+forthcoming.
+
 **Restart.**
 Each save step writes a fine-level AMR restart file alongside the level-0 restart data
 (whose format is unchanged): the current — possibly regridded — patch box and the fine
@@ -847,6 +856,7 @@ visualization output is future work.
 | `amr_tag_eps`           | Real    | Normalized density-gradient threshold for refinement tagging; must be > 0 when `amr_regrid_int > 0` (default 0.1) |
 | `amr_buf`               | Integer | Coarse-cell padding around tagged cells; must be >= 1 when `amr_regrid_int > 0` (default 3) |
 | `amr_subcycle`          | Logical | Advance fine level at dt/2 (two substeps per coarse step) with Berger–Colella refluxing |
+| `amr_max_patches`       | Integer | Number of fixed refined-patch slots preallocated (each max-patch sized; ~N x device memory); must be >= 1 (default 4) |
 
 ### 8. Acoustic Source {#sec-acoustic-source}
 

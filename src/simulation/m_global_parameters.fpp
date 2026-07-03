@@ -289,6 +289,11 @@ module m_global_parameters
     !! level covers exactly this intersection: local fine index 0 = patch-global fine index 2*(amr_isect_lo - amr_region_lo).
     integer :: amr_isect_lo(3) = 0, amr_isect_hi(3) = 0
 
+    !> Number of currently-active AMR fine-patch slots (T1: forced to 1) and the working slot index selecting which slot the
+    !! per-patch machinery (advance/reflux/restrict/regrid/IO) operates on. Read by m_amr and m_amr_registers (mirrors, no
+    !! use-cycle).
+    integer :: amr_num_patches = 1, amr_cur = 1
+
 contains
 
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
@@ -462,6 +467,7 @@ contains
         amr_tag_eps = 0.1_wp
         amr_buf = 3
         amr_subcycle = .false.
+        amr_max_patches = 4
         hybrid_smooth_flux = 2
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.
