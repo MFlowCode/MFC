@@ -218,7 +218,9 @@ PHYSICS_DOCS = {
         "explanation": (
             "Block-structured AMR (Experimental) adds a single 2:1 refined level-1 patch. "
             "Requires WENO reconstruction (recon_type = 1), SSP-RK3 (time_stepper = 3), "
-            "the 5-equation model (model_eqns = 2), and a single fluid (num_fluids = 1). "
+            "and the 5-equation model (model_eqns = 2); num_fluids > 1 additionally requires "
+            "mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha "
+            "consistency). "
             "Incompatible with viscous, surface tension, bubble models, phase change, "
             "immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, "
             "hybrid_weno, hybrid_riemann, active_box, and acoustic_source. "
@@ -1373,7 +1375,11 @@ class CaseValidator:
         self.prohibit(recon_type is not None and recon_type != 1, "amr requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(model_eqns is not None and model_eqns != 2, "amr requires model_eqns = 2 (5-equation)")
-        self.prohibit(num_fluids is not None and num_fluids != 1, "amr requires num_fluids = 1")
+        mpp_lim = self.get("mpp_lim", "F") == "T"
+        self.prohibit(
+            num_fluids is not None and num_fluids > 1 and not mpp_lim,
+            "amr with num_fluids > 1 requires mpp_lim " "(its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)",
+        )
         self.prohibit(
             viscous or surface_tension or hypoelasticity or hyperelasticity or mhd or chemistry,
             "amr does not support viscous/elastic/surface-tension/MHD/chemistry",

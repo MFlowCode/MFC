@@ -11,6 +11,13 @@
 !! uses 0-based transverse indexing relative to the rank's patch INTERSECTION (= the patch at np=1); freg uses 0-based LOCAL fine
 !! indexing (aligned: fine children of isect cell t are 2*t and 2*t+1). All arrays are preallocated at max size so regrid requires
 !! no reallocation.
+!!
+!! Multi-fluid (5-eq HLLC, the amr-gated path): the volume-fraction ADVECTIVE flux alpha_i*u_star travels through flux_n (the
+!! "VOLUME FRACTION FLUX" block of m_riemann_solver_hllc, same form as the mass flux), so the uniform 1:sys_size capture below
+!! refluxes the per-fluid masses, momentum, energy, AND alpha's advective part with no extra registers. The non-conservative
+!! remainder (the +alpha*d(u_star)/dx compression term m_rhs assembles from flux_src_n = u_star) is deliberately NOT captured:
+!! alpha is genuinely non-conservative, so forcing flux-matching on u_star would be wrong; coarse/fine volume-fraction
+!! consistency is instead maintained by mpp_lim's clamp+renormalize (required by the checker for amr with num_fluids > 1).
 module m_amr_registers
 
     use m_derived_types

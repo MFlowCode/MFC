@@ -2546,6 +2546,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         (a) static patch  – amr_regrid_int=0, no regrid, cheapest sanity check
         (b) dynamic regrid – amr_regrid_int=2, exercises the tag/rebuild path
         (c) subcycling    – amr_subcycle=T, exercises the dt/2 two-substep path
+        (d) two-fluid     – num_fluids=2 + mpp_lim, regrid + subcycle: exercises the
+            sum-preserving alpha prolongation and per-fluid reflux (SP9a)
 
         Grid: m=63 (indices 0..63); fine patch beg=16, end=47 so that
         2*(47-16+1)-1 = 63 <= 63 satisfies the extent guard.
@@ -2606,6 +2608,51 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 **amr_1d_base,
                 "amr_regrid_int": 0,
                 "amr_subcycle": "T",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (d) two-fluid: material interface (density ratio 10) at x=0.5, inside the initial
+        # patch (cells 16..47); uniform p and u advect it under regrid + subcycle
+        eps_a = 1.0e-6
+        stack.push(
+            "AMR -> 1D -> two-fluid",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%cv": 0.0,
+                "fluid_pp(2)%qv": 0.0,
+                "fluid_pp(2)%qvp": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(3)%vel(1)": 0.5,
+                "patch_icpp(2)%x_centroid": 0.3,
+                "patch_icpp(2)%length_x": 0.4,
+                "patch_icpp(3)%x_centroid": 0.75,
+                "patch_icpp(3)%length_x": 0.5,
+                "patch_icpp(1)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(1)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(1)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(1)%alpha(2)": eps_a,
+                "patch_icpp(2)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(2)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(2)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(2)%alpha(2)": eps_a,
+                "patch_icpp(3)%alpha_rho(1)": eps_a * 1.0,
+                "patch_icpp(3)%alpha_rho(2)": (1.0 - eps_a) * 10.0,
+                "patch_icpp(3)%alpha(1)": eps_a,
+                "patch_icpp(3)%alpha(2)": 1.0 - eps_a,
             },
         )
         cases.append(define_case_d(stack, "", {}))
