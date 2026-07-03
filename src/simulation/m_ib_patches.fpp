@@ -23,7 +23,7 @@ module m_ib_patches
     implicit none
 
     private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity, &
-        & s_initialize_ib_airfoils
+        & s_encode_patch_periodicity, s_initialize_ib_airfoils, s_get_periodicities
 
 contains
 
@@ -48,8 +48,9 @@ contains
         real(wp), dimension(3) :: center, xyz_local, length
         real(wp) :: radius, eta
 
-        !  3D Patch Geometries
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
+        !  3D Patch Geometries
         if (num_dims == 3) then
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
             do xp = xp_lower, xp_upper
@@ -678,7 +679,7 @@ contains
         #:endfor
 
         ! z only if 3D
-        if (present(zp_lower) .and. p /= 0) then
+        if (present(zp_lower) .and. num_dims == 3) then
             if (ib_bc_z%beg == BC_PERIODIC) then
                 zp_lower = -1
                 zp_upper = 1
@@ -686,6 +687,9 @@ contains
                 zp_lower = 0
                 zp_upper = 0
             end if
+        else if (present(zp_lower)) then
+            zp_lower = 0
+            zp_upper = 0
         end if
 
     end subroutine s_get_periodicities

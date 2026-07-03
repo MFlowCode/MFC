@@ -20,13 +20,16 @@ module m_collisions
     implicit none
 
     private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
-        & f_local_rank_owns_location, f_neighborhood_ranks_own_location
+        & f_local_rank_owns_location, f_neighborhood_ranks_own_location, ib_gbl_idx_lookup
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
     real(wp)                              :: spring_stiffness, damping_parameter
     $:GPU_DECLARE(create='[spring_stiffness, damping_parameter]')
     $:GPU_DECLARE(create='[collision_lookup, wall_overlap_distances]')
+
+    integer, dimension(:), allocatable :: ib_gbl_idx_lookup
+    $:GPU_DECLARE(create='[ib_gbl_idx_lookup]')
 
 contains
 
@@ -99,6 +102,9 @@ contains
             encoded_pid2 = collision_lookup(i, 4)
             call s_decode_patch_periodicity(encoded_pid1, pid1, xp1, yp1, zp1)
             call s_decode_patch_periodicity(encoded_pid2, pid2, xp2, yp2, zp2)
+            pid1 = collision_lookup(i, 1)
+            pid2 = collision_lookup(i, 2)
+
             ! call s_get_neighborhood_idx(pid1, pid1) ! global patch ID -> local index call s_get_neighborhood_idx(pid2, pid2)
             if (pid1 <= 0 .or. pid2 <= 0) cycle
 
@@ -291,6 +297,8 @@ contains
             ! get the decoded pairs for checking if they exist, using ii,jj,kk as dummy indices
             call s_decode_patch_periodicity(raw_pairs(pair_idx, 1), decoded_pairs(1), ii, jj, kk)
             call s_decode_patch_periodicity(raw_pairs(pair_idx, 2), decoded_pairs(2), ii, jj, kk)
+            decoded_pairs(1) = ib_gbl_idx_lookup(decoded_pairs(1))
+            decoded_pairs(2) = ib_gbl_idx_lookup(decoded_pairs(2))
 
             ! skip self-collisions (an IB cannot collide with its own periodic image)
             if (decoded_pairs(1) == decoded_pairs(2)) cycle
@@ -329,34 +337,46 @@ contains
     subroutine s_detect_ib_collisions_n2(num_considered_collisions)
 
         integer, intent(out)   :: num_considered_collisions
-        integer                :: pid1, pid2, encoded_pid1, encoded_pid2, current_collisions
+        integer                :: pid1, pid2, encoded_pid2, current_collisions
+        integer                :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper, xp, yp, zp
         real(wp), dimension(3) :: centroid_1, centroid_2, distance_vec
 
         num_considered_collisions = 0
 
-        $:GPU_PARALLEL_LOOP(private='[pid1, pid2, centroid_1, centroid_2, distance_vec, current_collisions]', &
-                            & copy='[num_considered_collisions]')
+        call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
+
+        $:GPU_PARALLEL_LOOP(private='[pid1, pid2, encoded_pid2, centroid_1, centroid_2, xp, yp, zp, distance_vec, &
+                            & current_collisions]', copyin='[xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper]', copy='[num_considered_collisions]')
         do pid1 = 1, num_ibs - 1
+            centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
+            if (num_dims == 3) centroid_1(3) = patch_ib(pid1)%z_centroid
             do pid2 = pid1 + 1, num_ibs
-                centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
-                centroid_2 = [patch_ib(pid2)%x_centroid, patch_ib(pid2)%y_centroid, 0._wp]
-                if (num_dims == 3) then
-                    centroid_1(3) = patch_ib(pid1)%z_centroid
-                    centroid_2(3) = patch_ib(pid2)%z_centroid
-                end if
-                distance_vec = centroid_2 - centroid_1
+                periodic_search: do xp = xp_lower, xp_upper
+                    do yp = yp_lower, yp_upper
+                        do zp = zp_lower, zp_upper
+                            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+                            if (num_dims == 3) centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp, &
+                                & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+                            distance_vec = centroid_2 - centroid_1
 
-                if (norm2(distance_vec) < patch_ib(pid1)%radius + patch_ib(pid2)%radius) then
-                    $:GPU_ATOMIC(atomic='capture')
-                    num_considered_collisions = num_considered_collisions + 1
-                    current_collisions = num_considered_collisions
-                    $:END_GPU_ATOMIC_CAPTURE()
+                            if (norm2(distance_vec) < patch_ib(pid1)%radius + patch_ib(pid2)%radius) then
+                                $:GPU_ATOMIC(atomic='capture')
+                                num_considered_collisions = num_considered_collisions + 1
+                                current_collisions = num_considered_collisions
+                                $:END_GPU_ATOMIC_CAPTURE()
 
-                    collision_lookup(current_collisions, 1) = pid1
-                    collision_lookup(current_collisions, 2) = pid2
-                    collision_lookup(current_collisions, 3) = pid1
-                    collision_lookup(current_collisions, 4) = pid2
-                end if
+                                call s_encode_patch_periodicity(patch_ib(pid2)%gbl_patch_id, xp, yp, zp, encoded_pid2)
+
+                                collision_lookup(current_collisions, 1) = pid1
+                                collision_lookup(current_collisions, 2) = pid2
+                                collision_lookup(current_collisions, 3) = patch_ib(pid1)%gbl_patch_id
+                                collision_lookup(current_collisions, 4) = encoded_pid2
+                                exit periodic_search
+                            end if
+                        end do
+                    end do
+                end do periodic_search
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()

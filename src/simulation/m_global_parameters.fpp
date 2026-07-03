@@ -105,7 +105,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[bc]')
     type(bounds_info) :: neighbor_domain_x, neighbor_domain_y, neighbor_domain_z
     integer           :: num_gbl_ibs, num_local_ibs
-    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z, num_gbl_ibs]')
+    $:GPU_DECLARE(create='[neighbor_domain_x, neighbor_domain_y, neighbor_domain_z, num_gbl_ibs]')
 
     ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
     ! down_sample: GPU-declared via generated_decls.fpp (registered param)
@@ -405,10 +405,6 @@ contains
         num_bc_patches = 0
         bc_io = .false.
         periodic_bc = .false.
-
-        x_domain%beg = dflt_real; x_domain%end = dflt_real
-        y_domain%beg = dflt_real; y_domain%end = dflt_real
-        z_domain%beg = dflt_real; z_domain%end = dflt_real
 
         ! bc_x/y/z (incl. vb/ve loop) already defaulted above; glb_bounds is #1290's grid-derived global extent
         glb_bounds(1)%beg = dflt_real; glb_bounds(1)%end = dflt_real
