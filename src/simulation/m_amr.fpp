@@ -9,8 +9,9 @@ module m_amr
 
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
-    use m_mpi_proxy, only: s_mpi_abort
-    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum
+    use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers, s_mpi_sendrecv_amr_fine_halo
+    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, &
+        & s_mpi_sendrecv_variables_buffers
     use m_rhs, only: s_compute_rhs
     use m_amr_registers, only: s_amr_zero_fine_registers
 
@@ -63,6 +64,11 @@ module m_amr
     !> Conservation-defect baselines (level-0 interior integrals at init)
     real(wp) :: amr_mass0 = 0._wp, amr_energy0 = 0._wp
 
+    !> True (identically on all ranks) iff some rank's fine ghost-fill stencil reads its coarse GHOST cells - the solver populates
+    !! only PRIM ghosts, so the CONS ghosts the fill prolongs from must be halo-exchanged first. Never true at np=1 (patch faces sit
+    !! >= buff_size inside the domain).
+    logical :: amr_xchg_coarse_ghosts = .false.
+
 contains
 
     !> Build the static refined level-1 patch. No-op unless amr. Called after level-0 grid (x_cb/dx ready) and time-steppers
@@ -71,47 +77,61 @@ contains
 
         integer :: i, d, max_f1, max_f2, max_f3
         integer :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
-        integer :: sidx(3), ext(3), owner_count, bad_loc, bad_glb
+        integer :: sidx(3), ext(3), maxc_loc(3), nmar, bad_loc, bad_glb
 
         if (.not. amr) return
 
         amr_dt_fine = 0.5_wp*dt
 
-        ! Containment (owner model): the patch + a buff_size shell must lie within THIS rank's subdomain.
-        ! (np=1: start_idx=0, m=m_glb - degenerates to the old domain-margin rule.)
-        ! buff_size is not available at checker time, so this check must be here.
-        sidx = 0
-        sidx(1) = start_idx(1)
-        if (n_glb > 0) sidx(2) = start_idx(2)
-        if (p_glb > 0) sidx(3) = start_idx(3)
-        amr_rank_owns_patch = amr_patch_beg(1) >= sidx(1) + buff_size .and. amr_patch_end(1) <= sidx(1) + m - buff_size
-        if (n_glb > 0) amr_rank_owns_patch = amr_rank_owns_patch .and. amr_patch_beg(2) >= sidx(2) + buff_size &
-            & .and. amr_patch_end(2) <= sidx(2) + n - buff_size
-        if (p_glb > 0) amr_rank_owns_patch = amr_rank_owns_patch .and. amr_patch_beg(3) >= sidx(3) + buff_size &
-            & .and. amr_patch_end(3) <= sidx(3) + p - buff_size
-        call s_mpi_allreduce_integer_max(merge(1, 0, amr_rank_owns_patch), owner_count)
-        if (owner_count == 0) then
-            call s_mpi_abort('amr patch must lie within a single rank subdomain (>= buff_size from its edges); ' &
-                             & // 'move the patch, use fewer ranks, or await SP7b')
+        ! Mirror decomposition: each rank holds the fine cells covering patch /\ its own subdomain
+        ! (np=1: the intersection is the whole patch). buff_size is not available at checker time,
+        ! so the geometric aborts below must live here.
+        sidx = 0; ext = 0
+        sidx(1) = start_idx(1); ext(1) = m
+        if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
+        if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
+        call s_amr_compute_isect(amr_patch_beg, amr_patch_end)
+
+        ! the fine ghost shell and the reflux outside cells must stay inside the global domain (identical
+        ! inputs on all ranks; every rank takes the same branch)
+        if (amr_patch_beg(1) < buff_size .or. amr_patch_end(1) > m_glb - buff_size .or. (n_glb > 0 .and. (amr_patch_beg(2) &
+            & < buff_size .or. amr_patch_end(2) > n_glb - buff_size)) .or. (p_glb > 0 .and. (amr_patch_beg(3) < buff_size &
+            & .or. amr_patch_end(3) > p_glb - buff_size))) then
+            call s_mpi_abort('amr patch must lie at least buff_size cells inside the domain boundaries')
         end if
 
-        ! The fine advance reuses the solver scratch (m_rhs/WENO/Riemann work arrays), which is sized to the
-        ! owner's LOCAL grid, so every fine extent must fit the owner's local extent. (np=1: the checker's
-        ! 2*patch-1 <= m_glb bound makes this a no-op.)
+        ! Scratch constraint: the fine advance reuses the solver scratch (m_rhs/WENO/Riemann work arrays),
+        ! which is sized to THIS rank's local grid, so each rank's fine extent must fit its local extent.
+        ! (np=1: the checker's 2*patch-1 <= m_glb bound makes this a no-op.)
         bad_loc = 0
         if (amr_rank_owns_patch) then
-            if (2*(amr_patch_end(1) - amr_patch_beg(1) + 1) - 1 > m) bad_loc = 1
-            if (n_glb > 0 .and. 2*(amr_patch_end(2) - amr_patch_beg(2) + 1) - 1 > n) bad_loc = 1
-            if (p_glb > 0 .and. 2*(amr_patch_end(3) - amr_patch_beg(3) + 1) - 1 > p) bad_loc = 1
+            if (2*(amr_isect_hi(1) - amr_isect_lo(1) + 1) - 1 > m) bad_loc = 1
+            if (n_glb > 0 .and. 2*(amr_isect_hi(2) - amr_isect_lo(2) + 1) - 1 > n) bad_loc = 1
+            if (p_glb > 0 .and. 2*(amr_isect_hi(3) - amr_isect_lo(3) + 1) - 1 > p) bad_loc = 1
         end if
         call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
         if (bad_glb == 1) then
-            call s_mpi_abort('amr fine extent exceeds the owner rank local grid (solver scratch is local-sized); ' &
-                             & // 'shrink the patch or use fewer ranks')
+            call s_mpi_abort('amr fine extent exceeds a rank local grid (solver scratch is local-sized): the patch ' &
+                             & // 'may cover at most about half of any rank subdomain per dimension; shrink the patch ' &
+                             & // 'or use fewer ranks')
         end if
 
-        ! Owner containment window in global indices, distributed to all ranks (fixed for the run; 0 in collapsed dims).
-        ext(1) = m; ext(2) = n; ext(3) = p
+        ! Fine ghost prolongation reads up to nmar coarse cells past each face of the intersection; if that
+        ! stencil leaves ANY rank's interior (patch near/at/across a rank boundary), the coarse CONS ghosts it
+        ! reads must be halo-exchanged before every fill (the solver populates only PRIM ghosts). All ranks
+        ! agree on the flag, so the pairwise exchanges are called consistently.
+        nmar = (buff_size + 1)/2 + 1
+        bad_loc = 0
+        if (amr_rank_owns_patch) then
+            if (amr_isect_lo(1) - sidx(1) < nmar .or. sidx(1) + ext(1) - amr_isect_hi(1) < nmar) bad_loc = 1
+            if (n_glb > 0 .and. (amr_isect_lo(2) - sidx(2) < nmar .or. sidx(2) + ext(2) - amr_isect_hi(2) < nmar)) bad_loc = 1
+            if (p_glb > 0 .and. (amr_isect_lo(3) - sidx(3) < nmar .or. sidx(3) + ext(3) - amr_isect_hi(3) < nmar)) bad_loc = 1
+        end if
+        call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
+        amr_xchg_coarse_ghosts = bad_glb == 1
+
+        ! Owner containment window in global indices (SP7a leftover: read only by the single-rank regrid path;
+        ! meaningless when the patch spans ranks - deleted with the T2 regrid rework).
         amr_owner_win_lo = 0; amr_owner_win_hi = 0
         do d = 1, num_dims
             call s_mpi_allreduce_integer_max(merge(sidx(d) + buff_size, -huge(1), amr_rank_owns_patch), amr_owner_win_lo(d))
@@ -127,11 +147,21 @@ contains
         if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/2
         if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/2
 
+        ! preallocation cap for MY fine arrays: the largest intersection any patch box can have with this
+        ! rank's subdomain (the scratch constraint caps it at about half the local extent; = amr_maxc at np=1)
+        maxc_loc(1) = min(amr_maxc(1), (m + 1)/2)
+        maxc_loc(2) = 1; maxc_loc(3) = 1
+        if (n_glb > 0) maxc_loc(2) = min(amr_maxc(2), (n + 1)/2)
+        if (p_glb > 0) maxc_loc(3) = min(amr_maxc(3), (p + 1)/2)
+
         ! max fine extents and buffered bounds for preallocation
-        max_f1 = 2*amr_maxc(1) - 1
+        max_f1 = 2*maxc_loc(1) - 1
         max_f2 = 0; max_f3 = 0
-        if (n_glb > 0) max_f2 = 2*amr_maxc(2) - 1
-        if (p_glb > 0) max_f3 = 2*amr_maxc(3) - 1
+        if (n_glb > 0) max_f2 = 2*maxc_loc(2) - 1
+        if (p_glb > 0) max_f3 = 2*maxc_loc(3) - 1
+
+        ! MPI exchange buffers for the fine halo (all ranks; no-op without MFC_MPI)
+        call s_initialize_amr_mpi_buffers(max_f1, max_f2, max_f3)
         mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
@@ -218,18 +248,43 @@ contains
 
     end subroutine s_build_level_coords
 
-    !> Set the fine level's geometry (region, extents, bounds, coordinates) for the box lo:hi. Arrays are preallocated at max size;
-    !! this only updates metadata and refills coords.
+    !> Compute this rank's per-dim intersection of the box lo:hi with its subdomain (GLOBAL indices, mirrored to amr_isect_lo/hi)
+    !! and whether it holds fine cells (amr_rank_owns_patch: nonempty in all active dims). Must be called with the COARSE grid state
+    !! in m/n/p (never from inside the fine advance).
+    impure subroutine s_amr_compute_isect(lo, hi)
+
+        integer, intent(in) :: lo(3), hi(3)
+        integer             :: sidx(3), ext(3), d
+
+        sidx = 0; ext = 0
+        sidx(1) = start_idx(1); ext(1) = m
+        if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
+        if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
+        do d = 1, 3
+            amr_isect_lo(d) = max(lo(d), sidx(d))
+            amr_isect_hi(d) = min(hi(d), sidx(d) + ext(d))
+        end do
+        amr_rank_owns_patch = amr_isect_lo(1) <= amr_isect_hi(1)
+        if (n_glb > 0) amr_rank_owns_patch = amr_rank_owns_patch .and. amr_isect_lo(2) <= amr_isect_hi(2)
+        if (p_glb > 0) amr_rank_owns_patch = amr_rank_owns_patch .and. amr_isect_lo(3) <= amr_isect_hi(3)
+
+    end subroutine s_amr_compute_isect
+
+    !> Set the fine level's geometry (region, intersection, extents, bounds, coordinates) for the box lo:hi. Arrays are preallocated
+    !! at max size; this only updates metadata and refills coords.
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
 
+        call s_amr_compute_isect(lo, hi)
         amr_fine%region%lo = lo; amr_fine%region%hi = hi
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
-        amr_fine%m = 2*(hi(1) - lo(1) + 1) - 1
+        ! LOCAL fine extents cover this rank's intersection (the whole patch at np=1); -1 in a dim whose
+        ! intersection is empty, so 0..extent loops are no-ops on ranks without fine cells
+        amr_fine%m = 2*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
         amr_fine%n = 0; amr_fine%p = 0
-        if (n_glb > 0) amr_fine%n = 2*(hi(2) - lo(2) + 1) - 1
-        if (p_glb > 0) amr_fine%p = 2*(hi(3) - lo(3) + 1) - 1
+        if (n_glb > 0) amr_fine%n = 2*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
+        if (p_glb > 0) amr_fine%p = 2*max(amr_isect_hi(3) - amr_isect_lo(3) + 1, 0) - 1
         amr_fine%idwbuff(1)%beg = -buff_size; amr_fine%idwbuff(1)%end = amr_fine%m + buff_size
         amr_fine%idwbuff(2)%beg = 0; amr_fine%idwbuff(2)%end = 0
         amr_fine%idwbuff(3)%beg = 0; amr_fine%idwbuff(3)%end = 0
@@ -239,15 +294,15 @@ contains
         if (p_glb > 0) then
             amr_fine%idwbuff(3)%beg = -buff_size; amr_fine%idwbuff(3)%end = amr_fine%p + buff_size
         end if
-        ! coord building is owner-only (non-owner coord arrays are unallocated); the parent origin is
-        ! converted to LOCAL indexing so the bisection reads the owner's local x_cb slice
+        ! coord building only on ranks with fine cells (others' coord arrays are unallocated); the parent origin
+        ! is this rank's INTERSECTION start, converted to LOCAL indexing so the bisection reads its x_cb slice
         if (amr_rank_owns_patch) then
-            call s_build_level_coords(x_cb, lbound(x_cb, 1), lo(1) - start_idx(1), amr_fine%m, amr_fine%x_cb, amr_fine%x_cc, &
-                                      & amr_fine%dx)
-            if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), lo(2) - start_idx(2), amr_fine%n, amr_fine%y_cb, &
-                & amr_fine%y_cc, amr_fine%dy)
-            if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), lo(3) - start_idx(3), amr_fine%p, amr_fine%z_cb, &
-                & amr_fine%z_cc, amr_fine%dz)
+            call s_build_level_coords(x_cb, lbound(x_cb, 1), amr_isect_lo(1) - start_idx(1), amr_fine%m, amr_fine%x_cb, &
+                                      & amr_fine%x_cc, amr_fine%dx)
+            if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), amr_isect_lo(2) - start_idx(2), amr_fine%n, &
+                & amr_fine%y_cb, amr_fine%y_cc, amr_fine%dy)
+            if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), amr_isect_lo(3) - start_idx(3), amr_fine%p, &
+                & amr_fine%z_cb, amr_fine%z_cc, amr_fine%dz)
         end if
 
     end subroutine s_set_amr_fine_geometry
@@ -261,19 +316,20 @@ contains
         integer                           :: fi, fj, fk, ci, cj, ck, ox, oy, oz
         real(wp)                          :: u0, sx, sy, sz, xix, xiy, xiz
 
-        ! region indices are GLOBAL; the coarse source qc is rank-LOCAL (identical at np=1: start_idx=0)
+        ! fine indices are LOCAL to this rank's intersection (the whole patch at np=1); amr_isect_lo is
+        ! GLOBAL; the coarse source qc is rank-LOCAL (identical at np=1: isect = patch, start_idx = 0)
 
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
         do fk = 0, amr_fine%p
-            ck = amr_fine%region%lo(3) + fk/amr_fine%ref_ratio - oz; if (p_glb == 0) ck = 0
+            ck = amr_isect_lo(3) + fk/amr_fine%ref_ratio - oz; if (p_glb == 0) ck = 0
             xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
             do fj = 0, amr_fine%n
-                cj = amr_fine%region%lo(2) + fj/amr_fine%ref_ratio - oy; if (n_glb == 0) cj = 0
+                cj = amr_isect_lo(2) + fj/amr_fine%ref_ratio - oy; if (n_glb == 0) cj = 0
                 xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                 do fi = 0, amr_fine%m
-                    ci = amr_fine%region%lo(1) + fi/amr_fine%ref_ratio - ox
+                    ci = amr_isect_lo(1) + fi/amr_fine%ref_ratio - ox
                     xix = (real(mod(fi, amr_fine%ref_ratio), wp) - 0.5_wp)*0.5_wp
                     u0 = real(qc%sf(ci, cj, ck), wp)
                     sx = minmod(real(qc%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc%sf(ci - 1, cj, ck), wp))
@@ -304,10 +360,23 @@ contains
     !> Dispatch prolongation. Guard: no-op unless amr.
     impure subroutine s_populate_amr_fine(q_cons_base)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
-        integer                                             :: i
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
+        integer                                                :: i
 
         if (.not. amr) return
+        ! interior prolongation slopes read one coarse cell past the intersection - valid CONS ghosts first
+        ! (ALL ranks call: pairwise halo). This runs BEFORE s_initialize_gpu_vars, and the halo packs the
+        ! DEVICE state, so push the host ICs first (redundant on CPU; repeated later by the GPU-vars init).
+        if (amr_xchg_coarse_ghosts) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(device='[q_cons_base(i)%sf]')
+            end do
+            call s_amr_exchange_coarse_cons_halo(q_cons_base)
+            ! the exchange unpacks on the device; the init prolongation below runs on the HOST
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
+            end do
+        end if
         if (.not. amr_rank_owns_patch) return
         call s_interpolate_coarse_to_fine(q_cons_base)
         ! prolonged fine state to the device (host prolongation; device consumers: ghost-fill/RK/RHS kernels)
@@ -326,7 +395,7 @@ contains
         integer                           :: ci, cj, ck, fi0, fj0, fk0, ddj, ddk, nchild, ox, oy, oz
         real(wp)                          :: acc
 
-        ! region loop indices are GLOBAL; the coarse target qc is rank-LOCAL
+        ! isect loop indices are GLOBAL (this rank's covered coarse cells); the coarse target qc is rank-LOCAL
 
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
@@ -334,12 +403,12 @@ contains
         nchild = amr_fine%ref_ratio
         if (n_glb > 0) nchild = nchild*amr_fine%ref_ratio
         if (p_glb > 0) nchild = nchild*amr_fine%ref_ratio
-        do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
-            fk0 = (ck - amr_fine%region%lo(3))*amr_fine%ref_ratio
-            do cj = amr_fine%region%lo(2), merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
-                fj0 = (cj - amr_fine%region%lo(2))*amr_fine%ref_ratio
-                do ci = amr_fine%region%lo(1), amr_fine%region%hi(1)
-                    fi0 = (ci - amr_fine%region%lo(1))*amr_fine%ref_ratio
+        do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
+            fk0 = (ck - amr_isect_lo(3))*amr_fine%ref_ratio
+            do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
+                fj0 = (cj - amr_isect_lo(2))*amr_fine%ref_ratio
+                do ci = amr_isect_lo(1), amr_isect_hi(1)
+                    fi0 = (ci - amr_isect_lo(1))*amr_fine%ref_ratio
                     acc = 0._wp
                     do ddk = 0, merge(amr_fine%ref_ratio - 1, 0, p_glb > 0)
                         do ddj = 0, merge(amr_fine%ref_ratio - 1, 0, n_glb > 0)
@@ -374,7 +443,7 @@ contains
         integer                                                :: c1lo, c1hi, c2lo, c2hi, c3lo, c3hi, dj_hi, dk_hi
         real(wp)                                               :: acc
 
-        ! region loop indices are GLOBAL; the coarse target is rank-LOCAL
+        ! isect loop indices are GLOBAL (this rank's covered coarse cells); the coarse target is rank-LOCAL
 
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
@@ -383,9 +452,9 @@ contains
         nchild = rr
         if (n_glb > 0) nchild = nchild*rr
         if (p_glb > 0) nchild = nchild*rr
-        c1lo = amr_fine%region%lo(1); c1hi = amr_fine%region%hi(1)
-        c2lo = amr_fine%region%lo(2); c2hi = merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
-        c3lo = amr_fine%region%lo(3); c3hi = merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
+        c1lo = amr_isect_lo(1); c1hi = amr_isect_hi(1)
+        c2lo = amr_isect_lo(2); c2hi = merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
+        c3lo = amr_isect_lo(3); c3hi = merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
         $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, acc, ddj, ddk]')
         do i = 1, sys_size
@@ -433,9 +502,9 @@ contains
         end do
         err = 0._wp
         do i = 1, sys_size
-            do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
-                do cj = amr_fine%region%lo(2), merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
-                    do ci = amr_fine%region%lo(1), amr_fine%region%hi(1)
+            do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
+                do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
+                    do ci = amr_isect_lo(1), amr_isect_hi(1)
                         e = abs(real(scratch(i)%sf(ci - ox, cj - oy, ck - oz), wp) - real(q_cons_base(i)%sf(ci - ox, cj - oy, &
                                 & ck - oz), wp))
                         if (e > err) err = e
@@ -525,14 +594,14 @@ contains
         logical                                                :: d2, d3
         real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz
 
-        ! region indices are GLOBAL; the coarse source q_coarse is rank-LOCAL
+        ! fine indices are LOCAL to this rank's intersection; amr_isect_lo is GLOBAL; the coarse source q_coarse is rank-LOCAL
 
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
         d2 = n_glb > 0; d3 = p_glb > 0
         rr = amr_fine%ref_ratio
-        lo1 = amr_fine%region%lo(1); lo2 = amr_fine%region%lo(2); lo3 = amr_fine%region%lo(3)
+        lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
         fm = amr_fine%m; fn = amr_fine%n; fp = amr_fine%p
         b1 = amr_fine%idwbuff(1)%beg; e1 = amr_fine%idwbuff(1)%end
         b2 = amr_fine%idwbuff(2)%beg; e2 = amr_fine%idwbuff(2)%end
@@ -652,6 +721,27 @@ contains
 
     end subroutine s_amr_fine_rk_update
 
+    !> Exchange the coarse conservative ghost layers at internal rank boundaries (physical-boundary ghosts untouched; per direction
+    !! beg then end, mirroring s_populate_variables_buffers' dispatch). The solver never fills CONS ghosts (only prim), so ranks
+    !! whose fine ghost-fill or prolongation stencil leaves their interior need this first. ALL ranks must call together (pairwise
+    !! exchange per internal neighbor).
+    impure subroutine s_amr_exchange_coarse_cons_halo(q_cons)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
+
+        if (bc_x%beg >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 1, -1, sys_size)
+        if (bc_x%end >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 1, 1, sys_size)
+        if (n_glb > 0) then
+            if (bc_y%beg >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 2, -1, sys_size)
+            if (bc_y%end >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 2, 1, sys_size)
+        end if
+        if (p_glb > 0) then
+            if (bc_z%beg >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 3, -1, sys_size)
+            if (bc_z%end >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 3, 1, sys_size)
+        end if
+
+    end subroutine s_amr_exchange_coarse_cons_halo
+
     !> Advance the fine level through RK stage s (same dt as level-0, no subcycling). Called BETWEEN the coarse RHS and the coarse
     !! RK update, so q_cons_coarse is the coarse STAGE-ENTRY state. Fine prim ghosts are obtained by widening idwint to the fine
     !! buffer so the cons->prim conversion inside s_compute_rhs covers the (prolonged) cons ghost shell; the BC populate is skipped
@@ -661,7 +751,7 @@ contains
 
         integer, intent(in)                                        :: s, t_step
         real(wp), intent(in)                                       :: coefs(4)
-        type(scalar_field), dimension(sys_size), intent(in)        :: q_cons_coarse
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_coarse
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         type(scalar_field), intent(inout)                          :: q_T_sf
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
@@ -669,11 +759,17 @@ contains
         real(wp), intent(inout)                                    :: time_avg
 
         if (.not. amr) return
+        ! valid coarse CONS ghosts for the ghost prolongation below (ALL ranks call: pairwise halo)
+        if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_coarse)
         if (.not. amr_rank_owns_patch) return
 
         ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the
         ! device-current coarse stage-entry state directly)
         call s_amr_fill_fine_ghosts(q_cons_coarse, amr_fine%q_cons)
+
+        ! continuation faces (the patch spans a rank boundary there): overwrite the prolonged ghosts with the
+        ! neighbor's true fine data (no exchange fires at np=1 / for fully-contained patches)
+        call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
 
         ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
@@ -703,7 +799,7 @@ contains
     impure subroutine s_advance_amr_fine_substeps(q_old, q_new, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
         & time_avg)
 
-        type(scalar_field), dimension(sys_size), intent(in)        :: q_old, q_new
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_old, q_new
         real(wp), dimension(:,:), intent(in)                       :: coefs  !< rk_coef(1:3, 1:4)
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         type(scalar_field), intent(inout)                          :: q_T_sf
@@ -716,6 +812,12 @@ contains
         real(wp)                                                   :: th
 
         if (.not. amr) return
+        ! valid coarse CONS ghosts on both lerp sources (ALL ranks call: pairwise halo); the exchanged t^n /
+        ! t^{n+1} ghost layers make the prolonged patch-boundary ghosts correct even at rank boundaries
+        if (amr_xchg_coarse_ghosts) then
+            call s_amr_exchange_coarse_cons_halo(q_old)
+            call s_amr_exchange_coarse_cons_halo(q_new)
+        end if
         if (.not. amr_rank_owns_patch) return
 
         ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1} (device kernels
@@ -730,6 +832,10 @@ contains
 
                 ! lerp the ghost shell into q_cons at the stage time (device kernel; interior untouched)
                 call s_amr_lerp_fine_ghosts(amr_fine%q_ghost_a, amr_fine%q_ghost_b, amr_fine%q_cons, th)
+
+                ! continuation-face ghosts AFTER the lerp: the substeps run in lockstep across ranks, so the
+                ! neighbor's current fine q_cons is the same-time data (the lerp stays patch-boundary-only)
+                call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
 
                 ! substep-entry backup for the SSP-RK combination (device copy, interior only)
                 if (s == 1) then
@@ -991,9 +1097,9 @@ contains
                 end do
             end do
         end do
-        do ck = amr_fine%region%lo(3), merge(amr_fine%region%hi(3), amr_fine%region%lo(3), p_glb > 0)
-            do cj = amr_fine%region%lo(2), merge(amr_fine%region%hi(2), amr_fine%region%lo(2), n_glb > 0)
-                do ci = amr_fine%region%lo(1), amr_fine%region%hi(1)
+        do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
+            do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
+                do ci = amr_isect_lo(1), amr_isect_hi(1)
                     dvc = dx(ci - ox)
                     if (n_glb > 0) dvc = dvc*dy(cj - oy)
                     if (p_glb > 0) dvc = dvc*dz(ck - oz)

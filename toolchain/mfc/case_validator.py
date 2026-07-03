@@ -222,9 +222,13 @@ PHYSICS_DOCS = {
             "Incompatible with viscous, surface tension, bubble models, phase change, "
             "immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, "
             "hybrid_weno, hybrid_riemann, active_box, and acoustic_source. "
-            "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
+            "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1, "
+            "and currently a single MPI rank. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
-            "incompatible with cfl_dt."
+            "incompatible with cfl_dt. "
+            "Under MPI the patch may span ranks (each rank holds the fine cells covering its "
+            "own subdomain) but may cover at most about half of any rank's subdomain per "
+            "dimension."
         ),
     },
     # Acoustic Sources

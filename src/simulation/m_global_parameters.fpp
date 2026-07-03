@@ -276,11 +276,18 @@ module m_global_parameters
     !> @}
 
     logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
-    logical :: amr_rank_owns_patch = .true.   !< true on the rank whose subdomain contains the AMR patch (all ranks at np=1)
+    !> true on ranks holding fine cells: patch intersects this rank's subdomain in every active dim (mirror decomposition; all ranks
+    !! at np=1)
+    logical :: amr_rank_owns_patch = .true.
 
     !> Current AMR fine-patch box in level-0 cell indices; mirrors amr_fine%region at all times (kept by s_set_amr_fine_geometry) so
     !! m_amr_registers can read it without a use-cycle through m_amr.
     integer :: amr_region_lo(3) = 0, amr_region_hi(3) = 0
+
+    !> Per-dim intersection of the patch with THIS rank's subdomain, GLOBAL level-0 cell indices (kept by s_set_amr_fine_geometry;
+    !! collapsed dims 0:0). May be empty (lo > hi) in a dim; amr_rank_owns_patch = nonempty in all active dims. The rank's fine
+    !! level covers exactly this intersection: local fine index 0 = patch-global fine index 2*(amr_isect_lo - amr_region_lo).
+    integer :: amr_isect_lo(3) = 0, amr_isect_hi(3) = 0
 
 contains
 

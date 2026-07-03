@@ -502,6 +502,8 @@ contains
             ! the coarse stage-entry state here (the stage-1 backup and RK update below have not run yet)
             if (amr .and. .not. amr_subcycle) call s_advance_amr_fine_stage(s, rk_coef(s,:), q_cons_ts(1)%vf, bc_type, q_T_sf, &
                 & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
+            ! freg slices of rank-boundary patch faces move to the outside rank (ALL ranks call; no-op at np=1)
+            if (amr .and. .not. amr_subcycle) call s_mpi_sendrecv_amr_reflux_faces()
             if (amr .and. .not. amr_subcycle) call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
@@ -595,6 +597,8 @@ contains
                                                  & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
             end if
             call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
+            ! freg slices of rank-boundary patch faces move to the outside rank (ALL ranks call; no-op at np=1)
+            if (amr_subcycle) call s_mpi_sendrecv_amr_reflux_faces()
             if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
         end if
 

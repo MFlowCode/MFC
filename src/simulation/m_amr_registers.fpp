@@ -7,9 +7,10 @@
 !> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine patch boundary (SP4). Depends only on m_derived_types +
 !! m_global_parameters so both m_rhs (capture) and m_time_steppers (apply) can use it without cycles. NOTE: m_amr uses m_rhs which
 !! uses m_amr_registers, so adding "use m_amr" here would create a compilation cycle. Region info is therefore read from
-!! amr_region_lo/hi (m_global_parameters), which s_set_amr_fine_geometry keeps mirroring amr_fine%region across regrids. creg uses
-!! relative 0-based transverse indexing for regrid readiness; freg uses 0-based fine indexing. All arrays are preallocated at max
-!! size so regrid requires no reallocation.
+!! amr_region_lo/hi and amr_isect_lo/hi (m_global_parameters), which s_set_amr_fine_geometry keeps mirroring across regrids. creg
+!! uses 0-based transverse indexing relative to the rank's patch INTERSECTION (= the patch at np=1); freg uses 0-based LOCAL fine
+!! indexing (aligned: fine children of isect cell t are 2*t and 2*t+1). All arrays are preallocated at max size so regrid requires
+!! no reallocation.
 module m_amr_registers
 
     use m_derived_types
@@ -18,7 +19,7 @@ module m_amr_registers
     implicit none
 
     private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_amr_zero_fine_registers, &
-        & s_amr_apply_reflux_state, s_finalize_amr_registers
+        & s_amr_apply_reflux_state, s_finalize_amr_registers, s_amr_reflux_face_flags, freg
 
     !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
@@ -35,17 +36,55 @@ module m_amr_registers
 
 contains
 
+    !> Reflux-face participation for THIS rank: own_lo(d)/own_hi(d) = it owns the coarse cell layer just OUTSIDE the patch's
+    !! low/high face in dim d (where the coarse capture and both reflux applies run; at an interior face the same rank also holds
+    !! the inside cells) - i.e. the outside layer lies in its subdomain in dim d and its patch intersection is nonempty in the
+    !! transverse dims. All true at np=1. Also returns sidx/ext (collapsed dims pinned to 0). Reads the COARSE grid state in m/n/p -
+    !! never call from inside the fine advance (the swapped fine branch of the capture).
+    impure subroutine s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+
+        integer, intent(out) :: sidx(3), ext(3)
+        logical, intent(out) :: own_lo(3), own_hi(3)
+        logical              :: tv(3), tvd
+        integer              :: d, t
+
+        sidx = 0; ext = 0
+        sidx(1) = start_idx(1); ext(1) = m
+        if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
+        if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
+        tv(1) = amr_isect_lo(1) <= amr_isect_hi(1)
+        tv(2) = (n_glb == 0) .or. amr_isect_lo(2) <= amr_isect_hi(2)
+        tv(3) = (p_glb == 0) .or. amr_isect_lo(3) <= amr_isect_hi(3)
+        own_lo = .false.; own_hi = .false.
+        do d = 1, num_dims
+            tvd = .true.
+            do t = 1, num_dims
+                if (t /= d) tvd = tvd .and. tv(t)
+            end do
+            own_lo(d) = tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d)
+            own_hi(d) = tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d)
+        end do
+
+    end subroutine s_amr_reflux_face_flags
+
     impure subroutine s_initialize_amr_registers()
 
         integer :: maxc1, maxc2, maxc3, max_f1, max_f2, max_f3
+        integer :: sidx(3), ext(3)
+        logical :: own_lo(3), own_hi(3)
 
         if (.not. amr) return
-        if (.not. amr_rank_owns_patch) return  ! registers are owner-only (like the fine level itself)
-        ! max coarse patch cells per dim (must match m_amr's amr_maxc)
-        maxc1 = (m_glb + 1)/2
+        ! participants: ranks with fine cells (freg capture) and ranks owning an outside face layer (creg
+        ! capture + apply; those also RECEIVE freg slices when a patch face sits on a rank boundary)
+        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+        if (.not. (amr_rank_owns_patch .or. any(own_lo) .or. any(own_hi))) return
+        ! max coarse patch cells per dim THIS rank can cover (must match m_amr's preallocation cap). The
+        ! transverse extents match the face-neighbor's by construction (cart neighbors share transverse
+        ! subdomains), so the whole-array freg sendrecvs in m_mpi_proxy pair up exactly.
+        maxc1 = min((m_glb + 1)/2, (m + 1)/2)
         maxc2 = 1; maxc3 = 1
-        if (n_glb > 0) maxc2 = (n_glb + 1)/2
-        if (p_glb > 0) maxc3 = (p_glb + 1)/2
+        if (n_glb > 0) maxc2 = min((n_glb + 1)/2, (n + 1)/2)
+        if (p_glb > 0) maxc3 = min((p_glb + 1)/2, (p + 1)/2)
         max_f1 = 2*maxc1 - 1
         max_f2 = 0; max_f3 = 0
         if (n_glb > 0) max_f2 = 2*maxc2 - 1
@@ -74,12 +113,14 @@ contains
         integer, intent(in)            :: id
         type(vector_field), intent(in) :: flux_dir
         integer, intent(in)            :: stage
-        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, al1, al2, al3
+        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2
+        integer                        :: sidx(3), ext(3)
+        logical                        :: own_lo(3), own_hi(3), cap_lo, cap_hi
         real(wp)                       :: coef
         logical                        :: accum
 
         if (.not. amr) return
-        if (.not. amr_rank_owns_patch) return
+        if (amr_in_fine_advance .and. .not. amr_rank_owns_patch) return
         ! flux data was just written by device kernels; the face reads below run as device kernels too
         if (amr_subcycle) then
             if (amr_in_fine_advance) then
@@ -132,19 +173,25 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         else
-            ! coarse branch: jlo/jhi = patch boundary faces; t1/t2 relative 0-based transverse.
-            ! amr_region_lo/hi are GLOBAL; the coarse flux array is rank-LOCAL, so index via the
-            ! local patch origin al1/al2/al3 (= global origin - start_idx; identical at np=1)
-            al1 = amr_region_lo(1) - start_idx(1)
-            al2 = amr_region_lo(2); if (n_glb > 0) al2 = al2 - start_idx(2)
-            al3 = amr_region_lo(3); if (p_glb > 0) al3 = al3 - start_idx(3)
+            ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its
+            ! flux_n covers that face; at a rank-interior face the same rank also holds the inside cells).
+            ! jlo/jhi = LOCAL flux indices of the patch's low/high faces; t1/t2 = 0-based transverse indices
+            ! relative to this rank's patch INTERSECTION (o1/o2 = local transverse origins), aligned with the
+            ! fine registers: the fine children of isect-relative cell t are faces 2*t and 2*t+1. At np=1 the
+            ! intersection is the patch and both flags hold, recovering the single-rank behavior exactly.
+            call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+            cap_lo = own_lo(id); cap_hi = own_hi(id)
+            if (.not. (cap_lo .or. cap_hi)) return
             select case (id)
-            case (1); jlo = al1 - 1; jhi = al1 + amr_region_hi(1) - amr_region_lo(1)
-                t1_hi = amr_region_hi(2) - amr_region_lo(2); t2_hi = amr_region_hi(3) - amr_region_lo(3)
-            case (2); jlo = al2 - 1; jhi = al2 + amr_region_hi(2) - amr_region_lo(2)
-                t1_hi = amr_region_hi(1) - amr_region_lo(1); t2_hi = amr_region_hi(3) - amr_region_lo(3)
-            case (3); jlo = al3 - 1; jhi = al3 + amr_region_hi(3) - amr_region_lo(3)
-                t1_hi = amr_region_hi(1) - amr_region_lo(1); t2_hi = amr_region_hi(2) - amr_region_lo(2)
+            case (1); jlo = amr_region_lo(1) - 1 - sidx(1); jhi = amr_region_hi(1) - sidx(1)
+                t1_hi = amr_isect_hi(2) - amr_isect_lo(2); o1 = amr_isect_lo(2) - sidx(2)
+                t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
+            case (2); jlo = amr_region_lo(2) - 1 - sidx(2); jhi = amr_region_hi(2) - sidx(2)
+                t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
+                t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
+            case (3); jlo = amr_region_lo(3) - 1 - sidx(3); jhi = amr_region_hi(3) - sidx(3)
+                t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
+                t2_hi = amr_isect_hi(2) - amr_isect_lo(2); o2 = amr_isect_lo(2) - sidx(2)
             end select
             $:GPU_PARALLEL_LOOP(collapse=3)
             do t2 = 0, t2_hi
@@ -152,34 +199,55 @@ contains
                     do eq = 1, sys_size
                         select case (id)
                         case (1)
-                            if (accum) then
-                                creg(1)%lo(eq, t1, t2) = creg(1)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jlo, al2 + t1, &
-                                     & al3 + t2), wp)
-                                creg(1)%hi(eq, t1, t2) = creg(1)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jhi, al2 + t1, &
-                                     & al3 + t2), wp)
-                            else
-                                creg(1)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jlo, al2 + t1, al3 + t2), wp)
-                                creg(1)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jhi, al2 + t1, al3 + t2), wp)
+                            if (cap_lo) then
+                                if (accum) then
+                                    creg(1)%lo(eq, t1, t2) = creg(1)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, &
+                                         & o2 + t2), wp)
+                                else
+                                    creg(1)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                end if
+                            end if
+                            if (cap_hi) then
+                                if (accum) then
+                                    creg(1)%hi(eq, t1, t2) = creg(1)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, &
+                                         & o2 + t2), wp)
+                                else
+                                    creg(1)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                end if
                             end if
                         case (2)
-                            if (accum) then
-                                creg(2)%lo(eq, t1, t2) = creg(2)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(al1 + t1, jlo, &
-                                     & al3 + t2), wp)
-                                creg(2)%hi(eq, t1, t2) = creg(2)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(al1 + t1, jhi, &
-                                     & al3 + t2), wp)
-                            else
-                                creg(2)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(al1 + t1, jlo, al3 + t2), wp)
-                                creg(2)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(al1 + t1, jhi, al3 + t2), wp)
+                            if (cap_lo) then
+                                if (accum) then
+                                    creg(2)%lo(eq, t1, t2) = creg(2)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, &
+                                         & o2 + t2), wp)
+                                else
+                                    creg(2)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                end if
+                            end if
+                            if (cap_hi) then
+                                if (accum) then
+                                    creg(2)%hi(eq, t1, t2) = creg(2)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, &
+                                         & o2 + t2), wp)
+                                else
+                                    creg(2)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                end if
                             end if
                         case (3)
-                            if (accum) then
-                                creg(3)%lo(eq, t1, t2) = creg(3)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(al1 + t1, &
-                                     & al2 + t2, jlo), wp)
-                                creg(3)%hi(eq, t1, t2) = creg(3)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(al1 + t1, &
-                                     & al2 + t2, jhi), wp)
-                            else
-                                creg(3)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(al1 + t1, al2 + t2, jlo), wp)
-                                creg(3)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(al1 + t1, al2 + t2, jhi), wp)
+                            if (cap_lo) then
+                                if (accum) then
+                                    creg(3)%lo(eq, t1, t2) = creg(3)%lo(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, &
+                                         & o2 + t2, jlo), wp)
+                                else
+                                    creg(3)%lo(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                end if
+                            end if
+                            if (cap_hi) then
+                                if (accum) then
+                                    creg(3)%hi(eq, t1, t2) = creg(3)%hi(eq, t1, t2) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, &
+                                         & o2 + t2, jhi), wp)
+                                else
+                                    creg(3)%hi(eq, t1, t2) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                end if
                             end if
                         end select
                     end do
@@ -198,58 +266,71 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch
-        integer                                                :: nx_c, ny_c, nz_c, al1, al2, al3, ah1, ah2, ah3
-        integer                                                :: dd1_hi, dd2_hi
-        logical                                                :: d2, d3
+        integer                                                :: nx_c, ny_c, nz_c, ol1, ol2, ol3, oh1, oh2, oh3, tl1, tl2, tl3
+        integer                                                :: dd1_hi, dd2_hi, sidx(3), ext(3)
+        logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
         real(wp)                                               :: fblo, fbhi, mlo, mhi
 
         if (.not. amr) return
-        if (.not. amr_rank_owns_patch) return
+        ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer
+        ! (all faces at np=1); freg slices from a rank-boundary face's fine side arrive via
+        ! s_mpi_sendrecv_amr_reflux_faces before this is called
+        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+        if (.not. (any(own_lo) .or. any(own_hi))) return
         ! device kernels: the coarse rhs stays device-resident for the coarse RK update kernel
         d2 = n_glb > 0; d3 = p_glb > 0
-        ! current coarse patch extents (relative, 0-based): 0..n{x,y,z}_c
-        nx_c = amr_region_hi(1) - amr_region_lo(1)
+        ! this rank's covered patch cells (isect-relative, 0-based): 0..n{x,y,z}_c; matches creg/freg indexing
+        nx_c = amr_isect_hi(1) - amr_isect_lo(1)
         ny_c = 0; nz_c = 0
-        if (n_glb > 0) ny_c = amr_region_hi(2) - amr_region_lo(2)
-        if (p_glb > 0) nz_c = amr_region_hi(3) - amr_region_lo(3)
-        ! LOCAL patch bounds (rhs_vf/dx are rank-local; amr_region_lo/hi are global)
-        al1 = amr_region_lo(1) - start_idx(1); ah1 = al1 + nx_c
-        al2 = amr_region_lo(2); if (n_glb > 0) al2 = al2 - start_idx(2)
-        al3 = amr_region_lo(3); if (p_glb > 0) al3 = al3 - start_idx(3)
-        ah2 = al2 + ny_c; ah3 = al3 + nz_c
+        if (n_glb > 0) ny_c = amr_isect_hi(2) - amr_isect_lo(2)
+        if (p_glb > 0) nz_c = amr_isect_hi(3) - amr_isect_lo(3)
+        ! LOCAL cell indices (rhs_vf/dx are rank-local): outside cells ol/oh, isect transverse origins tl
+        ol1 = amr_region_lo(1) - 1 - sidx(1); oh1 = amr_region_hi(1) + 1 - sidx(1)
+        ol2 = amr_region_lo(2) - 1 - sidx(2); oh2 = amr_region_hi(2) + 1 - sidx(2)
+        ol3 = amr_region_lo(3) - 1 - sidx(3); oh3 = amr_region_hi(3) + 1 - sidx(3)
+        tl1 = amr_isect_lo(1) - sidx(1); tl2 = amr_isect_lo(2) - sidx(2); tl3 = amr_isect_lo(3) - sidx(3)
         ! x-faces: transverse dims (y, z); children in each active transverse dim
-        nch = 1
-        if (n_glb > 0) nch = nch*2
-        if (p_glb > 0) nch = nch*2
-        dd1_hi = merge(1, 0, n_glb > 0); dd2_hi = merge(1, 0, p_glb > 0)
-        mlo = dx(al1 - 1); mhi = dx(ah1 + 1)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-        do eq = 1, sys_size
-            do c2 = 0, nz_c
-                do c1 = 0, ny_c
-                    f20 = 0; if (d3) f20 = 2*c2
-                    f10 = 0; if (d2) f10 = 2*c1
-                    fblo = 0._wp; fbhi = 0._wp
-                    do dd2 = 0, dd2_hi
-                        do dd1 = 0, dd1_hi
-                            fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2)
-                            fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2)
+        has_lo = own_lo(1); has_hi = own_hi(1)
+        if (has_lo .or. has_hi) then
+            nch = 1
+            if (n_glb > 0) nch = nch*2
+            if (p_glb > 0) nch = nch*2
+            dd1_hi = merge(1, 0, n_glb > 0); dd2_hi = merge(1, 0, p_glb > 0)
+            mlo = 1._wp; mhi = 1._wp
+            if (has_lo) mlo = dx(ol1)
+            if (has_hi) mhi = dx(oh1)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+            do eq = 1, sys_size
+                do c2 = 0, nz_c
+                    do c1 = 0, ny_c
+                        f20 = 0; if (d3) f20 = 2*c2
+                        f10 = 0; if (d2) f10 = 2*c1
+                        fblo = 0._wp; fbhi = 0._wp
+                        do dd2 = 0, dd2_hi
+                            do dd1 = 0, dd1_hi
+                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2)
+                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2)
+                            end do
                         end do
+                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                        if (has_lo) rhs_vf(eq)%sf(ol1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(ol1, tl2 + c1, &
+                            & tl3 + c2) + (creg(1)%lo(eq, c1, c2) - fblo)/mlo
+                        if (has_hi) rhs_vf(eq)%sf(oh1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(oh1, tl2 + c1, &
+                            & tl3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2))/mhi
                     end do
-                    fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                    rhs_vf(eq)%sf(al1 - 1, al2 + c1, al3 + c2) = rhs_vf(eq)%sf(al1 - 1, al2 + c1, al3 + c2) + (creg(1)%lo(eq, c1, &
-                           & c2) - fblo)/mlo
-                    rhs_vf(eq)%sf(ah1 + 1, al2 + c1, al3 + c2) = rhs_vf(eq)%sf(ah1 + 1, al2 + c1, &
-                           & al3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2))/mhi
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
         ! y-faces (n_glb > 0): transverse dims (x, z); x is always active (2 children)
-        if (n_glb > 0) then
+        has_lo = own_lo(2); has_hi = own_hi(2)
+        if (n_glb > 0 .and. (has_lo .or. has_hi)) then
             nch = 2
             if (p_glb > 0) nch = nch*2
-            mlo = dy(al2 - 1); mhi = dy(ah2 + 1)
+            dd2_hi = merge(1, 0, p_glb > 0)
+            mlo = 1._wp; mhi = 1._wp
+            if (has_lo) mlo = dy(ol2)
+            if (has_hi) mhi = dy(oh2)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
                 do c2 = 0, nz_c
@@ -264,19 +345,22 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        rhs_vf(eq)%sf(al1 + c1, al2 - 1, al3 + c2) = rhs_vf(eq)%sf(al1 + c1, al2 - 1, al3 + c2) + (creg(2)%lo(eq, &
-                               & c1, c2) - fblo)/mlo
-                        rhs_vf(eq)%sf(al1 + c1, ah2 + 1, al3 + c2) = rhs_vf(eq)%sf(al1 + c1, ah2 + 1, &
-                               & al3 + c2) + (fbhi - creg(2)%hi(eq, c1, c2))/mhi
+                        if (has_lo) rhs_vf(eq)%sf(tl1 + c1, ol2, tl3 + c2) = rhs_vf(eq)%sf(tl1 + c1, ol2, &
+                            & tl3 + c2) + (creg(2)%lo(eq, c1, c2) - fblo)/mlo
+                        if (has_hi) rhs_vf(eq)%sf(tl1 + c1, oh2, tl3 + c2) = rhs_vf(eq)%sf(tl1 + c1, oh2, &
+                            & tl3 + c2) + (fbhi - creg(2)%hi(eq, c1, c2))/mhi
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
         ! z-faces (p_glb > 0): transverse dims (x, y); both always active in 3D (4 children)
-        if (p_glb > 0) then
+        has_lo = own_lo(3); has_hi = own_hi(3)
+        if (p_glb > 0 .and. (has_lo .or. has_hi)) then
             nch = 4
-            mlo = dz(al3 - 1); mhi = dz(ah3 + 1)
+            mlo = 1._wp; mhi = 1._wp
+            if (has_lo) mlo = dz(ol3)
+            if (has_hi) mhi = dz(oh3)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
                 do c2 = 0, ny_c
@@ -291,10 +375,10 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        rhs_vf(eq)%sf(al1 + c1, al2 + c2, al3 - 1) = rhs_vf(eq)%sf(al1 + c1, al2 + c2, al3 - 1) + (creg(3)%lo(eq, &
-                               & c1, c2) - fblo)/mlo
-                        rhs_vf(eq)%sf(al1 + c1, al2 + c2, ah3 + 1) = rhs_vf(eq)%sf(al1 + c1, al2 + c2, &
-                               & ah3 + 1) + (fbhi - creg(3)%hi(eq, c1, c2))/mhi
+                        if (has_lo) rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, ol3) = rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, &
+                            & ol3) + (creg(3)%lo(eq, c1, c2) - fblo)/mlo
+                        if (has_hi) rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, oh3) = rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, &
+                            & oh3) + (fbhi - creg(3)%hi(eq, c1, c2))/mhi
                     end do
                 end do
             end do
@@ -335,56 +419,66 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
         integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch
-        integer                                                :: nx_c, ny_c, nz_c, al1, al2, al3, ah1, ah2, ah3
-        integer                                                :: dd1_hi, dd2_hi
-        logical                                                :: d2, d3
+        integer                                                :: nx_c, ny_c, nz_c, ol1, ol2, ol3, oh1, oh2, oh3, tl1, tl2, tl3
+        integer                                                :: dd1_hi, dd2_hi, sidx(3), ext(3)
+        logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
         real(wp)                                               :: fblo, fbhi, mlo, mhi, dtl
 
         if (.not. amr) return
-        if (.not. amr_rank_owns_patch) return
+        ! per-face participation and index conventions: see s_amr_apply_reflux
+        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+        if (.not. (any(own_lo) .or. any(own_hi))) return
         ! device kernels: the restricted coarse state stays device-resident
         d2 = n_glb > 0; d3 = p_glb > 0
         dtl = dt
-        nx_c = amr_region_hi(1) - amr_region_lo(1)
+        nx_c = amr_isect_hi(1) - amr_isect_lo(1)
         ny_c = 0; nz_c = 0
-        if (n_glb > 0) ny_c = amr_region_hi(2) - amr_region_lo(2)
-        if (p_glb > 0) nz_c = amr_region_hi(3) - amr_region_lo(3)
-        ! LOCAL patch bounds (q_cons/dx are rank-local; amr_region_lo/hi are global)
-        al1 = amr_region_lo(1) - start_idx(1); ah1 = al1 + nx_c
-        al2 = amr_region_lo(2); if (n_glb > 0) al2 = al2 - start_idx(2)
-        al3 = amr_region_lo(3); if (p_glb > 0) al3 = al3 - start_idx(3)
-        ah2 = al2 + ny_c; ah3 = al3 + nz_c
-        nch = 1
-        if (n_glb > 0) nch = nch*2
-        if (p_glb > 0) nch = nch*2
-        dd1_hi = merge(1, 0, n_glb > 0); dd2_hi = merge(1, 0, p_glb > 0)
-        mlo = dx(al1 - 1); mhi = dx(ah1 + 1)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-        do eq = 1, sys_size
-            do c2 = 0, nz_c
-                do c1 = 0, ny_c
-                    f20 = 0; if (d3) f20 = 2*c2
-                    f10 = 0; if (d2) f10 = 2*c1
-                    fblo = 0._wp; fbhi = 0._wp
-                    do dd2 = 0, dd2_hi
-                        do dd1 = 0, dd1_hi
-                            fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2)
-                            fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2)
+        if (n_glb > 0) ny_c = amr_isect_hi(2) - amr_isect_lo(2)
+        if (p_glb > 0) nz_c = amr_isect_hi(3) - amr_isect_lo(3)
+        ol1 = amr_region_lo(1) - 1 - sidx(1); oh1 = amr_region_hi(1) + 1 - sidx(1)
+        ol2 = amr_region_lo(2) - 1 - sidx(2); oh2 = amr_region_hi(2) + 1 - sidx(2)
+        ol3 = amr_region_lo(3) - 1 - sidx(3); oh3 = amr_region_hi(3) + 1 - sidx(3)
+        tl1 = amr_isect_lo(1) - sidx(1); tl2 = amr_isect_lo(2) - sidx(2); tl3 = amr_isect_lo(3) - sidx(3)
+        has_lo = own_lo(1); has_hi = own_hi(1)
+        if (has_lo .or. has_hi) then
+            nch = 1
+            if (n_glb > 0) nch = nch*2
+            if (p_glb > 0) nch = nch*2
+            dd1_hi = merge(1, 0, n_glb > 0); dd2_hi = merge(1, 0, p_glb > 0)
+            mlo = 1._wp; mhi = 1._wp
+            if (has_lo) mlo = dx(ol1)
+            if (has_hi) mhi = dx(oh1)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+            do eq = 1, sys_size
+                do c2 = 0, nz_c
+                    do c1 = 0, ny_c
+                        f20 = 0; if (d3) f20 = 2*c2
+                        f10 = 0; if (d2) f10 = 2*c1
+                        fblo = 0._wp; fbhi = 0._wp
+                        do dd2 = 0, dd2_hi
+                            do dd1 = 0, dd1_hi
+                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2)
+                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2)
+                            end do
                         end do
+                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                        if (has_lo) q_cons(eq)%sf(ol1, tl2 + c1, tl3 + c2) = q_cons(eq)%sf(ol1, tl2 + c1, &
+                            & tl3 + c2) + dtl*(creg(1)%lo(eq, c1, c2) - fblo)/mlo
+                        if (has_hi) q_cons(eq)%sf(oh1, tl2 + c1, tl3 + c2) = q_cons(eq)%sf(oh1, tl2 + c1, &
+                            & tl3 + c2) + dtl*(fbhi - creg(1)%hi(eq, c1, c2))/mhi
                     end do
-                    fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                    q_cons(eq)%sf(al1 - 1, al2 + c1, al3 + c2) = q_cons(eq)%sf(al1 - 1, al2 + c1, al3 + c2) + dtl*(creg(1)%lo(eq, &
-                           & c1, c2) - fblo)/mlo
-                    q_cons(eq)%sf(ah1 + 1, al2 + c1, al3 + c2) = q_cons(eq)%sf(ah1 + 1, al2 + c1, &
-                           & al3 + c2) + dtl*(fbhi - creg(1)%hi(eq, c1, c2))/mhi
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-        if (n_glb > 0) then
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        has_lo = own_lo(2); has_hi = own_hi(2)
+        if (n_glb > 0 .and. (has_lo .or. has_hi)) then
             nch = 2
             if (p_glb > 0) nch = nch*2
-            mlo = dy(al2 - 1); mhi = dy(ah2 + 1)
+            dd2_hi = merge(1, 0, p_glb > 0)
+            mlo = 1._wp; mhi = 1._wp
+            if (has_lo) mlo = dy(ol2)
+            if (has_hi) mhi = dy(oh2)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
                 do c2 = 0, nz_c
@@ -399,18 +493,21 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        q_cons(eq)%sf(al1 + c1, al2 - 1, al3 + c2) = q_cons(eq)%sf(al1 + c1, al2 - 1, &
-                               & al3 + c2) + dtl*(creg(2)%lo(eq, c1, c2) - fblo)/mlo
-                        q_cons(eq)%sf(al1 + c1, ah2 + 1, al3 + c2) = q_cons(eq)%sf(al1 + c1, ah2 + 1, &
-                               & al3 + c2) + dtl*(fbhi - creg(2)%hi(eq, c1, c2))/mhi
+                        if (has_lo) q_cons(eq)%sf(tl1 + c1, ol2, tl3 + c2) = q_cons(eq)%sf(tl1 + c1, ol2, &
+                            & tl3 + c2) + dtl*(creg(2)%lo(eq, c1, c2) - fblo)/mlo
+                        if (has_hi) q_cons(eq)%sf(tl1 + c1, oh2, tl3 + c2) = q_cons(eq)%sf(tl1 + c1, oh2, &
+                            & tl3 + c2) + dtl*(fbhi - creg(2)%hi(eq, c1, c2))/mhi
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-        if (p_glb > 0) then
+        has_lo = own_lo(3); has_hi = own_hi(3)
+        if (p_glb > 0 .and. (has_lo .or. has_hi)) then
             nch = 4
-            mlo = dz(al3 - 1); mhi = dz(ah3 + 1)
+            mlo = 1._wp; mhi = 1._wp
+            if (has_lo) mlo = dz(ol3)
+            if (has_hi) mhi = dz(oh3)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
                 do c2 = 0, ny_c
@@ -425,10 +522,10 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        q_cons(eq)%sf(al1 + c1, al2 + c2, al3 - 1) = q_cons(eq)%sf(al1 + c1, al2 + c2, &
-                               & al3 - 1) + dtl*(creg(3)%lo(eq, c1, c2) - fblo)/mlo
-                        q_cons(eq)%sf(al1 + c1, al2 + c2, ah3 + 1) = q_cons(eq)%sf(al1 + c1, al2 + c2, &
-                               & ah3 + 1) + dtl*(fbhi - creg(3)%hi(eq, c1, c2))/mhi
+                        if (has_lo) q_cons(eq)%sf(tl1 + c1, tl2 + c2, ol3) = q_cons(eq)%sf(tl1 + c1, tl2 + c2, &
+                            & ol3) + dtl*(creg(3)%lo(eq, c1, c2) - fblo)/mlo
+                        if (has_hi) q_cons(eq)%sf(tl1 + c1, tl2 + c2, oh3) = q_cons(eq)%sf(tl1 + c1, tl2 + c2, &
+                            & oh3) + dtl*(fbhi - creg(3)%hi(eq, c1, c2))/mhi
                     end do
                 end do
             end do
