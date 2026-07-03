@@ -14,6 +14,7 @@ module m_amr
         & s_mpi_sendrecv_variables_buffers
     use m_rhs, only: s_compute_rhs
     use m_amr_registers, only: s_amr_zero_fine_registers
+    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
 
     implicit none
 
@@ -435,7 +436,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
 
         if (.not. amr_rank_owns_patch) return
+        if (rank_time_wrt) call s_rank_time_tic()
         call s_restrict_all_vars(amr_fine%q_cons, coarse_tgt)
+        if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
 
@@ -769,12 +772,16 @@ contains
         if (.not. amr_rank_owns_patch) return
 
         ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the
-        ! device-current coarse stage-entry state directly)
+        ! device-current coarse stage-entry state directly); rank_time brackets cover the fine-advance
+        ! compute segments and pause across the MPI exchanges (the inner s_compute_rhs pair nests to a no-op)
+        if (rank_time_wrt) call s_rank_time_tic()
         call s_amr_fill_fine_ghosts(q_cons_coarse, amr_fine%q_cons)
+        if (rank_time_wrt) call s_rank_time_toc()
 
         ! continuation faces (the patch spans a rank boundary there): overwrite the prolonged ghosts with the
         ! neighbor's true fine data (no exchange fires at np=1 / for fully-contained patches)
         call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
+        if (rank_time_wrt) call s_rank_time_tic()
 
         ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
@@ -794,6 +801,7 @@ contains
 
         ! RK stage update (device kernel; mirror of the coarse non-IGR form)
         call s_amr_fine_rk_update(amr_fine%q_cons, amr_fine%q_cons_stor, amr_fine%rhs, coefs(1), coefs(2), coefs(3), coefs(4), dt)
+        if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_advance_amr_fine_stage
 
@@ -826,7 +834,9 @@ contains
         if (.not. amr_rank_owns_patch) return
 
         ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1} (device kernels
-        ! read the device-current coarse states directly)
+        ! read the device-current coarse states directly); rank_time brackets cover the fine-advance
+        ! compute segments and pause across the MPI exchanges (the inner s_compute_rhs pair nests to a no-op)
+        if (rank_time_wrt) call s_rank_time_tic()
         call s_amr_fill_fine_ghosts(q_old, amr_fine%q_ghost_a)
         call s_amr_fill_fine_ghosts(q_new, amr_fine%q_ghost_b)
         call s_amr_zero_fine_registers()
@@ -837,10 +847,12 @@ contains
 
                 ! lerp the ghost shell into q_cons at the stage time (device kernel; interior untouched)
                 call s_amr_lerp_fine_ghosts(amr_fine%q_ghost_a, amr_fine%q_ghost_b, amr_fine%q_cons, th)
+                if (rank_time_wrt) call s_rank_time_toc()
 
                 ! continuation-face ghosts AFTER the lerp: the substeps run in lockstep across ranks, so the
                 ! neighbor's current fine q_cons is the same-time data (the lerp stays patch-boundary-only)
                 call s_mpi_sendrecv_amr_fine_halo(amr_fine%q_cons, amr_fine%m, amr_fine%n, amr_fine%p)
+                if (rank_time_wrt) call s_rank_time_tic()
 
                 ! substep-entry backup for the SSP-RK combination (device copy, interior only)
                 if (s == 1) then
@@ -861,6 +873,7 @@ contains
                                           & 3), coefs(s, 4), amr_dt_fine)
             end do
         end do
+        if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_advance_amr_fine_substeps
 

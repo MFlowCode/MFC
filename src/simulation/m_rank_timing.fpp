@@ -20,6 +20,9 @@ module m_rank_timing
     real(wp) :: t_rank_compute = 0._wp
     !> system_clock tick captured at the most recent tic
     integer(8) :: tic_count
+    !> tic/toc nesting depth: only the outermost pair measures, so the AMR fine advance can bracket its compute segments while the
+    !! s_compute_rhs pair inside becomes a no-op (no double counting)
+    integer :: tic_depth = 0
 
 contains
 
@@ -28,6 +31,8 @@ contains
     impure subroutine s_rank_time_tic
 
         if (.not. rank_time_wrt) return
+        tic_depth = tic_depth + 1
+        if (tic_depth > 1) return
         $:GPU_WAIT()
         call system_clock(tic_count)
 
@@ -41,6 +46,8 @@ contains
         integer(8) :: toc_count, rate
 
         if (.not. rank_time_wrt) return
+        tic_depth = tic_depth - 1
+        if (tic_depth > 0) return
         $:GPU_WAIT()
         call system_clock(toc_count, rate)
         t_rank_compute = t_rank_compute + real(toc_count - tic_count, wp)/real(rate, wp)

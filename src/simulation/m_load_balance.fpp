@@ -38,6 +38,25 @@ contains
 
     end function f_offsets_differ_from_equal
 
+    !> True iff, for one axis's cumulative offsets, every part's intersection with the AMR patch satisfies the mirror-decomposition
+    !! scratch cap 2*(isect cells) - 1 <= part cells - 1 (the per-dim bound s_initialize_amr_module aborts on). Checking each axis
+    !! part independently is equivalent to checking every rank's box: a rank owns the patch iff its intersection is nonempty in
+    !! every active dim, and its per-dim intersection depends only on that axis's part index.
+    pure function f_amr_isect_fits(off, n_parts, pbeg, pend) result(ok)
+
+        integer, dimension(0:), intent(in) :: off
+        integer, intent(in)                :: n_parts, pbeg, pend
+        logical                            :: ok
+        integer                            :: r, ilo, ihi
+
+        ok = .true.
+        do r = 0, n_parts - 1
+            ilo = max(pbeg, off(r)); ihi = min(pend, off(r + 1) - 1)
+            if (ihi >= ilo .and. 2*(ihi - ilo + 1) - 1 > off(r + 1) - off(r) - 1) ok = .false.
+        end do
+
+    end function f_amr_isect_fits
+
     !> Read the first advection variable at the equal layout from the restart file and build global per-axis marginals. wx(0:m_glb),
     !! wy(0:n_glb), wz(0:p_glb) are allocated here; caller deallocates. Requires eqn_idx%adv%beg to be valid (call
     !! s_initialize_eqn_idx before invoking this).
@@ -136,9 +155,10 @@ contains
     !! every axis). Reads one advection variable from the restart file at the equal layout to build per-axis weight marginals.
     impure subroutine s_load_balance_rebalance()
 
-        real(wp), allocatable, dimension(:) :: wx, wy, wz
+        real(wp), allocatable, dimension(:) :: wx, wy, wz, vx, vy, vz
         integer, allocatable, dimension(:)  :: ox, oy, oz
-        integer                             :: lmin, recon_order
+        real(wp)                            :: amr_w(3), ff, scale
+        integer                             :: lmin, recon_order, pc(3), try
         logical                             :: changed
 
         if (.not. load_balance) return
@@ -165,9 +185,50 @@ contains
         @:PROHIBIT(num_procs_z > 1 .and. (p_glb + 1) < num_procs_z*lmin, "load_balance: z-axis too small for min cells per rank")
 
         allocate (ox(0:num_procs_x), oy(0:num_procs_y), oz(0:num_procs_z))
-        ox = f_weighted_splits(wx, num_procs_x, lmin)
-        oy = f_weighted_splits(wy, num_procs_y, lmin)
-        oz = f_weighted_splits(wz, num_procs_z, lmin)
+        allocate (vx(0:m_glb), vy(0:n_glb), vz(0:p_glb))
+
+        ! AMR fine-work injection: each patch-covered coarse cell costs an extra 2**num_dims (interleaved;
+        ! x2 subcycled) fine-cell RHS evaluations per coarse step, so the patch's axis projections gain
+        ! fine_factor * (patch transverse cells) in each marginal's own units (per-cell scale =
+        ! sum(w_axis)/total cells per axis: the probe's marginal sums are all equal, the missing-file
+        ! fallback's are per-index and differ across axes).
+        amr_w = 0._wp
+        pc = 1
+        if (amr) then
+            pc(1) = amr_patch_end(1) - amr_patch_beg(1) + 1
+            if (n_glb > 0) pc(2) = amr_patch_end(2) - amr_patch_beg(2) + 1
+            if (p_glb > 0) pc(3) = amr_patch_end(3) - amr_patch_beg(3) + 1
+            ff = real(2**(num_dims + merge(1, 0, amr_subcycle)), wp)/(real(m_glb + 1, wp)*real(n_glb + 1, wp)*real(p_glb + 1, wp))
+            amr_w(1) = ff*sum(wx)*real(pc(2), wp)*real(pc(3), wp)
+            amr_w(2) = ff*sum(wy)*real(pc(1), wp)*real(pc(3), wp)
+            amr_w(3) = ff*sum(wz)*real(pc(1), wp)*real(pc(2), wp)
+        end if
+
+        ! Deterministic feasibility clamp: if the weighted boxes would violate the AMR scratch cap on any
+        ! rank, halve the amr contribution and re-split (<= 3 retries; the final fallback drops it, which
+        ! s_initialize_amr_module's own init check governs). Pure arithmetic on rank-identical arrays, so
+        ! every rank takes the same branches.
+        scale = 1._wp
+        do try = 1, 4
+            if (try == 4) scale = 0._wp
+            vx = wx; vy = wy; vz = wz
+            if (amr .and. scale > 0._wp) then
+                vx(amr_patch_beg(1):amr_patch_end(1)) = vx(amr_patch_beg(1):amr_patch_end(1)) + scale*amr_w(1)
+                if (n_glb > 0) vy(amr_patch_beg(2):amr_patch_end(2)) = vy(amr_patch_beg(2):amr_patch_end(2)) + scale*amr_w(2)
+                if (p_glb > 0) vz(amr_patch_beg(3):amr_patch_end(3)) = vz(amr_patch_beg(3):amr_patch_end(3)) + scale*amr_w(3)
+            end if
+            ox = f_weighted_splits(vx, num_procs_x, lmin)
+            oy = f_weighted_splits(vy, num_procs_y, lmin)
+            oz = f_weighted_splits(vz, num_procs_z, lmin)
+            if (.not. amr) exit
+            if (f_amr_isect_fits(ox, num_procs_x, amr_patch_beg(1), amr_patch_end(1)) .and. (n_glb == 0 .or. f_amr_isect_fits(oy, &
+                & num_procs_y, amr_patch_beg(2), amr_patch_end(2))) .and. (p_glb == 0 .or. f_amr_isect_fits(oz, num_procs_z, &
+                & amr_patch_beg(3), amr_patch_end(3)))) exit
+            scale = 0.5_wp*scale
+        end do
+        if (amr .and. scale < 1._wp .and. proc_rank == 0) then
+            print *, '[load_balance] amr weight softened to fit the fine patch per rank; scale =', scale
+        end if
 
         changed = f_offsets_differ_from_equal(ox, m_glb + 1, num_procs_x) .or. f_offsets_differ_from_equal(oy, n_glb + 1, &
                                               & num_procs_y) .or. f_offsets_differ_from_equal(oz, p_glb + 1, num_procs_z)
@@ -180,7 +241,7 @@ contains
 
         if (changed) call s_apply_weighted_offsets(ox, oy, oz)
 
-        deallocate (wx, wy, wz, ox, oy, oz)
+        deallocate (wx, wy, wz, vx, vy, vz, ox, oy, oz)
 
     end subroutine s_load_balance_rebalance
 
