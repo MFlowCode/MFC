@@ -676,7 +676,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `sfc_partition_wrt`     | Logical | Report SFC-weighted load-balance partition |
 | `rank_time_wrt`         | Logical | Report per-rank RHS compute-time imbalance (max/mean) |
 | `load_balance`          | Logical | (Experimental/diagnostic) Weighted static Cartesian decomposition at init (requires `parallel_io = T`, >1 rank). Measured gain is small on CPU (~5%) and can be slower on GPU due to the occupancy floor; equal decomposition is near-optimal for uniform-cost workloads. |
-| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 patch with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2; num_fluids > 1 requires mpp_lim. |
+| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 patch with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2; num_fluids > 1 requires mpp_lim; supports physical viscosity. |
 | `amr_patch_beg(i)`      | Integer | Refined-patch start cell index in direction $i$ (level-0 index space) |
 | `amr_patch_end(i)`      | Integer | Refined-patch end cell index in direction $i$ (level-0 index space) |
 | `amr_regrid_int`        | Integer | Steps between AMR regrid events (0 = static patch) |
@@ -787,7 +787,17 @@ Multiple fluids (`num_fluids > 1`) are supported and additionally require `mpp_l
 whose volume-fraction clamp+renormalize maintains coarse/fine alpha consistency; the
 per-fluid masses are refluxed exactly, and volume fractions are prolonged with a
 sum-preserving closure (fine-level volume fractions sum to one by construction).
-It is incompatible with viscosity, surface tension, bubble models, phase-change (relax),
+Physical viscosity (`viscous = T`) is supported: the viscous stress/work travels through
+the momentum- and energy-equation source fluxes, which are captured into the same
+coarse–fine flux registers as the advective fluxes, so the interface is refluxed against
+the matched *total* (advective + viscous) flux and energy — including viscous work — is
+conserved. Fine-ghost velocity gradients at the coarse–fine boundary are taken from the
+conservative-linear prolongation of the coarse state (no special gradient reconstruction);
+that interface inconsistency is bounded and conservation is enforced by the flux-register
+matching. The density-gradient regrid tagger does not sense shear or boundary layers well,
+so viscous features may need a static or generously buffered patch (error-estimator taggers
+are future work).
+It is incompatible with surface tension, bubble models, phase-change (relax),
 immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, `hybrid_weno`,
 `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank

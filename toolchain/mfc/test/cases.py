@@ -2716,6 +2716,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (e) viscous (SP11): single-fluid Sod with physical viscosity (Re=100), regrid + subcycle.
+        # Exercises the viscous flux-register reflux (flux_src_n momentum/energy captured into the
+        # same registers as the advective flux_n) so the c/f boundary sees matched total fluxes.
+        stack.push(
+            "AMR -> 1D -> viscous",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "viscous": "T",
+                "weno_Re_flux": "T",
+                "weno_avg": "T",
+                "fluid_pp(1)%Re(1)": 100.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     add_convergence_cases(cases)

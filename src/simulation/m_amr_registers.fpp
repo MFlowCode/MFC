@@ -18,6 +18,13 @@
 !! remainder (the +alpha*d(u_star)/dx compression term m_rhs assembles from flux_src_n = u_star) is deliberately NOT captured:
 !! alpha is genuinely non-conservative, so forcing flux-matching on u_star would be wrong; coarse/fine volume-fraction
 !! consistency is instead maintained by mpp_lim's clamp+renormalize (required by the checker for amr with num_fluids > 1).
+!!
+!! Viscous (SP11): the viscous stress/work face fluxes travel through flux_src_n for the momentum and energy equations
+!! (m_rhs s_compute_additional_physics_rhs: rhs += (flux_src_n(j-1) - flux_src_n(j))/dx, identical face indexing and sign to the
+!! advective flux_n). They are captured into the SAME registers (added on top of the advective flux for mom..E) so the c/f reflux
+!! matches the TOTAL advective+viscous flux; energy conservation therefore includes the viscous work. Fine-ghost velocity gradients
+!! at the c/f boundary come from the conservative-linear cons prolongation (no special gradient reconstruction) - like the alpha
+!! K-term, that inconsistency is bounded, and conservation is enforced by the flux-register matching.
 module m_amr_registers
 
     use m_derived_types
@@ -112,10 +119,11 @@ contains
     !! call (amr_in_fine_advance false, coarse globals) fills creg at the patch boundary faces; fine call (flag true, globals
     !! swapped to the fine patch) fills freg at fine faces -1 and m/n/p. creg uses relative 0-based transverse; freg uses 0-based
     !! fine.
-    impure subroutine s_amr_capture_boundary_flux(id, flux_dir, stage)
+    impure subroutine s_amr_capture_boundary_flux(id, flux_dir, flux_src, stage)
 
         integer, intent(in)            :: id
         type(vector_field), intent(in) :: flux_dir
+        type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
         integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2
         integer                        :: sidx(3), ext(3)
@@ -176,6 +184,30 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+            ! total-flux matching: add the viscous momentum/energy face fluxes (flux_src) into the same fine
+            ! registers so the c/f reflux sees advective+viscous. Base coef/accum are applied above; always
+            ! accumulate here. Inviscid path skips this entirely (registers stay byte-identical).
+            if (viscous) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do t2 = 0, t2_hi
+                    do t1 = 0, t1_hi
+                        do eq = eqn_idx%mom%beg, eqn_idx%E
+                            select case (id)
+                            case (1)
+                                freg(1)%lo(eq, t1, t2) = freg(1)%lo(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(jlo, t1, t2), wp)
+                                freg(1)%hi(eq, t1, t2) = freg(1)%hi(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(jhi, t1, t2), wp)
+                            case (2)
+                                freg(2)%lo(eq, t1, t2) = freg(2)%lo(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(t1, jlo, t2), wp)
+                                freg(2)%hi(eq, t1, t2) = freg(2)%hi(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(t1, jhi, t2), wp)
+                            case (3)
+                                freg(3)%lo(eq, t1, t2) = freg(3)%lo(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(t1, t2, jlo), wp)
+                                freg(3)%hi(eq, t1, t2) = freg(3)%hi(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(t1, t2, jhi), wp)
+                            end select
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         else
             ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its
             ! flux_n covers that face; at a rank-interior face the same rank also holds the inside cells).
@@ -258,6 +290,35 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+            ! total-flux matching (coarse side): add viscous momentum/energy face fluxes into creg, same
+            ! face gating and transverse offsets as the base capture; always accumulate.
+            if (viscous) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do t2 = 0, t2_hi
+                    do t1 = 0, t1_hi
+                        do eq = eqn_idx%mom%beg, eqn_idx%E
+                            select case (id)
+                            case (1)
+                                if (cap_lo) creg(1)%lo(eq, t1, t2) = creg(1)%lo(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(jlo, &
+                                    & o1 + t1, o2 + t2), wp)
+                                if (cap_hi) creg(1)%hi(eq, t1, t2) = creg(1)%hi(eq, t1, t2) + coef*real(flux_src%vf(eq)%sf(jhi, &
+                                    & o1 + t1, o2 + t2), wp)
+                            case (2)
+                                if (cap_lo) creg(2)%lo(eq, t1, t2) = creg(2)%lo(eq, t1, &
+                                    & t2) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                if (cap_hi) creg(2)%hi(eq, t1, t2) = creg(2)%hi(eq, t1, &
+                                    & t2) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                            case (3)
+                                if (cap_lo) creg(3)%lo(eq, t1, t2) = creg(3)%lo(eq, t1, &
+                                    & t2) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                if (cap_hi) creg(3)%hi(eq, t1, t2) = creg(3)%hi(eq, t1, &
+                                    & t2) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                            end select
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
 
     end subroutine s_amr_capture_boundary_flux
