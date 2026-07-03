@@ -2555,6 +2555,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         (a) static patch  – amr_regrid_int=0, no regrid, cheapest sanity check
         (b) dynamic regrid – amr_regrid_int=2, exercises the tag/rebuild path
         (c) subcycling    – amr_subcycle=T, exercises the dt/2 two-substep path
+        (d) two-fluid     – num_fluids=2 + mpp_lim, regrid + subcycle: exercises the
+            sum-preserving alpha prolongation and per-fluid reflux (SP9a)
 
         Grid: m=63 (indices 0..63); fine patch beg=16, end=47 so that
         2*(47-16+1)-1 = 63 <= 63 satisfies the extent guard.
@@ -2615,6 +2617,109 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 **amr_1d_base,
                 "amr_regrid_int": 0,
                 "amr_subcycle": "T",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (d) 3D static patch — z-dimension coverage. 26^3 base grid (the
+        # checker's WENO5 floor is 26 cells per axis) with the Sod-like slabs
+        # stacked along z; 12^3 fine patch at coarse indices 6..17 per axis
+        # (fine extent 23 <= 25; >= buff_size=4 inside the domain).
+        amr_3d_base = {
+            "m": 25,
+            "n": 25,
+            "p": 25,
+            "dt": 2.0e-3,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "z_domain%beg": 0.0,
+            "z_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
+            "bc_y%end": -3,
+            "bc_z%beg": -3,
+            "bc_z%end": -3,
+            # 3D geometry: the three BASE_CFG states as full-x/y slabs along z
+            **{
+                f"patch_icpp({i})%{key}": val
+                for i in (1, 2, 3)
+                for key, val in (
+                    ("geometry", 9),
+                    ("x_centroid", 0.5),
+                    ("length_x", 1.0),
+                    ("y_centroid", 0.5),
+                    ("length_y", 1.0),
+                    ("vel(1)", 0.0),
+                    ("vel(2)", 0.0),
+                    ("vel(3)", 0.0),
+                )
+            },
+            "patch_icpp(1)%z_centroid": 0.05,
+            "patch_icpp(1)%length_z": 0.1,
+            "patch_icpp(2)%z_centroid": 0.45,
+            "patch_icpp(2)%length_z": 0.7,
+            "patch_icpp(3)%z_centroid": 0.9,
+            "patch_icpp(3)%length_z": 0.2,
+            # AMR: 2:1 fine patch spanning coarse indices 6..17 per axis
+            "amr": "T",
+            "amr_patch_beg(1)": 6,
+            "amr_patch_beg(2)": 6,
+            "amr_patch_beg(3)": 6,
+            "amr_patch_end(1)": 17,
+            "amr_patch_end(2)": 17,
+            "amr_patch_end(3)": 17,
+        }
+
+        stack.push("AMR -> 3D -> static patch", {**amr_3d_base, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (d) two-fluid: material interface (density ratio 10) at x=0.5, inside the initial
+        # patch (cells 16..47); uniform p and u advect it under regrid + subcycle
+        eps_a = 1.0e-6
+        stack.push(
+            "AMR -> 1D -> two-fluid",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%cv": 0.0,
+                "fluid_pp(2)%qv": 0.0,
+                "fluid_pp(2)%qvp": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(3)%vel(1)": 0.5,
+                "patch_icpp(2)%x_centroid": 0.3,
+                "patch_icpp(2)%length_x": 0.4,
+                "patch_icpp(3)%x_centroid": 0.75,
+                "patch_icpp(3)%length_x": 0.5,
+                "patch_icpp(1)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(1)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(1)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(1)%alpha(2)": eps_a,
+                "patch_icpp(2)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(2)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(2)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(2)%alpha(2)": eps_a,
+                "patch_icpp(3)%alpha_rho(1)": eps_a * 1.0,
+                "patch_icpp(3)%alpha_rho(2)": (1.0 - eps_a) * 10.0,
+                "patch_icpp(3)%alpha(1)": eps_a,
+                "patch_icpp(3)%alpha(2)": 1.0 - eps_a,
             },
         )
         cases.append(define_case_d(stack, "", {}))
