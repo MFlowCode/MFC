@@ -2611,6 +2611,64 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (d) 3D static patch — z-dimension coverage. 26^3 base grid (the
+        # checker's WENO5 floor is 26 cells per axis) with the Sod-like slabs
+        # stacked along z; 12^3 fine patch at coarse indices 6..17 per axis
+        # (fine extent 23 <= 25; >= buff_size=4 inside the domain).
+        amr_3d_base = {
+            "m": 25,
+            "n": 25,
+            "p": 25,
+            "dt": 2.0e-3,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "z_domain%beg": 0.0,
+            "z_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
+            "bc_y%end": -3,
+            "bc_z%beg": -3,
+            "bc_z%end": -3,
+            # 3D geometry: the three BASE_CFG states as full-x/y slabs along z
+            **{
+                f"patch_icpp({i})%{key}": val
+                for i in (1, 2, 3)
+                for key, val in (
+                    ("geometry", 9),
+                    ("x_centroid", 0.5),
+                    ("length_x", 1.0),
+                    ("y_centroid", 0.5),
+                    ("length_y", 1.0),
+                    ("vel(1)", 0.0),
+                    ("vel(2)", 0.0),
+                    ("vel(3)", 0.0),
+                )
+            },
+            "patch_icpp(1)%z_centroid": 0.05,
+            "patch_icpp(1)%length_z": 0.1,
+            "patch_icpp(2)%z_centroid": 0.45,
+            "patch_icpp(2)%length_z": 0.7,
+            "patch_icpp(3)%z_centroid": 0.9,
+            "patch_icpp(3)%length_z": 0.2,
+            # AMR: 2:1 fine patch spanning coarse indices 6..17 per axis
+            "amr": "T",
+            "amr_patch_beg(1)": 6,
+            "amr_patch_beg(2)": 6,
+            "amr_patch_beg(3)": 6,
+            "amr_patch_end(1)": 17,
+            "amr_patch_end(2)": 17,
+            "amr_patch_end(3)": 17,
+        }
+
+        stack.push("AMR -> 3D -> static patch", {**amr_3d_base, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     add_convergence_cases(cases)
