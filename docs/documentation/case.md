@@ -799,9 +799,15 @@ that interface inconsistency is bounded and conservation is enforced by the flux
 matching. The density-gradient regrid tagger does not sense shear or boundary layers well,
 so viscous features may need a static or generously buffered block (error-estimator taggers
 are future work).
-It is incompatible with surface tension, bubble models, phase-change (relax),
-immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, `hybrid_weno`,
-`hybrid_riemann`, and `acoustic_source`.
+Monodisperse (`nb = 1`) polytropic Euler-Euler bubbles (`bubbles_euler = T` with
+`polytropic = T`) are supported: the bubble moments are flux-based conserved variables
+refluxed through the same registers, and prolongation floors the radius moment so the
+reconstructed radius and number density stay positive (realizability). QBMM, non-polytropic,
+and polydisperse bubbles are not yet supported (their internal pressure / vapor-mass
+sub-fields and quadrature weights are not advanced on the fine level).
+It is incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles,
+polydisperse bubbles, phase-change (relax), immersed boundaries, IGR, cylindrical
+coordinates, MHD, chemistry, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the
 block may span rank boundaries and move freely across them under dynamic regrid.

@@ -32,6 +32,11 @@ module m_amr
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
 
+    !> Realizability floor for prolonged Euler-Euler bubble RADIUS moments (nR): a positive fraction of the coarse parent so R =
+    !! nR/n and n stay > 0. Minmod already keeps a positive field positive, so this fires only under floating-point edge cases
+    !! (conservation defect ~0 otherwise).
+    real(wp), parameter :: bub_pos_frac = 1.0e-10_wp
+
     !> One refined level: its own grid + conservative fields. Field arrays are device-resident (@:ALLOCATE); coords/metadata
     !! host-only.
     type t_level
@@ -334,12 +339,16 @@ contains
 
     !> Conservative-linear prolongation for a single variable pair. Reads coarse interior/ghost from qc; writes fine interior to qf.
     !! Minmod-limited slopes.
-    impure subroutine s_prolong_one_var(qc, qf)
+    impure subroutine s_prolong_one_var(qc, qf, pos)
 
         type(scalar_field), intent(in)    :: qc
         type(scalar_field), intent(inout) :: qf
+        logical, optional, intent(in)     :: pos  !< floor the child at bub_pos_frac*u0 (bubble radius-moment realizability)
         integer                           :: fi, fj, fk, ci, cj, ck, ox, oy, oz
-        real(wp)                          :: u0, sx, sy, sz, xix, xiy, xiz
+        real(wp)                          :: u0, sx, sy, sz, xix, xiy, xiz, child
+        logical                           :: floor_pos
+
+        floor_pos = .false.; if (present(pos)) floor_pos = pos
 
         ! fine indices are LOCAL to this rank's intersection (the whole block at np=1); amr_isect_lo is
         ! GLOBAL; the coarse source qc is rank-LOCAL (identical at np=1: isect = block, start_idx = 0)
@@ -362,7 +371,9 @@ contains
                     if (n_glb > 0) sy = minmod(real(qc%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc%sf(ci, cj - 1, ck), wp))
                     sz = 0._wp
                     if (p_glb > 0) sz = minmod(real(qc%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc%sf(ci, cj, ck - 1), wp))
-                    qf%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
+                    child = u0 + sx*xix + sy*xiy + sz*xiz
+                    if (floor_pos) child = max(child, bub_pos_frac*u0)
+                    qf%sf(fi, fj, fk) = child
                 end do
             end do
         end do
@@ -375,11 +386,16 @@ contains
     impure subroutine s_interpolate_coarse_to_fine(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
-        integer                                             :: i
+        integer                                             :: i, bstride
 
+        bstride = 1
+        if (bubbles_euler) bstride = (eqn_idx%bub%end - eqn_idx%bub%beg + 1)/nb
         do i = 1, sys_size
             if (num_fluids > 1 .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
-            call s_prolong_one_var(q_cons_base(i), amr_slots(amr_cur)%q_cons(i))
+            ! bubble RADIUS moments (first of each bin's stride) get the positivity floor; velocity moments prolong freely
+            call s_prolong_one_var(q_cons_base(i), amr_slots(amr_cur)%q_cons(i), &
+                                   & bubbles_euler .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end .and. mod(i &
+                                   & - eqn_idx%bub%beg, bstride) == 0)
         end do
         if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
 
@@ -730,8 +746,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_fine
         integer                                                :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
         integer                                                :: rr, lo1, lo2, lo3, fm, fn, fp, b1, e1, b2, e2, b3, e3
-        integer                                                :: advb, adve
-        logical                                                :: d2, d3, multi, shx, shy, shz
+        integer                                                :: advb, adve, bbeg, bend, bstride
+        logical                                                :: d2, d3, multi, shx, shy, shz, bubEE
         real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
 
         ! fine indices are LOCAL to this rank's intersection; amr_isect_lo is GLOBAL; the coarse source q_coarse is rank-LOCAL
@@ -748,6 +764,8 @@ contains
         b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
         multi = num_fluids > 1
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
+        bubEE = bubbles_euler; bbeg = eqn_idx%bub%beg; bend = eqn_idx%bub%end
+        bstride = 1; if (bubEE) bstride = (bend - bbeg + 1)/nb
         $:GPU_PARALLEL_LOOP(collapse=4, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
         do i = 1, sys_size
             do fk = b3, e3
@@ -779,6 +797,11 @@ contains
                             if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
                                 & ck - 1), wp))
                             q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
+                            ! bubble radius-moment realizability floor (nR > 0 -> R = nR/n, n > 0)
+                            if (bubEE .and. i >= bbeg .and. i <= bend) then
+                                if (mod(i - bbeg, bstride) == 0) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, fk), &
+                                    & wp), bub_pos_frac*u0)
+                            end if
                         end if
                     end do
                 end do

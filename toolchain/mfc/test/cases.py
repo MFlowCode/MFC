@@ -2776,6 +2776,49 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (g) Euler-Euler bubbles (SP13): monodisperse (nb=1) polytropic bubbles in a uniform
+        # void-fraction liquid, with a left pressure slab (pres=2) launching a wave through the
+        # block. Exercises the realizability-preserving radius-moment prolongation (floor at the
+        # interior/regrid/ghost fills) and the flux-based bubble-moment reflux, under regrid +
+        # subcycle. pb/mv are inert stubs (non-qbmm polytropic), so only the moment path runs.
+        stack.push(
+            "AMR -> 1D -> bubbles",
+            {
+                **amr_1d_base,
+                "dt": 5.0e-5,  # stiff bubble liquid (pi_inf=3515): keeps coarse+subcycled fine ICFL < 1
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "bubbles_euler": "T",
+                "bubble_model": 2,
+                "polytropic": "T",
+                "nb": 1,
+                "fluid_pp(1)%gamma": 0.16,
+                "fluid_pp(1)%pi_inf": 3515.0,
+                "bub_pp%R0ref": 1.0,
+                "bub_pp%p0ref": 1.0,
+                "bub_pp%rho0ref": 1.0,
+                "bub_pp%T0ref": 1.0,
+                "bub_pp%ss": 0.07179866765358993,
+                "bub_pp%pv": 0.02308216136195411,
+                "bub_pp%vd": 0.2404125083932959,
+                "bub_pp%mu_l": 0.009954269975623244,
+                "bub_pp%gam_g": 1.4,
+                "patch_icpp(1)%alpha_rho(1)": 0.96,
+                "patch_icpp(1)%alpha(1)": 4e-02,
+                "patch_icpp(1)%pres": 2.0,
+                "patch_icpp(2)%alpha_rho(1)": 0.96,
+                "patch_icpp(2)%alpha(1)": 4e-02,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%alpha_rho(1)": 0.96,
+                "patch_icpp(3)%alpha(1)": 4e-02,
+                "patch_icpp(3)%pres": 1.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     add_convergence_cases(cases)
