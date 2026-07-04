@@ -97,8 +97,12 @@ contains
                        & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)")
             @:PROHIBIT(surface_tension .or. hypoelasticity .or. hyperelasticity .or. mhd .or. chemistry, &
                        & "amr does not support elastic/surface-tension/MHD/chemistry")
-            @:PROHIBIT(bubbles_euler .or. bubbles_lagrange .or. qbmm .or. relax .or. ib .or. igr .or. cyl_coord, &
-                       & "amr does not support bubbles/phase-change/IB/IGR/cylindrical")
+            @:PROHIBIT(bubbles_lagrange .or. qbmm .or. relax .or. ib .or. igr .or. cyl_coord, &
+                       & "amr does not support Lagrangian bubbles/QBMM/phase-change/IB/IGR/cylindrical")
+            @:PROHIBIT(bubbles_euler .and. .not. polytropic, &
+                       & "amr Euler-Euler bubbles require polytropic = T (non-polytropic pb/mv advance is unvalidated with the fine level)")
+            @:PROHIBIT(bubbles_euler .and. (polydisperse .or. nb > 1), &
+                       & "amr Euler-Euler bubbles support only monodisperse nb = 1 (polydisperse quadrature is unvalidated with the fine level)")
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
             @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
             @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")

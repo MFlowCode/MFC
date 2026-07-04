@@ -221,8 +221,12 @@ PHYSICS_DOCS = {
             "and the 5-equation model (model_eqns = 2); num_fluids > 1 additionally requires "
             "mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha "
             "consistency). "
-            "Incompatible with viscous, surface tension, bubble models, phase change, "
-            "immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, "
+            "Supports monodisperse (nb = 1) polytropic Euler-Euler bubbles (bubbles_euler with "
+            "polytropic = T; the flux-based bubble moments are refluxed and prolongation floors "
+            "the radius moments for realizability). "
+            "Incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles, "
+            "polydisperse bubbles, "
+            "phase change, immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, "
             "hybrid_weno, hybrid_riemann, active_box, and acoustic_source. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
@@ -1391,8 +1395,19 @@ class CaseValidator:
             "amr does not support elastic/surface-tension/MHD/chemistry",
         )
         self.prohibit(
-            bubbles_euler or bubbles_lagrange or qbmm or relax or ib or igr or cyl_coord,
-            "amr does not support bubbles/phase-change/IB/IGR/cylindrical",
+            bubbles_lagrange or qbmm or relax or ib or igr or cyl_coord,
+            "amr does not support Lagrangian bubbles/QBMM/phase-change/IB/IGR/cylindrical",
+        )
+        polytropic = self.get("polytropic", "T") == "T"
+        polydisperse = self.get("polydisperse", "F") == "T"
+        nb = self.get("nb", 1)
+        self.prohibit(
+            bubbles_euler and not polytropic,
+            "amr Euler-Euler bubbles require polytropic = T (non-polytropic pb/mv advance is unvalidated with the fine level)",
+        )
+        self.prohibit(
+            bubbles_euler and (polydisperse or (nb is not None and nb > 1)),
+            "amr Euler-Euler bubbles support only monodisperse nb = 1 (polydisperse quadrature is unvalidated with the fine level)",
         )
         self.prohibit(active_box, "amr is incompatible with active_box")
         self.prohibit(hybrid_weno, "amr is incompatible with hybrid_weno")
