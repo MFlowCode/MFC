@@ -500,17 +500,18 @@ contains
 
             ! AMR fine-level stage advance (interleaved, non-subcycled): q_cons_ts(1)%vf still holds
             ! the coarse stage-entry state here (the stage-1 backup and RK update below have not run yet).
-            ! Each active patch slot is advanced + refluxed in turn (T1: one slot); amr_cur is reset to 1
+            ! Each active block slot is advanced + refluxed in turn (T1: one slot); amr_cur is reset to 1
             ! afterwards so the next stage's coarse RHS captures creg into slot 1.
             if (amr .and. .not. amr_subcycle) then
-                do amr_cur = 1, amr_num_patches
+                do amr_cur = 1, amr_num_blocks
+                    call s_amr_select_slot(amr_cur)  ! refresh the region/intersection mirrors for this block
                     call s_advance_amr_fine_stage(s, rk_coef(s,:), q_cons_ts(1)%vf, bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, &
                                                   & mv_ts(1)%sf, rhs_mv, t_step, time_avg)
-                    ! freg slices of rank-boundary patch faces move to the outside rank (ALL ranks call; no-op at np=1)
+                    ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
                     call s_mpi_sendrecv_amr_reflux_faces()
                     call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
                 end do
-                amr_cur = 1
+                call s_amr_select_slot(1)
             end if
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
@@ -595,22 +596,23 @@ contains
         ! AMR: (subcycle) two dt/2 fine substeps between the coarse t^n backup (q_cons_ts(stor), written
         ! at stage 1 and read-only afterwards) and the coarse t^{n+1} state; then fine solution ->
         ! level-0 covered cells (the only deliberate level-0 write); then (subcycle) the time-accumulated
-        ! Berger-Colella state reflux on the first coarse cells outside the patch
+        ! Berger-Colella state reflux on the first coarse cells outside the block
         if (amr) then
             ! ghost lerp sources, restriction target, and state-reflux target are all device-resident:
-            ! the substep/restriction/reflux machinery runs as device kernels (M2). Each active patch slot
+            ! the substep/restriction/reflux machinery runs as device kernels (M2). Each active block slot
             ! (T1: one) is subcycled, restricted, and state-refluxed in turn; amr_cur resets to 1 afterwards.
-            do amr_cur = 1, amr_num_patches
+            do amr_cur = 1, amr_num_blocks
+                call s_amr_select_slot(amr_cur)  ! refresh the region/intersection mirrors for this block
                 if (amr_subcycle) then
                     call s_advance_amr_fine_substeps(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, pb_ts(1)%sf, &
                                                      & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
                 end if
                 call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
-                ! freg slices of rank-boundary patch faces move to the outside rank (ALL ranks call; no-op at np=1)
+                ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
                 if (amr_subcycle) call s_mpi_sendrecv_amr_reflux_faces()
                 if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
             end do
-            amr_cur = 1
+            call s_amr_select_slot(1)
         end if
 
 #ifdef MFC_DEBUG

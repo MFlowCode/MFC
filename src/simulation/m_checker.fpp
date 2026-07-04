@@ -104,20 +104,23 @@ contains
             @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")
             @:PROHIBIT(acoustic_source, &
                        & "amr is incompatible with acoustic_source (dt-dependent RHS source; unvalidated with the fine-level advance)")
-            @:PROHIBIT(any(amr_patch_beg(1:num_dims) < 0), "amr_patch_beg must be >= 0")
-            @:PROHIBIT(amr_patch_end(1) > m_glb .or. (num_dims >= 2 .and. amr_patch_end(2) > n_glb) .or. (num_dims >= 3 &
-                       & .and. amr_patch_end(3) > p_glb), "amr_patch_end must be <= global cell max per axis")
-            @:PROHIBIT(any(amr_patch_end(1:num_dims) <= amr_patch_beg(1:num_dims)), &
-                       & "amr_patch_end must exceed amr_patch_beg on each active axis")
-            @:PROHIBIT(2*(amr_patch_end(1) - amr_patch_beg(1) + 1) - 1 > m_glb, &
+            @:PROHIBIT(any(amr_block_beg(1:num_dims) < 0), "amr_block_beg must be >= 0")
+            @:PROHIBIT(amr_block_end(1) > m_glb .or. (num_dims >= 2 .and. amr_block_end(2) > n_glb) .or. (num_dims >= 3 &
+                       & .and. amr_block_end(3) > p_glb), "amr_block_end must be <= global cell max per axis")
+            @:PROHIBIT(any(amr_block_end(1:num_dims) <= amr_block_beg(1:num_dims)), &
+                       & "amr_block_end must exceed amr_block_beg on each active axis")
+            @:PROHIBIT(2*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m_glb, &
                        & "amr fine x-extent exceeds the base grid (module scratch is sized to the base)")
-            @:PROHIBIT(num_dims >= 2 .and. 2*(amr_patch_end(2) - amr_patch_beg(2) + 1) - 1 > n_glb, &
+            @:PROHIBIT(num_dims >= 2 .and. 2*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n_glb, &
                        & "amr fine y-extent exceeds the base grid")
-            @:PROHIBIT(num_dims >= 3 .and. 2*(amr_patch_end(3) - amr_patch_beg(3) + 1) - 1 > p_glb, &
+            @:PROHIBIT(num_dims >= 3 .and. 2*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p_glb, &
                        & "amr fine z-extent exceeds the base grid")
             @:PROHIBIT(amr_regrid_int < 0, "amr_regrid_int must be >= 0")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_tag_eps <= 0._wp, "amr_tag_eps must be > 0 when regridding")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
+            @:PROHIBIT(amr_max_blocks < 1, "amr_max_blocks must be >= 1")
+            @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
+                       & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
         end if
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")

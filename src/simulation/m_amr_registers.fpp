@@ -4,11 +4,11 @@
 
 #:include 'macros.fpp'
 
-!> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine patch boundary (SP4). Depends only on m_derived_types +
+!> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine block boundary (SP4). Depends only on m_derived_types +
 !! m_global_parameters so both m_rhs (capture) and m_time_steppers (apply) can use it without cycles. NOTE: m_amr uses m_rhs which
 !! uses m_amr_registers, so adding "use m_amr" here would create a compilation cycle. Region info is therefore read from
 !! amr_region_lo/hi and amr_isect_lo/hi (m_global_parameters), which s_set_amr_fine_geometry keeps mirroring across regrids. creg
-!! uses 0-based transverse indexing relative to the rank's patch INTERSECTION (= the patch at np=1); freg uses 0-based LOCAL fine
+!! uses 0-based transverse indexing relative to the rank's block INTERSECTION (= the block at np=1); freg uses 0-based LOCAL fine
 !! indexing (aligned: fine children of isect cell t are 2*t and 2*t+1). All arrays are preallocated at max size so regrid requires
 !! no reallocation.
 !!
@@ -38,22 +38,22 @@ module m_amr_registers
     !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
 
-    !> Registers for the two patch faces normal to one direction: (1:sys_size, transverse-1, transverse-2, 1:amr_max_patches). The
-    !! trailing dimension is the patch slot (indexed by amr_cur); each slot's registers are captured/applied independently.
+    !> Registers for the two block faces normal to one direction: (1:sys_size, transverse-1, transverse-2, 1:amr_max_blocks). The
+    !! trailing dimension is the block slot (indexed by amr_cur); each slot's registers are captured/applied independently.
     type t_face_reg
         real(wp), allocatable :: lo(:,:,:,:)
         real(wp), allocatable :: hi(:,:,:,:)
     end type t_face_reg
 
-    type(t_face_reg) :: creg(3)  !< coarse flux at the patch boundary faces (relative 0-based transverse)
+    type(t_face_reg) :: creg(3)  !< coarse flux at the block boundary faces (relative 0-based transverse)
     type(t_face_reg) :: freg(3)  !< fine flux at the covering fine faces (0-based fine transverse)
     $:GPU_DECLARE(create='[creg, freg]')
 
 contains
 
-    !> Reflux-face participation for THIS rank: own_lo(d)/own_hi(d) = it owns the coarse cell layer just OUTSIDE the patch's
+    !> Reflux-face participation for THIS rank: own_lo(d)/own_hi(d) = it owns the coarse cell layer just OUTSIDE the block's
     !! low/high face in dim d (where the coarse capture and both reflux applies run; at an interior face the same rank also holds
-    !! the inside cells) - i.e. the outside layer lies in its subdomain in dim d and its patch intersection is nonempty in the
+    !! the inside cells) - i.e. the outside layer lies in its subdomain in dim d and its block intersection is nonempty in the
     !! transverse dims. All true at np=1. Also returns sidx/ext (collapsed dims pinned to 0). Reads the COARSE grid state in m/n/p -
     !! never call from inside the fine advance (the swapped fine branch of the capture).
     impure subroutine s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
@@ -87,10 +87,10 @@ contains
         integer :: maxc1, maxc2, maxc3, max_f1, max_f2, max_f3
 
         if (.not. amr) return
-        ! Registers on ALL ranks: regrid moves the patch faces, so any rank can become a participant (fine
+        ! Registers on ALL ranks: regrid moves the block faces, so any rank can become a participant (fine
         ! cells for freg; outside face layer for creg capture + apply and for RECEIVING freg slices when a
-        ! patch face sits on a rank boundary). Participation is re-derived per call from the current box.
-        ! max coarse patch cells per dim THIS rank can cover (must match m_amr's preallocation cap). The
+        ! block face sits on a rank boundary). Participation is re-derived per call from the current box.
+        ! max coarse block cells per dim THIS rank can cover (must match m_amr's preallocation cap). The
         ! transverse extents match the face-neighbor's by construction (cart neighbors share transverse
         ! subdomains), so the whole-array freg sendrecvs in m_mpi_proxy pair up exactly.
         maxc1 = min((m_glb + 1)/2, (m + 1)/2)
@@ -103,28 +103,28 @@ contains
         if (p_glb > 0) max_f3 = 2*maxc3 - 1
         ! creg: relative 0-based transverse (0:maxc_t-1); freg: 0-based fine (0:max_f_t).
         ! Device-resident (@:ALLOCATE): capture and both applies run as kernels; no host copies are read.
-        @:ALLOCATE(creg(1)%lo(1:sys_size,0:maxc2 - 1,0:maxc3 - 1,1:amr_max_patches), creg(1)%hi(1:sys_size,0:maxc2 - 1, &
-                   & 0:maxc3 - 1,1:amr_max_patches))
-        @:ALLOCATE(freg(1)%lo(1:sys_size,0:max_f2,0:max_f3,1:amr_max_patches), freg(1)%hi(1:sys_size,0:max_f2,0:max_f3, &
-                   & 1:amr_max_patches))
+        @:ALLOCATE(creg(1)%lo(1:sys_size,0:maxc2 - 1,0:maxc3 - 1,1:amr_max_blocks), creg(1)%hi(1:sys_size,0:maxc2 - 1, &
+                   & 0:maxc3 - 1,1:amr_max_blocks))
+        @:ALLOCATE(freg(1)%lo(1:sys_size,0:max_f2,0:max_f3,1:amr_max_blocks), freg(1)%hi(1:sys_size,0:max_f2,0:max_f3, &
+                   & 1:amr_max_blocks))
         if (n_glb > 0) then
-            @:ALLOCATE(creg(2)%lo(1:sys_size,0:maxc1 - 1,0:maxc3 - 1,1:amr_max_patches), creg(2)%hi(1:sys_size,0:maxc1 - 1, &
-                       & 0:maxc3 - 1,1:amr_max_patches))
-            @:ALLOCATE(freg(2)%lo(1:sys_size,0:max_f1,0:max_f3,1:amr_max_patches), freg(2)%hi(1:sys_size,0:max_f1,0:max_f3, &
-                       & 1:amr_max_patches))
+            @:ALLOCATE(creg(2)%lo(1:sys_size,0:maxc1 - 1,0:maxc3 - 1,1:amr_max_blocks), creg(2)%hi(1:sys_size,0:maxc1 - 1, &
+                       & 0:maxc3 - 1,1:amr_max_blocks))
+            @:ALLOCATE(freg(2)%lo(1:sys_size,0:max_f1,0:max_f3,1:amr_max_blocks), freg(2)%hi(1:sys_size,0:max_f1,0:max_f3, &
+                       & 1:amr_max_blocks))
         end if
         if (p_glb > 0) then
-            @:ALLOCATE(creg(3)%lo(1:sys_size,0:maxc1 - 1,0:maxc2 - 1,1:amr_max_patches), creg(3)%hi(1:sys_size,0:maxc1 - 1, &
-                       & 0:maxc2 - 1,1:amr_max_patches))
-            @:ALLOCATE(freg(3)%lo(1:sys_size,0:max_f1,0:max_f2,1:amr_max_patches), freg(3)%hi(1:sys_size,0:max_f1,0:max_f2, &
-                       & 1:amr_max_patches))
+            @:ALLOCATE(creg(3)%lo(1:sys_size,0:maxc1 - 1,0:maxc2 - 1,1:amr_max_blocks), creg(3)%hi(1:sys_size,0:maxc1 - 1, &
+                       & 0:maxc2 - 1,1:amr_max_blocks))
+            @:ALLOCATE(freg(3)%lo(1:sys_size,0:max_f1,0:max_f2,1:amr_max_blocks), freg(3)%hi(1:sys_size,0:max_f1,0:max_f2, &
+                       & 1:amr_max_blocks))
         end if
 
     end subroutine s_initialize_amr_registers
 
     !> Capture the c/f boundary-face fluxes for direction id from the just-finalized flux array. Runs INSIDE s_compute_rhs: coarse
-    !! call (amr_in_fine_advance false, coarse globals) fills creg at the patch boundary faces; fine call (flag true, globals
-    !! swapped to the fine patch) fills freg at fine faces -1 and m/n/p. creg uses relative 0-based transverse; freg uses 0-based
+    !! call (amr_in_fine_advance false, coarse globals) fills creg at the block boundary faces; fine call (flag true, globals
+    !! swapped to the fine block) fills freg at fine faces -1 and m/n/p. creg uses relative 0-based transverse; freg uses 0-based
     !! fine.
     impure subroutine s_amr_capture_boundary_flux(id, flux_dir, flux_src, stage)
 
@@ -132,15 +132,15 @@ contains
         type(vector_field), intent(in) :: flux_dir
         type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
-        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2, islot
+        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2, islot, save_cur
         integer                        :: sidx(3), ext(3)
         logical                        :: own_lo(3), own_hi(3), cap_lo, cap_hi
         real(wp)                       :: coef
         logical                        :: accum
 
         if (.not. amr) return
-        if (amr_in_fine_advance .and. .not. amr_rank_owns_patch) return
-        islot = amr_cur  ! working patch slot (local => captured by value in the device kernels below)
+        if (amr_in_fine_advance .and. .not. amr_rank_owns_block) return
+        islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         ! flux data was just written by device kernels; the face reads below run as device kernels too
         if (amr_subcycle) then
             if (amr_in_fine_advance) then
@@ -231,121 +231,128 @@ contains
         else
             ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its
             ! flux_n covers that face; at a rank-interior face the same rank also holds the inside cells).
-            ! jlo/jhi = LOCAL flux indices of the patch's low/high faces; t1/t2 = 0-based transverse indices
-            ! relative to this rank's patch INTERSECTION (o1/o2 = local transverse origins), aligned with the
+            ! jlo/jhi = LOCAL flux indices of the block's low/high faces; t1/t2 = 0-based transverse indices
+            ! relative to this rank's block INTERSECTION (o1/o2 = local transverse origins), aligned with the
             ! fine registers: the fine children of isect-relative cell t are faces 2*t and 2*t+1. At np=1 the
-            ! intersection is the patch and both flags hold, recovering the single-rank behavior exactly.
-            call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
-            cap_lo = own_lo(id); cap_hi = own_hi(id)
-            if (.not. (cap_lo .or. cap_hi)) return
-            select case (id)
-            case (1); jlo = amr_region_lo(1) - 1 - sidx(1); jhi = amr_region_hi(1) - sidx(1)
-                t1_hi = amr_isect_hi(2) - amr_isect_lo(2); o1 = amr_isect_lo(2) - sidx(2)
-                t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
-            case (2); jlo = amr_region_lo(2) - 1 - sidx(2); jhi = amr_region_hi(2) - sidx(2)
-                t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
-                t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
-            case (3); jlo = amr_region_lo(3) - 1 - sidx(3); jhi = amr_region_hi(3) - sidx(3)
-                t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
-                t2_hi = amr_isect_hi(2) - amr_isect_lo(2); o2 = amr_isect_lo(2) - sidx(2)
-            end select
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do t2 = 0, t2_hi
-                do t1 = 0, t1_hi
-                    do eq = 1, sys_size
-                        select case (id)
-                        case (1)
-                            if (cap_lo) then
-                                if (accum) then
-                                    creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
-                                else
-                                    creg(1)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
-                                end if
-                            end if
-                            if (cap_hi) then
-                                if (accum) then
-                                    creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
-                                else
-                                    creg(1)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
-                                end if
-                            end if
-                        case (2)
-                            if (cap_lo) then
-                                if (accum) then
-                                    creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
-                                else
-                                    creg(2)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
-                                end if
-                            end if
-                            if (cap_hi) then
-                                if (accum) then
-                                    creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
-                                else
-                                    creg(2)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
-                                end if
-                            end if
-                        case (3)
-                            if (cap_lo) then
-                                if (accum) then
-                                    creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
-                                else
-                                    creg(3)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
-                                end if
-                            end if
-                            if (cap_hi) then
-                                if (accum) then
-                                    creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
-                                else
-                                    creg(3)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
-                                end if
-                            end if
-                        end select
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-            ! total-flux matching (coarse side): add viscous momentum/energy face fluxes into creg, same
-            ! face gating and transverse offsets as the base capture; always accumulate.
-            if (viscous) then
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do t2 = 0, t2_hi
-                    do t1 = 0, t1_hi
-                        do eq = eqn_idx%mom%beg, eqn_idx%E
-                            select case (id)
-                            case (1)
-                                if (cap_lo) creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
-                                if (cap_hi) creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
-                            case (2)
-                                if (cap_lo) creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
-                                if (cap_hi) creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
-                            case (3)
-                                if (cap_lo) creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
-                                if (cap_hi) creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
-                            end select
+            ! intersection is the block and both flags hold, recovering the single-rank behavior exactly.
+            ! ONE coarse s_compute_rhs pass fills EVERY active block's registers: revisit each slot's region+intersection in turn.
+            save_cur = amr_cur
+            do islot = 1, amr_num_blocks
+                call s_amr_select_slot(islot)
+                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+                cap_lo = own_lo(id); cap_hi = own_hi(id)
+                if (cap_lo .or. cap_hi) then
+                    select case (id)
+                    case (1); jlo = amr_region_lo(1) - 1 - sidx(1); jhi = amr_region_hi(1) - sidx(1)
+                        t1_hi = amr_isect_hi(2) - amr_isect_lo(2); o1 = amr_isect_lo(2) - sidx(2)
+                        t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
+                    case (2); jlo = amr_region_lo(2) - 1 - sidx(2); jhi = amr_region_hi(2) - sidx(2)
+                        t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
+                        t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
+                    case (3); jlo = amr_region_lo(3) - 1 - sidx(3); jhi = amr_region_hi(3) - sidx(3)
+                        t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
+                        t2_hi = amr_isect_hi(2) - amr_isect_lo(2); o2 = amr_isect_lo(2) - sidx(2)
+                    end select
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do t2 = 0, t2_hi
+                        do t1 = 0, t1_hi
+                            do eq = 1, sys_size
+                                select case (id)
+                                case (1)
+                                    if (cap_lo) then
+                                        if (accum) then
+                                            creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                        else
+                                            creg(1)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                        end if
+                                    end if
+                                    if (cap_hi) then
+                                        if (accum) then
+                                            creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                        else
+                                            creg(1)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                        end if
+                                    end if
+                                case (2)
+                                    if (cap_lo) then
+                                        if (accum) then
+                                            creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                        else
+                                            creg(2)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                        end if
+                                    end if
+                                    if (cap_hi) then
+                                        if (accum) then
+                                            creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                        else
+                                            creg(2)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                        end if
+                                    end if
+                                case (3)
+                                    if (cap_lo) then
+                                        if (accum) then
+                                            creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                        else
+                                            creg(3)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                        end if
+                                    end if
+                                    if (cap_hi) then
+                                        if (accum) then
+                                            creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                        else
+                                            creg(3)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                        end if
+                                    end if
+                                end select
+                            end do
                         end do
                     end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+                    $:END_GPU_PARALLEL_LOOP()
+                    ! total-flux matching (coarse side): add viscous momentum/energy face fluxes into creg, same
+                    ! face gating and transverse offsets as the base capture; always accumulate.
+                    if (viscous) then
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do t2 = 0, t2_hi
+                            do t1 = 0, t1_hi
+                                do eq = eqn_idx%mom%beg, eqn_idx%E
+                                    select case (id)
+                                    case (1)
+                                        if (cap_lo) creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                        if (cap_hi) creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                    case (2)
+                                        if (cap_lo) creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                        if (cap_hi) creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                    case (3)
+                                        if (cap_lo) creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                        if (cap_hi) creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                    end select
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end if  ! cap_lo .or. cap_hi
+            end do
+            call s_amr_select_slot(save_cur)
         end if
 
     end subroutine s_amr_capture_boundary_flux
 
-    !> Correct the coarse rhs in the first cell OUTSIDE each patch face so the coarse update sees the (child-averaged) fine flux at
+    !> Correct the coarse rhs in the first cell OUTSIDE each block face so the coarse update sees the (child-averaged) fine flux at
     !! every c/f face. Signs follow rhs = (flux_left - flux_right)/dx: low face is the outside cell's RIGHT face => rhs += (F_coarse
-    !! - Fbar_fine)/dx; high face is the outside cell's LEFT face => rhs += (Fbar_fine - F_coarse)/dx. Cells INSIDE the patch need
+    !! - Fbar_fine)/dx; high face is the outside cell's LEFT face => rhs += (Fbar_fine - F_coarse)/dx. Cells INSIDE the block need
     !! no correction (end-of-step restriction overwrites them). c1/c2 are relative 0-based coarse transverse indices.
     impure subroutine s_amr_apply_reflux(rhs_vf)
 
@@ -357,7 +364,7 @@ contains
         real(wp)                                               :: fblo, fbhi, mlo, mhi
 
         if (.not. amr) return
-        islot = amr_cur  ! working patch slot (local => captured by value in the device kernels below)
+        islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer
         ! (all faces at np=1); freg slices from a rank-boundary face's fine side arrive via
         ! s_mpi_sendrecv_amr_reflux_faces before this is called
@@ -365,7 +372,7 @@ contains
         if (.not. (any(own_lo) .or. any(own_hi))) return
         ! device kernels: the coarse rhs stays device-resident for the coarse RK update kernel
         d2 = n_glb > 0; d3 = p_glb > 0
-        ! this rank's covered patch cells (isect-relative, 0-based): 0..n{x,y,z}_c; matches creg/freg indexing
+        ! this rank's covered block cells (isect-relative, 0-based): 0..n{x,y,z}_c; matches creg/freg indexing
         nx_c = amr_isect_hi(1) - amr_isect_lo(1)
         ny_c = 0; nz_c = 0
         if (n_glb > 0) ny_c = amr_isect_hi(2) - amr_isect_lo(2)
@@ -479,8 +486,8 @@ contains
         integer :: d, eq, t1, t2, t1_hi, t2_hi, islot
 
         if (.not. amr) return
-        if (.not. amr_rank_owns_patch) return
-        islot = amr_cur  ! working patch slot (local => captured by value in the device kernels below)
+        if (.not. amr_rank_owns_block) return
+        islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         do d = 1, 3
             if (allocated(freg(d)%lo)) then
                 t1_hi = ubound(freg(d)%lo, 2); t2_hi = ubound(freg(d)%lo, 3)
@@ -499,7 +506,7 @@ contains
 
     end subroutine s_amr_zero_fine_registers
 
-    !> Berger-Colella state correction (subcycle mode only): after restriction, correct the first coarse cell OUTSIDE each patch
+    !> Berger-Colella state correction (subcycle mode only): after restriction, correct the first coarse cell OUTSIDE each block
     !! face with the time-accumulated flux mismatch: low face: q += dt*(F_c_eff - Fbar_f_eff)/dx ; high face: q += dt*(Fbar_f_eff -
     !! F_c_eff)/dx. Registers hold EFFECTIVE (rk3_w-weighted, substep-averaged) fluxes in subcycle mode.
     impure subroutine s_amr_apply_reflux_state(q_cons)
@@ -512,7 +519,7 @@ contains
         real(wp)                                               :: fblo, fbhi, mlo, mhi, dtl
 
         if (.not. amr) return
-        islot = amr_cur  ! working patch slot (local => captured by value in the device kernels below)
+        islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         ! per-face participation and index conventions: see s_amr_apply_reflux
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
         if (.not. (any(own_lo) .or. any(own_hi))) return

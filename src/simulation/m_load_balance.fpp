@@ -38,9 +38,9 @@ contains
 
     end function f_offsets_differ_from_equal
 
-    !> True iff, for one axis's cumulative offsets, every part's intersection with the AMR patch satisfies the mirror-decomposition
+    !> True iff, for one axis's cumulative offsets, every part's intersection with the AMR block satisfies the mirror-decomposition
     !! scratch cap 2*(isect cells) - 1 <= part cells - 1 (the per-dim bound s_initialize_amr_module aborts on). Checking each axis
-    !! part independently is equivalent to checking every rank's box: a rank owns the patch iff its intersection is nonempty in
+    !! part independently is equivalent to checking every rank's box: a rank owns the block iff its intersection is nonempty in
     !! every active dim, and its per-dim intersection depends only on that axis's part index.
     pure function f_amr_isect_fits(off, n_parts, pbeg, pend) result(ok)
 
@@ -187,17 +187,17 @@ contains
         allocate (ox(0:num_procs_x), oy(0:num_procs_y), oz(0:num_procs_z))
         allocate (vx(0:m_glb), vy(0:n_glb), vz(0:p_glb))
 
-        ! AMR fine-work injection: each patch-covered coarse cell costs an extra 2**num_dims (interleaved;
-        ! x2 subcycled) fine-cell RHS evaluations per coarse step, so the patch's axis projections gain
-        ! fine_factor * (patch transverse cells) in each marginal's own units (per-cell scale =
+        ! AMR fine-work injection: each block-covered coarse cell costs an extra 2**num_dims (interleaved;
+        ! x2 subcycled) fine-cell RHS evaluations per coarse step, so the block's axis projections gain
+        ! fine_factor * (block transverse cells) in each marginal's own units (per-cell scale =
         ! sum(w_axis)/total cells per axis: the probe's marginal sums are all equal, the missing-file
         ! fallback's are per-index and differ across axes).
         amr_w = 0._wp
         pc = 1
         if (amr) then
-            pc(1) = amr_patch_end(1) - amr_patch_beg(1) + 1
-            if (n_glb > 0) pc(2) = amr_patch_end(2) - amr_patch_beg(2) + 1
-            if (p_glb > 0) pc(3) = amr_patch_end(3) - amr_patch_beg(3) + 1
+            pc(1) = amr_block_end(1) - amr_block_beg(1) + 1
+            if (n_glb > 0) pc(2) = amr_block_end(2) - amr_block_beg(2) + 1
+            if (p_glb > 0) pc(3) = amr_block_end(3) - amr_block_beg(3) + 1
             ff = real(2**(num_dims + merge(1, 0, amr_subcycle)), wp)/(real(m_glb + 1, wp)*real(n_glb + 1, wp)*real(p_glb + 1, wp))
             amr_w(1) = ff*sum(wx)*real(pc(2), wp)*real(pc(3), wp)
             amr_w(2) = ff*sum(wy)*real(pc(1), wp)*real(pc(3), wp)
@@ -213,21 +213,21 @@ contains
             if (try == 4) scale = 0._wp
             vx = wx; vy = wy; vz = wz
             if (amr .and. scale > 0._wp) then
-                vx(amr_patch_beg(1):amr_patch_end(1)) = vx(amr_patch_beg(1):amr_patch_end(1)) + scale*amr_w(1)
-                if (n_glb > 0) vy(amr_patch_beg(2):amr_patch_end(2)) = vy(amr_patch_beg(2):amr_patch_end(2)) + scale*amr_w(2)
-                if (p_glb > 0) vz(amr_patch_beg(3):amr_patch_end(3)) = vz(amr_patch_beg(3):amr_patch_end(3)) + scale*amr_w(3)
+                vx(amr_block_beg(1):amr_block_end(1)) = vx(amr_block_beg(1):amr_block_end(1)) + scale*amr_w(1)
+                if (n_glb > 0) vy(amr_block_beg(2):amr_block_end(2)) = vy(amr_block_beg(2):amr_block_end(2)) + scale*amr_w(2)
+                if (p_glb > 0) vz(amr_block_beg(3):amr_block_end(3)) = vz(amr_block_beg(3):amr_block_end(3)) + scale*amr_w(3)
             end if
             ox = f_weighted_splits(vx, num_procs_x, lmin)
             oy = f_weighted_splits(vy, num_procs_y, lmin)
             oz = f_weighted_splits(vz, num_procs_z, lmin)
             if (.not. amr) exit
-            if (f_amr_isect_fits(ox, num_procs_x, amr_patch_beg(1), amr_patch_end(1)) .and. (n_glb == 0 .or. f_amr_isect_fits(oy, &
-                & num_procs_y, amr_patch_beg(2), amr_patch_end(2))) .and. (p_glb == 0 .or. f_amr_isect_fits(oz, num_procs_z, &
-                & amr_patch_beg(3), amr_patch_end(3)))) exit
+            if (f_amr_isect_fits(ox, num_procs_x, amr_block_beg(1), amr_block_end(1)) .and. (n_glb == 0 .or. f_amr_isect_fits(oy, &
+                & num_procs_y, amr_block_beg(2), amr_block_end(2))) .and. (p_glb == 0 .or. f_amr_isect_fits(oz, num_procs_z, &
+                & amr_block_beg(3), amr_block_end(3)))) exit
             scale = 0.5_wp*scale
         end do
         if (amr .and. scale < 1._wp .and. proc_rank == 0) then
-            print *, '[load_balance] amr weight softened to fit the fine patch per rank; scale =', scale
+            print *, '[load_balance] amr weight softened to fit the fine block per rank; scale =', scale
         end if
 
         changed = f_offsets_differ_from_equal(ox, m_glb + 1, num_procs_x) .or. f_offsets_differ_from_equal(oy, n_glb + 1, &

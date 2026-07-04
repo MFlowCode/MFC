@@ -216,7 +216,7 @@ PHYSICS_DOCS = {
         "title": "Adaptive Mesh Refinement (AMR)",
         "category": "Adaptive Mesh Refinement",
         "explanation": (
-            "Block-structured AMR (Experimental) adds a single 2:1 refined level-1 patch. "
+            "Block-structured AMR (Experimental) adds a single 2:1 refined level-1 block. "
             "Requires WENO reconstruction (recon_type = 1), SSP-RK3 (time_stepper = 3), "
             "and the 5-equation model (model_eqns = 2); num_fluids > 1 additionally requires "
             "mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha "
@@ -1370,9 +1370,14 @@ class CaseValidator:
         acoustic_source = self.get("acoustic_source", "F") == "T"
         amr_tag_eps = self.get("amr_tag_eps")
         amr_buf = self.get("amr_buf")
-        amr_max_patches = self.get("amr_max_patches")
+        amr_max_blocks = self.get("amr_max_blocks")
+        amr_cluster_eff = self.get("amr_cluster_eff")
 
-        self.prohibit(amr_max_patches is not None and amr_max_patches < 1, "amr_max_patches must be >= 1")
+        self.prohibit(amr_max_blocks is not None and amr_max_blocks < 1, "amr_max_blocks must be >= 1")
+        self.prohibit(
+            amr_cluster_eff is not None and (amr_cluster_eff <= 0 or amr_cluster_eff > 1),
+            "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1",
+        )
         self.prohibit(recon_type is not None and recon_type != 1, "amr requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(model_eqns is not None and model_eqns != 2, "amr requires model_eqns = 2 (5-equation)")
