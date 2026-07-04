@@ -807,14 +807,42 @@ and polydisperse bubbles are not yet supported (their internal pressure / vapor-
 sub-fields and quadrature weights are not advanced on the fine level).
 Phase change (`relax`) is supported: the cell-local, mass/energy-conserving relaxation
 runs on the fine solution before restriction (matching the coarse once-per-step timing).
-It is incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles,
+Chemistry (`chemistry = T`) is supported for reactions and advection: the species partial
+densities are flux-based conserved variables refluxed through the same registers, the
+cell-local reaction source runs on the fine block through the shared RHS (matching the
+coarse per-stage timing), and prolongation rescales the species so their sum equals the
+continuity density (`sum(Y_k) = 1`, `Y_k >= 0` on the fine level by construction). Chemistry
+AMR runs single- and multi-rank: the fine block's cons->prim conversion widens over the ghost
+shell, so the temperature (the reacting-EOS Newton guess) is halo-exchanged with the coarse
+state at rank seams (mirroring the diffusion path) — without it the seam-ghost guess is
+uninitialized and the conversion diverges to NaN. Species mass diffusion (`chem_params%%diffusion
+= T`) is not supported: its source-flux terms are not captured into the coarse–fine flux registers,
+so refluxing would not conserve the diffused species mass/energy at the block boundary.
+AMR is incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles,
 polydisperse bubbles, immersed boundaries, IGR, cylindrical
-coordinates, MHD, chemistry, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
+coordinates, MHD, chemistry diffusion, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the
 block may span rank boundaries and move freely across them under dynamic regrid.
 The block may cover at most about half of any rank's subdomain per dimension (the fine
 advance reuses the rank-local solver scratch).
+
+**AMR + surface tension (unsupported).**
+Surface tension (`surface_tension = T`) is prohibited under AMR. *What works:* the capillary
+contribution is a face flux captured into the same coarse–fine registers as the advective
+flux, so it is refluxed conservatively — conservation is structural (mass and energy defects
+stay at machine precision regardless of the fine-side treatment). *What fails:* the capillary
+stress is normalized (∝ 1/|∇c|), so it depends on the interface-normal *direction*, not the
+gradient magnitude. Across a 2:1 coarse/fine boundary the conservative-linearly-prolonged fine
+ghost color cannot reproduce the coarse solver's interface normal, producing a growing spurious
+seam current. Every fine-block fix attempted failed: opening the capillary reflux gate alone
+(~540x baseline seam velocity, exponential), a smoothstep ramp suppressing the fine capillary
+force near the seam (~27x, bounded-linear, width-invariant), and a coarse-spacing gradient blend
+of the prolonged color (~556x, growing) — all leave a force imbalance from the inconsistent
+interface normal rather than a curvature spike that can be damped. *What might fix it:* capturing
+the native coarse-computed capillary force Ω in a per-block band during the coarse RHS, prolonging
+it to the fine boundary layer, and blending the force there — large and uncertain, and the
+diffuse-interface 2:1 normal inconsistency may be fundamental.
 
 **Static vs. dynamic block.**
 Setting `amr_regrid_int = 0` fixes the block at the initial `amr_block_beg`/`amr_block_end`

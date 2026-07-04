@@ -226,9 +226,13 @@ PHYSICS_DOCS = {
             "the radius moments for realizability). "
             "Supports phase change (relax): the cell-local, mass/energy-conserving relaxation runs "
             "on the fine solution before restriction (matching the coarse once-per-step timing). "
+            "Supports chemistry reactions and advection (single- and multi-rank): the cell-local "
+            "reaction source runs on the fine block through the shared RHS, species partial densities are "
+            "refluxed, and prolongation rescales them to the continuity density for realizability. Species "
+            "diffusion (chem_params%diffusion) is not supported (its flux_src fluxes are not refluxed). "
             "Incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles, "
             "polydisperse bubbles, "
-            "immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, "
+            "immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry diffusion, "
             "hybrid_weno, hybrid_riemann, active_box, and acoustic_source. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
@@ -1392,8 +1396,14 @@ class CaseValidator:
             "amr with num_fluids > 1 requires mpp_lim " "(its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)",
         )
         self.prohibit(
-            surface_tension or hypoelasticity or hyperelasticity or mhd or chemistry,
-            "amr does not support elastic/surface-tension/MHD/chemistry",
+            surface_tension or hypoelasticity or hyperelasticity or mhd,
+            "amr does not support elastic/surface-tension/MHD",
+        )
+        chem_diffusion = self.get("chem_params%diffusion", "F") == "T"
+        self.prohibit(
+            chemistry and chem_diffusion,
+            "amr chemistry supports reactions and advection only; species diffusion (chem_params%diffusion = T) is not "
+            "captured into the coarse/fine flux registers, so it would break conservation at the block boundary",
         )
         self.prohibit(
             bubbles_lagrange or qbmm or ib or igr or cyl_coord,

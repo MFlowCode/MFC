@@ -210,7 +210,9 @@ contains
                 @:ALLOCATE(amr_slots(islot)%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
                 @:ALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
                 @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(0:max_f1, 0:max_f2, 0:max_f3))
+                ! ghost-inclusive (mbuf) like q_cons/q_prim: the fine advance widens idwint to the buffer, so the cell-local
+                ! chemistry reaction source writes rhs over the ghost shell too (the RK update and reflux read only 0:m interior)
+                @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
                 @:ALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
                 @:ALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
                 @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
@@ -394,12 +396,14 @@ contains
         if (bubbles_euler) bstride = (eqn_idx%bub%end - eqn_idx%bub%beg + 1)/nb
         do i = 1, sys_size
             if (num_fluids > 1 .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
+            if (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end) cycle  ! sum/positivity closure below
             ! bubble RADIUS moments (first of each bin's stride) get the positivity floor; velocity moments prolong freely
             call s_prolong_one_var(q_cons_base(i), amr_slots(amr_cur)%q_cons(i), &
                                    & bubbles_euler .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end .and. mod(i &
                                    & - eqn_idx%bub%beg, bstride) == 0)
         end do
         if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
+        if (chemistry) call s_prolong_species_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
 
     end subroutine s_interpolate_coarse_to_fine
 
@@ -451,6 +455,52 @@ contains
         end do
 
     end subroutine s_prolong_alphas_closure
+
+    !> Species mass-fraction prolongation closure (chemistry): each partial density rho*Y_k is minmod-prolonged and clamped
+    !! non-negative, then all species are rescaled so sum_k(rho*Y_k) equals the (already prolonged) continuity density at the fine
+    !! cell. This keeps the fine species realizable (Y_k >= 0, and sum(Y_k) = 1 exactly under the cons->prim recovery rho = sum
+    !! rho*Y_k) and consistent with the continuity variable the reaction source reads. Same fine/coarse index mapping as
+    !! s_prolong_one_var; cont is prolonged in the main loop before this runs.
+    impure subroutine s_prolong_species_closure(qc, qf)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: qc
+        type(scalar_field), dimension(sys_size), intent(inout) :: qf
+        integer                                                :: fi, fj, fk, ci, cj, ck, ox, oy, oz, i
+        real(wp)                                               :: xix, xiy, xiz, u0, sx, sy, sz, av, rsum, rscale
+
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
+        do fk = 0, amr_slots(amr_cur)%p
+            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+            do fj = 0, amr_slots(amr_cur)%n
+                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                do fi = 0, amr_slots(amr_cur)%m
+                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
+                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                    rsum = 0._wp
+                    do i = eqn_idx%species%beg, eqn_idx%species%end
+                        u0 = real(qc(i)%sf(ci, cj, ck), wp)
+                        sx = minmod(real(qc(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc(i)%sf(ci - 1, cj, ck), wp))
+                        sy = 0._wp
+                        if (n_glb > 0) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, cj - 1, ck), wp))
+                        sz = 0._wp
+                        if (p_glb > 0) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, ck - 1), wp))
+                        av = max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp)
+                        qf(i)%sf(fi, fj, fk) = av
+                        rsum = rsum + av
+                    end do
+                    rscale = real(qf(eqn_idx%cont%end)%sf(fi, fj, fk), wp)/max(rsum, 1.e-30_wp)
+                    do i = eqn_idx%species%beg, eqn_idx%species%end
+                        qf(i)%sf(fi, fj, fk) = real(qf(i)%sf(fi, fj, fk), wp)*rscale
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_prolong_species_closure
 
     !> Shared per-cell limiter switch for the volume-fraction closure prolongation: per dim, slopes stay on only if NO fluid's
     !! centered differences change sign there (symmetric in the fluids, including the closure fluid).
