@@ -806,9 +806,15 @@ flux-based conserved variables refluxed through the same registers, so no separa
 is carried on the fine level. Prolongation floors every positive moment (radius, and the
 non-polytropic partial-pressure / vapor-mass moments) while leaving the signed velocity moment
 free, so the reconstructed radius, number density, internal pressure, and vapor mass stay
-non-negative (realizability). QBMM is not supported: it carries the per-quadrature-node
-internal pressure and vapor mass as a global side-array (pb/mv) that the fine advance would
-overwrite through the global grid swap, corrupting the coarse bubble state.
+non-negative (realizability). QBMM (`qbmm = T`) is supported for the polytropic model: each R0
+bin's bivariate six-moment set lives entirely in the conserved variables (the pb/mv quadrature
+arrays are inert stubs when `polytropic = T`), and the whole moment block is prolonged
+piecewise-constant so every fine/ghost cell inherits the coarse cell's realizable moment set
+(the CHyQMOM inversion needs the radius variance c20 = m20/m00 - (m10/m00)^2 to stay positive, which a
+per-component minmod slope could break); the moments still reflux and restrict on the standard
+conservative path. Non-polytropic QBMM (`polytropic = F`) is not supported: there the
+per-quadrature-node internal pressure and vapor mass (pb/mv) evolve as a global side-array that
+the fine advance would overwrite through the global grid swap, corrupting the coarse state.
 Phase change (`relax`) is supported: the cell-local, mass/energy-conserving relaxation
 runs on the fine solution before restriction (matching the coarse once-per-step timing).
 Chemistry (`chemistry = T`) is supported for reactions and advection: the species partial
@@ -824,8 +830,21 @@ uninitialized and the conversion diverges to NaN. Species mass diffusion (`chem_
 enthalpy energy flux) travel through the source-flux array and are captured into the same coarse–fine
 registers as the advective fluxes — like the viscous stress fluxes — so element mass and total
 energy conserve across the block boundary through refluxed, subcycled, and regridded advances.
-AMR is incompatible with surface tension, Lagrangian bubbles, QBMM,
-immersed boundaries, IGR, cylindrical
+Static immersed boundaries (`ib = T`) are supported: each fine block carries its own
+fine-grid IB state (markers, ghost points, levelset, image points, interpolation coefficients)
+computed from the body geometry at fine resolution once at initialization, and the fine
+advance applies the ghost-cell IB state correction on the block after each RK update (mirroring
+the coarse per-stage timing). A fixed body placed inside a static block is thus resolved on the
+refined level. The IB forcing is non-conservative by construction (the ghost-cell method injects
+mass/momentum/energy at the body), so the conservation defect is nonzero in the body region while
+the flux reflux still conserves to machine precision away from it. Limited to a single, non-moving,
+non-STL body on a static block (`amr_regrid_int = 0`); moving IB, multi-body, STL geometry, and
+dynamic regrid with IB are gated pending validation. Under MPI a body contained within one rank's
+subdomain is bit-exact across decompositions; a body spanning a rank seam is rejected at startup
+(the fine-IB image-point stencil across the seam is not yet decomposition-exact), so keep the body
+inside a single rank's subdomain (use fewer ranks or reposition it).
+AMR is incompatible with surface tension, Lagrangian bubbles, non-polytropic QBMM,
+IGR, cylindrical
 coordinates, MHD, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the

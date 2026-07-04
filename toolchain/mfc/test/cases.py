@@ -3074,6 +3074,120 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (l) Euler-Euler bubbles, QBMM + polytropic (SP19): nb=3 R0 bins, each carrying a bivariate
+        # 6-moment set (m00,m10,m01,m20,m11,m02) inverted by CHyQMOM every RHS call. polytropic=T keeps
+        # pb/mv inert (degenerate stubs), so no quadrature side-state is advanced on the fine level and
+        # all bubble state lives in q_cons. A left pressure slab (pres=2) drives a wave through the block
+        # under regrid + subcycle. Exercises the realizability-preserving prolongation: the whole bub
+        # block is injected piecewise-constant so every fine/ghost child inherits the coarse cell's
+        # realizable moment set (variance c20 = m20/m00 - (m10/m00)^2 > 0), keeping the CHyQMOM inversion
+        # NaN-free; the moments still reflux/restrict on the standard conservative q_cons path.
+        stack.push(
+            "AMR -> 1D -> bubbles QBMM",
+            {
+                **amr_1d_base,
+                "dt": 5.0e-5,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "bubbles_euler": "T",
+                "bubble_model": 2,
+                "polytropic": "T",
+                "polydisperse": "F",
+                "thermal": 3,
+                "qbmm": "T",
+                "dist_type": 2,
+                "poly_sigma": 0.3,
+                "sigR": 0.1,
+                "sigV": 0.1,
+                "rhoRV": 0.0,
+                "nb": 3,
+                "fluid_pp(1)%gamma": 0.16,
+                "fluid_pp(1)%pi_inf": 3515.0,
+                "bub_pp%R0ref": 1.0,
+                "bub_pp%p0ref": 1.0,
+                "bub_pp%rho0ref": 1.0,
+                "bub_pp%T0ref": 1.0,
+                "bub_pp%ss": 0.07179866765358993,
+                "bub_pp%pv": 0.02308216136195411,
+                "bub_pp%vd": 0.2404125083932959,
+                "bub_pp%mu_l": 0.009954269975623244,
+                "bub_pp%gam_g": 1.4,
+                "patch_icpp(1)%r0": 1,
+                "patch_icpp(1)%v0": 0,
+                "patch_icpp(1)%alpha_rho(1)": 0.96,
+                "patch_icpp(1)%alpha(1)": 4e-02,
+                "patch_icpp(1)%pres": 2.0,
+                "patch_icpp(2)%alpha_rho(1)": 0.96,
+                "patch_icpp(2)%alpha(1)": 4e-02,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%alpha_rho(1)": 0.96,
+                "patch_icpp(3)%alpha(1)": 4e-02,
+                "patch_icpp(3)%pres": 1.0,
+            },
+        )
+        # (n) STATIC IMMERSED BOUNDARY (SP20): a fixed circular body resolved on a static fine block that
+        # covers it. Each fine block carries its own fine-grid IB markers/ghost points computed from the
+        # geometry; the fine advance applies the IB state correction on the block. buff_size is floored to
+        # 10 by ib, so the 64x64 base and the 24-coarse-cell block (beg=20, end=43: fine extent 47 <= 63,
+        # >= 10 cells inside the domain) satisfy the block guards. Exercises: per-block fine IB setup, the
+        # fine-block correct-state, and the coarse/fine coupling around a body (non-conservative by IB
+        # nature at the body; conservative reflux elsewhere).
+        stack.push(
+            "AMR -> 2D -> static IBM circle",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-4,
+                "t_step_stop": 10,
+                "t_step_save": 10,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                # single uniform patch: quiescent flow drifting toward +x
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.1,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # static circular body at the domain center, inside the fine block
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.1,
+                "patch_ib(1)%slip": "F",
+                # static fine block covering the body (2:1)
+                "amr": "T",
+                "amr_block_beg(1)": 20,
+                "amr_block_beg(2)": 20,
+                "amr_block_end(1)": 43,
+                "amr_block_end(2)": 43,
+                "amr_regrid_int": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     add_convergence_cases(cases)

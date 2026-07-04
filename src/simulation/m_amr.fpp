@@ -16,11 +16,12 @@ module m_amr
     use m_constants, only: num_fluids_max
     use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers, s_mpi_sendrecv_amr_fine_halo
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, &
-        & s_mpi_sendrecv_variables_buffers
+        & s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k
     use m_amr_registers, only: s_amr_zero_fine_registers
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
+    use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, num_gps
 
     implicit none
 
@@ -29,7 +30,7 @@ module m_amr
         & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
         & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_advance_amr_fine_substeps, &
         & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, &
-        & s_amr_relax_fine
+        & s_amr_relax_fine, s_amr_setup_ib
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -221,6 +222,10 @@ contains
             end do
         end do
 
+        ! per-slot fine-grid IB marker fields (static-body AMR); sized to the same max buffered fine extents
+        ! as q_cons so the fine IB pipeline can resolve the body on the block
+        if (ib) call s_ibm_alloc_fine(amr_max_blocks, mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi)
+
         ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial block (slot amr_cur = 1)
         call s_set_amr_fine_geometry(amr_block_beg, amr_block_end)
 
@@ -343,16 +348,18 @@ contains
 
     !> Conservative-linear prolongation for a single variable pair. Reads coarse interior/ghost from qc; writes fine interior to qf.
     !! Minmod-limited slopes.
-    impure subroutine s_prolong_one_var(qc, qf, pos)
+    impure subroutine s_prolong_one_var(qc, qf, pos, inject)
 
         type(scalar_field), intent(in)    :: qc
         type(scalar_field), intent(inout) :: qf
-        logical, optional, intent(in)     :: pos  !< floor the child at bub_pos_frac*u0 (bubble radius-moment realizability)
+        logical, optional, intent(in)     :: pos     !< floor the child at bub_pos_frac*u0 (bubble radius-moment realizability)
+        logical, optional, intent(in)     :: inject  !< piecewise-constant (child = u0): QBMM moment realizability preservation
         integer                           :: fi, fj, fk, ci, cj, ck, ox, oy, oz
         real(wp)                          :: u0, sx, sy, sz, xix, xiy, xiz, child
-        logical                           :: floor_pos
+        logical                           :: floor_pos, pw_const
 
         floor_pos = .false.; if (present(pos)) floor_pos = pos
+        pw_const = .false.; if (present(inject)) pw_const = inject
 
         ! fine indices are LOCAL to this rank's intersection (the whole block at np=1); amr_isect_lo is
         ! GLOBAL; the coarse source qc is rank-LOCAL (identical at np=1: isect = block, start_idx = 0)
@@ -375,6 +382,9 @@ contains
                     if (n_glb > 0) sy = minmod(real(qc%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc%sf(ci, cj - 1, ck), wp))
                     sz = 0._wp
                     if (p_glb > 0) sz = minmod(real(qc%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc%sf(ci, cj, ck - 1), wp))
+                    if (pw_const) then
+                        sx = 0._wp; sy = 0._wp; sz = 0._wp
+                    end if
                     child = u0 + sx*xix + sy*xiy + sz*xiz
                     if (floor_pos) child = max(child, bub_pos_frac*u0)
                     qf%sf(fi, fj, fk) = child
@@ -397,11 +407,16 @@ contains
         do i = 1, sys_size
             if (num_fluids > 1 .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
             if (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end) cycle  ! sum/positivity closure below
-            ! bubble POSITIVE moments (radius nR, and non-polytropic partial pressure npb / vapor mass nmv) get the positivity
-            ! floor; the signed velocity moment nV (offset 1 in each bin's stride) prolongs freely
+            ! QBMM carries a bivariate 6-moment set per R0 bin whose CHyQMOM inversion requires realizability
+            ! (variance c20 = m20/m00 - (m10/m00)^2 > 0); per-component minmod prolongation can break that joint
+            ! constraint, so the whole bub block is injected piecewise-constant (each child inherits the coarse
+            ! cell's realizable moment set exactly). Non-QBMM Euler-Euler bubbles instead floor their POSITIVE
+            ! moments (radius nR, non-polytropic partial pressure npb / vapor mass nmv); the signed velocity moment
+            ! nV (offset 1 in each bin's stride) prolongs freely.
             call s_prolong_one_var(q_cons_base(i), amr_slots(amr_cur)%q_cons(i), &
-                                   & bubbles_euler .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end .and. mod(i &
-                                   & - eqn_idx%bub%beg, bstride) /= 1)
+                                   & pos=bubbles_euler .and. .not. qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end &
+                                   & .and. mod(i - eqn_idx%bub%beg, bstride) /= 1, &
+                                   & inject=qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end)
         end do
         if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
         if (chemistry) call s_prolong_species_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
@@ -619,6 +634,58 @@ contains
         call s_amr_restore_coarse()
 
     end subroutine s_amr_relax_fine
+
+    !> Compute the fine-grid IB state (markers/ghost points/levelset) for every active block from the body geometry (static-body
+    !! AMR). Called once after the coarse IB setup at init (regrid+IB is gated). Per slot with fine cells: swap the grid to the fine
+    !! block, swap the IB globals to the slot store, run the fine IB pipeline (writing into the slot store), restore. No-op unless
+    !! amr .and. ib.
+    impure subroutine s_amr_setup_ib()
+
+        integer         :: islot, save_cur
+        integer(kind=8) :: my_ib_gps, nrank_ib
+
+        if (.not. amr .or. .not. ib) return
+        save_cur = amr_cur
+        my_ib_gps = 0_8
+        do islot = 1, amr_num_blocks
+            call s_amr_select_slot(islot)
+            if (.not. amr_rank_owns_block) cycle
+            call s_amr_swap_to_fine()
+            call s_ibm_swap_to_fine(islot)
+            call s_ibm_setup_fine()
+            my_ib_gps = my_ib_gps + int(num_gps, 8)
+            call s_ibm_restore_from_fine(islot)
+            call s_amr_restore_coarse()
+        end do
+        call s_amr_select_slot(save_cur)
+
+        ! The fine-IB image-point stencil is not decomposition-exact across a rank seam.
+        ! If the body's fine ghost points appear on more than one rank (i.e. the body
+        ! straddles a coarse/fine rank boundary), abort rather than return a wrong
+        ! body-surface state. A body wholly within one rank is decomposition-exact.
+        call s_mpi_allreduce_integer_sum(merge(1_8, 0_8, my_ib_gps > 0_8), nrank_ib)
+        if (nrank_ib > 1_8) then
+            call s_mpi_abort('amr with ib: the immersed body straddles a rank boundary, where the ' &
+                             & // 'fine-IB image-point stencil is not yet decomposition-exact; keep the ' &
+                             & // 'body within a single rank subdomain (use fewer ranks or reposition it).')
+        end if
+
+    end subroutine s_amr_setup_ib
+
+    !> Apply the IB state correction on the current fine block after its RK update (static-body AMR). Mirrors the coarse per-stage
+    !! s_ibm_correct_state: swap the grid + IB globals to the fine block, correct q_cons/q_prim at the fine body/ghost cells,
+    !! restore. amr_cur / amr_rank_owns_block are set by the caller (the per-block advance loop). No-op unless ib.
+    impure subroutine s_amr_ib_correct_fine()
+
+        if (.not. ib) return
+        if (.not. amr_rank_owns_block) return
+        call s_amr_swap_to_fine()
+        call s_ibm_swap_to_fine(amr_cur)
+        call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim)
+        call s_ibm_restore_from_fine(amr_cur)
+        call s_amr_restore_coarse()
+
+    end subroutine s_amr_ib_correct_fine
 
     !> Device restriction kernel over all sys_size variable pairs (fine source qf -> coarse target qc).
     impure subroutine s_restrict_all_vars(qf, qc)
@@ -863,10 +930,16 @@ contains
                             sz = 0._wp
                             if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
                                 & ck - 1), wp))
+                            ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the
+                            ! coarse cell's realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component
+                            ! minmod slopes would break that joint constraint). Non-QBMM Euler-Euler bubbles instead
+                            ! floor their positive moments (nR / npb / nmv); the signed velocity moment nV (offset 1)
+                            ! is skipped.
+                            if (qbmm .and. i >= bbeg .and. i <= bend) then
+                                sx = 0._wp; sy = 0._wp; sz = 0._wp
+                            end if
                             q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
-                            ! bubble moment realizability floor: positive moments (radius nR, non-polytropic partial pressure
-                            ! npb / vapor mass nmv) floored; the signed velocity moment nV (offset 1 in the stride) is skipped
-                            if (bubEE .and. i >= bbeg .and. i <= bend) then
+                            if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
                                 if (mod(i - bbeg, bstride) /= 1) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, fk), &
                                     & wp), bub_pos_frac*u0)
                             end if
@@ -1091,6 +1164,8 @@ contains
         ! RK stage update (device kernel; mirror of the coarse non-IGR form)
         call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
                                   & coefs(2), coefs(3), coefs(4), dt)
+        ! IB state correction on the fine block (mirrors the coarse per-stage correct-state; no-op unless ib)
+        call s_amr_ib_correct_fine()
         if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_advance_amr_fine_stage
@@ -1165,6 +1240,8 @@ contains
                 ! RK stage update at the FINE time step (device kernel)
                 call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, &
                                           & coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, 4), amr_dt_fine)
+                ! IB state correction on the fine block after each substep RK update (no-op unless ib)
+                call s_amr_ib_correct_fine()
             end do
         end do
         if (rank_time_wrt) call s_rank_time_toc()

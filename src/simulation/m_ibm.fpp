@@ -26,7 +26,8 @@ module m_ibm
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points
-    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module
+    ; public :: ib_gbl_idx_lookup, s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, &
+        & s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, num_gps
 
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
@@ -35,6 +36,22 @@ module m_ibm
     $:GPU_DECLARE(create='[ghost_points]')
 
     integer :: num_gps  !< Number of ghost points
+
+    !> Per-block fine IB state for static-body AMR (SP20): each AMR slot keeps its own fine-grid markers + ghost-point list,
+    !! computed from the geometry at fine resolution so the body is resolved on the fine block. Swapped into the module globals
+    !! (ib_markers/ghost_points/num_gps) for the fine advance's setup and correct-state, then restored. Static body only (moving IB
+    !! gated under amr).
+    type ib_fine_state
+        type(integer_field)                          :: markers
+        type(ghost_point), allocatable, dimension(:) :: gps
+        integer                                      :: num_gps
+    end type ib_fine_state
+    type(ib_fine_state), allocatable :: ib_fine(:)
+
+    !> Coarse IB state parked across a fine swap (move_alloc bounce; paired swap/restore).
+    type(integer_field)                          :: ib_markers_save
+    type(ghost_point), allocatable, dimension(:) :: ghost_points_save
+    integer                                      :: num_gps_save
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[gp_layers, num_gps]')
 #elif defined(MFC_OpenMP)
@@ -1501,6 +1518,82 @@ contains
 
     end subroutine s_update_ib_lookup
 
+    !> Allocate the per-slot fine-IB marker fields (static-body AMR). One integer field per AMR slot, sized to the max buffered fine
+    !! extents (mirrors the coarse ib_markers bounds); ghost-point lists start empty and are filled by s_ibm_setup_fine. No-op
+    !! unless amr .and. ib.
+    impure subroutine s_ibm_alloc_fine(nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi)
+
+        integer, intent(in) :: nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi
+        integer             :: islot
+
+        allocate (ib_fine(1:nslots))
+        do islot = 1, nslots
+            @:ALLOCATE(ib_fine(islot)%markers%sf(f1_lo:f1_hi, f2_lo:f2_hi, f3_lo:f3_hi))
+            @:ACC_SETUP_SFs(ib_fine(islot)%markers)
+            ib_fine(islot)%markers%sf = 0
+            ib_fine(islot)%num_gps = 0
+            allocate (ib_fine(islot)%gps(1))
+        end do
+
+    end subroutine s_ibm_alloc_fine
+
+    !> Swap the module IB globals (ib_markers/ghost_points/num_gps) to fine slot islot's stored state; the coarse state parks in the
+    !! save bounce (markers via pointer alias, ghost points via move_alloc). MUST be paired with s_ibm_restore_from_fine. Grid
+    !! globals must already be swapped to the fine block.
+    impure subroutine s_ibm_swap_to_fine(islot)
+
+        integer, intent(in) :: islot
+
+        ib_markers_save%sf => ib_markers%sf
+        ib_markers%sf => ib_fine(islot)%markers%sf
+        call move_alloc(ghost_points, ghost_points_save)
+        call move_alloc(ib_fine(islot)%gps, ghost_points)
+        num_gps_save = num_gps; num_gps = ib_fine(islot)%num_gps
+        $:GPU_UPDATE(device='[num_gps]')
+
+    end subroutine s_ibm_swap_to_fine
+
+    !> Restore the coarse IB globals saved by s_ibm_swap_to_fine, parking the (possibly updated) fine state back in slot islot.
+    impure subroutine s_ibm_restore_from_fine(islot)
+
+        integer, intent(in) :: islot
+
+        ib_fine(islot)%markers%sf => ib_markers%sf
+        ib_markers%sf => ib_markers_save%sf
+        ib_markers_save%sf => null()
+        call move_alloc(ghost_points, ib_fine(islot)%gps)
+        call move_alloc(ghost_points_save, ghost_points)
+        ib_fine(islot)%num_gps = num_gps; num_gps = num_gps_save
+        $:GPU_UPDATE(device='[num_gps]')
+
+    end subroutine s_ibm_restore_from_fine
+
+    !> Compute the fine-grid IB state (markers, ghost points, levelset, image points, interpolation coeffs) for the current block.
+    !! The grid globals must be swapped to the fine block AND the IB globals swapped to this slot (s_ibm_swap_to_fine) before the
+    !! call: the pipeline writes into the module globals, which then hold this slot's fine state. Mirrors the static-body portion of
+    !! s_ibm_setup at fine resolution.
+    impure subroutine s_ibm_setup_fine()
+
+        ib_markers%sf = 0
+        $:GPU_UPDATE(device='[ib_markers%sf]')
+        call s_apply_ib_patches(ib_markers)
+        $:GPU_UPDATE(host='[ib_markers%sf]')
+
+        call s_find_num_ghost_points(num_gps)
+        $:GPU_UPDATE(device='[num_gps]')
+        if (allocated(ghost_points)) deallocate (ghost_points)
+        allocate (ghost_points(1:max(num_gps, 1)))
+        $:GPU_ENTER_DATA(copyin='[ghost_points]')
+
+        call s_find_ghost_points(ghost_points)
+        call s_apply_levelset(ghost_points, num_gps)
+        call s_compute_image_points(ghost_points)
+        call s_compute_interpolation_coeffs(ghost_points)
+
+        if (num_gps > 0) print '(A,I0,A,I0)', ' [amr] block ', amr_cur, ': fine IB ghost points = ', num_gps
+
+    end subroutine s_ibm_setup_fine
+
     !> Finalize the IBM module
     impure subroutine s_finalize_ibm_module()
 
@@ -1519,6 +1612,15 @@ contains
         end if
         if (allocated(ghost_points)) then
             @:DEALLOCATE(ghost_points)
+        end if
+        if (allocated(ib_fine)) then
+            do i = 1, size(ib_fine)
+                if (associated(ib_fine(i)%markers%sf)) then
+                    @:DEALLOCATE(ib_fine(i)%markers%sf)
+                end if
+                if (allocated(ib_fine(i)%gps)) deallocate (ib_fine(i)%gps)
+            end do
+            deallocate (ib_fine)
         end if
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI

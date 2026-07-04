@@ -98,8 +98,19 @@ contains
             @:PROHIBIT(surface_tension, &
                        & "amr does not support surface_tension: the capillary force depends on the interface normal (grad-c direction), which the conservative-linearly-prolonged fine ghost color cannot reproduce consistently with the coarse solver across a 2:1 coarse/fine boundary - a growing spurious seam current results")
             @:PROHIBIT(hypoelasticity .or. hyperelasticity .or. mhd, "amr does not support elastic/MHD")
-            @:PROHIBIT(bubbles_lagrange .or. qbmm .or. ib .or. igr .or. cyl_coord, &
-                       & "amr does not support Lagrangian bubbles/QBMM/IB/IGR/cylindrical (QBMM carries pb/mv quadrature side-state that the fine advance would corrupt through the global swap)")
+            @:PROHIBIT(bubbles_lagrange .or. igr .or. cyl_coord, "amr does not support Lagrangian bubbles/IGR/cylindrical")
+            @:PROHIBIT(qbmm .and. .not. polytropic, &
+                       & "amr does not support non-polytropic QBMM: its pb/mv quadrature side-state evolves as a global array that the fine advance would corrupt through the swap. Polytropic QBMM (pb/mv inert) is supported: its bubble moments live entirely in q_cons and are injected piecewise-constant at prolongation to preserve CHyQMOM realizability")
+            ! static-body IB AMR (SP20): a fixed single body resolved on a static fine block. Moving IB,
+            ! multi-body, STL geometry, and dynamic regrid with IB are gated (unvalidated / recompute-on-move).
+            @:PROHIBIT(ib .and. any(patch_ib(1:num_ibs)%moving_ibm /= 0), &
+                       & "amr with ib supports static bodies only (moving IB under amr is not yet validated)")
+            @:PROHIBIT(ib .and. num_ibs > 1, &
+                       & "amr with ib supports a single body only (multi-body IB under amr is not yet validated)")
+            @:PROHIBIT(ib .and. any(patch_ib(1:num_ibs)%geometry == 12), &
+                       & "amr with ib does not support STL-model geometry (not yet validated)")
+            @:PROHIBIT(ib .and. amr_regrid_int > 0, &
+                       & "amr with ib requires a static block (amr_regrid_int = 0); dynamic regrid with IB is not yet validated")
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
             @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
             @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")
