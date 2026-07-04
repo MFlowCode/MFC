@@ -2861,6 +2861,114 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (i) CROSS-FEATURE: viscous + two-fluid + multi-block + subcycle (SP11+SP9a+SP12a+SP6).
+        # Two material interfaces (fluid1|fluid2|fluid1, total-density ratio 10) at x=0.25 (cell 16) and
+        # x=0.75 (cell 48): the density-gradient tagger clusters TWO blocks (~32 coarse cells apart >
+        # buff_size + 2*amr_buf). A velocity step across each interface drives a real viscous stress, so
+        # both blocks' registers reflux the viscous momentum/energy AND the per-fluid species fluxes at
+        # once, under regrid + subcycle. Conservation defect stays ~1e-13.
+        stack.push(
+            "AMR -> 1D -> viscous multifluid multiblock",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "amr_max_blocks": 4,
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "viscous": "T",
+                "weno_Re_flux": "T",
+                "weno_avg": "T",
+                "fluid_pp(1)%Re(1)": 100.0,
+                "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%cv": 0.0,
+                "fluid_pp(2)%qv": 0.0,
+                "fluid_pp(2)%qvp": 0.0,
+                "fluid_pp(2)%Re(1)": 100.0,
+                # fluid1 | fluid2 | fluid1  => total-density interfaces at x=0.25 and x=0.75
+                "patch_icpp(1)%x_centroid": 0.125,
+                "patch_icpp(1)%length_x": 0.25,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(1)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(1)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(1)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(1)%alpha(2)": eps_a,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%vel(1)": 0.3,
+                "patch_icpp(2)%alpha_rho(1)": eps_a * 1.0,
+                "patch_icpp(2)%alpha_rho(2)": (1.0 - eps_a) * 10.0,
+                "patch_icpp(2)%alpha(1)": eps_a,
+                "patch_icpp(2)%alpha(2)": 1.0 - eps_a,
+                "patch_icpp(3)%x_centroid": 0.875,
+                "patch_icpp(3)%length_x": 0.25,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(3)%vel(1)": 0.5,
+                "patch_icpp(3)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(3)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(3)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(3)%alpha(2)": eps_a,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (j) CROSS-FEATURE: Euler-Euler bubbles + multi-block + subcycle + regrid (SP13+SP12a+SP6+SP5).
+        # Polytropic bubbly liquid with a pressure slab at EACH end (pres=2 at the left/right quarters,
+        # pres=1 in the middle): the two inward-running compression fronts create two separated density
+        # features, so the tagger clusters up to two blocks. Exercises the realizability-preserving
+        # radius-moment prolongation and the bubble-moment reflux across both blocks' registers, with the
+        # moments read from the subcycle time-lerp ghosts. dt=5e-5 keeps coarse+subcycled fine ICFL < 1.
+        stack.push(
+            "AMR -> 1D -> bubbles multiblock",
+            {
+                **amr_1d_base,
+                "dt": 5.0e-5,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "amr_max_blocks": 4,
+                "bubbles_euler": "T",
+                "bubble_model": 2,
+                "polytropic": "T",
+                "nb": 1,
+                "fluid_pp(1)%gamma": 0.16,
+                "fluid_pp(1)%pi_inf": 3515.0,
+                "bub_pp%R0ref": 1.0,
+                "bub_pp%p0ref": 1.0,
+                "bub_pp%rho0ref": 1.0,
+                "bub_pp%T0ref": 1.0,
+                "bub_pp%ss": 0.07179866765358993,
+                "bub_pp%pv": 0.02308216136195411,
+                "bub_pp%vd": 0.2404125083932959,
+                "bub_pp%mu_l": 0.009954269975623244,
+                "bub_pp%gam_g": 1.4,
+                "patch_icpp(1)%x_centroid": 0.125,
+                "patch_icpp(1)%length_x": 0.25,
+                "patch_icpp(1)%alpha_rho(1)": 0.96,
+                "patch_icpp(1)%alpha(1)": 4e-02,
+                "patch_icpp(1)%pres": 2.0,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%alpha_rho(1)": 0.96,
+                "patch_icpp(2)%alpha(1)": 4e-02,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%x_centroid": 0.875,
+                "patch_icpp(3)%length_x": 0.25,
+                "patch_icpp(3)%alpha_rho(1)": 0.96,
+                "patch_icpp(3)%alpha(1)": 4e-02,
+                "patch_icpp(3)%pres": 2.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     add_convergence_cases(cases)
