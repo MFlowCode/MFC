@@ -622,6 +622,12 @@ contains
         ! Neither procedure has to be carried out if pre-process is in fact not truly executed in parallel.
         call s_mpi_bcast_user_inputs()
         call s_initialize_parallel_io()
+
+        ! Save the global domain bounds before decomposition overwrites x/y/z_domain with each processor's local sub-domain bounds
+        x_domain_glb = x_domain
+        y_domain_glb = y_domain
+        z_domain_glb = z_domain
+
         call s_mpi_decompose_computational_domain()
 
         bc = bc_xyz_info(bc_x, bc_y, bc_z)
