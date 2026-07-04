@@ -3065,7 +3065,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
-<<<<<<< HEAD
         # (l) Euler-Euler bubbles, QBMM + polytropic (SP19): nb=3 R0 bins, each carrying a bivariate
         # 6-moment set (m00,m10,m01,m20,m11,m02) inverted by CHyQMOM every RHS call. polytropic=T keeps
         # pb/mv inert (degenerate stubs), so no quadrature side-state is advanced on the fine level and
