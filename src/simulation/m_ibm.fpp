@@ -1545,14 +1545,33 @@ contains
     !> Swap the module IB globals (ib_markers/ghost_points/num_gps) to fine slot islot's stored state; the coarse state parks in the
     !! save bounce (markers via pointer alias, ghost points via move_alloc). MUST be paired with s_ibm_restore_from_fine. Grid
     !! globals must already be swapped to the fine block.
-    impure subroutine s_ibm_swap_to_fine(islot)
+    impure subroutine s_ibm_swap_to_fine(islot, gps_on_device)
 
         integer, intent(in) :: islot
+        logical, intent(in) :: gps_on_device  !< fine ghost points already present on device (per-stage correct path)
+
+        ! A host pointer/allocatable swap leaves the device descriptor of the global
+        ! ib_markers/ghost_points still bound to the coarse device array; a GPU loop over
+        ! the swapped-in state would then index the stale coarse array (illegal access).
+        ! Detach the coarse device array and attach the fine one (present since
+        ! s_ibm_alloc_fine) so the descriptor is device-coherent for the fine advance.
 
         ib_markers_save%sf => ib_markers%sf
+        $:GPU_EXIT_DATA(detach='[ib_markers%sf]')
         ib_markers%sf => ib_fine(islot)%markers%sf
+        $:GPU_ENTER_DATA(attach='[ib_markers%sf]')
+
+        ! ghost_points is move_alloc'd. Detach the coarse device copy so the fine attach can
+        ! re-point the descriptor (attach only updates the pointer on a 0 -> 1 transition).
+        ! In the setup path s_ibm_setup_fine reallocates + copies in the fine list (which
+        ! attaches it); in the per-stage correct path the fine list already lives on device,
+        ! so attach it here.
+        $:GPU_EXIT_DATA(detach='[ghost_points]')
         call move_alloc(ghost_points, ghost_points_save)
         call move_alloc(ib_fine(islot)%gps, ghost_points)
+        if (gps_on_device) then
+            $:GPU_ENTER_DATA(attach='[ghost_points]')
+        end if
         num_gps_save = num_gps; num_gps = ib_fine(islot)%num_gps
         $:GPU_UPDATE(device='[num_gps]')
 
@@ -1563,11 +1582,19 @@ contains
 
         integer, intent(in) :: islot
 
+        ! Mirror s_ibm_swap_to_fine: detach the fine device arrays and re-attach the coarse
+        ! ones so the global descriptors point back at the coarse data after the swap.
+
         ib_fine(islot)%markers%sf => ib_markers%sf
+        $:GPU_EXIT_DATA(detach='[ib_markers%sf]')
         ib_markers%sf => ib_markers_save%sf
         ib_markers_save%sf => null()
+        $:GPU_ENTER_DATA(attach='[ib_markers%sf]')
+
+        $:GPU_EXIT_DATA(detach='[ghost_points]')
         call move_alloc(ghost_points, ib_fine(islot)%gps)
         call move_alloc(ghost_points_save, ghost_points)
+        $:GPU_ENTER_DATA(attach='[ghost_points]')
         ib_fine(islot)%num_gps = num_gps; num_gps = num_gps_save
         $:GPU_UPDATE(device='[num_gps]')
 

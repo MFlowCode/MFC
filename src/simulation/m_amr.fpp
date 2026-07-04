@@ -651,7 +651,7 @@ contains
             call s_amr_select_slot(islot)
             if (.not. amr_rank_owns_block) cycle
             call s_amr_swap_to_fine()
-            call s_ibm_swap_to_fine(islot)
+            call s_ibm_swap_to_fine(islot, gps_on_device=.false.)
             call s_ibm_setup_fine()
             my_ib_gps = my_ib_gps + int(num_gps, 8)
             call s_ibm_restore_from_fine(islot)
@@ -680,7 +680,7 @@ contains
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return
         call s_amr_swap_to_fine()
-        call s_ibm_swap_to_fine(amr_cur)
+        call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
         call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim)
         call s_ibm_restore_from_fine(amr_cur)
         call s_amr_restore_coarse()
