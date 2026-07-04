@@ -74,12 +74,12 @@ contains
 
     end subroutine s_initialize_amr_mpi_buffers
 
-    !> AMR fine-level halo exchange: overwrite the buff_size fine ghost layers of q_fine at CONTINUATION faces (where the patch
+    !> AMR fine-level halo exchange: overwrite the buff_size fine ghost layers of q_fine at CONTINUATION faces (where the block
     !! extends past this rank's intersection) with the neighbor rank's true fine data - the coarse-topology neighbor (bc_x/y/z rank
     !! encoding) holds matching fine cells by construction (mirror decomposition, lockstep in time). Sequential per direction with
     !! the coarse halo's transverse ranges, so corners propagate. Pack/unpack run as device kernels; only the buffers move through
     !! the host (no-op macros on CPU builds). Reads the COARSE grid state for participation - call BEFORE s_amr_swap_to_fine. No
-    !! exchange fires at np=1 or for fully-contained patches; fm/fn/fp are the LOCAL fine extents.
+    !! exchange fires at np=1 or for fully-contained blocks; fm/fn/fp are the LOCAL fine extents.
     impure subroutine s_mpi_sendrecv_amr_fine_halo(q_fine, fm, fn, fp)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_fine
@@ -90,10 +90,10 @@ contains
         logical :: go
 
         if (num_procs == 1) return
-        if (.not. amr_rank_owns_patch) return
+        if (.not. amr_rank_owns_block) return
         do d = 1, num_dims
             do loc = -1, 1, 2
-                ! a face participates iff the patch CONTINUES past this rank's intersection there; the
+                ! a face participates iff the block CONTINUES past this rank's intersection there; the
                 ! neighbor then participates on its matching face by construction (blocking pairwise
                 ! sendrecvs in a fixed (d, loc) order cannot deadlock)
                 select case (d)
@@ -234,7 +234,7 @@ contains
 
     end subroutine s_mpi_sendrecv_amr_fine_halo
 
-    !> AMR reflux-register exchange: where a patch face lies exactly ON a rank boundary, the fine side (freg) and the outside cells
+    !> AMR reflux-register exchange: where a block face lies exactly ON a rank boundary, the fine side (freg) and the outside cells
     !! (creg capture + apply) live on different ranks - the fine-side rank sends its freg face registers to the outside rank before
     !! the apply. Whole-array MPI_SENDRECV_REPLACE (send-only keeps the buffer; the two sides allocate identical extents: cart
     !! neighbors share transverse subdomains, and a rank is never both sender and receiver of the same face). ALL ranks must call
@@ -250,8 +250,8 @@ contains
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
         #:for D, BCD in [(1, 'bc_x'), (2, 'bc_y'), (3, 'bc_z')]
             if (${D}$ <= num_dims) then
-                ! low face of the patch in dim ${D}$: fine side = rank whose subdomain STARTS at the face
-                snd = amr_rank_owns_patch .and. amr_region_lo(${D}$) == sidx(${D}$)
+                ! low face of the block in dim ${D}$: fine side = rank whose subdomain STARTS at the face
+                snd = amr_rank_owns_block .and. amr_region_lo(${D}$) == sidx(${D}$)
                 rcv = own_lo(${D}$) .and. amr_region_lo(${D}$) - 1 == sidx(${D}$) + ext(${D}$)
                 if (snd .or. rcv) then
                     dst = MPI_PROC_NULL; src = MPI_PROC_NULL
@@ -266,8 +266,8 @@ contains
                         $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo]')
                     end if
                 end if
-                ! high face of the patch in dim ${D}$: fine side = rank whose subdomain ENDS at the face
-                snd = amr_rank_owns_patch .and. amr_region_hi(${D}$) == sidx(${D}$) + ext(${D}$)
+                ! high face of the block in dim ${D}$: fine side = rank whose subdomain ENDS at the face
+                snd = amr_rank_owns_block .and. amr_region_hi(${D}$) == sidx(${D}$) + ext(${D}$)
                 rcv = own_hi(${D}$) .and. amr_region_hi(${D}$) + 1 == sidx(${D}$)
                 if (snd .or. rcv) then
                     dst = MPI_PROC_NULL; src = MPI_PROC_NULL

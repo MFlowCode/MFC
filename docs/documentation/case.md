@@ -676,15 +676,15 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `sfc_partition_wrt`     | Logical | Report SFC-weighted load-balance partition |
 | `rank_time_wrt`         | Logical | Report per-rank RHS compute-time imbalance (max/mean) |
 | `load_balance`          | Logical | (Experimental/diagnostic) Weighted static Cartesian decomposition at init (requires `parallel_io = T`, >1 rank). Measured gain is small on CPU (~5%) and can be slower on GPU due to the occupancy floor; equal decomposition is near-optimal for uniform-cost workloads. |
-| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 patch with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2; num_fluids > 1 requires mpp_lim; supports physical viscosity. |
-| `amr_patch_beg(i)`      | Integer | Refined-patch start cell index in direction $i$ (level-0 index space) |
-| `amr_patch_end(i)`      | Integer | Refined-patch end cell index in direction $i$ (level-0 index space) |
-| `amr_regrid_int`        | Integer | Steps between AMR regrid events (0 = static patch) |
+| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 block with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2; num_fluids > 1 requires mpp_lim; supports physical viscosity. |
+| `amr_block_beg(i)`      | Integer | Refined-block start cell index in direction $i$ (level-0 index space) |
+| `amr_block_end(i)`      | Integer | Refined-block end cell index in direction $i$ (level-0 index space) |
+| `amr_regrid_int`        | Integer | Steps between AMR regrid events (0 = static block) |
 | `amr_tag_eps`           | Real    | Relative density-gradient threshold for AMR refinement tagging (default 0.1) |
 | `amr_buf`               | Integer | Coarse-cell padding around tagged cells when regridding (default 3) |
 | `amr_subcycle`          | Logical | Advance the coarse level at the case dt and the fine level at dt/2 (two substeps; Berger-Colella refluxing). Requires `amr`; incompatible with `cfl_dt`. |
-| `amr_max_patches`       | Integer | Number of fixed refined-patch slots preallocated (each max-patch sized; ~N x device memory); must be >= 1 (default 4) |
-| `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered patch box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
+| `amr_max_blocks`       | Integer | Number of fixed refined-block slots preallocated (each max-block sized; ~N x device memory); must be >= 1 (default 4) |
+| `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered block box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
 | `hybrid_weno`           | Logical | Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities (requires WENO reconstruction) |
 | `hybrid_weno_eps`       | Real    | Smoothness threshold for hybrid WENO shock flagging; must be > 0 (default 1e-2) |
 | `hybrid_riemann`        | Logical | Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq) |
@@ -776,9 +776,9 @@ It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_
 
 ### 7.1. Adaptive Mesh Refinement (AMR) {#sec-amr}
 
-MFC supports block-structured AMR (Experimental) via a single 2:1 refined level-1 patch
+MFC supports block-structured AMR (Experimental) via a single 2:1 refined level-1 block
 that coexists with the base-level solve.
-The fine patch is initialized from the base grid by piecewise-linear interpolation and
+The fine block is initialized from the base grid by piecewise-linear interpolation and
 remains continuously coupled to the base solve through conservative ghost-cell exchange
 and flux refluxing at the coarse–fine interface.
 
@@ -797,28 +797,28 @@ conserved. Fine-ghost velocity gradients at the coarse–fine boundary are taken
 conservative-linear prolongation of the coarse state (no special gradient reconstruction);
 that interface inconsistency is bounded and conservation is enforced by the flux-register
 matching. The density-gradient regrid tagger does not sense shear or boundary layers well,
-so viscous features may need a static or generously buffered patch (error-estimator taggers
+so viscous features may need a static or generously buffered block (error-estimator taggers
 are future work).
 It is incompatible with surface tension, bubble models, phase-change (relax),
 immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, `hybrid_weno`,
 `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
-holds the fine cells covering the patch's intersection with its own subdomain), so the
-patch may span rank boundaries and move freely across them under dynamic regrid.
-The patch may cover at most about half of any rank's subdomain per dimension (the fine
+holds the fine cells covering the block's intersection with its own subdomain), so the
+block may span rank boundaries and move freely across them under dynamic regrid.
+The block may cover at most about half of any rank's subdomain per dimension (the fine
 advance reuses the rank-local solver scratch).
 
-**Static vs. dynamic patch.**
-Setting `amr_regrid_int = 0` fixes the patch at the initial `amr_patch_beg`/`amr_patch_end`
+**Static vs. dynamic block.**
+Setting `amr_regrid_int = 0` fixes the block at the initial `amr_block_beg`/`amr_block_end`
 position for the entire run (useful for convergence studies or GPU correctness testing).
 Setting `amr_regrid_int > 0` triggers dynamic regrid every that many coarse steps:
 cells whose normalized density gradient exceeds `amr_tag_eps` are tagged, then clustered
-by a Berger–Rigoutsos recursive bisection into a list of separated patch boxes (each grown
-by `amr_buf` coarse cells of buffer padding). Boxes whose padded extents would come within
-`buff_size` of each other are merged, so separated features get their own refined box while
-nearby ones stay a single box (guaranteeing no fine–fine adjacency). Splitting stops once a
-box's tag efficiency (tagged/total cells) reaches `amr_cluster_eff`; the number of patches
-is capped at `amr_max_patches`.
+by a Berger–Rigoutsos recursive bisection into a list of separated block boxes (each grown
+by `amr_buf` coarse cells of buffer padding). Boxes whose padded extents would come within a
+ghost-cell buffer width of each other are merged, so separated features get their own refined
+box while nearby ones stay a single box (guaranteeing no fine–fine adjacency). Splitting stops once a
+box's tag efficiency (tagged/total cells) reaches `amr_cluster_eff`; the number of blocks
+is capped at `amr_max_blocks`.
 A positive `amr_tag_eps` and `amr_buf >= 1` are required whenever regridding is active.
 
 **Subcycling.**
@@ -829,17 +829,17 @@ Accumulated fine-level fluxes are applied back to the coarse level (reflux corre
 after each coarse step.
 `amr_subcycle` is incompatible with `cfl_dt` (variable time step) and requires `amr = T`.
 
-**Patch slots.**
-`amr_max_patches` (default 4) sets the number of fixed refined-patch slots preallocated
-for the run. Each slot is sized to the maximum patch extent, so `N` slots require roughly
-`N` times the device memory of a single patch; the goal is the compute win of refining
-separated features independently, and memory efficiency (compact per-patch pools) is a
-follow-up. Dynamic regrid clusters the tagged cells into up to `amr_max_patches` separated
+**Block slots.**
+`amr_max_blocks` (default 4) sets the number of fixed refined-block slots preallocated
+for the run. Each slot is sized to the maximum block extent, so `N` slots require roughly
+`N` times the device memory of a single block; the goal is the compute win of refining
+separated features independently, and memory efficiency (compact per-block pools) is a
+follow-up. Dynamic regrid clusters the tagged cells into up to `amr_max_blocks` separated
 boxes (`amr_cluster_eff` sets the min tag efficiency each box reaches before splitting stops).
 
 **Restart.**
 Each save step writes a fine-level AMR restart file alongside the level-0 restart data
-(whose format is unchanged): the current — possibly regridded — patch box and the fine
+(whose format is unchanged): the current — possibly regridded — block box and the fine
 solution, per rank (an `amr_fine.dat` in each rank's step directory, or a single shared
 `amr_*.dat` next to the level-0 MPI-IO restart file when `parallel_io` is on).
 Restarting (`t_step_start > 0`) restores the saved box and fine state seamlessly; it
@@ -849,20 +849,20 @@ If the AMR file is absent (e.g., data from an older run), the run proceeds with 
 warning and re-initializes the fine level by prolongation from the coarse restart data,
 losing the accumulated fine-level accuracy.
 Note that level-0 output already contains the restricted (coarse-resolution) fine
-solution over the patch, so existing visualization works unchanged; fine-resolution
+solution over the block, so existing visualization works unchanged; fine-resolution
 visualization output is future work.
 
 | Parameter               | Type    | Description                                    |
 | ---:                    | :----:  |          :---                                  |
 | `amr`                   | Logical | Enable AMR (see prose above for requirements and restrictions) |
-| `amr_patch_beg(i)`      | Integer | Initial refined-patch start cell index in direction $i$ (level-0 index space) |
-| `amr_patch_end(i)`      | Integer | Initial refined-patch end cell index in direction \f$i\f$ (level-0 index space); must satisfy \f$2\,(e_i - b_i + 1) - 1 \le N_i\f$ |
-| `amr_regrid_int`        | Integer | Coarse steps between regrid events (0 = static patch) |
+| `amr_block_beg(i)`      | Integer | Initial refined-block start cell index in direction $i$ (level-0 index space) |
+| `amr_block_end(i)`      | Integer | Initial refined-block end cell index in direction \f$i\f$ (level-0 index space); must satisfy \f$2\,(e_i - b_i + 1) - 1 \le N_i\f$ |
+| `amr_regrid_int`        | Integer | Coarse steps between regrid events (0 = static block) |
 | `amr_tag_eps`           | Real    | Normalized density-gradient threshold for refinement tagging; must be > 0 when `amr_regrid_int > 0` (default 0.1) |
 | `amr_buf`               | Integer | Coarse-cell padding around tagged cells; must be >= 1 when `amr_regrid_int > 0` (default 3) |
 | `amr_subcycle`          | Logical | Advance fine level at dt/2 (two substeps per coarse step) with Berger–Colella refluxing |
-| `amr_max_patches`       | Integer | Number of fixed refined-patch slots preallocated (each max-patch sized; ~N x device memory); must be >= 1 (default 4) |
-| `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered patch box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
+| `amr_max_blocks`       | Integer | Number of fixed refined-block slots preallocated (each max-block sized; ~N x device memory); must be >= 1 (default 4) |
+| `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered block box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
 
 ### 8. Acoustic Source {#sec-acoustic-source}
 

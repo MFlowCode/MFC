@@ -2543,13 +2543,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         """Golden tests for the block-structured AMR module.
 
         Three minimal 1D cases built on the BASE_CFG Sod IC:
-        (a) static patch  – amr_regrid_int=0, no regrid, cheapest sanity check
+        (a) static block  – amr_regrid_int=0, no regrid, cheapest sanity check
         (b) dynamic regrid – amr_regrid_int=2, exercises the tag/rebuild path
         (c) subcycling    – amr_subcycle=T, exercises the dt/2 two-substep path
         (d) two-fluid     – num_fluids=2 + mpp_lim, regrid + subcycle: exercises the
             sum-preserving alpha prolongation and per-fluid reflux (SP9a)
 
-        Grid: m=63 (indices 0..63); fine patch beg=16, end=47 so that
+        Grid: m=63 (indices 0..63); fine block beg=16, end=47 so that
         2*(47-16+1)-1 = 63 <= 63 satisfies the extent guard.
         """
         # Common 1D domain + Sod IC setup shared by all three AMR cases
@@ -2577,14 +2577,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "patch_icpp(3)%x_centroid": 0.9,
             "patch_icpp(3)%length_x": 0.2,
             "patch_icpp(3)%vel(1)": 0.0,
-            # AMR: 2:1 fine patch spanning coarse indices 16..47
+            # AMR: 2:1 fine block spanning coarse indices 16..47
             "amr": "T",
-            "amr_patch_beg(1)": 16,
-            "amr_patch_end(1)": 47,
+            "amr_block_beg(1)": 16,
+            "amr_block_end(1)": 47,
         }
 
-        # (a) static patch
-        stack.push("AMR -> 1D -> static patch", {**amr_1d_base, "amr_regrid_int": 0})
+        # (a) static block
+        stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0})
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
@@ -2613,9 +2613,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
-        # (d) 3D static patch — z-dimension coverage. 26^3 base grid (the
+        # (d) 3D static block — z-dimension coverage. 26^3 base grid (the
         # checker's WENO5 floor is 26 cells per axis) with the Sod-like slabs
-        # stacked along z; 12^3 fine patch at coarse indices 6..17 per axis
+        # stacked along z; 12^3 fine block at coarse indices 6..17 per axis
         # (fine extent 23 <= 25; >= buff_size=4 inside the domain).
         amr_3d_base = {
             "m": 25,
@@ -2657,22 +2657,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "patch_icpp(2)%length_z": 0.7,
             "patch_icpp(3)%z_centroid": 0.9,
             "patch_icpp(3)%length_z": 0.2,
-            # AMR: 2:1 fine patch spanning coarse indices 6..17 per axis
+            # AMR: 2:1 fine block spanning coarse indices 6..17 per axis
             "amr": "T",
-            "amr_patch_beg(1)": 6,
-            "amr_patch_beg(2)": 6,
-            "amr_patch_beg(3)": 6,
-            "amr_patch_end(1)": 17,
-            "amr_patch_end(2)": 17,
-            "amr_patch_end(3)": 17,
+            "amr_block_beg(1)": 6,
+            "amr_block_beg(2)": 6,
+            "amr_block_beg(3)": 6,
+            "amr_block_end(1)": 17,
+            "amr_block_end(2)": 17,
+            "amr_block_end(3)": 17,
         }
 
-        stack.push("AMR -> 3D -> static patch", {**amr_3d_base, "amr_regrid_int": 0})
+        stack.push("AMR -> 3D -> static block", {**amr_3d_base, "amr_regrid_int": 0})
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
         # (d) two-fluid: material interface (density ratio 10) at x=0.5, inside the initial
-        # patch (cells 16..47); uniform p and u advect it under regrid + subcycle
+        # block (cells 16..47); uniform p and u advect it under regrid + subcycle
         eps_a = 1.0e-6
         stack.push(
             "AMR -> 1D -> two-fluid",
@@ -2736,20 +2736,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
-        # (f) multi-patch (SP12a): three constant states with density interfaces at x=0.25 (cell 16)
+        # (f) multi-block (SP12a): three constant states with density interfaces at x=0.25 (cell 16)
         # and x=0.75 (cell 48) -- two features ~32 coarse cells apart (> buff_size + 2*amr_buf), so the
-        # Berger-Rigoutsos clustering forms TWO patches (one per interface) rather than one bounding box
+        # Berger-Rigoutsos clustering forms TWO blocks (one per interface) rather than one bounding box
         # spanning both plus the empty middle. Uniform pressure so the interfaces stay put; regrid on.
         # Exercises the per-slot advance + the single coarse-RHS flux-register capture filling both
-        # patches' registers (the whole SP12a capability).
+        # blocks' registers (the whole SP12a capability).
         stack.push(
-            "AMR -> 1D -> multi-patch",
+            "AMR -> 1D -> multi-block",
             {
                 **amr_1d_base,
                 "amr_regrid_int": 2,
                 "amr_tag_eps": 0.1,
                 "amr_buf": 2,
-                "amr_max_patches": 4,
+                "amr_max_blocks": 4,
                 "patch_icpp(1)%x_centroid": 0.125,
                 "patch_icpp(1)%length_x": 0.25,
                 "patch_icpp(1)%alpha_rho(1)": 1.0,

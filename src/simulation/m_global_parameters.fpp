@@ -276,37 +276,37 @@ module m_global_parameters
     !> @}
 
     logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
-    !> true on ranks holding fine cells: patch intersects this rank's subdomain in every active dim (mirror decomposition; all ranks
+    !> true on ranks holding fine cells: block intersects this rank's subdomain in every active dim (mirror decomposition; all ranks
     !! at np=1)
-    logical :: amr_rank_owns_patch = .true.
+    logical :: amr_rank_owns_block = .true.
 
-    !> Current AMR fine-patch box in level-0 cell indices; mirrors amr_fine%region at all times (kept by s_set_amr_fine_geometry) so
+    !> Current AMR fine-block box in level-0 cell indices; mirrors amr_fine%region at all times (kept by s_set_amr_fine_geometry) so
     !! m_amr_registers can read it without a use-cycle through m_amr.
     integer :: amr_region_lo(3) = 0, amr_region_hi(3) = 0
 
-    !> Per-dim intersection of the patch with THIS rank's subdomain, GLOBAL level-0 cell indices (kept by s_set_amr_fine_geometry;
-    !! collapsed dims 0:0). May be empty (lo > hi) in a dim; amr_rank_owns_patch = nonempty in all active dims. The rank's fine
-    !! level covers exactly this intersection: local fine index 0 = patch-global fine index 2*(amr_isect_lo - amr_region_lo).
+    !> Per-dim intersection of the block with THIS rank's subdomain, GLOBAL level-0 cell indices (kept by s_set_amr_fine_geometry;
+    !! collapsed dims 0:0). May be empty (lo > hi) in a dim; amr_rank_owns_block = nonempty in all active dims. The rank's fine
+    !! level covers exactly this intersection: local fine index 0 = block-global fine index 2*(amr_isect_lo - amr_region_lo).
     integer :: amr_isect_lo(3) = 0, amr_isect_hi(3) = 0
 
-    !> Number of currently-active AMR fine-patch slots (T1: forced to 1) and the working slot index selecting which slot the
-    !! per-patch machinery (advance/reflux/restrict/regrid/IO) operates on. Read by m_amr and m_amr_registers (mirrors, no
+    !> Number of currently-active AMR fine-block slots (T1: forced to 1) and the working slot index selecting which slot the
+    !! per-block machinery (advance/reflux/restrict/regrid/IO) operates on. Read by m_amr and m_amr_registers (mirrors, no
     !! use-cycle).
-    integer :: amr_num_patches = 1, amr_cur = 1
+    integer :: amr_num_blocks = 1, amr_cur = 1
 
-    !> Per-slot mirror storage (allocated 1:amr_max_patches by the AMR module): the region box, the rank's intersection, and its
-    !! ownership flag for every active patch. s_set_amr_fine_geometry writes the current slot's entry; s_amr_select_slot copies a
-    !! slot's entry back into the working mirrors above so the per-patch advance and the single coarse flux-register capture can
-    !! visit each patch in turn without a use-cycle through m_amr.
+    !> Per-slot mirror storage (allocated 1:amr_max_blocks by the AMR module): the region box, the rank's intersection, and its
+    !! ownership flag for every active block. s_set_amr_fine_geometry writes the current slot's entry; s_amr_select_slot copies a
+    !! slot's entry back into the working mirrors above so the per-block advance and the single coarse flux-register capture can
+    !! visit each block in turn without a use-cycle through m_amr.
     integer, allocatable :: amr_region_lo_all(:,:), amr_region_hi_all(:,:)
     integer, allocatable :: amr_isect_lo_all(:,:), amr_isect_hi_all(:,:)
     logical, allocatable :: amr_owns_all(:)
 
 contains
 
-    !> Make patch slot islot the working slot: set amr_cur and copy its stored mirrors (region, intersection, ownership) into the
-    !! working globals the per-patch machinery reads. Deterministic on all ranks (each holds the same slot metadata for the boxes it
-    !! intersects). No-op storage on ranks without a patch (owns = F).
+    !> Make block slot islot the working slot: set amr_cur and copy its stored mirrors (region, intersection, ownership) into the
+    !! working globals the per-block machinery reads. Deterministic on all ranks (each holds the same slot metadata for the boxes it
+    !! intersects). No-op storage on ranks without a block (owns = F).
     subroutine s_amr_select_slot(islot)
 
         integer, intent(in) :: islot
@@ -314,7 +314,7 @@ contains
         amr_cur = islot
         amr_region_lo = amr_region_lo_all(:,islot); amr_region_hi = amr_region_hi_all(:,islot)
         amr_isect_lo = amr_isect_lo_all(:,islot); amr_isect_hi = amr_isect_hi_all(:,islot)
-        amr_rank_owns_patch = amr_owns_all(islot)
+        amr_rank_owns_block = amr_owns_all(islot)
 
     end subroutine s_amr_select_slot
 
@@ -483,13 +483,13 @@ contains
         hybrid_weno_eps = 1.0e-2_wp
         hybrid_riemann = .false.
         amr = .false.
-        amr_patch_beg(:) = 0
-        amr_patch_end(:) = 0
+        amr_block_beg(:) = 0
+        amr_block_end(:) = 0
         amr_regrid_int = 0
         amr_tag_eps = 0.1_wp
         amr_buf = 3
         amr_subcycle = .false.
-        amr_max_patches = 4
+        amr_max_blocks = 4
         amr_cluster_eff = 0.7_wp
         hybrid_smooth_flux = 2
         partition_tile_size = 8
