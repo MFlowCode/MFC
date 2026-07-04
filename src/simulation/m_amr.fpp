@@ -343,16 +343,18 @@ contains
 
     !> Conservative-linear prolongation for a single variable pair. Reads coarse interior/ghost from qc; writes fine interior to qf.
     !! Minmod-limited slopes.
-    impure subroutine s_prolong_one_var(qc, qf, pos)
+    impure subroutine s_prolong_one_var(qc, qf, pos, inject)
 
         type(scalar_field), intent(in)    :: qc
         type(scalar_field), intent(inout) :: qf
-        logical, optional, intent(in)     :: pos  !< floor the child at bub_pos_frac*u0 (bubble radius-moment realizability)
+        logical, optional, intent(in)     :: pos     !< floor the child at bub_pos_frac*u0 (bubble radius-moment realizability)
+        logical, optional, intent(in)     :: inject  !< piecewise-constant (child = u0): QBMM moment realizability preservation
         integer                           :: fi, fj, fk, ci, cj, ck, ox, oy, oz
         real(wp)                          :: u0, sx, sy, sz, xix, xiy, xiz, child
-        logical                           :: floor_pos
+        logical                           :: floor_pos, pw_const
 
         floor_pos = .false.; if (present(pos)) floor_pos = pos
+        pw_const = .false.; if (present(inject)) pw_const = inject
 
         ! fine indices are LOCAL to this rank's intersection (the whole block at np=1); amr_isect_lo is
         ! GLOBAL; the coarse source qc is rank-LOCAL (identical at np=1: isect = block, start_idx = 0)
@@ -375,6 +377,9 @@ contains
                     if (n_glb > 0) sy = minmod(real(qc%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc%sf(ci, cj - 1, ck), wp))
                     sz = 0._wp
                     if (p_glb > 0) sz = minmod(real(qc%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc%sf(ci, cj, ck - 1), wp))
+                    if (pw_const) then
+                        sx = 0._wp; sy = 0._wp; sz = 0._wp
+                    end if
                     child = u0 + sx*xix + sy*xiy + sz*xiz
                     if (floor_pos) child = max(child, bub_pos_frac*u0)
                     qf%sf(fi, fj, fk) = child
@@ -397,11 +402,16 @@ contains
         do i = 1, sys_size
             if (num_fluids > 1 .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
             if (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end) cycle  ! sum/positivity closure below
-            ! bubble POSITIVE moments (radius nR, and non-polytropic partial pressure npb / vapor mass nmv) get the positivity
-            ! floor; the signed velocity moment nV (offset 1 in each bin's stride) prolongs freely
+            ! QBMM carries a bivariate 6-moment set per R0 bin whose CHyQMOM inversion requires realizability
+            ! (variance c20 = m20/m00 - (m10/m00)^2 > 0); per-component minmod prolongation can break that joint
+            ! constraint, so the whole bub block is injected piecewise-constant (each child inherits the coarse
+            ! cell's realizable moment set exactly). Non-QBMM Euler-Euler bubbles instead floor their POSITIVE
+            ! moments (radius nR, non-polytropic partial pressure npb / vapor mass nmv); the signed velocity moment
+            ! nV (offset 1 in each bin's stride) prolongs freely.
             call s_prolong_one_var(q_cons_base(i), amr_slots(amr_cur)%q_cons(i), &
-                                   & bubbles_euler .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end .and. mod(i &
-                                   & - eqn_idx%bub%beg, bstride) /= 1)
+                                   & pos=bubbles_euler .and. .not. qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end &
+                                   & .and. mod(i - eqn_idx%bub%beg, bstride) /= 1, &
+                                   & inject=qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end)
         end do
         if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
         if (chemistry) call s_prolong_species_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
@@ -863,10 +873,16 @@ contains
                             sz = 0._wp
                             if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
                                 & ck - 1), wp))
+                            ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the
+                            ! coarse cell's realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component
+                            ! minmod slopes would break that joint constraint). Non-QBMM Euler-Euler bubbles instead
+                            ! floor their positive moments (nR / npb / nmv); the signed velocity moment nV (offset 1)
+                            ! is skipped.
+                            if (qbmm .and. i >= bbeg .and. i <= bend) then
+                                sx = 0._wp; sy = 0._wp; sz = 0._wp
+                            end if
                             q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
-                            ! bubble moment realizability floor: positive moments (radius nR, non-polytropic partial pressure
-                            ! npb / vapor mass nmv) floored; the signed velocity moment nV (offset 1 in the stride) is skipped
-                            if (bubEE .and. i >= bbeg .and. i <= bend) then
+                            if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
                                 if (mod(i - bbeg, bstride) /= 1) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, fk), &
                                     & wp), bub_pos_frac*u0)
                             end if

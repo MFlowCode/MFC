@@ -224,8 +224,11 @@ PHYSICS_DOCS = {
             "Supports Euler-Euler bubbles (bubbles_euler), including non-polytropic (polytropic = F, "
             "pb/mv carried as conservative moments) and polydisperse (nb > 1) configurations: the "
             "flux-based bubble moments are refluxed and prolongation floors the positive moments "
-            "(radius, and non-polytropic partial-pressure/vapor-mass) for realizability. QBMM is not "
-            "supported (its pb/mv quadrature side-state would be corrupted by the fine advance). "
+            "(radius, and non-polytropic partial-pressure/vapor-mass) for realizability. Polytropic QBMM "
+            "(qbmm = T, polytropic = T) is supported: its six-moment set lives in the conserved variables "
+            "(pb/mv inert) and is prolonged piecewise-constant so each fine cell inherits the coarse cell's "
+            "realizable moment set (CHyQMOM needs radius variance c20 > 0). Non-polytropic QBMM is not "
+            "supported (its evolving pb/mv quadrature side-state would be corrupted by the fine advance). "
             "Supports phase change (relax): the cell-local, mass/energy-conserving relaxation runs "
             "on the fine solution before restriction (matching the coarse once-per-step timing). "
             "Supports chemistry reactions, advection, and species diffusion (single- and multi-rank): the "
@@ -1369,8 +1372,6 @@ class CaseValidator:
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
-        bubbles_euler = self.get("bubbles_euler", "F") == "T"
-        chemistry = self.get("chemistry", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         qbmm = self.get("qbmm", "F") == "T"
         ib = self.get("ib", "F") == "T"
@@ -1403,8 +1404,15 @@ class CaseValidator:
             "amr does not support elastic/surface-tension/MHD",
         )
         self.prohibit(
-            bubbles_lagrange or qbmm or ib or igr or cyl_coord,
-            "amr does not support Lagrangian bubbles/QBMM/IB/IGR/cylindrical " "(QBMM carries pb/mv quadrature side-state that the fine advance would corrupt through the global swap)",
+            bubbles_lagrange or ib or igr or cyl_coord,
+            "amr does not support Lagrangian bubbles/IB/IGR/cylindrical",
+        )
+        polytropic = self.get("polytropic", "T") == "T"  # Fortran default is .true.
+        self.prohibit(
+            qbmm and not polytropic,
+            "amr does not support non-polytropic QBMM "
+            "(its pb/mv quadrature side-state evolves as a global array that the fine advance would corrupt through the swap); "
+            "polytropic QBMM is supported (bubble moments live in q_cons, injected piecewise-constant at prolongation for CHyQMOM realizability)",
         )
         self.prohibit(active_box, "amr is incompatible with active_box")
         self.prohibit(hybrid_weno, "amr is incompatible with hybrid_weno")
