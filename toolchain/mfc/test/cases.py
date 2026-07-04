@@ -3127,6 +3127,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(3)%pres": 1.0,
             },
         )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         # (n) STATIC IMMERSED BOUNDARY (SP20): a fixed circular body resolved on a static fine block that
         # covers it. Each fine block carries its own fine-grid IB markers/ghost points computed from the
         # geometry; the fine advance applies the IB state correction on the block. buff_size is floored to
