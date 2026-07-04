@@ -97,7 +97,9 @@ contains
                        & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)")
             @:PROHIBIT(surface_tension, &
                        & "amr does not support surface_tension: the capillary force depends on the interface normal (grad-c direction), which the conservative-linearly-prolonged fine ghost color cannot reproduce consistently with the coarse solver across a 2:1 coarse/fine boundary - a growing spurious seam current results")
-            @:PROHIBIT(hypoelasticity .or. hyperelasticity .or. mhd .or. chemistry, "amr does not support elastic/MHD/chemistry")
+            @:PROHIBIT(hypoelasticity .or. hyperelasticity .or. mhd, "amr does not support elastic/MHD")
+            @:PROHIBIT(chemistry .and. chem_params%diffusion, &
+                       & "amr chemistry supports reactions and advection only; species diffusion (chem_params%diffusion = T) writes flux_src fluxes that are not captured into the coarse/fine flux registers, so it would break conservation at the block boundary")
             @:PROHIBIT(bubbles_lagrange .or. qbmm .or. ib .or. igr .or. cyl_coord, &
                        & "amr does not support Lagrangian bubbles/QBMM/IB/IGR/cylindrical")
             @:PROHIBIT(bubbles_euler .and. .not. polytropic, &

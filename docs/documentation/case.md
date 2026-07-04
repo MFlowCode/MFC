@@ -807,9 +807,20 @@ and polydisperse bubbles are not yet supported (their internal pressure / vapor-
 sub-fields and quadrature weights are not advanced on the fine level).
 Phase change (`relax`) is supported: the cell-local, mass/energy-conserving relaxation
 runs on the fine solution before restriction (matching the coarse once-per-step timing).
-It is incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles,
+Chemistry (`chemistry = T`) is supported for reactions and advection: the species partial
+densities are flux-based conserved variables refluxed through the same registers, the
+cell-local reaction source runs on the fine block through the shared RHS (matching the
+coarse per-stage timing), and prolongation rescales the species so their sum equals the
+continuity density (`sum(Y_k) = 1`, `Y_k >= 0` on the fine level by construction). Chemistry
+AMR runs single- and multi-rank: the fine block's cons->prim conversion widens over the ghost
+shell, so the temperature (the reacting-EOS Newton guess) is halo-exchanged with the coarse
+state at rank seams (mirroring the diffusion path) — without it the seam-ghost guess is
+uninitialized and the conversion diverges to NaN. Species mass diffusion (`chem_params%%diffusion
+= T`) is not supported: its source-flux terms are not captured into the coarse–fine flux registers,
+so refluxing would not conserve the diffused species mass/energy at the block boundary.
+AMR is incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles,
 polydisperse bubbles, immersed boundaries, IGR, cylindrical
-coordinates, MHD, chemistry, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
+coordinates, MHD, chemistry diffusion, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the
 block may span rank boundaries and move freely across them under dynamic regrid.

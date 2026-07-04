@@ -1923,6 +1923,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ndim in range(1, 4):
             cases.append(define_case_f(f"{ndim}D -> Chemistry -> Perfect Reactor", "examples/nD_perfect_reactor/case.py", ["--ndim", str(ndim)], mods=common_mods))
 
+        # Chemistry AMR: a reactive H2/O2/AR shocktube with a static 2:1 fine block over the reaction zone.
+        # Exercises the species sum/positivity prolongation closure, the per-block reaction on the fine level,
+        # and species reflux. The ppn=2 variant places the block (coarse 16..31) across the rank seam, exercising
+        # the fine halo exchange plus the temperature-ghost exchange the fine cons->prim Newton guess needs at
+        # the seam (without it the widened conversion diverges to NaN).
+        amr_chem_mods = {
+            "m": 48,
+            "t_step_start": 0,
+            "t_step_stop": 20,
+            "t_step_save": 20,
+            "amr": "T",
+            "amr_block_beg(1)": 16,
+            "amr_block_end(1)": 31,
+            "amr_regrid_int": 0,
+        }
+        for ppn, label in ((1, "Reactive Shocktube AMR"), (2, "Reactive Shocktube AMR -> 2 MPI Ranks")):
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> {label}",
+                    "examples/1D_reactive_shocktube/case.py",
+                    [],
+                    ppn=ppn,
+                    mods=amr_chem_mods,
+                    override_tol=10 ** (-8),
+                )
+            )
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
