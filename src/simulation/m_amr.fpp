@@ -18,6 +18,7 @@ module m_amr
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, &
         & s_mpi_sendrecv_variables_buffers
     use m_rhs, only: s_compute_rhs
+    use m_phase_change, only: s_infinite_relaxation_k
     use m_amr_registers, only: s_amr_zero_fine_registers
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
 
@@ -27,7 +28,8 @@ module m_amr
     public :: t_level, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
         & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_advance_amr_fine_substeps, &
-        & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart
+        & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, &
+        & s_amr_relax_fine
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -552,6 +554,20 @@ contains
         if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
+
+    !> Apply phase-change relaxation (relax) to the current fine block's interior, BEFORE restriction. Relaxation is a cell-local,
+    !! mass/energy-conserving equilibration (no stencil, no ghosts), so it needs no coarse/fine coupling: it just runs over the fine
+    !! interior. Swaps m/n/p to the fine extents so s_infinite_relaxation_k's 0:m,0:n,0:p loop covers this block. Matches the coarse
+    !! timing (once per full step; the coarse relax runs once after s_tvd_rk on q_cons_ts(1)) but on the fine solution so the fine
+    !! dynamics equilibrate at fine resolution rather than only the restricted coarse average.
+    impure subroutine s_amr_relax_fine()
+
+        if (.not. amr_rank_owns_block) return
+        call s_amr_swap_to_fine()
+        call s_infinite_relaxation_k(amr_slots(amr_cur)%q_cons)
+        call s_amr_restore_coarse()
+
+    end subroutine s_amr_relax_fine
 
     !> Device restriction kernel over all sys_size variable pairs (fine source qf -> coarse target qc).
     impure subroutine s_restrict_all_vars(qf, qc)

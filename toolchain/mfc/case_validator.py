@@ -224,9 +224,11 @@ PHYSICS_DOCS = {
             "Supports monodisperse (nb = 1) polytropic Euler-Euler bubbles (bubbles_euler with "
             "polytropic = T; the flux-based bubble moments are refluxed and prolongation floors "
             "the radius moments for realizability). "
+            "Supports phase change (relax): the cell-local, mass/energy-conserving relaxation runs "
+            "on the fine solution before restriction (matching the coarse once-per-step timing). "
             "Incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles, "
             "polydisperse bubbles, "
-            "phase change, immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, "
+            "immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry, "
             "hybrid_weno, hybrid_riemann, active_box, and acoustic_source. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
@@ -1364,7 +1366,6 @@ class CaseValidator:
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         qbmm = self.get("qbmm", "F") == "T"
-        relax = self.get("relax", "F") == "T"
         ib = self.get("ib", "F") == "T"
         igr = self.get("igr", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
@@ -1395,8 +1396,8 @@ class CaseValidator:
             "amr does not support elastic/surface-tension/MHD/chemistry",
         )
         self.prohibit(
-            bubbles_lagrange or qbmm or relax or ib or igr or cyl_coord,
-            "amr does not support Lagrangian bubbles/QBMM/phase-change/IB/IGR/cylindrical",
+            bubbles_lagrange or qbmm or ib or igr or cyl_coord,
+            "amr does not support Lagrangian bubbles/QBMM/IB/IGR/cylindrical",
         )
         polytropic = self.get("polytropic", "T") == "T"
         polydisperse = self.get("polydisperse", "F") == "T"

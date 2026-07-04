@@ -97,8 +97,8 @@ contains
                        & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)")
             @:PROHIBIT(surface_tension .or. hypoelasticity .or. hyperelasticity .or. mhd .or. chemistry, &
                        & "amr does not support elastic/surface-tension/MHD/chemistry")
-            @:PROHIBIT(bubbles_lagrange .or. qbmm .or. relax .or. ib .or. igr .or. cyl_coord, &
-                       & "amr does not support Lagrangian bubbles/QBMM/phase-change/IB/IGR/cylindrical")
+            @:PROHIBIT(bubbles_lagrange .or. qbmm .or. ib .or. igr .or. cyl_coord, &
+                       & "amr does not support Lagrangian bubbles/QBMM/IB/IGR/cylindrical")
             @:PROHIBIT(bubbles_euler .and. .not. polytropic, &
                        & "amr Euler-Euler bubbles require polytropic = T (non-polytropic pb/mv advance is unvalidated with the fine level)")
             @:PROHIBIT(bubbles_euler .and. (polydisperse .or. nb > 1), &
