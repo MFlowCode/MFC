@@ -215,7 +215,7 @@ a diagnostic message for unsupported combinations.
 | QBMM bubbles (polytropic) | Supported | Bubble moments live in `q_cons`, injected piecewise-constant at prolongation to preserve CHyQMOM realizability |
 | QBMM bubbles (non-polytropic) | **Not supported** | `pb`/`mv` quadrature side-state is a global array the fine advance would corrupt through the swap |
 | Lagrangian bubbles | **Not supported** | Lagrangian tracking not advanced on the fine level |
-| Immersed boundaries (`ib = T`; static, single, non-STL body; `amr_regrid_int = 0`) | Supported | Per-block fine-grid IB markers/ghost points; non-conservative ghost-cell forcing at the body; moving/multi-body/STL/dynamic-regrid gated; a body spanning a rank seam is rejected at startup |
+| Immersed boundaries (`ib = T`; single non-STL body, static or prescribed-motion `moving_ibm=1`; `amr_regrid_int = 0`) | Supported | Per-block fine-grid IB markers/ghost points, rebuilt each fine substage at the body's sub-time position for a moving body; non-conservative ghost-cell forcing at the body; force-driven (`moving_ibm=2`)/multi-body/STL/dynamic-regrid gated; a body spanning a rank seam is rejected at startup |
 | IGR solver | **Not supported** | Unvalidated with the fine-level advance |
 | Cylindrical / axisymmetric coordinates | **Not supported** | Unvalidated with the fine-level advance |
 | `active_box` | **Not supported** | Unvalidated combination |

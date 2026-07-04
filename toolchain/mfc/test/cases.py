@@ -3062,7 +3062,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(3)%pres": 1.0,
             },
         )
-        cases.append(define_case_d(stack, "", {}))
+        # override_tol: the non-polytropic bubble source is a stiff cell-local ODE whose GPU float-reassociation
+        # differs from CPU by ~1e-10 (well under its documented ~7e-10 model-level conservation defect), so the
+        # default 1e-10 IB/bubble tolerance is unrealistically tight for this case on GPU lanes.
+        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-9)))
         stack.pop()
 
         # (l) Euler-Euler bubbles, QBMM + polytropic (SP19): nb=3 R0 bins, each carrying a bivariate
@@ -3171,6 +3174,69 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_ib(1)%slip": "F",
                 # static fine block covering the body (2:1)
                 "amr": "T",
+                "amr_block_beg(1)": 20,
+                "amr_block_beg(2)": 20,
+                "amr_block_end(1)": 43,
+                "amr_block_end(2)": 43,
+                "amr_regrid_int": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (o) PRESCRIBED-MOTION MOVING IMMERSED BOUNDARY (SP21): a single circular body translating at a
+        # prescribed velocity (moving_ibm=1) through quiescent flow, resolved on a STATIC fine block that
+        # contains its whole trajectory. Each fine RK substage rebuilds the block's IB markers/ghost points
+        # at the body's sub-time position (the same linear time-interpolation the subcycle applies to the
+        # fluid ghosts). Exercises the per-substep fine-IB recompute and subcycled body-time consistency;
+        # force-driven motion (moving_ibm=2) stays gated under amr.
+        stack.push(
+            "AMR -> 2D -> moving IBM circle",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-3,
+                "t_step_stop": 20,
+                "t_step_save": 20,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                # quiescent uniform flow; the body's prescribed motion is the sole driver
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # circular body at the domain center translating in +y (prescribed, moving_ibm=1)
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.1,
+                "patch_ib(1)%slip": "F",
+                "patch_ib(1)%moving_ibm": 1,
+                "patch_ib(1)%vel(2)": 1.0,
+                # static fine block containing the body's whole trajectory (2:1)
+                "amr": "T",
+                "amr_subcycle": "T",
                 "amr_block_beg(1)": 20,
                 "amr_block_beg(2)": 20,
                 "amr_block_end(1)": 43,

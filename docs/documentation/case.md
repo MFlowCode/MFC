@@ -837,9 +837,12 @@ advance applies the ghost-cell IB state correction on the block after each RK up
 the coarse per-stage timing). A fixed body placed inside a static block is thus resolved on the
 refined level. The IB forcing is non-conservative by construction (the ghost-cell method injects
 mass/momentum/energy at the body), so the conservation defect is nonzero in the body region while
-the flux reflux still conserves to machine precision away from it. Limited to a single, non-moving,
-non-STL body on a static block (`amr_regrid_int = 0`); moving IB, multi-body, STL geometry, and
-dynamic regrid with IB are gated pending validation. Under MPI a body contained within one rank's
+the flux reflux still conserves to machine precision away from it. A body in prescribed motion
+(`moving_ibm = 1`) is also supported: the fine block's IB markers/ghost points are rebuilt each fine
+RK substage at the body's sub-time position (the same linear time interpolation the subcycle applies
+to the fluid ghosts), so the refined body tracks its prescribed trajectory. Limited to a single
+non-STL body on a static block (`amr_regrid_int = 0`); force-driven motion (`moving_ibm = 2`),
+multi-body, STL geometry, and dynamic regrid with IB are gated pending validation. Under MPI a body contained within one rank's
 subdomain is bit-exact across decompositions; a body spanning a rank seam is rejected at startup
 (the fine-IB image-point stencil across the seam is not yet decomposition-exact), so keep the body
 inside a single rank's subdomain (use fewer ranks or reposition it).
