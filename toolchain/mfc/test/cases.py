@@ -2736,6 +2736,37 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (f) multi-patch (SP12a): three constant states with density interfaces at x=0.25 (cell 16)
+        # and x=0.75 (cell 48) -- two features ~32 coarse cells apart (> buff_size + 2*amr_buf), so the
+        # Berger-Rigoutsos clustering forms TWO patches (one per interface) rather than one bounding box
+        # spanning both plus the empty middle. Uniform pressure so the interfaces stay put; regrid on.
+        # Exercises the per-slot advance + the single coarse-RHS flux-register capture filling both
+        # patches' registers (the whole SP12a capability).
+        stack.push(
+            "AMR -> 1D -> multi-patch",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_max_patches": 4,
+                "patch_icpp(1)%x_centroid": 0.125,
+                "patch_icpp(1)%length_x": 0.25,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%alpha_rho(1)": 0.2,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%x_centroid": 0.875,
+                "patch_icpp(3)%length_x": 0.25,
+                "patch_icpp(3)%alpha_rho(1)": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     add_convergence_cases(cases)

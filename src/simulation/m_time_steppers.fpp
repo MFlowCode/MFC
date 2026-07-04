@@ -504,13 +504,14 @@ contains
             ! afterwards so the next stage's coarse RHS captures creg into slot 1.
             if (amr .and. .not. amr_subcycle) then
                 do amr_cur = 1, amr_num_patches
+                    call s_amr_select_slot(amr_cur)  ! refresh the region/intersection mirrors for this patch
                     call s_advance_amr_fine_stage(s, rk_coef(s,:), q_cons_ts(1)%vf, bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, &
                                                   & mv_ts(1)%sf, rhs_mv, t_step, time_avg)
                     ! freg slices of rank-boundary patch faces move to the outside rank (ALL ranks call; no-op at np=1)
                     call s_mpi_sendrecv_amr_reflux_faces()
                     call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
                 end do
-                amr_cur = 1
+                call s_amr_select_slot(1)
             end if
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
@@ -601,6 +602,7 @@ contains
             ! the substep/restriction/reflux machinery runs as device kernels (M2). Each active patch slot
             ! (T1: one) is subcycled, restricted, and state-refluxed in turn; amr_cur resets to 1 afterwards.
             do amr_cur = 1, amr_num_patches
+                call s_amr_select_slot(amr_cur)  ! refresh the region/intersection mirrors for this patch
                 if (amr_subcycle) then
                     call s_advance_amr_fine_substeps(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, pb_ts(1)%sf, &
                                                      & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)
@@ -610,7 +612,7 @@ contains
                 if (amr_subcycle) call s_mpi_sendrecv_amr_reflux_faces()
                 if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
             end do
-            amr_cur = 1
+            call s_amr_select_slot(1)
         end if
 
 #ifdef MFC_DEBUG

@@ -118,6 +118,9 @@ contains
             @:PROHIBIT(amr_regrid_int < 0, "amr_regrid_int must be >= 0")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_tag_eps <= 0._wp, "amr_tag_eps must be > 0 when regridding")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
+            @:PROHIBIT(amr_max_patches < 1, "amr_max_patches must be >= 1")
+            @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
+                       & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
         end if
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")

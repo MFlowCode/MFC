@@ -294,7 +294,29 @@ module m_global_parameters
     !! use-cycle).
     integer :: amr_num_patches = 1, amr_cur = 1
 
+    !> Per-slot mirror storage (allocated 1:amr_max_patches by the AMR module): the region box, the rank's intersection, and its
+    !! ownership flag for every active patch. s_set_amr_fine_geometry writes the current slot's entry; s_amr_select_slot copies a
+    !! slot's entry back into the working mirrors above so the per-patch advance and the single coarse flux-register capture can
+    !! visit each patch in turn without a use-cycle through m_amr.
+    integer, allocatable :: amr_region_lo_all(:,:), amr_region_hi_all(:,:)
+    integer, allocatable :: amr_isect_lo_all(:,:), amr_isect_hi_all(:,:)
+    logical, allocatable :: amr_owns_all(:)
+
 contains
+
+    !> Make patch slot islot the working slot: set amr_cur and copy its stored mirrors (region, intersection, ownership) into the
+    !! working globals the per-patch machinery reads. Deterministic on all ranks (each holds the same slot metadata for the boxes it
+    !! intersects). No-op storage on ranks without a patch (owns = F).
+    subroutine s_amr_select_slot(islot)
+
+        integer, intent(in) :: islot
+
+        amr_cur = islot
+        amr_region_lo = amr_region_lo_all(:,islot); amr_region_hi = amr_region_hi_all(:,islot)
+        amr_isect_lo = amr_isect_lo_all(:,islot); amr_isect_hi = amr_isect_hi_all(:,islot)
+        amr_rank_owns_patch = amr_owns_all(islot)
+
+    end subroutine s_amr_select_slot
 
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
     !! parameters once they are read from the input file.
@@ -468,6 +490,7 @@ contains
         amr_buf = 3
         amr_subcycle = .false.
         amr_max_patches = 4
+        amr_cluster_eff = 0.7_wp
         hybrid_smooth_flux = 2
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.

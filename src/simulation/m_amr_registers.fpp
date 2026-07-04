@@ -132,7 +132,7 @@ contains
         type(vector_field), intent(in) :: flux_dir
         type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
-        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2, islot
+        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2, islot, save_cur
         integer                        :: sidx(3), ext(3)
         logical                        :: own_lo(3), own_hi(3), cap_lo, cap_hi
         real(wp)                       :: coef
@@ -235,110 +235,117 @@ contains
             ! relative to this rank's patch INTERSECTION (o1/o2 = local transverse origins), aligned with the
             ! fine registers: the fine children of isect-relative cell t are faces 2*t and 2*t+1. At np=1 the
             ! intersection is the patch and both flags hold, recovering the single-rank behavior exactly.
-            call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
-            cap_lo = own_lo(id); cap_hi = own_hi(id)
-            if (.not. (cap_lo .or. cap_hi)) return
-            select case (id)
-            case (1); jlo = amr_region_lo(1) - 1 - sidx(1); jhi = amr_region_hi(1) - sidx(1)
-                t1_hi = amr_isect_hi(2) - amr_isect_lo(2); o1 = amr_isect_lo(2) - sidx(2)
-                t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
-            case (2); jlo = amr_region_lo(2) - 1 - sidx(2); jhi = amr_region_hi(2) - sidx(2)
-                t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
-                t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
-            case (3); jlo = amr_region_lo(3) - 1 - sidx(3); jhi = amr_region_hi(3) - sidx(3)
-                t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
-                t2_hi = amr_isect_hi(2) - amr_isect_lo(2); o2 = amr_isect_lo(2) - sidx(2)
-            end select
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do t2 = 0, t2_hi
-                do t1 = 0, t1_hi
-                    do eq = 1, sys_size
-                        select case (id)
-                        case (1)
-                            if (cap_lo) then
-                                if (accum) then
-                                    creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
-                                else
-                                    creg(1)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
-                                end if
-                            end if
-                            if (cap_hi) then
-                                if (accum) then
-                                    creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
-                                else
-                                    creg(1)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
-                                end if
-                            end if
-                        case (2)
-                            if (cap_lo) then
-                                if (accum) then
-                                    creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
-                                else
-                                    creg(2)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
-                                end if
-                            end if
-                            if (cap_hi) then
-                                if (accum) then
-                                    creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
-                                else
-                                    creg(2)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
-                                end if
-                            end if
-                        case (3)
-                            if (cap_lo) then
-                                if (accum) then
-                                    creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
-                                else
-                                    creg(3)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
-                                end if
-                            end if
-                            if (cap_hi) then
-                                if (accum) then
-                                    creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
-                                         & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
-                                else
-                                    creg(3)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
-                                end if
-                            end if
-                        end select
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-            ! total-flux matching (coarse side): add viscous momentum/energy face fluxes into creg, same
-            ! face gating and transverse offsets as the base capture; always accumulate.
-            if (viscous) then
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do t2 = 0, t2_hi
-                    do t1 = 0, t1_hi
-                        do eq = eqn_idx%mom%beg, eqn_idx%E
-                            select case (id)
-                            case (1)
-                                if (cap_lo) creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
-                                if (cap_hi) creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
-                            case (2)
-                                if (cap_lo) creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
-                                if (cap_hi) creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
-                            case (3)
-                                if (cap_lo) creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
-                                if (cap_hi) creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
-                                    & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
-                            end select
+            ! ONE coarse s_compute_rhs pass fills EVERY active patch's registers: revisit each slot's region+intersection in turn.
+            save_cur = amr_cur
+            do islot = 1, amr_num_patches
+                call s_amr_select_slot(islot)
+                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+                cap_lo = own_lo(id); cap_hi = own_hi(id)
+                if (cap_lo .or. cap_hi) then
+                    select case (id)
+                    case (1); jlo = amr_region_lo(1) - 1 - sidx(1); jhi = amr_region_hi(1) - sidx(1)
+                        t1_hi = amr_isect_hi(2) - amr_isect_lo(2); o1 = amr_isect_lo(2) - sidx(2)
+                        t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
+                    case (2); jlo = amr_region_lo(2) - 1 - sidx(2); jhi = amr_region_hi(2) - sidx(2)
+                        t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
+                        t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
+                    case (3); jlo = amr_region_lo(3) - 1 - sidx(3); jhi = amr_region_hi(3) - sidx(3)
+                        t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
+                        t2_hi = amr_isect_hi(2) - amr_isect_lo(2); o2 = amr_isect_lo(2) - sidx(2)
+                    end select
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do t2 = 0, t2_hi
+                        do t1 = 0, t1_hi
+                            do eq = 1, sys_size
+                                select case (id)
+                                case (1)
+                                    if (cap_lo) then
+                                        if (accum) then
+                                            creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                        else
+                                            creg(1)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                        end if
+                                    end if
+                                    if (cap_hi) then
+                                        if (accum) then
+                                            creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                        else
+                                            creg(1)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                        end if
+                                    end if
+                                case (2)
+                                    if (cap_lo) then
+                                        if (accum) then
+                                            creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                        else
+                                            creg(2)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                        end if
+                                    end if
+                                    if (cap_hi) then
+                                        if (accum) then
+                                            creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                        else
+                                            creg(2)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                        end if
+                                    end if
+                                case (3)
+                                    if (cap_lo) then
+                                        if (accum) then
+                                            creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                        else
+                                            creg(3)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                        end if
+                                    end if
+                                    if (cap_hi) then
+                                        if (accum) then
+                                            creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
+                                                 & islot) + coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                        else
+                                            creg(3)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                        end if
+                                    end if
+                                end select
+                            end do
                         end do
                     end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+                    $:END_GPU_PARALLEL_LOOP()
+                    ! total-flux matching (coarse side): add viscous momentum/energy face fluxes into creg, same
+                    ! face gating and transverse offsets as the base capture; always accumulate.
+                    if (viscous) then
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do t2 = 0, t2_hi
+                            do t1 = 0, t1_hi
+                                do eq = eqn_idx%mom%beg, eqn_idx%E
+                                    select case (id)
+                                    case (1)
+                                        if (cap_lo) creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                        if (cap_hi) creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                    case (2)
+                                        if (cap_lo) creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                        if (cap_hi) creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                    case (3)
+                                        if (cap_lo) creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                        if (cap_hi) creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                    end select
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                end if  ! cap_lo .or. cap_hi
+            end do
+            call s_amr_select_slot(save_cur)
         end if
 
     end subroutine s_amr_capture_boundary_flux

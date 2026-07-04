@@ -684,6 +684,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `amr_buf`               | Integer | Coarse-cell padding around tagged cells when regridding (default 3) |
 | `amr_subcycle`          | Logical | Advance the coarse level at the case dt and the fine level at dt/2 (two substeps; Berger-Colella refluxing). Requires `amr`; incompatible with `cfl_dt`. |
 | `amr_max_patches`       | Integer | Number of fixed refined-patch slots preallocated (each max-patch sized; ~N x device memory); must be >= 1 (default 4) |
+| `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered patch box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
 | `hybrid_weno`           | Logical | Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities (requires WENO reconstruction) |
 | `hybrid_weno_eps`       | Real    | Smoothness threshold for hybrid WENO shock flagging; must be > 0 (default 1e-2) |
 | `hybrid_riemann`        | Logical | Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq) |
@@ -811,9 +812,13 @@ advance reuses the rank-local solver scratch).
 Setting `amr_regrid_int = 0` fixes the patch at the initial `amr_patch_beg`/`amr_patch_end`
 position for the entire run (useful for convergence studies or GPU correctness testing).
 Setting `amr_regrid_int > 0` triggers dynamic regrid every that many coarse steps:
-cells whose normalized density gradient exceeds `amr_tag_eps` are tagged, grown by
-`amr_buf` coarse cells of buffer padding, and the fine patch is rebuilt to span the
-resulting bounding box.
+cells whose normalized density gradient exceeds `amr_tag_eps` are tagged, then clustered
+by a Berger–Rigoutsos recursive bisection into a list of separated patch boxes (each grown
+by `amr_buf` coarse cells of buffer padding). Boxes whose padded extents would come within
+`buff_size` of each other are merged, so separated features get their own refined box while
+nearby ones stay a single box (guaranteeing no fine–fine adjacency). Splitting stops once a
+box's tag efficiency (tagged/total cells) reaches `amr_cluster_eff`; the number of patches
+is capped at `amr_max_patches`.
 A positive `amr_tag_eps` and `amr_buf >= 1` are required whenever regridding is active.
 
 **Subcycling.**
@@ -829,8 +834,8 @@ after each coarse step.
 for the run. Each slot is sized to the maximum patch extent, so `N` slots require roughly
 `N` times the device memory of a single patch; the goal is the compute win of refining
 separated features independently, and memory efficiency (compact per-patch pools) is a
-follow-up. The current release populates a single slot; multi-patch clustering is
-forthcoming.
+follow-up. Dynamic regrid clusters the tagged cells into up to `amr_max_patches` separated
+boxes (`amr_cluster_eff` sets the min tag efficiency each box reaches before splitting stops).
 
 **Restart.**
 Each save step writes a fine-level AMR restart file alongside the level-0 restart data
@@ -857,6 +862,7 @@ visualization output is future work.
 | `amr_buf`               | Integer | Coarse-cell padding around tagged cells; must be >= 1 when `amr_regrid_int > 0` (default 3) |
 | `amr_subcycle`          | Logical | Advance fine level at dt/2 (two substeps per coarse step) with Berger–Colella refluxing |
 | `amr_max_patches`       | Integer | Number of fixed refined-patch slots preallocated (each max-patch sized; ~N x device memory); must be >= 1 (default 4) |
+| `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered patch box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
 
 ### 8. Acoustic Source {#sec-acoustic-source}
 
