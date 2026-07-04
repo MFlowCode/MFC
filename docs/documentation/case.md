@@ -816,6 +816,23 @@ block may span rank boundaries and move freely across them under dynamic regrid.
 The block may cover at most about half of any rank's subdomain per dimension (the fine
 advance reuses the rank-local solver scratch).
 
+**AMR + surface tension (unsupported).**
+Surface tension (`surface_tension = T`) is prohibited under AMR. *What works:* the capillary
+contribution is a face flux captured into the same coarse–fine registers as the advective
+flux, so it is refluxed conservatively — conservation is structural (mass and energy defects
+stay at machine precision regardless of the fine-side treatment). *What fails:* the capillary
+stress is normalized (∝ 1/|∇c|), so it depends on the interface-normal *direction*, not the
+gradient magnitude. Across a 2:1 coarse/fine boundary the conservative-linearly-prolonged fine
+ghost color cannot reproduce the coarse solver's interface normal, producing a growing spurious
+seam current. Every fine-block fix attempted failed: opening the capillary reflux gate alone
+(~540x baseline seam velocity, exponential), a smoothstep ramp suppressing the fine capillary
+force near the seam (~27x, bounded-linear, width-invariant), and a coarse-spacing gradient blend
+of the prolonged color (~556x, growing) — all leave a force imbalance from the inconsistent
+interface normal rather than a curvature spike that can be damped. *What might fix it:* capturing
+the native coarse-computed capillary force Ω in a per-block band during the coarse RHS, prolonging
+it to the fine boundary layer, and blending the force there — large and uncertain, and the
+diffuse-interface 2:1 normal inconsistency may be fundamental.
+
 **Static vs. dynamic block.**
 Setting `amr_regrid_int = 0` fixes the block at the initial `amr_block_beg`/`amr_block_end`
 position for the entire run (useful for convergence studies or GPU correctness testing).
