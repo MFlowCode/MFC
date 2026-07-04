@@ -840,9 +840,9 @@ mass/momentum/energy at the body), so the conservation defect is nonzero in the 
 the flux reflux still conserves to machine precision away from it. Limited to a single, non-moving,
 non-STL body on a static block (`amr_regrid_int = 0`); moving IB, multi-body, STL geometry, and
 dynamic regrid with IB are gated pending validation. Under MPI a body contained within one rank's
-subdomain is bit-exact across decompositions; a body spanning a rank seam is stable but shows a
-small, localized difference at the body surface (the fine-IB image-point stencil across the seam is
-not yet decomposition-exact).
+subdomain is bit-exact across decompositions; a body spanning a rank seam is rejected at startup
+(the fine-IB image-point stencil across the seam is not yet decomposition-exact), so keep the body
+inside a single rank's subdomain (use fewer ranks or reposition it).
 AMR is incompatible with surface tension, Lagrangian bubbles, non-polytropic QBMM,
 IGR, cylindrical
 coordinates, MHD, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.

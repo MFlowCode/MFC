@@ -212,8 +212,10 @@ a diagnostic message for unsupported combinations.
 | Chemistry — reactions + advection + diffusion (`chemistry = T`) | Supported | Species sum/positivity closure on prolongation; temperature ghost exchanged at rank seams; diffusion fluxes refluxed like viscous |
 | Surface tension (`surface_tension = T`) | **Not supported** | The capillary force depends on the interface-normal direction; the prolonged fine ghost color cannot reproduce the coarse normal across a 2:1 boundary, producing a growing spurious seam current. See @ref case section 7.1. |
 | Hypoelasticity / hyperelasticity / MHD | **Not supported** | Unvalidated with the fine-level advance |
-| Lagrangian bubbles / QBMM | **Not supported** | Lagrangian tracking / quadrature side-state not advanced on the fine level |
-| Immersed boundaries (`ib = T`) | **Not supported** | Unvalidated with the fine-level advance |
+| QBMM bubbles (polytropic) | Supported | Bubble moments live in `q_cons`, injected piecewise-constant at prolongation to preserve CHyQMOM realizability |
+| QBMM bubbles (non-polytropic) | **Not supported** | `pb`/`mv` quadrature side-state is a global array the fine advance would corrupt through the swap |
+| Lagrangian bubbles | **Not supported** | Lagrangian tracking not advanced on the fine level |
+| Immersed boundaries (`ib = T`; static, single, non-STL body; `amr_regrid_int = 0`) | Supported | Per-block fine-grid IB markers/ghost points; non-conservative ghost-cell forcing at the body; moving/multi-body/STL/dynamic-regrid gated; a body spanning a rank seam is rejected at startup |
 | IGR solver | **Not supported** | Unvalidated with the fine-level advance |
 | Cylindrical / axisymmetric coordinates | **Not supported** | Unvalidated with the fine-level advance |
 | `active_box` | **Not supported** | Unvalidated combination |
