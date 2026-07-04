@@ -816,11 +816,13 @@ AMR runs single- and multi-rank: the fine block's cons->prim conversion widens o
 shell, so the temperature (the reacting-EOS Newton guess) is halo-exchanged with the coarse
 state at rank seams (mirroring the diffusion path) — without it the seam-ghost guess is
 uninitialized and the conversion diverges to NaN. Species mass diffusion (`chem_params%%diffusion
-= T`) is not supported: its source-flux terms are not captured into the coarse–fine flux registers,
-so refluxing would not conserve the diffused species mass/energy at the block boundary.
+= T`) is also supported: the mixture-averaged species mass fluxes (and the thermal-conduction +
+enthalpy energy flux) travel through the source-flux array and are captured into the same coarse–fine
+registers as the advective fluxes — like the viscous stress fluxes — so element mass and total
+energy conserve across the block boundary through refluxed, subcycled, and regridded advances.
 AMR is incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles,
 polydisperse bubbles, immersed boundaries, IGR, cylindrical
-coordinates, MHD, chemistry diffusion, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
+coordinates, MHD, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the
 block may span rank boundaries and move freely across them under dynamic regrid.

@@ -1950,6 +1950,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # Chemistry diffusion AMR: reactions + species mass diffusion with the same static block over the
+        # reaction/diffusion zone. Exercises the flux_src reflux of the species (and energy) diffusion
+        # fluxes into the coarse/fine registers - without it element mass/energy leak at the block boundary.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Reactive Shocktube AMR -> Species Diffusion",
+                "examples/1D_reactive_shocktube/case.py",
+                [],
+                ppn=1,
+                mods={**amr_chem_mods, "chem_params%diffusion": "T"},
+                override_tol=10 ** (-8),
+            )
+        )
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
