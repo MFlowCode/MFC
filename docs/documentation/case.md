@@ -799,12 +799,16 @@ that interface inconsistency is bounded and conservation is enforced by the flux
 matching. The density-gradient regrid tagger does not sense shear or boundary layers well,
 so viscous features may need a static or generously buffered block (error-estimator taggers
 are future work).
-Monodisperse (`nb = 1`) polytropic Euler-Euler bubbles (`bubbles_euler = T` with
-`polytropic = T`) are supported: the bubble moments are flux-based conserved variables
-refluxed through the same registers, and prolongation floors the radius moment so the
-reconstructed radius and number density stay positive (realizability). QBMM, non-polytropic,
-and polydisperse bubbles are not yet supported (their internal pressure / vapor-mass
-sub-fields and quadrature weights are not advanced on the fine level).
+Euler-Euler bubbles (`bubbles_euler = T`) are supported, including non-polytropic
+(`polytropic = F`) and polydisperse (`nb > 1`) configurations: the bubble moments — radius,
+velocity, and, for non-polytropic, partial pressure and vapor mass, per R0 bin — are all
+flux-based conserved variables refluxed through the same registers, so no separate side-state
+is carried on the fine level. Prolongation floors every positive moment (radius, and the
+non-polytropic partial-pressure / vapor-mass moments) while leaving the signed velocity moment
+free, so the reconstructed radius, number density, internal pressure, and vapor mass stay
+non-negative (realizability). QBMM is not supported: it carries the per-quadrature-node
+internal pressure and vapor mass as a global side-array (pb/mv) that the fine advance would
+overwrite through the global grid swap, corrupting the coarse bubble state.
 Phase change (`relax`) is supported: the cell-local, mass/energy-conserving relaxation
 runs on the fine solution before restriction (matching the coarse once-per-step timing).
 Chemistry (`chemistry = T`) is supported for reactions and advection: the species partial
@@ -820,8 +824,8 @@ uninitialized and the conversion diverges to NaN. Species mass diffusion (`chem_
 enthalpy energy flux) travel through the source-flux array and are captured into the same coarse–fine
 registers as the advective fluxes — like the viscous stress fluxes — so element mass and total
 energy conserve across the block boundary through refluxed, subcycled, and regridded advances.
-AMR is incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles,
-polydisperse bubbles, immersed boundaries, IGR, cylindrical
+AMR is incompatible with surface tension, Lagrangian bubbles, QBMM,
+immersed boundaries, IGR, cylindrical
 coordinates, MHD, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the
