@@ -188,11 +188,49 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
         if [ "${GITHUB_ACTIONS:-}" = "true" ] && [ -w "${TMPDIR:-/tmp}" ]; then
             export UV_CACHE_DIR="${TMPDIR:-/tmp}/uv-cache-${USER:-$(id -un)}"
         fi
+
+        # uv's cache (~/.cache/uv by default, or the node-local redirect above
+        # in CI) is shared per-user across every repo/worktree/matrix leg. uv's
+        # own cache lock protects individual entries, but concurrent installs
+        # from separate uv processes can still race while one extracts/prunes
+        # the shared archive-v0 store, leaving a corrupted entry (e.g. a
+        # missing dist-info METADATA file) that fails every subsequent install
+        # until the cache is manually cleared -- both across self-hosted CI
+        # matrix legs (Frontier, Phoenix) sharing a login node, and across
+        # concurrent local builds by the same user. Serialize the install
+        # call itself so only one uv process touches a given cache dir at a
+        # time. Fall back to /tmp for the lock file itself if TMPDIR isn't
+        # writable (e.g. a stale TMPDIR left over from a prior job's
+        # since-deleted scratch dir), so a bad TMPDIR can't break installs
+        # that used to work fine before this lock existed.
+        UV_LOCK_DIR="${TMPDIR:-/tmp}"
+        [ -d "$UV_LOCK_DIR" ] && [ -w "$UV_LOCK_DIR" ] || UV_LOCK_DIR=/tmp
+        UV_INSTALL_LOCK="${UV_LOCK_DIR}/mfc-uv-install-${USER:-$(id -un)}.lock"
+        if command -v flock > /dev/null 2>&1; then
+            uv_install() { flock "$UV_INSTALL_LOCK" uv pip install "$@"; }
+        else
+            uv_install() { uv pip install "$@"; }
+        fi
+
+        # A cache entry corrupted before this lock existed (or by any other
+        # cause) will otherwise fail every subsequent install until someone
+        # notices and clears the cache by hand -- which is exactly what
+        # happened here (a stale corrupted entry on a self-hosted runner kept
+        # failing across multiple PRs before anyone caught it). Self-heal: on
+        # the first failure, clear the cache and retry once before giving up.
+        uv_install_with_retry() {
+            if uv_install "$@"; then
+                return 0
+            fi
+            warn "(venv) uv install failed; clearing the uv cache and retrying once, in case a corrupted cache entry is the cause..."
+            uv cache clean > /dev/null 2>&1 || true
+            uv_install "$@"
+        }
         log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
 
         if [ "$verbose" = "1" ]; then
             # Verbose mode: show full uv output
-            if uv pip install "$(pwd)/toolchain"; then
+            if uv_install_with_retry "$(pwd)/toolchain"; then
                 ok "(venv) Installation succeeded."
                 cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
             else
@@ -203,7 +241,7 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
             fi
         else
             # Default: show progress but filter out individual package lines (+ pkg==ver)
-            uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1
+            uv_install_with_retry "$(pwd)/toolchain" > "$PIP_LOG" 2>&1
             UV_EXIT=$?
             # Show filtered output (progress info without package list)
             # Filter out lines like " + pkg==1.0", " - pkg==1.0", " ~ pkg==1.0"
