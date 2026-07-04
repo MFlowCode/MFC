@@ -237,8 +237,13 @@ PHYSICS_DOCS = {
             "realizability. Species diffusion (chem_params%diffusion) is refluxed too: its species mass "
             "fluxes (and thermal-conduction/enthalpy energy flux) travel through flux_src and are captured "
             "into the coarse/fine registers, so element mass and energy conserve across the block boundary. "
+            "Supports static immersed boundaries (ib): each fine block carries its own fine-grid "
+            "markers/ghost points computed from the body geometry, and the fine advance applies the IB "
+            "state correction on the block, so a fixed body is resolved on the refined level. Limited to "
+            "a single, non-moving, non-STL body on a static block (amr_regrid_int = 0); moving/multi-body/"
+            "STL IB and dynamic-regrid-with-IB are gated pending validation. "
             "Incompatible with surface tension, Lagrangian bubbles, QBMM, "
-            "immersed boundaries, IGR, cylindrical coordinates, MHD, "
+            "IGR, cylindrical coordinates, MHD, "
             "hybrid_weno, hybrid_riemann, active_box, and acoustic_source. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
@@ -1404,8 +1409,8 @@ class CaseValidator:
             "amr does not support elastic/surface-tension/MHD",
         )
         self.prohibit(
-            bubbles_lagrange or ib or igr or cyl_coord,
-            "amr does not support Lagrangian bubbles/IB/IGR/cylindrical",
+            bubbles_lagrange or igr or cyl_coord,
+            "amr does not support Lagrangian bubbles/IGR/cylindrical",
         )
         polytropic = self.get("polytropic", "T") == "T"  # Fortran default is .true.
         self.prohibit(
@@ -1414,6 +1419,18 @@ class CaseValidator:
             "(its pb/mv quadrature side-state evolves as a global array that the fine advance would corrupt through the swap); "
             "polytropic QBMM is supported (bubble moments live in q_cons, injected piecewise-constant at prolongation for CHyQMOM realizability)",
         )
+        if ib:
+            # static-body IB AMR (SP20): a fixed single body resolved on a static fine block.
+            num_ibs = self.get("num_ibs") or 0
+            moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, num_ibs + 1))
+            stl = any((self.get(f"patch_ib({i})%geometry")) == 12 for i in range(1, num_ibs + 1))
+            self.prohibit(moving, "amr with ib supports static bodies only (moving IB under amr is not yet validated)")
+            self.prohibit(num_ibs > 1, "amr with ib supports a single body only (multi-body IB under amr is not yet validated)")
+            self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
+            self.prohibit(
+                amr_regrid_int is not None and amr_regrid_int > 0,
+                "amr with ib requires a static block (amr_regrid_int = 0); dynamic regrid with IB is not yet validated",
+            )
         self.prohibit(active_box, "amr is incompatible with active_box")
         self.prohibit(hybrid_weno, "amr is incompatible with hybrid_weno")
         self.prohibit(hybrid_riemann, "amr is incompatible with hybrid_riemann")

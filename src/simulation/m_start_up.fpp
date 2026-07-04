@@ -922,6 +922,8 @@ contains
                 deallocate (particle_cloud_ibs)
             end block
             call s_ibm_setup()
+            ! per-block fine-grid IB state (static-body AMR): resolve the body on each fine block from the geometry
+            if (amr) call s_amr_setup_ib()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
                 call s_write_ib_data_file(0)
                 call s_write_ib_state_file(0)

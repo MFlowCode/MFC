@@ -830,8 +830,21 @@ uninitialized and the conversion diverges to NaN. Species mass diffusion (`chem_
 enthalpy energy flux) travel through the source-flux array and are captured into the same coarse–fine
 registers as the advective fluxes — like the viscous stress fluxes — so element mass and total
 energy conserve across the block boundary through refluxed, subcycled, and regridded advances.
+Static immersed boundaries (`ib = T`) are supported: each fine block carries its own
+fine-grid IB state (markers, ghost points, levelset, image points, interpolation coefficients)
+computed from the body geometry at fine resolution once at initialization, and the fine
+advance applies the ghost-cell IB state correction on the block after each RK update (mirroring
+the coarse per-stage timing). A fixed body placed inside a static block is thus resolved on the
+refined level. The IB forcing is non-conservative by construction (the ghost-cell method injects
+mass/momentum/energy at the body), so the conservation defect is nonzero in the body region while
+the flux reflux still conserves to machine precision away from it. Limited to a single, non-moving,
+non-STL body on a static block (`amr_regrid_int = 0`); moving IB, multi-body, STL geometry, and
+dynamic regrid with IB are gated pending validation. Under MPI a body contained within one rank's
+subdomain is bit-exact across decompositions; a body spanning a rank seam is stable but shows a
+small, localized difference at the body surface (the fine-IB image-point stencil across the seam is
+not yet decomposition-exact).
 AMR is incompatible with surface tension, Lagrangian bubbles, non-polytropic QBMM,
-immersed boundaries, IGR, cylindrical
+IGR, cylindrical
 coordinates, MHD, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the
