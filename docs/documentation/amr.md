@@ -207,13 +207,12 @@ a diagnostic message for unsupported combinations.
 | Single-fluid Euler (`num_fluids = 1`) | Supported | Base configuration |
 | Multi-fluid Euler (`num_fluids > 1`) | Supported | Requires `mpp_lim = T`; volume fractions sum-preserved on prolongation |
 | Viscous (`viscous = T`) | Supported | Viscous fluxes refluxed; bounded seam error at prolongation ghost layer |
-| Euler-Euler bubbles (`bubbles_euler`, `polytropic = T`, `nb = 1`) | Supported | Radius moment realizability floor applied on prolongation |
+| Euler-Euler bubbles (`bubbles_euler`; polytropic or non-polytropic; `nb >= 1`, polydisperse) | Supported | Moment realizability floor applied to all positive moments on prolongation |
 | Phase change / relaxation (`relax = T`) | Supported | Per-cell relaxation runs on the fine block before restriction |
-| Chemistry — reactions + advection (`chemistry = T`, `chem_params%%diffusion = F`) | Supported | Species sum/positivity closure on prolongation; temperature ghost exchanged at rank seams |
+| Chemistry — reactions + advection + diffusion (`chemistry = T`) | Supported | Species sum/positivity closure on prolongation; temperature ghost exchanged at rank seams; diffusion fluxes refluxed like viscous |
 | Surface tension (`surface_tension = T`) | **Not supported** | The capillary force depends on the interface-normal direction; the prolonged fine ghost color cannot reproduce the coarse normal across a 2:1 boundary, producing a growing spurious seam current. See @ref case section 7.1. |
-| Chemistry diffusion (`chem_params%%diffusion = T`) | **Not supported** | Diffusion source fluxes are not captured into the c/f registers; refluxing would not conserve diffused species mass/energy at the block boundary. |
 | Hypoelasticity / hyperelasticity / MHD | **Not supported** | Unvalidated with the fine-level advance |
-| Lagrangian bubbles / QBMM / polydisperse bubbles / non-polytropic bubbles | **Not supported** | Internal pressure, vapor-mass sub-fields, or quadrature weights are not advanced on the fine level |
+| Lagrangian bubbles / QBMM | **Not supported** | Lagrangian tracking / quadrature side-state not advanced on the fine level |
 | Immersed boundaries (`ib = T`) | **Not supported** | Unvalidated with the fine-level advance |
 | IGR solver | **Not supported** | Unvalidated with the fine-level advance |
 | Cylindrical / axisymmetric coordinates | **Not supported** | Unvalidated with the fine-level advance |
