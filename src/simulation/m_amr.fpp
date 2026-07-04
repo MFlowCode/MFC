@@ -16,12 +16,12 @@ module m_amr
     use m_constants, only: num_fluids_max
     use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers, s_mpi_sendrecv_amr_fine_halo
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, &
-        & s_mpi_sendrecv_variables_buffers
+        & s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k
     use m_amr_registers, only: s_amr_zero_fine_registers
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
-    use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state
+    use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, num_gps
 
     implicit none
 
@@ -641,20 +641,34 @@ contains
     !! amr .and. ib.
     impure subroutine s_amr_setup_ib()
 
-        integer :: islot, save_cur
+        integer         :: islot, save_cur
+        integer(kind=8) :: my_ib_gps, nrank_ib
 
         if (.not. amr .or. .not. ib) return
         save_cur = amr_cur
+        my_ib_gps = 0_8
         do islot = 1, amr_num_blocks
             call s_amr_select_slot(islot)
             if (.not. amr_rank_owns_block) cycle
             call s_amr_swap_to_fine()
             call s_ibm_swap_to_fine(islot)
             call s_ibm_setup_fine()
+            my_ib_gps = my_ib_gps + int(num_gps, 8)
             call s_ibm_restore_from_fine(islot)
             call s_amr_restore_coarse()
         end do
         call s_amr_select_slot(save_cur)
+
+        ! The fine-IB image-point stencil is not decomposition-exact across a rank seam.
+        ! If the body's fine ghost points appear on more than one rank (i.e. the body
+        ! straddles a coarse/fine rank boundary), abort rather than return a wrong
+        ! body-surface state. A body wholly within one rank is decomposition-exact.
+        call s_mpi_allreduce_integer_sum(merge(1_8, 0_8, my_ib_gps > 0_8), nrank_ib)
+        if (nrank_ib > 1_8) then
+            call s_mpi_abort('amr with ib: the immersed body straddles a rank boundary, where the ' &
+                             & // 'fine-IB image-point stencil is not yet decomposition-exact; keep the ' &
+                             & // 'body within a single rank subdomain (use fewer ranks or reposition it).')
+        end if
 
     end subroutine s_amr_setup_ib
 
