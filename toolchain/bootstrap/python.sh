@@ -188,11 +188,27 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
         if [ "${GITHUB_ACTIONS:-}" = "true" ] && [ -w "${TMPDIR:-/tmp}" ]; then
             export UV_CACHE_DIR="${TMPDIR:-/tmp}/uv-cache-${USER:-$(id -un)}"
         fi
+
+        # Self-hosted HPC runners (Frontier, Phoenix) run several matrix legs
+        # (interfaces/shards) as the same OS user on the same login node at
+        # once, all sharing the UV_CACHE_DIR above. uv's own cache lock
+        # protects individual entries, but concurrent installs can still race
+        # while uv extracts/prunes the shared archive-v0 store, leaving a
+        # corrupted entry (e.g. a missing dist-info METADATA file) that fails
+        # every subsequent install until the cache is manually cleared.
+        # Serialize the install call itself so only one uv process touches a
+        # given cache dir at a time.
+        UV_INSTALL_LOCK="${TMPDIR:-/tmp}/mfc-uv-install-${USER:-$(id -un)}.lock"
+        if command -v flock > /dev/null 2>&1; then
+            uv_install() { flock "$UV_INSTALL_LOCK" uv pip install "$@"; }
+        else
+            uv_install() { uv pip install "$@"; }
+        fi
         log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
 
         if [ "$verbose" = "1" ]; then
             # Verbose mode: show full uv output
-            if uv pip install "$(pwd)/toolchain"; then
+            if uv_install "$(pwd)/toolchain"; then
                 ok "(venv) Installation succeeded."
                 cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
             else
@@ -203,7 +219,7 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
             fi
         else
             # Default: show progress but filter out individual package lines (+ pkg==ver)
-            uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1
+            uv_install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1
             UV_EXIT=$?
             # Show filtered output (progress info without package list)
             # Filter out lines like " + pkg==1.0", " - pkg==1.0", " ~ pkg==1.0"
