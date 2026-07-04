@@ -101,10 +101,11 @@ contains
             @:PROHIBIT(bubbles_lagrange .or. igr .or. cyl_coord, "amr does not support Lagrangian bubbles/IGR/cylindrical")
             @:PROHIBIT(qbmm .and. .not. polytropic, &
                        & "amr does not support non-polytropic QBMM: its pb/mv quadrature side-state evolves as a global array that the fine advance would corrupt through the swap. Polytropic QBMM (pb/mv inert) is supported: its bubble moments live entirely in q_cons and are injected piecewise-constant at prolongation to preserve CHyQMOM realizability")
-            ! static-body IB AMR (SP20): a fixed single body resolved on a static fine block. Moving IB,
+            ! static-body IB AMR (SP20) + prescribed-motion single moving body (SP21): a fixed or analytically-moving
+            ! (moving_ibm==1) single body resolved on a static fine block. Force/torque-driven motion (moving_ibm==2),
             ! multi-body, STL geometry, and dynamic regrid with IB are gated (unvalidated / recompute-on-move).
-            @:PROHIBIT(ib .and. any(patch_ib(1:num_ibs)%moving_ibm /= 0), &
-                       & "amr with ib supports static bodies only (moving IB under amr is not yet validated)")
+            @:PROHIBIT(ib .and. any(patch_ib(1:num_ibs)%moving_ibm == 2), &
+                       & "amr with ib supports static or prescribed-motion (moving_ibm=1) bodies only; force-driven moving IB (moving_ibm=2) under amr is not yet validated")
             @:PROHIBIT(ib .and. num_ibs > 1, &
                        & "amr with ib supports a single body only (multi-body IB under amr is not yet validated)")
             @:PROHIBIT(ib .and. any(patch_ib(1:num_ibs)%geometry == 12), &

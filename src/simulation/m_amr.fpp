@@ -21,7 +21,8 @@ module m_amr
     use m_phase_change, only: s_infinite_relaxation_k
     use m_amr_registers, only: s_amr_zero_fine_registers
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
-    use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, num_gps
+    use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
+        & s_update_mib, moving_immersed_boundary_flag, num_gps
 
     implicit none
 
@@ -687,6 +688,26 @@ contains
 
     end subroutine s_amr_ib_correct_fine
 
+    !> Rebuild the current fine block's IB state (markers/ghost points/image points) from the moving body's position (prescribed
+    !! motion, moving_ibm==1). Reuses the coarse s_update_mib recompute on the swapped-in fine slot (grid + IB globals swapped to
+    !! the fine block, recompute writes into the slot store, restore). For the subcycled advance pass th in [0,1], the fine
+    !! substep's fraction of the coarse step: s_update_mib snapshots the body to the linear time interpolation between the coarse
+    !! t^n and t^{n+1} positions, the same time-interpolation the subcycle applies to the fluid ghost shell. Pass th < 0 for the
+    !! non-subcycled lockstep stage (uses the body's current position). No-op unless ib. Must precede s_amr_ib_correct_fine.
+    impure subroutine s_amr_update_mib_fine(th)
+
+        real(wp), intent(in) :: th
+
+        if (.not. ib) return
+        if (.not. amr_rank_owns_block) return
+        call s_amr_swap_to_fine()
+        call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
+        call s_update_mib(num_ibs, th)
+        call s_ibm_restore_from_fine(amr_cur)
+        call s_amr_restore_coarse()
+
+    end subroutine s_amr_update_mib_fine
+
     !> Device restriction kernel over all sys_size variable pairs (fine source qf -> coarse target qc).
     impure subroutine s_restrict_all_vars(qf, qc)
 
@@ -1164,6 +1185,8 @@ contains
         ! RK stage update (device kernel; mirror of the coarse non-IGR form)
         call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
                                   & coefs(2), coefs(3), coefs(4), dt)
+        ! moving body: rebuild the fine-block IB state at the current (lockstep-stage) body position before the correct-state
+        if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(-1._wp)
         ! IB state correction on the fine block (mirrors the coarse per-stage correct-state; no-op unless ib)
         call s_amr_ib_correct_fine()
         if (rank_time_wrt) call s_rank_time_toc()
@@ -1240,6 +1263,9 @@ contains
                 ! RK stage update at the FINE time step (device kernel)
                 call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, &
                                           & coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, 4), amr_dt_fine)
+                ! moving body: rebuild the fine-block IB state at the body's fine sub-time position (th matches the fluid-ghost
+                ! lerp)
+                if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(th)
                 ! IB state correction on the fine block after each substep RK update (no-op unless ib)
                 call s_amr_ib_correct_fine()
             end do
