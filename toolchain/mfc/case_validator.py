@@ -221,18 +221,21 @@ PHYSICS_DOCS = {
             "and the 5-equation model (model_eqns = 2); num_fluids > 1 additionally requires "
             "mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha "
             "consistency). "
-            "Supports monodisperse (nb = 1) polytropic Euler-Euler bubbles (bubbles_euler with "
-            "polytropic = T; the flux-based bubble moments are refluxed and prolongation floors "
-            "the radius moments for realizability). "
+            "Supports Euler-Euler bubbles (bubbles_euler), including non-polytropic (polytropic = F, "
+            "pb/mv carried as conservative moments) and polydisperse (nb > 1) configurations: the "
+            "flux-based bubble moments are refluxed and prolongation floors the positive moments "
+            "(radius, and non-polytropic partial-pressure/vapor-mass) for realizability. QBMM is not "
+            "supported (its pb/mv quadrature side-state would be corrupted by the fine advance). "
             "Supports phase change (relax): the cell-local, mass/energy-conserving relaxation runs "
             "on the fine solution before restriction (matching the coarse once-per-step timing). "
-            "Supports chemistry reactions and advection (single- and multi-rank): the cell-local "
-            "reaction source runs on the fine block through the shared RHS, species partial densities are "
-            "refluxed, and prolongation rescales them to the continuity density for realizability. Species "
-            "diffusion (chem_params%diffusion) is not supported (its flux_src fluxes are not refluxed). "
-            "Incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles, "
-            "polydisperse bubbles, "
-            "immersed boundaries, IGR, cylindrical coordinates, MHD, chemistry diffusion, "
+            "Supports chemistry reactions, advection, and species diffusion (single- and multi-rank): the "
+            "cell-local reaction source runs on the fine block through the shared RHS, species partial "
+            "densities are refluxed, and prolongation rescales them to the continuity density for "
+            "realizability. Species diffusion (chem_params%diffusion) is refluxed too: its species mass "
+            "fluxes (and thermal-conduction/enthalpy energy flux) travel through flux_src and are captured "
+            "into the coarse/fine registers, so element mass and energy conserve across the block boundary. "
+            "Incompatible with surface tension, Lagrangian bubbles, QBMM, "
+            "immersed boundaries, IGR, cylindrical coordinates, MHD, "
             "hybrid_weno, hybrid_riemann, active_box, and acoustic_source. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
@@ -1366,8 +1369,8 @@ class CaseValidator:
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
-        chemistry = self.get("chemistry", "F") == "T"
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         qbmm = self.get("qbmm", "F") == "T"
         ib = self.get("ib", "F") == "T"
@@ -1399,26 +1402,9 @@ class CaseValidator:
             surface_tension or hypoelasticity or hyperelasticity or mhd,
             "amr does not support elastic/surface-tension/MHD",
         )
-        chem_diffusion = self.get("chem_params%diffusion", "F") == "T"
-        self.prohibit(
-            chemistry and chem_diffusion,
-            "amr chemistry supports reactions and advection only; species diffusion (chem_params%diffusion = T) is not "
-            "captured into the coarse/fine flux registers, so it would break conservation at the block boundary",
-        )
         self.prohibit(
             bubbles_lagrange or qbmm or ib or igr or cyl_coord,
-            "amr does not support Lagrangian bubbles/QBMM/IB/IGR/cylindrical",
-        )
-        polytropic = self.get("polytropic", "T") == "T"
-        polydisperse = self.get("polydisperse", "F") == "T"
-        nb = self.get("nb", 1)
-        self.prohibit(
-            bubbles_euler and not polytropic,
-            "amr Euler-Euler bubbles require polytropic = T (non-polytropic pb/mv advance is unvalidated with the fine level)",
-        )
-        self.prohibit(
-            bubbles_euler and (polydisperse or (nb is not None and nb > 1)),
-            "amr Euler-Euler bubbles support only monodisperse nb = 1 (polydisperse quadrature is unvalidated with the fine level)",
+            "amr does not support Lagrangian bubbles/QBMM/IB/IGR/cylindrical " "(QBMM carries pb/mv quadrature side-state that the fine advance would corrupt through the global swap)",
         )
         self.prohibit(active_box, "amr is incompatible with active_box")
         self.prohibit(hybrid_weno, "amr is incompatible with hybrid_weno")

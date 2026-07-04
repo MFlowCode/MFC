@@ -34,9 +34,9 @@ module m_amr
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
 
-    !> Realizability floor for prolonged Euler-Euler bubble RADIUS moments (nR): a positive fraction of the coarse parent so R =
-    !! nR/n and n stay > 0. Minmod already keeps a positive field positive, so this fires only under floating-point edge cases
-    !! (conservation defect ~0 otherwise).
+    !> Realizability floor for prolonged Euler-Euler bubble POSITIVE moments (radius nR, and non-polytropic partial pressure npb /
+    !! vapor mass nmv): a positive fraction of the coarse parent so the derived R = nR/n, pb, mv stay >= 0. Minmod already keeps a
+    !! positive field positive, so this fires only under floating-point edge cases (conservation defect ~0 otherwise).
     real(wp), parameter :: bub_pos_frac = 1.0e-10_wp
 
     !> One refined level: its own grid + conservative fields. Field arrays are device-resident (@:ALLOCATE); coords/metadata
@@ -397,10 +397,11 @@ contains
         do i = 1, sys_size
             if (num_fluids > 1 .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
             if (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end) cycle  ! sum/positivity closure below
-            ! bubble RADIUS moments (first of each bin's stride) get the positivity floor; velocity moments prolong freely
+            ! bubble POSITIVE moments (radius nR, and non-polytropic partial pressure npb / vapor mass nmv) get the positivity
+            ! floor; the signed velocity moment nV (offset 1 in each bin's stride) prolongs freely
             call s_prolong_one_var(q_cons_base(i), amr_slots(amr_cur)%q_cons(i), &
                                    & bubbles_euler .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end .and. mod(i &
-                                   & - eqn_idx%bub%beg, bstride) == 0)
+                                   & - eqn_idx%bub%beg, bstride) /= 1)
         end do
         if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
         if (chemistry) call s_prolong_species_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
@@ -863,9 +864,10 @@ contains
                             if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
                                 & ck - 1), wp))
                             q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
-                            ! bubble radius-moment realizability floor (nR > 0 -> R = nR/n, n > 0)
+                            ! bubble moment realizability floor: positive moments (radius nR, non-polytropic partial pressure
+                            ! npb / vapor mass nmv) floored; the signed velocity moment nV (offset 1 in the stride) is skipped
                             if (bubEE .and. i >= bbeg .and. i <= bend) then
-                                if (mod(i - bbeg, bstride) == 0) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, fk), &
+                                if (mod(i - bbeg, bstride) /= 1) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, fk), &
                                     & wp), bub_pos_frac*u0)
                             end if
                         end if

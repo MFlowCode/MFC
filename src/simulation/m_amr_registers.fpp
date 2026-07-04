@@ -25,6 +25,12 @@
 !! matches the TOTAL advective+viscous flux; energy conservation therefore includes the viscous work. Fine-ghost velocity gradients
 !! at the c/f boundary come from the conservative-linear cons prolongation (no special gradient reconstruction) - like the alpha
 !! K-term, that inconsistency is bounded, and conservation is enforced by the flux-register matching.
+!!
+!! Chemistry species diffusion (SP17): the mixture-averaged species mass fluxes travel through flux_src_n for the species equations,
+!! and the thermal-conduction + enthalpy energy flux through the energy equation - the same face-difference assembly as viscous.
+!! They are captured into the SAME registers (species always; energy only when NOT viscous, since a viscous run already captures the
+!! combined flux_src_n(E)) so the c/f reflux matches the total advective+diffusive flux and species/element/energy conservation holds
+!! across the block boundary. Fine-ghost species gradients come from the species-closure cons prolongation - bounded like viscous.
 module m_amr_registers
 
     use m_derived_types
@@ -228,6 +234,57 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
+            ! total-flux matching (chemistry species diffusion): the mixture-averaged species mass fluxes
+            ! travel through flux_src_n for the species equations; the thermal-conduction + enthalpy energy
+            ! flux travels through the energy equation and is captured here only when NOT viscous (the
+            ! viscous block above already captured flux_src_n(E), which holds viscous+diffusion combined).
+            if (chemistry .and. chem_params%diffusion) then
+                $:GPU_PARALLEL_LOOP(collapse=2)
+                do t2 = 0, t2_hi
+                    do t1 = 0, t1_hi
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eq = eqn_idx%species%beg, eqn_idx%species%end
+                            select case (id)
+                            case (1)
+                                freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(jlo, &
+                                     & t1, t2), wp)
+                                freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(jhi, &
+                                     & t1, t2), wp)
+                            case (2)
+                                freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(t1, &
+                                     & jlo, t2), wp)
+                                freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(t1, &
+                                     & jhi, t2), wp)
+                            case (3)
+                                freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(t1, &
+                                     & t2, jlo), wp)
+                                freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*real(flux_src%vf(eq)%sf(t1, &
+                                     & t2, jhi), wp)
+                            end select
+                        end do
+                        if (.not. viscous) then
+                            select case (id)
+                            case (1)
+                                freg(1)%lo(eqn_idx%E, t1, t2, islot) = freg(1)%lo(eqn_idx%E, t1, t2, &
+                                     & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(jlo, t1, t2), wp)
+                                freg(1)%hi(eqn_idx%E, t1, t2, islot) = freg(1)%hi(eqn_idx%E, t1, t2, &
+                                     & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(jhi, t1, t2), wp)
+                            case (2)
+                                freg(2)%lo(eqn_idx%E, t1, t2, islot) = freg(2)%lo(eqn_idx%E, t1, t2, &
+                                     & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(t1, jlo, t2), wp)
+                                freg(2)%hi(eqn_idx%E, t1, t2, islot) = freg(2)%hi(eqn_idx%E, t1, t2, &
+                                     & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(t1, jhi, t2), wp)
+                            case (3)
+                                freg(3)%lo(eqn_idx%E, t1, t2, islot) = freg(3)%lo(eqn_idx%E, t1, t2, &
+                                     & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(t1, t2, jlo), wp)
+                                freg(3)%hi(eqn_idx%E, t1, t2, islot) = freg(3)%hi(eqn_idx%E, t1, t2, &
+                                     & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(t1, t2, jhi), wp)
+                            end select
+                        end if
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         else
             ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its
             ! flux_n covers that face; at a rank-interior face the same rank also holds the inside cells).
@@ -339,6 +396,56 @@ contains
                                             & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
                                     end select
                                 end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                    ! total-flux matching (coarse side, chemistry species diffusion): species mass fluxes
+                    ! into creg (and the energy flux only when NOT viscous, as on the fine side); same face
+                    ! gating and transverse offsets as the base capture; always accumulate.
+                    if (chemistry .and. chem_params%diffusion) then
+                        $:GPU_PARALLEL_LOOP(collapse=2)
+                        do t2 = 0, t2_hi
+                            do t1 = 0, t1_hi
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do eq = eqn_idx%species%beg, eqn_idx%species%end
+                                    select case (id)
+                                    case (1)
+                                        if (cap_lo) creg(1)%lo(eq, t1, t2, islot) = creg(1)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                        if (cap_hi) creg(1)%hi(eq, t1, t2, islot) = creg(1)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                    case (2)
+                                        if (cap_lo) creg(2)%lo(eq, t1, t2, islot) = creg(2)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                        if (cap_hi) creg(2)%hi(eq, t1, t2, islot) = creg(2)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                    case (3)
+                                        if (cap_lo) creg(3)%lo(eq, t1, t2, islot) = creg(3)%lo(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                        if (cap_hi) creg(3)%hi(eq, t1, t2, islot) = creg(3)%hi(eq, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                    end select
+                                end do
+                                if (.not. viscous) then
+                                    select case (id)
+                                    case (1)
+                                        if (cap_lo) creg(1)%lo(eqn_idx%E, t1, t2, islot) = creg(1)%lo(eqn_idx%E, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                        if (cap_hi) creg(1)%hi(eqn_idx%E, t1, t2, islot) = creg(1)%hi(eqn_idx%E, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                    case (2)
+                                        if (cap_lo) creg(2)%lo(eqn_idx%E, t1, t2, islot) = creg(2)%lo(eqn_idx%E, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                        if (cap_hi) creg(2)%hi(eqn_idx%E, t1, t2, islot) = creg(2)%hi(eqn_idx%E, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                    case (3)
+                                        if (cap_lo) creg(3)%lo(eqn_idx%E, t1, t2, islot) = creg(3)%lo(eqn_idx%E, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                        if (cap_hi) creg(3)%hi(eqn_idx%E, t1, t2, islot) = creg(3)%hi(eqn_idx%E, t1, t2, &
+                                            & islot) + coef*real(flux_src%vf(eqn_idx%E)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                    end select
+                                end if
                             end do
                         end do
                         $:END_GPU_PARALLEL_LOOP()

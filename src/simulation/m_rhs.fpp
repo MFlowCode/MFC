@@ -778,8 +778,18 @@ contains
                 call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))
                 call nvtxEndRange
 
+                ! RHS for chemistry species diffusion: writes the species (and, when not viscous, energy)
+                ! face fluxes into flux_src_n. Runs before the AMR capture below so refluxing sees the
+                ! total advection+diffusion flux, mirroring the viscous flux_src the Riemann solver wrote.
+                if (chemistry .and. chem_params%diffusion) then
+                    call nvtxStartRange("RHS-CHEM-DIFFUSION")
+                    call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
+                    call nvtxEndRange
+                end if
+
                 ! AMR refluxing: record the c/f boundary-face fluxes exactly as the assembly above
-                ! used them (after s_cbc may have modified flux_n inside the advection source call);
+                ! used them (after s_cbc may have modified flux_n inside the advection source call, and
+                ! after all flux_src contributions - viscous and species diffusion - are in place);
                 ! must run before the next direction's sweep reuses the aliased flux_n storage
                 if (amr) call s_amr_capture_boundary_flux(id, flux_n(id), flux_src_n(id), stage)
 
@@ -787,13 +797,6 @@ contains
                 call nvtxStartRange("RHS-HYPOELASTICITY")
                 if (hypoelasticity) call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
                 call nvtxEndRange
-
-                ! RHS for diffusion
-                if (chemistry .and. chem_params%diffusion) then
-                    call nvtxStartRange("RHS-CHEM-DIFFUSION")
-                    call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
-                    call nvtxEndRange
-                end if
 
                 ! Viscous stress contribution to RHS
                 if (viscous .or. surface_tension .or. chem_params%diffusion) then

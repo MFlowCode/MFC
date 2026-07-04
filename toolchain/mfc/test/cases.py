@@ -1959,6 +1959,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # Chemistry diffusion AMR: reactions + species mass diffusion with the same static block over the
+        # reaction/diffusion zone. Exercises the flux_src reflux of the species (and energy) diffusion
+        # fluxes into the coarse/fine registers - without it element mass/energy leak at the block boundary.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Reactive Shocktube AMR -> Species Diffusion",
+                "examples/1D_reactive_shocktube/case.py",
+                [],
+                ppn=1,
+                mods={**amr_chem_mods, "chem_params%diffusion": "T"},
+                override_tol=10 ** (-8),
+            )
+        )
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
@@ -3000,6 +3014,61 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(3)%alpha_rho(1)": 0.96,
                 "patch_icpp(3)%alpha(1)": 4e-02,
                 "patch_icpp(3)%pres": 2.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (k) Euler-Euler bubbles, NON-POLYTROPIC + multi-bin (SP18): nb=3 R0 bins with
+        # polytropic=F, so each bin carries FOUR conserved moments (radius nR, velocity nV,
+        # partial pressure npb, vapor mass nmv) — 12 bubble moments total. A left pressure slab
+        # (pres=2) drives a wave through the block under regrid + subcycle. Exercises the extended
+        # realizability floor (positive moments nR/npb/nmv floored, signed nV free) across all bins
+        # at the interior/regrid/ghost prolongation, and the flux-based reflux of the full moment
+        # set. pb/mv live entirely in q_cons (non-qbmm), so no side-state advance is needed on the
+        # fine level. dt=5e-5 keeps coarse+subcycled fine ICFL < 1.
+        stack.push(
+            "AMR -> 1D -> bubbles nonpolytropic",
+            {
+                **amr_1d_base,
+                "dt": 5.0e-5,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "bubbles_euler": "T",
+                "bubble_model": 2,
+                "polytropic": "F",
+                "nb": 3,
+                "fluid_pp(1)%gamma": 0.16,
+                "fluid_pp(1)%pi_inf": 3515.0,
+                "bub_pp%R0ref": 1.0,
+                "bub_pp%p0ref": 1.0,
+                "bub_pp%rho0ref": 1.0,
+                "bub_pp%T0ref": 1.0,
+                "bub_pp%ss": 0.07179866765358993,
+                "bub_pp%pv": 0.02308216136195411,
+                "bub_pp%vd": 0.2404125083932959,
+                "bub_pp%mu_l": 0.009954269975623244,
+                "bub_pp%mu_v": 8.758168074360729e-05,
+                "bub_pp%mu_g": 0.00017881922111898042,
+                "bub_pp%gam_v": 1.33,
+                "bub_pp%gam_g": 1.4,
+                "bub_pp%M_v": 18.02,
+                "bub_pp%M_g": 28.97,
+                "bub_pp%k_v": 0.5583395141263873,
+                "bub_pp%k_g": 0.7346421281308791,
+                "bub_pp%R_v": 1334.8378710170155,
+                "bub_pp%R_g": 830.2995663005393,
+                "patch_icpp(1)%alpha_rho(1)": 0.96,
+                "patch_icpp(1)%alpha(1)": 4e-02,
+                "patch_icpp(1)%pres": 2.0,
+                "patch_icpp(2)%alpha_rho(1)": 0.96,
+                "patch_icpp(2)%alpha(1)": 4e-02,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%alpha_rho(1)": 0.96,
+                "patch_icpp(3)%alpha(1)": 4e-02,
+                "patch_icpp(3)%pres": 1.0,
             },
         )
         cases.append(define_case_d(stack, "", {}))
