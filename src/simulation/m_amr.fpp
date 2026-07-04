@@ -1634,8 +1634,8 @@ contains
         !> Write the fine-level restart file for save step t_step alongside the level-0 restart (whose format stays untouched): the
         !! writing rank count, the active-block count, and for EACH block its box + each rank's intersection-local fine conservative
         !! state. Serial mode: one unformatted file per rank inside its level-0 step directory. Parallel mode: one shared MPI-IO
-        !! file (2-int global header [np, nboxes], then per block a 6-int box header followed by the ranks' fine blocks concatenated
-        !! in rank order). Same rank count + decomposition required to restart.
+        !! file (3-int global header [np, nboxes, sys_size], then per block a 6-int box header followed by the ranks' fine blocks
+        !! concatenated in rank order). Same rank count + decomposition required to restart.
         impure subroutine s_write_amr_restart(t_step)
 
             integer, intent(in)                  :: t_step
@@ -1664,7 +1664,7 @@ contains
                 ! per-rank file in the step directory freshly created by the level-0 serial write
                 write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step, '/amr_fine.dat'
                 open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
-                write (2) num_procs, amr_num_blocks
+                write (2) num_procs, amr_num_blocks, sys_size
                 do k = 1, amr_num_blocks
                     write (2) amr_slots(k)%region%lo, amr_slots(k)%region%hi, amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p
                     if (amr_owns_all(k)) then
@@ -1684,9 +1684,9 @@ contains
                     call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
                 end if
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
-                if (proc_rank == 0) call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), [num_procs, amr_num_blocks], 2, &
-                    & MPI_INTEGER, status, ierr)
-                disp0 = int(2*ibytes, MPI_OFFSET_KIND)  ! running byte offset past the 2-int global header
+                if (proc_rank == 0) call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), [num_procs, amr_num_blocks, sys_size], &
+                    & 3, MPI_INTEGER, status, ierr)
+                disp0 = int(3*ibytes, MPI_OFFSET_KIND)  ! running byte offset past the 3-int global header
                 do k = 1, amr_num_blocks
                     cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
                     if (.not. amr_owns_all(k)) cnt = 0
@@ -1732,9 +1732,9 @@ contains
 
             logical, intent(out)                 :: restored
             character(LEN=path_len + 3*name_len) :: file_loc
-            character(LEN=200)                   :: msg
+            character(LEN=300)                   :: msg
             logical                              :: file_exist
-            integer                              :: i, k, ts, have_loc, have_glb, ghdr(2), reg(6), rm, rn, rp
+            integer                              :: i, k, ts, have_loc, have_glb, ghdr(3), reg(6), rm, rn, rp
 
 #ifdef MFC_MPI
             integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
@@ -1778,6 +1778,13 @@ contains
                            & ghdr(1), ' ranks but this run has ', num_procs, '; restart with the same rank count'
                     call s_mpi_abort(trim(msg))
                 end if
+                if (ghdr(3) /= sys_size) then
+                    write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
+                           & ' conserved variables but this run has ', sys_size, &
+                           & '; the physics configuration ' &
+                           & // '(num_fluids/model_eqns/bubbles/chemistry/...) must match the run that wrote the restart'
+                    call s_mpi_abort(trim(msg))
+                end if
                 amr_num_blocks = ghdr(2)
                 do k = 1, amr_num_blocks
                     amr_cur = k
@@ -1798,14 +1805,21 @@ contains
 #ifdef MFC_MPI
                 ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 2, MPI_INTEGER, status, ierr)
+                call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
                 if (ghdr(1) /= num_procs) then
                     write (msg, '(A,I0,A,I0,A)') 'amr restart rank-count mismatch: the AMR restart file was written with ', &
                            & ghdr(1), ' ranks but this run has ', num_procs, '; restart with the same rank count'
                     call s_mpi_abort(trim(msg))
                 end if
+                if (ghdr(3) /= sys_size) then
+                    write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
+                           & ' conserved variables but this run has ', sys_size, &
+                           & '; the physics configuration ' &
+                           & // '(num_fluids/model_eqns/bubbles/chemistry/...) must match the run that wrote the restart'
+                    call s_mpi_abort(trim(msg))
+                end if
                 amr_num_blocks = ghdr(2)
-                disp0 = int(2*ibytes, MPI_OFFSET_KIND)
+                disp0 = int(3*ibytes, MPI_OFFSET_KIND)
                 do k = 1, amr_num_blocks
                     amr_cur = k
                     call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)

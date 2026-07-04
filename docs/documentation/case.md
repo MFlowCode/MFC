@@ -907,8 +907,14 @@ Each save step writes a fine-level AMR restart file alongside the level-0 restar
 solution, per rank (an `amr_fine.dat` in each rank's step directory, or a single shared
 `amr_*.dat` next to the level-0 MPI-IO restart file when `parallel_io` is on).
 Restarting (`t_step_start > 0`) restores the saved box and fine state seamlessly; it
-requires the same rank count (and decomposition) as the run that wrote the file, and
-aborts with a clear message otherwise.
+requires the same rank count (and decomposition) as the run that wrote the file, and the
+same physics configuration (`sys_size` — the number of conserved variables set by
+`num_fluids`/`model_eqns`/`bubbles`/`chemistry`/...), and aborts with a clear message
+otherwise.
+On restart the AMR block geometry (block count and boxes) is read from the AMR restart
+file, not from the `amr_block_beg`/`amr_block_end` case parameters — so editing those
+parameters for a restart run has no effect. To re-derive the blocks from parameters,
+start fresh (`t_step_start = 0`).
 If the AMR file is absent (e.g., data from an older run), the run proceeds with a
 warning and re-initializes the fine level by prolongation from the coarse restart data,
 losing the accumulated fine-level accuracy.

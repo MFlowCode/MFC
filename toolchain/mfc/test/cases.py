@@ -2626,7 +2626,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # (a) static block
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0})
-        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
         stack.pop()
 
         # (b) dynamic regrid
@@ -2651,7 +2651,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_subcycle": "T",
             },
         )
-        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
         stack.pop()
 
         # (d) 3D static block — z-dimension coverage. 26^3 base grid (the
@@ -3244,7 +3244,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_regrid_int": 0,
             },
         )
-        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
         stack.pop()
 
     amr_golden_tests()
