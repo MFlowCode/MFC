@@ -319,7 +319,35 @@ contains
             end do
         end if
 
-        if (viscous .and. (.not. igr)) then
+        if (igr) then
+            @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
+            @:ALLOCATE(dq_prim_dy_qp(1)%vf(1:sys_size))
+            @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:sys_size))
+
+            do l = eqn_idx%mom%beg, eqn_idx%mom%end
+                @:ALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+            end do
+
+            @:ACC_SETUP_VFs(dq_prim_dx_qp(1))
+
+            if (n > 0) then
+                do l = eqn_idx%mom%beg, eqn_idx%mom%end
+                    @:ALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                               & idwbuff(3)%beg:idwbuff(3)%end))
+                end do
+
+                @:ACC_SETUP_VFs(dq_prim_dy_qp(1))
+
+                if (p > 0) then
+                    do l = eqn_idx%mom%beg, eqn_idx%mom%end
+                        @:ALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                    end do
+                    @:ACC_SETUP_VFs(dq_prim_dz_qp(1))
+                end if
+            end if
+        else if (viscous) then
             @:ALLOCATE(tau_Re_vf(1:sys_size))
             do i = 1, num_dims
                 @:ALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
@@ -563,7 +591,7 @@ contains
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
             & idwbuff(2), idwbuff(3))
 
-        ! IGR fills its viscous source fluxes during custom reconstruction.
+        ! IGR fills its viscous source fluxes through its custom viscous helper.
         if ((viscous .and. .not. igr)) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_rsx_vf, dqR_prim_dx_n, &
@@ -587,10 +615,23 @@ contains
         ! Loop over coordinate directions for dimensional splitting
         do id = 1, num_dims
             if (igr) then
-                ! Reconstruct IGR face states and, when viscous, fill IGR viscous source fluxes.
+                if (id == 1) then
+                    call nvtxStartRange("IGR-JAC-RHS")
+                    call s_igr_compute_jac_rhs(q_cons_vf, dq_prim_dx_qp(1)%vf, dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf, id)
+                    call nvtxEndRange
+                end if
+
+                ! Reconstruct IGR face states for the shared LF Riemann path.
                 call nvtxStartRange("IGR-RECONSTRUCTION")
-                call s_igr_reconstruct_cell_boundary_values(q_cons_vf, qL_rsx_vf, qR_rsx_vf, flux_src_n(id)%vf, id)
+                call s_igr_reconstruct_cell_boundary_values(q_cons_vf, qL_rsx_vf, qR_rsx_vf, id)
                 call nvtxEndRange
+
+                if (viscous) then
+                    call nvtxStartRange("IGR-VISCOUS")
+                    call s_igr_get_viscous(q_cons_vf, qL_rsx_vf, qR_rsx_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
+                                           & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf, id)
+                    call nvtxEndRange
+                end if
             end if
 
             if (.not. igr) then
