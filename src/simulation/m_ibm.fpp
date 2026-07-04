@@ -40,10 +40,10 @@ module m_ibm
 
     integer :: num_gps  !< Number of ghost points
 
-    !> Per-block fine IB state for static-body AMR (SP20): each AMR slot keeps its own fine-grid markers + ghost-point list,
-    !! computed from the geometry at fine resolution so the body is resolved on the fine block. Swapped into the module globals
-    !! (ib_markers/ghost_points/num_gps) for the fine advance's setup and correct-state, then restored. Static body only (moving IB
-    !! gated under amr).
+    !> Per-block fine IB state for single-body AMR (SP20 static, SP21 prescribed-motion): each AMR slot keeps its own fine-grid
+    !! markers + ghost-point list, computed from the geometry at fine resolution so the body is resolved on the fine block. Swapped
+    !! into the module globals (ib_markers/ghost_points/num_gps) for the fine advance's setup, per-substep moving recompute, and
+    !! correct-state, then restored. For a moving body the ghost-point list is sized generously so the recompute never reallocates.
     type ib_fine_state
         type(integer_field)                          :: markers
         type(ghost_point), allocatable, dimension(:) :: gps
@@ -874,12 +874,36 @@ contains
 
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
-    impure subroutine s_update_mib(num_ibs)
+    impure subroutine s_update_mib(num_ibs, th)
 
         integer, intent(in) :: num_ibs
-        integer             :: i, j, k, z_gp_layers
+        !> AMR subcycling: fine sub-time fraction in [0,1] of the coarse step. When present and >= 0 the moving body is snapshotted
+        !! to the linear time interpolation between its coarse t^n position (step_*) and t^{n+1} position (current), matching the
+        !! fluid-ghost lerp the subcycle applies, and restored afterwards. Absent/negative => current position.
+        real(wp), intent(in), optional :: th
+        integer :: i, j, k, z_gp_layers
+        logical :: snap
+        real(wp) :: sc(3, num_ibs), sa(3, num_ibs)  !< body centroids/angles saved across the sub-time snapshot
 
         call nvtxStartRange("UPDATE-MIBM")
+
+        snap = .false.
+        if (present(th)) then
+            if (th >= 0._wp) snap = .true.
+        end if
+        if (snap) then
+            do i = 1, num_ibs
+                sc(1, i) = patch_ib(i)%x_centroid; sc(2, i) = patch_ib(i)%y_centroid; sc(3, i) = patch_ib(i)%z_centroid
+                sa(:,i) = patch_ib(i)%angles
+                if (patch_ib(i)%moving_ibm /= 0) then
+                    patch_ib(i)%x_centroid = (1._wp - th)*patch_ib(i)%step_x_centroid + th*sc(1, i)
+                    patch_ib(i)%y_centroid = (1._wp - th)*patch_ib(i)%step_y_centroid + th*sc(2, i)
+                    patch_ib(i)%z_centroid = (1._wp - th)*patch_ib(i)%step_z_centroid + th*sc(3, i)
+                    patch_ib(i)%angles = (1._wp - th)*patch_ib(i)%step_angles + th*sa(:,i)
+                end if
+            end do
+            $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        end if
 
         ! Clears the existing immersed boundary indices
         z_gp_layers = 0; if (p /= 0) z_gp_layers = gp_layers + 1
@@ -914,6 +938,15 @@ contains
         call s_compute_image_points(ghost_points)
         call s_compute_interpolation_coeffs(ghost_points)
         call nvtxEndRange
+
+        if (snap) then
+            do i = 1, num_ibs
+                patch_ib(i)%x_centroid = sc(1, i); patch_ib(i)%y_centroid = sc(2, i); patch_ib(i)%z_centroid = sc(3, i)
+                patch_ib(i)%angles = sa(:,i)
+                if (patch_ib(i)%moving_ibm /= 0) call s_update_ib_rotation_matrix(i)
+            end do
+            $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        end if
 
         call nvtxEndRange
 
@@ -1606,6 +1639,8 @@ contains
     !! s_ibm_setup at fine resolution.
     impure subroutine s_ibm_setup_fine()
 
+        integer(kind=8) :: ng_max
+
         ib_markers%sf = 0
         $:GPU_UPDATE(device='[ib_markers%sf]')
         call s_apply_ib_patches(ib_markers)
@@ -1614,7 +1649,14 @@ contains
         call s_find_num_ghost_points(num_gps)
         $:GPU_UPDATE(device='[num_gps]')
         if (allocated(ghost_points)) deallocate (ghost_points)
-        allocate (ghost_points(1:max(num_gps, 1)))
+        if (moving_immersed_boundary_flag) then
+            ! moving body: size the slot's ghost-point list to a generous fixed bound (capped at the block cell count) so the
+            ! per-substep s_update_mib recompute never has to reallocate device-resident data as the body translates
+            ng_max = min(max(int(num_gps, 8)*2_8, 1_8), int(m + 1, 8)*int(n + 1, 8)*int(p + 1, 8))
+            allocate (ghost_points(1:int(ng_max)))
+        else
+            allocate (ghost_points(1:max(num_gps, 1)))
+        end if
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
 
         call s_find_ghost_points(ghost_points)
