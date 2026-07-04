@@ -805,8 +805,10 @@ refluxed through the same registers, and prolongation floors the radius moment s
 reconstructed radius and number density stay positive (realizability). QBMM, non-polytropic,
 and polydisperse bubbles are not yet supported (their internal pressure / vapor-mass
 sub-fields and quadrature weights are not advanced on the fine level).
+Phase change (`relax`) is supported: the cell-local, mass/energy-conserving relaxation
+runs on the fine solution before restriction (matching the coarse once-per-step timing).
 It is incompatible with surface tension, Lagrangian bubbles, QBMM, non-polytropic bubbles,
-polydisperse bubbles, phase-change (relax), immersed boundaries, IGR, cylindrical
+polydisperse bubbles, immersed boundaries, IGR, cylindrical
 coordinates, MHD, chemistry, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the

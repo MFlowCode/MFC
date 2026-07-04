@@ -2810,6 +2810,57 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (h) phase change (SP15): two-fluid (liquid water + vapor) pT-equilibrium relaxation
+        # (relax_model=5) with a pressure/temperature-disequilibrium interface inside the block,
+        # regrid + subcycle. Exercises the per-block relaxation on the fine solution BEFORE
+        # restriction: s_amr_relax_fine equilibrates the fine cells (cell-local, mass/energy-
+        # conserving) so the restricted coarse average is relax-consistent. Small dt keeps the
+        # stiff water EOS (pi_inf~1.7e9) CFL-stable over the six captured steps.
+        stack.push(
+            "AMR -> 1D -> phase change",
+            {
+                **amr_1d_base,
+                "dt": 1.0e-6,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_subcycle": "T",
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "relax": "T",
+                "relax_model": 5,
+                "palpha_eps": 1.0e-2,
+                "ptgalpha_eps": 1.0e-2,
+                "fluid_pp(1)%gamma": 0.7409,
+                "fluid_pp(1)%pi_inf": 1.7409e09,
+                "fluid_pp(1)%cv": 1816.0,
+                "fluid_pp(1)%qv": -1167000.0,
+                "fluid_pp(1)%qvp": 0.0,
+                "fluid_pp(2)%gamma": 2.3266,
+                "fluid_pp(2)%pi_inf": 0.0e00,
+                "fluid_pp(2)%cv": 1040.0,
+                "fluid_pp(2)%qv": 2030000.0,
+                "fluid_pp(2)%qvp": -23400.0,
+                "patch_icpp(1)%pres": 4.3755e05,
+                "patch_icpp(1)%alpha(1)": 8.7149e-06,
+                "patch_icpp(1)%alpha_rho(1)": 9.6457e02 * 8.7149e-06,
+                "patch_icpp(1)%alpha(2)": 1 - 8.7149e-06,
+                "patch_icpp(1)%alpha_rho(2)": 2.3132 * (1 - 8.7149e-06),
+                "patch_icpp(2)%pres": 9.6602e04,
+                "patch_icpp(2)%alpha(1)": 3.6749e-05,
+                "patch_icpp(2)%alpha_rho(1)": 1.0957e03 * 3.6749e-05,
+                "patch_icpp(2)%alpha(2)": 1 - 3.6749e-05,
+                "patch_icpp(2)%alpha_rho(2)": 0.5803 * (1 - 3.6749e-05),
+                "patch_icpp(3)%pres": 9.6602e04,
+                "patch_icpp(3)%alpha(1)": 3.6749e-05,
+                "patch_icpp(3)%alpha_rho(1)": 1.0957e03 * 3.6749e-05,
+                "patch_icpp(3)%alpha(2)": 1 - 3.6749e-05,
+                "patch_icpp(3)%alpha_rho(2)": 0.5803 * (1 - 3.6749e-05),
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     add_convergence_cases(cases)
