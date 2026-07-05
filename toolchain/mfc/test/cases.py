@@ -3434,6 +3434,47 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     amr_golden_tests()
 
+    def hybrid_sensor_tests():
+        """Golden tests for the hybrid WENO/Riemann smoothness sensors: a 1D Sod-type shock so the
+        sensor genuinely partitions the domain (full nonlinear WENO/upwind flux at the
+        discontinuities, central weights/flux in the smooth regions). These protect the sensor
+        plumbing and the shared nonlinear-weight block in m_weno against silent divergence."""
+        hybrid_1d_base = {
+            "m": 63,
+            "n": 0,
+            "p": 0,
+            "dt": 5.0e-4,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "patch_icpp(1)%geometry": 1,
+            "patch_icpp(1)%x_centroid": 0.05,
+            "patch_icpp(1)%length_x": 0.1,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(2)%geometry": 1,
+            "patch_icpp(2)%x_centroid": 0.45,
+            "patch_icpp(2)%length_x": 0.7,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(3)%geometry": 1,
+            "patch_icpp(3)%x_centroid": 0.9,
+            "patch_icpp(3)%length_x": 0.2,
+            "patch_icpp(3)%vel(1)": 0.0,
+        }
+        stack.push("Hybrid -> 1D -> WENO sensor", {**hybrid_1d_base, "hybrid_weno": "T", "hybrid_weno_eps": 1.0e-2})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        stack.push(
+            "Hybrid -> 1D -> Riemann sensor",
+            {**hybrid_1d_base, "hybrid_riemann": "T", "hybrid_weno_eps": 1.0e-2, "hybrid_smooth_flux": 2},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+    hybrid_sensor_tests()
+
     add_convergence_cases(cases)
 
     # Sanity Check 1
