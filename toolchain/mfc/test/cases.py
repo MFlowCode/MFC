@@ -2811,6 +2811,36 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
         stack.pop()
 
+        # (d3) acoustic source: a sine pulse emitted on the coarse grid (support 1 at x=0.1) with a
+        # static fine block downstream (x in [0.44, 0.75]); the wave crosses the coarse/fine boundary
+        # into the block during the run. The source acts on the coarse grid only - a support/block
+        # overlap aborts at startup - and the fine advance skips it (coarse-index spatials).
+        stack.push(
+            "AMR -> 1D -> acoustic static block",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_block_beg(1)": 28,
+                "dt": 2.0e-3,
+                "t_step_stop": 200,
+                "t_step_save": 200,
+                # uniform quiescent background (overrides the Sod-like patch states)
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(3)%alpha_rho(1)": 1.0,
+                "acoustic_source": "T",
+                "acoustic(1)%support": 1,
+                "acoustic(1)%loc(1)": 0.1,
+                "acoustic(1)%pulse": 1,
+                "acoustic(1)%wavelength": 0.2,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         # (e) viscous (SP11): single-fluid Sod with physical viscosity (Re=100), regrid + subcycle.
         # Exercises the viscous flux-register reflux (flux_src_n momentum/energy captured into the
         # same registers as the advective flux_n) so the c/f boundary sees matched total fluxes.

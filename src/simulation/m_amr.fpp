@@ -74,6 +74,7 @@ module m_amr
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
+    logical               :: sw_acoustic_source
     real(wp), allocatable :: sw_x_cb(:), sw_x_cc(:), sw_dx(:)
     real(wp), allocatable :: sw_y_cb(:), sw_y_cc(:), sw_dy(:)
     real(wp), allocatable :: sw_z_cb(:), sw_z_cc(:), sw_dz(:)
@@ -800,6 +801,10 @@ contains
 
         sw_m = m; sw_n = n; sw_p = p
         sw_idwint = idwint; sw_idwbuff = idwbuff
+        ! the acoustic source's precomputed spatials are coarse-grid cell indices: applying them on
+        ! the fine block would inject at wrong cells (or out of bounds). The support is guaranteed
+        ! not to overlap the block (checked at startup), so the fine RHS correctly skips the source.
+        sw_acoustic_source = acoustic_source; acoustic_source = .false.
         m = amr_slots(amr_cur)%m; n = amr_slots(amr_cur)%n; p = amr_slots(amr_cur)%p
         idwint(1)%beg = 0; idwint(1)%end = m
         idwint(2)%beg = 0; idwint(2)%end = n
@@ -872,6 +877,7 @@ contains
 
         m = sw_m; n = sw_n; p = sw_p
         idwint = sw_idwint; idwbuff = sw_idwbuff
+        acoustic_source = sw_acoustic_source
         ! restore full coarse coords from bounce buffers
         x_cb = sw_x_cb; x_cc = sw_x_cc; dx = sw_dx
         if (n_glb > 0) then; y_cb = sw_y_cb; y_cc = sw_y_cc; dy = sw_dy; end if

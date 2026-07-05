@@ -455,6 +455,25 @@ contains
                 call s_mpi_abort('Fatal Error: Inconsistent allocation of source_spatials')
             end if
 
+            ! The AMR fine advance skips the acoustic source (the spatials above are coarse-grid
+            ! cell indices), so a static fine block overlapping the support would silently drop
+            ! the source inside the block - abort instead. Emitted waves still enter the block
+            ! through the coarse/fine coupling; only the support itself must stay coarse-only.
+            if (amr) then
+                do j = 1, count
+                    if (int(source_spatials(ai)%coord(1, &
+                        & j)) + start_idx(1) >= amr_block_beg(1) .and. int(source_spatials(ai)%coord(1, &
+                        & j)) + start_idx(1) <= amr_block_end(1) .and. (n_glb == 0 .or. (int(source_spatials(ai)%coord(2, &
+                        & j)) + start_idx(2) >= amr_block_beg(2) .and. int(source_spatials(ai)%coord(2, &
+                        & j)) + start_idx(2) <= amr_block_end(2))) .and. (p_glb == 0 .or. (int(source_spatials(ai)%coord(3, &
+                        & j)) + start_idx(3) >= amr_block_beg(3) .and. int(source_spatials(ai)%coord(3, &
+                        & j)) + start_idx(3) <= amr_block_end(3)))) then
+                        call s_mpi_abort('amr with acoustic_source: the source support overlaps the static fine block; ' &
+                                         & // 'the source acts on the coarse grid only - move the source or the block apart')
+                    end if
+                end do
+            end if
+
             if (count > 0) then
                 $:GPU_UPDATE(device='[source_spatials(ai)%coord]')
                 $:GPU_UPDATE(device='[source_spatials(ai)%val]')
