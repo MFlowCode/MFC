@@ -106,6 +106,10 @@ exit 0
                 set(_flang_mpi_lib "$ENV{CRAY_MPICH_LIB}")
             endif()
             if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND NOT "${_flang_mpi_inc}" STREQUAL "")
+                if("${_flang_mpi_lib}" STREQUAL "")
+                    message(FATAL_ERROR "amdflang MPI include path is set but its link libraries are not. "
+                        "Set both MFC_FLANG_MPI_INC and MFC_FLANG_MPI_LIB (or both CRAY_MPICH_INC and CRAY_MPICH_LIB).")
+                endif()
                 target_compile_options(${a_target} PRIVATE "${_flang_mpi_inc}")
                 target_link_libraries(${a_target} PRIVATE ${_flang_mpi_lib})
             else()

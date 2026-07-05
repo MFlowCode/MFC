@@ -168,7 +168,9 @@ if [ "$u_c" '==' 'amdfund' ]; then
     # Direct WORK-filesystem path (mounted at the same /work1 point on login and
     # compute nodes); override OLCF_AFAR_ROOT before loading to use another drop.
     export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b}"
-    _mfc_mpi_lib="/opt/ohpc/pub/mpi/openmpi4-gnu12/4.1.8/lib"
+    # Track the loaded openmpi4 module's prefix (OpenHPC sets MPI_DIR) instead of
+    # pinning a path that can drift from the module.
+    _mfc_mpi_lib="${MPI_DIR:-/opt/ohpc/pub/mpi/openmpi4-gnu12/4.1.8}/lib"
 
     export PATH="${OLCF_AFAR_ROOT}/lib/llvm/bin:${OLCF_AFAR_ROOT}/bin:${PATH}"
     export LD_LIBRARY_PATH="${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${_mfc_mpi_lib}:${LD_LIBRARY_PATH}"
@@ -181,6 +183,13 @@ if [ "$u_c" '==' 'amdfund' ]; then
     export FC="${OLCF_AFAR_ROOT}/bin/amdflang"
 
     unset _mfc_mpi_lib
+
+    if [ ! -x "$FC" ]; then
+        error "amdfund: amdflang not found at $M$FC$CR."
+        error "Set $M\$OLCF_AFAR_ROOT$CR to your AFAR drop, then reload, e.g.:"
+        error "  export OLCF_AFAR_ROOT=/path/to/therock-afar-<ver>-gfx90a-...; source ./mfc.sh load -c amdfund -m g"
+        return
+    fi
 fi
 
 ok 'All modules and environment variables have been loaded.'
