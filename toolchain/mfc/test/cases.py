@@ -1934,6 +1934,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # reproducible. Not a correctness bug -- the case is genuinely chaotic at
                 # this stiffness, so it is not a portable regression target.
                 "3D_mibm_periodic_collision",
+                # This is a testing matrix for the 3D two-way coupled lagrange bubbles solver
+                # with MPI. It is not intended for testing.
+                "3D_lagrange_coupling_matrix",
             ]
             if path in casesToSkip:
                 continue
