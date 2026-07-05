@@ -532,7 +532,7 @@ contains
         if (p == 0) gp_layers_z = 0
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp]', copy='[num_gps_local]', firstprivate='[gp_layers, &
-                            & gp_layers_z]', collapse=3)
+                            & gp_layers_z]', copyin='[ib_markers%sf]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -580,8 +580,8 @@ contains
         if (p == 0) gp_layers_z = 0
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, neighborhood_patch_id, &
-                            & xp, yp, zp]', copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, &
-                            & gp_layers_z]', collapse=3)
+                            & xp, yp, zp]', copyin='[count, count_i, x_domain, y_domain, z_domain, ib_markers%sf]', &
+                            & firstprivate='[gp_layers, gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -663,7 +663,8 @@ contains
         integer                                              :: patch_id
         logical                                              :: is_cell_center
 
-        $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, buf, gp, interp_coeffs, eta, alpha, patch_id, is_cell_center]')
+        $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, buf, gp, interp_coeffs, eta, alpha, patch_id, &
+                            & is_cell_center]', copyin='[ib_markers%sf]')
         do q = 1, num_gps
             gp = ghost_points_in(q)
             ! Get the interpolation points
