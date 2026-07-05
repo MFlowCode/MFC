@@ -2645,7 +2645,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_buf": 2,
             },
         )
-        cases.append(define_case_d(stack, "", {}))
+        # restart_check on the REGRIDDED layout: unlike the static block, a regridded block set
+        # cannot be reconstructed from the ICs, so the roundtrip proves the restart file itself
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # 2 MPI ranks + parallel_io: the ONLY test that executes the MPI-IO AMR restart write/read
+        # (EXSCAN offset arithmetic, per-rank-extents validation) and multi-rank dynamic regrid
+        # (coarse-halo exchange before tagging, fine seam halo) - a rank-seam or restart-offset bug
+        # is a silent wrong answer everywhere else in the suite
+        stack.push("2 MPI Ranks", {"parallel_io": "T"})
+        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True))
+        stack.pop()
         stack.pop()
 
         # (c) subcycling
@@ -3471,6 +3480,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {**hybrid_1d_base, "hybrid_riemann": "T", "hybrid_weno_eps": 1.0e-2, "hybrid_smooth_flux": 2},
         )
         cases.append(define_case_d(stack, "", {}))
+        # the central smooth-flux (enum 1) is a distinct flux path from Rusanov (2) - cover both
+        cases.append(define_case_d(stack, "central flux", {"hybrid_smooth_flux": 1}))
         stack.pop()
 
     hybrid_sensor_tests()
