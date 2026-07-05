@@ -285,10 +285,7 @@
 #:def OMP_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraOmpArgs=None)
     #:set copyin_val = OMP_COPYIN_STR(copyin).strip('\n') + OMP_COPYIN_STR(copyinReadOnly).strip('\n')
     #:set create_val = OMP_CREATE_STR(create)
-    #! attach: OpenACC re-points a pointer to its already-present target without copying. Use map(to:),
-    #! NOT always,to: on a present array it attaches the descriptor without a force-copy that would
-    #! clobber device-side data with stale host values (OpenACC-parity attach semantics).
-    #:set attach_val = OMP_MAP_STR('to', attach)
+    #:set attach_val = OMP_MAP_STR('always,to', attach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
     #:set omp_clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
     #:set omp_directive = '!$omp target enter data ' + omp_clause_val + extraOmpArgs_val.strip('\n')
@@ -298,16 +295,11 @@
 #:def OMP_EXIT_DATA(copyout=None, delete=None, detach=None, extraOmpArgs=None)
     #:set copyout_val = OMP_COPYOUT_STR(copyout)
     #:set delete_val = OMP_DELETE_STR(delete)
-    #! detach: OpenACC detaches a pointer WITHOUT freeing or copying its target. The OMP map(from:)
-    #! equivalent would decrement the refcount and DEALLOCATE the still-needed device array (and copy
-    #! back), which is why the IB fine-swap crashed on OMP. So detach emits nothing here; the paired
-    #! attach (map(to:)) re-points the descriptor to the still-present array.
+    #:set detach_val = OMP_MAP_STR('always,from', detach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
-    #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n')
-    #:if clause_val.strip() or extraOmpArgs_val.strip()
-        #:set omp_directive = '!$omp target exit data ' + clause_val + extraOmpArgs_val.strip('\n')
-        $:omp_directive
-    #:endif
+    #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
+    #:set omp_directive = '!$omp target exit data ' + clause_val + extraOmpArgs_val.strip('\n')
+    $:omp_directive
 #:enddef
 
 #:def OMP_UPDATE(host=None, device=None, extraOmpArgs=None)
