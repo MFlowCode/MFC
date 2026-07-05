@@ -1403,7 +1403,7 @@ class CaseValidator:
         )
         self.prohibit(recon_type is not None and recon_type != 1, "amr requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
-        self.prohibit(model_eqns is not None and model_eqns != 2, "amr requires model_eqns = 2 (5-equation)")
+        self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
         mpp_lim = self.get("mpp_lim", "F") == "T"
         self.prohibit(
             num_fluids is not None and num_fluids > 1 and not mpp_lim,

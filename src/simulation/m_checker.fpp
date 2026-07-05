@@ -92,7 +92,10 @@ contains
         if (amr) then
             @:PROHIBIT(recon_type /= recon_type_weno, "amr requires WENO reconstruction")
             @:PROHIBIT(time_stepper /= time_stepper_rk3, "amr requires time_stepper = 3 (SSP-RK3)")
-            @:PROHIBIT(model_eqns /= 2, "amr requires model_eqns = 2 (5-equation)")
+            ! 6-equation support: the internal-energy equations prolong/restrict on the generic
+            ! conservative path and the per-stage pressure relaxation (cell-local) also runs on
+            ! each fine block, mirroring the coarse stage order.
+            @:PROHIBIT(model_eqns /= 2 .and. model_eqns /= 3, "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
             @:PROHIBIT(num_fluids > 1 .and. .not. mpp_lim, &
                        & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)")
             @:PROHIBIT(surface_tension, &

@@ -2773,6 +2773,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("thinc", {"int_comp": 1})
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
+        # 6-equation model on the same interface advection: the internal-energy equations ride the
+        # generic conservative prolong/restrict/reflux, and the per-stage pressure relaxation
+        # (cell-local) runs on the fine block mirroring the coarse stage order
+        stack.push("6eq", {"model_eqns": 3})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
         # (d2) hypoelasticity: the suite's 1D hypoelastic shock config (stiff water EOS + shear

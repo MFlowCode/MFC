@@ -13,7 +13,8 @@ module m_amr
 
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
-    use m_constants, only: num_fluids_max
+    use m_constants, only: num_fluids_max, model_eqns_6eq
+    use m_pressure_relaxation, only: s_pressure_relaxation_procedure
     use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers, s_mpi_sendrecv_amr_fine_halo
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, &
         & s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers
@@ -672,6 +673,17 @@ contains
 
     end subroutine s_amr_relax_fine
 
+    !> 6-equation model: apply the per-stage pressure relaxation to the fine block's interior (cell-local equilibration, no
+    !! stencil), mirroring the coarse per-stage call. Swaps the grid so the routine's 0:m,0:n,0:p loop covers this block.
+    impure subroutine s_amr_pressure_relax_fine()
+
+        if (.not. amr_rank_owns_block) return
+        call s_amr_swap_to_fine()
+        call s_pressure_relaxation_procedure(amr_slots(amr_cur)%q_cons)
+        call s_amr_restore_coarse()
+
+    end subroutine s_amr_pressure_relax_fine
+
     !> Compute the fine-grid IB state (markers/ghost points/levelset) for every active block from the body geometry (static-body
     !! AMR). Called once after the coarse IB setup at init (regrid+IB is gated). Per slot with fine cells: swap the grid to the fine
     !! block, swap the IB globals to the slot store, run the fine IB pipeline (writing into the slot store), restore. No-op unless
@@ -718,7 +730,14 @@ contains
         if (.not. amr_rank_owns_block) return
         call s_amr_swap_to_fine()
         call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
-        call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim)
+        if (qbmm .and. .not. polytropic) then
+            ! mirror the coarse correct-state: non-polytropic QBMM also corrects the block's own
+            ! pb/mv side-state at the body ghost points (bounds match the swapped fine idwbuff)
+            call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim, amr_slots(amr_cur)%pb_f, &
+                                     & amr_slots(amr_cur)%mv_f)
+        else
+            call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim)
+        end if
         call s_ibm_restore_from_fine(amr_cur)
         call s_amr_restore_coarse()
 
@@ -1424,6 +1443,8 @@ contains
         call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
                                   & coefs(2), coefs(3), coefs(4), dt)
         if (qbmm .and. .not. polytropic) call s_amr_fine_rk_update_pbmv(coefs(1), coefs(2), coefs(3), coefs(4), dt)
+        ! 6-equation model: per-stage pressure relaxation on the block (before IB correct, coarse order)
+        if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
         ! moving body: rebuild the fine-block IB state at the current (lockstep-stage) body position before the correct-state
         if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(-1._wp)
         ! IB state correction on the fine block (mirrors the coarse per-stage correct-state; no-op unless ib)
@@ -1502,6 +1523,9 @@ contains
                 ! RK stage update at the FINE time step (device kernel)
                 call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, &
                                           & coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, 4), amr_dt_fine)
+                ! 6-equation model: per-substage pressure relaxation (instantaneous equilibration -
+                ! per stage at fine dt is the same infinite-rate limit the coarse applies per stage)
+                if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
                 ! moving body: rebuild the fine-block IB state at the body's fine sub-time position (th matches the fluid-ghost
                 ! lerp)
                 if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(th)
