@@ -2763,6 +2763,37 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (d2) hypoelasticity: the suite's 1D hypoelastic shock config (stiff water EOS + shear
+        # modulus G) on a static 2:1 fine block over the wave region. Stress components prolong
+        # via the generic conservative-linear path; the fine swap recomputes the spacing-dependent
+        # FD coefficients the stress source uses (coarse coefficients would halve fine gradients).
+        stack.push(
+            "AMR -> 1D -> hypoelastic static block",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                # stiff water EOS: c ~ 83; dt=5e-5 keeps the 2:1 fine block at CFL ~ 0.5
+                "dt": 5.0e-5,
+                "hypoelasticity": "T",
+                "riemann_solver": 1,
+                "fd_order": 4,
+                "fluid_pp(1)%gamma": 0.3,
+                "fluid_pp(1)%pi_inf": 7.8e05,
+                "fluid_pp(1)%G": 1.0e05,
+                "patch_icpp(1)%pres": 1.0e06,
+                "patch_icpp(1)%alpha_rho(1)": 1000.0e00,
+                "patch_icpp(2)%pres": 1.0e05,
+                "patch_icpp(2)%alpha_rho(1)": 1000.0e00,
+                "patch_icpp(3)%pres": 5.0e05,
+                "patch_icpp(3)%alpha_rho(1)": 1000.0e00,
+                "patch_icpp(1)%tau_e(1)": 0.0e-00,
+                "patch_icpp(2)%tau_e(1)": 0.0e-00,
+                "patch_icpp(3)%tau_e(1)": 0.0e-00,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         # (e) viscous (SP11): single-fluid Sod with physical viscosity (Re=100), regrid + subcycle.
         # Exercises the viscous flux-register reflux (flux_src_n momentum/energy captured into the
         # same registers as the advective flux_n) so the c/f boundary sees matched total fluxes.

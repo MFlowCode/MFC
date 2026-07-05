@@ -97,7 +97,9 @@ contains
                        & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)")
             @:PROHIBIT(surface_tension, &
                        & "amr does not support surface_tension: the capillary force depends on the interface normal (grad-c direction), which the conservative-linearly-prolonged fine ghost color cannot reproduce consistently with the coarse solver across a 2:1 coarse/fine boundary - a growing spurious seam current results")
-            @:PROHIBIT(hypoelasticity .or. hyperelasticity .or. mhd, "amr does not support elastic/MHD")
+            ! hypoelasticity is supported: stress components prolong via the generic conservative-linear
+            ! path and the swap/restore recomputes the spacing-dependent FD coefficients per grid
+            @:PROHIBIT(hyperelasticity .or. mhd, "amr does not support hyperelasticity/MHD")
             @:PROHIBIT(bubbles_lagrange .or. igr .or. cyl_coord, "amr does not support Lagrangian bubbles/IGR/cylindrical")
             @:PROHIBIT(qbmm .and. .not. polytropic, &
                        & "amr does not support non-polytropic QBMM: its pb/mv quadrature side-state evolves as a global array that the fine advance would corrupt through the swap. Polytropic QBMM (pb/mv inert) is supported: its bubble moments live entirely in q_cons and are injected piecewise-constant at prolongation to preserve CHyQMOM realizability")

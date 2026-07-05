@@ -1374,7 +1374,6 @@ class CaseValidator:
         model_eqns = self.get("model_eqns")
         num_fluids = self.get("num_fluids")
         surface_tension = self.get("surface_tension", "F") == "T"
-        hypoelasticity = self.get("hypoelasticity", "F") == "T"
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
@@ -1405,8 +1404,8 @@ class CaseValidator:
             "amr with num_fluids > 1 requires mpp_lim " "(its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)",
         )
         self.prohibit(
-            surface_tension or hypoelasticity or hyperelasticity or mhd,
-            "amr does not support elastic/surface-tension/MHD",
+            surface_tension or hyperelasticity or mhd,
+            "amr does not support surface-tension/hyperelasticity/MHD",
         )
         self.prohibit(
             bubbles_lagrange or igr or cyl_coord,

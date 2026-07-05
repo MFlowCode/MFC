@@ -23,6 +23,7 @@ module m_amr
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps
+    use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
 
     implicit none
 
@@ -860,6 +861,9 @@ contains
         ! sync the swapped extents/bounds/coordinates to the device: RHS kernels read the
         ! device copies of these GPU_DECLARE'd globals (stale coarse bounds = OOB kernels)
         call s_amr_sync_grid_state_to_device()
+        ! hypoelastic stress sources use grid-spacing-dependent FD coefficients: recompute
+        ! them from the (now fine) grid, else every fine velocity gradient is halved
+        if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
 
     end subroutine s_amr_swap_to_fine
 
@@ -874,6 +878,7 @@ contains
         if (p_glb > 0) then; z_cb = sw_z_cb; z_cc = sw_z_cc; dz = sw_dz; end if
         ! sync the restored coarse extents/bounds/coordinates back to the device
         call s_amr_sync_grid_state_to_device()
+        if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
 
     end subroutine s_amr_restore_coarse
 
