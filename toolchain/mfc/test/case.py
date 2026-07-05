@@ -320,6 +320,9 @@ if "post_process" in ARGS["mfc"]["targets"]:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
 else:
     mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}
+    # honor a case's EXPLICIT setting of these keys (e.g. parallel_io = T for MPI-IO
+    # restart / load_balance coverage) instead of clobbering it
+    mods = {{k: v for k, v in mods.items() if k not in case}}
 
 print(json.dumps({{**case, **mods}}))
 """,

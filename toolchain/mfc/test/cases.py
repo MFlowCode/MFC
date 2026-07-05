@@ -3439,6 +3439,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # TWO prescribed-motion bodies: the per-substage fine-IB rebuild runs the multi-body core
+        # for moving bodies too (allowed since the num_ibs gate lift, previously unvalidated)
+        stack.push(
+            "two bodies",
+            {
+                "num_ibs": 2,
+                "patch_ib(1)%x_centroid": 0.40,
+                "patch_ib(1)%radius": 0.06,
+                "patch_ib(2)%geometry": 2,
+                "patch_ib(2)%x_centroid": 0.60,
+                "patch_ib(2)%y_centroid": 0.5,
+                "patch_ib(2)%radius": 0.06,
+                "patch_ib(2)%slip": "F",
+                "patch_ib(2)%moving_ibm": 1,
+                "patch_ib(2)%vel(2)": 1.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
     amr_golden_tests()
@@ -3485,6 +3504,69 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     hybrid_sensor_tests()
+
+    def load_balance_tests():
+        """Golden for the weighted init-time decomposition (load_balance): a two-fluid material
+        interface at x=0.5 makes the alpha marginal asymmetric (fluid-1 volume fraction ~1 left,
+        ~0 right), so the 2-rank weighted split genuinely differs from the equal split and
+        s_apply_weighted_offsets re-decomposes. This is the only coverage of that path - the
+        feature is a no-op at 1 rank by construction, and wrong weighted halo extents would
+        corrupt the solution everywhere while looking plausible."""
+        eps_lb = 1.0e-6
+        stack.push(
+            "LoadBalance -> 1D -> weighted split",
+            {
+                "m": 63,
+                "n": 0,
+                "p": 0,
+                "dt": 5.0e-4,
+                "t_step_stop": 6,
+                "t_step_save": 6,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "parallel_io": "T",
+                "load_balance": "T",
+                "num_fluids": 2,
+                "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%cv": 0.0,
+                "fluid_pp(2)%qv": 0.0,
+                "fluid_pp(2)%qvp": 0.0,
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.05,
+                "patch_icpp(1)%length_x": 0.1,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(2)%geometry": 1,
+                "patch_icpp(2)%x_centroid": 0.3,
+                "patch_icpp(2)%length_x": 0.4,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(3)%geometry": 1,
+                "patch_icpp(3)%x_centroid": 0.75,
+                "patch_icpp(3)%length_x": 0.5,
+                "patch_icpp(3)%vel(1)": 0.5,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": (1.0 - eps_lb) * 1.0,
+                "patch_icpp(1)%alpha_rho(2)": eps_lb * 10.0,
+                "patch_icpp(1)%alpha(1)": 1.0 - eps_lb,
+                "patch_icpp(1)%alpha(2)": eps_lb,
+                "patch_icpp(2)%alpha_rho(1)": (1.0 - eps_lb) * 1.0,
+                "patch_icpp(2)%alpha_rho(2)": eps_lb * 10.0,
+                "patch_icpp(2)%alpha(1)": 1.0 - eps_lb,
+                "patch_icpp(2)%alpha(2)": eps_lb,
+                "patch_icpp(3)%alpha_rho(1)": eps_lb * 1.0,
+                "patch_icpp(3)%alpha_rho(2)": (1.0 - eps_lb) * 10.0,
+                "patch_icpp(3)%alpha(1)": eps_lb,
+                "patch_icpp(3)%alpha(2)": 1.0 - eps_lb,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+    load_balance_tests()
 
     add_convergence_cases(cases)
 

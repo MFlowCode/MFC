@@ -1,4 +1,4 @@
-This file was created on 2026-07-05 15:36:30.321214.
+This file was created on 2026-07-05 15:36:41.835876.
 
 mfc.sh:
 
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               2
     Stepping:                                7
-    CPU(s) scaling MHz:                      75%
+    CPU(s) scaling MHz:                      77%
     CPU max MHz:                             2700.0000
     CPU min MHz:                             1200.0000
     BogoMIPS:                                5400.00
