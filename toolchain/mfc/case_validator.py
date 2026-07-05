@@ -252,7 +252,8 @@ PHYSICS_DOCS = {
             "Incompatible with surface tension, Lagrangian bubbles, "
             "IGR, 3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
             "per-cell WENO coefficients are recomputed for each block on swap), MHD, hyperelasticity, "
-            "hybrid_weno, hybrid_riemann, and active_box. "
+            "and active_box. hybrid_weno/hybrid_riemann are supported: each level recomputes the "
+            "sensor over its own (swapped) bounds every RHS call. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
             "incompatible with cfl_dt. "
@@ -1393,8 +1394,6 @@ class CaseValidator:
         igr = self.get("igr", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
         active_box = self.get("active_box", "F") == "T"
-        hybrid_weno = self.get("hybrid_weno", "F") == "T"
-        hybrid_riemann = self.get("hybrid_riemann", "F") == "T"
         amr_tag_eps = self.get("amr_tag_eps")
         amr_buf = self.get("amr_buf")
         amr_max_blocks = self.get("amr_max_blocks")
@@ -1441,8 +1440,6 @@ class CaseValidator:
                 "amr dynamic regrid with ib supports static bodies only; " "moving bodies require a static block (amr_regrid_int = 0)",
             )
         self.prohibit(active_box, "amr is incompatible with active_box")
-        self.prohibit(hybrid_weno, "amr is incompatible with hybrid_weno")
-        self.prohibit(hybrid_riemann, "amr is incompatible with hybrid_riemann")
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(
             amr_regrid_int is not None and amr_regrid_int > 0 and (amr_tag_eps is None or amr_tag_eps <= 0),

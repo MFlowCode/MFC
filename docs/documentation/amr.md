@@ -223,7 +223,7 @@ a diagnostic message for unsupported combinations.
 | Grid stretching (`stretch_x[y,z] = T`) | Supported | Fine ghost-shell coordinates extend by exact parent-cell bisection, and the spacing-dependent WENO coefficients are recomputed for the active grid on every block swap/restore (`amr_weno_coef_recompute`, armed automatically when the grid is nonuniform); prolongation stays conservative but its slope estimate is first-order on nonuniform parents |
 | Riemann-extrapolation BCs (`bc = -4`) | **Not supported** | Boundary-adjusted WENO coefficient rows cannot be inherited by interior blocks (checker gate) |
 | `active_box` | **Not supported** | Unvalidated combination |
-| `hybrid_weno` / `hybrid_riemann` | **Not supported** | Unvalidated combination |
+| `hybrid_weno` / `hybrid_riemann` | Supported | The sensor arrays are sized to the coarse ghost-inclusive bounds (the fine extent guard keeps fine indices inside them) and the sensor is recomputed from the live bounds every RHS call, so each level evaluates its own sensor; conservative full-WENO defaults at buffer edges |
 | `acoustic_source` | Supported | The source acts on the coarse grid only: its support must not overlap the initial block (startup abort), and dynamic regrid keeps its boxes clear of the support (tags suppressed, candidate boxes clipped); emitted waves enter blocks through the coarse/fine coupling |
 
 **Mandatory solver settings.**

@@ -2648,6 +2648,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # restart_check on the REGRIDDED layout: unlike the static block, a regridded block set
         # cannot be reconstructed from the ICs, so the roundtrip proves the restart file itself
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # hybrid sensors on the fine level. eps 0.5 exceeds the Sod shock's Jameson phi (~0.3),
+        # putting the shock cells under the sensor's control (central weights/flux where
+        # phi < eps): a dead sensor moves the answer by ~5e-4. At physical eps (1e-2) the
+        # combination is bitwise-identical to plain AMR by design (only constant/eps-dominated
+        # cells go central, and those reconstruct identically under any convex weights).
+        cases.append(define_case_d(stack, "hybrid_weno sensor", {"hybrid_weno": "T", "hybrid_weno_eps": 0.5}))
+        cases.append(define_case_d(stack, "hybrid_riemann sensor", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.5, "hybrid_smooth_flux": 2}))
         # 2 MPI ranks + parallel_io: the ONLY test that executes the MPI-IO AMR restart write/read
         # (EXSCAN offset arithmetic, per-rank-extents validation) and multi-rank dynamic regrid
         # (coarse-halo exchange before tagging, fine seam halo) - a rank-seam or restart-offset bug
@@ -3590,12 +3597,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         }
         stack.push("Hybrid -> 1D -> WENO sensor", {**hybrid_1d_base, "hybrid_weno": "T", "hybrid_weno_eps": 1.0e-2})
         cases.append(define_case_d(stack, "", {}))
+        # liveness golden: eps 0.5 > the shock's phi (~0.3) puts consequential cells under the
+        # sensor (answer moves ~5e-4 vs plain WENO); the eps=1e-2 case is bitwise-identical to
+        # plain by design (only constant/eps-dominated cells go central) so it protects
+        # no-corruption but cannot detect a dead sensor
+        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}))
         stack.pop()
         stack.push(
             "Hybrid -> 1D -> Riemann sensor",
             {**hybrid_1d_base, "hybrid_riemann": "T", "hybrid_weno_eps": 1.0e-2, "hybrid_smooth_flux": 2},
         )
         cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}))
         # the central smooth-flux (enum 1) is a distinct flux path from Rusanov (2) - cover both
         cases.append(define_case_d(stack, "central flux", {"hybrid_smooth_flux": 1}))
         stack.pop()

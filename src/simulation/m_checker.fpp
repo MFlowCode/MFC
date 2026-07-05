@@ -141,8 +141,10 @@ contains
             @:PROHIBIT(ib .and. amr_regrid_int > 0 .and. any(patch_ib(1:num_ibs)%moving_ibm > 0), &
                        & "amr dynamic regrid with ib supports static bodies only; moving bodies require a static block (amr_regrid_int = 0)")
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
-            @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
-            @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")
+            ! no hybrid_weno/hybrid_riemann gate: the sensor arrays are sized to the coarse
+            ! idwbuff (the fine extent guard keeps fine bounds inside them) and the sensor is
+            ! recomputed from the live (swapped) idwbuff every RHS call, so each level evaluates
+            ! its own sensor with conservative full-WENO defaults at its buffer edges.
             ! no acoustic_source gate here: acoustic sources act on the coarse grid only (their spatial support is precomputed as
             ! coarse cell indices). A startup check aborts if the support overlaps the user-placed
             ! initial block; the dynamic regrid keeps its own boxes clear of the support (tags are

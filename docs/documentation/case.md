@@ -851,7 +851,8 @@ subdomain is bit-exact across decompositions; a body spanning a rank seam is rej
 inside a single rank's subdomain (use fewer ranks or reposition it).
 AMR is incompatible with surface tension, Lagrangian bubbles, IGR, 3D cylindrical
 coordinates (2D axisymmetric IS supported), MHD, hyperelasticity, Riemann-extrapolation
-boundaries (bc = -4), `hybrid_weno`, `hybrid_riemann`, and `active_box`.
+boundaries (bc = -4), and `active_box`. `hybrid_weno`/`hybrid_riemann` are supported: each
+level recomputes the smoothness sensor over its own (swapped) bounds every RHS call.
 Nonuniform grids ARE supported (grid stretching and the axisymmetric axis half-cell): the fine
 ghost-shell coordinates extend by exact parent-cell bisection and the spacing-dependent WENO
 coefficients are recomputed for the active grid on every block swap/restore, armed automatically
