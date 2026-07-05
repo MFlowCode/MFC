@@ -2658,6 +2658,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # body forces ride the subcycle: accel is evaluated at the coarse-step-frozen mytime on
+        # fine substeps - the same per-step time freezing the coarse RK3 stages already apply, so
+        # coarse and fine see one consistent forcing. Oscillatory + gravity per suite convention.
+        stack.push("bodyforces", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
         # (d) 3D static block — z-dimension coverage. 26^3 base grid (the
@@ -2761,6 +2767,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # THINC interface compression on the advecting interface: the sharpener reads the live
+        # grid arrays (swapped per block) and its scratch spans idwbuff, so it is AMR-correct by
+        # construction - this golden protects the reachable WENO+int_comp combo under regrid+subcycle
+        stack.push("thinc", {"int_comp": 1})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
         # (d2) hypoelasticity: the suite's 1D hypoelastic shock config (stiff water EOS + shear
@@ -2792,6 +2804,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # continuum damage rides hypoelasticity: its source is cell-local (pointwise in the local
+        # stress), so it is AMR-correct by construction - this golden protects the reachable combo
+        stack.push("cont_damage", {"cont_damage": "T", "tau_star": 0.0, "cont_damage_s": 2.0, "alpha_bar": 1e-4})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
         # (e) viscous (SP11): single-fluid Sod with physical viscosity (Re=100), regrid + subcycle.
