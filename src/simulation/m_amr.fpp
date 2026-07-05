@@ -24,6 +24,7 @@ module m_amr
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
+    use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
 
     implicit none
 
@@ -1391,6 +1392,62 @@ contains
     !! amr_buf-padded extents come within buff_size (guaranteeing no fine-fine adjacency: separated boxes stay >= buff_size apart,
     !! nearby ones collapse to a single box == the legacy bounding box). Boxes are the raw tagged extents; the caller pads, clamps
     !! and size-caps each one.
+    !> True iff global level-0 cell (gi, gj, gk) lies inside any acoustic source support bbox.
+    pure logical function f_in_acoustic_support(gi, gj, gk) result(insup)
+
+        integer, intent(in) :: gi, gj, gk
+        integer             :: s
+
+        insup = .false.
+        do s = 1, num_source
+            if (gi >= acoustic_supp_lo(1, s) .and. gi <= acoustic_supp_hi(1, s) .and. (n_glb == 0 .or. (gj >= acoustic_supp_lo(2, &
+                & s) .and. gj <= acoustic_supp_hi(2, s))) .and. (p_glb == 0 .or. (gk >= acoustic_supp_lo(3, &
+                & s) .and. gk <= acoustic_supp_hi(3, s)))) then
+                insup = .true.; return
+            end if
+        end do
+
+    end function f_in_acoustic_support
+
+    !> Clip a candidate regrid box (global indices) so it does not overlap any acoustic source support bbox: per overlapping source,
+    !! remove the overlap along the single axis/side that keeps the largest remaining extent (deterministic: lower axis, then begin
+    !! side, wins ties). Clipping only shrinks the box and may empty it (hi < lo); the caller drops empties.
+    impure subroutine s_amr_clip_box_from_sources(lo, hi)
+
+        integer, intent(inout) :: lo(3), hi(3)
+        integer                :: s, d, best_d, best_side, best_ext, ext_l, ext_r
+        logical                :: ovl
+
+        do s = 1, num_source
+            if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return  ! emptied by an earlier clip
+            ovl = lo(1) <= acoustic_supp_hi(1, s) .and. hi(1) >= acoustic_supp_lo(1, s)
+            if (n_glb > 0) ovl = ovl .and. lo(2) <= acoustic_supp_hi(2, s) .and. hi(2) >= acoustic_supp_lo(2, s)
+            if (p_glb > 0) ovl = ovl .and. lo(3) <= acoustic_supp_hi(3, s) .and. hi(3) >= acoustic_supp_lo(3, s)
+            if (.not. ovl) cycle
+            best_d = 1; best_side = 1; best_ext = -1
+            do d = 1, num_dims
+                ext_l = acoustic_supp_lo(d, s) - lo(d)  ! cells kept by [lo(d), supp_lo-1]
+                ext_r = hi(d) - acoustic_supp_hi(d, s)  ! cells kept by [supp_hi+1, hi(d)]
+                if (ext_l > best_ext) then; best_ext = ext_l; best_d = d; best_side = 1; end if
+                if (ext_r > best_ext) then; best_ext = ext_r; best_d = d; best_side = 2; end if
+            end do
+            if (best_side == 1) then
+                hi(best_d) = acoustic_supp_lo(best_d, s) - 1
+            else
+                lo(best_d) = acoustic_supp_hi(best_d, s) + 1
+            end if
+        end do
+        ! safety net: clipping removed every overlap by construction - anything left is a bug
+        do s = 1, num_source
+            if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return
+            ovl = lo(1) <= acoustic_supp_hi(1, s) .and. hi(1) >= acoustic_supp_lo(1, s)
+            if (n_glb > 0) ovl = ovl .and. lo(2) <= acoustic_supp_hi(2, s) .and. hi(2) >= acoustic_supp_lo(2, s)
+            if (p_glb > 0) ovl = ovl .and. lo(3) <= acoustic_supp_hi(3, s) .and. hi(3) >= acoustic_supp_lo(3, s)
+            if (ovl) call s_mpi_abort('amr regrid: acoustic source exclusion clip failed (internal error)')
+        end do
+
+    end subroutine s_amr_clip_box_from_sources
+
     impure subroutine s_amr_cluster(tag_grid, boxes, nboxes)
 
         logical, intent(in)                   :: tag_grid(0:,0:,0:)
@@ -1541,6 +1598,11 @@ contains
                         if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj, ck + 1) - f_amr_rho_tot(q_cons_base, ci, &
                             & cj, ck - 1)))
                         if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
+                        ! the acoustic source support stays coarse (its spatials are coarse cell
+                        ! indices): suppress tags there so the clusterer splits around the source
+                        if (acoustic_source .and. tag_grid(ci, cj, ck)) then
+                            if (f_in_acoustic_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
+                        end if
                     end do
                 end do
             end do
@@ -1569,6 +1631,9 @@ contains
                 else
                     lo(3) = 0; hi(3) = 0
                 end if
+                ! keep candidate boxes clear of every acoustic source support (the source acts on the
+                ! coarse grid only); clipping only shrinks, so boxes stay disjoint - empties drop below
+                if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
                 if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) cycle  ! confined to the domain margin
                 k = k + 1; boxes(k)%lo = lo; boxes(k)%hi = hi
             end do

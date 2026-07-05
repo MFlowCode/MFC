@@ -2839,6 +2839,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # dynamic regrid chasing the emitted wave: the tagger fires on the travelling pulse, and
+        # the regrid keeps its boxes clear of the source support (tags suppressed over it,
+        # candidate boxes clipped) - the source region stays coarse while blocks track the wave
+        stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
         # (e) viscous (SP11): single-fluid Sod with physical viscosity (Re=100), regrid + subcycle.

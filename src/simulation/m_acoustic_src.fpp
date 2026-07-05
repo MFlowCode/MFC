@@ -13,12 +13,17 @@ module m_acoustic_src
     use m_variables_conversion
     use m_helper_basic
     use m_constants
+    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max
 
     implicit none
 
-    private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
+    private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations, &
+        & acoustic_supp_lo, acoustic_supp_hi
 
-    integer, allocatable, dimension(:) :: pulse, support
+    !> Global (level-0 index space) bounding box of each source's spatial support, reduced over ranks. The AMR dynamic regrid keeps
+    !! fine blocks clear of these (the source acts on the coarse grid only). Allocated/filled only when amr with acoustic_source.
+    integer, allocatable, dimension(:,:) :: acoustic_supp_lo, acoustic_supp_hi  !< (1:3, 1:num_source)
+    integer, allocatable, dimension(:)   :: pulse, support
     $:GPU_DECLARE(create='[pulse, support]')
 
     logical, allocatable, dimension(:) :: dipole
@@ -119,6 +124,9 @@ contains
         @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE(mom_src(1:num_vels, 0:m, 0:n, 0:p))
         @:ALLOCATE(E_src(0:m, 0:n, 0:p))
+
+        ! host-only helper for the AMR regrid's source-exclusion clipping (filled by the precompute)
+        if (amr) allocate (acoustic_supp_lo(1:3,1:num_source), acoustic_supp_hi(1:3,1:num_source))
 
     end subroutine s_initialize_acoustic_src
 
@@ -394,6 +402,7 @@ contains
         integer             :: j, k, l, ai
         integer             :: count
         integer             :: dim
+        integer             :: sidx_supp(3), lo_loc, hi_loc
         real(wp)            :: source_spatial, angle, xyz_to_r_ratios(3)
         real(wp), parameter :: threshold = 1.e-10_wp
 
@@ -471,6 +480,22 @@ contains
                         call s_mpi_abort('amr with acoustic_source: the source support overlaps the static fine block; ' &
                                          & // 'the source acts on the coarse grid only - move the source or the block apart')
                     end if
+                end do
+
+                ! global support bounding box (all ranks agree): the dynamic regrid suppresses tags
+                ! and clips candidate boxes against it so fine blocks never cover the source
+                sidx_supp = 0
+                sidx_supp(1) = start_idx(1)
+                if (n_glb > 0) sidx_supp(2) = start_idx(2)
+                if (p_glb > 0) sidx_supp(3) = start_idx(3)
+                do j = 1, 3
+                    lo_loc = huge(1); hi_loc = -huge(1)
+                    do k = 1, count
+                        lo_loc = min(lo_loc, int(source_spatials(ai)%coord(j, k)) + sidx_supp(j))
+                        hi_loc = max(hi_loc, int(source_spatials(ai)%coord(j, k)) + sidx_supp(j))
+                    end do
+                    call s_mpi_allreduce_integer_min(lo_loc, acoustic_supp_lo(j, ai))
+                    call s_mpi_allreduce_integer_max(hi_loc, acoustic_supp_hi(j, ai))
                 end do
             end if
 

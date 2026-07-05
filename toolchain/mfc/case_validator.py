@@ -243,8 +243,10 @@ PHYSICS_DOCS = {
             "are resolved on the refined level. Limited to non-STL bodies on a static block "
             "(amr_regrid_int = 0); force-driven moving IB, STL IB, and dynamic-regrid-with-IB are gated "
             "pending validation. Hypoelasticity (with continuum damage) is supported; polytropic QBMM is "
-            "supported. Acoustic sources are supported on a static block: the source acts on the coarse "
-            "grid and its support must not overlap the fine block (checked at startup). "
+            "supported. Acoustic sources are supported: the source acts on the coarse grid; its support "
+            "must not overlap the user-placed initial block (checked at startup), and under dynamic "
+            "regrid the source region stays coarse (tags are suppressed over the support and candidate "
+            "boxes are clipped clear of it). "
             "Incompatible with surface tension, Lagrangian bubbles, non-polytropic QBMM, "
             "IGR, cylindrical coordinates, MHD, hyperelasticity, "
             "hybrid_weno, hybrid_riemann, and active_box. "
@@ -1387,7 +1389,6 @@ class CaseValidator:
         active_box = self.get("active_box", "F") == "T"
         hybrid_weno = self.get("hybrid_weno", "F") == "T"
         hybrid_riemann = self.get("hybrid_riemann", "F") == "T"
-        acoustic_source = self.get("acoustic_source", "F") == "T"
         amr_tag_eps = self.get("amr_tag_eps")
         amr_buf = self.get("amr_buf")
         amr_max_blocks = self.get("amr_max_blocks")
@@ -1438,10 +1439,6 @@ class CaseValidator:
         self.prohibit(active_box, "amr is incompatible with active_box")
         self.prohibit(hybrid_weno, "amr is incompatible with hybrid_weno")
         self.prohibit(hybrid_riemann, "amr is incompatible with hybrid_riemann")
-        self.prohibit(
-            acoustic_source and amr_regrid_int is not None and amr_regrid_int > 0,
-            "amr with acoustic_source requires a static block (amr_regrid_int = 0): " "the source support is precomputed on the coarse grid and must not overlap a fine block",
-        )
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(
             amr_regrid_int is not None and amr_regrid_int > 0 and (amr_tag_eps is None or amr_tag_eps <= 0),

@@ -117,10 +117,9 @@ contains
             @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
             @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")
             ! acoustic sources act on the coarse grid only (their spatial support is precomputed as
-            ! coarse cell indices); a startup check aborts if the support overlaps the static block.
-            ! Dynamic regrid stays gated: new blocks could appear anywhere, including on the source.
-            @:PROHIBIT(acoustic_source .and. amr_regrid_int > 0, &
-                       & "amr with acoustic_source requires a static block (amr_regrid_int = 0): the source support is precomputed on the coarse grid and must not overlap a fine block")
+            ! coarse cell indices). A startup check aborts if the support overlaps the user-placed
+            ! initial block; the dynamic regrid keeps its own boxes clear of the support (tags are
+            ! suppressed over it and candidate boxes are clipped), so the source region stays coarse.
             @:PROHIBIT(any(amr_block_beg(1:num_dims) < 0), "amr_block_beg must be >= 0")
             @:PROHIBIT(amr_block_end(1) > m_glb .or. (num_dims >= 2 .and. amr_block_end(2) > n_glb) .or. (num_dims >= 3 &
                        & .and. amr_block_end(3) > p_glb), "amr_block_end must be <= global cell max per axis")
