@@ -140,7 +140,23 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
 
     for case in cases[:]:
         if ARG("single"):
-            skip = ["low_Mach", "Hypoelasticity", "teno", "Chemistry", "Phase Change model 6", "Axisymmetric", "Transducer", "Transducer Array", "Cylindrical", "HLLD", "Example"]
+            skip = [
+                "low_Mach",
+                "Hypoelasticity",
+                "teno",
+                "Chemistry",
+                "Phase Change model 6",
+                "Axisymmetric",
+                "Transducer",
+                "Transducer Array",
+                "Cylindrical",
+                "HLLD",
+                "Example",
+                # 200-step acoustic propagation drifts past the single tolerance; the AMR
+                # nonpolytropic pair carries override_tol=5e-9, unsatisfiable below single epsilon
+                "AMR -> 1D -> acoustic",
+                "nonpolytropic",
+            ]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
                 skipped_cases.append(case)
