@@ -349,10 +349,10 @@ contains
 
         allocate (proc_coords(1:num_dims))
 
-#ifdef MFC_MPI
-        ! start_idx is always needed (e.g. for sfc_partition_wrt); parallel I/O setup below is optional.
+        ! start_idx is read by decomposition-aware features (amr, sfc_partition_wrt) in ALL builds;
+        ! the serial/single-rank offset is 0 and the MPI decomposition overwrites it
         allocate (start_idx(1:num_dims))
-#endif
+        start_idx = 0
 
         if (parallel_io .neqv. .true.) return
 
@@ -375,10 +375,7 @@ contains
     impure subroutine s_finalize_global_parameters_common
 
         deallocate (proc_coords)
-
-#ifdef MFC_MPI
         deallocate (start_idx)
-#endif
 
     end subroutine s_finalize_global_parameters_common
 

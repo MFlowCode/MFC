@@ -69,7 +69,10 @@ contains
         D = ((gs_min(lp) - 1.0_wp)*cvs(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
 
 #ifdef MFC_SIMULATION
-        if (relax .and. load_weight_wrt) then
+        ! the load-weight field is computed for load_weight_wrt AND for sfc_partition_wrt (which
+        ! calls s_compute_load_weight too): allocate and populate under the same condition, else
+        ! the sfc-only path reads unallocated (or allocated-but-never-written) iteration counts
+        if (relax .and. (load_weight_wrt .or. sfc_partition_wrt)) then
             @:ALLOCATE(pc_iter_count(0:m, 0:n, 0:p))
         end if
 #endif
@@ -261,8 +264,9 @@ contains
                     end do
 
 #ifdef MFC_SIMULATION
-                    ! Accumulate Newton iteration count for load-weight diagnostic (no-op when load_weight_wrt=F).
-                    if (load_weight_wrt) pc_iter_count(j, k, l) = real(ns_pc, stp)
+                    ! Accumulate Newton iteration count for the load-weight diagnostic (matches the
+                    ! allocation condition; no-op when neither writer is enabled).
+                    if (load_weight_wrt .or. sfc_partition_wrt) pc_iter_count(j, k, l) = real(ns_pc, stp)
 #endif
                 end do
             end do

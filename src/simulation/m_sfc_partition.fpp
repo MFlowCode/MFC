@@ -165,11 +165,11 @@ contains
 
             integer, intent(out)         :: order(:)
             integer(kind=8), allocatable :: code(:)
-            integer                      :: tx, ty, tz, t, i, jmin
-            integer(kind=8)              :: cmin
-            logical, allocatable         :: used(:)
+            integer                      :: tx, ty, tz, t, i
+            integer                      :: width, lo_r, mid_r, hi_r, ia, ib_m, iw
+            integer, allocatable         :: work(:)
 
-            allocate (code(0:n_tiles - 1), used(0:n_tiles - 1)); used = .false.
+            allocate (code(0:n_tiles - 1))
             do tz = 0, n_tiles_z - 1
                 do ty = 0, n_tiles_y - 1
                     do tx = 0, n_tiles_x - 1
@@ -178,40 +178,61 @@ contains
                     end do
                 end do
             end do
-            ! selection by min code (n_tiles is modest; O(n_tiles^2) acceptable, or replace with a sort)
+            ! index sort by Morton code: bottom-up mergesort, O(n_tiles log n_tiles). A selection
+            ! loop is prohibitive at fine tile sizes (n_tiles reaches 1e6+ on large 3D grids).
+            ! Codes are unique (one per tile), so the order is deterministic on every rank.
             do i = 1, n_tiles
-                cmin = huge(0_8); jmin = -1
-                do t = 0, n_tiles - 1
-                    if (.not. used(t) .and. code(t) < cmin) then; cmin = code(t); jmin = t; end if
-                end do
-                order(i) = jmin; used(jmin) = .true.
+                order(i) = i - 1
             end do
-            deallocate (code, used)
+            allocate (work(1:n_tiles))
+            width = 1
+            do while (width < n_tiles)
+                do lo_r = 1, n_tiles, 2*width
+                    mid_r = min(lo_r + width - 1, n_tiles)
+                    hi_r = min(lo_r + 2*width - 1, n_tiles)
+                    if (mid_r >= hi_r) cycle
+                    ia = lo_r; ib_m = mid_r + 1; iw = lo_r
+                    do while (ia <= mid_r .and. ib_m <= hi_r)
+                        if (code(order(ia)) <= code(order(ib_m))) then
+                            work(iw) = order(ia); ia = ia + 1
+                        else
+                            work(iw) = order(ib_m); ib_m = ib_m + 1
+                        end if
+                        iw = iw + 1
+                    end do
+                    do while (ia <= mid_r); work(iw) = order(ia); ia = ia + 1; iw = iw + 1; end do
+                        do while (ib_m <= hi_r); work(iw) = order(ib_m); ib_m = ib_m + 1; iw = iw + 1; end do
+                            order(lo_r:hi_r) = work(lo_r:hi_r)
+                        end do
+                        width = 2*width
+                    end do
+                    deallocate (work)
+                    deallocate (code)
 
-        end subroutine s_build_sfc_order
+                end subroutine s_build_sfc_order
 
-        !> Print current static imbalance, predicted post-balance imbalance, and gain ratio.
-        impure subroutine s_report_sfc_partition
+                !> Print current static imbalance, predicted post-balance imbalance, and gain ratio.
+                impure subroutine s_report_sfc_partition
 
-            real(wp), allocatable :: rank_w(:)
-            real(wp)              :: w_sum, w_max, w_mean, imb_new, imb_cur, gain
-            integer               :: t
+                    real(wp), allocatable :: rank_w(:)
+                    real(wp)              :: w_sum, w_max, w_mean, imb_new, imb_cur, gain
+                    integer               :: t
 
-            if (.not. sfc_partition_wrt) return
-            allocate (rank_w(0:num_procs - 1)); rank_w = 0._wp
-            do t = 0, n_tiles - 1
-                rank_w(tile_rank(t)) = rank_w(tile_rank(t)) + tile_weight(t)
-            end do
-            w_sum = sum(rank_w); w_max = maxval(rank_w); w_mean = w_sum/real(num_procs, wp)
-            imb_new = w_max/max(w_mean, tiny(1._wp))
-            imb_cur = cur_w_max/max(w_mean, tiny(1._wp))
-            gain = imb_cur/max(imb_new, tiny(1._wp))
-            if (proc_rank == 0) then
-                print '(A,F8.3,A,F8.3,A,F8.3,A,I0,A,I0,A)', '[sfc_partition] imbalance current=', imb_cur, ' predicted=', &
-                    & imb_new, ' gain=', gain, '  (', n_tiles, ' tiles over ', num_procs, ' ranks)'
-            end if
-            deallocate (rank_w)
+                    if (.not. sfc_partition_wrt) return
+                    allocate (rank_w(0:num_procs - 1)); rank_w = 0._wp
+                    do t = 0, n_tiles - 1
+                        rank_w(tile_rank(t)) = rank_w(tile_rank(t)) + tile_weight(t)
+                    end do
+                    w_sum = sum(rank_w); w_max = maxval(rank_w); w_mean = w_sum/real(num_procs, wp)
+                    imb_new = w_max/max(w_mean, tiny(1._wp))
+                    imb_cur = cur_w_max/max(w_mean, tiny(1._wp))
+                    gain = imb_cur/max(imb_new, tiny(1._wp))
+                    if (proc_rank == 0) then
+                        print '(A,F8.3,A,F8.3,A,F8.3,A,I0,A,I0,A)', '[sfc_partition] imbalance current=', imb_cur, ' predicted=', &
+                            & imb_new, ' gain=', gain, '  (', n_tiles, ' tiles over ', num_procs, ' ranks)'
+                    end if
+                    deallocate (rank_w)
 
-        end subroutine s_report_sfc_partition
+                end subroutine s_report_sfc_partition
 
-    end module m_sfc_partition
+            end module m_sfc_partition

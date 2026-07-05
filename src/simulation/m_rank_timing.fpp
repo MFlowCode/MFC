@@ -46,6 +46,11 @@ contains
         integer(8) :: toc_count, rate
 
         if (.not. rank_time_wrt) return
+        ! unmatched toc (caller bug): clamp instead of underflowing into an uninitialized tic_count
+        if (tic_depth <= 0) then
+            tic_depth = 0
+            return
+        end if
         tic_depth = tic_depth - 1
         if (tic_depth > 0) return
         $:GPU_WAIT()
