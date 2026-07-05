@@ -211,23 +211,24 @@ a diagnostic message for unsupported combinations.
 | Phase change / relaxation (`relax = T`) | Supported | Per-cell relaxation runs on the fine block before restriction |
 | Chemistry — reactions + advection + diffusion (`chemistry = T`) | Supported | Species sum/positivity closure on prolongation; temperature ghost exchanged at rank seams; diffusion fluxes refluxed like viscous |
 | Surface tension (`surface_tension = T`) | **Not supported** | The capillary force depends on the interface-normal direction; the prolonged fine ghost color cannot reproduce the coarse normal across a 2:1 boundary, producing a growing spurious seam current. See @ref case section 7.1. |
-| Hypoelasticity / hyperelasticity / MHD | **Not supported** | Unvalidated with the fine-level advance |
+| Hypoelasticity (`hypoelasticity = T`, incl. continuum damage) | Supported | Stress components prolong on the generic conservative path; the fine swap recomputes the spacing-dependent FD coefficients |
+| Hyperelasticity / MHD | **Not supported** | Gated (hyperelasticity has no upstream test coverage to validate against; MHD needs divergence-preserving B prolongation) |
 | QBMM bubbles (polytropic) | Supported | Bubble moments live in `q_cons`, injected piecewise-constant at prolongation to preserve CHyQMOM realizability |
-| QBMM bubbles (non-polytropic) | **Not supported** | `pb`/`mv` quadrature side-state is a global array the fine advance would corrupt through the swap |
+| QBMM bubbles (non-polytropic) | Supported (static block, no subcycle) | Each block carries its own `pb`/`mv` quadrature side-state: prolonged piecewise-constant (realizability), advanced with the block's own rhs scratch, restricted back with the moments; dynamic regrid and `amr_subcycle` remain gated |
 | Lagrangian bubbles | **Not supported** | Lagrangian tracking not advanced on the fine level |
-| Immersed boundaries (`ib = T`; single non-STL body, static or prescribed-motion `moving_ibm=1`; `amr_regrid_int = 0`) | Supported | Per-block fine-grid IB markers/ghost points, rebuilt each fine substage at the body's sub-time position for a moving body; non-conservative ghost-cell forcing at the body; force-driven (`moving_ibm=2`)/multi-body/STL/dynamic-regrid gated; a body spanning a rank seam is rejected at startup |
+| Immersed boundaries (`ib = T`; one or more non-STL bodies, static or prescribed-motion `moving_ibm=1`; `amr_regrid_int = 0`) | Supported | Per-block fine-grid IB markers/ghost points, rebuilt each fine substage at the body's sub-time position for a moving body; non-conservative ghost-cell forcing at the body; force-driven (`moving_ibm=2`)/STL/dynamic-regrid gated; a body spanning a rank seam is rejected at startup |
 | IGR solver | **Not supported** | Unvalidated with the fine-level advance |
 | Cylindrical / axisymmetric coordinates | **Not supported** | Unvalidated with the fine-level advance |
 | `active_box` | **Not supported** | Unvalidated combination |
 | `hybrid_weno` / `hybrid_riemann` | **Not supported** | Unvalidated combination |
-| `acoustic_source` | **Not supported** | dt-dependent RHS source; unvalidated with the fine-level advance |
+| `acoustic_source` | Supported | The source acts on the coarse grid only: its support must not overlap the initial block (startup abort), and dynamic regrid keeps its boxes clear of the support (tags suppressed, candidate boxes clipped); emitted waves enter blocks through the coarse/fine coupling |
 
 **Mandatory solver settings.**
 
 AMR requires:
 - WENO reconstruction: `recon_type = 1` (any order)
 - SSP-RK3 time-stepping: `time_stepper = 3`
-- 5-equation model: `model_eqns = 2`
+- 5- or 6-equation model: `model_eqns = 2` or `3` (for 6-eq the per-stage pressure relaxation also runs on each fine block)
 
 ---
 
@@ -261,7 +262,7 @@ through 47 (level-0 index space):
     # ... base grid, patch, time-stepping settings ...
     'recon_type'     : 1,   # WENO (required)
     'time_stepper'   : 3,   # SSP-RK3 (required)
-    'model_eqns'     : 2,   # 5-equation model (required)
+    'model_eqns'     : 2,   # 5- or 6-equation model (2 or 3)
 
     # AMR
     'amr'            : 'T',

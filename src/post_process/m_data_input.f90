@@ -631,6 +631,7 @@ contains
         logical                              :: file_exist
         integer                              :: k, i, nblk, ghdr(3), reg(6), rm, rn, rp
         integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d
+        integer                              :: have_loc, have_glb
         logical                              :: owns
 
 #ifdef MFC_MPI
@@ -664,15 +665,32 @@ contains
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
         end if
         inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (.not. file_exist) then
-            if (proc_rank == 0) print '(A,I0,A)', ' [amr] post: no AMR fine-block file at t_step ', t_step, &
-                & '; writing the coarse mesh only'
+        ! all ranks must agree: in serial (per-rank-file) mode a partially present p_all tree would
+        ! otherwise mix fine-overlay and coarse-only ranks with no message unless rank 0 was the
+        ! missing one (mirrors the sim reader's allreduce-min agreement)
+        have_loc = merge(1, 0, file_exist)
+        call s_mpi_allreduce_integer_min(have_loc, have_glb)
+        if (have_glb == 0) then
+            if (proc_rank == 0 .and. file_exist) print '(A,I0,A)', ' [amr] post: AMR fine-block file(s) at t_step ', t_step, &
+                & ' are missing on some ranks; writing the coarse mesh only'
+            if (proc_rank == 0 .and. .not. file_exist) print '(A,I0,A)', ' [amr] post: no AMR fine-block file at t_step ', &
+                & t_step, '; writing the coarse mesh only'
             return
         end if
 
         if (.not. parallel_io) then
             open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
             read (2) ghdr
+            ! the layout offsets depend on both: a stale file from a different run configuration
+            ! would otherwise misalign every record (mirrors the sim reader's header validation)
+            if (ghdr(1) /= num_procs) then
+                call s_mpi_abort('amr post: the AMR fine-block file was written with a different rank count; ' &
+                                 & // 'run post_process with the same number of ranks as the simulation')
+            end if
+            if (ghdr(3) /= sys_size) then
+                call s_mpi_abort('amr post: the AMR fine-block file was written with a different number of ' &
+                                 & // 'conserved variables; the physics configuration must match the simulation')
+            end if
             nblk = ghdr(2)
             allocate (amr_fine(nblk))
             amr_num_fine = 0
@@ -709,6 +727,10 @@ contains
             if (ghdr(1) /= num_procs) then
                 call s_mpi_abort('amr post: the AMR fine-block file was written with a different rank count; ' &
                                  & // 'run post_process with the same number of ranks as the simulation')
+            end if
+            if (ghdr(3) /= sys_size) then
+                call s_mpi_abort('amr post: the AMR fine-block file was written with a different number of ' &
+                                 & // 'conserved variables; the physics configuration must match the simulation')
             end if
             nblk = ghdr(2)
             allocate (amr_fine(nblk))

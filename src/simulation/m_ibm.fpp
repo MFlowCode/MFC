@@ -35,7 +35,8 @@ module m_ibm
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
 
-    integer :: num_gps  !< Number of ghost points
+    integer         :: num_gps      !< Number of ghost points
+    integer(kind=8) :: max_num_gps  !< ghost_points capacity fixed at setup (2x the initial allreduced total, cell-count capped)
 
     !> Per-block fine IB state for single-body AMR (SP20 static, SP21 prescribed-motion): each AMR slot keeps its own fine-grid
     !! markers + ghost-point list, computed from the geometry at fine resolution so the body is resolved on the fine block. Swapped
@@ -86,8 +87,7 @@ contains
     !> Initializes the values of various IBM variables, such as ghost points and image points.
     impure subroutine s_ibm_setup()
 
-        integer         :: i, j, k
-        integer(kind=8) :: max_num_gps
+        integer :: i, j, k
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
@@ -934,6 +934,12 @@ contains
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps)
+        ! the ghost_points capacity (max_num_gps, a 2x-of-setup heuristic) can be outgrown when the
+        ! moving surface's discrete cell count increases (body entering the domain, bodies separating,
+        ! rotating non-convex geometry); the fill below has no bound check, so overflow would be a
+        ! silent device out-of-bounds write
+        @:PROHIBIT(int(num_gps, 8) > max_num_gps, &
+                   & "moving IB: the ghost-point count outgrew its setup-time capacity (max_num_gps); the body's surface-cell count increased beyond 2x the initial total")
         call s_find_ghost_points(ghost_points)
         call nvtxEndRange
 

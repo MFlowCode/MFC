@@ -676,7 +676,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `sfc_partition_wrt`     | Logical | Report SFC-weighted load-balance partition |
 | `rank_time_wrt`         | Logical | Report per-rank RHS compute-time imbalance (max/mean) |
 | `load_balance`          | Logical | (Experimental/diagnostic) Weighted static Cartesian decomposition at init (requires `parallel_io = T`, >1 rank). Measured gain is small on CPU (~5%) and can be slower on GPU due to the occupancy floor; equal decomposition is near-optimal for uniform-cost workloads. |
-| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 block with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2; num_fluids > 1 requires mpp_lim; supports physical viscosity. |
+| `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 block with gradient-based dynamic regrid, optional dt/2 subcycling, and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2 or 3; num_fluids > 1 requires mpp_lim; supports physical viscosity. |
 | `amr_block_beg(i)`      | Integer | Refined-block start cell index in direction $i$ (level-0 index space) |
 | `amr_block_end(i)`      | Integer | Refined-block end cell index in direction $i$ (level-0 index space) |
 | `amr_regrid_int`        | Integer | Steps between AMR regrid events (0 = static block) |
@@ -776,7 +776,7 @@ It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_
 
 ### 7.1. Adaptive Mesh Refinement (AMR) {#sec-amr}
 
-MFC supports block-structured AMR (Experimental) via a single 2:1 refined level-1 block
+MFC supports block-structured AMR (Experimental) via up to `amr_max_blocks` 2:1 refined level-1 blocks
 that coexists with the base-level solve.
 The fine block is initialized from the base grid by piecewise-linear interpolation and
 remains continuously coupled to the base solve through conservative ghost-cell exchange
@@ -784,7 +784,7 @@ and flux refluxing at the coarse–fine interface.
 
 **Restrictions.**
 AMR requires WENO reconstruction (`recon_type = 1`, any order), SSP-RK3 time-stepping
-(`time_stepper = 3`), and the 5-equation model (`model_eqns = 2`).
+(`time_stepper = 3`), and the 5- or 6-equation model (`model_eqns = 2` or `3`; for 6-eq the per-stage pressure relaxation also runs on each fine block).
 Multiple fluids (`num_fluids > 1`) are supported and additionally require `mpp_lim`,
 whose volume-fraction clamp+renormalize maintains coarse/fine alpha consistency; the
 per-fluid masses are refluxed exactly, and volume fractions are prolonged with a
@@ -812,9 +812,10 @@ arrays are inert stubs when `polytropic = T`), and the whole moment block is pro
 piecewise-constant so every fine/ghost cell inherits the coarse cell's realizable moment set
 (the CHyQMOM inversion needs the radius variance c20 = m20/m00 - (m10/m00)^2 to stay positive, which a
 per-component minmod slope could break); the moments still reflux and restrict on the standard
-conservative path. Non-polytropic QBMM (`polytropic = F`) is not supported: there the
-per-quadrature-node internal pressure and vapor mass (pb/mv) evolve as a global side-array that
-the fine advance would overwrite through the global grid swap, corrupting the coarse state.
+conservative path. Non-polytropic QBMM (`polytropic = F`) is supported on a static block without
+subcycling: each block carries its own per-quadrature-node internal pressure and vapor mass
+(pb/mv), prolonged piecewise-constant for realizability, advanced with the block's own rhs
+scratch, and restricted back with the moments (dynamic regrid and `amr_subcycle` remain gated).
 Phase change (`relax`) is supported: the cell-local, mass/energy-conserving relaxation
 runs on the fine solution before restriction (matching the coarse once-per-step timing).
 Chemistry (`chemistry = T`) is supported for reactions and advection: the species partial
@@ -840,15 +841,16 @@ mass/momentum/energy at the body), so the conservation defect is nonzero in the 
 the flux reflux still conserves to machine precision away from it. A body in prescribed motion
 (`moving_ibm = 1`) is also supported: the fine block's IB markers/ghost points are rebuilt each fine
 RK substage at the body's sub-time position (the same linear time interpolation the subcycle applies
-to the fluid ghosts), so the refined body tracks its prescribed trajectory. Limited to a single
-non-STL body on a static block (`amr_regrid_int = 0`); force-driven motion (`moving_ibm = 2`),
-multi-body, STL geometry, and dynamic regrid with IB are gated pending validation. Under MPI a body contained within one rank's
+to the fluid ghosts), so the refined body tracks its prescribed trajectory. Supports one or more
+non-STL bodies on a static block (`amr_regrid_int = 0`); force-driven motion (`moving_ibm = 2`),
+STL geometry, and dynamic regrid with IB are gated pending validation. Under MPI a body contained within one rank's
 subdomain is bit-exact across decompositions; a body spanning a rank seam is rejected at startup
 (the fine-IB image-point stencil across the seam is not yet decomposition-exact), so keep the body
 inside a single rank's subdomain (use fewer ranks or reposition it).
-AMR is incompatible with surface tension, Lagrangian bubbles, non-polytropic QBMM,
-IGR, cylindrical
-coordinates, MHD, `hybrid_weno`, `hybrid_riemann`, and `acoustic_source`.
+AMR is incompatible with surface tension, Lagrangian bubbles, IGR, cylindrical
+coordinates, MHD, hyperelasticity, `hybrid_weno`, `hybrid_riemann`, and `active_box`.
+Acoustic sources are supported on the coarse grid only: the support must not overlap the initial
+block (startup abort) and dynamic regrid keeps its boxes clear of the support.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
 holds the fine cells covering the block's intersection with its own subdomain), so the
 block may span rank boundaries and move freely across them under dynamic regrid.

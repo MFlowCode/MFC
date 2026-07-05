@@ -127,7 +127,7 @@ contains
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
             @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
             @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")
-            ! acoustic sources act on the coarse grid only (their spatial support is precomputed as
+            ! no acoustic_source gate here: acoustic sources act on the coarse grid only (their spatial support is precomputed as
             ! coarse cell indices). A startup check aborts if the support overlaps the user-placed
             ! initial block; the dynamic regrid keeps its own boxes clear of the support (tags are
             ! suppressed over it and candidate boxes are clipped), so the source region stays coarse.

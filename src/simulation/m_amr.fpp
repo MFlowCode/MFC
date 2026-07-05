@@ -4,7 +4,9 @@
 
 #:include 'macros.fpp'
 
-!> @brief AMR hierarchy (SP1: one static, inert refined level-1 block alongside the base solve).
+!> @brief Block-structured AMR: up to amr_max_blocks 2:1 refined level-1 blocks, advanced with the shared solver via grid-state
+!! swap, conservatively coupled to level 0 (ghost prolongation, Berger-Colella flux reflux, restriction), with optional dt/2
+!! subcycling and dynamic regrid.
 module m_amr
 
 #ifdef MFC_MPI
@@ -70,7 +72,7 @@ module m_amr
         real(wp), allocatable  :: rhs_pb_f(:,:,:,:,:), rhs_mv_f(:,:,:,:,:)  !< fine rhs (ghost-inclusive like rhs)
     end type t_level
 
-    !> Fixed pool of refined-block slots (T1: amr_num_blocks = 1 active; slots 2..amr_max_blocks allocated-inactive). The working
+    !> Fixed pool of refined-block slots (at init one slot is active; dynamic regrid activates up to amr_max_blocks). The working
     !! slot amr_cur (m_global_parameters) selects which slot every per-block routine operates on.
     type(t_level), allocatable :: amr_slots(:)
     integer                    :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
@@ -84,6 +86,7 @@ module m_amr
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
     logical               :: sw_acoustic_source
+    logical               :: amr_swapped = .false.  !< paired-swap guard: a nested swap would corrupt the bounce buffers silently
     real(wp), allocatable :: sw_x_cb(:), sw_x_cc(:), sw_dx(:)
     real(wp), allocatable :: sw_y_cb(:), sw_y_cc(:), sw_dy(:)
     real(wp), allocatable :: sw_z_cb(:), sw_z_cc(:), sw_dz(:)
@@ -231,6 +234,9 @@ contains
                 @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
                 @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
                 @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_cons_stor(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_a(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_b(i))
             end do
             if (qbmm .and. .not. polytropic) then
                 @:ALLOCATE(amr_slots(islot)%pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
@@ -642,9 +648,10 @@ contains
 
     end subroutine s_restrict_one_var
 
-    !> Volume-weighted restriction: each covered coarse cell = average of its ref_ratio^d fine children. Writes ONLY the caller's
-    !! coarse target (SP2: a scratch buffer) - never level-0. Device kernel (per-cell arithmetic identical to s_restrict_one_var,
-    !! which remains the host path for the init-time diagnostics).
+    !> Volume-weighted restriction: each covered coarse cell = average of its ref_ratio^d fine children. Writes the caller's coarse
+    !! target - in production the level-0 state q_cons_ts(1)%vf (the deliberate fold-back of fine data each step, plus coarse pb/mv
+    !! for non-polytropic QBMM); the init-time diagnostics pass a scratch buffer instead. Device kernel (per-cell arithmetic
+    !! identical to s_restrict_one_var, which remains the host path for the diagnostics).
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -1032,6 +1039,10 @@ contains
     !> Swap the global grid state to the fine block. MUST be paired with s_amr_restore_coarse.
     impure subroutine s_amr_swap_to_fine()
 
+        ! a nested swap would overwrite the sw_* bounce buffers with FINE state, and the eventual
+        ! restore would install fine extents as the coarse grid - silent corruption of everything after
+        @:ASSERT(.not. amr_swapped, "nested s_amr_swap_to_fine (swap/restore must pair)")
+        amr_swapped = .true.
         sw_m = m; sw_n = n; sw_p = p
         sw_idwint = idwint; sw_idwbuff = idwbuff
         ! the acoustic source's precomputed spatials are coarse-grid cell indices: applying them on
@@ -1108,6 +1119,8 @@ contains
     !> Restore the global grid state saved by s_amr_swap_to_fine.
     impure subroutine s_amr_restore_coarse()
 
+        @:ASSERT(amr_swapped, "s_amr_restore_coarse without a matching s_amr_swap_to_fine")
+        amr_swapped = .false.
         m = sw_m; n = sw_n; p = sw_p
         idwint = sw_idwint; idwbuff = sw_idwbuff
         acoustic_source = sw_acoustic_source
@@ -1637,12 +1650,6 @@ contains
 
     end subroutine s_amr_find_split
 
-    !> Cluster the local per-cell tag field into a LIST of separated block boxes (global level-0 cell indices), identically on every
-    !! rank. Gathers the tags into a global field (allreduce MAX), runs Berger-Rigoutsos recursive bisection until each box's tag
-    !! efficiency reaches amr_cluster_eff (or it is atomic / the amr_max_blocks cap is reached), then merges any two boxes whose
-    !! amr_buf-padded extents come within buff_size (guaranteeing no fine-fine adjacency: separated boxes stay >= buff_size apart,
-    !! nearby ones collapse to a single box == the legacy bounding box). Boxes are the raw tagged extents; the caller pads, clamps
-    !! and size-caps each one.
     !> True iff global level-0 cell (gi, gj, gk) lies inside any acoustic source support bbox.
     pure logical function f_in_acoustic_support(gi, gj, gk) result(insup)
 
@@ -1699,6 +1706,12 @@ contains
 
     end subroutine s_amr_clip_box_from_sources
 
+    !> Cluster the local per-cell tag field into a LIST of separated block boxes (global level-0 cell indices), identically on every
+    !! rank. Gathers the tags into a global field (allreduce MAX), runs Berger-Rigoutsos recursive bisection until each box's tag
+    !! efficiency reaches amr_cluster_eff (or it is atomic / the amr_max_blocks cap is reached), then merges any two boxes whose
+    !! amr_buf-padded extents come within buff_size (guaranteeing no fine-fine adjacency: separated boxes stay >= buff_size apart,
+    !! nearby ones collapse to a single box == the legacy bounding box). Boxes are the raw tagged extents; the caller pads, clamps
+    !! and size-caps each one.
     impure subroutine s_amr_cluster(tag_grid, boxes, nboxes)
 
         logical, intent(in)                   :: tag_grid(0:,0:,0:)
@@ -1961,8 +1974,9 @@ contains
         !> Write the fine-level restart file for save step t_step alongside the level-0 restart (whose format stays untouched): the
         !! writing rank count, the active-block count, and for EACH block its box + each rank's intersection-local fine conservative
         !! state. Serial mode: one unformatted file per rank inside its level-0 step directory. Parallel mode: one shared MPI-IO
-        !! file (3-int global header [np, nboxes, sys_size], then per block a 6-int box header followed by the ranks' fine blocks
-        !! concatenated in rank order). Same rank count + decomposition required to restart.
+        !! file (3-int global header [np, nboxes, sys_size], then per block a 6-int box header, a 3*np-int per-rank fine-extents
+        !! record [m,n,p per rank, 0s for non-owners; validated on read], followed by the ranks' fine blocks concatenated in rank
+        !! order). Same rank count + decomposition required to restart (enforced by the extents record).
         impure subroutine s_write_amr_restart(t_step)
 
             integer, intent(in)                  :: t_step
@@ -2013,6 +2027,8 @@ contains
                     call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
                 end if
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+                ! MPI-IO file handles default to MPI_ERRORS_RETURN: failures are silent unless checked
+                if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart write: MPI_FILE_OPEN failed for ' // trim(file_loc))
                 if (proc_rank == 0) call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), [num_procs, amr_num_blocks, sys_size], &
                     & 3, MPI_INTEGER, status, ierr)
                 disp0 = int(3*ibytes, MPI_OFFSET_KIND)  ! running byte offset past the 3-int global header
@@ -2055,10 +2071,14 @@ contains
                     end do
                     call MPI_FILE_WRITE_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, &
                                                & mpi_io_p, status, ierr)
+                    if (ierr /= MPI_SUCCESS) &
+                        & call s_mpi_abort('amr restart write: data write failed (disk full/quota?); the file is unusable')
                     deallocate (buf)
                     disp0 = ddisp + tot_cnt*int(sbytes, MPI_OFFSET_KIND)
                 end do
+                ! the close is where buffered MPI-IO data flushes on many stacks - a failure here truncates the file
                 call MPI_FILE_CLOSE(ifile, ierr)
+                if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart write: MPI_FILE_CLOSE failed; the file may be truncated')
 #endif
             end if
 
@@ -2082,7 +2102,7 @@ contains
             integer                             :: myext(3)
             integer, allocatable                :: wext(:), rext(:)
             integer, dimension(MPI_STATUS_SIZE) :: status
-            integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, tot_cnt, disp0, ddisp
+            integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, tot_cnt, disp0, ddisp, fsz
             real(stp), allocatable              :: buf(:)
 #endif
 
@@ -2128,7 +2148,7 @@ contains
                            & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
                     call s_mpi_abort(trim(msg))
                 end if
-                if (ghdr(2) > amr_max_blocks) then
+                if (ghdr(2) < 1 .or. ghdr(2) > amr_max_blocks) then
                     call s_mpi_abort('amr restart: the file holds more fine blocks than amr_max_blocks ' &
                                      & // 'in this run; restart with amr_max_blocks at least the written block count')
                 end if
@@ -2136,6 +2156,12 @@ contains
                 do k = 1, amr_num_blocks
                     amr_cur = k
                     read (2) reg, rm, rn, rp
+                    ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
+                    ! build and coordinate reads out of bounds silently in release builds
+                    if (reg(1) < 0 .or. reg(4) > m_glb .or. reg(1) > reg(4) .or. (n_glb > 0 .and. (reg(2) < 0 .or. reg(5) > n_glb &
+                        & .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) > reg(6)))) then
+                        call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
+                    end if
                     call s_set_amr_fine_geometry(reg(1:3), reg(4:6))
                     if (rm /= amr_slots(k)%m .or. rn /= amr_slots(k)%n .or. rp /= amr_slots(k)%p) then
                         call s_mpi_abort('amr restart decomposition mismatch: this rank''s fine extents differ from the file' &
@@ -2152,6 +2178,11 @@ contains
 #ifdef MFC_MPI
                 ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                ! MPI-IO errors are silent by default (MPI_ERRORS_RETURN on file handles) and a read past EOF
+                ! is not even an error - it returns short with an uninitialized tail. Grab the size up front;
+                ! the exact expected byte count is compared after the layout records are consumed below.
+                if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart read: MPI_FILE_OPEN failed for ' // trim(file_loc))
+                call MPI_FILE_GET_SIZE(ifile, fsz, ierr)
                 call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
                 if (ghdr(1) /= num_procs) then
                     write (msg, '(A,I0,A,I0,A)') 'amr restart rank-count mismatch: the AMR restart file was written with ', &
@@ -2165,7 +2196,7 @@ contains
                            & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
                     call s_mpi_abort(trim(msg))
                 end if
-                if (ghdr(2) > amr_max_blocks) then
+                if (ghdr(2) < 1 .or. ghdr(2) > amr_max_blocks) then
                     call s_mpi_abort('amr restart: the file holds more fine blocks than amr_max_blocks ' &
                                      & // 'in this run; restart with amr_max_blocks at least the written block count')
                 end if
@@ -2174,6 +2205,12 @@ contains
                 do k = 1, amr_num_blocks
                     amr_cur = k
                     call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                    ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
+                    ! build and coordinate reads out of bounds silently in release builds
+                    if (reg(1) < 0 .or. reg(4) > m_glb .or. reg(1) > reg(4) .or. (n_glb > 0 .and. (reg(2) < 0 .or. reg(5) > n_glb &
+                        & .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) > reg(6)))) then
+                        call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
+                    end if
                     if (.not. allocated(wext)) allocate (wext(3*num_procs), rext(3*num_procs))
                     call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, &
                                               & status, ierr)
@@ -2214,6 +2251,13 @@ contains
                     deallocate (buf)
                     disp0 = ddisp + tot_cnt*int(sbytes, MPI_OFFSET_KIND)
                 end do
+                ! disp0 now equals the exact byte count a complete file must have: a truncated file (crashed
+                ! writer, filesystem hiccup) passes every layout check above but returns short reads with
+                ! garbage tails - fail closed instead of restoring uninitialized data as the fine level
+                if (disp0 /= fsz) then
+                    call s_mpi_abort('amr restart read: file size does not match the expected layout ' &
+                                     & // '(truncated or corrupt amr restart file)')
+                end if
                 call MPI_FILE_CLOSE(ifile, ierr)
 #endif
             end if

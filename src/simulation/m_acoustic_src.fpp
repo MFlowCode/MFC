@@ -402,7 +402,7 @@ contains
         integer             :: j, k, l, ai
         integer             :: count
         integer             :: dim
-        integer             :: sidx_supp(3), lo_loc, hi_loc
+        integer             :: sidx_supp(3), lo_loc, hi_loc, kb
         real(wp)            :: source_spatial, angle, xyz_to_r_ratios(3)
         real(wp), parameter :: threshold = 1.e-10_wp
 
@@ -476,17 +476,23 @@ contains
                 sidx_supp(1) = start_idx(1)
                 if (n_glb > 0) sidx_supp(2) = start_idx(2)
                 if (p_glb > 0) sidx_supp(3) = start_idx(3)
-                do j = 1, count
-                    if (int(source_spatials(ai)%coord(1, &
-                        & j)) + sidx_supp(1) >= amr_block_beg(1) .and. int(source_spatials(ai)%coord(1, &
-                        & j)) + sidx_supp(1) <= amr_block_end(1) .and. (n_glb == 0 .or. (int(source_spatials(ai)%coord(2, &
-                        & j)) + sidx_supp(2) >= amr_block_beg(2) .and. int(source_spatials(ai)%coord(2, &
-                        & j)) + sidx_supp(2) <= amr_block_end(2))) .and. (p_glb == 0 .or. (int(source_spatials(ai)%coord(3, &
-                        & j)) + sidx_supp(3) >= amr_block_beg(3) .and. int(source_spatials(ai)%coord(3, &
-                        & j)) + sidx_supp(3) <= amr_block_end(3)))) then
-                        call s_mpi_abort('amr with acoustic_source: the source support overlaps the static fine block; ' &
-                                         & // 'the source acts on the coarse grid only - move the source or the block apart')
-                    end if
+                ! check every ACTIVE block region (this covers the user-placed initial block AND
+                ! restart-restored regridded boxes - a source moved between write and restart could
+                ! otherwise overlap a restored block and silently drop the source inside it)
+                do kb = 1, amr_num_blocks
+                    do j = 1, count
+                        if (int(source_spatials(ai)%coord(1, j)) + sidx_supp(1) >= amr_region_lo_all(1, &
+                            & kb) .and. int(source_spatials(ai)%coord(1, j)) + sidx_supp(1) <= amr_region_hi_all(1, &
+                            & kb) .and. (n_glb == 0 .or. (int(source_spatials(ai)%coord(2, &
+                            & j)) + sidx_supp(2) >= amr_region_lo_all(2, kb) .and. int(source_spatials(ai)%coord(2, &
+                            & j)) + sidx_supp(2) <= amr_region_hi_all(2, &
+                            & kb))) .and. (p_glb == 0 .or. (int(source_spatials(ai)%coord(3, &
+                            & j)) + sidx_supp(3) >= amr_region_lo_all(3, kb) .and. int(source_spatials(ai)%coord(3, &
+                            & j)) + sidx_supp(3) <= amr_region_hi_all(3, kb)))) then
+                            call s_mpi_abort('amr with acoustic_source: the source support overlaps a fine block; ' &
+                                             & // 'the source acts on the coarse grid only - move the source or the block apart')
+                        end if
+                    end do
                 end do
 
                 ! global support bounding box (all ranks agree): the dynamic regrid suppresses tags

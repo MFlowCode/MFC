@@ -16,8 +16,7 @@ module m_sfc_partition
     implicit none
 
     private
-    public :: s_initialize_sfc_partition_module, s_finalize_sfc_partition_module, s_compute_sfc_partition, &
-        & s_report_sfc_partition, n_tiles_x, n_tiles_y, n_tiles_z, n_tiles, tile_weight, tile_rank, sfc_order
+    public :: s_initialize_sfc_partition_module, s_finalize_sfc_partition_module, s_compute_sfc_partition, s_report_sfc_partition
 
     integer               :: n_tiles_x, n_tiles_y, n_tiles_z, n_tiles
     real(wp), allocatable :: tile_weight(:)  !< global per-tile aggregated cost (linear index)

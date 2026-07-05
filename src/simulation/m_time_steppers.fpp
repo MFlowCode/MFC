@@ -503,7 +503,7 @@ contains
 
             ! AMR fine-level stage advance (interleaved, non-subcycled): q_cons_ts(1)%vf still holds
             ! the coarse stage-entry state here (the stage-1 backup and RK update below have not run yet).
-            ! Each active block slot is advanced + refluxed in turn (T1: one slot); amr_cur is reset to 1
+            ! Each active block slot is advanced + refluxed in turn; amr_cur is reset to 1
             ! afterwards so the next stage's coarse RHS captures creg into slot 1.
             if (amr .and. .not. amr_subcycle) then
                 do islot = 1, amr_num_blocks
@@ -603,7 +603,7 @@ contains
         if (amr) then
             ! ghost lerp sources, restriction target, and state-reflux target are all device-resident:
             ! the substep/restriction/reflux machinery runs as device kernels (M2). Each active block slot
-            ! (T1: one) is subcycled, restricted, and state-refluxed in turn; amr_cur resets to 1 afterwards.
+            ! is subcycled, restricted, and state-refluxed in turn; amr_cur resets to 1 afterwards.
             do islot = 1, amr_num_blocks
                 call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                 if (amr_subcycle) then

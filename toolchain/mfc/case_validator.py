@@ -216,9 +216,10 @@ PHYSICS_DOCS = {
         "title": "Adaptive Mesh Refinement (AMR)",
         "category": "Adaptive Mesh Refinement",
         "explanation": (
-            "Block-structured AMR (Experimental) adds a single 2:1 refined level-1 block. "
+            "Block-structured AMR (Experimental) adds up to amr_max_blocks 2:1 refined level-1 blocks. "
             "Requires WENO reconstruction (recon_type = 1), SSP-RK3 (time_stepper = 3), "
-            "and the 5-equation model (model_eqns = 2); num_fluids > 1 additionally requires "
+            "and the 5- or 6-equation model (model_eqns = 2 or 3; for 6-eq the per-stage pressure "
+            "relaxation also runs on each fine block); num_fluids > 1 additionally requires "
             "mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha "
             "consistency). "
             "Supports Euler-Euler bubbles (bubbles_euler), including non-polytropic (polytropic = F, "
@@ -227,8 +228,7 @@ PHYSICS_DOCS = {
             "(radius, and non-polytropic partial-pressure/vapor-mass) for realizability. Polytropic QBMM "
             "(qbmm = T, polytropic = T) is supported: its six-moment set lives in the conserved variables "
             "(pb/mv inert) and is prolonged piecewise-constant so each fine cell inherits the coarse cell's "
-            "realizable moment set (CHyQMOM needs radius variance c20 > 0). Non-polytropic QBMM is not "
-            "supported (its evolving pb/mv quadrature side-state would be corrupted by the fine advance). "
+            "realizable moment set (CHyQMOM needs radius variance c20 > 0). "
             "Supports phase change (relax): the cell-local, mass/energy-conserving relaxation runs "
             "on the fine solution before restriction (matching the coarse once-per-step timing). "
             "Supports chemistry reactions, advection, and species diffusion (single- and multi-rank): the "
