@@ -16,6 +16,7 @@ module m_data_output
     use m_compile_specific
     use m_helper
     use m_variables_conversion
+    use m_chemistry, only: s_compute_q_T_sf
     use m_data_input, only: amr_fine, amr_num_fine
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo, format_binary, precision_single
 
@@ -726,6 +727,10 @@ contains
             ibnd(1)%beg = 0; ibnd(1)%end = fm
             ibnd(2)%beg = 0; ibnd(2)%end = fn
             ibnd(3)%beg = 0; ibnd(3)%end = fp
+            ! seed the temperature guess from the fine conservative state (the reacting-EOS cons->prim
+            ! uses q_T as its Newton initial guess); without this q_T_blk is uninitialized -> NaN under
+            ! bounds-checked/NaN-init builds, mirroring the coarse path (m_start_up: s_compute_q_T_sf)
+            if (chemistry) call s_compute_q_T_sf(q_T_blk, amr_fine(k)%q_cons, ibnd)
             call s_convert_conservative_to_primitive_variables(amr_fine(k)%q_cons, q_T_blk, q_prim_blk, ibnd)
 
             if (fp > 0) then
