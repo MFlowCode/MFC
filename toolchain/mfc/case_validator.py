@@ -243,7 +243,7 @@ PHYSICS_DOCS = {
             "are resolved on the refined level. Limited to non-STL bodies on a static block "
             "(amr_regrid_int = 0); force-driven moving IB, STL IB, and dynamic-regrid-with-IB are gated "
             "pending validation. Hypoelasticity (with continuum damage) is supported; polytropic QBMM is "
-            "supported; non-polytropic QBMM is supported on a static block without subcycling (each "
+            "supported; non-polytropic QBMM is fully supported, including dynamic regrid and subcycling (each "
             "block carries its own pb/mv quadrature side-state, prolonged piecewise-constant and "
             "restricted back with the moments). Acoustic sources are supported: the source acts on the coarse grid; its support "
             "must not overlap the user-placed initial block (checked at startup), and under dynamic "
@@ -1389,7 +1389,6 @@ class CaseValidator:
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
-        qbmm = self.get("qbmm", "F") == "T"
         ib = self.get("ib", "F") == "T"
         igr = self.get("igr", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
@@ -1429,17 +1428,6 @@ class CaseValidator:
         self.prohibit(
             cyl_coord and (self.get("p", 0) or 0) > 0,
             "amr with cyl_coord supports 2D axisymmetric only: " "the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance",
-        )
-        polytropic = self.get("polytropic", "T") == "T"  # Fortran default is .true.
-        # non-polytropic QBMM: each block carries its own pb/mv side-state; regrid and subcycle
-        # do not yet carry it, so those combinations stay gated
-        self.prohibit(
-            qbmm and not polytropic and amr_regrid_int is not None and amr_regrid_int > 0,
-            "amr with non-polytropic QBMM requires a static block (amr_regrid_int = 0): " "the regrid rebuild does not yet carry the pb/mv side-state",
-        )
-        self.prohibit(
-            qbmm and not polytropic and self.get("amr_subcycle", "F") == "T",
-            "amr with non-polytropic QBMM does not support amr_subcycle: " "the subcycle ghost-lerp does not yet carry the pb/mv side-state",
         )
         if ib:
             # static/prescribed-motion IB AMR (SP20/21): one or more bodies resolved on a static fine block.

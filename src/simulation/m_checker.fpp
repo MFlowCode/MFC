@@ -123,12 +123,9 @@ contains
                        & "amr with cyl_coord supports 2D axisymmetric only: the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance")
             ! non-polytropic QBMM: each block carries its own pb/mv quadrature side-state (prolonged
             ! piecewise-constant to preserve CHyQMOM realizability, advanced with the block's own rhs
-            ! scratch, restricted back with the moments). Dynamic regrid and subcycling are gated: the
-            ! regrid stash/overlap-copy and the subcycle ghost-lerp do not yet carry pb/mv.
-            @:PROHIBIT(qbmm .and. (.not. polytropic) .and. amr_regrid_int > 0, &
-                       & "amr with non-polytropic QBMM requires a static block (amr_regrid_int = 0): the regrid rebuild does not yet carry the pb/mv side-state")
-            @:PROHIBIT(qbmm .and. (.not. polytropic) .and. amr_subcycle, &
-                       & "amr with non-polytropic QBMM does not support amr_subcycle: the subcycle ghost-lerp does not yet carry the pb/mv side-state")
+            ! scratch, restricted back with the moments). The subcycle time-lerps the pb/mv ghost
+            ! shell like the conservative ghosts, and the regrid bounces the side-state through the
+            ! pb/mv_stor arrays exactly like q_cons - dynamic regrid and subcycling are supported.
             ! static-body IB AMR (SP20) + prescribed-motion moving bodies (SP21): fixed or analytically-moving
             ! (moving_ibm==1) bodies resolved on a static fine block. Multi-body (num_ibs>1) is supported - every body
             ! shares the one static block and reuses the multi-body-capable core IB setup. Force/torque-driven motion

@@ -3254,6 +3254,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, override_tol=5 * 10 ** (-9)))
+        # dynamic regrid + subcycle: the pb/mv side-state now regrids (stor bounce + re-prolong +
+        # overlap copy) and subcycles (two-source ghost time-lerp) exactly like q_cons
+        stack.push("regrid subcycle", {"amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "amr_subcycle": "T"})
+        cases.append(define_case_d(stack, "", {}, override_tol=5 * 10 ** (-9)))
+        stack.pop()
         stack.pop()
         stack.pop()
         # (n) STATIC IMMERSED BOUNDARY (SP20): a fixed circular body resolved on a static fine block that
