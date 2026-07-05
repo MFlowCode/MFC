@@ -1376,6 +1376,9 @@ _nv(
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
 )
+# post_process reads the `amr` flag (only) to overlay the refined fine blocks on the coarse
+# mesh; the fine-block geometry is recovered from the AMR restart file, not from these params.
+_nv(_SIM_POST, "amr")
 _nv(
     _PRE,
     "stretch_x",

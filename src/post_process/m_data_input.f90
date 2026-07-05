@@ -20,7 +20,7 @@ module m_data_input
     implicit none
 
     private; public :: s_initialize_data_input_module, s_read_data_files, s_read_serial_data_files, s_read_parallel_data_files, &
-        & s_finalize_data_input_module
+        & s_read_amr_data, s_free_amr_data, s_finalize_data_input_module
 
     abstract interface
 
@@ -41,6 +41,17 @@ module m_data_input
     type(scalar_field), public                               :: q_T_sf     !< Temperature field
     ! type(scalar_field), public :: ib_markers !<
     type(integer_field), public :: ib_markers
+
+    !> One AMR fine-block piece owned by this rank, held for visualization overlay of the refined solution.
+    type, public :: amr_fine_block
+        integer                                       :: lo(3), hi(3)      !< global coarse-index region bounds of the parent block
+        integer                                       :: m, n, p           !< local fine extents (interior 0:m, 0:n, 0:p)
+        real(wp), allocatable, dimension(:)           :: x_cb, y_cb, z_cb  !< reconstructed fine cell boundaries
+        type(scalar_field), allocatable, dimension(:) :: q_cons            !< fine conservative state
+    end type amr_fine_block
+
+    type(amr_fine_block), allocatable, dimension(:), public :: amr_fine  !< this rank's owned block pieces
+    integer, public :: amr_num_fine  !< number of block pieces this rank owns (<= file's block count)
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
@@ -549,6 +560,224 @@ contains
 
         s_read_data_files => null()
 
+        call s_free_amr_data()
+
     end subroutine s_finalize_data_input_module
+
+    !> Reconstruct level-1 fine cell boundaries fcb(-1:nfine) by bisecting the coarse cells of pcb, starting at this rank's LOCAL
+    !! coarse index lo_local. Mirrors s_build_level_coords (m_amr) but keeps only the boundaries needed by the mesh.
+    pure subroutine s_amr_reconstruct_fine_cb(pcb, pcb_lb, lo_local, nfine, fcb)
+
+        real(wp), intent(in)                 :: pcb(:)
+        integer, intent(in)                  :: pcb_lb, lo_local, nfine
+        real(wp), allocatable, intent(inout) :: fcb(:)
+        integer                              :: fi, c, off
+        real(wp)                             :: xl, xr, xm
+
+        off = 1 - pcb_lb  ! pcb(j) = coarse_cb(j + pcb_lb - 1); coarse_cb(c) = pcb(c + off)
+        do fi = 0, nfine
+            c = lo_local + fi/2
+            xl = pcb(c - 1 + off)
+            xr = pcb(c + off)
+            xm = 0.5_wp*(xl + xr)
+            if (mod(fi, 2) == 0) then
+                fcb(fi - 1) = xl
+                fcb(fi) = xm
+            else
+                fcb(fi) = xr
+            end if
+        end do
+
+    end subroutine s_amr_reconstruct_fine_cb
+
+    !> Populate block slot `k` metadata, allocate its conservative fields, and reconstruct its fine coordinates from the coarse cell
+    !! boundaries (x_cb/y_cb/z_cb, already read for this t_step). isect_lo is the block's global coarse origin; sidx is this rank's
+    !! global coarse origin (0 for a single-rank/no-MPI run).
+    impure subroutine s_setup_amr_block(k, reg, isect_lo, sidx, fm, fn, fp)
+
+        integer, intent(in) :: k, reg(6), isect_lo(3), sidx(3), fm, fn, fp
+        integer             :: i
+
+        amr_fine(k)%lo = reg(1:3)
+        amr_fine(k)%hi = reg(4:6)
+        amr_fine(k)%m = fm; amr_fine(k)%n = fn; amr_fine(k)%p = fp
+
+        allocate (amr_fine(k)%q_cons(1:sys_size))
+        do i = 1, sys_size
+            allocate (amr_fine(k)%q_cons(i)%sf(0:fm,0:fn,0:fp))
+        end do
+
+        ! isect_lo is GLOBAL; sidx is this rank's global origin (0 for a single-rank/no-MPI run), so
+        ! isect_lo - sidx is the LOCAL coarse index whose x_cb slice the bisection reads.
+        allocate (amr_fine(k)%x_cb(-1:fm))
+        call s_amr_reconstruct_fine_cb(x_cb, lbound(x_cb, 1), isect_lo(1) - sidx(1), fm, amr_fine(k)%x_cb)
+        if (n > 0) then
+            allocate (amr_fine(k)%y_cb(-1:fn))
+            call s_amr_reconstruct_fine_cb(y_cb, lbound(y_cb, 1), isect_lo(2) - sidx(2), fn, amr_fine(k)%y_cb)
+        end if
+        if (p > 0) then
+            allocate (amr_fine(k)%z_cb(-1:fp))
+            call s_amr_reconstruct_fine_cb(z_cb, lbound(z_cb, 1), isect_lo(3) - sidx(3), fp, amr_fine(k)%z_cb)
+        end if
+
+    end subroutine s_setup_amr_block
+
+    !> Read the AMR fine-level restart file for t_step (mirrors s_read_amr_restart in m_amr, serial and parallel branches) and store
+    !! this rank's owned block pieces for the post-process overlay. No-op when amr is off or the file is absent.
+    impure subroutine s_read_amr_data(t_step)
+
+        integer, intent(in)                  :: t_step
+        character(LEN=path_len + 3*name_len) :: file_loc
+        logical                              :: file_exist
+        integer                              :: k, i, nblk, ghdr(2), reg(6), rm, rn, rp
+        integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d
+        logical                              :: owns
+
+#ifdef MFC_MPI
+        integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, tot_cnt, disp0, ddisp
+        real(stp), allocatable              :: buf(:)
+#endif
+
+        call s_free_amr_data()
+        if (.not. amr) return
+
+        ! this rank's subdomain in global coarse indices (mirror s_amr_compute_isect's sidx/ext). start_idx is
+        ! allocated only under MPI; for a single-rank/no-MPI run the global origin is 0.
+        sidx = 0; ext = 0
+        ext(1) = m
+        if (n > 0) ext(2) = n
+        if (p > 0) ext(3) = p
+#ifdef MFC_MPI
+        sidx(1) = start_idx(1)
+        if (n > 0) sidx(2) = start_idx(2)
+        if (p > 0) sidx(3) = start_idx(3)
+#endif
+
+        if (.not. parallel_io) then
+            write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step, '/amr_fine.dat'
+        else
+            write (file_loc, '(A,I0,A)') 'amr_', t_step, '.dat'
+            file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+        end if
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (.not. file_exist) then
+            if (proc_rank == 0) print '(A,I0,A)', ' [amr] post: no AMR fine-block file at t_step ', t_step, &
+                & '; writing the coarse mesh only'
+            return
+        end if
+
+        if (.not. parallel_io) then
+            open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
+            read (2) ghdr
+            nblk = ghdr(2)
+            allocate (amr_fine(nblk))
+            amr_num_fine = 0
+            do k = 1, nblk
+                read (2) reg, rm, rn, rp
+                do d = 1, 3
+                    isect_lo(d) = max(reg(d), sidx(d))
+                    isect_hi(d) = min(reg(3 + d), sidx(d) + ext(d))
+                end do
+                owns = isect_lo(1) <= isect_hi(1)
+                if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
+                if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
+                if (.not. owns) cycle  ! writer emitted no data record for a block this rank does not own
+                fm = 2*(isect_hi(1) - isect_lo(1) + 1) - 1
+                fn = 0; fp = 0
+                if (n > 0) fn = 2*(isect_hi(2) - isect_lo(2) + 1) - 1
+                if (p > 0) fp = 2*(isect_hi(3) - isect_lo(3) + 1) - 1
+                if (fm /= rm .or. fn /= rn .or. fp /= rp) call s_mpi_abort('amr post: fine-extent mismatch vs the ' &
+                    & // 'AMR restart file (identical rank count and decomposition required). Exiting.')
+                amr_num_fine = amr_num_fine + 1
+                call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp)
+                do i = 1, sys_size
+                    read (2) amr_fine(amr_num_fine)%q_cons(i)%sf(0:fm,0:fn,0:fp)
+                end do
+            end do
+            close (2)
+        else
+#ifdef MFC_MPI
+            ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 2, MPI_INTEGER, status, ierr)
+            nblk = ghdr(2)
+            allocate (amr_fine(nblk))
+            amr_num_fine = 0
+            disp0 = int(2*ibytes, MPI_OFFSET_KIND)
+            do k = 1, nblk
+                call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                do d = 1, 3
+                    isect_lo(d) = max(reg(d), sidx(d))
+                    isect_hi(d) = min(reg(3 + d), sidx(d) + ext(d))
+                end do
+                owns = isect_lo(1) <= isect_hi(1)
+                if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
+                if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
+                fm = 2*max(isect_hi(1) - isect_lo(1) + 1, 0) - 1
+                fn = 0; fp = 0
+                if (n > 0) fn = 2*max(isect_hi(2) - isect_lo(2) + 1, 0) - 1
+                if (p > 0) fp = 2*max(isect_hi(3) - isect_lo(3) + 1, 0) - 1
+                cnt = sys_size*(fm + 1)*(fn + 1)*(fp + 1)
+                if (.not. owns) cnt = 0
+                my_cnt = int(cnt, MPI_OFFSET_KIND)
+                my_off = int(0, MPI_OFFSET_KIND)
+                call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
+                if (proc_rank == 0) my_off = int(0, MPI_OFFSET_KIND)
+                call MPI_ALLREDUCE(my_cnt, tot_cnt, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
+                ddisp = disp0 + int(6*ibytes, MPI_OFFSET_KIND)
+                allocate (buf(max(cnt, 1)))
+                call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
+                                          & status, ierr)
+                if (owns) then
+                    amr_num_fine = amr_num_fine + 1
+                    call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp)
+                    idx = 0
+                    do i = 1, sys_size
+                        do fk = 0, fp
+                            do fj = 0, fn
+                                do fi = 0, fm
+                                    idx = idx + 1
+                                    amr_fine(amr_num_fine)%q_cons(i)%sf(fi, fj, fk) = buf(idx)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+                deallocate (buf)
+                disp0 = ddisp + tot_cnt*int(sbytes, MPI_OFFSET_KIND)
+            end do
+            call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+        end if
+
+        if (proc_rank == 0) print '(A,I0,A,I0,A)', ' [amr] post: read ', ghdr(2), ' fine block(s) (', amr_num_fine, &
+            & ' owned by rank 0)'
+
+    end subroutine s_read_amr_data
+
+    !> Release the stored AMR fine-block pieces.
+    impure subroutine s_free_amr_data()
+
+        integer :: k, i
+
+        if (allocated(amr_fine)) then
+            do k = 1, amr_num_fine
+                if (allocated(amr_fine(k)%q_cons)) then
+                    do i = 1, sys_size
+                        if (associated(amr_fine(k)%q_cons(i)%sf)) deallocate (amr_fine(k)%q_cons(i)%sf)
+                    end do
+                    deallocate (amr_fine(k)%q_cons)
+                end if
+                if (allocated(amr_fine(k)%x_cb)) deallocate (amr_fine(k)%x_cb)
+                if (allocated(amr_fine(k)%y_cb)) deallocate (amr_fine(k)%y_cb)
+                if (allocated(amr_fine(k)%z_cb)) deallocate (amr_fine(k)%z_cb)
+            end do
+            deallocate (amr_fine)
+        end if
+        amr_num_fine = 0
+
+    end subroutine s_free_amr_data
 
 end module m_data_input
