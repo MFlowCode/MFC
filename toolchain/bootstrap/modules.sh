@@ -164,7 +164,9 @@ fi
 # AMD HPCFund: AFAR LLVM Flang (amdflang) + system GNU-built OpenMPI, gfx90a.
 # The stock mpi.mod is GNU-built and binary-incompatible with amdflang, so we
 # point at a pre-generated flang-compatible one under $OLCF_AFAR_ROOT/include/mpi.
-if [ "$u_c" '==' 'amdfund' ]; then
+# amdflang is only supported for OpenMP-offload GPU builds; CPU-mode (-m c) builds
+# use the gfortran + OpenMPI provided by the amdfund-all modules, so gate on GPU.
+if [ "$u_c" '==' 'amdfund' ] && [ "$cg" '==' 'gpu' ]; then
     # Direct WORK-filesystem path (mounted at the same /work1 point on login and
     # compute nodes); override OLCF_AFAR_ROOT before loading to use another drop.
     export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b}"
