@@ -187,6 +187,9 @@ contains
         t_save = dflt_real
         t_stop = dflt_real
 
+        ! AMR: post_process overlays the refined fine blocks when this is on (default off)
+        amr = .false.
+
         ! Simulation algorithm parameters (post-specific)
         mixture_err = .false.
         alt_soundspeed = .false.
