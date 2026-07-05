@@ -134,8 +134,12 @@ contains
                        & "amr with ib supports static or prescribed-motion (moving_ibm=1) bodies only; force-driven moving IB (moving_ibm=2) under amr is not yet validated")
             @:PROHIBIT(ib .and. any(patch_ib(1:num_ibs)%geometry == 12), &
                        & "amr with ib does not support STL-model geometry (not yet validated)")
-            @:PROHIBIT(ib .and. amr_regrid_int > 0, &
-                       & "amr with ib requires a static block (amr_regrid_int = 0); dynamic regrid with IB is not yet validated")
+            ! dynamic regrid with STATIC bodies: candidate boxes expand to fully contain every body
+            ! (partial coverage is an untested regime), overlapping expansions merge, and the fine
+            ! IB state is rebuilt from the geometry after every regrid. Moving bodies stay gated:
+            ! their per-substep position updates are not yet coupled to a moving block set.
+            @:PROHIBIT(ib .and. amr_regrid_int > 0 .and. any(patch_ib(1:num_ibs)%moving_ibm > 0), &
+                       & "amr dynamic regrid with ib supports static bodies only; moving bodies require a static block (amr_regrid_int = 0)")
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
             @:PROHIBIT(hybrid_weno, "amr is incompatible with hybrid_weno (unvalidated combination)")
             @:PROHIBIT(hybrid_riemann, "amr is incompatible with hybrid_riemann (unvalidated combination)")

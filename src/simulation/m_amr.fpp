@@ -1832,6 +1832,76 @@ contains
 
     end subroutine s_amr_clip_box_from_sources
 
+    !> Expand a candidate regrid box (global indices) to fully contain every immersed body it overlaps, with a buff_size margin (the
+    !! IB image-point stencils need resolved surroundings). Expansion is re-clamped to the domain interior by the caller's own
+    !! guards; a body too large for the per-rank block cap aborts with a named message. Static bodies only (moving bodies with
+    !! dynamic regrid remain gated).
+    impure subroutine s_amr_expand_box_over_bodies(lo, hi)
+
+        integer, intent(inout) :: lo(3), hi(3)
+        integer                :: i, d, blo(3), bhi(3), mrg
+        real(wp)               :: c(3), half(3)
+        logical                :: ovl
+
+        ! containment margin: the IB image-point stencil reaches a few cells beyond the surface
+        ! (the validated static-block goldens keep ~5); buff_size (floored to 10 by ib) would
+        ! exceed the per-rank block cap for ordinary bodies
+
+        mrg = max(amr_buf, 4)
+
+        do i = 1, num_ibs
+            c = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid]
+            select case (patch_ib(i)%geometry)
+            case (2, 8, 10)  ! circle, sphere, cylinder: radius-bounded (cylinder length adds below)
+                half = patch_ib(i)%radius
+                if (patch_ib(i)%geometry == 10) then
+                    half(1) = max(half(1), 0.5_wp*patch_ib(i)%length_x)
+                    half(2) = max(half(2), 0.5_wp*patch_ib(i)%length_y)
+                    half(3) = max(half(3), 0.5_wp*patch_ib(i)%length_z)
+                end if
+            case (3, 9)  ! rectangle, box
+                half = 0.5_wp*[patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]
+            case default
+                call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
+                                 & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
+            end select
+            ! physical bbox -> global coarse indices (uniform spacing is enforced for amr; the
+            ! axisymmetric half axis cell only shrinks dy(0), so the floor is still conservative)
+            blo(1) = int((c(1) - half(1) - x_domain%beg)/dx(0)) - mrg
+            bhi(1) = int((c(1) + half(1) - x_domain%beg)/dx(0)) + mrg
+            blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
+            if (n_glb > 0) then
+                blo(2) = int((c(2) - half(2) - y_domain%beg)/dy(min(1, n))) - mrg
+                bhi(2) = int((c(2) + half(2) - y_domain%beg)/dy(min(1, n))) + mrg
+            end if
+            if (p_glb > 0) then
+                blo(3) = int((c(3) - half(3) - z_domain%beg)/dz(0)) - mrg
+                bhi(3) = int((c(3) + half(3) - z_domain%beg)/dz(0)) + mrg
+            end if
+            ! blocks must stay buff_size inside the domain: a body whose margin-padded bbox does
+            ! not fit cannot be contained - fail with a named message instead of a clipped body
+            if (blo(1) < buff_size .or. bhi(1) > m_glb - buff_size .or. (n_glb > 0 .and. (blo(2) < buff_size .or. bhi(2) > n_glb &
+                & - buff_size)) .or. (p_glb > 0 .and. (blo(3) < buff_size .or. bhi(3) > p_glb - buff_size))) then
+                call s_mpi_abort('amr dynamic regrid with ib: the immersed body plus its containment ' &
+                                 & // 'margin does not fit inside the refinable domain interior (blocks stay buff_size off the edges)')
+            end if
+            ovl = lo(1) <= bhi(1) .and. hi(1) >= blo(1)
+            if (n_glb > 0) ovl = ovl .and. lo(2) <= bhi(2) .and. hi(2) >= blo(2)
+            if (p_glb > 0) ovl = ovl .and. lo(3) <= bhi(3) .and. hi(3) >= blo(3)
+            if (.not. ovl) cycle
+            do d = 1, num_dims
+                lo(d) = min(lo(d), blo(d))
+                hi(d) = max(hi(d), bhi(d))
+            end do
+            if (hi(1) - lo(1) + 1 > amr_maxc_fit(1) .or. (n_glb > 0 .and. hi(2) - lo(2) + 1 > amr_maxc_fit(2)) .or. (p_glb > 0 &
+                & .and. hi(3) - lo(3) + 1 > amr_maxc_fit(3))) then
+                call s_mpi_abort('amr dynamic regrid with ib: containing the immersed body plus margin ' &
+                                 & // 'exceeds the per-rank block size cap; use fewer ranks or a larger amr_maxc_fit')
+            end if
+        end do
+
+    end subroutine s_amr_expand_box_over_bodies
+
     !> Cluster the local per-cell tag field into a LIST of separated block boxes (global level-0 cell indices), identically on every
     !! rank. Gathers the tags into a global field (allreduce MAX), runs Berger-Rigoutsos recursive bisection until each box's tag
     !! efficiency reaches amr_cluster_eff (or it is atomic / the amr_max_blocks cap is reached), then merges any two boxes whose
@@ -1952,7 +2022,7 @@ contains
             type(t_box), allocatable                               :: boxes(:)
             integer                                                :: lo(3), hi(3), sh(3), old_np, k, kk
             integer                                                :: old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks)
-            logical                                                :: old_owns(amr_max_blocks), any_xchg, same
+            logical                                                :: old_owns(amr_max_blocks), any_xchg, same, merged
             integer                                                :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, i
             integer                                                :: sidx(3), tg_lo(3), tg_hi(3), nboxes
             real(wp)                                               :: r0, g
@@ -2024,11 +2094,58 @@ contains
                 ! keep candidate boxes clear of every acoustic source support (the source acts on the
                 ! coarse grid only); clipping only shrinks, so boxes stay disjoint - empties drop below
                 if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
+                ! a fine block that PARTIALLY covers an immersed body is an untested regime (ghost
+                ! prolongation through body-interior cells, refluxing across the body): any box that
+                ! overlaps a body's bounding box is expanded to contain the whole body plus margin
+                if (ib) call s_amr_expand_box_over_bodies(lo, hi)
                 if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) cycle  ! confined to the domain margin
                 k = k + 1; boxes(k)%lo = lo; boxes(k)%hi = hi
             end do
             nboxes = k
             if (nboxes == 0) return
+
+            if (ib) then
+                ! body-containment expansion can make boxes overlap (bisection guaranteed disjoint
+                ! boxes; two boxes near one body both grow over it): merge overlapping pairs to a
+                ! bounding box until none remain - overlapping blocks would double-restrict/reflux
+                merged = .true.
+                do while (merged)
+                    merged = .false.
+                    outer: do k = 1, nboxes - 1
+                        do kk = k + 1, nboxes
+                            if (boxes(k)%lo(1) <= boxes(kk)%hi(1) .and. boxes(k)%hi(1) >= boxes(kk)%lo(1) .and. (n_glb == 0 &
+                                & .or. (boxes(k)%lo(2) <= boxes(kk)%hi(2) .and. boxes(k)%hi(2) >= boxes(kk)%lo(2))) &
+                                & .and. (p_glb == 0 .or. (boxes(k)%lo(3) <= boxes(kk)%hi(3) .and. boxes(k)%hi(3) &
+                                & >= boxes(kk)%lo(3)))) then
+                                boxes(k)%lo = min(boxes(k)%lo, boxes(kk)%lo)
+                                boxes(k)%hi = max(boxes(k)%hi, boxes(kk)%hi)
+                                boxes(kk) = boxes(nboxes); nboxes = nboxes - 1
+                                if (boxes(k)%hi(1) - boxes(k)%lo(1) + 1 > amr_maxc_fit(1) .or. (n_glb > 0 .and. boxes(k)%hi(2) &
+                                    & - boxes(k)%lo(2) + 1 > amr_maxc_fit(2)) .or. (p_glb > 0 .and. boxes(k)%hi(3) &
+                                    & - boxes(k)%lo(3) + 1 > amr_maxc_fit(3))) then
+                                    call s_mpi_abort('amr regrid: merging body-containing blocks exceeds ' &
+                                                     & // 'the per-rank block size cap')
+                                end if
+                                merged = .true.
+                                exit outer
+                            end if
+                        end do
+                    end do outer
+                end do
+                ! the expansion may also have grown a box onto an acoustic source support: the two
+                ! constraints (contain the body, exclude the source) cannot both hold - fail closed
+                if (acoustic_source) then
+                    do k = 1, nboxes
+                        lo = boxes(k)%lo; hi = boxes(k)%hi
+                        call s_amr_clip_box_from_sources(lo, hi)
+                        if (any(lo /= boxes(k)%lo) .or. any(hi /= boxes(k)%hi)) then
+                            call s_mpi_abort('amr regrid: a block must contain an immersed body AND stay ' &
+                                             & // 'clear of an acoustic source support - the constraints conflict; ' &
+                                             & // 'move the body or the source apart')
+                        end if
+                    end do
+                end if
+            end if
 
             ! 4) unchanged? (same count and boxes as the live slots -> keep them; a rebuild would reproduce them exactly anyway)
             if (nboxes == amr_num_blocks) then
@@ -2130,6 +2247,9 @@ contains
                 call s_mpi_sendrecv_amr_fine_halo(amr_slots(k)%q_cons, amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p)
             end do
             amr_xchg_coarse_ghosts = any_xchg  ! coarse halo exchanged once per step if ANY block needs it
+            ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/
+            ! image points recomputed from the body definitions; no state carries across regrids)
+            if (ib) call s_amr_setup_ib()
             call s_amr_select_slot(1)
 
         end subroutine s_amr_regrid

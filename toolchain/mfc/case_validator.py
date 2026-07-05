@@ -1433,6 +1433,7 @@ class CaseValidator:
             # static/prescribed-motion IB AMR (SP20/21): one or more bodies resolved on a static fine block.
             num_ibs = self.get("num_ibs") or 0
             force_driven = any((self.get(f"patch_ib({i})%moving_ibm") or 0) == 2 for i in range(1, num_ibs + 1))
+            force_driven_or_moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) > 0 for i in range(1, num_ibs + 1))
             stl = any((self.get(f"patch_ib({i})%geometry")) == 12 for i in range(1, num_ibs + 1))
             self.prohibit(
                 force_driven,
@@ -1440,8 +1441,8 @@ class CaseValidator:
             )
             self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
             self.prohibit(
-                amr_regrid_int is not None and amr_regrid_int > 0,
-                "amr with ib requires a static block (amr_regrid_int = 0); dynamic regrid with IB is not yet validated",
+                amr_regrid_int is not None and amr_regrid_int > 0 and force_driven_or_moving,
+                "amr dynamic regrid with ib supports static bodies only; " "moving bodies require a static block (amr_regrid_int = 0)",
             )
         self.prohibit(active_box, "amr is incompatible with active_box")
         self.prohibit(hybrid_weno, "amr is incompatible with hybrid_weno")

@@ -3320,6 +3320,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # dynamic regrid with a STATIC body: candidate boxes expand to contain the body + margin,
+        # overlapping expansions merge, and the fine IB state rebuilds from geometry every regrid
+        stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2, "t_step_stop": 20, "t_step_save": 20})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
         # (n2) MULTI-BODY static IB AMR: TWO static circular bodies sharing one static 2:1 fine block, in
