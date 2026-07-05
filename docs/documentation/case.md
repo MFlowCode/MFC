@@ -847,8 +847,10 @@ STL geometry, and dynamic regrid with IB are gated pending validation. Under MPI
 subdomain is bit-exact across decompositions; a body spanning a rank seam is rejected at startup
 (the fine-IB image-point stencil across the seam is not yet decomposition-exact), so keep the body
 inside a single rank's subdomain (use fewer ranks or reposition it).
-AMR is incompatible with surface tension, Lagrangian bubbles, IGR, cylindrical
-coordinates, MHD, hyperelasticity, `hybrid_weno`, `hybrid_riemann`, and `active_box`.
+AMR is incompatible with surface tension, Lagrangian bubbles, IGR, 3D cylindrical
+coordinates (2D axisymmetric IS supported; the axis half-cell's per-cell WENO coefficients are
+recomputed per block on swap), MHD, hyperelasticity, grid stretching, Riemann-extrapolation
+boundaries (bc = -4), `hybrid_weno`, `hybrid_riemann`, and `active_box`.
 Acoustic sources are supported on the coarse grid only: the support must not overlap the initial
 block (startup abort) and dynamic regrid keeps its boxes clear of the support.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank

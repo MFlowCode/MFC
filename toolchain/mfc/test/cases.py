@@ -3460,6 +3460,66 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
         stack.pop()
 
+        # (p) 2D AXISYMMETRIC: an off-axis pressure pulse drives genuinely radial flow (nonzero
+        # geometric sources) with the static fine block's lower-r edge at the MINIMUM legal axis
+        # distance (amr_block_beg(2) = buff_size) - the stiffest 1/r a block can see. The axis
+        # half-width cell makes the coarse y-WENO coefficients per-cell, so this also exercises
+        # the per-swap coefficient recompute (amr_weno_coef_recompute). Validated against a
+        # no-AMR reference (diffs match the Cartesian control's resolution effects; r-weighted
+        # mass drift 1.09e-6 vs the reference's 1.07e-6).
+        stack.push(
+            "AMR -> 2D -> axisymmetric",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "cyl_coord": "T",
+                "dt": 2.0e-4,
+                "t_step_stop": 40,
+                "t_step_save": 40,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -2,
+                "bc_y%end": -6,
+                "num_patches": 2,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%geometry": 2,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.28,
+                "patch_icpp(2)%radius": 0.1,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%pres": 5.0,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "amr": "T",
+                "amr_block_beg(1)": 20,
+                "amr_block_beg(2)": 4,
+                "amr_block_end(1)": 43,
+                "amr_block_end(2)": 27,
+                "amr_regrid_int": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():

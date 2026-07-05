@@ -12,7 +12,8 @@ module m_checker
     use m_mpi_proxy
     use m_helper
     use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3, riemann_solver_hllc
+    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3, riemann_solver_hllc, &
+        & BC_RIEMANN_EXTRAP
 
     implicit none
 
@@ -98,6 +99,13 @@ contains
             ! conservative path and the per-stage pressure relaxation (cell-local) also runs on
             ! each fine block, mirroring the coarse stage order.
             @:PROHIBIT(model_eqns /= 2 .and. model_eqns /= 3, "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
+            ! Riemann-extrapolation BCs modify the WENO coefficient rows near the domain boundary;
+            ! the fine advance reuses (or block-locally recomputes) those arrays, and neither form
+            ! can carry the coarse boundary special-casing onto an interior block correctly
+            @:PROHIBIT(bc_x%beg == BC_RIEMANN_EXTRAP .or. bc_x%end == BC_RIEMANN_EXTRAP .or. (n_glb > 0 &
+                       & .and. (bc_y%beg == BC_RIEMANN_EXTRAP .or. bc_y%end == BC_RIEMANN_EXTRAP)) .or. (p_glb > 0 &
+                       & .and. (bc_z%beg == BC_RIEMANN_EXTRAP .or. bc_z%end == BC_RIEMANN_EXTRAP)), &
+                       & "amr does not support Riemann-extrapolation boundary conditions (bc = -4): they alter the WENO coefficient rows near the boundary, which the fine-block reconstruction cannot inherit correctly")
             @:PROHIBIT(num_fluids > 1 .and. .not. mpp_lim, &
                        & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)")
             @:PROHIBIT(surface_tension, &
@@ -105,7 +113,14 @@ contains
             ! hypoelasticity is supported: stress components prolong via the generic conservative-linear
             ! path and the swap/restore recomputes the spacing-dependent FD coefficients per grid
             @:PROHIBIT(hyperelasticity .or. mhd, "amr does not support hyperelasticity/MHD")
-            @:PROHIBIT(bubbles_lagrange .or. igr .or. cyl_coord, "amr does not support Lagrangian bubbles/IGR/cylindrical")
+            @:PROHIBIT(bubbles_lagrange .or. igr, "amr does not support Lagrangian bubbles/IGR")
+            ! 2D axisymmetric is supported: the geometric sources read the live grid arrays the fine
+            ! swap replaces, and the axis-singularity viscous treatment is skipped on fine blocks
+            ! (blocks cannot touch the axis - the domain-edge clamp keeps them buff_size inside).
+            ! 3D cylindrical stays gated: its per-stage azimuthal Fourier filter is a global
+            ! operation incompatible with the block-local fine advance.
+            @:PROHIBIT(cyl_coord .and. p > 0, &
+                       & "amr with cyl_coord supports 2D axisymmetric only: the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance")
             ! non-polytropic QBMM: each block carries its own pb/mv quadrature side-state (prolonged
             ! piecewise-constant to preserve CHyQMOM realizability, advanced with the block's own rhs
             ! scratch, restricted back with the moments). Dynamic regrid and subcycling are gated: the

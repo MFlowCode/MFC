@@ -1481,7 +1481,10 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
+            ! the axis-singularity stress treatment belongs to the PHYSICAL axis only: bc_y is not
+            ! swapped by the AMR fine advance, so without the guard a fine block would apply axis
+            ! handling at its own (interior) lower-y edge - the coarse pass owns the real axis
+            if (cyl_coord .and. (.not. amr_in_fine_advance) .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                 if (viscous) then
                     if (p > 0) then
                         call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, &

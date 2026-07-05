@@ -27,6 +27,7 @@ module m_amr
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
+    use m_weno, only: s_compute_weno_coefficients
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
 
     implicit none
@@ -87,6 +88,10 @@ module m_amr
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
     logical               :: sw_acoustic_source
     logical               :: amr_swapped = .false.  !< paired-swap guard: a nested swap would corrupt the bounce buffers silently
+    !> True when the coarse grid is nonuniform in an allowed way (the 2D-axisymmetric half-width axis cell): the WENO reconstruction
+    !! coefficients are then per-cell, so the fine advance must recompute them for the block's own (uniform) grid on every swap and
+    !! restore the coarse ones after. False on fully uniform grids - the recompute is skipped and behavior is bit-identical.
+    logical               :: amr_weno_coef_recompute = .false.
     real(wp), allocatable :: sw_x_cb(:), sw_x_cc(:), sw_dx(:)
     real(wp), allocatable :: sw_y_cb(:), sw_y_cc(:), sw_dy(:)
     real(wp), allocatable :: sw_z_cb(:), sw_z_cc(:), sw_dz(:)
@@ -204,6 +209,37 @@ contains
             allocate (sw_z_cc(-buff_size:p + buff_size))
             allocate (sw_dz(-buff_size:p + buff_size))
         end if
+
+        ! Grid uniformity policy. WENO reconstruction coefficients are spacing-dependent; on a
+        ! uniform grid they are identical at every cell, which is why the fine advance can reuse
+        ! the coarse arrays untouched. The ONE allowed nonuniformity is 2D-axisymmetric's
+        ! half-width axis cell (dy(0) = dy/2 by construction): there the coefficients are
+        ! recomputed for the active grid on every swap/restore (amr_weno_coef_recompute). General
+        ! stretching stays aborted: the fine ghost-shell coordinate extension assumes local
+        ! uniformity at the block edges. The stretch_* flags are pre_process-only, so the grid
+        ! itself is checked (this also catches externally generated grids).
+        if (maxval(dx(0:m)) - minval(dx(0:m)) > 1.e-12_wp*maxval(dx(0:m))) then
+            call s_mpi_abort('amr requires a uniform grid in x: the fine-block ghost coordinates ' &
+                             & // 'and reconstruction assume uniform spacing (x is stretched)')
+        end if
+        if (n_glb > 0) then
+            if (n > 0 .and. maxval(dy(1:n)) - minval(dy(1:n)) > 1.e-12_wp*maxval(dy(1:n))) then
+                call s_mpi_abort('amr requires a uniform grid in y away from the axis (y/r is stretched)')
+            end if
+            if (abs(dy(0) - dy(min(1, n))) > 1.e-12_wp*dy(min(1, n))) then
+                if (.not. cyl_coord) then
+                    call s_mpi_abort('amr requires a uniform grid in y (the first cell width differs and ' &
+                                     & // 'this is not the axisymmetric axis half-cell)')
+                end if
+                amr_weno_coef_recompute = .true.
+            end if
+        end if
+        if (p_glb > 0) then
+            if (maxval(dz(0:p)) - minval(dz(0:p)) > 1.e-12_wp*maxval(dz(0:p))) then
+                call s_mpi_abort('amr requires a uniform grid in z (z is stretched)')
+            end if
+        end if
+        if (weno_order == 1) amr_weno_coef_recompute = .false.  ! order 1 has no grid-dependent coefficients
 
         ! preallocate every slot at max buffered extents (each sized exactly as the single legacy block): coords (host) +
         ! fields (device-resident @:ALLOCATE so s_compute_rhs kernels can run on the fine block; q_cons/q_prim/rhs get the
@@ -1113,6 +1149,9 @@ contains
         ! hypoelastic stress sources use grid-spacing-dependent FD coefficients: recompute
         ! them from the (now fine) grid, else every fine velocity gradient is halved
         if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
+        ! nonuniform coarse grid (axisymmetric axis half-cell): the per-cell WENO coefficients
+        ! must be rebuilt for the block's own uniform grid (no-op flag on uniform grids)
+        if (amr_weno_coef_recompute) call s_amr_recompute_weno_coefs()
 
     end subroutine s_amr_swap_to_fine
 
@@ -1131,8 +1170,30 @@ contains
         ! sync the restored coarse extents/bounds/coordinates back to the device
         call s_amr_sync_grid_state_to_device()
         if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
+        if (amr_weno_coef_recompute) call s_amr_recompute_weno_coefs()
 
     end subroutine s_amr_restore_coarse
+
+    !> Recompute the WENO reconstruction coefficient arrays from the CURRENT grid globals (the fine block's after a swap, the coarse
+    !! grid's after a restore). s_compute_weno_coefficients reads the live cell-boundary arrays, refreshes uniform_grid, and pushes
+    !! its own device updates; the coefficient arrays were sized to the coarse local ranges at init, which the fine ranges never
+    !! exceed (the scratch-fit abort guarantees it).
+    impure subroutine s_amr_recompute_weno_coefs()
+
+        type(int_bounds_info) :: is1, is2, is3
+
+        is1%beg = -buff_size; is1%end = m + buff_size
+        call s_compute_weno_coefficients(1, is1)
+        if (n_glb > 0) then
+            is2%beg = -buff_size; is2%end = n + buff_size
+            call s_compute_weno_coefficients(2, is2)
+        end if
+        if (p_glb > 0) then
+            is3%beg = -buff_size; is3%end = p + buff_size
+            call s_compute_weno_coefficients(3, is3)
+        end if
+
+    end subroutine s_amr_recompute_weno_coefs
 
     !> Push the (host-side) global grid state to its device copies after a swap/restore. m/n/p, idwint/idwbuff, and the coordinate
     !! arrays are GPU_DECLARE'd; kernels read the device copies. No-op on CPU builds.

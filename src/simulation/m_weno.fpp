@@ -17,7 +17,7 @@ module m_weno
     use m_nvtx
 
     private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr, s_compute_weno_sensor, &
-        & weno_full
+        & s_compute_weno_coefficients, weno_full
 
     !> @name The cell-average variables that will be WENO-reconstructed unpacked into an array for performance
     !> @{

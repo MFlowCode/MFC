@@ -250,7 +250,8 @@ PHYSICS_DOCS = {
             "regrid the source region stays coarse (tags are suppressed over the support and candidate "
             "boxes are clipped clear of it). "
             "Incompatible with surface tension, Lagrangian bubbles, "
-            "IGR, cylindrical coordinates, MHD, hyperelasticity, "
+            "IGR, 3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
+            "per-cell WENO coefficients are recomputed for each block on swap), MHD, hyperelasticity, "
             "hybrid_weno, hybrid_riemann, and active_box. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
@@ -1408,6 +1409,10 @@ class CaseValidator:
         self.prohibit(recon_type is not None and recon_type != 1, "amr requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
+        self.prohibit(
+            any(self.get(f"stretch_{d}", "F") == "T" for d in "xyz"),
+            "amr does not support grid stretching: " "the fine-block reconstruction reuses the coarse WENO coefficients, which is exact only on uniform grids",
+        )
         mpp_lim = self.get("mpp_lim", "F") == "T"
         self.prohibit(
             num_fluids is not None and num_fluids > 1 and not mpp_lim,
@@ -1418,8 +1423,12 @@ class CaseValidator:
             "amr does not support surface-tension/hyperelasticity/MHD",
         )
         self.prohibit(
-            bubbles_lagrange or igr or cyl_coord,
-            "amr does not support Lagrangian bubbles/IGR/cylindrical",
+            bubbles_lagrange or igr,
+            "amr does not support Lagrangian bubbles/IGR",
+        )
+        self.prohibit(
+            cyl_coord and (self.get("p", 0) or 0) > 0,
+            "amr with cyl_coord supports 2D axisymmetric only: " "the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance",
         )
         polytropic = self.get("polytropic", "T") == "T"  # Fortran default is .true.
         # non-polytropic QBMM: each block carries its own pb/mv side-state; regrid and subcycle

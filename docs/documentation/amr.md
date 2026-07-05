@@ -218,7 +218,9 @@ a diagnostic message for unsupported combinations.
 | Lagrangian bubbles | **Not supported** | Lagrangian tracking not advanced on the fine level |
 | Immersed boundaries (`ib = T`; one or more non-STL bodies, static or prescribed-motion `moving_ibm=1`; `amr_regrid_int = 0`) | Supported | Per-block fine-grid IB markers/ghost points, rebuilt each fine substage at the body's sub-time position for a moving body; non-conservative ghost-cell forcing at the body; force-driven (`moving_ibm=2`)/STL/dynamic-regrid gated; a body spanning a rank seam is rejected at startup |
 | IGR solver | **Not supported** | Unvalidated with the fine-level advance |
-| Cylindrical / axisymmetric coordinates | **Not supported** | Unvalidated with the fine-level advance |
+| 2D axisymmetric (`cyl_coord = T`, `p = 0`) | Supported | Geometric sources read the live (swapped) grid; the axis half-width cell's per-cell WENO coefficients are recomputed for each block on swap/restore; blocks stay `buff_size` off the axis (domain-edge clamp); the axis-singularity viscous treatment runs on the coarse pass only |
+| 3D cylindrical (`cyl_coord = T`, `p > 0`) | **Not supported** | The per-stage azimuthal Fourier filter is a global operation incompatible with the block-local fine advance |
+| Grid stretching / Riemann-extrapolation BCs (`bc = -4`) | **Not supported** | Stretched ghost-shell coordinates and boundary-adjusted WENO coefficient rows cannot be inherited by interior blocks (runtime grid-uniformity abort; checker gate) |
 | `active_box` | **Not supported** | Unvalidated combination |
 | `hybrid_weno` / `hybrid_riemann` | **Not supported** | Unvalidated combination |
 | `acoustic_source` | Supported | The source acts on the coarse grid only: its support must not overlap the initial block (startup abort), and dynamic regrid keeps its boxes clear of the support (tags suppressed, candidate boxes clipped); emitted waves enter blocks through the coarse/fine coupling |
