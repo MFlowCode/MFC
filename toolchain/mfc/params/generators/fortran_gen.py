@@ -371,9 +371,14 @@ def _emit_lag_params(lines: List[str]) -> None:
     from the Fortran type by upstream #1085/#1093 and are no longer in the registry.
     """
     # Walk the registry for lag_params members, split by type.
-    lag_log = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type == ParamType.LOG)
-    lag_int = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
-    lag_real = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in _REAL_TYPES)
+    lag_all = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%"))
+    lag_log = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type == ParamType.LOG)
+    lag_int = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
+    lag_real = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type in _REAL_TYPES)
+    lag_str = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type == ParamType.STR)
+    unhandled = set(lag_all) - set(lag_log) - set(lag_int) - set(lag_real) - set(lag_str)
+    if unhandled:
+        raise ValueError(f"lag_params members with unhandled ParamType (would be silently missing from the broadcast): {sorted(unhandled)}")
     lines.append("        if (bubbles_lagrange) then")
     for mem in sorted(lag_log):
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
@@ -381,6 +386,8 @@ def _emit_lag_params(lines: List[str]) -> None:
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)")
     for mem in sorted(lag_real):
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    for mem in sorted(lag_str):
+        lines.append(f"            call MPI_BCAST(lag_params%{mem}, len(lag_params%{mem}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end if")
 
 
