@@ -3214,6 +3214,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # (l2) QBMM NON-POLYTROPIC on a STATIC block: polytropic=F activates the pb/mv quadrature
+        # side-state (nnode x nb per cell), which the block now carries itself: prolonged
+        # piecewise-constant (realizability, like the moments), advanced with the block's own rhs
+        # scratch (the coarse rhs_pb/mv stay untouched at fine indices), and restricted back with
+        # the moments. Static block, no subcycle (both gated for nonpoly). Same override_tol
+        # rationale as the nonpolytropic bubbles case: stiff thermal+mechanical bubble ODE in a
+        # stiff liquid amplifies float-reassociation noise; a real bug is orders larger.
+        stack.push(
+            "nonpolytropic",
+            {
+                "amr_regrid_int": 0,
+                "amr_subcycle": "F",
+                "polytropic": "F",
+                "bub_pp%mu_v": 8.758168074360729e-05,
+                "bub_pp%mu_g": 0.00017881922111898042,
+                "bub_pp%gam_v": 1.33,
+                "bub_pp%M_v": 18.02,
+                "bub_pp%M_g": 28.97,
+                "bub_pp%k_v": 0.5583395141263873,
+                "bub_pp%k_g": 0.7346421281308791,
+                "bub_pp%R_v": 1334.8378710170155,
+                "bub_pp%R_g": 830.2995663005393,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, override_tol=5 * 10 ** (-9)))
+        stack.pop()
         stack.pop()
         # (n) STATIC IMMERSED BOUNDARY (SP20): a fixed circular body resolved on a static fine block that
         # covers it. Each fine block carries its own fine-grid IB markers/ghost points computed from the

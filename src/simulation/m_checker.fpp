@@ -101,8 +101,14 @@ contains
             ! path and the swap/restore recomputes the spacing-dependent FD coefficients per grid
             @:PROHIBIT(hyperelasticity .or. mhd, "amr does not support hyperelasticity/MHD")
             @:PROHIBIT(bubbles_lagrange .or. igr .or. cyl_coord, "amr does not support Lagrangian bubbles/IGR/cylindrical")
-            @:PROHIBIT(qbmm .and. .not. polytropic, &
-                       & "amr does not support non-polytropic QBMM: its pb/mv quadrature side-state evolves as a global array that the fine advance would corrupt through the swap. Polytropic QBMM (pb/mv inert) is supported: its bubble moments live entirely in q_cons and are injected piecewise-constant at prolongation to preserve CHyQMOM realizability")
+            ! non-polytropic QBMM: each block carries its own pb/mv quadrature side-state (prolonged
+            ! piecewise-constant to preserve CHyQMOM realizability, advanced with the block's own rhs
+            ! scratch, restricted back with the moments). Dynamic regrid and subcycling are gated: the
+            ! regrid stash/overlap-copy and the subcycle ghost-lerp do not yet carry pb/mv.
+            @:PROHIBIT(qbmm .and. (.not. polytropic) .and. amr_regrid_int > 0, &
+                       & "amr with non-polytropic QBMM requires a static block (amr_regrid_int = 0): the regrid rebuild does not yet carry the pb/mv side-state")
+            @:PROHIBIT(qbmm .and. (.not. polytropic) .and. amr_subcycle, &
+                       & "amr with non-polytropic QBMM does not support amr_subcycle: the subcycle ghost-lerp does not yet carry the pb/mv side-state")
             ! static-body IB AMR (SP20) + prescribed-motion moving bodies (SP21): fixed or analytically-moving
             ! (moving_ibm==1) bodies resolved on a static fine block. Multi-body (num_ibs>1) is supported - every body
             ! shares the one static block and reuses the multi-body-capable core IB setup. Force/torque-driven motion
