@@ -842,15 +842,20 @@ the flux reflux still conserves to machine precision away from it. A body in pre
 (`moving_ibm = 1`) is also supported: the fine block's IB markers/ghost points are rebuilt each fine
 RK substage at the body's sub-time position (the same linear time interpolation the subcycle applies
 to the fluid ghosts), so the refined body tracks its prescribed trajectory. Supports one or more
-non-STL bodies on a static block (`amr_regrid_int = 0`); force-driven motion (`moving_ibm = 2`),
-STL geometry, and dynamic regrid with IB are gated pending validation. Under MPI a body contained within one rank's
+non-STL bodies, static or in prescribed motion; with dynamic regrid (static bodies only) every
+candidate box expands to fully contain each body plus a margin and the fine IB state is rebuilt
+from geometry after each regrid. Force-driven motion (`moving_ibm = 2`), STL geometry, and moving
+bodies combined with dynamic regrid are gated pending validation. Under MPI a body contained within one rank's
 subdomain is bit-exact across decompositions; a body spanning a rank seam is rejected at startup
 (the fine-IB image-point stencil across the seam is not yet decomposition-exact), so keep the body
 inside a single rank's subdomain (use fewer ranks or reposition it).
 AMR is incompatible with surface tension, Lagrangian bubbles, IGR, 3D cylindrical
-coordinates (2D axisymmetric IS supported; the axis half-cell's per-cell WENO coefficients are
-recomputed per block on swap), MHD, hyperelasticity, grid stretching, Riemann-extrapolation
+coordinates (2D axisymmetric IS supported), MHD, hyperelasticity, Riemann-extrapolation
 boundaries (bc = -4), `hybrid_weno`, `hybrid_riemann`, and `active_box`.
+Nonuniform grids ARE supported (grid stretching and the axisymmetric axis half-cell): the fine
+ghost-shell coordinates extend by exact parent-cell bisection and the spacing-dependent WENO
+coefficients are recomputed for the active grid on every block swap/restore, armed automatically
+when the grid is detected nonuniform at startup.
 Acoustic sources are supported on the coarse grid only: the support must not overlap the initial
 block (startup abort) and dynamic regrid keeps its boxes clear of the support.
 Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank

@@ -214,33 +214,25 @@ contains
             allocate (sw_dz(-buff_size:p + buff_size))
         end if
 
-        ! Grid uniformity policy. WENO reconstruction coefficients are spacing-dependent; on a
-        ! uniform grid they are identical at every cell, which is why the fine advance can reuse
-        ! the coarse arrays untouched. The ONE allowed nonuniformity is 2D-axisymmetric's
-        ! half-width axis cell (dy(0) = dy/2 by construction): there the coefficients are
-        ! recomputed for the active grid on every swap/restore (amr_weno_coef_recompute). General
-        ! stretching stays aborted: the fine ghost-shell coordinate extension assumes local
-        ! uniformity at the block edges. The stretch_* flags are pre_process-only, so the grid
-        ! itself is checked (this also catches externally generated grids).
+        ! Grid uniformity policy. The two spacing-uniformity consumers are both handled exactly:
+        ! the fine-block ghost-shell coordinates extend by exact parent-cell bisection (reads
+        ! sw_*_cb), and the spacing-dependent WENO reconstruction coefficients are recomputed for
+        ! the active grid on every swap/restore when the grid is nonuniform anywhere (stretched
+        ! grids, or 2D-axisymmetric's half-width axis cell dy(0) = dy/2). On fully uniform grids
+        ! the flag stays false and behavior is bit-identical to the reuse path. The stretch_*
+        ! flags are pre_process-only, so the grid itself is checked (this also catches
+        ! externally generated grids).
         if (maxval(dx(0:m)) - minval(dx(0:m)) > 1.e-12_wp*maxval(dx(0:m))) then
-            call s_mpi_abort('amr requires a uniform grid in x: the fine-block ghost coordinates ' &
-                             & // 'and reconstruction assume uniform spacing (x is stretched)')
+            amr_weno_coef_recompute = .true.
         end if
         if (n_glb > 0) then
-            if (n > 0 .and. maxval(dy(1:n)) - minval(dy(1:n)) > 1.e-12_wp*maxval(dy(1:n))) then
-                call s_mpi_abort('amr requires a uniform grid in y away from the axis (y/r is stretched)')
-            end if
-            if (abs(dy(0) - dy(min(1, n))) > 1.e-12_wp*dy(min(1, n))) then
-                if (.not. cyl_coord) then
-                    call s_mpi_abort('amr requires a uniform grid in y (the first cell width differs and ' &
-                                     & // 'this is not the axisymmetric axis half-cell)')
-                end if
+            if (maxval(dy(0:n)) - minval(dy(0:n)) > 1.e-12_wp*maxval(dy(0:n))) then
                 amr_weno_coef_recompute = .true.
             end if
         end if
         if (p_glb > 0) then
             if (maxval(dz(0:p)) - minval(dz(0:p)) > 1.e-12_wp*maxval(dz(0:p))) then
-                call s_mpi_abort('amr requires a uniform grid in z (z is stretched)')
+                amr_weno_coef_recompute = .true.
             end if
         end if
         if (weno_order == 1) amr_weno_coef_recompute = .false.  ! order 1 has no grid-dependent coefficients
@@ -1121,38 +1113,82 @@ contains
             dz(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%dz(0:amr_slots(amr_cur)%p)
         end if
         ! Extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m).
-        ! The viscous velocity gradient divides by ghost cell-center spacings (x_cc(j+-1) - x_cc(j)), so at
-        ! a rank seam the fine subdomain-edge cell would otherwise use a stale coarse spacing and diverge
-        ! from the np=1 (fully-owned) result. Uniform 2:1 continuation of the (locally-uniform) base region.
+        ! Ghost cells use the EXACT parent-cell bisection - the same formula as the interior, with
+        ! floor division for negative indices. The parent boundaries beyond the block edge come from
+        ! the coarse coordinates saved in the sw_* bounce buffers moments ago; blocks stay buff_size
+        ! inside the domain, so every ghost parent is an interior (or rank-seam-exchanged) coarse
+        ! cell with exact coordinates. This makes the ghost shell stretched-grid-exact (the old
+        ! locally-uniform continuation was only exact on uniform bases).
         block
-            integer  :: jg
-            real(wp) :: sp
-            sp = amr_slots(amr_cur)%dx(amr_slots(amr_cur)%m)
+            integer :: jg, cl
             do jg = amr_slots(amr_cur)%m + 1, amr_slots(amr_cur)%m + buff_size
-                dx(jg) = sp; x_cb(jg) = x_cb(jg - 1) + sp; x_cc(jg) = x_cc(jg - 1) + sp
+                cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp) - start_idx(1)
+                if (mod(jg, 2) == 0) then
+                    x_cb(jg) = 0.5_wp*(sw_x_cb(cl - 1) + sw_x_cb(cl))
+                else
+                    x_cb(jg) = sw_x_cb(cl)
+                end if
+                dx(jg) = x_cb(jg) - x_cb(jg - 1); x_cc(jg) = 0.5_wp*(x_cb(jg - 1) + x_cb(jg))
             end do
-            sp = amr_slots(amr_cur)%dx(0)
-            do jg = -1, -buff_size, -1
-                dx(jg) = sp; x_cb(jg - 1) = x_cb(jg) - sp; x_cc(jg) = x_cc(jg + 1) - sp
+            ! unified boundary formula (matches the interior bisection): boundary k belongs to
+            ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
+            do jg = -1 - buff_size, -1
+                cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp) - start_idx(1)
+                if (mod(abs(jg), 2) == 0) then
+                    x_cb(jg) = 0.5_wp*(sw_x_cb(cl - 1) + sw_x_cb(cl))
+                else
+                    x_cb(jg) = sw_x_cb(cl)
+                end if
+            end do
+            do jg = -buff_size, -1
+                dx(jg) = x_cb(jg) - x_cb(jg - 1); x_cc(jg) = 0.5_wp*(x_cb(jg - 1) + x_cb(jg))
             end do
             if (n_glb > 0) then
-                sp = amr_slots(amr_cur)%dy(amr_slots(amr_cur)%n)
                 do jg = amr_slots(amr_cur)%n + 1, amr_slots(amr_cur)%n + buff_size
-                    dy(jg) = sp; y_cb(jg) = y_cb(jg - 1) + sp; y_cc(jg) = y_cc(jg - 1) + sp
+                    cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp) - start_idx(2)
+                    if (mod(jg, 2) == 0) then
+                        y_cb(jg) = 0.5_wp*(sw_y_cb(cl - 1) + sw_y_cb(cl))
+                    else
+                        y_cb(jg) = sw_y_cb(cl)
+                    end if
+                    dy(jg) = y_cb(jg) - y_cb(jg - 1); y_cc(jg) = 0.5_wp*(y_cb(jg - 1) + y_cb(jg))
                 end do
-                sp = amr_slots(amr_cur)%dy(0)
-                do jg = -1, -buff_size, -1
-                    dy(jg) = sp; y_cb(jg - 1) = y_cb(jg) - sp; y_cc(jg) = y_cc(jg + 1) - sp
+                ! unified boundary formula (matches the interior bisection): boundary k belongs to
+                ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
+                do jg = -1 - buff_size, -1
+                    cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp) - start_idx(2)
+                    if (mod(abs(jg), 2) == 0) then
+                        y_cb(jg) = 0.5_wp*(sw_y_cb(cl - 1) + sw_y_cb(cl))
+                    else
+                        y_cb(jg) = sw_y_cb(cl)
+                    end if
+                end do
+                do jg = -buff_size, -1
+                    dy(jg) = y_cb(jg) - y_cb(jg - 1); y_cc(jg) = 0.5_wp*(y_cb(jg - 1) + y_cb(jg))
                 end do
             end if
             if (p_glb > 0) then
-                sp = amr_slots(amr_cur)%dz(amr_slots(amr_cur)%p)
                 do jg = amr_slots(amr_cur)%p + 1, amr_slots(amr_cur)%p + buff_size
-                    dz(jg) = sp; z_cb(jg) = z_cb(jg - 1) + sp; z_cc(jg) = z_cc(jg - 1) + sp
+                    cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp) - start_idx(3)
+                    if (mod(jg, 2) == 0) then
+                        z_cb(jg) = 0.5_wp*(sw_z_cb(cl - 1) + sw_z_cb(cl))
+                    else
+                        z_cb(jg) = sw_z_cb(cl)
+                    end if
+                    dz(jg) = z_cb(jg) - z_cb(jg - 1); z_cc(jg) = 0.5_wp*(z_cb(jg - 1) + z_cb(jg))
                 end do
-                sp = amr_slots(amr_cur)%dz(0)
-                do jg = -1, -buff_size, -1
-                    dz(jg) = sp; z_cb(jg - 1) = z_cb(jg) - sp; z_cc(jg) = z_cc(jg + 1) - sp
+                ! unified boundary formula (matches the interior bisection): boundary k belongs to
+                ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
+                do jg = -1 - buff_size, -1
+                    cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp) - start_idx(3)
+                    if (mod(abs(jg), 2) == 0) then
+                        z_cb(jg) = 0.5_wp*(sw_z_cb(cl - 1) + sw_z_cb(cl))
+                    else
+                        z_cb(jg) = sw_z_cb(cl)
+                    end if
+                end do
+                do jg = -buff_size, -1
+                    dz(jg) = z_cb(jg) - z_cb(jg - 1); z_cc(jg) = 0.5_wp*(z_cb(jg - 1) + z_cb(jg))
                 end do
             end if
         end block

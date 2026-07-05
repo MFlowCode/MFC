@@ -2657,6 +2657,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
         stack.pop()
 
+        # (b') stretched grid + dynamic regrid: the ONLY test where the coarse grid is
+        # nonuniform - exercises the exact parent-bisection ghost-shell coordinates and the
+        # per-swap WENO coefficient recompute (amr_weno_coef_recompute armed at init).
+        # stretch_x expands the domain beyond [0,1], so the end patches are widened to keep
+        # the expanded cells covered; the fine block 16..47 straddles the uniform core
+        # [x_a, x_b] so its ghost shells sit on nonuniform parents on both sides.
+        stack.push(
+            "AMR -> 1D -> stretched grid -> dynamic regrid",
+            {
+                **amr_1d_base,
+                "stretch_x": "T",
+                "a_x": 2.0,
+                "x_a": 0.4,
+                "x_b": 0.6,
+                "loops_x": 1,
+                "patch_icpp(1)%x_centroid": -1.95,
+                "patch_icpp(1)%length_x": 4.1,
+                "patch_icpp(3)%x_centroid": 2.9,
+                "patch_icpp(3)%length_x": 4.2,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
+        stack.pop()
+
         # (c) subcycling
         stack.push(
             "AMR -> 1D -> subcycle",
