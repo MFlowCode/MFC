@@ -460,9 +460,12 @@ contains
         integer, intent(in)     :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
-        integer                 :: i, j, k, l, q, s              !< Generic loop iterator
-        integer                 :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
-        real(wp)                :: start, finish
+        integer                 :: i, j, k, l, q, s  !< Generic loop iterator
+        !> block-slot loop variable (s_amr_select_slot assigns the global amr_cur, so amr_cur itself must not be the active DO
+        !! variable)
+        integer  :: islot
+        integer  :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
+        real(wp) :: start, finish
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
@@ -503,8 +506,8 @@ contains
             ! Each active block slot is advanced + refluxed in turn (T1: one slot); amr_cur is reset to 1
             ! afterwards so the next stage's coarse RHS captures creg into slot 1.
             if (amr .and. .not. amr_subcycle) then
-                do amr_cur = 1, amr_num_blocks
-                    call s_amr_select_slot(amr_cur)  ! refresh the region/intersection mirrors for this block
+                do islot = 1, amr_num_blocks
+                    call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                     call s_advance_amr_fine_stage(s, rk_coef(s,:), q_cons_ts(1)%vf, bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, &
                                                   & mv_ts(1)%sf, rhs_mv, t_step, time_avg)
                     ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
@@ -601,8 +604,8 @@ contains
             ! ghost lerp sources, restriction target, and state-reflux target are all device-resident:
             ! the substep/restriction/reflux machinery runs as device kernels (M2). Each active block slot
             ! (T1: one) is subcycled, restricted, and state-refluxed in turn; amr_cur resets to 1 afterwards.
-            do amr_cur = 1, amr_num_blocks
-                call s_amr_select_slot(amr_cur)  ! refresh the region/intersection mirrors for this block
+            do islot = 1, amr_num_blocks
+                call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                 if (amr_subcycle) then
                     call s_advance_amr_fine_substeps(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, pb_ts(1)%sf, &
                                                      & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg)

@@ -1337,6 +1337,10 @@ class CaseValidator:
         self.prohibit(recon_type is not None and recon_type != 1, "active_box requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "active_box requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(ib, "active_box is incompatible with immersed boundaries")
+        self.prohibit(
+            self.get("hybrid_weno", "F") == "T" or self.get("hybrid_riemann", "F") == "T",
+            "active_box is incompatible with hybrid_weno/hybrid_riemann: " "the smoothness sensor sweeps the full domain but the cons-to-prim conversion is narrowed to the active-box footprint",
+        )
         self.prohibit(acoustic_source, "active_box is incompatible with acoustic sources")
         self.prohibit(bodyForces, "active_box is incompatible with body forces")
         self.prohibit(bubbles_lagrange, "active_box is incompatible with Lagrangian bubbles")

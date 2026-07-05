@@ -43,6 +43,8 @@ contains
         if (active_box) then
             @:PROHIBIT(recon_type /= recon_type_weno, "active_box requires WENO reconstruction")
             @:PROHIBIT(ib, "active_box is incompatible with immersed boundaries")
+            @:PROHIBIT(hybrid_weno .or. hybrid_riemann, &
+                       & "active_box is incompatible with hybrid_weno/hybrid_riemann: the smoothness sensor sweeps the full domain but the cons-to-prim conversion is narrowed to the active-box footprint, so the sensor would read unconverted primitives outside it")
             @:PROHIBIT(acoustic_source, "active_box is incompatible with acoustic sources")
             @:PROHIBIT(bodyForces, "active_box is incompatible with body forces")
             @:PROHIBIT(bubbles_lagrange, "active_box is incompatible with Lagrangian bubbles")

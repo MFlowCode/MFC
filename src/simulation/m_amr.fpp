@@ -1971,6 +1971,8 @@ contains
 
 #ifdef MFC_MPI
             integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, reg(6), ibytes, sbytes
+            integer                             :: myext(3)
+            integer, allocatable                :: wext(:)
             integer, dimension(MPI_STATUS_SIZE) :: status
             integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, tot_cnt, disp0, ddisp
             logical                             :: file_exist
@@ -2026,7 +2028,19 @@ contains
                         reg(1:3) = amr_slots(k)%region%lo; reg(4:6) = amr_slots(k)%region%hi
                         call MPI_FILE_WRITE_AT(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
                     end if
-                    ddisp = disp0 + int(6*ibytes, MPI_OFFSET_KIND)
+                    ! per-rank fine extents (0s for non-owning ranks): readers rebuild this vector
+                    ! from their own decomposition and abort on mismatch - a different rank count,
+                    ! ownership pattern, or load_balance split would otherwise silently misalign
+                    ! the concatenated per-rank data slices below
+                    if (.not. allocated(wext)) allocate (wext(3*num_procs))
+                    myext = 0
+                    if (amr_owns_all(k)) myext = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
+                    call MPI_ALLGATHER(myext, 3, MPI_INTEGER, wext, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                    if (proc_rank == 0) then
+                        call MPI_FILE_WRITE_AT(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, &
+                                               & status, ierr)
+                    end if
+                    ddisp = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
                     allocate (buf(max(cnt, 1)))
                     idx = 0
                     do i = 1, sys_size
@@ -2065,6 +2079,8 @@ contains
 
 #ifdef MFC_MPI
             integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
+            integer                             :: myext(3)
+            integer, allocatable                :: wext(:), rext(:)
             integer, dimension(MPI_STATUS_SIZE) :: status
             integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, tot_cnt, disp0, ddisp
             real(stp), allocatable              :: buf(:)
@@ -2112,6 +2128,10 @@ contains
                            & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
                     call s_mpi_abort(trim(msg))
                 end if
+                if (ghdr(2) > amr_max_blocks) then
+                    call s_mpi_abort('amr restart: the file holds more fine blocks than amr_max_blocks ' &
+                                     & // 'in this run; restart with amr_max_blocks at least the written block count')
+                end if
                 amr_num_blocks = ghdr(2)
                 do k = 1, amr_num_blocks
                     amr_cur = k
@@ -2145,12 +2165,30 @@ contains
                            & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
                     call s_mpi_abort(trim(msg))
                 end if
+                if (ghdr(2) > amr_max_blocks) then
+                    call s_mpi_abort('amr restart: the file holds more fine blocks than amr_max_blocks ' &
+                                     & // 'in this run; restart with amr_max_blocks at least the written block count')
+                end if
                 amr_num_blocks = ghdr(2)
                 disp0 = int(3*ibytes, MPI_OFFSET_KIND)
                 do k = 1, amr_num_blocks
                     amr_cur = k
                     call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                    if (.not. allocated(wext)) allocate (wext(3*num_procs), rext(3*num_procs))
+                    call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, &
+                                              & status, ierr)
                     call s_set_amr_fine_geometry(reg(1:3), reg(4:6))
+                    ! validate the writer's per-rank layout against this run's decomposition: a
+                    ! mismatch (e.g. re-derived load_balance splits at restart) would silently
+                    ! misalign every rank's slice of the concatenated data
+                    myext = 0
+                    if (amr_rank_owns_block) myext = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
+                    call MPI_ALLGATHER(myext, 3, MPI_INTEGER, rext, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                    if (any(rext /= wext)) then
+                        call s_mpi_abort('amr restart: the per-rank fine-block layout in the file does not match ' &
+                                         & // 'this run''s decomposition; the rank count, ownership, and (with ' &
+                                         & // 'load_balance) the weighted splits must match the run that wrote the restart')
+                    end if
                     cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
                     if (.not. amr_rank_owns_block) cnt = 0
                     my_cnt = int(cnt, MPI_OFFSET_KIND)
@@ -2158,7 +2196,7 @@ contains
                     call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
                     if (proc_rank == 0) my_off = int(0, MPI_OFFSET_KIND)
                     call MPI_ALLREDUCE(my_cnt, tot_cnt, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
-                    ddisp = disp0 + int(6*ibytes, MPI_OFFSET_KIND)
+                    ddisp = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
                     allocate (buf(max(cnt, 1)))
                     call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                               & status, ierr)
@@ -2390,6 +2428,14 @@ contains
                 @:DEALLOCATE(amr_slots(islot)%rhs)
                 @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
                 @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
+                if (qbmm .and. .not. polytropic) then
+                    @:DEALLOCATE(amr_slots(islot)%pb_f)
+                    @:DEALLOCATE(amr_slots(islot)%mv_f)
+                    @:DEALLOCATE(amr_slots(islot)%pb_stor)
+                    @:DEALLOCATE(amr_slots(islot)%mv_stor)
+                    @:DEALLOCATE(amr_slots(islot)%rhs_pb_f)
+                    @:DEALLOCATE(amr_slots(islot)%rhs_mv_f)
+                end if
                 if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
                 if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)
                 if (allocated(amr_slots(islot)%z_cb)) deallocate (amr_slots(islot)%z_cb, amr_slots(islot)%z_cc, amr_slots(islot)%dz)

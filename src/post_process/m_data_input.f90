@@ -635,6 +635,8 @@ contains
 
 #ifdef MFC_MPI
         integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
+        integer                             :: myext(3)
+        integer, allocatable                :: wext(:), rext(:)
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, tot_cnt, disp0, ddisp
         real(stp), allocatable              :: buf(:)
@@ -702,12 +704,21 @@ contains
             ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
             call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
+            ! the parallel layout is per-rank slices concatenated in WRITER rank order: a different
+            ! rank count or decomposition would silently misalign every block - fail closed instead
+            if (ghdr(1) /= num_procs) then
+                call s_mpi_abort('amr post: the AMR fine-block file was written with a different rank count; ' &
+                                 & // 'run post_process with the same number of ranks as the simulation')
+            end if
             nblk = ghdr(2)
             allocate (amr_fine(nblk))
+            allocate (wext(3*num_procs), rext(3*num_procs))
             amr_num_fine = 0
             disp0 = int(3*ibytes, MPI_OFFSET_KIND)
             do k = 1, nblk
                 call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, status, &
+                                          & ierr)
                 do d = 1, 3
                     isect_lo(d) = max(reg(d), sidx(d))
                     isect_hi(d) = min(reg(3 + d), sidx(d) + ext(d))
@@ -719,6 +730,16 @@ contains
                 fn = 0; fp = 0
                 if (n > 0) fn = 2*max(isect_hi(2) - isect_lo(2) + 1, 0) - 1
                 if (p > 0) fp = 2*max(isect_hi(3) - isect_lo(3) + 1, 0) - 1
+                ! validate the writer's per-rank layout against this run's decomposition (catches a
+                ! load_balance simulation, whose weighted splits post never reproduces)
+                myext = 0
+                if (owns) myext = [fm, fn, fp]
+                call MPI_ALLGATHER(myext, 3, MPI_INTEGER, rext, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                if (any(rext /= wext)) then
+                    call s_mpi_abort('amr post: the per-rank fine-block layout in the file does not match this ' &
+                                     & // 'decomposition (e.g. the simulation used load_balance); the AMR overlay ' &
+                                     & // 'requires the writing decomposition')
+                end if
                 cnt = sys_size*(fm + 1)*(fn + 1)*(fp + 1)
                 if (.not. owns) cnt = 0
                 my_cnt = int(cnt, MPI_OFFSET_KIND)
@@ -726,7 +747,7 @@ contains
                 call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
                 if (proc_rank == 0) my_off = int(0, MPI_OFFSET_KIND)
                 call MPI_ALLREDUCE(my_cnt, tot_cnt, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
-                ddisp = disp0 + int(6*ibytes, MPI_OFFSET_KIND)
+                ddisp = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
                 allocate (buf(max(cnt, 1)))
                 call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                           & status, ierr)

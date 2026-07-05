@@ -100,7 +100,8 @@ contains
 
         !> Generic loop iterators
         integer :: i, j, k, l
-        integer :: ns_pc, ns_tmp  !< per-cell Newton-iteration accumulators for load-weight diagnostic
+        integer :: ns_pc, ns_tmp   !< per-cell Newton-iteration accumulators for load-weight diagnostic
+        logical :: count_pc_iters  !< host-evaluated kernel guard (a device copy of the wrt flags is never synced)
 
 #ifdef _CRAYFTN
 #ifdef MFC_OpenACC
@@ -111,8 +112,14 @@ contains
 
         ! starting equilibrium solver
 
+#ifdef MFC_SIMULATION
+        count_pc_iters = load_weight_wrt .or. sfc_partition_wrt
+#else
+        count_pc_iters = .false.
+#endif
+
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok, pS, pSOV, pSSL, &
-                            & TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF, ns_pc, ns_tmp]')
+                            & TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF, ns_pc, ns_tmp]', copyin='[count_pc_iters]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -266,7 +273,7 @@ contains
 #ifdef MFC_SIMULATION
                     ! Accumulate Newton iteration count for the load-weight diagnostic (matches the
                     ! allocation condition; no-op when neither writer is enabled).
-                    if (load_weight_wrt .or. sfc_partition_wrt) pc_iter_count(j, k, l) = real(ns_pc, stp)
+                    if (count_pc_iters) pc_iter_count(j, k, l) = real(ns_pc, stp)
 #endif
                 end do
             end do

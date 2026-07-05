@@ -468,15 +468,22 @@ contains
             ! cell indices), so a static fine block overlapping the support would silently drop
             ! the source inside the block - abort instead. Emitted waves still enter the block
             ! through the coarse/fine coupling; only the support itself must stay coarse-only.
+            ! sidx_supp is the bounds-safe start offset: start_idx is allocated (1:num_dims) and
+            ! Fortran .or. does not short-circuit, so raw start_idx(2:3) reads are out of bounds
+            ! in 1D/2D.
             if (amr) then
+                sidx_supp = 0
+                sidx_supp(1) = start_idx(1)
+                if (n_glb > 0) sidx_supp(2) = start_idx(2)
+                if (p_glb > 0) sidx_supp(3) = start_idx(3)
                 do j = 1, count
                     if (int(source_spatials(ai)%coord(1, &
-                        & j)) + start_idx(1) >= amr_block_beg(1) .and. int(source_spatials(ai)%coord(1, &
-                        & j)) + start_idx(1) <= amr_block_end(1) .and. (n_glb == 0 .or. (int(source_spatials(ai)%coord(2, &
-                        & j)) + start_idx(2) >= amr_block_beg(2) .and. int(source_spatials(ai)%coord(2, &
-                        & j)) + start_idx(2) <= amr_block_end(2))) .and. (p_glb == 0 .or. (int(source_spatials(ai)%coord(3, &
-                        & j)) + start_idx(3) >= amr_block_beg(3) .and. int(source_spatials(ai)%coord(3, &
-                        & j)) + start_idx(3) <= amr_block_end(3)))) then
+                        & j)) + sidx_supp(1) >= amr_block_beg(1) .and. int(source_spatials(ai)%coord(1, &
+                        & j)) + sidx_supp(1) <= amr_block_end(1) .and. (n_glb == 0 .or. (int(source_spatials(ai)%coord(2, &
+                        & j)) + sidx_supp(2) >= amr_block_beg(2) .and. int(source_spatials(ai)%coord(2, &
+                        & j)) + sidx_supp(2) <= amr_block_end(2))) .and. (p_glb == 0 .or. (int(source_spatials(ai)%coord(3, &
+                        & j)) + sidx_supp(3) >= amr_block_beg(3) .and. int(source_spatials(ai)%coord(3, &
+                        & j)) + sidx_supp(3) <= amr_block_end(3)))) then
                         call s_mpi_abort('amr with acoustic_source: the source support overlaps the static fine block; ' &
                                          & // 'the source acts on the coarse grid only - move the source or the block apart')
                     end if
@@ -484,10 +491,6 @@ contains
 
                 ! global support bounding box (all ranks agree): the dynamic regrid suppresses tags
                 ! and clips candidate boxes against it so fine blocks never cover the source
-                sidx_supp = 0
-                sidx_supp(1) = start_idx(1)
-                if (n_glb > 0) sidx_supp(2) = start_idx(2)
-                if (p_glb > 0) sidx_supp(3) = start_idx(3)
                 do j = 1, 3
                     lo_loc = huge(1); hi_loc = -huge(1)
                     do k = 1, count

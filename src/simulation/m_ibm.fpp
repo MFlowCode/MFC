@@ -1688,7 +1688,11 @@ contains
                 if (associated(ib_fine(i)%markers%sf)) then
                     @:DEALLOCATE(ib_fine(i)%markers%sf)
                 end if
-                if (allocated(ib_fine(i)%gps)) deallocate (ib_fine(i)%gps)
+                ! gps carries the device mapping it inherited (move_alloc from the copyin-mapped
+                ! ghost_points): @:DEALLOCATE releases the mapping too; a bare deallocate leaks it
+                if (allocated(ib_fine(i)%gps)) then
+                    @:DEALLOCATE(ib_fine(i)%gps)
+                end if
             end do
             deallocate (ib_fine)
         end if
