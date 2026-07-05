@@ -156,7 +156,11 @@ contains
 
         if (amr) call s_read_amr_data(t_step)
 
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+        ! seed the chemistry temperature over the INTERIOR only (mirrors the simulation,
+        ! m_start_up): the ghost q_cons is unread at this point, so a ghost-inclusive sweep
+        ! would Newton-iterate on garbage (NaN under NaN-init builds) at rank seams and
+        ! physical boundaries; s_populate_variables_buffers below extends q_T into the ghosts
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         if (buff_size > 0) then
             call s_populate_grid_variables_buffers()

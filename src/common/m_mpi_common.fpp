@@ -570,7 +570,10 @@ contains
             chem_T_comm = .true.
             v_size = nVar + 1
 #else
-        else if (present(q_T_sf) .and. chemistry .and. chem_params%diffusion) then
+        else if (present(q_T_sf) .and. chemistry) then
+            ! post_process converts cons->prim over the ghost-inclusive bounds, so the temperature
+            ! Newton guess must be valid at rank seams for EVERY chemistry run (not only diffusion):
+            ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output
             chem_T_comm = .true.
             v_size = nVar + 1
 #endif
