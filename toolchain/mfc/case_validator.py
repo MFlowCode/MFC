@@ -1420,7 +1420,7 @@ class CaseValidator:
             "polytropic QBMM is supported (bubble moments live in q_cons, injected piecewise-constant at prolongation for CHyQMOM realizability)",
         )
         if ib:
-            # static-body IB AMR (SP20): a fixed single body resolved on a static fine block.
+            # static/prescribed-motion IB AMR (SP20/21): one or more bodies resolved on a static fine block.
             num_ibs = self.get("num_ibs") or 0
             force_driven = any((self.get(f"patch_ib({i})%moving_ibm") or 0) == 2 for i in range(1, num_ibs + 1))
             stl = any((self.get(f"patch_ib({i})%geometry")) == 12 for i in range(1, num_ibs + 1))
@@ -1428,7 +1428,6 @@ class CaseValidator:
                 force_driven,
                 "amr with ib supports static or prescribed-motion (moving_ibm=1) bodies only; " "force-driven moving IB (moving_ibm=2) under amr is not yet validated",
             )
-            self.prohibit(num_ibs > 1, "amr with ib supports a single body only (multi-body IB under amr is not yet validated)")
             self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
             self.prohibit(
                 amr_regrid_int is not None and amr_regrid_int > 0,

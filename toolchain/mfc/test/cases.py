@@ -3192,6 +3192,67 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (n2) MULTI-BODY static IB AMR: TWO static circular bodies sharing one static 2:1 fine block, in
+        # quiescent flow drifting +x. The fine-IB setup reuses the multi-body-capable core routines, so both
+        # bodies are marked/ghosted on the fine block (validated: fine-block ghost points = 2x the single body).
+        stack.push(
+            "AMR -> 2D -> static IBM two circles",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-4,
+                "t_step_stop": 10,
+                "t_step_save": 10,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.1,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # two static circular bodies, both inside the fine block
+                "ib": "T",
+                "num_ibs": 2,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.42,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.06,
+                "patch_ib(1)%slip": "F",
+                "patch_ib(2)%geometry": 2,
+                "patch_ib(2)%x_centroid": 0.58,
+                "patch_ib(2)%y_centroid": 0.5,
+                "patch_ib(2)%radius": 0.06,
+                "patch_ib(2)%slip": "F",
+                # single static 2:1 fine block covering both bodies
+                "amr": "T",
+                "amr_block_beg(1)": 20,
+                "amr_block_beg(2)": 20,
+                "amr_block_end(1)": 43,
+                "amr_block_end(2)": 43,
+                "amr_regrid_int": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         # (o) PRESCRIBED-MOTION MOVING IMMERSED BOUNDARY (SP21): a single circular body translating at a
         # prescribed velocity (moving_ibm=1) through quiescent flow, resolved on a STATIC fine block that
         # contains its whole trajectory. Each fine RK substage rebuilds the block's IB markers/ghost points
