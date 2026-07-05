@@ -487,9 +487,9 @@ def create_input_lagrange(path_test):
 
 def copy_input_lagrange(path_example_input, path_test):
     folder_path_dest = path_test + "/input/"
-    fite_path_dest = folder_path_dest + "lag_bubbles.dat"
+    file_path_dest = folder_path_dest + "lag_bubbles.dat"
     file_path_src = common.MFC_EXAMPLE_DIRPATH + path_example_input + "/input/lag_bubbles.dat"
     if not os.path.exists(folder_path_dest):
         os.mkdir(folder_path_dest)
 
-    shutil.copyfile(file_path_src, fite_path_dest)
+    shutil.copyfile(file_path_src, file_path_dest)
