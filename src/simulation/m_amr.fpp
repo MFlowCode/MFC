@@ -1782,7 +1782,7 @@ contains
                     write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
                            & ' conserved variables but this run has ', sys_size, &
                            & '; the physics configuration ' &
-                           & // '(num_fluids/model_eqns/bubbles/chemistry/...) must match the run that wrote the restart'
+                           & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
                     call s_mpi_abort(trim(msg))
                 end if
                 amr_num_blocks = ghdr(2)
@@ -1815,7 +1815,7 @@ contains
                     write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
                            & ' conserved variables but this run has ', sys_size, &
                            & '; the physics configuration ' &
-                           & // '(num_fluids/model_eqns/bubbles/chemistry/...) must match the run that wrote the restart'
+                           & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
                     call s_mpi_abort(trim(msg))
                 end if
                 amr_num_blocks = ghdr(2)

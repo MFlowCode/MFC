@@ -629,7 +629,7 @@ contains
         integer, intent(in)                  :: t_step
         character(LEN=path_len + 3*name_len) :: file_loc
         logical                              :: file_exist
-        integer                              :: k, i, nblk, ghdr(2), reg(6), rm, rn, rp
+        integer                              :: k, i, nblk, ghdr(3), reg(6), rm, rn, rp
         integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d
         logical                              :: owns
 
@@ -701,11 +701,11 @@ contains
 #ifdef MFC_MPI
             ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 2, MPI_INTEGER, status, ierr)
+            call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
             nblk = ghdr(2)
             allocate (amr_fine(nblk))
             amr_num_fine = 0
-            disp0 = int(2*ibytes, MPI_OFFSET_KIND)
+            disp0 = int(3*ibytes, MPI_OFFSET_KIND)
             do k = 1, nblk
                 call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
                 do d = 1, 3

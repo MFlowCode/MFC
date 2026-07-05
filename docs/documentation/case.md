@@ -908,9 +908,9 @@ solution, per rank (an `amr_fine.dat` in each rank's step directory, or a single
 `amr_*.dat` next to the level-0 MPI-IO restart file when `parallel_io` is on).
 Restarting (`t_step_start > 0`) restores the saved box and fine state seamlessly; it
 requires the same rank count (and decomposition) as the run that wrote the file, and the
-same physics configuration (`sys_size` — the number of conserved variables set by
-`num_fluids`/`model_eqns`/`bubbles`/`chemistry`/...), and aborts with a clear message
-otherwise.
+same physics configuration — the number of conserved variables, which depends on
+`num_fluids`, `model_eqns`, and the enabled bubble/chemistry models — and aborts with a
+clear message otherwise.
 On restart the AMR block geometry (block count and boxes) is read from the AMR restart
 file, not from the `amr_block_beg`/`amr_block_end` case parameters — so editing those
 parameters for a restart run has no effect. To re-derive the blocks from parameters,
