@@ -1,6 +1,6 @@
 # AMR fine-level distribution (design note)
 
-**Status:** in progress, own branch (`amr-fine-dist`), separate from the AMR mega-PR.
+**Status:** in progress on `up/mega` (part of the AMR effort). Phase 1 landed (map computed, not applied); Phase 2 is the apply + gather/scatter checkpoint.
 
 ## Problem
 
