@@ -249,11 +249,15 @@ PHYSICS_DOCS = {
             "must not overlap the user-placed initial block (checked at startup), and under dynamic "
             "regrid the source region stays coarse (tags are suppressed over the support and candidate "
             "boxes are clipped clear of it). "
+            "IGR is supported with restriction-only coarse/fine coupling: the fine block runs its "
+            "own fixed-iteration sigma solve seeded and Dirichlet-bounded by the converged coarse "
+            "sigma; seam conservation is truncation-order (the reflux is not captured from the "
+            "fused IGR flux kernels); amr_subcycle is not yet supported under IGR. "
             "Lagrangian bubbles are supported with the cloud excluded from fine blocks (two-way "
             "coupling lives on the coarse grid): regrid suppresses tags and clips boxes around the "
             "cloud's padded bbox, and a per-stage guard aborts if the cloud reaches an active block. "
             "Incompatible with surface tension, "
-            "IGR, 3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
+            "3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
             "per-cell WENO coefficients are recomputed for each block on swap), MHD, hyperelasticity, "
             "and active_box. hybrid_weno/hybrid_riemann are supported: each level recomputes the "
             "sensor over its own (swapped) bounds every RHS call. "
@@ -1407,7 +1411,7 @@ class CaseValidator:
             amr_cluster_eff is not None and (amr_cluster_eff <= 0 or amr_cluster_eff > 1),
             "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1",
         )
-        self.prohibit(recon_type is not None and recon_type != 1, "amr requires WENO reconstruction (recon_type = 1)")
+        self.prohibit(recon_type is not None and recon_type != 1 and not igr, "amr requires WENO reconstruction (recon_type = 1) or the IGR solver")
         self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
         mpp_lim = self.get("mpp_lim", "F") == "T"
@@ -1421,7 +1425,10 @@ class CaseValidator:
             surface_tension or hyperelasticity or mhd,
             "amr does not support surface-tension/hyperelasticity/MHD",
         )
-        self.prohibit(igr, "amr does not support the IGR solver")
+        self.prohibit(
+            igr and self.get("amr_subcycle", "F") == "T",
+            "amr_subcycle with the IGR solver is not yet supported (lockstep only)",
+        )
         self.prohibit(
             cyl_coord and (self.get("p", 0) or 0) > 0,
             "amr with cyl_coord supports 2D axisymmetric only: " "the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance",

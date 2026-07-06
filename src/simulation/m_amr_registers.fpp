@@ -145,6 +145,7 @@ contains
         logical                        :: accum
 
         if (.not. amr) return
+        if (igr) return  ! stage-1 IGR coupling is restriction-only: the fused IGR flux kernels do not expose face fluxes to capture
         if (amr_in_fine_advance .and. .not. amr_rank_owns_block) return
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         ! flux data was just written by device kernels; the face reads below run as device kernels too
@@ -471,6 +472,7 @@ contains
         real(wp)                                               :: fblo, fbhi, mlo, mhi
 
         if (.not. amr) return
+        if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer
         ! (all faces at np=1); freg slices from a rank-boundary face's fine side arrive via
@@ -593,6 +595,7 @@ contains
         integer :: d, eq, t1, t2, t1_hi, t2_hi, islot
 
         if (.not. amr) return
+        if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         if (.not. amr_rank_owns_block) return
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         do d = 1, 3
@@ -626,6 +629,7 @@ contains
         real(wp)                                               :: fblo, fbhi, mlo, mhi, dtl
 
         if (.not. amr) return
+        if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         ! per-face participation and index conventions: see s_amr_apply_reflux
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)

@@ -481,7 +481,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
-    def alter_igr():
+    def alter_igr(amr_variant=False):
         stack.push("IGR", {"igr": "T", "alf_factor": 10, "num_igr_iters": 10, "elliptic_smoothing": "T", "elliptic_smoothing_iters": 10, "num_igr_warm_start_iters": 10})
 
         for order in [3, 5]:
@@ -490,6 +490,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "Jacobi", {"igr_iter_solver": 1}))
             if order == 5:
                 cases.append(define_case_d(stack, "Gauss Seidel", {"igr_iter_solver": 2}))
+            # AMR (stage-1 restriction-only coupling): the fine block runs its own fixed-iteration
+            # sigma solve, seeded and Dirichlet-bounded by the converged coarse sigma (frozen
+            # ghost ring, per-iteration BC populate skipped); validated free-stream-exact, with
+            # the AMR-vs-reference error at resolution scale (rho 1.3e-4 rel-L2) and a
+            # truncation-level transverse seam artifact from the coarse/fine sigma jump
+            if order == 3 and amr_variant:
+                stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 14, "amr_block_beg(2)": 12, "amr_block_end(1)": 33, "amr_block_end(2)": 27, "amr_regrid_int": 0, "igr_iter_solver": 1})
+                cases.append(define_case_d(stack, "", {}))
+                cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
+                stack.pop()
 
             stack.pop()
 
@@ -623,7 +633,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_low_Mach_correction()
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
-                alter_igr()
+                # AMR variants only on the targeted 2D 1-fluid inviscid base (one static + one
+                # dynamic-regrid golden; the block indices are 2D)
+                alter_igr(amr_variant=(len(dimInfo[0]) == 2 and num_fluids == 1))
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)

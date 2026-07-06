@@ -855,7 +855,11 @@ lives on the coarse grid, regrid suppresses tags and clips boxes around the clou
 bounding box, EL volume fractions prolong without the sum-to-one closure (their sum is the
 local liquid fraction, not 1), and a per-stage guard aborts if the cloud reaches an active
 block (reduce `amr_regrid_int` or increase `amr_buf`).
-AMR is incompatible with surface tension, IGR, 3D cylindrical
+The IGR solver is supported with restriction-only coarse/fine coupling: the fine block runs
+its own fixed-iteration sigma solve seeded and Dirichlet-bounded by the converged coarse
+sigma; seam conservation is truncation-order (no reflux capture from the fused IGR flux
+kernels), free-stream preservation is exact, and `amr_subcycle` is gated under IGR.
+AMR is incompatible with surface tension, 3D cylindrical
 coordinates (2D axisymmetric IS supported), MHD, hyperelasticity, Riemann-extrapolation
 boundaries (bc = -4), and `active_box`. `hybrid_weno`/`hybrid_riemann` are supported: each
 level recomputes the smoothness sensor over its own (swapped) bounds every RHS call.

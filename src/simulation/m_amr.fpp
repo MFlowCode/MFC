@@ -30,6 +30,7 @@ module m_amr
     use m_weno, only: s_compute_weno_coefficients
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
+    use m_igr, only: jac, jac_old
 
     implicit none
 
@@ -92,6 +93,12 @@ module m_amr
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
     logical               :: sw_acoustic_source
+
+    !> IGR sigma-state bounce (igr only): the fine solve reuses the module jac/jac_old arrays at fine indices (the extent guard
+    !! keeps fine bounds inside), so the coarse contents - jac_old is the Jacobi warm start persisting across steps - are saved here
+    !! across the fine advance.
+    real(wp), allocatable :: sw_jac(:,:,:), sw_jac_old(:,:,:)
+    $:GPU_DECLARE(create='[sw_jac, sw_jac_old]')
 
     !> Lagrangian bubble-cloud exclusion support: padded global coarse-index bbox of the cloud (positions + mapCells smearing +
     !! stencil headroom [+ drift margin at regrid]). Blocks and regrid boxes stay clear of it: a bubble inside a block loses two-way
@@ -222,6 +229,10 @@ contains
             allocate (sw_z_cc(-buff_size:p + buff_size))
             allocate (sw_dz(-buff_size:p + buff_size))
         end if
+        if (igr) then
+            @:ALLOCATE(sw_jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(sw_jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        end if
 
         ! Grid uniformity policy. The two spacing-uniformity consumers are both handled exactly:
         ! the fine-block ghost-shell coordinates extend by exact parent-cell bisection (reads
@@ -244,7 +255,7 @@ contains
                 amr_weno_coef_recompute = .true.
             end if
         end if
-        if (weno_order == 1) amr_weno_coef_recompute = .false.  ! order 1 has no grid-dependent coefficients
+        if (weno_order == 1 .or. igr) amr_weno_coef_recompute = .false.  ! order 1 / IGR: no grid-dependent WENO coefficients
 
         ! preallocate every slot at max buffered extents (each sized exactly as the single legacy block): coords (host) +
         ! fields (device-resident @:ALLOCATE so s_compute_rhs kernels can run on the fine block; q_cons/q_prim/rhs get the
@@ -1247,6 +1258,13 @@ contains
         ! must be rebuilt for the block's own uniform grid (no-op flag on uniform grids)
         if (amr_weno_coef_recompute) call s_amr_recompute_weno_coefs()
 
+        ! IGR: save the coarse sigma state and seed the fine solve. jac holds THIS stage's
+        ! converged coarse sigma (the coarse RHS ran first), so its parent values are both the
+        ! best initial guess and the frozen Dirichlet ghost data for the block-local Jacobi
+        ! solve (the per-iteration BC/halo populate is skipped under amr_in_fine_advance).
+        ! Piecewise-constant parent injection over the full buffered fine range.
+        if (igr) call s_amr_igr_swap_sigma()
+
     end subroutine s_amr_swap_to_fine
 
     !> Restore the global grid state saved by s_amr_swap_to_fine.
@@ -1265,8 +1283,64 @@ contains
         call s_amr_sync_grid_state_to_device()
         if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
         if (amr_weno_coef_recompute) call s_amr_recompute_weno_coefs()
+        if (igr) call s_amr_igr_restore_sigma()
 
     end subroutine s_amr_restore_coarse
+
+    !> Save the coarse jac/jac_old and seed the (already swapped-in) fine block's sigma state by piecewise-constant parent injection
+    !! from the saved coarse sigma: interior = initial guess, ghost shell = frozen Dirichlet coupling data for the block-local
+    !! iterative solve.
+    impure subroutine s_amr_igr_swap_sigma()
+
+        integer :: j, k, l, ci, cj, ck
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+        do l = sw_idwbuff(3)%beg, sw_idwbuff(3)%end
+            do k = sw_idwbuff(2)%beg, sw_idwbuff(2)%end
+                do j = sw_idwbuff(1)%beg, sw_idwbuff(1)%end
+                    sw_jac(j, k, l) = jac(j, k, l)
+                    sw_jac_old(j, k, l) = jac_old(j, k, l)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]')
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    ci = amr_isect_lo(1) + floor(real(j, wp)/2._wp) - start_idx(1)
+                    cj = 0; ck = 0
+                    if (n_glb > 0) cj = amr_isect_lo(2) + floor(real(k, wp)/2._wp) - start_idx(2)
+                    if (p_glb > 0) ck = amr_isect_lo(3) + floor(real(l, wp)/2._wp) - start_idx(3)
+                    ci = min(max(ci, sw_idwbuff(1)%beg), sw_idwbuff(1)%end)
+                    cj = min(max(cj, sw_idwbuff(2)%beg), sw_idwbuff(2)%end)
+                    ck = min(max(ck, sw_idwbuff(3)%beg), sw_idwbuff(3)%end)
+                    jac(j, k, l) = sw_jac(ci, cj, ck)
+                    jac_old(j, k, l) = sw_jac(ci, cj, ck)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_igr_swap_sigma
+
+    !> Restore the coarse jac/jac_old saved by s_amr_igr_swap_sigma (bounds already restored).
+    impure subroutine s_amr_igr_restore_sigma()
+
+        integer :: j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    jac(j, k, l) = sw_jac(j, k, l)
+                    jac_old(j, k, l) = sw_jac_old(j, k, l)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_igr_restore_sigma
 
     !> Recompute the WENO reconstruction coefficient arrays from the CURRENT grid globals (the fine block's after a swap, the coarse
     !! grid's after a restore). s_compute_weno_coefficients reads the live cell-boundary arrays, refreshes uniform_grid, and pushes
@@ -1642,9 +1716,10 @@ contains
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
 
-        ! RK stage update (device kernel; mirror of the coarse non-IGR form)
+        ! RK stage update (device kernel; mirror of the coarse form - under IGR the rhs already
+        ! embeds dt, matching the coarse igr update, so the dt factor is 1)
         call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
-                                  & coefs(2), coefs(3), coefs(4), dt)
+                                  & coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
         if (qbmm .and. .not. polytropic) call s_amr_fine_rk_update_pbmv(coefs(1), coefs(2), coefs(3), coefs(4), dt)
         ! 6-equation model: per-stage pressure relaxation on the block (before IB correct, coarse order)
         if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
@@ -2990,6 +3065,10 @@ contains
             if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
             if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
             if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
+            if (igr) then
+                @:DEALLOCATE(sw_jac)
+                @:DEALLOCATE(sw_jac_old)
+            end if
 
         end subroutine s_finalize_amr_module
 

@@ -93,7 +93,7 @@ contains
                    & "hybrid_riemann (cheap central/Rusanov flux) is incompatible with the low_Mach correction")
 
         if (amr) then
-            @:PROHIBIT(recon_type /= recon_type_weno, "amr requires WENO reconstruction")
+            @:PROHIBIT((.not. igr) .and. recon_type /= recon_type_weno, "amr requires WENO reconstruction (or the IGR solver)")
             @:PROHIBIT(time_stepper /= time_stepper_rk3, "amr requires time_stepper = 3 (SSP-RK3)")
             ! 6-equation support: the internal-energy equations prolong/restrict on the generic
             ! conservative path and the per-stage pressure relaxation (cell-local) also runs on
@@ -113,7 +113,11 @@ contains
             ! hypoelasticity is supported: stress components prolong via the generic conservative-linear
             ! path and the swap/restore recomputes the spacing-dependent FD coefficients per grid
             @:PROHIBIT(hyperelasticity .or. mhd, "amr does not support hyperelasticity/MHD")
-            @:PROHIBIT(igr, "amr does not support the IGR solver")
+            ! IGR is supported with restriction-only coarse/fine coupling (stage 1): the fine
+            ! block runs its own fixed-iteration sigma solve seeded and Dirichlet-bounded by the
+            ! converged coarse sigma; the Berger-Colella reflux is not yet captured from the
+            ! fused IGR flux kernels, so seam conservation is truncation-order, not exact
+            @:PROHIBIT(igr .and. amr_subcycle, "amr_subcycle with the IGR solver is not yet supported (lockstep only)")
             ! Lagrangian bubbles are supported with the cloud EXCLUDED from fine blocks (two-way
             ! coupling lives on the coarse grid): regrid suppresses tags and clips boxes around
             ! the cloud's padded bbox, and a per-stage guard aborts if the cloud reaches a block
