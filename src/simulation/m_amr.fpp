@@ -673,7 +673,7 @@ contains
             $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
         end do
         ! non-polytropic QBMM: seed the block's quadrature side-state from the coarse fields
-        if (qbmm .and. .not. polytropic) call s_amr_prolong_pbmv_host()
+        if (qbmm .and. .not. polytropic) call s_amr_prolong_pbmv()
 
     end subroutine s_populate_amr_fine
 
@@ -912,24 +912,29 @@ contains
     !! push to the device. Piecewise-constant preserves the per-cell realizable quadrature set (mirroring the moments' injection).
     !! Called at init populate and at restart (the fine side-state is re-prolonged from the restored coarse fields - a one-time
     !! smoothing; q_cons is restored exactly).
-    impure subroutine s_amr_prolong_pbmv_host()
+    impure subroutine s_amr_prolong_pbmv()
 
-        integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
+        integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz, fm, fn, fp
+
+        ! device kernel reading the DEVICE-current coarse side-state directly: a host-side copy
+        ! here would read a stale host mirror on GPU builds (regrid-time prolongation corruption)
 
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
         rr = amr_slots(amr_cur)%ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
+        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
+        $:GPU_PARALLEL_LOOP(collapse=5, private='[ci, cj, ck]')
         do ib_ = 1, nb
             do q = 1, nnode
-                do fk = 0, amr_slots(amr_cur)%p
-                    ck = 0
-                    if (p_glb > 0) ck = lo3 + fk/rr - oz
-                    do fj = 0, amr_slots(amr_cur)%n
-                        cj = 0
-                        if (n_glb > 0) cj = lo2 + fj/rr - oy
-                        do fi = 0, amr_slots(amr_cur)%m
+                do fk = 0, fp
+                    do fj = 0, fn
+                        do fi = 0, fm
+                            ck = 0
+                            if (p_glb > 0) ck = lo3 + fk/rr - oz
+                            cj = 0
+                            if (n_glb > 0) cj = lo2 + fj/rr - oy
                             ci = lo1 + fi/rr - ox
                             amr_slots(amr_cur)%pb_f(fi, fj, fk, q, ib_) = pb_ts(1)%sf(ci, cj, ck, q, ib_)
                             amr_slots(amr_cur)%mv_f(fi, fj, fk, q, ib_) = mv_ts(1)%sf(ci, cj, ck, q, ib_)
@@ -938,19 +943,20 @@ contains
                 end do
             end do
         end do
-        $:GPU_UPDATE(device='[amr_slots(amr_cur)%pb_f, amr_slots(amr_cur)%mv_f]')
+        $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_prolong_pbmv_host
+    end subroutine s_amr_prolong_pbmv
 
     !> Non-polytropic QBMM: piecewise-constant prolongation of the fine pb/mv GHOST shell from the coarse side-state (device kernel;
     !! interior untouched). The ghosts feed the widened-idwint conversions and the qbmm rhs over the shell, mirroring the q_cons
-    !! ghost fill.
-    impure subroutine s_amr_fill_fine_ghosts_pbmv(pb_c, mv_c, pb_tgt, mv_tgt)
+    !! ghost fill. The fine target is selected by integer (1 = pb_f/mv_f, 2 = ghost_a, 3 = ghost_b) and the slot arrays are
+    !! referenced DIRECTLY inside the kernels: passing an amr_slots(amr_cur) component as an assumed-shape actual makes nvfortran
+    !! emit a component-section data clause that fails partially-present on device (the coarse sources pb_c/mv_c follow the proven
+    !! pb_ts pattern).
+    impure subroutine s_amr_fill_fine_ghosts_pbmv(pb_c, mv_c, tgt)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_c, mv_c
-
-        real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
-             & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_tgt, mv_tgt
+        integer, intent(in) :: tgt
         integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, fm, fn, fp, b1, e1, b2, e2, b3, e3, ox, oy, oz
         logical :: d2, d3
 
@@ -964,27 +970,32 @@ contains
         b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
         b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
         b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
-        $:GPU_PARALLEL_LOOP(collapse=5, private='[ci, cj, ck]')
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do fk = b3, e3
-                    do fj = b2, e2
-                        do fi = b1, e1
-                            if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
-                                ck = 0
-                                if (d3) ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                                cj = 0
-                                if (d2) cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                                ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                                pb_tgt(fi, fj, fk, q, ib_) = pb_c(ci, cj, ck, q, ib_)
-                                mv_tgt(fi, fj, fk, q, ib_) = mv_c(ci, cj, ck, q, ib_)
-                            end if
+        #:for TGT, SFX in [(1, 'f'), (2, 'ghost_a'), (3, 'ghost_b')]
+            if (tgt == ${TGT}$) then
+                $:GPU_PARALLEL_LOOP(collapse=5, private='[ci, cj, ck]')
+                do ib_ = 1, nb
+                    do q = 1, nnode
+                        do fk = b3, e3
+                            do fj = b2, e2
+                                do fi = b1, e1
+                                    if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) &
+                                        & then
+                                        ck = 0
+                                        if (d3) ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                                        cj = 0
+                                        if (d2) cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                                        ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                                        amr_slots(amr_cur)%pb_${SFX}$ (fi, fj, fk, q, ib_) = pb_c(ci, cj, ck, q, ib_)
+                                        amr_slots(amr_cur)%mv_${SFX}$ (fi, fj, fk, q, ib_) = mv_c(ci, cj, ck, q, ib_)
+                                    end if
+                                end do
+                            end do
                         end do
                     end do
                 end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
 
     end subroutine s_amr_fill_fine_ghosts_pbmv
 
@@ -1687,8 +1698,7 @@ contains
 
         ! non-polytropic QBMM: prolong the block's pb/mv ghost shell from the coarse stage-entry
         ! side-state (its rhs is cell-local, so ghosts only feed the widened-idwint conversions)
-        if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, amr_slots(amr_cur)%pb_f, &
-            & amr_slots(amr_cur)%mv_f)
+        if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, 1)
 
         ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
@@ -1769,8 +1779,8 @@ contains
         call s_amr_fill_fine_ghosts(q_new, amr_slots(amr_cur)%q_ghost_b)
         ! non-polytropic QBMM: the pb/mv ghost shell gets the same two-source time-lerp treatment
         if (qbmm .and. .not. polytropic) then
-            call s_amr_fill_fine_ghosts_pbmv(pb_old, mv_old, amr_slots(amr_cur)%pb_ghost_a, amr_slots(amr_cur)%mv_ghost_a)
-            call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, amr_slots(amr_cur)%pb_ghost_b, amr_slots(amr_cur)%mv_ghost_b)
+            call s_amr_fill_fine_ghosts_pbmv(pb_old, mv_old, 2)
+            call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, 3)
         end if
         call s_amr_zero_fine_registers()
 
@@ -2510,7 +2520,7 @@ contains
                 ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant),
                 ! then overwrite the overlap with the old blocks' fine data (same index shift)
                 if (qbmm .and. .not. polytropic) then
-                    call s_amr_prolong_pbmv_host()
+                    call s_amr_prolong_pbmv()
                     do kk = 1, old_np
                         if (.not. old_owns(kk)) cycle
                         sh = 2*(amr_isect_lo - old_ilo(:,kk))
@@ -2845,7 +2855,7 @@ contains
             if (qbmm .and. .not. polytropic) then
                 do k = 1, amr_num_blocks
                     call s_amr_select_slot(k)
-                    if (amr_owns_all(k)) call s_amr_prolong_pbmv_host()
+                    if (amr_owns_all(k)) call s_amr_prolong_pbmv()
                 end do
             end if
             call s_amr_select_slot(1)
