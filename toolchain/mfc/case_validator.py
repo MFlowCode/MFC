@@ -605,6 +605,8 @@ class CaseValidator:
 
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
 
+        fd_order = self.get("fd_order")
+        self.prohibit(ib and fd_order is None, "fd_order must be specified for ib")
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
         has_particle_clouds = num_particle_clouds > 0 and any((self.get(f"particle_cloud({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_clouds + 1))
         self.prohibit(
@@ -2265,7 +2267,6 @@ class CaseValidator:
         self.check_continuum_damage()
         self.check_grcbc()
         self.check_probe_integral_output()
-        self.check_chemistry()
 
     def validate_pre_process(self):
         """Validate pre-process-specific parameters"""
@@ -2275,7 +2276,6 @@ class CaseValidator:
         self.check_parallel_io_pre_process()
         self.check_grid_stretching()
         self.check_perturb_density()
-        self.check_chemistry()
         self.check_misc_pre_process()
         self.check_patch_physics()
         self.check_volume_fraction_sum()
@@ -2303,7 +2303,6 @@ class CaseValidator:
         self.check_schlieren()
         self.check_surface_tension_post()
         self.check_no_flow_variables()
-        self.check_chemistry()
 
     def validate(self, stage: str = "simulation"):
         """Main validation method

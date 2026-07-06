@@ -173,6 +173,14 @@ module m_global_parameters
     integer :: fd_number  !< Finite-difference half-stencil size: MAX(1, fd_order/2)
     $:GPU_DECLARE(create='[fd_number]')
 
+    !> @name Centered finite-difference coefficients in x-, y- and z-coordinate directions
+    !> @{
+    real(wp), allocatable, dimension(:,:) :: fd_coeff_x
+    real(wp), allocatable, dimension(:,:) :: fd_coeff_y
+    real(wp), allocatable, dimension(:,:) :: fd_coeff_z
+    !> @}
+    $:GPU_DECLARE(create='[fd_coeff_x, fd_coeff_y, fd_coeff_z]')
+
     ! probe, integral: auto-generated in generated_decls.fpp
 
     !> @name Reference density and pressure for Tait EOS
@@ -818,15 +826,7 @@ contains
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 
-        if (elasticity) then
-            fd_number = max(1, fd_order/2)
-        end if
-
-        if (mhd) then
-            fd_number = max(1, fd_order/2)
-        end if
-
-        if (probe_wrt) then
+        if (elasticity .or. mhd .or. probe_wrt .or. ib) then
             fd_number = max(1, fd_order/2)
         end if
 
@@ -934,6 +934,7 @@ contains
         @:DEALLOCATE(fluid_inv_re)
 
         if (bubbles_euler) then
+            @:DEALLOCATE(ptil)
             @:DEALLOCATE(qbmm_idx%rs, qbmm_idx%vs, qbmm_idx%ps, qbmm_idx%ms)
             if (qbmm) then
                 @:DEALLOCATE(qbmm_idx%moms)

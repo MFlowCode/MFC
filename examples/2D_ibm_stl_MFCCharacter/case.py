@@ -50,6 +50,7 @@ print(
             "bc_y%end": -3,
             "ib": "T",
             "num_ibs": 1,
+            "fd_order": 2,
             # Formatted Database Files Structure Parameters
             # Export primitive variables in double precision with parallel
             # I/O to minimize I/O computational time during large simulations

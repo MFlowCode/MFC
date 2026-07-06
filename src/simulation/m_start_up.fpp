@@ -1488,6 +1488,13 @@ contains
                     call MPI_SENDRECV(end_val, 1, mpi_p, send_neighbor, ${TAG + 1}$, recv_val, 1, mpi_p, recv_neighbor, &
                                       & ${TAG + 1}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                     end_val = recv_val
+
+                    ! protect from looping back around on yourself multiple times
+                    if (f_approx_equal(beg_val, ${X}$_cb(${DIM}$)) .or. f_approx_equal(end_val, ${X}$_cb(-1))) then
+                        beg_val = -huge(0._wp)
+                        end_val = huge(0._wp)
+                        exit
+                    end if
                 end do
                 neighbor_domain_${X}$%beg = beg_val
                 neighbor_domain_${X}$%end = end_val
