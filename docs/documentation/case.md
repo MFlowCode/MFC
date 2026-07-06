@@ -860,7 +860,9 @@ its own fixed-iteration sigma solve seeded and Dirichlet-bounded by the converge
 sigma; seam conservation is truncation-order (no reflux capture from the fused IGR flux
 kernels), free-stream preservation is exact, and `amr_subcycle` is gated under IGR.
 AMR is incompatible with surface tension, 3D cylindrical
-coordinates (2D axisymmetric IS supported), MHD, hyperelasticity, Riemann-extrapolation
+coordinates (2D axisymmetric IS supported), 2D/3D MHD (measured: the coarse/fine seam is a
+continuous div(B) source that GLM cleaning cannot remove; 1D MHD/RMHD IS supported since
+div(B) = 0 by construction there), hyperelasticity, and Riemann-extrapolation
 boundaries (bc = -4). `active_box` is supported (single-rank): blocks must sit strictly inside the growing active window (init abort + regrid clamp), and the fine advance treats its whole block as active. `hybrid_weno`/`hybrid_riemann` are supported: each
 level recomputes the smoothness sensor over its own (swapped) bounds every RHS call.
 Nonuniform grids ARE supported (grid stretching and the axisymmetric axis half-cell): the fine

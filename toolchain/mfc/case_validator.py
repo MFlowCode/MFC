@@ -259,8 +259,10 @@ PHYSICS_DOCS = {
             "Incompatible with surface tension, "
             "3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
             "per-cell WENO coefficients are recomputed for each block on swap), hyperelasticity, and "
-            "MHD (measured: the coarse/fine seam is a continuous O(1) div(B) source that GLM cleaning "
-            "spreads but cannot remove; divergence-preserving B prolongation/reflux is future work). "
+            "2D/3D MHD (measured: the coarse/fine seam is a continuous O(1) div(B) source that GLM "
+            "cleaning spreads but cannot remove; divergence-preserving B prolongation/reflux is future "
+            "work). 1D MHD/RMHD IS supported: div(B) = 0 by construction there (Bx is the uniform Bx0 "
+            "parameter; By/Bz reflux and restrict as ordinary conserved scalars). "
             "hybrid_weno/hybrid_riemann are supported: each level recomputes the "
             "sensor over its own (swapped) bounds every RHS call. "
             "active_box is supported (single-rank, per active_box's own MPI gate): blocks must "
@@ -1426,8 +1428,12 @@ class CaseValidator:
             "Lagrangian bubbles are exempt (their alphas sum to the local liquid fraction)",
         )
         self.prohibit(
-            surface_tension or hyperelasticity or mhd,
-            "amr does not support surface-tension/hyperelasticity/MHD",
+            surface_tension or hyperelasticity,
+            "amr does not support surface-tension/hyperelasticity",
+        )
+        self.prohibit(
+            mhd and (self.get("n", 0) or 0) > 0,
+            "amr with mhd is 1D-only " "(the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)",
         )
         self.prohibit(
             igr and self.get("amr_subcycle", "F") == "T",

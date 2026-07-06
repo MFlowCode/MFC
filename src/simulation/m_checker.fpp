@@ -121,7 +121,11 @@ contains
             ! 1.4e-3 cleaning background; HLLD, which has no GLM coupling at all, NaNs
             ! outright). Supporting MHD needs divergence-preserving (constrained-transport
             ! class) prolongation and reflux for B.
-            @:PROHIBIT(mhd, "amr does not support MHD (the coarse/fine seam is not divergence-preserving for B)")
+            ! 1D MHD/RMHD is exempt: div(B) = d(Bx)/dx and 1D evolves only By/Bz (Bx is the
+            ! uniform Bx0 parameter), so div(B) is IDENTICALLY zero - the failure mode above
+            ! is structurally absent and By/Bz reflux/restrict as ordinary conserved scalars.
+            @:PROHIBIT(mhd .and. n > 0, &
+                       & "amr with mhd is 1D-only (the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)")
             ! IGR is supported with restriction-only coarse/fine coupling (stage 1): the fine
             ! block runs its own fixed-iteration sigma solve seeded and Dirichlet-bounded by the
             ! converged coarse sigma; the Berger-Colella reflux is not yet captured from the

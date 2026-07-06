@@ -2831,6 +2831,57 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (b''') 1D MHD + RMHD: div(B) = d(Bx)/dx and 1D evolves only By/Bz (Bx is the uniform
+        # Bx0 parameter), so div(B) is IDENTICALLY zero and the 2D/3D seam-monopole failure
+        # mode (measured, gated) is structurally absent - By/Bz reflux and restrict as
+        # ordinary conserved scalars. Brio-Wu with HLLD (the div-brittle solver: its 1D
+        # stability is part of what these protect) + a relativistic variant.
+        mhd_1d_base = {
+            **amr_1d_base,
+            "m": 200,
+            "dt": 1.0e-3,
+            "t_step_stop": 20,
+            "t_step_save": 20,
+            "num_patches": 2,
+            "mhd": "T",
+            "Bx0": 0.75,
+            "riemann_solver": 4,
+            "wave_speeds": 1,
+            "num_fluids": 1,
+            "patch_icpp(1)%x_centroid": 0.25,
+            "patch_icpp(1)%length_x": 0.5,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%vel(3)": 0.0,
+            "patch_icpp(1)%By": 1.0,
+            "patch_icpp(1)%Bz": 0.0,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%pres": 0.1,
+            "patch_icpp(2)%alpha_rho(1)": 0.125,
+            "patch_icpp(2)%vel(2)": 0.0,
+            "patch_icpp(2)%vel(3)": 0.0,
+            "patch_icpp(2)%By": -1.0,
+            "patch_icpp(2)%Bz": 0.0,
+            "patch_icpp(3)%pres": None,
+            "patch_icpp(3)%alpha_rho(1)": None,
+            "patch_icpp(3)%geometry": None,
+            "patch_icpp(3)%x_centroid": None,
+            "patch_icpp(3)%length_x": None,
+            "patch_icpp(3)%vel(1)": None,
+            "amr_block_beg(1)": 60,
+            "amr_block_end(1)": 145,
+        }
+        stack.push("AMR -> 1D -> MHD -> HLLD", {**mhd_1d_base, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 0.05, "amr_buf": 3}))
+        stack.pop()
+        stack.push(
+            "AMR -> 1D -> RMHD",
+            {**mhd_1d_base, "relativity": "T", "riemann_solver": 1, "Bx0": 0.5, "amr_regrid_int": 0},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         # (c) subcycling
         stack.push(
             "AMR -> 1D -> subcycle",
