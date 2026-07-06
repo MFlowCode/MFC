@@ -244,26 +244,28 @@ contains
         ! the fine-block ghost-shell coordinates extend by exact parent-cell bisection (reads
         ! sw_*_cb), and the spacing-dependent WENO reconstruction coefficients are recomputed for
         ! the active grid on every swap/restore when the grid is nonuniform anywhere (stretched
-        ! grids, or 2D-axisymmetric's half-width axis cell dy(0) = dy/2). On fully uniform grids
+        ! grids, or 2D-axisymmetric's half-width axis cell dy(0) = dy/2). The tolerance is epsilon-
+        ! scaled: an absolute 1e-12 would sit below single-precision grid roundoff and classify
+        ! every grid as stretched (spuriously tripping the stretched-combo gates). On uniform grids
         ! the flag stays false and behavior is bit-identical to the reuse path. The stretch_*
         ! flags are pre_process-only, so the grid itself is checked (this also catches
         ! externally generated grids).
-        if (maxval(dx(0:m)) - minval(dx(0:m)) > 1.e-12_wp*maxval(dx(0:m))) then
+        if (maxval(dx(0:m)) - minval(dx(0:m)) > 1.e3_wp*epsilon(1._wp)*maxval(dx(0:m))) then
             amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
         end if
         if (n_glb > 0) then
             ! interior nonuniformity is stretching; a lone dy(0) deviation is stretching only
             ! when it is NOT the axisymmetric half-width axis cell
-            if (n > 0 .and. maxval(dy(1:n)) - minval(dy(1:n)) > 1.e-12_wp*maxval(dy(1:n))) then
+            if (n > 0 .and. maxval(dy(1:n)) - minval(dy(1:n)) > 1.e3_wp*epsilon(1._wp)*maxval(dy(1:n))) then
                 amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
             end if
-            if (abs(dy(0) - dy(min(1, n))) > 1.e-12_wp*dy(min(1, n))) then
+            if (abs(dy(0) - dy(min(1, n))) > 1.e3_wp*epsilon(1._wp)*dy(min(1, n))) then
                 amr_weno_coef_recompute = .true.
                 if (.not. cyl_coord) amr_grid_stretched = .true.
             end if
         end if
         if (p_glb > 0) then
-            if (maxval(dz(0:p)) - minval(dz(0:p)) > 1.e-12_wp*maxval(dz(0:p))) then
+            if (maxval(dz(0:p)) - minval(dz(0:p)) > 1.e3_wp*epsilon(1._wp)*maxval(dz(0:p))) then
                 amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
             end if
         end if
