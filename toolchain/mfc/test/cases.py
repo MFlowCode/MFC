@@ -2711,6 +2711,49 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # 2 MPI ranks: the ONLY case exercising the '- start_idx(d)' rank-offset terms of the
+        # parent-bisection ghost formula on a grid where a wrong offset changes coordinates
+        # (uniform spacing makes any parent index give the same value; the block spans the seam)
+        cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
+        stack.pop()
+
+        # (b'') stretched in y, 2D: the y-direction parent-bisection formula (copy-pasted per
+        # dim) reduces to the uniform formula on every other 2D/3D golden; here the block's
+        # lower/upper y ghost shells sit on nonuniform parents (uniform core y in [0.35, 0.6])
+        stack.push(
+            "AMR -> 2D -> stretched grid y -> dynamic regrid",
+            {
+                **amr_1d_base,
+                "n": 39,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "stretch_y": "T",
+                "a_y": 2.0,
+                "y_a": 0.35,
+                "y_b": 0.6,
+                "loops_y": 1,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(2)%geometry": 3,
+                "patch_icpp(3)%geometry": 3,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(3)%y_centroid": 0.5,
+                "patch_icpp(1)%length_y": 10.0,
+                "patch_icpp(2)%length_y": 10.0,
+                "patch_icpp(3)%length_y": 10.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(3)%vel(2)": 0.0,
+                "amr_block_beg(2)": 10,
+                "amr_block_end(2)": 25,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
         # (c) subcycling

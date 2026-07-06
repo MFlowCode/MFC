@@ -112,10 +112,11 @@ module m_amr
     integer :: lag_supp_lo(3), lag_supp_hi(3)
     logical :: lag_supp_on = .false.
     logical :: amr_swapped = .false.  !< paired-swap guard: a nested swap would corrupt the bounce buffers silently
-    !> True when the coarse grid is nonuniform in an allowed way (the 2D-axisymmetric half-width axis cell): the WENO reconstruction
-    !! coefficients are then per-cell, so the fine advance must recompute them for the block's own (uniform) grid on every swap and
-    !! restore the coarse ones after. False on fully uniform grids - the recompute is skipped and behavior is bit-identical.
-    logical               :: amr_weno_coef_recompute = .false.
+    !> True when the coarse grid is nonuniform (stretched grids, or 2D-axisymmetric's half-width axis cell): the spacing-dependent
+    !! WENO coefficients are then recomputed for the ACTIVE grid on every block swap (the fine block's grid is itself nonuniform
+    !! under stretching) and restored after. False on fully uniform grids - the recompute is skipped and behavior is bit-identical.
+    logical :: amr_weno_coef_recompute = .false.
+    logical :: amr_grid_stretched = .false.  !< stretched coarse spacing (beyond the axisym axis half-cell; set at init)
     real(wp), allocatable :: sw_x_cb(:), sw_x_cc(:), sw_dx(:)
     real(wp), allocatable :: sw_y_cb(:), sw_y_cc(:), sw_dy(:)
     real(wp), allocatable :: sw_z_cb(:), sw_z_cc(:), sw_dz(:)
@@ -248,19 +249,34 @@ contains
         ! flags are pre_process-only, so the grid itself is checked (this also catches
         ! externally generated grids).
         if (maxval(dx(0:m)) - minval(dx(0:m)) > 1.e-12_wp*maxval(dx(0:m))) then
-            amr_weno_coef_recompute = .true.
+            amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
         end if
         if (n_glb > 0) then
-            if (maxval(dy(0:n)) - minval(dy(0:n)) > 1.e-12_wp*maxval(dy(0:n))) then
+            ! interior nonuniformity is stretching; a lone dy(0) deviation is stretching only
+            ! when it is NOT the axisymmetric half-width axis cell
+            if (n > 0 .and. maxval(dy(1:n)) - minval(dy(1:n)) > 1.e-12_wp*maxval(dy(1:n))) then
+                amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
+            end if
+            if (abs(dy(0) - dy(min(1, n))) > 1.e-12_wp*dy(min(1, n))) then
                 amr_weno_coef_recompute = .true.
+                if (.not. cyl_coord) amr_grid_stretched = .true.
             end if
         end if
         if (p_glb > 0) then
             if (maxval(dz(0:p)) - minval(dz(0:p)) > 1.e-12_wp*maxval(dz(0:p))) then
-                amr_weno_coef_recompute = .true.
+                amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
             end if
         end if
         if (weno_order == 1 .or. igr) amr_weno_coef_recompute = .false.  ! order 1 / IGR: no grid-dependent WENO coefficients
+        ! The IB containment expansion / moving-body guard and the Lagrangian-cloud exclusion
+        ! convert physical positions to global cell indices as int((x - beg)/dx(0)) - valid only
+        ! for uniform spacing (and dx(0) is rank-local on a stretched grid, so ranks would build
+        ! DIFFERENT regrid box sets: silently rank-inconsistent fine geometry). Fail closed.
+        if (amr_grid_stretched .and. (bubbles_lagrange .or. (ib .and. amr_regrid_int > 0))) then
+            call s_mpi_abort('amr on a stretched grid does not support ' &
+                             & // 'Lagrangian bubbles or dynamic regrid with immersed bodies: their ' &
+                             & // 'position-to-cell-index conversions assume uniform spacing')
+        end if
 
         ! preallocate every slot at max buffered extents (each sized exactly as the single legacy block): coords (host) +
         ! fields (device-resident @:ALLOCATE so s_compute_rhs kernels can run on the fine block; q_cons/q_prim/rhs get the
@@ -838,16 +854,18 @@ contains
 
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return
-        ! Between regrids a moving body must stay inside its block: the regrid expansion
-        ! contained it with margin max(amr_buf,4), and here we require the body plus the
-        ! image-point stencil reach (2 coarse cells) to remain contained. Consecutive
-        ! contained positions keep every sub-time interpolate contained (axis-aligned
-        ! boxes are convex in the linearly-moving corners). A body that overlaps the
-        ! block edge would get silently clipped forcing - abort instead.
-        if (amr_regrid_int > 0) then
+        ! A moving body must stay inside its block (a body overlapping the block edge gets
+        ! silently clipped forcing - abort instead). Under dynamic regrid the expansion
+        ! contained it with margin max(amr_buf,4) and we require body + image-point stencil
+        ! reach (2 coarse cells) to remain contained between regrids; on a STATIC block the
+        ! user's placement is authoritative (validated configs sit tighter than the regrid
+        ! margin), so only the body bbox itself must stay inside. Consecutive contained
+        ! positions keep every sub-time interpolate contained (axis-aligned boxes are
+        ! convex in the linearly-moving corners).
+        if (any(patch_ib(1:num_ibs)%moving_ibm /= 0)) then
             do i = 1, num_ibs
                 if (patch_ib(i)%moving_ibm == 0) cycle
-                call s_amr_body_bbox(i, 2, blo, bhi)
+                call s_amr_body_bbox(i, merge(2, 0, amr_regrid_int > 0), blo, bhi)
                 ovl = blo(1) <= amr_slots(amr_cur)%region%hi(1) .and. bhi(1) >= amr_slots(amr_cur)%region%lo(1)
                 if (n_glb > 0) ovl = ovl .and. blo(2) <= amr_slots(amr_cur)%region%hi(2) .and. bhi(2) &
                     & >= amr_slots(amr_cur)%region%lo(2)
@@ -860,8 +878,9 @@ contains
                 if (p_glb > 0) inside = inside .and. blo(3) >= amr_slots(amr_cur)%region%lo(3) .and. bhi(3) &
                     & <= amr_slots(amr_cur)%region%hi(3)
                 if (.not. inside) then
-                    call s_mpi_abort('amr dynamic regrid with moving ib: the body reached the fine-block ' &
-                                     & // 'boundary between regrids; reduce amr_regrid_int or increase amr_buf')
+                    call s_mpi_abort('amr with moving ib: the body reached the fine-block boundary; ' &
+                                     & // 'under dynamic regrid reduce amr_regrid_int or increase amr_buf, ' &
+                                     & // 'for a static block enlarge it to contain the trajectory')
                 end if
             end do
         end if
@@ -917,10 +936,9 @@ contains
 
     end subroutine s_restrict_all_vars
 
-    !> Non-polytropic QBMM: piecewise-constant HOST prolongation of the coarse pb/mv side-state onto the block's fine interior, then
-    !! push to the device. Piecewise-constant preserves the per-cell realizable quadrature set (mirroring the moments' injection).
-    !! Called at init populate and at restart (the fine side-state is re-prolonged from the restored coarse fields - a one-time
-    !! smoothing; q_cons is restored exactly).
+    !> Non-polytropic QBMM: piecewise-constant prolongation of the block's pb/mv interior from the coarse side-state. HOST loops +
+    !! device push; all three callers make the coarse host mirrors current first: init populate and restart read pb/mv on the host,
+    !! the regrid path refreshes them from the device before re-prolonging.
     impure subroutine s_amr_prolong_pbmv()
 
         integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
@@ -957,10 +975,8 @@ contains
 
     !> Non-polytropic QBMM: piecewise-constant prolongation of the fine pb/mv GHOST shell from the coarse side-state (device kernel;
     !! interior untouched). The ghosts feed the widened-idwint conversions and the qbmm rhs over the shell, mirroring the q_cons
-    !! ghost fill. The fine target is selected by integer (1 = pb_f/mv_f, 2 = ghost_a, 3 = ghost_b) and the slot arrays are
-    !! referenced DIRECTLY inside the kernels: passing an amr_slots(amr_cur) component as an assumed-shape actual makes nvfortran
-    !! emit a component-section data clause that fails partially-present on device (the coarse sources pb_c/mv_c follow the proven
-    !! pb_ts pattern).
+    !! ghost fill. All four arrays are assumed-shape dummies with %sf pointer-member actuals (the device-proven pb_ts pattern); only
+    !! raw derived-type 5D members as actuals tripped nvfortran's component-section data clauses on device.
     impure subroutine s_amr_fill_fine_ghosts_pbmv(pb_c, mv_c, pb_t, mv_t)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_c, mv_c
@@ -1279,8 +1295,8 @@ contains
         ! hypoelastic stress sources use grid-spacing-dependent FD coefficients: recompute
         ! them from the (now fine) grid, else every fine velocity gradient is halved
         if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
-        ! nonuniform coarse grid (axisymmetric axis half-cell): the per-cell WENO coefficients
-        ! must be rebuilt for the block's own uniform grid (no-op flag on uniform grids)
+        ! nonuniform coarse grid (stretched, or the axisymmetric axis half-cell): the per-cell
+        ! WENO coefficients must be rebuilt for the block's own grid (no-op flag on uniform grids)
         if (amr_weno_coef_recompute) call s_amr_recompute_weno_coefs()
 
         ! IGR: save the coarse sigma state and seed the fine solve. jac holds THIS stage's
@@ -1698,8 +1714,10 @@ contains
         if (.not. amr) return
         ! valid coarse CONS ghosts for the ghost prolongation below (ALL ranks call: pairwise halo)
         if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_coarse)
-        if (.not. amr_rank_owns_block) return
+        ! the Lagrangian-cloud guard runs on EVERY rank (rank-local bubbles vs the block's
+        ! GLOBAL box): a non-owner rank's bubbles can reach into a block across a rank seam
         call s_amr_check_lag_clear()
+        if (.not. amr_rank_owns_block) return
 
         ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the
         ! device-current coarse stage-entry state directly); rank_time brackets cover the fine-advance
@@ -1790,7 +1808,7 @@ contains
             call s_amr_exchange_coarse_cons_halo(q_old)
             call s_amr_exchange_coarse_cons_halo(q_new)
         end if
-        if (amr_rank_owns_block) call s_amr_check_lag_clear()
+        call s_amr_check_lag_clear()  ! EVERY rank: non-owner bubbles can reach the block across a seam
         if (.not. amr_rank_owns_block) return
 
         ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1} (device kernels
@@ -2161,8 +2179,9 @@ contains
             call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
                              & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
         end select
-        ! physical bbox -> global coarse indices (uniform spacing is enforced for amr; the
-        ! axisymmetric half axis cell only shrinks dy(0), so the floor is still conservative)
+        ! physical bbox -> global coarse indices: valid for uniform spacing only (stretched
+        ! grids with ib-dynamic-regrid/Lagrangian are aborted at init; the axisymmetric half
+        ! axis cell only shrinks dy(0), so the floor is still conservative)
         blo(1) = int((c(1) - half(1) - x_domain%beg)/dx(0)) - mrg
         bhi(1) = int((c(1) + half(1) - x_domain%beg)/dx(0)) + mrg
         blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
@@ -2455,12 +2474,13 @@ contains
                         end do
                     end do outer
                 end do
-                ! the expansion may also have grown a box onto an acoustic source support: the two
-                ! constraints (contain the body, exclude the source) cannot both hold - fail closed
-                if (acoustic_source) then
+                ! the expansion may also have grown a box onto an acoustic source support or the
+                ! Lagrangian cloud: the constraints (contain the body, exclude the source/cloud)
+                ! cannot both hold - fail closed
+                if (acoustic_source .or. (bubbles_lagrange .and. lag_supp_on)) then
                     do k = 1, nboxes
                         lo = boxes(k)%lo; hi = boxes(k)%hi
-                        call s_amr_clip_box_from_sources(lo, hi)
+                        if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
                         if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
                         if (any(lo /= boxes(k)%lo) .or. any(hi /= boxes(k)%hi)) then
                             call s_mpi_abort('amr regrid: a block must contain an immersed body AND stay ' &

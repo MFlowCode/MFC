@@ -812,10 +812,10 @@ arrays are inert stubs when `polytropic = T`), and the whole moment block is pro
 piecewise-constant so every fine/ghost cell inherits the coarse cell's realizable moment set
 (the CHyQMOM inversion needs the radius variance c20 = m20/m00 - (m10/m00)^2 to stay positive, which a
 per-component minmod slope could break); the moments still reflux and restrict on the standard
-conservative path. Non-polytropic QBMM (`polytropic = F`) is supported on a static block without
-subcycling: each block carries its own per-quadrature-node internal pressure and vapor mass
+conservative path. Non-polytropic QBMM (`polytropic = F`) is fully supported: each block carries its own
+per-quadrature-node internal pressure and vapor mass
 (pb/mv), prolonged piecewise-constant for realizability, advanced with the block's own rhs
-scratch, and restricted back with the moments (dynamic regrid and `amr_subcycle` remain gated).
+scratch, and restricted back with the moments; dynamic regrid and `amr_subcycle` are both supported.
 Phase change (`relax`) is supported: the cell-local, mass/energy-conserving relaxation
 runs on the fine solution before restriction (matching the coarse once-per-step timing).
 Chemistry (`chemistry = T`) is supported for reactions and advection: the species partial

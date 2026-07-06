@@ -1443,6 +1443,11 @@ class CaseValidator:
                 "amr with ib supports static or prescribed-motion (moving_ibm=1) bodies only; " "force-driven moving IB (moving_ibm=2) under amr is not yet validated",
             )
             self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
+        stretched = any(self.get(f"stretch_{d}", "F") == "T" for d in "xyz")
+        self.prohibit(
+            stretched and (bubbles_lagrange or (ib and amr_regrid_int is not None and amr_regrid_int > 0)),
+            "amr on a stretched grid does not support Lagrangian bubbles or dynamic regrid with immersed bodies " "(their position-to-cell-index conversions assume uniform spacing)",
+        )
         self.prohibit(active_box, "amr is incompatible with active_box")
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(
