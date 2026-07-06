@@ -52,6 +52,9 @@ famd-all cpe/25.09
 famd-all PrgEnv-amd
 famd-all amd/7.2.0 rocm/7.2.0
 
+amdfund    AMD HPCFund
+amdfund-all gnu12 openmpi4/4.1.8 cmake rocm/7.2.0
+
 tuo     OLCF Tuolumne
 tuo-all cpe/25.03 rocm/6.3.1
 tuo-all cray-fftw/3.3.10.9 cray-hdf5 python/3.12.2 cmake
