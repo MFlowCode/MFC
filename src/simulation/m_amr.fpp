@@ -272,10 +272,18 @@ contains
             end if
         end if
         if (weno_order == 1 .or. igr) amr_weno_coef_recompute = .false.  ! order 1 / IGR: no grid-dependent WENO coefficients
-        ! The IB containment expansion / moving-body guard and the Lagrangian-cloud exclusion
-        ! convert physical positions to global cell indices as int((x - beg)/dx(0)) - valid only
-        ! for uniform spacing (and dx(0) is rank-local on a stretched grid, so ranks would build
-        ! DIFFERENT regrid box sets: silently rank-inconsistent fine geometry). Fail closed.
+        ! Fail closed on stretched grid + Lagrangian/IB-dynamic-regrid. TWO independent blockers
+        ! (both confirmed by experiment):
+        !  (1) the position->global-cell-index conversions here use int((x-beg)/dx(0)), inexact
+        !      on a stretched grid and rank-inconsistent (dx(0) is rank-local). FIXABLE: assemble
+        !      the global cell-boundary arrays (allreduce-MAX of owned boundaries) and bisection-
+        !      search them - correct on any grid, identical on every rank.
+        !  (2) THE HARDER BLOCKER: IB/Lagrangian floor buff_size (10/6), but s_amr_recompute_weno_coefs
+        !      (armed only on nonuniform grids) indexes poly_coef_cb* over -buff_size:m+buff_size
+        !      while m_weno sized those arrays with a smaller buff_size at init -> OOB write in
+        !      s_compute_weno_coefficients (gfortran bounds trap at m_weno.fpp weno5 branch). Needs
+        !      the WENO coefficient arrays sized to the final buff_size (or the recompute clamped
+        !      to the module's true bounds) before this gate can lift. Fix (1) alone is insufficient.
         if (amr_grid_stretched .and. (bubbles_lagrange .or. (ib .and. amr_regrid_int > 0))) then
             call s_mpi_abort('amr on a stretched grid does not support ' &
                              & // 'Lagrangian bubbles or dynamic regrid with immersed bodies: their ' &
