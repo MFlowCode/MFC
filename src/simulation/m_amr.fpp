@@ -303,7 +303,15 @@ contains
                 @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
                 ! ghost-inclusive (mbuf) like q_cons/q_prim: the fine advance widens idwint to the buffer, so the cell-local
                 ! chemistry reaction source writes rhs over the ghost shell too (the RK update and reflux read only 0:m interior)
-                @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                ! IGR writes its rhs over -1:m+1 per dim INCLUDING collapsed ones (the coarse
+                ! rhs_vf is allocated (-1:m+1,-1:n+1,-1:p+1) under igr); the buffered fine
+                ! extents already cover -1:+1 in active dims, collapsed dims need the widening
+                if (igr) then
+                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
+                               & -1):max(mbuf3_hi, 1)))
+                else
+                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                end if
                 @:ALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
                 @:ALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
                 @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
