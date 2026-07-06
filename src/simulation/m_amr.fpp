@@ -29,6 +29,7 @@ module m_amr
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
     use m_weno, only: s_compute_weno_coefficients
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
+    use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
     use m_igr, only: jac, jac_old
 
@@ -39,7 +40,7 @@ module m_amr
         & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
         & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_advance_amr_fine_substeps, &
         & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, &
-        & s_amr_relax_fine, s_amr_setup_ib
+        & s_amr_relax_fine, s_amr_setup_ib, s_amr_check_active_box_containment
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -92,6 +93,7 @@ module m_amr
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
     logical               :: sw_acoustic_source
+    logical               :: sw_ab_active
 
     !> IGR sigma-state bounce (igr only): the fine solve reuses the module jac/jac_old arrays at fine indices (the extent guard
     !! keeps fine bounds inside), so the coarse contents - jac_old is the Jacobi warm start persisting across steps - are saved here
@@ -1197,6 +1199,11 @@ contains
         ! the fine block would inject at wrong cells (or out of bounds). The support is guaranteed
         ! not to overlap the block (checked at startup), so the fine RHS correctly skips the source.
         sw_acoustic_source = acoustic_source; acoustic_source = .false.
+        ! active-box windows are COARSE cell indices: applying them on the swapped fine grid
+        ! would window the wrong cells. Blocks are contained in the active window (init check +
+        ! regrid clamp), so the fine advance legitimately treats its whole block as active.
+        sw_ab_active = ab_active; ab_active = .false.
+        $:GPU_UPDATE(device='[ab_active]')
         m = amr_slots(amr_cur)%m; n = amr_slots(amr_cur)%n; p = amr_slots(amr_cur)%p
         idwint(1)%beg = 0; idwint(1)%end = m
         idwint(2)%beg = 0; idwint(2)%end = n
@@ -1326,6 +1333,8 @@ contains
         m = sw_m; n = sw_n; p = sw_p
         idwint = sw_idwint; idwbuff = sw_idwbuff
         acoustic_source = sw_acoustic_source
+        ab_active = sw_ab_active
+        $:GPU_UPDATE(device='[ab_active]')
         ! restore full coarse coords from bounce buffers
         x_cb = sw_x_cb; x_cc = sw_x_cc; dx = sw_dx
         if (n_glb > 0) then; y_cb = sw_y_cb; y_cc = sw_y_cc; dy = sw_dy; end if
@@ -2185,6 +2194,33 @@ contains
     !! IB image-point stencils need resolved surroundings). Expansion is re-clamped to the domain interior by the caller's own
     !! guards; a body too large for the per-rank block cap aborts with a named message. The bbox reads the live centroid, so a
     !! moving body's box tracks its current position; between regrids s_amr_update_mib_fine guards containment.
+    !> active_box + AMR containment: every active block must sit strictly inside the active window (one-cell margin). Two reasons:
+    !! the coarse RK update is windowed, so a reflux correction at a face cell outside the window would be silently dropped
+    !! (conservation leak), and the coarse RHS only computes fluxes inside the window. The window only ever GROWS (s_grow_active_box
+    !! is monotone, self-disabling at full domain), so containment established at init and re-established at each regrid holds
+    !! between them. Collective (same window and block metadata on all ranks).
+    impure subroutine s_amr_check_active_box_containment()
+
+        integer :: k
+        logical :: ok
+
+        ! ab_active is only ever true at num_procs == 1 (m_active_box disables itself under
+        ! MPI), so ab and block indices share the same (global == local) index space
+
+        if ((.not. amr) .or. (.not. ab_active)) return
+        do k = 1, amr_num_blocks
+            ok = amr_region_lo_all(1, k) > ab_x%beg .and. amr_region_hi_all(1, k) < ab_x%end
+            if (n_glb > 0) ok = ok .and. amr_region_lo_all(2, k) > ab_y%beg .and. amr_region_hi_all(2, k) < ab_y%end
+            if (p_glb > 0) ok = ok .and. amr_region_lo_all(3, k) > ab_z%beg .and. amr_region_hi_all(3, k) < ab_z%end
+            if (.not. ok) then
+                call s_mpi_abort('amr with active_box: an AMR block is not strictly inside the active ' &
+                                 & // 'window; place the initial block (with a one-cell margin) inside the ' &
+                                 & // 'initial non-ambient region plus buff_size')
+            end if
+        end do
+
+    end subroutine s_amr_check_active_box_containment
+
     !> Margin-padded global coarse-index bounding box of immersed body i (supported analytic geometries only; aborts on others).
     !! Reads the body's LIVE centroid, so a moving body's box tracks its current position.
     impure subroutine s_amr_body_bbox(i, mrg, blo, bhi)
@@ -2465,6 +2501,15 @@ contains
                 ! coarse grid only); clipping only shrinks, so boxes stay disjoint - empties drop below
                 if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
                 if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
+                ! active_box: boxes stay strictly inside the active window (the windowed coarse
+                ! update would drop reflux corrections at faces outside it). Tags cannot arise
+                ! outside (frozen-ambient exterior), so only the amr_buf padding is ever cut -
+                ! and the cut cells are ambient. np=1 only (ab_active is false under MPI).
+                if (ab_active) then
+                    lo(1) = max(lo(1), ab_x%beg + 1); hi(1) = min(hi(1), ab_x%end - 1)
+                    if (n_glb > 0) then; lo(2) = max(lo(2), ab_y%beg + 1); hi(2) = min(hi(2), ab_y%end - 1); end if
+                    if (p_glb > 0) then; lo(3) = max(lo(3), ab_z%beg + 1); hi(3) = min(hi(3), ab_z%end - 1); end if
+                end if
                 ! a fine block that PARTIALLY covers an immersed body is an untested regime (ghost
                 ! prolongation through body-interior cells, refluxing across the body): any box that
                 ! overlaps a body's bounding box is expanded to contain the whole body plus margin
@@ -2511,6 +2556,11 @@ contains
                         lo = boxes(k)%lo; hi = boxes(k)%hi
                         if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
                         if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
+                        if (ab_active) then
+                            lo(1) = max(lo(1), ab_x%beg + 1); hi(1) = min(hi(1), ab_x%end - 1)
+                            if (n_glb > 0) then; lo(2) = max(lo(2), ab_y%beg + 1); hi(2) = min(hi(2), ab_y%end - 1); end if
+                            if (p_glb > 0) then; lo(3) = max(lo(3), ab_z%beg + 1); hi(3) = min(hi(3), ab_z%end - 1); end if
+                        end if
                         if (any(lo /= boxes(k)%lo) .or. any(hi /= boxes(k)%hi)) then
                             call s_mpi_abort('amr regrid: a block must contain an immersed body AND stay ' &
                                              & // 'clear of an acoustic source support / Lagrangian bubble cloud - the ' &

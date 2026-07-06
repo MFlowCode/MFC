@@ -861,7 +861,7 @@ sigma; seam conservation is truncation-order (no reflux capture from the fused I
 kernels), free-stream preservation is exact, and `amr_subcycle` is gated under IGR.
 AMR is incompatible with surface tension, 3D cylindrical
 coordinates (2D axisymmetric IS supported), MHD, hyperelasticity, Riemann-extrapolation
-boundaries (bc = -4), and `active_box`. `hybrid_weno`/`hybrid_riemann` are supported: each
+boundaries (bc = -4). `active_box` is supported (single-rank): blocks must sit strictly inside the growing active window (init abort + regrid clamp), and the fine advance treats its whole block as active. `hybrid_weno`/`hybrid_riemann` are supported: each
 level recomputes the smoothness sensor over its own (swapped) bounds every RHS call.
 Nonuniform grids ARE supported (grid stretching and the axisymmetric axis half-cell): the fine
 ghost-shell coordinates extend by exact parent-cell bisection and the spacing-dependent WENO

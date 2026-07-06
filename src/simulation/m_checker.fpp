@@ -146,7 +146,10 @@ contains
             ! regime), overlapping expansions merge, and the fine IB state is rebuilt from the
             ! geometry after every regrid. Between regrids a moving body's containment is
             ! guarded per substage (abort if it reaches the block boundary).
-            @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
+            ! active_box is supported (np=1 by active_box's own gate): blocks must sit strictly
+            ! inside the monotonically-growing active window (init check + regrid clamp; the
+            ! windowed coarse update would drop reflux corrections at faces outside it), and
+            ! the fine advance disables the coarse-indexed windowing on the swapped block grid
             ! no hybrid_weno/hybrid_riemann gate: the sensor arrays are sized to the coarse
             ! idwbuff (the fine extent guard keeps fine bounds inside them) and the sensor is
             ! recomputed from the live (swapped) idwbuff every RHS call, so each level evaluates

@@ -258,9 +258,12 @@ PHYSICS_DOCS = {
             "cloud's padded bbox, and a per-stage guard aborts if the cloud reaches an active block. "
             "Incompatible with surface tension, "
             "3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
-            "per-cell WENO coefficients are recomputed for each block on swap), MHD, hyperelasticity, "
-            "and active_box. hybrid_weno/hybrid_riemann are supported: each level recomputes the "
+            "per-cell WENO coefficients are recomputed for each block on swap), MHD, and hyperelasticity. "
+            "hybrid_weno/hybrid_riemann are supported: each level recomputes the "
             "sensor over its own (swapped) bounds every RHS call. "
+            "active_box is supported (single-rank, per active_box's own MPI gate): blocks must "
+            "sit strictly inside the growing active window (init abort + regrid clamp), and the "
+            "fine advance treats its whole block as active. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
             "incompatible with cfl_dt. "
@@ -1400,7 +1403,6 @@ class CaseValidator:
         ib = self.get("ib", "F") == "T"
         igr = self.get("igr", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
-        active_box = self.get("active_box", "F") == "T"
         amr_tag_eps = self.get("amr_tag_eps")
         amr_buf = self.get("amr_buf")
         amr_max_blocks = self.get("amr_max_blocks")
@@ -1448,7 +1450,7 @@ class CaseValidator:
             stretched and (bubbles_lagrange or (ib and amr_regrid_int is not None and amr_regrid_int > 0)),
             "amr on a stretched grid does not support Lagrangian bubbles or dynamic regrid with immersed bodies " "(their position-to-cell-index conversions assume uniform spacing)",
         )
-        self.prohibit(active_box, "amr is incompatible with active_box")
+
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(
             amr_regrid_int is not None and amr_regrid_int > 0 and (amr_tag_eps is None or amr_tag_eps <= 0),

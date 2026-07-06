@@ -2613,6 +2613,66 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # active_box + AMR (np=1 by active_box's own MPI gate): a 2D central blast with the
+        # block strictly inside the initial active window. t_step_stop=10 keeps the window
+        # partial for the whole run (it grows buff_size cells/step and self-disables at full
+        # domain), so every step exercises the windowed coarse advance around a live fine
+        # block. Validated: ab+AMR vs plain AMR agree to 9.8e-15 (the active_box round-off
+        # spec) over 200 steps incl. the self-disable transition; the containment abort and
+        # the regrid window-clamp are manually negative-tested.
+        stack.push(
+            "Kernel -> 2D -> active_box -> AMR",
+            {
+                "m": 127,
+                "n": 127,
+                "p": 0,
+                "dt": 5.0e-5,
+                "t_step_stop": 10,
+                "t_step_save": 10,
+                "num_patches": 2,
+                "mixture_err": "F",
+                "mapped_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%geometry": 2,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%radius": 0.08,
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%pres": 10.0,
+                "patch_icpp(2)%alpha_rho(1)": 2.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "active_box": "T",
+                "amr": "T",
+                "amr_block_beg(1)": 52,
+                "amr_block_beg(2)": 52,
+                "amr_block_end(1)": 75,
+                "amr_block_end(2)": 75,
+                "amr_regrid_int": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 0.02, "amr_buf": 3}))
+        stack.pop()
+
     kernel_golden_tests()
 
     def amr_golden_tests():

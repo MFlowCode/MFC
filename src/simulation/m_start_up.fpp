@@ -957,6 +957,8 @@ contains
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
         if (active_box) call s_initialize_active_box(q_cons_ts(1)%vf)
+        ! AMR blocks must sit strictly inside the active window (named abort otherwise)
+        if (active_box .and. amr) call s_amr_check_active_box_containment()
 
     end subroutine s_initialize_modules
 
