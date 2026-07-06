@@ -141,9 +141,10 @@ contains
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps]')
+        ! ghost_points is GPU_DECLARE'd and @:ALLOCATE establishes its device mapping; no
+        ! explicit copyin (contents are written by the device pipeline below) - an extra
+        ! dynamic map on top of the declared entry corrupts CCE-OMP's descriptor (lib-4425)
         @:ALLOCATE(ghost_points(1:max_num_gps))
-
-        $:GPU_ENTER_DATA(copyin='[ghost_points]')
         ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points(ghost_points)
         call s_apply_levelset(ghost_points, num_gps)
@@ -1651,16 +1652,21 @@ contains
 
         call s_find_num_ghost_points(num_gps)
         $:GPU_UPDATE(device='[num_gps]')
-        if (allocated(ghost_points)) deallocate (ghost_points)
+        ! @:DEALLOCATE/@:ALLOCATE keep the declared array's device mapping paired with the
+        ! host allocation: a bare deallocate leaks the present-table entry, and a later
+        ! allocate reusing that host address range then fails partially-present on Cray-acc
+        ! (the entry collision only bites from the SECOND setup, i.e. AMR regrid paths)
+        if (allocated(ghost_points)) then
+            @:DEALLOCATE(ghost_points)
+        end if
         if (moving_immersed_boundary_flag) then
             ! moving body: size the slot's ghost-point list to a generous fixed bound (capped at the block cell count) so the
             ! per-substep s_update_mib recompute never has to reallocate device-resident data as the body translates
             ng_max = min(max(int(num_gps, 8)*2_8, 1_8), int(m + 1, 8)*int(n + 1, 8)*int(p + 1, 8))
-            allocate (ghost_points(1:int(ng_max)))
+            @:ALLOCATE(ghost_points(1:int(ng_max)))
         else
-            allocate (ghost_points(1:max(num_gps, 1)))
+            @:ALLOCATE(ghost_points(1:max(num_gps, 1)))
         end if
-        $:GPU_ENTER_DATA(copyin='[ghost_points]')
 
         call s_find_ghost_points(ghost_points)
         call s_apply_levelset(ghost_points, num_gps)
