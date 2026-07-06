@@ -934,6 +934,7 @@ contains
             $:GPU_UPDATE(device='[muscl_order, muscl_lim]')
             $:GPU_UPDATE(device='[igr, igr_order]')
             $:GPU_UPDATE(device='[num_fluids, num_dims, viscous, num_vels, nb, muscl_lim]')
+            $:GPU_UPDATE(device='[hybrid_weno, hybrid_riemann, hybrid_weno_eps, hybrid_smooth_flux]')
         #:endif
 
         $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta]')

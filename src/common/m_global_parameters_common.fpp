@@ -104,6 +104,7 @@ module m_global_parameters_common
         $:GPU_DECLARE(create='[mapped_weno, wenoz, teno, wenoz_q, mhd, relativity]')
         $:GPU_DECLARE(create='[igr_iter_solver, igr_order, viscous, igr_pres_lim, igr]')
         $:GPU_DECLARE(create='[recon_type, muscl_order, muscl_polyn, muscl_lim]')
+        $:GPU_DECLARE(create='[hybrid_weno, hybrid_riemann, hybrid_weno_eps, hybrid_smooth_flux]')
     #:endif
 #endif
 
