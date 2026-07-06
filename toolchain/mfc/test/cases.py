@@ -1707,6 +1707,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     # slab; EL alphas sum to the local liquid fraction, so they prolong WITHOUT
                     # the sum-to-one closure (which would corrupt the EL state - caught by the
                     # free-stream battery), and a per-stage guard keeps the cloud out of blocks
+                    # KNOWN CI QUIRK: these two goldens fail with a post-detected NaN on the
+                    # nvhpc 24.1/24.3 compat lanes ONLY (non-gating, continue-on-error; 24.5+
+                    # green). Exhaustively unreproducible off GitHub's runners: the exact
+                    # failing stack - NVHPC 24.3, -tp=px -Kieee, HPC-X MPI, the CI docker
+                    # image itself (via apptainer) - passes on Phoenix, as do zen2/native
+                    # builds. Suspected runner-hardware/virtualization interaction with old
+                    # nvfortran codegen; revisit only if it starts failing on 24.5+.
                     if len(dimInfo[0]) == 2 and adap_dt == "F" and couplingMethod == 2:
                         stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0})
                         cases.append(define_case_d(stack, "", {}))
