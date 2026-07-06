@@ -70,13 +70,12 @@ module m_amr
         !! only the local cell + the block's own moment fluxes), so the fine treatment is prolong -> advance -> restrict with no
         !! reflux; ghosts feed the widened- idwint conversions and are prolonged piecewise-constant (CHyQMOM realizability, like the
         !! moments).
-        real(stp), allocatable :: pb_f(:,:,:,:,:), mv_f(:,:,:,:,:)        !< fine pb/mv (ghost-inclusive)
-        real(stp), allocatable :: pb_stor(:,:,:,:,:), mv_stor(:,:,:,:,:)  !< SSP-RK step-entry backup (also the regrid bounce)
+        type(pres_field) :: pb_f, mv_f        !< fine pb/mv (ghost-inclusive)
+        type(pres_field) :: pb_stor, mv_stor  !< SSP-RK step-entry backup (also the regrid bounce)
         !> subcycle ghost-lerp sources at coarse t^n / t^{n+1} (ghost shell only): ghost pb feeds the mixture pressure in the
         !! widened conversion, so it needs the same time fidelity as q_cons
-        real(stp), allocatable :: pb_ghost_a(:,:,:,:,:), mv_ghost_a(:,:,:,:,:)
-        real(stp), allocatable :: pb_ghost_b(:,:,:,:,:), mv_ghost_b(:,:,:,:,:)
-        real(wp), allocatable  :: rhs_pb_f(:,:,:,:,:), rhs_mv_f(:,:,:,:,:)  !< fine rhs (ghost-inclusive like rhs)
+        type(pres_field) :: pb_ghost_a, mv_ghost_a
+        type(pres_field) :: pb_ghost_b, mv_ghost_b
     end type t_level
 
     !> Fixed pool of refined-block slots (at init one slot is active; dynamic regrid activates up to amr_max_blocks). The working
@@ -99,6 +98,12 @@ module m_amr
     !! across the fine advance.
     real(wp), allocatable :: sw_jac(:,:,:), sw_jac_old(:,:,:)
     $:GPU_DECLARE(create='[sw_jac, sw_jac_old]')
+
+    !> Non-polytropic QBMM fine rhs scratch, shared across slots (slots advance sequentially). Module-level raw arrays mirror the
+    !! coarse rhs_pb/rhs_mv pattern: derived-type component actuals for these tripped nvfortran's component-section data clauses on
+    !! device.
+    real(wp), allocatable :: amr_rhs_pb_f(:,:,:,:,:), amr_rhs_mv_f(:,:,:,:,:)
+    $:GPU_DECLARE(create='[amr_rhs_pb_f, amr_rhs_mv_f]')
 
     !> Lagrangian bubble-cloud exclusion support: padded global coarse-index bbox of the cloud (positions + mapCells smearing +
     !! stencil headroom [+ drift margin at regrid]). Blocks and regrid boxes stay clear of it: a bubble inside a block loses two-way
@@ -291,17 +296,20 @@ contains
                 @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_b(i))
             end do
             if (qbmm .and. .not. polytropic) then
-                @:ALLOCATE(amr_slots(islot)%pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                @:ALLOCATE(amr_slots(islot)%mv_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                @:ALLOCATE(amr_slots(islot)%pb_stor(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                @:ALLOCATE(amr_slots(islot)%mv_stor(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                @:ALLOCATE(amr_slots(islot)%rhs_pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                @:ALLOCATE(amr_slots(islot)%rhs_mv_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
+                #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
+                    @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
+                    @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
+                #:endfor
+                if (islot == 1) then
+                    @:ALLOCATE(amr_rhs_pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
+                    @:ALLOCATE(amr_rhs_mv_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
+                end if
                 if (amr_subcycle) then
-                    @:ALLOCATE(amr_slots(islot)%pb_ghost_a(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                    @:ALLOCATE(amr_slots(islot)%mv_ghost_a(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                    @:ALLOCATE(amr_slots(islot)%pb_ghost_b(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                    @:ALLOCATE(amr_slots(islot)%mv_ghost_b(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
+                    #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
+                        @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, &
+                                   & 1:nb))
+                        @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
+                    #:endfor
                 end if
             end if
         end do
@@ -805,8 +813,8 @@ contains
         if (qbmm .and. .not. polytropic) then
             ! mirror the coarse correct-state: non-polytropic QBMM also corrects the block's own
             ! pb/mv side-state at the body ghost points (bounds match the swapped fine idwbuff)
-            call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim, amr_slots(amr_cur)%pb_f, &
-                                     & amr_slots(amr_cur)%mv_f)
+            call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim, amr_slots(amr_cur)%pb_f%sf, &
+                                     & amr_slots(amr_cur)%mv_f%sf)
         else
             call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim)
         end if
@@ -936,8 +944,8 @@ contains
                             cj = 0
                             if (n_glb > 0) cj = lo2 + fj/rr - oy
                             ci = lo1 + fi/rr - ox
-                            amr_slots(amr_cur)%pb_f(fi, fj, fk, q, ib_) = pb_ts(1)%sf(ci, cj, ck, q, ib_)
-                            amr_slots(amr_cur)%mv_f(fi, fj, fk, q, ib_) = mv_ts(1)%sf(ci, cj, ck, q, ib_)
+                            amr_slots(amr_cur)%pb_f%sf(fi, fj, fk, q, ib_) = pb_ts(1)%sf(ci, cj, ck, q, ib_)
+                            amr_slots(amr_cur)%mv_f%sf(fi, fj, fk, q, ib_) = mv_ts(1)%sf(ci, cj, ck, q, ib_)
                         end do
                     end do
                 end do
@@ -985,8 +993,8 @@ contains
                                         cj = 0
                                         if (d2) cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
                                         ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                                        amr_slots(amr_cur)%pb_${SFX}$ (fi, fj, fk, q, ib_) = pb_c(ci, cj, ck, q, ib_)
-                                        amr_slots(amr_cur)%mv_${SFX}$ (fi, fj, fk, q, ib_) = mv_c(ci, cj, ck, q, ib_)
+                                        amr_slots(amr_cur)%pb_${SFX}$%sf(fi, fj, fk, q, ib_) = pb_c(ci, cj, ck, q, ib_)
+                                        amr_slots(amr_cur)%mv_${SFX}$%sf(fi, fj, fk, q, ib_) = mv_c(ci, cj, ck, q, ib_)
                                     end if
                                 end do
                             end do
@@ -1013,8 +1021,8 @@ contains
                 do fk = b3, e3
                     do fj = b2, e2
                         do fi = b1, e1
-                            amr_slots(amr_cur)%pb_stor(fi, fj, fk, q, ib_) = amr_slots(amr_cur)%pb_f(fi, fj, fk, q, ib_)
-                            amr_slots(amr_cur)%mv_stor(fi, fj, fk, q, ib_) = amr_slots(amr_cur)%mv_f(fi, fj, fk, q, ib_)
+                            amr_slots(amr_cur)%pb_stor%sf(fi, fj, fk, q, ib_) = amr_slots(amr_cur)%pb_f%sf(fi, fj, fk, q, ib_)
+                            amr_slots(amr_cur)%mv_stor%sf(fi, fj, fk, q, ib_) = amr_slots(amr_cur)%mv_f%sf(fi, fj, fk, q, ib_)
                         end do
                     end do
                 end do
@@ -1038,12 +1046,12 @@ contains
                 do fk = 0, fp
                     do fj = 0, fn
                         do fi = 0, fm
-                            amr_slots(amr_cur)%pb_f(fi, fj, fk, q, ib_) = (c1*amr_slots(amr_cur)%pb_f(fi, fj, fk, q, &
-                                      & ib_) + c2*amr_slots(amr_cur)%pb_stor(fi, fj, fk, q, &
-                                      & ib_) + c3*dtl*amr_slots(amr_cur)%rhs_pb_f(fi, fj, fk, q, ib_))/c4
-                            amr_slots(amr_cur)%mv_f(fi, fj, fk, q, ib_) = (c1*amr_slots(amr_cur)%mv_f(fi, fj, fk, q, &
-                                      & ib_) + c2*amr_slots(amr_cur)%mv_stor(fi, fj, fk, q, &
-                                      & ib_) + c3*dtl*amr_slots(amr_cur)%rhs_mv_f(fi, fj, fk, q, ib_))/c4
+                            amr_slots(amr_cur)%pb_f%sf(fi, fj, fk, q, ib_) = (c1*amr_slots(amr_cur)%pb_f%sf(fi, fj, fk, q, &
+                                      & ib_) + c2*amr_slots(amr_cur)%pb_stor%sf(fi, fj, fk, q, ib_) + c3*dtl*amr_rhs_pb_f(fi, fj, &
+                                      & fk, q, ib_))/c4
+                            amr_slots(amr_cur)%mv_f%sf(fi, fj, fk, q, ib_) = (c1*amr_slots(amr_cur)%mv_f%sf(fi, fj, fk, q, &
+                                      & ib_) + c2*amr_slots(amr_cur)%mv_stor%sf(fi, fj, fk, q, ib_) + c3*dtl*amr_rhs_mv_f(fi, fj, &
+                                      & fk, q, ib_))/c4
                         end do
                     end do
                 end do
@@ -1083,11 +1091,11 @@ contains
                             accp = 0._wp; accm = 0._wp
                             do ddk = 0, dk_hi
                                 do ddj = 0, dj_hi
-                                    accp = accp + real(amr_slots(amr_cur)%pb_f(fi0, fj0 + ddj, fk0 + ddk, q, ib_), &
-                                                       & wp) + real(amr_slots(amr_cur)%pb_f(fi0 + 1, fj0 + ddj, fk0 + ddk, q, &
+                                    accp = accp + real(amr_slots(amr_cur)%pb_f%sf(fi0, fj0 + ddj, fk0 + ddk, q, ib_), &
+                                                       & wp) + real(amr_slots(amr_cur)%pb_f%sf(fi0 + 1, fj0 + ddj, fk0 + ddk, q, &
                                                        & ib_), wp)
-                                    accm = accm + real(amr_slots(amr_cur)%mv_f(fi0, fj0 + ddj, fk0 + ddk, q, ib_), &
-                                                       & wp) + real(amr_slots(amr_cur)%mv_f(fi0 + 1, fj0 + ddj, fk0 + ddk, q, &
+                                    accm = accm + real(amr_slots(amr_cur)%mv_f%sf(fi0, fj0 + ddj, fk0 + ddk, q, ib_), &
+                                                       & wp) + real(amr_slots(amr_cur)%mv_f%sf(fi0 + 1, fj0 + ddj, fk0 + ddk, q, &
                                                        & ib_), wp)
                                 end do
                             end do
@@ -1579,10 +1587,12 @@ contains
                     do fj = b2, e2
                         do fi = b1, e1
                             if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
-                                amr_slots(amr_cur)%pb_f(fi, fj, fk, q, ib_) = (1._wp - th)*real(amr_slots(amr_cur)%pb_ghost_a(fi, &
-                                          & fj, fk, q, ib_), wp) + th*real(amr_slots(amr_cur)%pb_ghost_b(fi, fj, fk, q, ib_), wp)
-                                amr_slots(amr_cur)%mv_f(fi, fj, fk, q, ib_) = (1._wp - th)*real(amr_slots(amr_cur)%mv_ghost_a(fi, &
-                                          & fj, fk, q, ib_), wp) + th*real(amr_slots(amr_cur)%mv_ghost_b(fi, fj, fk, q, ib_), wp)
+                                amr_slots(amr_cur)%pb_f%sf(fi, fj, fk, q, &
+                                          & ib_) = (1._wp - th)*real(amr_slots(amr_cur)%pb_ghost_a%sf(fi, fj, fk, q, ib_), &
+                                          & wp) + th*real(amr_slots(amr_cur)%pb_ghost_b%sf(fi, fj, fk, q, ib_), wp)
+                                amr_slots(amr_cur)%mv_f%sf(fi, fj, fk, q, &
+                                          & ib_) = (1._wp - th)*real(amr_slots(amr_cur)%mv_ghost_a%sf(fi, fj, fk, q, ib_), &
+                                          & wp) + th*real(amr_slots(amr_cur)%mv_ghost_b%sf(fi, fj, fk, q, ib_), wp)
                             end if
                         end do
                     end do
@@ -1717,8 +1727,8 @@ contains
             ! the block's OWN side-state and rhs scratch: the coarse pb_in/rhs_pb must not be
             ! touched at fine indices (the coarse stage consumes them after this fine stage)
             call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
-                               & amr_slots(amr_cur)%pb_f, amr_slots(amr_cur)%rhs_pb_f, amr_slots(amr_cur)%mv_f, &
-                               & amr_slots(amr_cur)%rhs_mv_f, t_step, time_avg, s)
+                               & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, &
+                               & time_avg, s)
         else
             call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
                                & pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, s)
@@ -1815,8 +1825,8 @@ contains
                 if (qbmm .and. .not. polytropic) then
                     ! the block's OWN side-state and rhs scratch (the coarse arrays stay untouched)
                     call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, &
-                                       & amr_slots(amr_cur)%rhs, amr_slots(amr_cur)%pb_f, amr_slots(amr_cur)%rhs_pb_f, &
-                                       & amr_slots(amr_cur)%mv_f, amr_slots(amr_cur)%rhs_mv_f, t_step, time_avg, s)
+                                       & amr_slots(amr_cur)%rhs, amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, &
+                                       & amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, time_avg, s)
                 else
                     call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, &
                                        & amr_slots(amr_cur)%rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, s)
@@ -2470,11 +2480,11 @@ contains
                     ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like
                     ! q_cons (both stors are dead between steps)
                     if (qbmm .and. .not. polytropic) then
-                        $:GPU_UPDATE(host='[amr_slots(k)%pb_f, amr_slots(k)%mv_f]')
-                        amr_slots(k)%pb_stor(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
-                                  & :) = amr_slots(k)%pb_f(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
-                        amr_slots(k)%mv_stor(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
-                                  & :) = amr_slots(k)%mv_f(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
+                        $:GPU_UPDATE(host='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f]')
+                        amr_slots(k)%pb_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
+                                  & :) = amr_slots(k)%pb_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
+                        amr_slots(k)%mv_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
+                                  & :) = amr_slots(k)%mv_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
                     end if
                 end if
             end do
@@ -2533,13 +2543,13 @@ contains
                                 do fi = 0, amr_slots(k)%m
                                     ofi = fi + sh(1)
                                     if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                    amr_slots(k)%pb_f(fi, fj, fk,:,:) = amr_slots(kk)%pb_stor(ofi, ofj, ofk,:,:)
-                                    amr_slots(k)%mv_f(fi, fj, fk,:,:) = amr_slots(kk)%mv_stor(ofi, ofj, ofk,:,:)
+                                    amr_slots(k)%pb_f%sf(fi, fj, fk,:,:) = amr_slots(kk)%pb_stor%sf(ofi, ofj, ofk,:,:)
+                                    amr_slots(k)%mv_f%sf(fi, fj, fk,:,:) = amr_slots(kk)%mv_stor%sf(ofi, ofj, ofk,:,:)
                                 end do
                             end do
                         end do
                     end do
-                    $:GPU_UPDATE(device='[amr_slots(k)%pb_f, amr_slots(k)%mv_f]')
+                    $:GPU_UPDATE(device='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f]')
                 end if
                 call s_mpi_sendrecv_amr_fine_halo(amr_slots(k)%q_cons, amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p)
             end do
@@ -3053,17 +3063,21 @@ contains
                 @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
                 @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
                 if (qbmm .and. .not. polytropic) then
-                    @:DEALLOCATE(amr_slots(islot)%pb_f)
-                    @:DEALLOCATE(amr_slots(islot)%mv_f)
-                    @:DEALLOCATE(amr_slots(islot)%pb_stor)
-                    @:DEALLOCATE(amr_slots(islot)%mv_stor)
-                    @:DEALLOCATE(amr_slots(islot)%rhs_pb_f)
-                    @:DEALLOCATE(amr_slots(islot)%rhs_mv_f)
+                    @:DEALLOCATE(amr_slots(islot)%pb_f%sf)
+                    @:DEALLOCATE(amr_slots(islot)%mv_f%sf)
+                    @:DEALLOCATE(amr_slots(islot)%pb_stor%sf)
+                    @:DEALLOCATE(amr_slots(islot)%mv_stor%sf)
+                    if (islot == 1) then
+                        @:DEALLOCATE(amr_rhs_pb_f)
+                    end if
+                    if (islot == 1) then
+                        @:DEALLOCATE(amr_rhs_mv_f)
+                    end if
                     if (amr_subcycle) then
-                        @:DEALLOCATE(amr_slots(islot)%pb_ghost_a)
-                        @:DEALLOCATE(amr_slots(islot)%mv_ghost_a)
-                        @:DEALLOCATE(amr_slots(islot)%pb_ghost_b)
-                        @:DEALLOCATE(amr_slots(islot)%mv_ghost_b)
+                        @:DEALLOCATE(amr_slots(islot)%pb_ghost_a%sf)
+                        @:DEALLOCATE(amr_slots(islot)%mv_ghost_a%sf)
+                        @:DEALLOCATE(amr_slots(islot)%pb_ghost_b%sf)
+                        @:DEALLOCATE(amr_slots(islot)%mv_ghost_b%sf)
                     end if
                 end if
                 if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
