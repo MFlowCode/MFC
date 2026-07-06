@@ -842,10 +842,11 @@ the flux reflux still conserves to machine precision away from it. A body in pre
 (`moving_ibm = 1`) is also supported: the fine block's IB markers/ghost points are rebuilt each fine
 RK substage at the body's sub-time position (the same linear time interpolation the subcycle applies
 to the fluid ghosts), so the refined body tracks its prescribed trajectory. Supports one or more
-non-STL bodies, static or in prescribed motion; with dynamic regrid (static bodies only) every
-candidate box expands to fully contain each body plus a margin and the fine IB state is rebuilt
-from geometry after each regrid. Force-driven motion (`moving_ibm = 2`), STL geometry, and moving
-bodies combined with dynamic regrid are gated pending validation. Under MPI a body contained within one rank's
+non-STL bodies, static or in prescribed motion; with dynamic regrid every candidate box expands
+to fully contain each body at its live position plus a margin, the fine IB state is rebuilt from
+geometry after each regrid, and a per-substage guard aborts if a moving body reaches its block
+boundary between regrids (reduce `amr_regrid_int` or increase `amr_buf`). Force-driven motion
+(`moving_ibm = 2`) and STL geometry are gated pending validation. Under MPI a body contained within one rank's
 subdomain is bit-exact across decompositions; a body spanning a rank seam is rejected at startup
 (the fine-IB image-point stencil across the seam is not yet decomposition-exact), so keep the body
 inside a single rank's subdomain (use fewer ranks or reposition it).

@@ -117,6 +117,7 @@ contains
         integer :: i, d, max_f1, max_f2, max_f3, islot
         integer :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
         integer :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
+        integer :: blk_lo(3), blk_hi(3)
 
         if (.not. amr) return
 
@@ -290,8 +291,13 @@ contains
         ! as q_cons so the fine IB pipeline can resolve the body on the block
         if (ib) call s_ibm_alloc_fine(amr_max_blocks, mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi)
 
-        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial block (slot amr_cur = 1)
-        call s_set_amr_fine_geometry(amr_block_beg, amr_block_end)
+        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial block (slot amr_cur = 1).
+        ! Under dynamic regrid with bodies the initial block gets the same body-containment
+        ! expansion regrid boxes get (the moving-body containment guard requires it from step 1);
+        ! for a static block (amr_regrid_int = 0) the user's placement is authoritative.
+        blk_lo = amr_block_beg; blk_hi = amr_block_end
+        if (ib .and. amr_regrid_int > 0) call s_amr_expand_box_over_bodies(blk_lo, blk_hi)
+        call s_set_amr_fine_geometry(blk_lo, blk_hi)
 
     end subroutine s_initialize_amr_module
 
@@ -797,9 +803,38 @@ contains
     impure subroutine s_amr_update_mib_fine(th)
 
         real(wp), intent(in) :: th
+        integer              :: i, blo(3), bhi(3)
+        logical              :: ovl, inside
 
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return
+        ! Between regrids a moving body must stay inside its block: the regrid expansion
+        ! contained it with margin max(amr_buf,4), and here we require the body plus the
+        ! image-point stencil reach (2 coarse cells) to remain contained. Consecutive
+        ! contained positions keep every sub-time interpolate contained (axis-aligned
+        ! boxes are convex in the linearly-moving corners). A body that overlaps the
+        ! block edge would get silently clipped forcing - abort instead.
+        if (amr_regrid_int > 0) then
+            do i = 1, num_ibs
+                if (patch_ib(i)%moving_ibm == 0) cycle
+                call s_amr_body_bbox(i, 2, blo, bhi)
+                ovl = blo(1) <= amr_slots(amr_cur)%region%hi(1) .and. bhi(1) >= amr_slots(amr_cur)%region%lo(1)
+                if (n_glb > 0) ovl = ovl .and. blo(2) <= amr_slots(amr_cur)%region%hi(2) .and. bhi(2) &
+                    & >= amr_slots(amr_cur)%region%lo(2)
+                if (p_glb > 0) ovl = ovl .and. blo(3) <= amr_slots(amr_cur)%region%hi(3) .and. bhi(3) &
+                    & >= amr_slots(amr_cur)%region%lo(3)
+                if (.not. ovl) cycle
+                inside = blo(1) >= amr_slots(amr_cur)%region%lo(1) .and. bhi(1) <= amr_slots(amr_cur)%region%hi(1)
+                if (n_glb > 0) inside = inside .and. blo(2) >= amr_slots(amr_cur)%region%lo(2) .and. bhi(2) &
+                    & <= amr_slots(amr_cur)%region%hi(2)
+                if (p_glb > 0) inside = inside .and. blo(3) >= amr_slots(amr_cur)%region%lo(3) .and. bhi(3) &
+                    & <= amr_slots(amr_cur)%region%hi(3)
+                if (.not. inside) then
+                    call s_mpi_abort('amr dynamic regrid with moving ib: the body reached the fine-block ' &
+                                     & // 'boundary between regrids; reduce amr_regrid_int or increase amr_buf')
+                end if
+            end do
+        end if
         call s_amr_swap_to_fine()
         call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
         call s_update_mib(num_ibs, th)
@@ -1870,13 +1905,51 @@ contains
 
     !> Expand a candidate regrid box (global indices) to fully contain every immersed body it overlaps, with a buff_size margin (the
     !! IB image-point stencils need resolved surroundings). Expansion is re-clamped to the domain interior by the caller's own
-    !! guards; a body too large for the per-rank block cap aborts with a named message. Static bodies only (moving bodies with
-    !! dynamic regrid remain gated).
+    !! guards; a body too large for the per-rank block cap aborts with a named message. The bbox reads the live centroid, so a
+    !! moving body's box tracks its current position; between regrids s_amr_update_mib_fine guards containment.
+    !> Margin-padded global coarse-index bounding box of immersed body i (supported analytic geometries only; aborts on others).
+    !! Reads the body's LIVE centroid, so a moving body's box tracks its current position.
+    impure subroutine s_amr_body_bbox(i, mrg, blo, bhi)
+
+        integer, intent(in)  :: i, mrg
+        integer, intent(out) :: blo(3), bhi(3)
+        real(wp)             :: c(3), half(3)
+
+        c = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid]
+        select case (patch_ib(i)%geometry)
+        case (2, 8, 10)  ! circle, sphere, cylinder: radius-bounded (cylinder length adds below)
+            half = patch_ib(i)%radius
+            if (patch_ib(i)%geometry == 10) then
+                half(1) = max(half(1), 0.5_wp*patch_ib(i)%length_x)
+                half(2) = max(half(2), 0.5_wp*patch_ib(i)%length_y)
+                half(3) = max(half(3), 0.5_wp*patch_ib(i)%length_z)
+            end if
+        case (3, 9)  ! rectangle, box
+            half = 0.5_wp*[patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]
+        case default
+            call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
+                             & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
+        end select
+        ! physical bbox -> global coarse indices (uniform spacing is enforced for amr; the
+        ! axisymmetric half axis cell only shrinks dy(0), so the floor is still conservative)
+        blo(1) = int((c(1) - half(1) - x_domain%beg)/dx(0)) - mrg
+        bhi(1) = int((c(1) + half(1) - x_domain%beg)/dx(0)) + mrg
+        blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
+        if (n_glb > 0) then
+            blo(2) = int((c(2) - half(2) - y_domain%beg)/dy(min(1, n))) - mrg
+            bhi(2) = int((c(2) + half(2) - y_domain%beg)/dy(min(1, n))) + mrg
+        end if
+        if (p_glb > 0) then
+            blo(3) = int((c(3) - half(3) - z_domain%beg)/dz(0)) - mrg
+            bhi(3) = int((c(3) + half(3) - z_domain%beg)/dz(0)) + mrg
+        end if
+
+    end subroutine s_amr_body_bbox
+
     impure subroutine s_amr_expand_box_over_bodies(lo, hi)
 
         integer, intent(inout) :: lo(3), hi(3)
         integer                :: i, d, blo(3), bhi(3), mrg
-        real(wp)               :: c(3), half(3)
         logical                :: ovl
 
         ! containment margin: the IB image-point stencil reaches a few cells beyond the surface
@@ -1886,34 +1959,7 @@ contains
         mrg = max(amr_buf, 4)
 
         do i = 1, num_ibs
-            c = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid]
-            select case (patch_ib(i)%geometry)
-            case (2, 8, 10)  ! circle, sphere, cylinder: radius-bounded (cylinder length adds below)
-                half = patch_ib(i)%radius
-                if (patch_ib(i)%geometry == 10) then
-                    half(1) = max(half(1), 0.5_wp*patch_ib(i)%length_x)
-                    half(2) = max(half(2), 0.5_wp*patch_ib(i)%length_y)
-                    half(3) = max(half(3), 0.5_wp*patch_ib(i)%length_z)
-                end if
-            case (3, 9)  ! rectangle, box
-                half = 0.5_wp*[patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]
-            case default
-                call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
-                                 & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
-            end select
-            ! physical bbox -> global coarse indices (uniform spacing is enforced for amr; the
-            ! axisymmetric half axis cell only shrinks dy(0), so the floor is still conservative)
-            blo(1) = int((c(1) - half(1) - x_domain%beg)/dx(0)) - mrg
-            bhi(1) = int((c(1) + half(1) - x_domain%beg)/dx(0)) + mrg
-            blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
-            if (n_glb > 0) then
-                blo(2) = int((c(2) - half(2) - y_domain%beg)/dy(min(1, n))) - mrg
-                bhi(2) = int((c(2) + half(2) - y_domain%beg)/dy(min(1, n))) + mrg
-            end if
-            if (p_glb > 0) then
-                blo(3) = int((c(3) - half(3) - z_domain%beg)/dz(0)) - mrg
-                bhi(3) = int((c(3) + half(3) - z_domain%beg)/dz(0)) + mrg
-            end if
+            call s_amr_body_bbox(i, mrg, blo, bhi)
             ! blocks must stay buff_size inside the domain: a body whose margin-padded bbox does
             ! not fit cannot be contained - fail with a named message instead of a clipped body
             if (blo(1) < buff_size .or. bhi(1) > m_glb - buff_size .or. (n_glb > 0 .and. (blo(2) < buff_size .or. bhi(2) > n_glb &

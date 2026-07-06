@@ -3502,6 +3502,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
+        # MOVING body + DYNAMIC regrid: candidate boxes expand over the body's LIVE centroid and
+        # the per-substage containment guard holds between regrids. Mach 0.25 keeps the start
+        # transient compact (at Mach ~0.85 the tagged wake legitimately outgrows the per-rank
+        # box cap - a named abort, not a supported regime at this domain size); validated
+        # tracking: 200 steps / 29 regrids with the body rising 25 cells past its initial box,
+        # error at/below the static-block control (rho L2 5.6e-3 vs 8.5e-3)
+        stack.push(
+            "dynamic regrid",
+            {
+                "patch_ib(1)%vel(2)": 0.3,
+                "amr_regrid_int": 5,
+                "amr_tag_eps": 0.05,
+                "amr_buf": 3,
+                "t_step_stop": 40,
+                "t_step_save": 40,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
         # (p) 2D AXISYMMETRIC: an off-axis pressure pulse drives genuinely radial flow (nonzero

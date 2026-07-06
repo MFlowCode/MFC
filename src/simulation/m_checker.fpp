@@ -129,17 +129,16 @@ contains
             ! static-body IB AMR (SP20) + prescribed-motion moving bodies (SP21): fixed or analytically-moving
             ! (moving_ibm==1) bodies resolved on a static fine block. Multi-body (num_ibs>1) is supported - every body
             ! shares the one static block and reuses the multi-body-capable core IB setup. Force/torque-driven motion
-            ! (moving_ibm==2), STL geometry, and dynamic regrid with IB remain gated (unvalidated / recompute-on-move).
+            ! (moving_ibm==2) and STL geometry remain gated (unvalidated).
             @:PROHIBIT(ib .and. any(patch_ib(1:num_ibs)%moving_ibm == 2), &
                        & "amr with ib supports static or prescribed-motion (moving_ibm=1) bodies only; force-driven moving IB (moving_ibm=2) under amr is not yet validated")
             @:PROHIBIT(ib .and. any(patch_ib(1:num_ibs)%geometry == 12), &
                        & "amr with ib does not support STL-model geometry (not yet validated)")
-            ! dynamic regrid with STATIC bodies: candidate boxes expand to fully contain every body
-            ! (partial coverage is an untested regime), overlapping expansions merge, and the fine
-            ! IB state is rebuilt from the geometry after every regrid. Moving bodies stay gated:
-            ! their per-substep position updates are not yet coupled to a moving block set.
-            @:PROHIBIT(ib .and. amr_regrid_int > 0 .and. any(patch_ib(1:num_ibs)%moving_ibm > 0), &
-                       & "amr dynamic regrid with ib supports static bodies only; moving bodies require a static block (amr_regrid_int = 0)")
+            ! dynamic regrid with bodies (static or prescribed-motion): candidate boxes expand to
+            ! fully contain every body at its LIVE position (partial coverage is an untested
+            ! regime), overlapping expansions merge, and the fine IB state is rebuilt from the
+            ! geometry after every regrid. Between regrids a moving body's containment is
+            ! guarded per substage (abort if it reaches the block boundary).
             @:PROHIBIT(active_box, "amr is incompatible with active_box (unvalidated combination)")
             ! no hybrid_weno/hybrid_riemann gate: the sensor arrays are sized to the coarse
             ! idwbuff (the fine extent guard keeps fine bounds inside them) and the sensor is
