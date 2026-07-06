@@ -302,6 +302,12 @@ module m_global_parameters
     integer, allocatable :: amr_isect_lo_all(:,:), amr_isect_hi_all(:,:)
     logical, allocatable :: amr_owns_all(:)
 
+    !> Fine-level distribution map (fine-SFC-distribution work): SFC/work-balanced single-owner rank per active block. PHASE 1
+    !! computes and reports it but does NOT apply it - the mirror decomposition (amr_owns_all) still governs ownership, so behavior
+    !! is unchanged. Phase 2 switches amr_rank_owns_block to (amr_block_owner(k) == proc_rank) + coarse<->fine gather/scatter. See
+    !! docs/documentation/amr_fine_distribution.md.
+    integer, allocatable :: amr_block_owner(:)
+
 contains
 
     !> Make block slot islot the working slot: set amr_cur and copy its stored mirrors (region, intersection, ownership) into the

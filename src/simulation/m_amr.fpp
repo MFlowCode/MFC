@@ -152,7 +152,9 @@ contains
         allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
         allocate (amr_owns_all(amr_max_blocks))
+        allocate (amr_block_owner(amr_max_blocks))
         amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
+        amr_block_owner = 0
         amr_num_blocks = 1
         amr_cur = 1
 
@@ -361,6 +363,7 @@ contains
         blk_lo = amr_block_beg; blk_hi = amr_block_end
         if (ib .and. amr_regrid_int > 0) call s_amr_expand_box_over_bodies(blk_lo, blk_hi)
         call s_set_amr_fine_geometry(blk_lo, blk_hi)
+        call s_amr_assign_block_owners()  ! Phase 1: compute + report the fine-dist map (not applied)
 
     end subroutine s_initialize_amr_module
 
@@ -399,6 +402,79 @@ contains
     !> Compute this rank's per-dim intersection of the box lo:hi with its subdomain (GLOBAL indices, mirrored to amr_isect_lo/hi)
     !! and whether it holds fine cells (amr_rank_owns_block: nonempty in all active dims). Must be called with the COARSE grid state
     !! in m/n/p (never from inside the fine advance).
+    !> Fine-level distribution map (PHASE 1: computed + reported, NOT applied). Assigns each active block a single owner rank by
+    !! chains-on-chains balancing of fine-work weight (fine cell count) in Morton order of the block's low corner - the same SFC
+    !! idea m_sfc_partition uses for the base grid, at block granularity. Pure function of the replicated block geometry
+    !! (amr_region_*_all), so it is deterministic and identical on every rank with no communication. Mirror ownership (amr_owns_all)
+    !! is untouched; this only fills amr_block_owner for the Phase-2 switch and prints a predicted-imbalance line.
+    impure subroutine s_amr_assign_block_owners()
+
+        integer         :: k, kk, r, ord(amr_num_blocks)
+        integer(kind=8) :: wt(amr_num_blocks), key(amr_num_blocks), tmpk, cum, tgt, total
+        integer         :: tmpo
+        real(wp)        :: rank_load(0:num_procs - 1), imbal
+
+        if (amr_num_blocks < 1) return
+
+        ! per-block fine-work weight = fine cell count (product of 2*extent-1 over active dims)
+        do k = 1, amr_num_blocks
+            wt(k) = int(2*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1, 8)
+            if (n_glb > 0) wt(k) = wt(k)*int(2*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 8)
+            if (p_glb > 0) wt(k) = wt(k)*int(2*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 8)
+            key(k) = f_amr_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
+            ord(k) = k
+        end do
+
+        ! sort block indices by Morton key (insertion sort - amr_num_blocks is small, <= amr_max_blocks)
+        do k = 2, amr_num_blocks
+            tmpk = key(ord(k)); tmpo = ord(k); kk = k - 1
+            do while (kk >= 1)
+                if (key(ord(kk)) <= tmpk) exit
+                ord(kk + 1) = ord(kk); kk = kk - 1
+            end do
+            ord(kk + 1) = tmpo
+        end do
+
+        ! chains-on-chains: walk blocks in SFC order, advance the owner rank when the cumulative weight crosses the next even share
+        total = 0_8
+        do k = 1, amr_num_blocks
+            total = total + wt(k)
+        end do
+        rank_load = 0._wp
+        r = 0; cum = 0_8
+        do k = 1, amr_num_blocks
+            tgt = (int(r + 1, 8)*total)/int(num_procs, 8)
+            if (cum >= tgt .and. r < num_procs - 1) r = r + 1
+            amr_block_owner(ord(k)) = r
+            rank_load(r) = rank_load(r) + real(wt(ord(k)), wp)
+            cum = cum + wt(ord(k))
+        end do
+
+        if (proc_rank == 0) then
+            imbal = maxval(rank_load)/max(real(total, wp)/real(num_procs, wp), 1._wp)
+            print '(A,I0,A,F6.2,A)', ' [amr] fine-dist map: ', amr_num_blocks, ' block(s), predicted fine-work imbalance ', &
+                & imbal, 'x (1.00 = perfect; map computed, not yet applied)'
+        end if
+
+    end subroutine s_amr_assign_block_owners
+
+    !> 3D Morton (Z-order) key from global coarse indices; collapsed dims contribute 0. 21 bits/dim (fits a 64-bit key for grids up
+    !! to 2^21 cells/dim, far beyond any block-index range).
+    pure integer(kind=8) function f_amr_morton(ix, iy, iz) result(key)
+        integer, intent(in) :: ix, iy, iz
+        integer             :: b
+        integer(kind=8)     :: xx, yy, zz
+
+        xx = int(max(ix, 0), 8); yy = int(max(iy, 0), 8); zz = int(max(iz, 0), 8)
+        key = 0_8
+        do b = 0, 20
+            key = ior(key, ishft(iand(ishft(xx, -b), 1_8), 3*b))
+            key = ior(key, ishft(iand(ishft(yy, -b), 1_8), 3*b + 1))
+            key = ior(key, ishft(iand(ishft(zz, -b), 1_8), 3*b + 2))
+        end do
+
+    end function f_amr_morton
+
     impure subroutine s_amr_compute_isect(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
@@ -2681,6 +2757,7 @@ contains
             ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/
             ! image points recomputed from the body definitions; no state carries across regrids)
             if (ib) call s_amr_setup_ib()
+            call s_amr_assign_block_owners()  ! Phase 1: recompute the fine-dist map for the new block set
             call s_amr_select_slot(1)
 
         end subroutine s_amr_regrid
@@ -3213,6 +3290,7 @@ contains
             if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
             if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
             if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
+            if (allocated(amr_block_owner)) deallocate (amr_block_owner)
             if (igr) then
                 @:DEALLOCATE(sw_jac)
                 @:DEALLOCATE(sw_jac_old)
