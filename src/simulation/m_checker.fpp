@@ -112,7 +112,16 @@ contains
                        & "amr does not support surface_tension: the capillary force depends on the interface normal (grad-c direction), which the conservative-linearly-prolonged fine ghost color cannot reproduce consistently with the coarse solver across a 2:1 coarse/fine boundary - a growing spurious seam current results")
             ! hypoelasticity is supported: stress components prolong via the generic conservative-linear
             ! path and the swap/restore recomputes the spacing-dependent FD coefficients per grid
-            @:PROHIBIT(hyperelasticity .or. mhd, "amr does not support hyperelasticity/MHD")
+            @:PROHIBIT(hyperelasticity, "amr does not support hyperelasticity")
+            ! MHD stays gated ON MEASURED EVIDENCE (not just caution): B/psi ride the generic
+            ! conservative machinery structurally, but the per-component prolongation/reflux is
+            ! not divergence-preserving - on a magnetized 2D Brio-Wu the c/f seam acts as a
+            ! continuous O(1) monopole source that GLM cleaning spreads but cannot remove
+            ! (max|divB| 0.53 in the block interior and 0.36 far-field vs the no-AMR run's
+            ! 1.4e-3 cleaning background; HLLD, which has no GLM coupling at all, NaNs
+            ! outright). Supporting MHD needs divergence-preserving (constrained-transport
+            ! class) prolongation and reflux for B.
+            @:PROHIBIT(mhd, "amr does not support MHD (the coarse/fine seam is not divergence-preserving for B)")
             ! IGR is supported with restriction-only coarse/fine coupling (stage 1): the fine
             ! block runs its own fixed-iteration sigma solve seeded and Dirichlet-bounded by the
             ! converged coarse sigma; the Berger-Colella reflux is not yet captured from the
