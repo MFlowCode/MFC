@@ -2682,11 +2682,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # phi < eps): a dead sensor moves the answer by ~5e-4. At physical eps (1e-2) the
         # combination is bitwise-identical to plain AMR by design (only constant/eps-dominated
         # cells go central, and those reconstruct identically under any convex weights).
-        # override_tol 1e-8: the consequential-eps regime amplifies benign backend FP variation
-        # (intel -O3 drifts these up to ~3e-7 rel across runs, past the 1e-12 default) while the signal these
-        # goldens exist to catch - a dead sensor - moves the answer by ~5e-4, four orders above
-        cases.append(define_case_d(stack, "hybrid_weno sensor", {"hybrid_weno": "T", "hybrid_weno_eps": 0.5}, override_tol=1.0e-6))
-        cases.append(define_case_d(stack, "hybrid_riemann sensor", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.5, "hybrid_smooth_flux": 2}, override_tol=1.0e-6))
+        # override_tol 5e-5, sized by decision theory rather than drift-chasing: the harness
+        # reports only the FIRST variable past tolerance, so each tighter bound just reveals
+        # the next quantile of the same deterministic deviation field (intel-CPU and Cray-acc
+        # produce IDENTICAL sensor-on results that differ from the gnu-generated golden by up
+        # to ~6e-6 - compiler FP-contraction behavior, not noise). 5e-5 sits an order below
+        # the ~5e-4 dead-sensor signal these goldens exist to catch and 8x above the worst
+        # observed legitimate drift; if a platform ever drifts past 5e-5 the golden design
+        # itself (static cross-compiler reference) stops being able to discriminate
+        cases.append(define_case_d(stack, "hybrid_weno sensor", {"hybrid_weno": "T", "hybrid_weno_eps": 0.5}, override_tol=5.0e-5))
+        cases.append(define_case_d(stack, "hybrid_riemann sensor", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.5, "hybrid_smooth_flux": 2}, override_tol=5.0e-5))
         # 2 MPI ranks + parallel_io: the ONLY test that executes the MPI-IO AMR restart write/read
         # (EXSCAN offset arithmetic, per-rank-extents validation) and multi-rank dynamic regrid
         # (coarse-halo exchange before tagging, fine seam halo) - a rank-seam or restart-offset bug
@@ -3696,14 +3701,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # sensor (answer moves ~5e-4 vs plain WENO); the eps=1e-2 case is bitwise-identical to
         # plain by design (only constant/eps-dominated cells go central) so it protects
         # no-corruption but cannot detect a dead sensor
-        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}, override_tol=1.0e-6))
+        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}, override_tol=5.0e-5))
         stack.pop()
         stack.push(
             "Hybrid -> 1D -> Riemann sensor",
             {**hybrid_1d_base, "hybrid_riemann": "T", "hybrid_weno_eps": 1.0e-2, "hybrid_smooth_flux": 2},
         )
         cases.append(define_case_d(stack, "", {}))
-        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}, override_tol=1.0e-6))
+        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}, override_tol=5.0e-5))
         # the central smooth-flux (enum 1) is a distinct flux path from Rusanov (2) - cover both
         cases.append(define_case_d(stack, "central flux", {"hybrid_smooth_flux": 1}))
         stack.pop()
