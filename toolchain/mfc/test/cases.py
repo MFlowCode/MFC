@@ -2675,8 +2675,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # phi < eps): a dead sensor moves the answer by ~5e-4. At physical eps (1e-2) the
         # combination is bitwise-identical to plain AMR by design (only constant/eps-dominated
         # cells go central, and those reconstruct identically under any convex weights).
-        cases.append(define_case_d(stack, "hybrid_weno sensor", {"hybrid_weno": "T", "hybrid_weno_eps": 0.5}))
-        cases.append(define_case_d(stack, "hybrid_riemann sensor", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.5, "hybrid_smooth_flux": 2}))
+        # override_tol 1e-8: the consequential-eps regime amplifies benign backend FP variation
+        # (intel -O3 drifts these by ~3e-10 rel past the 1e-12 default) while the signal these
+        # goldens exist to catch - a dead sensor - moves the answer by ~5e-4, four orders above
+        cases.append(define_case_d(stack, "hybrid_weno sensor", {"hybrid_weno": "T", "hybrid_weno_eps": 0.5}, override_tol=1.0e-8))
+        cases.append(define_case_d(stack, "hybrid_riemann sensor", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.5, "hybrid_smooth_flux": 2}, override_tol=1.0e-8))
         # 2 MPI ranks + parallel_io: the ONLY test that executes the MPI-IO AMR restart write/read
         # (EXSCAN offset arithmetic, per-rank-extents validation) and multi-rank dynamic regrid
         # (coarse-halo exchange before tagging, fine seam halo) - a rank-seam or restart-offset bug
@@ -2952,7 +2955,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "acoustic(1)%wavelength": 0.2,
             },
         )
-        cases.append(define_case_d(stack, "", {}))
+        # override_tol 1e-8: intel -O3 drifts this case ~3e-10 rel past the 1e-12 default
+        cases.append(define_case_d(stack, "", {}, override_tol=1.0e-8))
         # dynamic regrid chasing the emitted wave: the tagger fires on the travelling pulse, and
         # the regrid keeps its boxes clear of the source support (tags suppressed over it,
         # candidate boxes clipped) - the source region stays coarse while blocks track the wave
@@ -3685,14 +3689,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # sensor (answer moves ~5e-4 vs plain WENO); the eps=1e-2 case is bitwise-identical to
         # plain by design (only constant/eps-dominated cells go central) so it protects
         # no-corruption but cannot detect a dead sensor
-        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}))
+        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}, override_tol=1.0e-8))
         stack.pop()
         stack.push(
             "Hybrid -> 1D -> Riemann sensor",
             {**hybrid_1d_base, "hybrid_riemann": "T", "hybrid_weno_eps": 1.0e-2, "hybrid_smooth_flux": 2},
         )
         cases.append(define_case_d(stack, "", {}))
-        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}))
+        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}, override_tol=1.0e-8))
         # the central smooth-flux (enum 1) is a distinct flux path from Rusanov (2) - cover both
         cases.append(define_case_d(stack, "central flux", {"hybrid_smooth_flux": 1}))
         stack.pop()

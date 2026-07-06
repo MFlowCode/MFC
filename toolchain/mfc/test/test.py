@@ -156,6 +156,11 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 # nonpolytropic pair carries override_tol=5e-9, unsatisfiable below single epsilon
                 "AMR -> 1D -> acoustic",
                 "nonpolytropic",
+                # the consequential-eps hybrid goldens carry override_tol=1e-8 (unscaled by the
+                # single 1e8 relaxation), below single-precision drift for these cases
+                "consequential eps",
+                "hybrid_weno sensor",
+                "hybrid_riemann sensor",
             ]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
