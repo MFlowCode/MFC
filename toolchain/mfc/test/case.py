@@ -149,6 +149,16 @@ def trace_to_uuid(trace: str) -> str:
     return hex(binascii.crc32(hashlib.sha1(str(trace).encode()).digest())).upper()[2:].zfill(8)
 
 
+# Opt-in (per test, via honor_io_keys=True) exemption from the POST_PROCESS_OFF_PARAMS
+# clobber: a test whose DEFINITION sets parallel_io etc. for coverage (MPI-IO AMR restart,
+# load_balance) keeps its explicit values. Content-based honoring is wrong: Example-derived
+# tests import example case.py files that set these keys, but their goldens were generated
+# under the clobber (an unconditional honor broke 18 example goldens on every CI lane).
+HONOR_IO_SNIPPET = """
+    # this test opts in to keeping its explicitly-set IO keys (see HONOR_IO_SNIPPET)
+    mods = {k: v for k, v in mods.items() if k not in case}"""
+
+
 @dataclasses.dataclass(init=False)
 class TestCase(case.Case):
     ppn: int
@@ -158,13 +168,24 @@ class TestCase(case.Case):
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
     canary: bool = False
+    honor_io_keys: bool = False
 
     def __init__(
-        self, trace: str, mods: dict, ppn: int = None, override_tol: float = None, restart_check: bool = False, kind: str = "golden", convergence_spec: Optional[dict] = None, canary: bool = False
+        self,
+        trace: str,
+        mods: dict,
+        ppn: int = None,
+        override_tol: float = None,
+        restart_check: bool = False,
+        kind: str = "golden",
+        convergence_spec: Optional[dict] = None,
+        canary: bool = False,
+        honor_io_keys: bool = False,
     ) -> None:
         self.trace = trace
         self.ppn = ppn or 1
         self.override_tol = override_tol
+        self.honor_io_keys = honor_io_keys
         self.restart_check = restart_check
         self.kind = kind
         self.convergence_spec = convergence_spec
@@ -319,10 +340,7 @@ if "post_process" in ARGS["mfc"]["targets"]:
     if case['p'] != 0:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
 else:
-    mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}
-    # honor a case's EXPLICIT setting of these keys (e.g. parallel_io = T for MPI-IO
-    # restart / load_balance coverage) instead of clobbering it
-    mods = {{k: v for k, v in mods.items() if k not in case}}
+    mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}{HONOR_IO_SNIPPET if self.honor_io_keys else ""}
 
 print(json.dumps({{**case, **mods}}))
 """,
@@ -380,6 +398,7 @@ class TestCaseBuilder:
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
     canary: bool = False
+    honor_io_keys: bool = False
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -412,7 +431,7 @@ class TestCaseBuilder:
         if self.functor:
             self.functor(dictionary)
 
-        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, canary=self.canary)
+        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, canary=self.canary, honor_io_keys=self.honor_io_keys)
 
 
 @dataclasses.dataclass
@@ -447,7 +466,9 @@ def define_convergence_case(trace: str, spec: dict, ppn: int = None) -> TestCase
     return TestCaseBuilder(trace, {}, None, None, ppn or 1, None, None, False, kind="convergence", convergence_spec=spec)
 
 
-def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False) -> TestCaseBuilder:
+def define_case_d(
+    stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False, honor_io_keys: bool = False
+) -> TestCaseBuilder:
     mods: dict = {}
 
     for mod in stack.mods:
@@ -463,7 +484,7 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check)
+    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check, honor_io_keys=honor_io_keys)
 
 
 def input_bubbles_lagrange(self):

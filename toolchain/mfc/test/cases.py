@@ -2682,7 +2682,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # (coarse-halo exchange before tagging, fine seam halo) - a rank-seam or restart-offset bug
         # is a silent wrong answer everywhere else in the suite
         stack.push("2 MPI Ranks", {"parallel_io": "T"})
-        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True))
+        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True, honor_io_keys=True))
         stack.pop()
         stack.pop()
 
@@ -3714,7 +3714,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(3)%alpha(2)": 1.0 - eps_lb,
             },
         )
-        cases.append(define_case_d(stack, "", {}, ppn=2))
+        cases.append(define_case_d(stack, "", {}, ppn=2, honor_io_keys=True))
         stack.pop()
 
     load_balance_tests()
