@@ -1690,6 +1690,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("adap_dt=T", {"adap_dt": "T"})
 
                     cases.append(define_case_d(stack, "", {}))
+                    # AMR with the bubble cloud EXCLUDED from the block (2D two-way, fixed dt):
+                    # the block sits clear of the bubble (0.5, 0.5) and the acoustic support
+                    # slab; EL alphas sum to the local liquid fraction, so they prolong WITHOUT
+                    # the sum-to-one closure (which would corrupt the EL state - caught by the
+                    # free-stream battery), and a per-stage guard keeps the cloud out of blocks
+                    if len(dimInfo[0]) == 2 and adap_dt == "F" and couplingMethod == 2:
+                        stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0})
+                        cases.append(define_case_d(stack, "", {}))
+                        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}))
+                        stack.pop()
 
                     stack.pop()
 

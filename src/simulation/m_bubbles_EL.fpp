@@ -1514,6 +1514,28 @@ contains
 
     end subroutine s_write_restart_lag_bubbles
 
+    !> Physical-space bounding box of this rank's Lagrangian bubbles (committed step positions, register 1). Rank-local: the caller
+    !! allreduces if it needs the global cloud. Returns pmin > pmax when the rank holds no bubbles.
+    impure subroutine s_lag_cloud_bbox_local(pmin, pmax)
+
+        real(wp), dimension(3), intent(out) :: pmin, pmax
+        real(wp)                            :: x1n, x2n, x3n, x1x, x2x, x3x
+        integer                             :: k
+
+        x1n = huge(1._wp); x2n = huge(1._wp); x3n = huge(1._wp)
+        x1x = -huge(1._wp); x2x = -huge(1._wp); x3x = -huge(1._wp)
+        $:GPU_PARALLEL_LOOP(private='[k]', reduction='[[x1n, x2n, x3n], [x1x, x2x, x3x]]', reductionOp='[MIN, MAX]', copy='[x1n, &
+                            & x2n, x3n, x1x, x2x, x3x]')
+        do k = 1, nBubs
+            x1n = min(x1n, mtn_pos(k, 1, 1)); x1x = max(x1x, mtn_pos(k, 1, 1))
+            x2n = min(x2n, mtn_pos(k, 2, 1)); x2x = max(x2x, mtn_pos(k, 2, 1))
+            x3n = min(x3n, mtn_pos(k, 3, 1)); x3x = max(x3x, mtn_pos(k, 3, 1))
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        pmin = [x1n, x2n, x3n]; pmax = [x1x, x2x, x3x]
+
+    end subroutine s_lag_cloud_bbox_local
+
     !> Compute the maximum and minimum radius of each bubble
     subroutine s_calculate_lag_bubble_stats()
 

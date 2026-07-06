@@ -869,7 +869,10 @@ contains
             call nvtxEndRange
         end if
 
-        if (bubbles_lagrange) then
+        ! Lagrangian bubbles couple on the coarse grid only (the cloud is excluded from fine
+        ! blocks): during the fine advance the EL hooks are skipped - a bubble's position would
+        ! map to wrong cell indices on the swapped block grid
+        if (bubbles_lagrange .and. .not. amr_in_fine_advance) then
             ! RHS additions for sub-grid bubbles_lagrange
             call nvtxStartRange("RHS-EL-BUBBLES-SRC")
             call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)

@@ -249,7 +249,10 @@ PHYSICS_DOCS = {
             "must not overlap the user-placed initial block (checked at startup), and under dynamic "
             "regrid the source region stays coarse (tags are suppressed over the support and candidate "
             "boxes are clipped clear of it). "
-            "Incompatible with surface tension, Lagrangian bubbles, "
+            "Lagrangian bubbles are supported with the cloud excluded from fine blocks (two-way "
+            "coupling lives on the coarse grid): regrid suppresses tags and clips boxes around the "
+            "cloud's padded bbox, and a per-stage guard aborts if the cloud reaches an active block. "
+            "Incompatible with surface tension, "
             "IGR, 3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
             "per-cell WENO coefficients are recomputed for each block on swap), MHD, hyperelasticity, "
             "and active_box. hybrid_weno/hybrid_riemann are supported: each level recomputes the "
@@ -1409,17 +1412,16 @@ class CaseValidator:
         self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
         mpp_lim = self.get("mpp_lim", "F") == "T"
         self.prohibit(
-            num_fluids is not None and num_fluids > 1 and not mpp_lim,
-            "amr with num_fluids > 1 requires mpp_lim " "(its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency)",
+            num_fluids is not None and num_fluids > 1 and not mpp_lim and not bubbles_lagrange,
+            "amr with num_fluids > 1 requires mpp_lim "
+            "(its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency); "
+            "Lagrangian bubbles are exempt (their alphas sum to the local liquid fraction)",
         )
         self.prohibit(
             surface_tension or hyperelasticity or mhd,
             "amr does not support surface-tension/hyperelasticity/MHD",
         )
-        self.prohibit(
-            bubbles_lagrange or igr,
-            "amr does not support Lagrangian bubbles/IGR",
-        )
+        self.prohibit(igr, "amr does not support the IGR solver")
         self.prohibit(
             cyl_coord and (self.get("p", 0) or 0) > 0,
             "amr with cyl_coord supports 2D axisymmetric only: " "the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance",

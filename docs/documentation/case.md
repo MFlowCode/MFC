@@ -850,7 +850,12 @@ boundary between regrids (reduce `amr_regrid_int` or increase `amr_buf`). Force-
 subdomain is bit-exact across decompositions; a body spanning a rank seam is rejected at startup
 (the fine-IB image-point stencil across the seam is not yet decomposition-exact), so keep the body
 inside a single rank's subdomain (use fewer ranks or reposition it).
-AMR is incompatible with surface tension, Lagrangian bubbles, IGR, 3D cylindrical
+Lagrangian bubbles are supported with the cloud excluded from fine blocks: two-way coupling
+lives on the coarse grid, regrid suppresses tags and clips boxes around the cloud's padded
+bounding box, EL volume fractions prolong without the sum-to-one closure (their sum is the
+local liquid fraction, not 1), and a per-stage guard aborts if the cloud reaches an active
+block (reduce `amr_regrid_int` or increase `amr_buf`).
+AMR is incompatible with surface tension, IGR, 3D cylindrical
 coordinates (2D axisymmetric IS supported), MHD, hyperelasticity, Riemann-extrapolation
 boundaries (bc = -4), and `active_box`. `hybrid_weno`/`hybrid_riemann` are supported: each
 level recomputes the smoothness sensor over its own (swapped) bounds every RHS call.

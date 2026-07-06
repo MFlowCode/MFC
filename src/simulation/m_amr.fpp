@@ -15,11 +15,11 @@ module m_amr
 
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
-    use m_constants, only: num_fluids_max, model_eqns_6eq
+    use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
     use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers, s_mpi_sendrecv_amr_fine_halo
-    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, &
-        & s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers
+    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, s_mpi_allreduce_min, &
+        & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k
     use m_amr_registers, only: s_amr_zero_fine_registers
@@ -29,6 +29,7 @@ module m_amr
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
     use m_weno, only: s_compute_weno_coefficients
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
+    use m_bubbles_EL, only: s_lag_cloud_bbox_local
 
     implicit none
 
@@ -91,7 +92,14 @@ module m_amr
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
     logical               :: sw_acoustic_source
-    logical               :: amr_swapped = .false.  !< paired-swap guard: a nested swap would corrupt the bounce buffers silently
+
+    !> Lagrangian bubble-cloud exclusion support: padded global coarse-index bbox of the cloud (positions + mapCells smearing +
+    !! stencil headroom [+ drift margin at regrid]). Blocks and regrid boxes stay clear of it: a bubble inside a block loses two-way
+    !! coupling (the fine advance skips the EL hooks and the coarse result under the block is discarded by restriction). Recomputed
+    !! collectively at each regrid; guarded rank-locally per stage.
+    integer :: lag_supp_lo(3), lag_supp_hi(3)
+    logical :: lag_supp_on = .false.
+    logical :: amr_swapped = .false.  !< paired-swap guard: a nested swap would corrupt the bounce buffers silently
     !> True when the coarse grid is nonuniform in an allowed way (the 2D-axisymmetric half-width axis cell): the WENO reconstruction
     !! coefficients are then per-cell, so the fine advance must recompute them for the block's own (uniform) grid on every swap and
     !! restore the coarse ones after. False on fully uniform grids - the recompute is skipped and behavior is bit-identical.
@@ -488,7 +496,9 @@ contains
         bstride = 1
         if (bubbles_euler) bstride = (eqn_idx%bub%end - eqn_idx%bub%beg + 1)/nb
         do i = 1, sys_size
-            if (num_fluids > 1 .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
+            ! Lagrangian bubbles: alphas sum to the LOCAL liquid fraction beta (not 1), so the
+            ! sum-to-one closure would corrupt the EL state; each alpha prolongs plainly instead
+            if (num_fluids > 1 .and. (.not. bubbles_lagrange) .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
             if (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end) cycle  ! sum/positivity closure below
             ! QBMM carries a bivariate 6-moment set per R0 bin whose CHyQMOM inversion requires realizability
             ! (variance c20 = m20/m00 - (m10/m00)^2 > 0); per-component minmod prolongation can break that joint
@@ -501,7 +511,7 @@ contains
                                    & .and. mod(i - eqn_idx%bub%beg, bstride) /= 1, &
                                    & inject=qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end)
         end do
-        if (num_fluids > 1) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
+        if (num_fluids > 1 .and. (.not. bubbles_lagrange)) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
         if (chemistry) call s_prolong_species_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
 
     end subroutine s_interpolate_coarse_to_fine
@@ -1319,7 +1329,7 @@ contains
         b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
         b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
         b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
-        multi = num_fluids > 1
+        multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
         bubEE = bubbles_euler; bbeg = eqn_idx%bub%beg; bend = eqn_idx%bub%end
         bstride = 1; if (bubEE) bstride = (bend - bbeg + 1)/nb
@@ -1586,6 +1596,7 @@ contains
         ! valid coarse CONS ghosts for the ghost prolongation below (ALL ranks call: pairwise halo)
         if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_coarse)
         if (.not. amr_rank_owns_block) return
+        call s_amr_check_lag_clear()
 
         ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the
         ! device-current coarse stage-entry state directly); rank_time brackets cover the fine-advance
@@ -1672,6 +1683,7 @@ contains
             call s_amr_exchange_coarse_cons_halo(q_old)
             call s_amr_exchange_coarse_cons_halo(q_new)
         end if
+        if (amr_rank_owns_block) call s_amr_check_lag_clear()
         if (.not. amr_rank_owns_block) return
 
         ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1} (device kernels
@@ -1903,6 +1915,113 @@ contains
 
     end subroutine s_amr_clip_box_from_sources
 
+    !> Convert a physical-space bbox to a global coarse-index bbox padded by pad_cells.
+    pure subroutine s_lag_phys_to_cells(pmin, pmax, pad_cells, blo, bhi)
+
+        real(wp), dimension(3), intent(in) :: pmin, pmax
+        integer, intent(in)                :: pad_cells
+        integer, intent(out)               :: blo(3), bhi(3)
+
+        blo(1) = int((pmin(1) - x_domain%beg)/dx(0)) - pad_cells
+        bhi(1) = int((pmax(1) - x_domain%beg)/dx(0)) + pad_cells
+        blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
+        if (n_glb > 0) then
+            blo(2) = int((pmin(2) - y_domain%beg)/dy(min(1, n))) - pad_cells
+            bhi(2) = int((pmax(2) - y_domain%beg)/dy(min(1, n))) + pad_cells
+        end if
+        if (p_glb > 0) then
+            blo(3) = int((pmin(3) - z_domain%beg)/dz(0)) - pad_cells
+            bhi(3) = int((pmax(3) - z_domain%beg)/dz(0)) + pad_cells
+        end if
+
+    end subroutine s_lag_phys_to_cells
+
+    !> Recompute the global Lagrangian-cloud exclusion bbox (collective: allreduces the rank-local position extrema). pad_cells
+    !! covers smearing + stencil (+ drift until the next recompute). No-op (lag_supp_on = false) when no rank holds a bubble.
+    impure subroutine s_amr_compute_lag_supp(pad_cells)
+
+        integer, intent(in)    :: pad_cells
+        real(wp), dimension(3) :: pmin_loc, pmax_loc, pmin_glb, pmax_glb
+        integer                :: d
+
+        call s_lag_cloud_bbox_local(pmin_loc, pmax_loc)
+        do d = 1, 3
+            call s_mpi_allreduce_min(pmin_loc(d), pmin_glb(d))
+            call s_mpi_allreduce_max(pmax_loc(d), pmax_glb(d))
+        end do
+        lag_supp_on = pmin_glb(1) <= pmax_glb(1)
+        if (.not. lag_supp_on) return
+        call s_lag_phys_to_cells(pmin_glb, pmax_glb, pad_cells, lag_supp_lo, lag_supp_hi)
+
+    end subroutine s_amr_compute_lag_supp
+
+    !> True iff global level-0 cell (gi, gj, gk) lies inside the Lagrangian-cloud exclusion bbox.
+    pure logical function f_in_lag_support(gi, gj, gk) result(insup)
+
+        integer, intent(in) :: gi, gj, gk
+
+        insup = .false.
+        if (.not. lag_supp_on) return
+        insup = gi >= lag_supp_lo(1) .and. gi <= lag_supp_hi(1) .and. (n_glb == 0 .or. (gj >= lag_supp_lo(2) &
+                                  & .and. gj <= lag_supp_hi(2))) .and. (p_glb == 0 .or. (gk >= lag_supp_lo(3) &
+                                  & .and. gk <= lag_supp_hi(3)))
+
+    end function f_in_lag_support
+
+    !> Clip a candidate regrid box (global indices) clear of one support bbox: remove the overlap along the single axis/side that
+    !! keeps the largest remaining extent (deterministic: lower axis, then begin side, wins ties). Only shrinks; may empty the box
+    !! (hi < lo).
+    pure subroutine s_amr_clip_box_from_supp(lo, hi, slo, shi)
+
+        integer, intent(inout) :: lo(3), hi(3)
+        integer, intent(in)    :: slo(3), shi(3)
+        integer                :: d, best_d, best_side, best_ext, ext_l, ext_r
+        logical                :: ovl
+
+        if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return
+        ovl = lo(1) <= shi(1) .and. hi(1) >= slo(1)
+        if (n_glb > 0) ovl = ovl .and. lo(2) <= shi(2) .and. hi(2) >= slo(2)
+        if (p_glb > 0) ovl = ovl .and. lo(3) <= shi(3) .and. hi(3) >= slo(3)
+        if (.not. ovl) return
+        best_d = 1; best_side = 1; best_ext = -1
+        do d = 1, num_dims
+            ext_l = slo(d) - lo(d)
+            ext_r = hi(d) - shi(d)
+            if (ext_l > best_ext) then; best_ext = ext_l; best_d = d; best_side = 1; end if
+            if (ext_r > best_ext) then; best_ext = ext_r; best_d = d; best_side = 2; end if
+        end do
+        if (best_side == 1) then
+            hi(best_d) = slo(best_d) - 1
+        else
+            lo(best_d) = shi(best_d) + 1
+        end if
+
+    end subroutine s_amr_clip_box_from_supp
+
+    !> Rank-local per-stage guard: the local bubbles' padded bbox must stay clear of the current block. Catches an overlapping
+    !! initial placement on the first stage and drift that outran the regrid margin afterwards.
+    impure subroutine s_amr_check_lag_clear()
+
+        real(wp), dimension(3) :: pmin_loc, pmax_loc
+        integer                :: blo(3), bhi(3)
+        logical                :: ovl
+
+        if (.not. bubbles_lagrange) return
+        call s_lag_cloud_bbox_local(pmin_loc, pmax_loc)
+        if (pmin_loc(1) > pmax_loc(1)) return  ! no bubbles on this rank
+        call s_lag_phys_to_cells(pmin_loc, pmax_loc, mapCells + 2, blo, bhi)
+        ovl = blo(1) <= amr_slots(amr_cur)%region%hi(1) .and. bhi(1) >= amr_slots(amr_cur)%region%lo(1)
+        if (n_glb > 0) ovl = ovl .and. blo(2) <= amr_slots(amr_cur)%region%hi(2) .and. bhi(2) >= amr_slots(amr_cur)%region%lo(2)
+        if (p_glb > 0) ovl = ovl .and. blo(3) <= amr_slots(amr_cur)%region%hi(3) .and. bhi(3) >= amr_slots(amr_cur)%region%lo(3)
+        if (ovl) then
+            call s_mpi_abort('amr with Lagrangian bubbles: the bubble cloud (positions + smearing support) ' &
+                             & // 'overlaps an active fine block, where two-way coupling would be lost. Keep the initial ' &
+                             & // 'block clear of the cloud; under dynamic regrid, reduce amr_regrid_int or increase ' &
+                             & // 'amr_buf so the exclusion margin covers the cloud drift between regrids')
+        end if
+
+    end subroutine s_amr_check_lag_clear
+
     !> Expand a candidate regrid box (global indices) to fully contain every immersed body it overlaps, with a buff_size margin (the
     !! IB image-point stencils need resolved surroundings). Expansion is re-clamped to the domain interior by the caller's own
     !! guards; a body too large for the per-rank block cap aborts with a named message. The bbox reads the live centroid, so a
@@ -2118,6 +2237,10 @@ contains
                 $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
             end do
 
+            ! Lagrangian-cloud exclusion bbox for this regrid (collective): smearing (mapCells) +
+            ! stencil headroom (2) + drift margin until the next regrid (amr_buf)
+            if (bubbles_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
+
             ! 1) per-cell tag field (density-gradient criterion, unchanged), skipping the two global boundary cells per active dim
             sidx = 0
             sidx(1) = start_idx(1)
@@ -2144,6 +2267,11 @@ contains
                         ! indices): suppress tags there so the clusterer splits around the source
                         if (acoustic_source .and. tag_grid(ci, cj, ck)) then
                             if (f_in_acoustic_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
+                        end if
+                        ! the Lagrangian bubble cloud stays coarse (two-way coupling lives on the
+                        ! coarse grid): suppress tags over its padded bbox
+                        if (bubbles_lagrange .and. tag_grid(ci, cj, ck)) then
+                            if (f_in_lag_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
                         end if
                     end do
                 end do
@@ -2176,6 +2304,7 @@ contains
                 ! keep candidate boxes clear of every acoustic source support (the source acts on the
                 ! coarse grid only); clipping only shrinks, so boxes stay disjoint - empties drop below
                 if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
+                if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
                 ! a fine block that PARTIALLY covers an immersed body is an untested regime (ghost
                 ! prolongation through body-interior cells, refluxing across the body): any box that
                 ! overlaps a body's bounding box is expanded to contain the whole body plus margin
@@ -2220,10 +2349,11 @@ contains
                     do k = 1, nboxes
                         lo = boxes(k)%lo; hi = boxes(k)%hi
                         call s_amr_clip_box_from_sources(lo, hi)
+                        if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
                         if (any(lo /= boxes(k)%lo) .or. any(hi /= boxes(k)%hi)) then
                             call s_mpi_abort('amr regrid: a block must contain an immersed body AND stay ' &
-                                             & // 'clear of an acoustic source support - the constraints conflict; ' &
-                                             & // 'move the body or the source apart')
+                                             & // 'clear of an acoustic source support / Lagrangian bubble cloud - the ' &
+                                             & // 'constraints conflict; move the body, source, or cloud apart')
                         end if
                     end do
                 end if
