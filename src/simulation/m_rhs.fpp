@@ -103,6 +103,7 @@ module m_rhs
 
     type(int_bounds_info) :: ab_int(1:3)  !< Active-box interior bounds for convert call (device-resident)
     $:GPU_DECLARE(create='[ab_int]')
+    logical :: ab_prim_seeded = .false.  !< Active-box: whether q_prim_qp's frozen exterior has been seeded once (host-only)
     $:GPU_DECLARE(create='[is1, is2, is3]')
 
     !> @name Saved fluxes for testing
@@ -497,7 +498,7 @@ contains
 
         call cpu_time(t_start)
 
-        if (ab_active) then
+        if (ab_active .and. ab_prim_seeded) then
             cbjlo = max(idwbuff(1)%beg, ab_x%beg - buff_size)
             cbjhi = min(idwbuff(1)%end, ab_x%end + buff_size)
             cbklo = max(idwbuff(2)%beg, ab_y%beg - buff_size)
@@ -510,11 +511,19 @@ contains
             ab_int(2)%beg = max(0, ab_y%beg - buff_size); ab_int(2)%end = min(n, ab_y%end + buff_size)
             ab_int(3)%beg = max(0, ab_z%beg - buff_size); ab_int(3)%end = min(p, ab_z%end + buff_size)
         else
+            ! Full-domain window: used for every non-active_box run, and for the ONE-TIME seeding
+            ! pass on the first active_box RHS call. active_box narrows the cons->prim producer to
+            ! the box, but full-domain consumers (the ICFL/vCFL monitor, probes, IB) still read
+            ! 0:m,0:n,0:p; an unconverted exterior is uninitialized memory -> NaN (fatal on Cray,
+            ! silently finite on some compilers). Seeding q_prim_qp over the full domain once fills
+            ! the frozen ambient exterior with valid primitives, which subsequent narrowed passes
+            ! never overwrite.
             cbjlo = idwbuff(1)%beg; cbjhi = idwbuff(1)%end
             cbklo = idwbuff(2)%beg; cbkhi = idwbuff(2)%end
             cbllo = idwbuff(3)%beg; cblhi = idwbuff(3)%end
             ab_int = idwint
         end if
+        if (ab_active) ab_prim_seeded = .true.
 
         $:GPU_UPDATE(device='[ab_int]')
 
