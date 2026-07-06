@@ -1344,11 +1344,27 @@ contains
     impure subroutine s_amr_igr_swap_sigma()
 
         integer :: j, k, l, ci, cj, ck
+        integer :: cb1, ce1, cb2, ce2, cb3, ce3, fb1, fe1, fb2, fe2, fb3, fe3
+        integer :: lo1, lo2, lo3, ox, oy, oz
 
+        ! bounds/offsets hoisted to scalars: sw_idwbuff (and friends) are host-only module
+        ! state - referencing them inside the kernels makes OpenACC's present lookup fail
+        ! (OpenMP's implicit map(to) tolerates it, which is why only acc lanes crashed)
+
+        cb1 = sw_idwbuff(1)%beg; ce1 = sw_idwbuff(1)%end
+        cb2 = sw_idwbuff(2)%beg; ce2 = sw_idwbuff(2)%end
+        cb3 = sw_idwbuff(3)%beg; ce3 = sw_idwbuff(3)%end
+        fb1 = idwbuff(1)%beg; fe1 = idwbuff(1)%end
+        fb2 = idwbuff(2)%beg; fe2 = idwbuff(2)%end
+        fb3 = idwbuff(3)%beg; fe3 = idwbuff(3)%end
+        lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
+        ox = start_idx(1); oy = 0; oz = 0
+        if (n_glb > 0) oy = start_idx(2)
+        if (p_glb > 0) oz = start_idx(3)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = sw_idwbuff(3)%beg, sw_idwbuff(3)%end
-            do k = sw_idwbuff(2)%beg, sw_idwbuff(2)%end
-                do j = sw_idwbuff(1)%beg, sw_idwbuff(1)%end
+        do l = cb3, ce3
+            do k = cb2, ce2
+                do j = cb1, ce1
                     sw_jac(j, k, l) = jac(j, k, l)
                     sw_jac_old(j, k, l) = jac_old(j, k, l)
                 end do
@@ -1356,16 +1372,16 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]')
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
-                    ci = amr_isect_lo(1) + floor(real(j, wp)/2._wp) - start_idx(1)
+        do l = fb3, fe3
+            do k = fb2, fe2
+                do j = fb1, fe1
+                    ci = lo1 + floor(real(j, wp)/2._wp) - ox
                     cj = 0; ck = 0
-                    if (n_glb > 0) cj = amr_isect_lo(2) + floor(real(k, wp)/2._wp) - start_idx(2)
-                    if (p_glb > 0) ck = amr_isect_lo(3) + floor(real(l, wp)/2._wp) - start_idx(3)
-                    ci = min(max(ci, sw_idwbuff(1)%beg), sw_idwbuff(1)%end)
-                    cj = min(max(cj, sw_idwbuff(2)%beg), sw_idwbuff(2)%end)
-                    ck = min(max(ck, sw_idwbuff(3)%beg), sw_idwbuff(3)%end)
+                    if (n_glb > 0) cj = lo2 + floor(real(k, wp)/2._wp) - oy
+                    if (p_glb > 0) ck = lo3 + floor(real(l, wp)/2._wp) - oz
+                    ci = min(max(ci, cb1), ce1)
+                    cj = min(max(cj, cb2), ce2)
+                    ck = min(max(ck, cb3), ce3)
                     jac(j, k, l) = sw_jac(ci, cj, ck)
                     jac_old(j, k, l) = sw_jac(ci, cj, ck)
                 end do
@@ -1378,12 +1394,15 @@ contains
     !> Restore the coarse jac/jac_old saved by s_amr_igr_swap_sigma (bounds already restored).
     impure subroutine s_amr_igr_restore_sigma()
 
-        integer :: j, k, l
+        integer :: j, k, l, b1, e1, b2, e2, b3, e3
 
+        b1 = idwbuff(1)%beg; e1 = idwbuff(1)%end
+        b2 = idwbuff(2)%beg; e2 = idwbuff(2)%end
+        b3 = idwbuff(3)%beg; e3 = idwbuff(3)%end
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
+        do l = b3, e3
+            do k = b2, e2
+                do j = b1, e1
                     jac(j, k, l) = sw_jac(j, k, l)
                     jac_old(j, k, l) = sw_jac_old(j, k, l)
                 end do
