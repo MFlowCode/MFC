@@ -883,19 +883,6 @@ contains
         if (n_glb > 0) amr_rank_owns_block = amr_rank_owns_block .and. amr_isect_lo(2) <= amr_isect_hi(2)
         if (p_glb > 0) amr_rank_owns_block = amr_rank_owns_block .and. amr_isect_lo(3) <= amr_isect_hi(3)
 
-        ! non-polytropic QBMM: the fine rank-seam halo exchanges q_cons only, so a block spanning
-        ! ranks would advance with unexchanged pb/mv seam ghosts - a silent wrong answer. Keep the
-        ! block inside one rank subdomain (fewer ranks or reposition) until the halo carries pb/mv.
-        if (qbmm .and. (.not. polytropic) .and. amr_rank_owns_block) then
-            if (amr_isect_lo(1) /= lo(1) .or. amr_isect_hi(1) /= hi(1) .or. (n_glb > 0 .and. (amr_isect_lo(2) /= lo(2) &
-                & .or. amr_isect_hi(2) /= hi(2))) .or. (p_glb > 0 .and. (amr_isect_lo(3) /= lo(3) .or. amr_isect_hi(3) /= hi(3)))) &
-                & then
-                call s_mpi_abort('amr with non-polytropic qbmm: the fine block spans a rank boundary, but the ' &
-                                 & // 'fine seam halo does not carry the pb/mv side-state; keep the block within ' &
-                                 & // 'a single rank subdomain (use fewer ranks or reposition the block)')
-            end if
-        end if
-
     end subroutine s_amr_compute_isect
 
     !> Set the fine level's geometry (region, intersection, extents, bounds, coordinates) for the box lo:hi. Arrays are preallocated
