@@ -959,6 +959,7 @@ contains
         @:DEALLOCATE(fluid_inv_re)
 
         if (bubbles_euler) then
+            @:DEALLOCATE(ptil)
             @:DEALLOCATE(qbmm_idx%rs, qbmm_idx%vs, qbmm_idx%ps, qbmm_idx%ms)
             if (qbmm) then
                 @:DEALLOCATE(qbmm_idx%moms)

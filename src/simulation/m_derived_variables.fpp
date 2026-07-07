@@ -21,8 +21,6 @@ module m_derived_variables
     private; public :: s_initialize_derived_variables_module, s_initialize_derived_variables, s_compute_derived_variables, &
         & s_finalize_derived_variables_module
 
-    ! fd_coeff_x, fd_coeff_y, fd_coeff_z: declared in m_global_parameters so m_viscous can see them too
-
     ! @name Variables for computing acceleration
     !> @{
     real(wp), public, allocatable, dimension(:,:,:) :: accel_mag
@@ -508,21 +506,23 @@ contains
             end if
         end if
 
-        if (probe_wrt) then
-            deallocate (accel_mag, x_accel)
+        if (probe_wrt .or. ib) then
+            @:DEALLOCATE(accel_mag)
+            @:DEALLOCATE(x_accel)
             if (n > 0) then
-                deallocate (y_accel)
+                @:DEALLOCATE(y_accel)
                 if (p > 0) then
-                    deallocate (z_accel)
+                    @:DEALLOCATE(z_accel)
                 end if
             end if
+            @:DEALLOCATE(fd_coeff_x)
+            if (n > 0) then
+                @:DEALLOCATE(fd_coeff_y)
+            end if
+            if (p > 0) then
+                @:DEALLOCATE(fd_coeff_z)
+            end if
         end if
-
-        ! Deallocating the variables that might have been used to bookkeep the finite-difference coefficients in the x-, y- and
-        ! z-directions
-        if (allocated(fd_coeff_x)) deallocate (fd_coeff_x)
-        if (allocated(fd_coeff_y)) deallocate (fd_coeff_y)
-        if (allocated(fd_coeff_z)) deallocate (fd_coeff_z)
 
     end subroutine s_finalize_derived_variables_module
 

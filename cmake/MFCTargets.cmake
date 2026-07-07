@@ -96,10 +96,22 @@ exit 0
             find_package(MPI COMPONENTS Fortran REQUIRED)
 
             target_compile_definitions(${a_target} PRIVATE MFC_MPI)
-            if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND
-               DEFINED ENV{CRAY_MPICH_INC} AND NOT "$ENV{CRAY_MPICH_INC}" STREQUAL "")
-                target_compile_options(${a_target} PRIVATE "$ENV{CRAY_MPICH_INC}")
-                target_link_libraries(${a_target} PRIVATE $ENV{CRAY_MPICH_LIB})
+            # amdflang (LLVMFlang) needs MPI include/link paths passed explicitly, as
+            # its mpi.mod must match the compiler ABI. Prefer the compiler-neutral
+            # MFC_FLANG_MPI_* vars; fall back to the legacy CRAY_MPICH_* names (Frontier).
+            set(_flang_mpi_inc "$ENV{MFC_FLANG_MPI_INC}")
+            set(_flang_mpi_lib "$ENV{MFC_FLANG_MPI_LIB}")
+            if("${_flang_mpi_inc}" STREQUAL "")
+                set(_flang_mpi_inc "$ENV{CRAY_MPICH_INC}")
+                set(_flang_mpi_lib "$ENV{CRAY_MPICH_LIB}")
+            endif()
+            if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND NOT "${_flang_mpi_inc}" STREQUAL "")
+                if("${_flang_mpi_lib}" STREQUAL "")
+                    message(FATAL_ERROR "amdflang MPI include path is set but its link libraries are not. "
+                        "Set both MFC_FLANG_MPI_INC and MFC_FLANG_MPI_LIB (or both CRAY_MPICH_INC and CRAY_MPICH_LIB).")
+                endif()
+                target_compile_options(${a_target} PRIVATE "${_flang_mpi_inc}")
+                target_link_libraries(${a_target} PRIVATE ${_flang_mpi_lib})
             else()
                 target_link_libraries(${a_target} PRIVATE MPI::MPI_Fortran)
             endif()
@@ -121,8 +133,13 @@ exit 0
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                    if(DEFINED ENV{CRAY_HIPFORT_LIB} AND NOT "$ENV{CRAY_HIPFORT_LIB}" STREQUAL "")
-                        target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
+                    # Prefer the neutral MFC_FLANG_HIPFORT_LIB; fall back to CRAY_HIPFORT_LIB (Frontier).
+                    set(_flang_hipfort_lib "$ENV{MFC_FLANG_HIPFORT_LIB}")
+                    if("${_flang_hipfort_lib}" STREQUAL "")
+                        set(_flang_hipfort_lib "$ENV{CRAY_HIPFORT_LIB}")
+                    endif()
+                    if(NOT "${_flang_hipfort_lib}" STREQUAL "")
+                        target_link_libraries(${a_target} PRIVATE ${_flang_hipfort_lib})
                     else()
                         find_library(HIPFFT_LIB hipfft
                             HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
@@ -244,11 +261,14 @@ exit 0
                 endif()
 
 		        find_library(HIP_LIB amdhip64
-                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
+                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib" REQUIRED)
                 find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
-                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" REQUIRED)
+                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib" REQUIRED)
+                # The hipfort module dir moved to lib/llvm/include in newer AFAR
+                # (therock) drops; keep the classic path for Frontier's layout.
                 target_include_directories(${a_target} PRIVATE
-                    "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn")
+                    "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn"
+                    "$ENV{OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn")
                 target_link_libraries(${a_target} PRIVATE
                     ${HIP_LIB} ${HIPFORT_AMDGCN_LIB})
 

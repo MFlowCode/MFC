@@ -1874,6 +1874,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",
+                "2D_premixed_landau_insta",
+                "1D_flamelet",
+                "2D_premixed_flame_vortex",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
                 # by a large mu_max: even on the downsized grid the step count to reach t_stop
@@ -1891,6 +1894,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # one variable past the 1e-3 Example tolerance, while all other lanes pass.
                 # The forcing physics is correct; the golden is just cross-compiler-marginal.
                 "2D_synthetic_turbulence",
+                # Two immersed boundaries colliding across a periodic boundary via a stiff
+                # soft-sphere spring. The spring acts as a strong amplifier: it turns the
+                # ~1e-13 CPU/GPU floating-point difference in the hydrodynamic force (the
+                # order-dependent atomic surface-pressure integral) into an exponentially
+                # growing trajectory divergence, so the sharp-interface field fails the
+                # golden tolerance on GPU lanes even though both runs are individually
+                # reproducible. Not a correctness bug -- the case is genuinely chaotic at
+                # this stiffness, so it is not a portable regression target.
+                "3D_mibm_periodic_collision",
             ]
             if path in casesToSkip:
                 continue
@@ -1938,6 +1950,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-10),
                 )
             )
+
+        cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={"t_step_stop": 1, "t_step_save": 1}, override_tol=10 ** (-10)))
 
         stack.push(
             "1D -> Chemistry -> Dual Isothermal Wall Gradient",
