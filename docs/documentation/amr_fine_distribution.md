@@ -82,7 +82,8 @@ Remaining (the conservation crux — reflux is NOT yet decoupling-correct):
   it (allreduce, replacing the cart-neighbor `s_mpi_sendrecv_amr_reflux_faces`); (3) coarse-outside-owners
   capture `creg` locally and apply `(freg-creg)` to their owned outside cells — verify the apply's
   block-relative transverse indexing maps onto each receiver's local coarse slice. Conservation-critical.
-- **QBMM pb/mv** gather/scatter for np≥2 (currently local; np≥2 QBMM+AMR ungated, untested — gate or scatter).
+- **QBMM pb/mv** gather/scatter for np≥2 (currently local; non-polytropic QBMM+AMR now **gated fail-closed** at np≥2 in
+  `m_checker` — see "Known open" for the scatter follow-up).
 - np=2 conservation + assignment-independence validation once reflux lands (acceptance goldens:
   BD21A5C0, 5EFB3277, 79B334C7 — they pass on `up/mega` via the mirror).
 
@@ -153,8 +154,12 @@ mirror splits a block across ranks there, so its footprint already matches tilin
 
 ## Known open
 
-- **QBMM pb/mv** gather/scatter for np≥2 (still local; np≥2 QBMM+AMR ungated/untested — gate or scatter). The regrid
-  QBMM overlap-copy is still local-only (same bug class as the q_cons migration above, deferred with the rest of QBMM).
+- **QBMM pb/mv** gather/scatter for np≥2 — the pb/mv side-state coarse↔fine coupling (`s_amr_prolong_pbmv` /
+  `s_restrict_pbmv`) and the regrid QBMM overlap-copy are still LOCAL-only (same bug class as the q_cons migration
+  above). Now **gated fail-closed**: `m_checker` PROHIBITs `qbmm .and. .not. polytropic .and. num_procs > 1` for `amr`,
+  so np≥2 non-polytropic QBMM+AMR aborts at case load instead of silently coupling to the wrong coarse side-state.
+  Distributing pb/mv (gather/scatter/migration, mirroring q_cons) is future work for when np≥2 QBMM+AMR is needed and
+  testable. Polytropic QBMM+AMR at np≥2 is unaffected (its moments ride q_cons, which is already distributed).
 - **`amr_g?cb` lacks physical-boundary ghost coords** (sized `-1:m_glb`; the base grid's `x/y/z_cb` carry BC-aware ghosts
   via `s_populate_grid_variables_buffers`). A near-domain-edge **whole** (untiled) block can drive the fine ghost-coord
   build out of `amr_gycb` bounds — surfaced only by artificially disabling tiling; tiled blocks stay in bounds. Fix if
