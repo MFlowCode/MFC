@@ -130,7 +130,7 @@ once-at-init coordinate assembly.
      surfaces once tiling makes several blocks). Restart (`s_read_amr_restart`) is a two-pass read (regions → assign →
      place data) for both the parallel_io and non-parallel_io paths.
 2. **Regrid cross-rank fine-state migration** — DONE (the stretched-np≥2 correctness fix). The regrid overlap-copy
-   preserves a covering old block's fine detail by reading `amr_slots(kk)%q_cons_stor`, but that was local-only
+   preserves a covering old block's fine detail by reading `amr_slots(kk)%%q_cons_stor`, but that was local-only
    (`if (.not. old_owns(kk)) cycle`). Under fine-level distribution an old block can be owned by a rank *other* than the
    one now owning a covering new block, so the copy was silently skipped and the new block kept only its
    coarse-prolonged values — **exact on uniform grids** (prolongation reproduces the fine field) but **~O(1e-4) wrong on

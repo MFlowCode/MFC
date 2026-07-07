@@ -1265,15 +1265,14 @@ contains
                 if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
                 return
             end if
+            ! fine -> host for the cross-rank send-slice packing below (the local overwrite reads the fine on the device)
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[amr_slots(amr_cur)%q_cons(i)%sf]')
             end do
-            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
-                call s_amr_restrict_overwrite(coarse_tgt, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[coarse_tgt(i)%sf]')
-                end do
-            end if
+            ! owner-local covered cells: restrict fine(device) -> coarse(device) touching ONLY those cells (no whole-coarse
+            ! device push, which clobbered the device-advanced non-covered coarse cells - the same GPU-only bug fixed at np=1)
+            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device(coarse_tgt, &
+                & amr_slots(amr_cur)%q_cons, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
             nsrc = 0
             do r = 0, num_procs - 1
                 if (r == owner) cycle
@@ -1333,8 +1332,10 @@ contains
                     end do
                 end do
                 deallocate (rbuf)
+                ! push ONLY the covered cells to the device - a whole-array update would clobber the device-advanced
+                ! non-covered coarse cells with this rank's stale host copy (the same GPU-only bug fixed at np=1)
                 do i = 1, sys_size
-                    $:GPU_UPDATE(device='[coarse_tgt(i)%sf]')
+                    $:GPU_UPDATE(device='[coarse_tgt(i)%sf(bl(1) - o1:bh(1) - o1, bl(2) - o2:bh(2) - o2, bl(3) - o3:bh(3) - o3)]')
                 end do
             end if
         end if
