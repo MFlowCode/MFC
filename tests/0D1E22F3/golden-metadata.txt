@@ -1,0 +1,120 @@
+This file was created on 2026-05-18 14:49:14.954336.
+
+mfc.sh:
+
+    Invocation: test --generate -o 0D1E22F3 --no-debug
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        c0dc28b9d6dd5fad0edecc59c8d4d3bc59d664ae on ExtrusionV3 (dirty)
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v4.1.2 on Dimitrioss-MacBook-Air.local
+    
+        C       : AppleClang v17.0.0.17000013 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/dimitriosadam/Desktop/MFC-Adam/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.1.2 on Dimitrioss-MacBook-Air.local
+    
+        C       : AppleClang v17.0.0.17000013 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/dimitriosadam/Desktop/MFC-Adam/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v4.1.2 on Dimitrioss-MacBook-Air.local
+    
+        C       : AppleClang v17.0.0.17000013 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/dimitriosadam/Desktop/MFC-Adam/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M3
+

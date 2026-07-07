@@ -779,6 +779,8 @@ def _load():
         _r(n, LOG)
     _r("int_comp", INT)
     _r("case_dir", STR, str_len="path_len")
+    _r("file_extension", STR, str_len="path_len")
+    _r("files_dir", STR, str_len="path_len")
 
     # Body force
     for d in ["x", "y", "z"]:
@@ -1364,6 +1366,8 @@ _nv(
     "elliptic_smoothing_iters",
     "simplex_perturb",
     "simplex_params",
+    "files_dir",
+    "file_extension",
 )
 _nv(
     _POST,

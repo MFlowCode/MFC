@@ -1874,6 +1874,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",
+                "2D_premixed_landau_insta",
+                "1D_flamelet",
+                "2D_premixed_flame_vortex",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
                 # by a large mu_max: even on the downsized grid the step count to reach t_stop
@@ -1941,6 +1944,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-10),
                 )
             )
+
+        cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={"t_step_stop": 1, "t_step_save": 1}, override_tol=10 ** (-10)))
 
         stack.push(
             "1D -> Chemistry -> Dual Isothermal Wall Gradient",
