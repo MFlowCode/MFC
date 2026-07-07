@@ -140,16 +140,25 @@ once-at-init coordinate assembly.
    future work. Validated (`-b mpirun`): 79B334C7 (1D stretched dynamic-regrid, 2 ranks) passes; F0DDE1B4 (np=1 twin),
    5EFB3277 + BD21A5C0 (uniform np=2 tiled + restart), and the np=1 AMR batch all pass.
 
+## Golden regeneration note (tiling refines more at np=1)
+
+At np=1, tiling adds a capability the mirror never had: refining a tagged region **larger than `amr_maxc`** (half the
+domain per dim). The old regrid **clamped** any box to `amr_maxc_fit` (`hi = lo + amr_maxc_fit - 1`), so a big tag was
+only partially refined; block-splitting **tiles** it and refines the whole tag. Any np=1 AMR golden whose tag exceeds
+`amr_maxc(dim)` therefore changes (more cells refined) and must be regenerated with the tiled binary — an *intended*
+solution change, not a regression (the tiled advance is bit-identical to the mirror where footprints match, conservation
+is exact, and the seam is exact). Example: **B7704247** (2D stretched-y regrid) — the mirror refined `y4:23` (20 cells,
+clamped); tiling refines the full `y4:35` (`y4:19` + `y20:35`). Golden regenerated. np≥2 goldens are unaffected: the
+mirror splits a block across ranks there, so its footprint already matches tiling.
+
 ## Known open
 
-- **B7704247** (AMR 2D stretched-y dynamic regrid, np=1) fails at abs 4.4e-11 (> 1e-12 tol) on `cons.1.00`. Isolated:
-  **not** tiling (persists with y-tiling disabled — the block stays whole), **not** the migration (np=1; migration is
-  `num_procs>1`-guarded), and it fails at the committed state too. So it is a **whole-block 2D-stretched-y** regression
-  from the earlier fine-distribution commits — the whole-block `amr_gycb` y-coordinates or the reflux redesign's y-face
-  metric on a stretched grid. Small but real; a distinct, narrower investigation, and it may also affect np≥2
-  2D-stretched.
 - **QBMM pb/mv** gather/scatter for np≥2 (still local; np≥2 QBMM+AMR ungated/untested — gate or scatter). The regrid
   QBMM overlap-copy is still local-only (same bug class as the q_cons migration above, deferred with the rest of QBMM).
+- **`amr_g?cb` lacks physical-boundary ghost coords** (sized `-1:m_glb`; the base grid's `x/y/z_cb` carry BC-aware ghosts
+  via `s_populate_grid_variables_buffers`). A near-domain-edge **whole** (untiled) block can drive the fine ghost-coord
+  build out of `amr_gycb` bounds — surfaced only by artificially disabling tiling; tiled blocks stay in bounds. Fix if
+  untiled near-edge whole blocks ever become reachable.
 - Minor: the P2P routines scan all `num_procs` to find participants (integer-only, O(P) per block per stage); the regrid
   migration broadcasts (correctness-first, → P2P); patch-only device transfers instead of whole-field host round-trips
   (GPU only); own-only slot allocation.
