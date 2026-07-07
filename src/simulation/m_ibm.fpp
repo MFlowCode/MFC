@@ -4,6 +4,34 @@
 
 #:include 'macros.fpp'
 
+!> @brief Per-block fine-grid immersed-boundary state for single-body AMR (SP20 static, SP21 prescribed-motion). This is a SEPARATE
+!! module from m_ibm on purpose: declaring these non-declare-target derived-type allocatables inside m_ibm corrupts CCE's OpenMP
+!! declare-target descriptor table for m_ibm's ghost_points and aborts its @:ALLOCATE with "lib-4425: Uninitialized descriptor for
+!! ALLOCATE statement argument" (even for a plain non-AMR IBM run, which never touches this state). A distinct module keeps m_ibm's
+!! compiled image identical to the pre-AMR-IB baseline. Do not fold these declarations back into m_ibm.
+module m_ibm_fine
+
+    use m_derived_types
+
+    implicit none
+
+    !> Per-block fine IB state: each AMR slot keeps its own fine-grid markers + ghost-point list, computed from the geometry at fine
+    !! resolution so the body is resolved on the fine block. Swapped into m_ibm's module globals (ib_markers/ghost_points/num_gps)
+    !! for the fine advance's setup, per-substep moving recompute, and correct-state, then restored. For a moving body the
+    !! ghost-point list is sized generously so the recompute never reallocates.
+    type ib_fine_state
+        type(integer_field)                          :: markers
+        type(ghost_point), allocatable, dimension(:) :: gps
+        integer                                      :: num_gps
+    end type ib_fine_state
+    type(ib_fine_state), allocatable :: ib_fine(:)
+
+    !> Coarse IB state parked across a fine swap (move_alloc bounce; paired swap/restore).
+    type(integer_field)                          :: ib_markers_save
+    type(ghost_point), allocatable, dimension(:) :: ghost_points_save
+    integer                                      :: num_gps_save
+end module m_ibm_fine
+
 !> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the
 !! flow state
 module m_ibm
@@ -22,6 +50,12 @@ module m_ibm
     use m_patch_geometries
     use m_collisions
 
+    ! Fine-IB AMR state (ib_fine/ib_markers_save/ghost_points_save/num_gps_save) lives in a
+    ! separate module so it is NOT part of m_ibm's compiled image: on CCE OpenMP-offload,
+    ! declaring those derived-type allocatables here corrupts the declare-target descriptor
+    ! for ghost_points and aborts its @:ALLOCATE with lib-4425. See m_ibm_fine.
+    use m_ibm_fine
+
     implicit none
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
@@ -36,22 +70,6 @@ module m_ibm
     $:GPU_DECLARE(create='[ghost_points]')
 
     integer :: num_gps  !< Number of ghost points
-
-    !> Per-block fine IB state for single-body AMR (SP20 static, SP21 prescribed-motion): each AMR slot keeps its own fine-grid
-    !! markers + ghost-point list, computed from the geometry at fine resolution so the body is resolved on the fine block. Swapped
-    !! into the module globals (ib_markers/ghost_points/num_gps) for the fine advance's setup, per-substep moving recompute, and
-    !! correct-state, then restored. For a moving body the ghost-point list is sized generously so the recompute never reallocates.
-    type ib_fine_state
-        type(integer_field)                          :: markers
-        type(ghost_point), allocatable, dimension(:) :: gps
-        integer                                      :: num_gps
-    end type ib_fine_state
-    type(ib_fine_state), allocatable :: ib_fine(:)
-
-    !> Coarse IB state parked across a fine swap (move_alloc bounce; paired swap/restore).
-    type(integer_field)                          :: ib_markers_save
-    type(ghost_point), allocatable, dimension(:) :: ghost_points_save
-    integer                                      :: num_gps_save
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[gp_layers, num_gps]')
 #elif defined(MFC_OpenMP)
