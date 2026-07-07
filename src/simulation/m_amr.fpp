@@ -1249,12 +1249,25 @@ contains
         maxsz = sys_size*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
 
         if (proc_rank == owner) then
-            do i = 1, sys_size
-                $:GPU_UPDATE(host='[amr_slots(amr_cur)%q_cons(i)%sf]')
-            end do
             ! overwrite the covered cells this rank owns, then send each other coarse-owner its covered slice
             call f_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+            if (num_procs == 1) then
+                ! np=1 device-native fold-back: restrict the fine block (device) into the coarse (device) over the COVERED
+                ! cells only - no host round-trip. The old path pulled the fine to host, restricted on host, then pushed the
+                ! WHOLE coarse array back to the device (GPU_UPDATE device coarse_tgt), clobbering the device-advanced
+                ! NON-covered coarse cells with the stale host copy - a GPU-only divergence (invisible on CPU where
+                ! host==device) that IGR/MHD/acoustic amplify. The owner holds every covered cell at np=1.
+                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device(coarse_tgt, &
+                    & amr_slots(amr_cur)%q_cons, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+                if (qbmm .and. .not. polytropic .and. amr_rank_owns_block) call s_restrict_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, &
+                    & amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
+                if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
+                return
+            end if
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_slots(amr_cur)%q_cons(i)%sf]')
+            end do
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 call s_amr_restrict_overwrite(coarse_tgt, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
                 do i = 1, sys_size
@@ -1385,6 +1398,43 @@ contains
         end do
 
     end subroutine s_amr_restrict_overwrite
+
+    !> Device-native restriction overwrite (np=1): restrict the fine block q_fine (DEVICE) to coarse averages over the covered
+    !! coarse cells [bl:bh] GLOBAL and write coarse_tgt (DEVICE) directly - no host round-trip, only the covered cells touched (the
+    !! old whole-coarse device push clobbered non-covered cells). Inlines f_amr_restrict_cell EXACTLY (same child-sum order: ddk,
+    !! ddj, then fi0 and fi0+1; /nchild; stp cast) so it is bit-identical to the host path on CPU and matches the coarse
+    !! restriction. q_fine (== amr_slots(amr_cur)%q_cons) and coarse_tgt are device-resident (ACC_SETUP_SFs).
+    impure subroutine s_amr_restrict_overwrite_device(coarse_tgt, q_fine, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+        type(scalar_field), dimension(sys_size), intent(in) :: q_fine
+        integer, intent(in) :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
+        integer :: i, ci, cj, ck, fi0, fj0, fk0, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
+        real(wp) :: acc
+
+        bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
+        rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddj, ddk, acc]')
+        do i = 1, sys_size
+            do ck = bl3, bh3
+                do cj = bl2, bh2
+                    do ci = bl1, bh1
+                        fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
+                        acc = 0._wp
+                        do ddk = 0, dk_hi
+                            do ddj = 0, dj_hi
+                                acc = acc + real(q_fine(i)%sf(fi0, fj0 + ddj, fk0 + ddk), wp) + real(q_fine(i)%sf(fi0 + 1, &
+                                                 & fj0 + ddj, fk0 + ddk), wp)
+                            end do
+                        end do
+                        coarse_tgt(i)%sf(ci - o1, cj - o2, ck - o3) = real(acc/real(nchild, wp), stp)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_restrict_overwrite_device
 
     !> Apply phase-change relaxation (relax) to the current fine block's interior, BEFORE restriction. Relaxation is a cell-local,
     !! mass/energy-conserving equilibration (no stencil, no ghosts), so it needs no coarse/fine coupling: it just runs over the fine
