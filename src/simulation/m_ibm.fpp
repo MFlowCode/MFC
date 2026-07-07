@@ -933,6 +933,10 @@ contains
             if (th >= 0._wp) snap = .true.
         end if
         if (snap) then
+            ! The body position/angles were just updated on device by the RK body-motion loop
+            ! (m_time_steppers); sync to host before the host-side sub-time interpolation reads them, else the
+            ! fine block is built at the stale t^n position on GPU (host-current on CPU, so this only bites GPU).
+            $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
             do i = 1, num_ibs
                 sc(1, i) = patch_ib(i)%x_centroid; sc(2, i) = patch_ib(i)%y_centroid; sc(3, i) = patch_ib(i)%z_centroid
                 sa(:,i) = patch_ib(i)%angles
