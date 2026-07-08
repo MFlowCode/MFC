@@ -40,9 +40,25 @@ Multi-level replaces "coarse = L0" with "**the coarse side of level `l+1` is lev
 
 1. **Foundation (bit-identical).** `amr_max_level` namelist param (default 1), gated
    `amr_max_level > 1` fail-closed in `m_checker` until the recursion lands. *(this increment)*
-2. **Recursive coupling.** Add the per-block `%%level`/`%%parent` tags, then parameterize
-   gather/prolong/restriction/reflux by a coarse-level source: the level-`l` block data instead
-   of only `q_cons_base`. The L1↔L0 path is the `l = 0` special case and stays byte-identical.
+2. **Recursive coupling.** Add the per-block `%%level`/`%%parent` tags (done: `amr_block_level`
+   in 2a; `f_amr_parent_block(k)` finds the covering coarser block by region overlap), then
+   parameterize gather/prolong/restriction/reflux by a coarse-level source: the level-`l` block
+   data instead of only `q_cons_base`. The L1↔L0 path is the `l = 0` case and stays byte-identical.
+
+   **The one hard detail — the coarse frame.** The prolong reads `amr_cg` via
+   (`amr_isect_lo`, `amr_cpat_off`, `ref_ratio`) and is reused unchanged as long as `amr_cg` and
+   that frame are in **parent-level cell indices**. Level-1 block: parent level is L0, frame is
+   L0 indices (today). Level-2 block with L0 region `R2`, parent L1 block `p` with L0 region `R1`:
+   - parent-fine index of L0 cell `c` is `2*(c - R1.lo)` (ref_ratio per level);
+   - coarse footprint in the parent's fine frame: `isect = 2*(R2 - R1.lo)`;
+   - fine extent `m = ref_ratio*(parent-fine footprint) - 1 = ref_ratio^2 * |R2| - 1`;
+   - `amr_cg` holds the parent's fine cells `[isect.lo - nmar : isect.hi + nmar]`, gathered from
+     `amr_slots(p)%%q_cons` (np=1: local copy; np≥2: P2P via `amr_block_owner`);
+   - "coarse coords" are the parent's fine coords `amr_slots(p)%%x_cb`, not `amr_gxcb` — needed
+     only for the advance/stretched grids, so a **uniform-grid np=1 operator self-check**
+     (`prolong → restrict` conserves) is the first testable milestone and can skip coords.
+   `s_set_amr_fine_geometry` and `s_amr_gather_coarse_patch` choose this frame; each gains a
+   `level == 1 ? L0 : parent-fine` branch.
 3. **Recursive subcycle driver.** Generalize the `m_time_steppers` AMR advance into a
    recursive `advance(level)` with per-level `dt` and time-interpolated coarse ghosts.
 4. **Per-level regrid + proper nesting.** Tag each level for the next-finer one; build level

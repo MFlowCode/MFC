@@ -657,6 +657,26 @@ contains
 
     end function f_amr_boxes_overlap
 
+    !> Multi-level nesting: index of the covering level-(level(k)-1) block that block k refines - its coarse parent - or 0 when
+    !! block k is level 1 (its parent is the L0 base grid). Regions are in L0 cell indices at every level, so the parent is the
+    !! level-below block whose box contains k's; proper nesting guarantees exactly one, and the first overlap is returned.
+    pure integer function f_amr_parent_block(k) result(p)
+
+        integer, intent(in) :: k
+        integer             :: j
+
+        p = 0
+        if (amr_block_level(k) <= 1) return
+        do j = 1, amr_num_blocks
+            if (amr_block_level(j) == amr_block_level(k) - 1 .and. f_amr_boxes_overlap(amr_region_lo_all(:,k), &
+                & amr_region_hi_all(:,k), amr_region_lo_all(:,j), amr_region_hi_all(:,j))) then
+                p = j
+                return
+            end if
+        end do
+
+    end function f_amr_parent_block
+
     !> Copy this rank's own coarse cells (box [bl:bh] GLOBAL, read from q_coarse at its own start-idx frame o1/o2/o3) into amr_cg in
     !! the block-local patch frame. stp -> stp, exact.
     impure subroutine s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)
