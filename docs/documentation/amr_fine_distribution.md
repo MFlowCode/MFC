@@ -111,26 +111,45 @@ Validated: np=1 1D/2D/3D goldens bit-identical; np=2 conservation exact in 1D (e
 transverse-face appliers (mass 1.4e-14), bounds-clean. `s_mpi_allreduce_array_max` remains only for the
 once-at-init coordinate assembly.
 
-## Phase 3 (remaining)
+## Phase 3
 
-1. **Block-splitting / tiling** (the coverage gap) — IN PROGRESS.
-   - **1/3 DONE (committed)**: `s_amr_tile_box` splits any box > `amr_maxc_fit` into contiguous ≤`amr_maxc_fit`
-     sub-blocks, wired into the initial-block setup and the regrid pipeline (non-IB); `s_populate_amr_fine` loops
-     over all blocks refreshing per-block mirrors via `s_amr_select_slot`. np=1 bit-identical (a normal block is one
-     tile); np≥2 tiles into balanced sub-blocks (1.00x imbalance) but the adjacent SEAMS are not yet conservative.
-   - **2/3 TODO — block-to-block fine-fine halo.** Adjacent sub-blocks A|B share a fine seam; A's seam ghost must be
-     B's stage-entry interior (prolonging from coarse there is non-conservative). Correctness needs the halo to read
-     **stage-entry** neighbour data, but the driver advances blocks one-at-a-time, so a later block sees an earlier
-     block's post-update state. Fix = restructure the fine advance into three driver phases: **fill all** (gather +
-     coarse ghost-fill), **fine-fine halo** (overwrite seam ghosts from neighbours — every block's interior is still
-     stage-entry here), **advance all** (RHS + RK update). Split `s_advance_amr_fine_stage` into fill/advance halves;
-     add `s_amr_fine_fine_halo` (adjacency from the replicated `amr_region_*_all`; owner↔owner P2P exchange of the
-     buff_size-deep near-seam interior, reusing the `amr_decomp`/box-intersection machinery); do the same for the
-     subcycle path. The old within-block `s_mpi_sendrecv_amr_fine_halo` (now dead) is the template.
-   - **3/3 TODO — reflux seam-exclusion.** A sub-block face shared with another fine sub-block is fine-fine, not c/f:
-     exclude it from `s_amr_reflux_face_flags` `own_lo/own_hi` (else the subcycle state-reflux corrupts the neighbour's
-     restriction-overwritten cell). Detect via the replicated block list (outside cell is inside another block).
-   Validate: tiled np=2 conserves; existing 2-rank goldens (BD21A5C0, 5EFB3277, 79B334C7) pass (they pass on up/mega).
-2. **QBMM pb/mv** gather/scatter for np≥2 (still local; np≥2 QBMM+AMR ungated/untested — gate or scatter).
-3. Minor: the P2P routines scan all `num_procs` to find participants (integer-only, O(P) per block per stage);
-   patch-only device transfers instead of whole-field host round-trips (GPU only); own-only slot allocation.
+1. **Block-splitting / tiling** (the coverage gap) — DONE.
+   - **Tiling**: `s_amr_tile_box` splits any box > `amr_maxc_fit` into contiguous ≤`amr_maxc_fit` sub-blocks, wired into
+     the initial-block setup and the regrid pipeline (non-IB); `s_populate_amr_fine` loops over all blocks refreshing
+     per-block mirrors via `s_amr_select_slot`.
+   - **Block-to-block fine-fine halo**: the fine advance is three driver phases — **fill all** (gather + coarse
+     ghost-fill), **`s_amr_fine_fine_halo`** (overwrite each seam ghost with the neighbour's *stage-entry* interior,
+     buff_size-deep, `MPI_Sendrecv` between owners or a local copy when one rank owns both; adjacency from the
+     replicated `amr_region_*_all` via `f_amr_seam`), **advance all** (RHS + RK). `s_advance_amr_fine_stage` split into
+     `s_amr_fine_stage_fill` / `s_amr_fine_stage_advance`.
+   - **Reflux seam-exclusion**: `f_amr_face_is_seam` drops a sub-block face shared with another fine sub-block from
+     `s_amr_reflux_face_flags` `own_lo/own_hi` (fine-fine, not c/f).
+   - **Owner-ordering fix**: `s_amr_assign_block_owners` runs BEFORE the owner-dependent `s_set_amr_fine_geometry` in
+     init, regrid, AND restart — the stale default (rank-0) owner map otherwise sized multi-block owners wrong (only
+     surfaces once tiling makes several blocks). Restart (`s_read_amr_restart`) is a two-pass read (regions → assign →
+     place data) for both the parallel_io and non-parallel_io paths.
+2. **Regrid cross-rank fine-state migration** — DONE (the stretched-np≥2 correctness fix). The regrid overlap-copy
+   preserves a covering old block's fine detail by reading `amr_slots(kk)%q_cons_stor`, but that was local-only
+   (`if (.not. old_owns(kk)) cycle`). Under fine-level distribution an old block can be owned by a rank *other* than the
+   one now owning a covering new block, so the copy was silently skipped and the new block kept only its
+   coarse-prolonged values — **exact on uniform grids** (prolongation reproduces the fine field) but **~O(1e-4) wrong on
+   stretched grids** (prolongation is not exact). Fix: broadcast every old block's stashed fine state from its owner
+   into the replicated slot's `q_cons_stor` on all ranks (`num_procs>1`; no-op at np=1), copy the overlap from *every*
+   covering old block regardless of ownership, and take `old_ilo`/`old_ext` from the global replicated region (not the
+   owner-only isect). Correctness-first collective; a per-block P2P version mirroring `s_amr_gather_coarse_patch` is
+   future work. Validated (`-b mpirun`): 79B334C7 (1D stretched dynamic-regrid, 2 ranks) passes; F0DDE1B4 (np=1 twin),
+   5EFB3277 + BD21A5C0 (uniform np=2 tiled + restart), and the np=1 AMR batch all pass.
+
+## Known open
+
+- **B7704247** (AMR 2D stretched-y dynamic regrid, np=1) fails at abs 4.4e-11 (> 1e-12 tol) on `cons.1.00`. Isolated:
+  **not** tiling (persists with y-tiling disabled — the block stays whole), **not** the migration (np=1; migration is
+  `num_procs>1`-guarded), and it fails at the committed state too. So it is a **whole-block 2D-stretched-y** regression
+  from the earlier fine-distribution commits — the whole-block `amr_gycb` y-coordinates or the reflux redesign's y-face
+  metric on a stretched grid. Small but real; a distinct, narrower investigation, and it may also affect np≥2
+  2D-stretched.
+- **QBMM pb/mv** gather/scatter for np≥2 (still local; np≥2 QBMM+AMR ungated/untested — gate or scatter). The regrid
+  QBMM overlap-copy is still local-only (same bug class as the q_cons migration above, deferred with the rest of QBMM).
+- Minor: the P2P routines scan all `num_procs` to find participants (integer-only, O(P) per block per stage); the regrid
+  migration broadcasts (correctness-first, → P2P); patch-only device transfers instead of whole-field host round-trips
+  (GPU only); own-only slot allocation.

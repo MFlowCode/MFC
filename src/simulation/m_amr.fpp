@@ -3178,6 +3178,7 @@ contains
             type(t_box), allocatable                               :: boxes(:)
             integer                                                :: lo(3), hi(3), sh(3), old_np, k, kk
             integer                                                :: old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks)
+            integer                                                :: old_owner(amr_max_blocks)
             logical                                                :: old_owns(amr_max_blocks), any_xchg, same, merged
             integer                                                :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, i
             integer                                                :: sidx(3), tg_lo(3), tg_hi(3), nboxes
@@ -3362,8 +3363,13 @@ contains
             ! 5) stash every live slot's fine interior (dead-between-steps q_cons_stor bounce), keeping its old intersection origin
             old_np = amr_num_blocks
             do k = 1, old_np
-                old_ilo(:,k) = amr_isect_lo_all(:,k)
-                old_ext(:,k) = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
+                ! GLOBAL block origin + extents (replicated, valid on every rank - not the owner-only isect), so the cross-rank
+                ! migration below and the overlap-copy's index shift are correct even where this rank did not own the old block
+                old_ilo(:,k) = amr_region_lo_all(:,k)
+                old_ext(1, k) = 2*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
+                old_ext(2, k) = merge(2*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 0, n_glb > 0)
+                old_ext(3, k) = merge(2*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 0, p_glb > 0)
+                old_owner(k) = amr_block_owner(k)
                 old_owns(k) = amr_owns_all(k)
                 if (old_owns(k)) then
                     do i = 1, sys_size
@@ -3389,6 +3395,55 @@ contains
                 $:GPU_UPDATE(host='[pb_ts(1)%sf, mv_ts(1)%sf]')
             end if
 
+#ifdef MFC_MPI
+            ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by reading
+            ! amr_slots(kk)%q_cons_stor, but under fine-level distribution an old block may be owned by a rank OTHER than the one
+            ! now
+            ! owning a covering new block. Broadcast every old block's stashed fine state from its owner into the replicated slot's
+            ! q_cons_stor on all ranks, so the copy is correct regardless of ownership. Without this a cross-rank-covered new block
+            ! keeps only its coarse-prolonged values - exact on uniform grids but ~O(1e-4) wrong on stretched grids (prolongation is
+            ! not exact there). (Correctness-first collective; a per-block P2P version mirroring s_amr_gather_coarse_patch is future
+            ! work.) No-op at np=1 (single owner - the data is already local).
+            if (num_procs > 1) then
+                block
+                    integer               :: kk2, ii, gi, gj, gk, cnt2, idx2, ierr2
+                    real(wp), allocatable :: bcbuf(:)
+                    do kk2 = 1, old_np
+                        cnt2 = sys_size*(old_ext(1, kk2) + 1)*(old_ext(2, kk2) + 1)*(old_ext(3, kk2) + 1)
+                        allocate (bcbuf(cnt2))
+                        if (old_owns(kk2)) then
+                            idx2 = 0
+                            do ii = 1, sys_size
+                                do gk = 0, old_ext(3, kk2)
+                                    do gj = 0, old_ext(2, kk2)
+                                        do gi = 0, old_ext(1, kk2)
+                                            idx2 = idx2 + 1
+                                            bcbuf(idx2) = real(amr_slots(kk2)%q_cons_stor(ii)%sf(gi, gj, gk), wp)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end if
+                        call MPI_Bcast(bcbuf, cnt2, mpi_p, old_owner(kk2), MPI_COMM_WORLD, ierr2)
+                        if (.not. old_owns(kk2)) then
+                            idx2 = 0
+                            do ii = 1, sys_size
+                                do gk = 0, old_ext(3, kk2)
+                                    do gj = 0, old_ext(2, kk2)
+                                        do gi = 0, old_ext(1, kk2)
+                                            idx2 = idx2 + 1
+                                            amr_slots(kk2)%q_cons_stor(ii)%sf(gi, gj, gk) = real(bcbuf(idx2), stp)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                        end if
+                        deallocate (bcbuf)
+                    end do
+                end block
+            end if
+#endif
+
             ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
             amr_num_blocks = nboxes
             any_xchg = .false.
@@ -3410,8 +3465,9 @@ contains
                 call s_amr_gather_coarse_patch(q_cons_base, .false.)
                 if (.not. amr_rank_owns_block) cycle
                 call s_interpolate_coarse_to_fine()
+                ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy
+                ! the overlap from EVERY covering old block regardless of who owned it - sh is the old->new LOCAL fine index shift
                 do kk = 1, old_np
-                    if (.not. old_owns(kk)) cycle
                     sh = 2*(amr_isect_lo - old_ilo(:,kk))  ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
                     do i = 1, sys_size
                         do fk = 0, amr_slots(k)%p
