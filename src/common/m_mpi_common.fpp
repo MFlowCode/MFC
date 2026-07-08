@@ -1432,13 +1432,16 @@ contains
     !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of
     !! cell-boundary locations may be calculated directly from those of the cell-width distributions.
 #ifndef MFC_PRE_PROCESS
-    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
+    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc, offset)
 
         integer, intent(in) :: mpi_dir
         integer, intent(in) :: pbc_loc
+        !> Ghost layers for cell-boundary arrays (buff_size in simulation, module offset_* in post-process)
+        type(int_bounds_info), intent(in) :: offset
 
 #ifdef MFC_MPI
         integer :: ierr  !< Generic flag used to identify and report MPI errors
+        integer :: i
 
         if (mpi_dir == 1) then
             if (pbc_loc == -1) then  ! PBC at the beginning
@@ -1449,6 +1452,12 @@ contains
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
+                do i = 1, offset%beg
+                    x_cb(-1 - i) = x_cb(-i) - dx(-i)
+                end do
+                do i = 1, buff_size
+                    x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
+                end do
             else  ! PBC at the end
                 if (bc_x%beg >= 0) then  ! PBC at the end and beginning
                     call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
@@ -1457,6 +1466,12 @@ contains
                     call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
                                       & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
+                do i = 1, offset%end
+                    x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
+                end do
+                do i = 1, buff_size
+                    x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
+                end do
             end if
         else if (mpi_dir == 2) then
             if (pbc_loc == -1) then  ! PBC at the beginning
@@ -1467,6 +1482,12 @@ contains
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
+                do i = 1, offset%beg
+                    y_cb(-1 - i) = y_cb(-i) - dy(-i)
+                end do
+                do i = 1, buff_size
+                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
+                end do
             else  ! PBC at the end
                 if (bc_y%beg >= 0) then  ! PBC at the end and beginning
                     call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
@@ -1475,6 +1496,12 @@ contains
                     call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
                                       & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
+                do i = 1, offset%end
+                    y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
+                end do
+                do i = 1, buff_size
+                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
+                end do
             end if
         else
             if (pbc_loc == -1) then  ! PBC at the beginning
@@ -1485,6 +1512,12 @@ contains
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
                                       & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
+                do i = 1, offset%beg
+                    z_cb(-1 - i) = z_cb(-i) - dz(-i)
+                end do
+                do i = 1, buff_size
+                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
+                end do
             else  ! PBC at the end
                 if (bc_z%beg >= 0) then  ! PBC at the end and beginning
                     call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
@@ -1493,6 +1526,12 @@ contains
                     call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
                                       & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
                 end if
+                do i = 1, offset%end
+                    z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
+                end do
+                do i = 1, buff_size
+                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
+                end do
             end if
         end if
 #endif
