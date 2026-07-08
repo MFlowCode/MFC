@@ -59,8 +59,22 @@ Multi-level replaces "coarse = L0" with "**the coarse side of level `l+1` is lev
      (`prolong → restrict` conserves) is the first testable milestone and can skip coords.
    `s_set_amr_fine_geometry` and `s_amr_gather_coarse_patch` choose this frame; each gains a
    `level == 1 ? L0 : parent-fine` branch.
-3. **Recursive subcycle driver.** Generalize the `m_time_steppers` AMR advance into a
-   recursive `advance(level)` with per-level `dt` and time-interpolated coarse ghosts.
+3. **Advance (make level-2 evolve).** 2b built the coupling *into* a level-2 block
+   (gather-from-parent, prolong); this builds the coupling *out* of it plus the driver:
+   - **restrict-to-parent** — level-aware `s_restrict_fine_to_coarse` folds a level-2 block's
+     fine averages back into its parent L1 block's fine array (mirror of gather-from-parent,
+     same parent-fine frame);
+   - **reflux-to-parent** — the Berger-Colella C/F flux correction from L2 into L1's cells
+     (the reflux registers key off "the coarse", which becomes level l-1);
+   - a **persistent static L2 block** (replacing the non-intrusive self-test), and a
+     **level-loop driver** in `m_time_steppers`: for level 1..maxlevel, fill+advance from the
+     parent then restrict+reflux to it.
+   Both restrict-to-parent and reflux-to-parent are required for conservation.
+   **Lock-step first** (all levels advance at L0's `dt`, interleaved per RK stage — extends
+   today's non-subcycle mode; no time-interpolation/recursion): first milestone is a np=1
+   static 2-level case that runs several steps and conserves (~1e-13). **Then** add recursive
+   subcycling (level l+1 takes `ref_ratio` substeps with time-interpolated ghosts) on top,
+   generalizing `s_advance_amr_fine_substeps` (already Berger-Colella for L0↔L1).
 4. **Per-level regrid + proper nesting.** Tag each level for the next-finer one; build level
    `l+1` boxes clustered + tiled + nested inside level `l`; distribute (reusing the SFC map).
 5. **Restart / distribution / GPU per level.** Extend the fine-restart record with a per-block
