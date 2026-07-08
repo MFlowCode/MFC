@@ -85,6 +85,13 @@ module m_amr
     type(t_level), allocatable :: amr_slots(:)
     integer                    :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
+    !> Per-slot field-array sizing (module-scope so s_amr_alloc_slot/s_amr_free_slot, called from init/regrid/restart/finalize, see
+    !! them): max fine cells per dim (2*maxc_loc-1) and the buffered array bounds. amr_slot_live(k) tracks whether slot k's
+    !! per-block field arrays are currently allocated - lazy owned-only sizing keeps a rank's fine memory ~1/num_procs of the pool.
+    integer              :: max_f1, max_f2, max_f3
+    integer              :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
+    logical, allocatable :: amr_slot_live(:)
+
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min over ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
     !! 2*(isect cells) - 1 <= local extent holds by construction. Equals amr_maxc at np=1.
@@ -160,8 +167,7 @@ contains
     !! (sys_size/buff_size set). Preallocates all fine arrays at max size so regrid only needs to call s_set_amr_fine_geometry.
     impure subroutine s_initialize_amr_module()
 
-        integer :: i, d, max_f1, max_f2, max_f3, islot
-        integer :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
+        integer :: i, d, islot
         integer :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
         integer :: blk_lo(3), blk_hi(3)
 
@@ -324,64 +330,16 @@ contains
                              & // 'position-to-cell-index conversions assume uniform spacing')
         end if
 
-        ! preallocate every slot at max buffered extents (each sized exactly as the single legacy block): coords (host) +
-        ! fields (device-resident @:ALLOCATE so s_compute_rhs kernels can run on the fine block; q_cons/q_prim/rhs get the
-        ! Cray pointer setup mirroring m_time_steppers' field vectors). Loops always use the current slot's m/n/p.
+        ! per-slot field arrays are allocated by s_amr_alloc_slot / freed by s_amr_free_slot (sized to the max buffered block).
+        ! Increment 1 allocates every slot here (bit-identical to the old inline loop); the lazy owned-only reconcile that keeps a
+        ! rank's fine memory ~1/num_procs of the pool follows. The QBMM RHS scratch (amr_rhs_pb_f/mv_f) is single - allocate once.
+        allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
+        if (qbmm .and. .not. polytropic) then
+            @:ALLOCATE(amr_rhs_pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
+            @:ALLOCATE(amr_rhs_mv_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
+        end if
         do islot = 1, amr_max_blocks
-            amr_slots(islot)%ref_ratio = 2
-            amr_slots(islot)%buff_size = buff_size
-            allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
-            if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), &
-                & amr_slots(islot)%dy(0:max_f2))
-            if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), &
-                & amr_slots(islot)%dz(0:max_f3))
-            @:ALLOCATE(amr_slots(islot)%q_cons(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%q_cons_stor(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%q_ghost_a(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%q_ghost_b(1:sys_size))
-            do i = 1, sys_size
-                @:ALLOCATE(amr_slots(islot)%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                ! ghost-inclusive (mbuf) like q_cons/q_prim: the fine advance widens idwint to the buffer, so the cell-local
-                ! chemistry reaction source writes rhs over the ghost shell too (the RK update and reflux read only 0:m interior)
-                ! IGR writes its rhs over -1:m+1 per dim INCLUDING collapsed ones (the coarse
-                ! rhs_vf is allocated (-1:m+1,-1:n+1,-1:p+1) under igr); the buffered fine
-                ! extents already cover -1:+1 in active dims, collapsed dims need the widening
-                if (igr) then
-                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
-                               & -1):max(mbuf3_hi, 1)))
-                else
-                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                end if
-                @:ALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_cons_stor(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_a(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_b(i))
-            end do
-            if (qbmm .and. .not. polytropic) then
-                #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
-                    @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                    @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
-                #:endfor
-                if (islot == 1) then
-                    @:ALLOCATE(amr_rhs_pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                    @:ALLOCATE(amr_rhs_mv_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                end if
-                if (amr_subcycle) then
-                    #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
-                        @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, &
-                                   & 1:nb))
-                        @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
-                    #:endfor
-                end if
-            end if
+            call s_amr_alloc_slot(islot)
         end do
 
         ! fine-level distribution: coarse-patch gather buffer (see decl). Sized to the largest block's coarse footprint
@@ -4137,48 +4095,118 @@ contains
 
         end function minmod
 
+        !> Allocate slot islot's per-block field arrays (coords + the 6 device-resident field vectors + non-poly QBMM side-state),
+        !! sized to the max buffered block - mirrors the old init inline loop. Idempotent (no-op if already live). The single QBMM
+        !! RHS scratch amr_rhs_pb_f/mv_f and the global amr_cg/amr_decomp are NOT per-slot and stay in init/finalize.
+        impure subroutine s_amr_alloc_slot(islot)
+
+            integer, intent(in) :: islot
+            integer             :: i
+
+            if (amr_slot_live(islot)) return
+            amr_slots(islot)%ref_ratio = 2
+            amr_slots(islot)%buff_size = buff_size
+            allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
+            if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), &
+                & amr_slots(islot)%dy(0:max_f2))
+            if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), &
+                & amr_slots(islot)%dz(0:max_f3))
+            @:ALLOCATE(amr_slots(islot)%q_cons(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%q_cons_stor(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%q_ghost_a(1:sys_size))
+            @:ALLOCATE(amr_slots(islot)%q_ghost_b(1:sys_size))
+            do i = 1, sys_size
+                @:ALLOCATE(amr_slots(islot)%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                ! rhs is ghost-inclusive (mbuf); igr widens to -1:+1 per dim including collapsed ones (coarse rhs_vf is -1:m+1 etc.)
+                if (igr) then
+                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
+                               & -1):max(mbuf3_hi, 1)))
+                else
+                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                end if
+                @:ALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_cons_stor(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_a(i))
+                @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_b(i))
+            end do
+            if (qbmm .and. .not. polytropic) then
+                #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
+                    @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
+                    @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
+                #:endfor
+                if (amr_subcycle) then
+                    #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
+                        @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, &
+                                   & 1:nb))
+                        @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
+                    #:endfor
+                end if
+            end if
+            amr_slot_live(islot) = .true.
+
+        end subroutine s_amr_alloc_slot
+
+        !> Free slot islot's per-block field arrays (inverse of s_amr_alloc_slot). Idempotent (no-op if not live).
+        impure subroutine s_amr_free_slot(islot)
+
+            integer, intent(in) :: islot
+            integer             :: i
+
+            if (.not. amr_slot_live(islot)) return
+            do i = 1, sys_size
+                @:DEALLOCATE(amr_slots(islot)%q_cons(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf)
+                @:DEALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf)
+            end do
+            @:DEALLOCATE(amr_slots(islot)%q_cons)
+            @:DEALLOCATE(amr_slots(islot)%q_cons_stor)
+            @:DEALLOCATE(amr_slots(islot)%q_prim)
+            @:DEALLOCATE(amr_slots(islot)%rhs)
+            @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
+            @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
+            if (qbmm .and. .not. polytropic) then
+                @:DEALLOCATE(amr_slots(islot)%pb_f%sf)
+                @:DEALLOCATE(amr_slots(islot)%mv_f%sf)
+                @:DEALLOCATE(amr_slots(islot)%pb_stor%sf)
+                @:DEALLOCATE(amr_slots(islot)%mv_stor%sf)
+                if (amr_subcycle) then
+                    @:DEALLOCATE(amr_slots(islot)%pb_ghost_a%sf)
+                    @:DEALLOCATE(amr_slots(islot)%mv_ghost_a%sf)
+                    @:DEALLOCATE(amr_slots(islot)%pb_ghost_b%sf)
+                    @:DEALLOCATE(amr_slots(islot)%mv_ghost_b%sf)
+                end if
+            end if
+            if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
+            if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)
+            if (allocated(amr_slots(islot)%z_cb)) deallocate (amr_slots(islot)%z_cb, amr_slots(islot)%z_cc, amr_slots(islot)%dz)
+            amr_slot_live(islot) = .false.
+
+        end subroutine s_amr_free_slot
+
         impure subroutine s_finalize_amr_module()
 
             integer :: i, islot
 
             if (.not. amr) return
             do islot = 1, amr_max_blocks
-                do i = 1, sys_size
-                    @:DEALLOCATE(amr_slots(islot)%q_cons(i)%sf)
-                    @:DEALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf)
-                    @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
-                    @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
-                    @:DEALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf)
-                    @:DEALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf)
-                end do
-                @:DEALLOCATE(amr_slots(islot)%q_cons)
-                @:DEALLOCATE(amr_slots(islot)%q_cons_stor)
-                @:DEALLOCATE(amr_slots(islot)%q_prim)
-                @:DEALLOCATE(amr_slots(islot)%rhs)
-                @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
-                @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
-                if (qbmm .and. .not. polytropic) then
-                    @:DEALLOCATE(amr_slots(islot)%pb_f%sf)
-                    @:DEALLOCATE(amr_slots(islot)%mv_f%sf)
-                    @:DEALLOCATE(amr_slots(islot)%pb_stor%sf)
-                    @:DEALLOCATE(amr_slots(islot)%mv_stor%sf)
-                    if (islot == 1) then
-                        @:DEALLOCATE(amr_rhs_pb_f)
-                    end if
-                    if (islot == 1) then
-                        @:DEALLOCATE(amr_rhs_mv_f)
-                    end if
-                    if (amr_subcycle) then
-                        @:DEALLOCATE(amr_slots(islot)%pb_ghost_a%sf)
-                        @:DEALLOCATE(amr_slots(islot)%mv_ghost_a%sf)
-                        @:DEALLOCATE(amr_slots(islot)%pb_ghost_b%sf)
-                        @:DEALLOCATE(amr_slots(islot)%mv_ghost_b%sf)
-                    end if
-                end if
-                if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
-                if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)
-                if (allocated(amr_slots(islot)%z_cb)) deallocate (amr_slots(islot)%z_cb, amr_slots(islot)%z_cc, amr_slots(islot)%dz)
+                call s_amr_free_slot(islot)
             end do
+            if (qbmm .and. .not. polytropic) then
+                @:DEALLOCATE(amr_rhs_pb_f)
+                @:DEALLOCATE(amr_rhs_mv_f)
+            end if
+            deallocate (amr_slot_live)
             do i = 1, sys_size
                 @:DEALLOCATE(amr_cg(i)%sf)
             end do
