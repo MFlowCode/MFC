@@ -687,7 +687,46 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! The atomic capture above assigns array slots in thread-completion order, so the ghost-point
+        ! LIST order is nondeterministic on the GPU and differs from the CPU's serial (loop) order. Any
+        ! order-sensitive consumer downstream (e.g. the surface-force reduction) then produces a
+        ! backend-dependent result, which the discrete image-point stencil amplifies -> the moving
+        ! AMR-IB golden diverges across backends. (This is why only moving AMR-IB is affected: static
+        ! AMR-IB and non-AMR moving IB never rebuild the list on-device per substep.) Sort the list into
+        ! a deterministic lexicographic (i,j,k) cell order on the host so every backend iterates
+        ! identically; num_gps is O(1e2), so the round-trip is negligible.
+        $:GPU_UPDATE(host='[ghost_points_in]')
+        call s_sort_ghost_points_by_loc(ghost_points_in, num_gps)
+        $:GPU_UPDATE(device='[ghost_points_in]')
+
     end subroutine s_find_ghost_points
+
+    !> Sort the ghost-point list into a deterministic lexicographic (loc(1), loc(2), loc(3)) cell order. Insertion sort on the host
+    !! (num_gps is O(1e2)); makes the on-device parallel search's slot order backend-independent so downstream order-sensitive
+    !! operations are reproducible.
+    pure subroutine s_sort_ghost_points_by_loc(gps, n)
+
+        integer, intent(in)                            :: n
+        type(ghost_point), dimension(n), intent(inout) :: gps
+        type(ghost_point)                              :: tmp
+        integer                                        :: a, b
+        logical                                        :: less
+
+        do a = 2, n
+            tmp = gps(a)
+            b = a - 1
+            do
+                if (b < 1) exit
+                less = tmp%loc(1) < gps(b)%loc(1) .or. (tmp%loc(1) == gps(b)%loc(1) .and. (tmp%loc(2) < gps(b)%loc(2) &
+                               & .or. (tmp%loc(2) == gps(b)%loc(2) .and. tmp%loc(3) < gps(b)%loc(3))))
+                if (.not. less) exit
+                gps(b + 1) = gps(b)
+                b = b - 1
+            end do
+            gps(b + 1) = tmp
+        end do
+
+    end subroutine s_sort_ghost_points_by_loc
 
     !> Compute the interpolation coefficients for image points
     subroutine s_compute_interpolation_coeffs(ghost_points_in)
