@@ -330,12 +330,16 @@ contains
     !! distributions, based on the boundary conditions.
     subroutine s_populate_grid_variables_buffers
 
-        integer               :: i
+#ifdef MFC_SIMULATION
+        ! Simulation allocates the cell-boundary arrays with buff_size ghost layers, so the
+        ! ghost extrapolation extends over the full buffer. In post-process the module-level
+        ! offset_x/y/z (which the x_cb/y_cb/z_cb allocations are sized to) are used instead.
         type(int_bounds_info) :: offset_x, offset_y, offset_z
 
         offset_x%beg = buff_size; offset_x%end = buff_size
         offset_y%beg = buff_size; offset_y%end = buff_size
         offset_z%beg = buff_size; offset_z%end = buff_size
+#endif
 
 #ifndef MFC_PRE_PROCESS
         call s_populate_grid_bc_direction(1, -1, bc_x, offset_x)
@@ -373,7 +377,7 @@ contains
         end if
 
         if (bc_edge >= 0) then
-            call s_mpi_sendrecv_grid_variables_buffers(bc_dir, bc_loc)
+            call s_mpi_sendrecv_grid_variables_buffers(bc_dir, bc_loc, offset_dir)
             return
         end if
 
