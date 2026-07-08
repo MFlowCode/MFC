@@ -546,7 +546,8 @@ VALIDATE_COMMAND = Command(
     positionals=[
         Positional(
             name="input",
-            help="Path to case file to validate.",
+            help="Path(s) to case file(s) to validate. Multiple files validate in one process (used by precheck).",
+            nargs="+",
             completion=Completion(type=CompletionType.FILES_PY),
         ),
     ],

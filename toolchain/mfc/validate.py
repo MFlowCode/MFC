@@ -12,9 +12,58 @@ from .run import input as run_input
 from .state import ARG
 
 
+def _validate_batch(inputs):
+    """Load + constraint-validate many case files in ONE process. Used by precheck to validate every example
+    case without re-paying the mfc.sh/venv bootstrap per case (the serial per-case './mfc.sh validate' loop
+    was ~90% bootstrap overhead). Only a load/parse failure fails the command - constraint issues are warnings -
+    matching the historical per-file exit behavior (a single './mfc.sh validate' exits non-zero only on load error).
+    Cases with constraint issues are still surfaced (listed in the summary) so the batched output is not misleading."""
+    failed = []
+    with_issues = []
+    for c in inputs:
+        if not os.path.isfile(c):
+            failed.append(c)
+            continue
+        try:
+            case = run_input.load(c, do_print=False)
+        except MFCException:
+            failed.append(c)
+            continue
+        had_issue = False
+        for stage in ("pre_process", "simulation", "post_process"):
+            try:
+                if CaseValidator(case.params).validate(stage):  # non-empty -> warnings
+                    had_issue = True
+            except CaseConstraintError:
+                had_issue = True  # constraint violation is a warning here, not a load failure
+        if had_issue:
+            with_issues.append(c)
+    n = len(inputs)
+    if failed:
+        cons.print(f"[bold red]✗ {len(failed)}/{n} case(s) failed to load:[/bold red]")
+        for c in failed:
+            cons.print(f"    {c}")
+        sys.exit(1)
+    if with_issues:
+        cons.print(f"[bold green]✓[/bold green] Validated {n} case(s): all loaded " f"([yellow]{len(with_issues)} with constraint issues[/yellow]; " f"run './mfc.sh validate <case>' for details):")
+        for c in with_issues:
+            cons.print(f"    [yellow]⚠[/yellow] {c}")
+    else:
+        cons.print(f"[bold green]✓[/bold green] Validated {n} case(s): all loaded, no constraint issues.")
+
+
 def validate():
-    """Validate a case file without building or running."""
-    input_file = ARG("input")
+    """Validate one or more case files without building or running."""
+    inputs = ARG("input")
+    if isinstance(inputs, str):
+        inputs = [inputs]
+    if len(inputs) > 1:
+        if ARG("migrate"):  # --migrate rewrites a file in place; only meaningful one case at a time
+            cons.print("[bold red]Error:[/bold red] --migrate operates on a single case file at a time.")
+            sys.exit(1)
+        _validate_batch(inputs)
+        return
+    input_file = inputs[0]
 
     if not os.path.isfile(input_file):
         cons.print(f"[bold red]Error:[/bold red] File not found: {input_file}")
