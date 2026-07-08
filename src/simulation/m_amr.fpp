@@ -1310,6 +1310,32 @@ contains
             end do
             deallocate (scratch)
             print '(A,I0,A,ES12.4)', ' [amr] MULTILEVEL self-test (L2 block ', L2, '): restrict-prolong conservation err = ', err
+            ! restrict-to-parent (increment 3 step 1): fold L2 back into the parent block; the covered cells must be UNCHANGED
+            ! (restrict(prolong) = identity), which exercises s_amr_restrict_to_parent via s_restrict_fine_to_coarse.
+            block
+                real(wp)               :: err2, e2
+                real(stp), allocatable :: psave(:,:,:,:)
+                allocate (psave(amr_isect_lo(1):amr_isect_hi(1),amr_isect_lo(2):amr_isect_hi(2),amr_isect_lo(3):amr_isect_hi(3), &
+                          & 1:sys_size))
+                do i = 1, sys_size
+                    psave(:,:,:,i) = amr_slots(1)%q_cons(i)%sf(amr_isect_lo(1):amr_isect_hi(1),amr_isect_lo(2):amr_isect_hi(2), &
+                          & amr_isect_lo(3):amr_isect_hi(3))
+                end do
+                call s_restrict_fine_to_coarse(amr_slots(1)%q_cons)  ! coarse_tgt ignored for level>=2 (folds into the parent)
+                err2 = 0._wp
+                do i = 1, sys_size
+                    do ck = amr_isect_lo(3), amr_isect_hi(3)
+                        do cj = amr_isect_lo(2), amr_isect_hi(2)
+                            do ci = amr_isect_lo(1), amr_isect_hi(1)
+                                e2 = abs(real(psave(ci, cj, ck, i), wp) - real(amr_slots(1)%q_cons(i)%sf(ci, cj, ck), wp))
+                                if (e2 > err2) err2 = e2
+                            end do
+                        end do
+                    end do
+                end do
+                deallocate (psave)
+                print '(A,ES12.4)', ' [amr] MULTILEVEL self-test: restrict-to-parent identity err     = ', err2
+            end block
         end if
         call s_amr_free_slot(L2)
         amr_block_level(L2) = 1; amr_num_blocks = n1; amr_num_levels = 1
@@ -1368,6 +1394,15 @@ contains
         integer, allocatable :: reqs(:), drank(:)
 
         if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_tic()
+
+        ! multi-level: a level>=2 block folds back into its PARENT block's fine array (the coarse side of level l is level l-1),
+        ! not the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. np=1 local; np>=2 P2P
+        ! TODO.
+        if (amr_block_level(amr_cur) >= 2) then
+            if (amr_rank_owns_block) call s_amr_restrict_to_parent()
+            if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
+            return
+        end if
 
         ! whole-block-per-rank fold-back: the block owner restricts its fine block to coarse averages over the covered cells
         ! [region_lo:region_hi] and SCATTERS them POINT-TO-POINT to the coarse-cell owners - the owner overwrites the covered
@@ -1485,6 +1520,23 @@ contains
         if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
+
+    !> Multi-level restriction: fold the current level>=2 block's fine averages back into its PARENT block's fine array over the
+    !! covered cells. Same child-sum kernel as the L0 fold-back, targeted at the parent in the parent-fine frame (amr_isect is
+    !! already parent-fine; offset 0 = the parent's local fine indexing). np=1 local; the np>=2 P2P scatter is future work.
+    impure subroutine s_amr_restrict_to_parent()
+
+        integer :: pblk, rr, nchild, dj_hi, dk_hi
+
+        pblk = f_amr_parent_block(amr_cur)
+        rr = amr_slots(amr_cur)%ref_ratio
+        nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
+        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
+        if (amr_isect_lo(1) <= amr_isect_hi(1) .and. amr_isect_lo(2) <= amr_isect_hi(2) .and. amr_isect_lo(3) <= amr_isect_hi(3)) &
+            & call s_amr_restrict_overwrite_device(amr_slots(pblk)%q_cons, amr_slots(amr_cur)%q_cons, amr_isect_lo, amr_isect_hi, &
+            & 0, 0, 0, amr_isect_lo, rr, dj_hi, dk_hi, nchild)
+
+    end subroutine s_amr_restrict_to_parent
 
     !> Rank r's coarse INTERIOR box (global) from the replicated amr_decomp table (no ghosts). Covered coarse cells are in-domain,
     !! so restriction targets are identified by interior overlap alone.
