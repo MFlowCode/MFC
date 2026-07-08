@@ -164,7 +164,7 @@ module m_amr
 contains
 
     !> Build the static refined level-1 block. No-op unless amr. Called after level-0 grid (x_cb/dx ready) and time-steppers
-    !! (sys_size/buff_size set). Preallocates all fine arrays at max size so regrid only needs to call s_set_amr_fine_geometry.
+    !! (sys_size/buff_size set). Per-slot fine arrays are allocated lazily (s_amr_reconcile_slots) - only the blocks a rank owns.
     impure subroutine s_initialize_amr_module()
 
         integer :: i, d, islot
@@ -338,9 +338,8 @@ contains
             @:ALLOCATE(amr_rhs_pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
             @:ALLOCATE(amr_rhs_mv_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
         end if
-        do islot = 1, amr_max_blocks
-            call s_amr_alloc_slot(islot)
-        end do
+        ! per-slot field arrays are allocated lazily by s_amr_reconcile_slots once ownership is known (after the block setup +
+        ! s_amr_assign_block_owners below), so a rank holds only its owned blocks' fine arrays - not all amr_max_blocks slots.
 
         ! fine-level distribution: coarse-patch gather buffer (see decl). Sized to the largest block's coarse footprint
         ! (block coarse cells + 2*nmar halo, block-local frame). Device-mapped so the runtime ghost-fill reads it on the owner.
@@ -400,6 +399,7 @@ contains
                 amr_region_lo_all(:,kk) = tiled(kk)%lo; amr_region_hi_all(:,kk) = tiled(kk)%hi
             end do
             call s_amr_assign_block_owners()  ! Phase 1: compute + report the fine-dist map
+            call s_amr_reconcile_slots()  ! allocate this rank's owned initial blocks (owner-guarded geometry writes below)
             do kk = 1, nt
                 amr_cur = kk
                 call s_set_amr_fine_geometry(tiled(kk)%lo, tiled(kk)%hi)
@@ -3440,6 +3440,10 @@ contains
                             end do
                         end if
                     end do
+                    ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the reconcile below)
+                    do kk = 1, old_np
+                        if (getk(kk)) call s_amr_alloc_slot(kk)
+                    end do
                     allocate (rq(old_np*num_procs), spack(max(maxcnt, 1), old_np), rpack(max(maxcnt, 1), old_np))
                     nrq = 0
                     do kk = 1, old_np  ! post receives for the old blocks I need
@@ -3498,6 +3502,7 @@ contains
             if (proc_rank == 0) print '(A,I0,A)', ' [amr] regrid: ', nboxes, ' block(s)'
             do k = 1, nboxes
                 amr_cur = k
+                if (amr_block_owner(k) == proc_rank) call s_amr_alloc_slot(k)  ! owned slot needs its arrays before geometry/prolong
                 call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
                 any_xchg = any_xchg .or. amr_xchg_coarse_ghosts
                 if (proc_rank == 0) print '(A,I0,A,I0,A,I0,A,I0,A)', ' [amr]   block ', k, ': box x ', boxes(k)%lo(1), ':', &
@@ -3557,6 +3562,9 @@ contains
                 ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
             end do
             amr_xchg_coarse_ghosts = any_xchg  ! coarse halo exchanged once per step if ANY block needs it
+            ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
+            ! new-owned slots were allocated in the build loop, so this only frees - a rank keeps just its owned blocks' fine arrays
+            call s_amr_reconcile_slots()
             ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/
             ! image points recomputed from the body definitions; no state carries across regrids)
             if (ib) call s_amr_setup_ib()
@@ -3772,6 +3780,8 @@ contains
                             & n_glb > 0) .or. rp /= merge(2*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
                             call s_mpi_abort('amr restart: block fine extents disagree with the region (corrupt file)')
                         end if
+                        ! serial (same rank count): had_data == this run's ownership, so this is the owned slot
+                        call s_amr_alloc_slot(k)
                         do i = 1, sys_size
                             read (2) amr_slots(k)%q_cons(i)%sf(0:rm,0:rn,0:rp)
                         end do
@@ -3781,6 +3791,7 @@ contains
                 ! PASS 2: rebuild whole-block owners from the regions, then each block's geometry under the
                 ! correct owner; verify the data read (write-owner) matches who owns the block in this run
                 call s_amr_assign_block_owners()
+                call s_amr_reconcile_slots()  ! free any init slots not in the restart set (had_data slots stay: they are owned)
                 do k = 1, amr_num_blocks
                     amr_cur = k
                     call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
@@ -3844,6 +3855,7 @@ contains
                 ! PASS 2: rebuild whole-block owners from the regions, then per block build geometry under the
                 ! correct owner, validate the writer's layout, and read this rank's owned slice at its offset.
                 call s_amr_assign_block_owners()
+                call s_amr_reconcile_slots()  ! allocate this run's owned blocks (frees any stale init slots) before the read below
                 do k = 1, amr_num_blocks
                     amr_cur = k
                     call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
@@ -4193,6 +4205,27 @@ contains
             amr_slot_live(islot) = .false.
 
         end subroutine s_amr_free_slot
+
+        !> Reconcile the allocated per-slot field arrays to the CURRENT ownership: allocate every active block this rank owns, free
+        !! everything else. Call after ownership is set (init/regrid/restart). A rank ends holding only its owned blocks' fine
+        !! arrays (~amr_num_blocks/num_procs of the pool), not all amr_max_blocks. Regrid must alloc its transient (received/old)
+        !! slots BEFORE calling this, since it frees anything not currently owned.
+        impure subroutine s_amr_reconcile_slots()
+
+            integer :: k
+            logical :: needed
+
+            do k = 1, amr_max_blocks
+                needed = k <= amr_num_blocks
+                if (needed) needed = amr_block_owner(k) == proc_rank
+                if (needed) then
+                    call s_amr_alloc_slot(k)
+                else
+                    call s_amr_free_slot(k)
+                end if
+            end do
+
+        end subroutine s_amr_reconcile_slots
 
         impure subroutine s_finalize_amr_module()
 
