@@ -187,6 +187,13 @@ contains
         amr_num_blocks = 1
         amr_cur = 1
 
+        ! fine-level load balance is capped at min(num blocks, amr_max_blocks) ranks: the SFC map spreads whole blocks, so with
+        ! fewer blocks than ranks some ranks own no fine work. Warn when the pool itself is the limit (raise amr_max_blocks).
+        if (proc_rank == 0 .and. num_procs > amr_max_blocks) then
+            print '(A,I0,A,I0,A)', ' [amr] WARNING: amr_max_blocks (', amr_max_blocks, ') < num_procs (', num_procs, &
+                & '): the fine level can occupy at most amr_max_blocks ranks - raise amr_max_blocks for better fine-level balance'
+        end if
+
         ! Mirror decomposition: each rank holds the fine cells covering block /\ its own subdomain
         ! (np=1: the intersection is the whole block). buff_size is not available at checker time,
         ! so the geometric aborts below must live here.
