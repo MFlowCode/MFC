@@ -894,12 +894,14 @@ contains
         call s_populate_grid_variables_buffers()
 
         call s_initialize_amr_module()
-        call s_initialize_amr_registers()
+        call s_initialize_amr_registers(amr_maxc_fit)
         call s_amr_operator_checks()
         ! restarts restore the saved (possibly regridded) box and fine state; otherwise prolong from coarse
         call s_read_amr_restart(amr_restored)
         if (.not. amr_restored) call s_populate_amr_fine(q_cons_ts(1)%vf)
-        call s_amr_conservation_check(q_cons_ts(1)%vf)
+        ! the restrict-prolong check reads the gathered coarse patch amr_cg that s_populate_amr_fine just built; on a restart
+        ! s_populate is skipped (fine state is restored, not prolonged), so the check is both inapplicable and unarmed
+        if (.not. amr_restored) call s_amr_conservation_check(q_cons_ts(1)%vf)
         call s_amr_conservation_defect(q_cons_ts(1)%vf, .false.)
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)

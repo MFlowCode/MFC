@@ -17,12 +17,12 @@ module m_amr
     use m_global_parameters
     use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
-    use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers, s_mpi_sendrecv_amr_fine_halo
+    use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, s_mpi_allreduce_min, &
-        & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers
+        & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k
-    use m_amr_registers, only: s_amr_zero_fine_registers
+    use m_amr_registers, only: s_amr_zero_fine_registers, freg
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps
@@ -36,11 +36,11 @@ module m_amr
     implicit none
 
     private
-    public :: t_level, amr_maxc, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
+    public :: t_level, amr_maxc, amr_maxc_fit, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
         & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_advance_amr_fine_substeps, &
         & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, &
-        & s_amr_relax_fine, s_amr_setup_ib, s_amr_check_active_box_containment
+        & s_amr_relax_fine, s_amr_setup_ib, s_amr_check_active_box_containment, s_amr_p2p_reflux_faces
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -119,6 +119,10 @@ module m_amr
     !! under stretching) and restored after. False on fully uniform grids - the recompute is skipped and behavior is bit-identical.
     logical :: amr_weno_coef_recompute = .false.
     logical :: amr_grid_stretched = .false.  !< stretched coarse spacing (beyond the axisym axis half-cell; set at init)
+    !> Persistent GLOBAL coarse cell-boundary arrays (indices -1:X_glb), assembled once at init. The fine-distribution owner
+    !! reconstructs whole-block fine coordinates from these (its fine cells cover coarse cells it does not own the coordinate slice
+    !! for). Exact on any grid.
+    real(wp), allocatable :: amr_gxcb(:), amr_gycb(:), amr_gzcb(:)
     real(wp), allocatable :: sw_x_cb(:), sw_x_cc(:), sw_dx(:)
     real(wp), allocatable :: sw_y_cb(:), sw_y_cc(:), sw_dy(:)
     real(wp), allocatable :: sw_z_cb(:), sw_z_cc(:), sw_dz(:)
@@ -130,6 +134,24 @@ module m_amr
     !! only PRIM ghosts, so the CONS ghosts the fill prolongs from must be halo-exchanged first. Never true at np=1 (block faces sit
     !! >= buff_size inside the domain).
     logical :: amr_xchg_coarse_ghosts = .false.
+
+    !> Per-block gathered coarse patch (fine-level distribution). The block owner may not hold the coarse cells its block refines,
+    !! so before each prolongation/ghost-fill the coarse patch spanning region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full
+    !! coarse-cell reach of every prolongation stencil) is gathered here POINT-TO-POINT from the coarse-owners (s_amr_gather_coarse_
+    !! patch). Stored in amr_cg as stp scalar_fields (a drop-in for the coarse q_cons in the prolong/ghost-fill kernels) in a
+    !! block-LOCAL frame: amr_cg cell 0 is GLOBAL coarse cell amr_cpat_off(d). Messages carry wp, cast to stp (identity for stp
+    !! coarse), so at np=1 (owner copies its own coarse) the patch equals the local coarse read bit-for-bit. Sized to the largest
+    !! block.
+    type(scalar_field), allocatable :: amr_cg(:)
+    integer                         :: amr_cpat_mar = 0     !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
+    integer                         :: amr_cpat_hi(3) = 0   !< amr_cg upper local bounds per dim (0 in collapsed dims)
+    integer                         :: amr_cpat_off(3) = 0  !< GLOBAL coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar)
+
+    !> Replicated coarse-decomposition table (fine-level distribution, point-to-point coupling): amr_decomp(1:3, r) = rank r's
+    !! coarse start_idx per dim, amr_decomp(4:6, r) = its coarse extent (m/n/p). Allgathered once at init (the coarse decomposition
+    !! is fixed for the run). Lets any rank compute which ranks own a given global coarse-cell range, so the gather/scatter/reflux
+    !! coupling is owner <-> only the (SFC-local) coarse-owners - no global collective per block per stage.
+    integer, allocatable :: amr_decomp(:,:)  !< (1:6, 0:num_procs-1)
 
 contains
 
@@ -175,20 +197,20 @@ contains
             call s_mpi_abort('amr block must lie at least buff_size cells inside the domain boundaries')
         end if
 
-        ! Scratch constraint: the fine advance reuses the solver scratch (m_rhs/WENO/Riemann work arrays),
-        ! which is sized to THIS rank's local grid, so each rank's fine extent must fit its local extent.
-        ! (np=1: the checker's 2*block-1 <= m_glb bound makes this a no-op.)
+        ! Scratch constraint: the fine advance reuses the solver scratch (m_rhs/WENO/Riemann work arrays) and the global
+        ! coordinate arrays, all sized to THIS rank's local grid. Fine-level distribution gives a block WHOLE to its owner, so
+        ! the WHOLE block's fine extent (2*block-1) must fit every rank's local extent (a big block cannot be whole-owned; it
+        ! must be split into <= local-half boxes - the mirror model instead split the block ACROSS ranks). Checked on the
+        ! replicated block box so all ranks agree. (np=1: local extent = global, so 2*block-1 <= m_glb always holds.)
         bad_loc = 0
-        if (amr_rank_owns_block) then
-            if (2*(amr_isect_hi(1) - amr_isect_lo(1) + 1) - 1 > m) bad_loc = 1
-            if (n_glb > 0 .and. 2*(amr_isect_hi(2) - amr_isect_lo(2) + 1) - 1 > n) bad_loc = 1
-            if (p_glb > 0 .and. 2*(amr_isect_hi(3) - amr_isect_lo(3) + 1) - 1 > p) bad_loc = 1
-        end if
+        if (2*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m) bad_loc = 1
+        if (n_glb > 0 .and. 2*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n) bad_loc = 1
+        if (p_glb > 0 .and. 2*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p) bad_loc = 1
         call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
         if (bad_glb == 1) then
-            call s_mpi_abort('amr fine extent exceeds a rank local grid (solver scratch is local-sized): the block ' &
-                             & // 'may cover at most about half of any rank subdomain per dimension; shrink the block ' &
-                             & // 'or use fewer ranks')
+            call s_mpi_abort('amr fine extent exceeds a rank local grid (solver scratch is local-sized): under fine-level ' &
+                             & // 'distribution a block is owned whole, so it may cover at most about half of any rank ' &
+                             & // 'subdomain per dimension; shrink the block, split it, or use fewer ranks')
         end if
 
         ! max coarse block cells per dim (upper bound for any future regrid box); 1 for collapsed dims
@@ -205,12 +227,12 @@ contains
             amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
         end do
 
-        ! preallocation cap for MY fine arrays: the largest intersection any block box can have with this
-        ! rank's subdomain (the scratch constraint caps it at about half the local extent; = amr_maxc at np=1)
-        maxc_loc(1) = min(amr_maxc(1), (m + 1)/2)
-        maxc_loc(2) = 1; maxc_loc(3) = 1
-        if (n_glb > 0) maxc_loc(2) = min(amr_maxc(2), (n + 1)/2)
-        if (p_glb > 0) maxc_loc(3) = min(amr_maxc(3), (p + 1)/2)
+        ! preallocation cap for MY fine arrays: fine-level distribution gives a block WHOLE to its owner, so any rank must hold an
+        ! entire block - but the scratch-constraint abort above (allreduced over every rank's local half-extent) guarantees no
+        ! block exceeds amr_maxc_fit = min-over-ranks local-half, and regrid clamps boxes to it. So amr_maxc_fit (NOT the global-
+        ! half amr_maxc) is the true max block a rank can own; sizing to it right-sizes the fine/coord arrays (~1/num_procs the
+        ! memory of global-half at scale). At np=1 amr_maxc_fit == amr_maxc, so the sizing (and everything) is unchanged.
+        maxc_loc = amr_maxc_fit
 
         ! max fine extents and buffered bounds for preallocation
         max_f1 = 2*maxc_loc(1) - 1
@@ -274,6 +296,11 @@ contains
             end if
         end if
         if (weno_order == 1 .or. igr) amr_weno_coef_recompute = .false.  ! order 1 / IGR: no grid-dependent WENO coefficients
+
+        ! persistent global coarse boundaries: the fine-distribution owner rebuilds whole-block
+        ! fine coordinates from these (needed once the fine level is decoupled from the coarse
+        ! decomposition; harmless otherwise)
+        call s_amr_build_global_cb()
         ! Fail closed on stretched grid + Lagrangian/IB-dynamic-regrid. TWO independent blockers
         ! (both confirmed by experiment):
         !  (1) the position->global-cell-index conversions here use int((x-beg)/dx(0)), inexact
@@ -352,6 +379,36 @@ contains
             end if
         end do
 
+        ! fine-level distribution: coarse-patch gather buffer (see decl). Sized to the largest block's coarse footprint
+        ! (block coarse cells + 2*nmar halo, block-local frame). Device-mapped so the runtime ghost-fill reads it on the owner.
+        amr_cpat_mar = (buff_size + 1)/2 + 1
+        amr_cpat_hi = 0
+        amr_cpat_hi(1) = maxc_loc(1) - 1 + 2*amr_cpat_mar
+        if (n_glb > 0) amr_cpat_hi(2) = maxc_loc(2) - 1 + 2*amr_cpat_mar
+        if (p_glb > 0) amr_cpat_hi(3) = maxc_loc(3) - 1 + 2*amr_cpat_mar
+        @:ALLOCATE(amr_cg(1:sys_size))
+        do i = 1, sys_size
+            @:ALLOCATE(amr_cg(i)%sf(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3)))
+            amr_cg(i)%sf = 0._stp  ! padding beyond a block's valid patch extent is never read; keep it finite for the device copy
+            @:ACC_SETUP_SFs(amr_cg(i))
+        end do
+
+        ! replicated coarse-decomposition table for point-to-point coupling (see decl). The coarse decomposition is fixed for the
+        ! run, so this is allgathered once. Row r = [start_idx(1:3), m, n, p] for rank r (collapsed dims pinned to 0).
+        allocate (amr_decomp(6,0:num_procs - 1))
+        block
+            integer :: myrow(6), ierr
+            myrow = 0
+            myrow(1) = start_idx(1); myrow(4) = m
+            if (n_glb > 0) then; myrow(2) = start_idx(2); myrow(5) = n; end if
+            if (p_glb > 0) then; myrow(3) = start_idx(3); myrow(6) = p; end if
+#ifdef MFC_MPI
+            call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+#else
+            amr_decomp(:,0) = myrow
+#endif
+        end block
+
         ! per-slot fine-grid IB marker fields (static-body AMR); sized to the same max buffered fine extents
         ! as q_cons so the fine IB pipeline can resolve the body on the block
         if (ib) call s_ibm_alloc_fine(amr_max_blocks, mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi)
@@ -402,6 +459,312 @@ contains
     !> Compute this rank's per-dim intersection of the box lo:hi with its subdomain (GLOBAL indices, mirrored to amr_isect_lo/hi)
     !! and whether it holds fine cells (amr_rank_owns_block: nonempty in all active dims). Must be called with the COARSE grid state
     !! in m/n/p (never from inside the fine advance).
+    !> Assemble the persistent global coarse cell-boundary arrays. Each rank writes the boundaries of the cells it owns (shared
+    !! inter-rank faces written identically by both neighbours) into a sentinel-filled global array; an elementwise MAX allreduce
+    !! recovers the exact global array on every rank. Grid is fixed for the run, so this runs once.
+    impure subroutine s_amr_build_global_cb()
+
+        integer             :: j
+        real(wp), parameter :: sentinel = -huge(1._wp)
+
+        allocate (amr_gxcb(-1:m_glb)); amr_gxcb = sentinel
+        do j = -1, m
+            amr_gxcb(start_idx(1) + j) = x_cb(j)
+        end do
+        call s_mpi_allreduce_array_max(amr_gxcb, m_glb + 2)
+        if (n_glb > 0) then
+            allocate (amr_gycb(-1:n_glb)); amr_gycb = sentinel
+            do j = -1, n
+                amr_gycb(start_idx(2) + j) = y_cb(j)
+            end do
+            call s_mpi_allreduce_array_max(amr_gycb, n_glb + 2)
+        end if
+        if (p_glb > 0) then
+            allocate (amr_gzcb(-1:p_glb)); amr_gzcb = sentinel
+            do j = -1, p
+                amr_gzcb(start_idx(3) + j) = z_cb(j)
+            end do
+            call s_mpi_allreduce_array_max(amr_gzcb, p_glb + 2)
+        end if
+
+    end subroutine s_amr_build_global_cb
+
+    !> Fine-level distribution: assemble the current block's coarse patch on its owner. The patch covers GLOBAL coarse cells
+    !! region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full reach of every prolongation/ghost-fill stencil) for all sys_size
+    !! variables, stored in amr_cg in a block-LOCAL frame (cell 0 == global amr_cpat_off). POINT-TO-POINT: the owner receives the
+    !! patch cells it does not hold from exactly the (SFC-local) coarse-owners that hold them - each rank's contribution is the
+    !! intersection of the patch with its contiguous owned coarse range (f_amr_rank_coarse_range, = the f_amr_own_coarse set), read
+    !! from the replicated amr_decomp table. Non-participants send/recv nothing (no global collective). At np=1 the owner is the
+    !! sole rank and just copies its own coarse over the patch, bit-for-bit. Host fill (q_coarse must be host-current with valid
+    !! ghosts); the packed data is wp, cast to stp into amr_cg (identity for stp coarse), then pushed to the device.
+    impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
+        !> runtime callers pass .true. (coarse device-current); init/regrid pass .false. (host is truth)
+        logical, intent(in)   :: pull_host
+        integer               :: i, g1, g2, g3, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
+        integer               :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
+        real(wp), allocatable :: rbuf(:,:), sbuf(:)
+        integer, allocatable  :: reqs(:), srank(:)
+
+        if (pull_host) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[q_coarse(i)%sf]')
+            end do
+        end if
+
+        ! block-local patch frame (cell 0 == global region_lo-nmar; collapsed dims -> 0) + its GLOBAL cell range [plo:phi]
+        amr_cpat_off = 0
+        amr_cpat_off(1) = amr_region_lo_all(1, amr_cur) - amr_cpat_mar
+        if (n_glb > 0) amr_cpat_off(2) = amr_region_lo_all(2, amr_cur) - amr_cpat_mar
+        if (p_glb > 0) amr_cpat_off(3) = amr_region_lo_all(3, amr_cur) - amr_cpat_mar
+        v1hi = (amr_region_hi_all(1, amr_cur) - amr_region_lo_all(1, amr_cur)) + 2*amr_cpat_mar
+        v2hi = 0; v3hi = 0
+        if (n_glb > 0) v2hi = (amr_region_hi_all(2, amr_cur) - amr_region_lo_all(2, amr_cur)) + 2*amr_cpat_mar
+        if (p_glb > 0) v3hi = (amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur)) + 2*amr_cpat_mar
+        plo = amr_cpat_off
+        phi(1) = amr_cpat_off(1) + v1hi; phi(2) = amr_cpat_off(2) + v2hi; phi(3) = amr_cpat_off(3) + v3hi
+
+        owner = amr_block_owner(amr_cur)
+        o1 = start_idx(1); o2 = 0; o3 = 0
+        if (n_glb > 0) o2 = start_idx(2)
+        if (p_glb > 0) o3 = start_idx(3)
+        maxsz = sys_size*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
+
+        if (proc_rank == owner) then
+            ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
+            call f_amr_rank_coarse_range(proc_rank, crlo, crhi)
+            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+            call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
+            ! count + post recvs from every OTHER rank whose owned range overlaps the patch
+            nsrc = 0
+            do r = 0, num_procs - 1
+                if (r == owner) cycle
+                call f_amr_rank_coarse_range(r, crlo, crhi)
+                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
+            end do
+            if (nsrc > 0) then
+                allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc))
+                nsrc = 0
+                do r = 0, num_procs - 1
+                    if (r == owner) cycle
+                    call f_amr_rank_coarse_range(r, crlo, crhi)
+                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                    if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
+                    boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    nsrc = nsrc + 1; srank(nsrc) = r
+#ifdef MFC_MPI
+                    call MPI_IRECV(rbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
+#endif
+                end do
+#ifdef MFC_MPI
+                call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+#endif
+                do idx = 1, nsrc
+                    call f_amr_rank_coarse_range(srank(idx), crlo, crhi)
+                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                    ! unpack in the SAME (i, g3, g2, g1) order the sender packed; place at amr_cg patch-local index
+                    r = 0
+                    do i = 1, sys_size
+                        do g3 = bl(3), bh(3)
+                            do g2 = bl(2), bh(2)
+                                do g1 = bl(1), bh(1)
+                                    r = r + 1
+                                    amr_cg(i)%sf(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3)) = real(rbuf(r, &
+                                           & idx), stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                deallocate (rbuf, reqs, srank)
+            end if
+            do i = 1, sys_size
+                $:GPU_UPDATE(device='[amr_cg(i)%sf]')
+            end do
+        else
+            ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
+            call f_amr_rank_coarse_range(proc_rank, crlo, crhi)
+            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
+                boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                allocate (sbuf(boxsz))
+                idx = 0
+                do i = 1, sys_size
+                    do g3 = bl(3), bh(3)
+                        do g2 = bl(2), bh(2)
+                            do g1 = bl(1), bh(1)
+                                idx = idx + 1; sbuf(idx) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
+                            end do
+                        end do
+                    end do
+                end do
+#ifdef MFC_MPI
+                call MPI_SEND(sbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
+#endif
+                deallocate (sbuf)
+            end if
+        end if
+
+    end subroutine s_amr_gather_coarse_patch
+
+    !> This rank's (r's) contiguous owned coarse-cell range per dim from the replicated amr_decomp table: interior [start:start+ext]
+    !! plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal to the set where
+    !! f_amr_own_coarse is true, but as one contiguous span so box intersections identify contributors without a per-cell scan.
+    pure subroutine f_amr_rank_coarse_range(r, crlo, crhi)
+
+        integer, intent(in)  :: r
+        integer, intent(out) :: crlo(3), crhi(3)
+
+        crlo = 0; crhi = 0
+        crlo(1) = amr_decomp(1, r); if (amr_decomp(1, r) == 0) crlo(1) = -buff_size
+        crhi(1) = amr_decomp(1, r) + amr_decomp(4, r); if (crhi(1) == m_glb) crhi(1) = crhi(1) + buff_size
+        if (n_glb > 0) then
+            crlo(2) = amr_decomp(2, r); if (amr_decomp(2, r) == 0) crlo(2) = -buff_size
+            crhi(2) = amr_decomp(2, r) + amr_decomp(5, r); if (crhi(2) == n_glb) crhi(2) = crhi(2) + buff_size
+        end if
+        if (p_glb > 0) then
+            crlo(3) = amr_decomp(3, r); if (amr_decomp(3, r) == 0) crlo(3) = -buff_size
+            crhi(3) = amr_decomp(3, r) + amr_decomp(6, r); if (crhi(3) == p_glb) crhi(3) = crhi(3) + buff_size
+        end if
+
+    end subroutine f_amr_rank_coarse_range
+
+    !> Per-dim intersection of two global boxes [alo:ahi] and [blo:bhi] -> [olo:ohi] (empty when olo > ohi in some dim).
+    pure subroutine s_amr_box_isect(alo, ahi, blo, bhi, olo, ohi)
+
+        integer, intent(in)  :: alo(3), ahi(3), blo(3), bhi(3)
+        integer, intent(out) :: olo(3), ohi(3)
+
+        olo = max(alo, blo); ohi = min(ahi, bhi)
+
+    end subroutine s_amr_box_isect
+
+    !> Copy this rank's own coarse cells (box [bl:bh] GLOBAL, read from q_coarse at its own start-idx frame o1/o2/o3) into amr_cg in
+    !! the block-local patch frame. stp -> stp, exact.
+    impure subroutine s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
+        integer, intent(in)                                 :: bl(3), bh(3), o1, o2, o3
+        integer                                             :: i, g1, g2, g3
+
+        do i = 1, sys_size
+            do g3 = bl(3), bh(3)
+                do g2 = bl(2), bh(2)
+                    do g1 = bl(1), bh(1)
+                        amr_cg(i)%sf(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3)) = q_coarse(i)%sf(g1 - o1, &
+                               & g2 - o2, g3 - o3)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_amr_unpack_patch
+
+    !> True iff rank r is a reflux applier for the current block: it owns the coarse cell layer just OUTSIDE some block face AND its
+    !! subdomain overlaps the block transversely. Mirrors s_amr_reflux_face_flags exactly, but parameterized by r's subdomain from
+    !! the replicated amr_decomp table (so the block owner can decide which ranks to send freg to, and each rank agrees on whether
+    !! it receives). Uses amr_region_lo/hi (the current block, set on every rank by s_amr_select_slot).
+    pure logical function f_amr_reflux_participates(r) result(part)
+
+        integer, intent(in) :: r
+        integer             :: sidx(3), ext(3), d, t
+        logical             :: tv(3), tvd
+
+        sidx = 0; ext = 0
+        sidx(1) = amr_decomp(1, r); ext(1) = amr_decomp(4, r)
+        if (n_glb > 0) then; sidx(2) = amr_decomp(2, r); ext(2) = amr_decomp(5, r); end if
+        if (p_glb > 0) then; sidx(3) = amr_decomp(3, r); ext(3) = amr_decomp(6, r); end if
+        tv(1) = amr_region_lo(1) <= sidx(1) + ext(1) .and. amr_region_hi(1) >= sidx(1)
+        tv(2) = (n_glb == 0) .or. (amr_region_lo(2) <= sidx(2) + ext(2) .and. amr_region_hi(2) >= sidx(2))
+        tv(3) = (p_glb == 0) .or. (amr_region_lo(3) <= sidx(3) + ext(3) .and. amr_region_hi(3) >= sidx(3))
+        part = .false.
+        do d = 1, num_dims
+            tvd = .true.
+            do t = 1, num_dims
+                if (t /= d) tvd = tvd .and. tv(t)
+            end do
+            if (tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d)) part = .true.
+            if (tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d)) part = .true.
+        end do
+
+    end function f_amr_reflux_participates
+
+    !> Fine-level distribution: deliver the current block's fine flux registers freg (captured by the owner during the fine advance)
+    !! to exactly the (SFC-local) coarse-outside-owners that apply the reflux - POINT-TO-POINT, replacing the global broadcast. The
+    !! owner sends its whole freg slot (block-relative; each applier reads its own transverse slice) to every participant; non-owner
+    !! participants receive it. Device-resident: the owner stages its slot to host, receivers push it back. No-op without MPI/at
+    !! np=1.
+    impure subroutine s_amr_p2p_reflux_faces()
+
+#ifdef MFC_MPI
+        integer              :: owner, r, ierr, nreq, cnt
+        integer, allocatable :: reqs(:)
+
+        if (.not. amr) return
+        if (num_procs == 1) return
+        owner = amr_block_owner(amr_cur)
+        if (proc_rank == owner) then
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                end if
+            #:endfor
+            nreq = 0
+            do r = 0, num_procs - 1
+                if (r /= owner .and. f_amr_reflux_participates(r)) nreq = nreq + 1
+            end do
+            if (nreq > 0) then
+                allocate (reqs(2*num_dims*nreq))
+                nreq = 0
+                do r = 0, num_procs - 1
+                    if (r == owner .or. .not. f_amr_reflux_participates(r)) cycle
+                    #:for D in [1, 2, 3]
+                        if (${D}$ <= num_dims) then
+                            cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                            nreq = nreq + 1
+                            call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, r, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
+                            nreq = nreq + 1
+                            call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, r, ${2*D + 1}$, MPI_COMM_WORLD, reqs(nreq), &
+                                           & ierr)
+                        end if
+                    #:endfor
+                end do
+                call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
+                deallocate (reqs)
+            end if
+        else if (f_amr_reflux_participates(proc_rank)) then
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
+                                  & ierr)
+                    call MPI_RECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D + 1}$, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                end if
+            #:endfor
+        end if
+#endif
+
+    end subroutine s_amr_p2p_reflux_faces
+
+    !> True iff this rank is the AUTHORITATIVE holder of global coarse cell g in one dimension (o = interior origin start_idx, ext =
+    !! interior extent m/n/p, glb = global last index). A cell is owned by exactly one rank: its interior owner, or - for a
+    !! physical-exterior ghost (g < 0 or g > glb) - the boundary-adjacent rank that holds it as a ghost. Inter-rank ghosts are
+    !! deliberately NOT claimed (the neighbour's interior owns them), so the sentinel-MAX gather has no double-contribution and
+    !! needs no coarse-ghost halo exchange for correctness across rank seams.
+    pure logical function f_amr_own_coarse(g, o, ext, glb) result(mine)
+
+        integer, intent(in) :: g, o, ext, glb
+        ! interior left physical ghost (leftmost rank)
+
+        mine = (g >= o .and. g <= o + ext) .or. (g < 0 .and. o == 0 .and. g >= -buff_size) .or. (g > glb .and. o + ext == glb &
+                & .and. g <= glb + buff_size)  ! right physical ghost (rightmost rank)
+
+    end function f_amr_own_coarse
+
     !> Fine-level distribution map (PHASE 1: computed + reported, NOT applied). Assigns each active block a single owner rank by
     !! chains-on-chains balancing of fine-work weight (fine cell count) in Morton order of the block's low corner - the same SFC
     !! idea m_sfc_partition uses for the base grid, at block granularity. Pure function of the replicated block geometry
@@ -515,15 +878,27 @@ contains
         integer, intent(in) :: lo(3), hi(3)
         integer             :: sidx(3), ext(3), nmar, bad_loc, bad_glb
 
-        call s_amr_compute_isect(lo, hi)
         amr_slots(amr_cur)%region%lo = lo; amr_slots(amr_cur)%region%hi = hi
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
-        ! stash this slot's mirrors so s_amr_select_slot can revisit each block during the per-block advance and the coarse capture
         amr_region_lo_all(:,amr_cur) = lo; amr_region_hi_all(:,amr_cur) = hi
+
+        ! FINE-LEVEL DISTRIBUTION: a block is owned WHOLE by amr_block_owner(k). The owner holds
+        ! fine cells for the ENTIRE block; every other rank holds none. amr_isect_lo/hi records
+        ! the block's coarse footprint (= the whole block on the owner) - it drives the
+        ! coarse<->fine gather/scatter (which coarse cells the owner pulls in / pushes back).
+        ! At np=1 the owner is rank 0 and the footprint is the whole domain-resident block, so
+        ! this reduces exactly to the old mirror (block \cap subdomain == whole block).
+        amr_rank_owns_block = (amr_block_owner(amr_cur) == proc_rank)
+        if (amr_rank_owns_block) then
+            amr_isect_lo = lo; amr_isect_hi = hi
+        else
+            amr_isect_lo = 1; amr_isect_hi = 0  ! empty footprint
+            if (n_glb > 0) then; amr_isect_lo(2) = 1; amr_isect_hi(2) = 0; end if
+            if (p_glb > 0) then; amr_isect_lo(3) = 1; amr_isect_hi(3) = 0; end if
+        end if
         amr_isect_lo_all(:,amr_cur) = amr_isect_lo; amr_isect_hi_all(:,amr_cur) = amr_isect_hi
         amr_owns_all(amr_cur) = amr_rank_owns_block
-        ! LOCAL fine extents cover this rank's intersection (the whole block at np=1); -1 in a dim whose
-        ! intersection is empty, so 0..extent loops are no-ops on ranks without fine cells
+        ! fine extents cover the WHOLE block on the owner; -1 (empty) on non-owners
         amr_slots(amr_cur)%m = 2*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
         amr_slots(amr_cur)%n = 0; amr_slots(amr_cur)%p = 0
         if (n_glb > 0) amr_slots(amr_cur)%n = 2*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
@@ -540,11 +915,14 @@ contains
         ! coord building only on ranks with fine cells (others never read their coord arrays); the parent origin
         ! is this rank's INTERSECTION start, converted to LOCAL indexing so the bisection reads its x_cb slice
         if (amr_rank_owns_block) then
-            call s_build_level_coords(x_cb, lbound(x_cb, 1), amr_isect_lo(1) - start_idx(1), amr_slots(amr_cur)%m, &
-                                      & amr_slots(amr_cur)%x_cb, amr_slots(amr_cur)%x_cc, amr_slots(amr_cur)%dx)
-            if (n_glb > 0) call s_build_level_coords(y_cb, lbound(y_cb, 1), amr_isect_lo(2) - start_idx(2), amr_slots(amr_cur)%n, &
+            ! whole-block fine coords from the GLOBAL boundaries (owner may not hold the coarse
+            ! coordinate slice for cells it now refines). amr_gxcb has lbound -1; the parent
+            ! origin is the block's GLOBAL low corner.
+            call s_build_level_coords(amr_gxcb, -1, amr_isect_lo(1), amr_slots(amr_cur)%m, amr_slots(amr_cur)%x_cb, &
+                                      & amr_slots(amr_cur)%x_cc, amr_slots(amr_cur)%dx)
+            if (n_glb > 0) call s_build_level_coords(amr_gycb, -1, amr_isect_lo(2), amr_slots(amr_cur)%n, &
                 & amr_slots(amr_cur)%y_cb, amr_slots(amr_cur)%y_cc, amr_slots(amr_cur)%dy)
-            if (p_glb > 0) call s_build_level_coords(z_cb, lbound(z_cb, 1), amr_isect_lo(3) - start_idx(3), amr_slots(amr_cur)%p, &
+            if (p_glb > 0) call s_build_level_coords(amr_gzcb, -1, amr_isect_lo(3), amr_slots(amr_cur)%p, &
                 & amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, amr_slots(amr_cur)%dz)
         end if
 
@@ -583,12 +961,9 @@ contains
         floor_pos = .false.; if (present(pos)) floor_pos = pos
         pw_const = .false.; if (present(inject)) pw_const = inject
 
-        ! fine indices are LOCAL to this rank's intersection (the whole block at np=1); amr_isect_lo is
-        ! GLOBAL; the coarse source qc is rank-LOCAL (identical at np=1: isect = block, start_idx = 0)
-
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): amr_isect_lo is GLOBAL and
+        ! equals region_lo on the owner, so amr_isect_lo + f/rr - amr_cpat_off = nmar + f/rr is the patch-local coarse index
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
             ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
             xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
@@ -619,10 +994,9 @@ contains
     !> Conservative-linear prolongation: fill amr_fine interior from coarse (level-0), minmod-limited. Symmetric child offsets
     !! (+/-1/4 of a coarse cell) => the ref_ratio^d children average to the coarse value. Multi-fluid volume fractions take the
     !! sum-preserving closure path instead (single-fluid runs never branch, so their prolongation is untouched).
-    impure subroutine s_interpolate_coarse_to_fine(q_cons_base)
+    impure subroutine s_interpolate_coarse_to_fine()
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
-        integer                                             :: i, bstride
+        integer :: i, bstride
 
         bstride = 1
         if (bubbles_euler) bstride = (eqn_idx%bub%end - eqn_idx%bub%beg + 1)/nb
@@ -637,13 +1011,13 @@ contains
             ! cell's realizable moment set exactly). Non-QBMM Euler-Euler bubbles instead floor their POSITIVE
             ! moments (radius nR, non-polytropic partial pressure npb / vapor mass nmv); the signed velocity moment
             ! nV (offset 1 in each bin's stride) prolongs freely.
-            call s_prolong_one_var(q_cons_base(i), amr_slots(amr_cur)%q_cons(i), &
+            call s_prolong_one_var(amr_cg(i), amr_slots(amr_cur)%q_cons(i), &
                                    & pos=bubbles_euler .and. .not. qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end &
                                    & .and. mod(i - eqn_idx%bub%beg, bstride) /= 1, &
                                    & inject=qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end)
         end do
-        if (num_fluids > 1 .and. (.not. bubbles_lagrange)) call s_prolong_alphas_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
-        if (chemistry) call s_prolong_species_closure(q_cons_base, amr_slots(amr_cur)%q_cons)
+        if (num_fluids > 1 .and. (.not. bubbles_lagrange)) call s_prolong_alphas_closure(amr_cg, amr_slots(amr_cur)%q_cons)
+        if (chemistry) call s_prolong_species_closure(amr_cg, amr_slots(amr_cur)%q_cons)
 
     end subroutine s_interpolate_coarse_to_fine
 
@@ -661,9 +1035,9 @@ contains
         real(wp)                                               :: xix, xiy, xiz, u0, sx, sy, sz, av, asum
         logical                                                :: shx, shy, shz
 
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): patch-frame offset
+
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
             ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
             xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
@@ -708,9 +1082,9 @@ contains
         integer                                                :: fi, fj, fk, ci, cj, ck, ox, oy, oz, i
         real(wp)                                               :: xix, xiy, xiz, u0, sx, sy, sz, av, rsum, rscale
 
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): patch-frame offset
+
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
             ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
             xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
@@ -786,8 +1160,11 @@ contains
                 $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
             end do
         end if
+        ! fine-level distribution: gather the block's coarse patch onto its owner (collective - ALL ranks call before the
+        ! owner-only return below). Host source q_cons_base is IC-current here (and ghost-valid via the exchange above).
+        call s_amr_gather_coarse_patch(q_cons_base, .false.)
         if (.not. amr_rank_owns_block) return
-        call s_interpolate_coarse_to_fine(q_cons_base)
+        call s_interpolate_coarse_to_fine()
         ! prolonged fine state to the device (host prolongation; device consumers: ghost-fill/RK/RHS kernels)
         do i = 1, sys_size
             $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
@@ -806,11 +1183,10 @@ contains
         integer                           :: ci, cj, ck, fi0, fj0, fk0, ddj, ddk, nchild, ox, oy, oz
         real(wp)                          :: acc
 
-        ! isect loop indices are GLOBAL (this rank's covered coarse cells); the coarse target qc is rank-LOCAL
+        ! host operator-check diagnostic only: coarse target qc is the block-local patch (amr_cg frame), so the covered global
+        ! coarse cell ci writes qc at the patch-local index ci - amr_cpat_off (the same frame s_prolong_one_var reads)
 
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         nchild = amr_slots(amr_cur)%ref_ratio
         if (n_glb > 0) nchild = nchild*amr_slots(amr_cur)%ref_ratio
         if (p_glb > 0) nchild = nchild*amr_slots(amr_cur)%ref_ratio
@@ -840,17 +1216,168 @@ contains
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+        integer :: i, ci, cj, ck, nchild, rr, dj_hi, dk_hi, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
+        integer :: rlo(3), rhi(3), ilo(3), ihi(3), bl(3), bh(3)
+        real(wp), allocatable :: sbuf(:,:), rbuf(:)
+        integer, allocatable :: reqs(:), drank(:)
 
-        if (.not. amr_rank_owns_block) return
-        if (rank_time_wrt) call s_rank_time_tic()
-        call s_restrict_all_vars(amr_slots(amr_cur)%q_cons, coarse_tgt)
-        ! non-polytropic QBMM: the block's side-state restricts alongside the moments so the coarse
-        ! cells under the block carry the fine-resolved quadrature state into the next coarse step
-        if (qbmm .and. .not. polytropic) call s_restrict_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, amr_slots(amr_cur)%pb_f%sf, &
-            & amr_slots(amr_cur)%mv_f%sf)
-        if (rank_time_wrt) call s_rank_time_toc()
+        if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_tic()
+
+        ! whole-block-per-rank fold-back: the block owner restricts its fine block to coarse averages over the covered cells
+        ! [region_lo:region_hi] and SCATTERS them POINT-TO-POINT to the coarse-cell owners - the owner overwrites the covered
+        ! cells it holds locally and SENDS each other coarse-owner exactly its covered slice (all sys_size in one message). Covered
+        ! cells are in-domain (no ghosts), so each is owned by exactly one interior owner. At np=1 the owner owns every covered
+        ! cell, sends nothing, and overwrites locally with the same child-sum -> bit-identical.
+        rr = amr_slots(amr_cur)%ref_ratio
+        nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
+        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
+        rlo = 0; rhi = 0
+        rlo(1) = amr_region_lo_all(1, amr_cur); rhi(1) = amr_region_hi_all(1, amr_cur)
+        if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, amr_cur); rhi(2) = amr_region_hi_all(2, amr_cur); end if
+        if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, amr_cur); rhi(3) = amr_region_hi_all(3, amr_cur); end if
+        owner = amr_block_owner(amr_cur)
+        o1 = start_idx(1); o2 = 0; o3 = 0
+        if (n_glb > 0) o2 = start_idx(2)
+        if (p_glb > 0) o3 = start_idx(3)
+        maxsz = sys_size*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
+
+        if (proc_rank == owner) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_slots(amr_cur)%q_cons(i)%sf]')
+            end do
+            ! overwrite the covered cells this rank owns, then send each other coarse-owner its covered slice
+            call f_amr_rank_interior(proc_rank, ilo, ihi)
+            call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
+                call s_amr_restrict_overwrite(coarse_tgt, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+                do i = 1, sys_size
+                    $:GPU_UPDATE(device='[coarse_tgt(i)%sf]')
+                end do
+            end if
+            nsrc = 0
+            do r = 0, num_procs - 1
+                if (r == owner) cycle
+                call f_amr_rank_interior(r, ilo, ihi)
+                call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
+            end do
+            if (nsrc > 0) then
+                allocate (sbuf(maxsz, nsrc), reqs(nsrc), drank(nsrc))
+                nsrc = 0
+                do r = 0, num_procs - 1
+                    if (r == owner) cycle
+                    call f_amr_rank_interior(r, ilo, ihi)
+                    call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+                    if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
+                    nsrc = nsrc + 1; drank(nsrc) = r
+                    boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    idx = 0
+                    do i = 1, sys_size
+                        do ck = bl(3), bh(3)
+                            do cj = bl(2), bh(2)
+                                do ci = bl(1), bh(1)
+                                    idx = idx + 1
+                                    sbuf(idx, nsrc) = f_amr_restrict_cell(i, ci, cj, ck, rlo, rr, dj_hi, dk_hi, nchild)
+                                end do
+                            end do
+                        end do
+                    end do
+#ifdef MFC_MPI
+                    call MPI_ISEND(sbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
+#endif
+                end do
+#ifdef MFC_MPI
+                call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+#endif
+                deallocate (sbuf, reqs, drank)
+            end if
+        else
+            ! coarse-owner: if I hold covered cells, receive my slice from the owner and overwrite my local coarse
+            call f_amr_rank_interior(proc_rank, ilo, ihi)
+            call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
+                boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                allocate (rbuf(boxsz))
+#ifdef MFC_MPI
+                call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+                idx = 0
+                do i = 1, sys_size
+                    do ck = bl(3), bh(3)
+                        do cj = bl(2), bh(2)
+                            do ci = bl(1), bh(1)
+                                idx = idx + 1
+                                coarse_tgt(i)%sf(ci - o1, cj - o2, ck - o3) = real(rbuf(idx), stp)
+                            end do
+                        end do
+                    end do
+                end do
+                deallocate (rbuf)
+                do i = 1, sys_size
+                    $:GPU_UPDATE(device='[coarse_tgt(i)%sf]')
+                end do
+            end if
+        end if
+
+        ! non-polytropic QBMM: pb/mv restriction stays LOCAL (np>=2 QBMM fold-back is not yet distributed; np=1 exact)
+        if (qbmm .and. .not. polytropic .and. amr_rank_owns_block) call s_restrict_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, &
+            & amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
+        if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
+
+    !> Rank r's coarse INTERIOR box (global) from the replicated amr_decomp table (no ghosts). Covered coarse cells are in-domain,
+    !! so restriction targets are identified by interior overlap alone.
+    pure subroutine f_amr_rank_interior(r, ilo, ihi)
+
+        integer, intent(in)  :: r
+        integer, intent(out) :: ilo(3), ihi(3)
+
+        ilo = 0; ihi = 0
+        ilo(1) = amr_decomp(1, r); ihi(1) = amr_decomp(1, r) + amr_decomp(4, r)
+        if (n_glb > 0) then; ilo(2) = amr_decomp(2, r); ihi(2) = amr_decomp(2, r) + amr_decomp(5, r); end if
+        if (p_glb > 0) then; ilo(3) = amr_decomp(3, r); ihi(3) = amr_decomp(3, r) + amr_decomp(6, r); end if
+
+    end subroutine f_amr_rank_interior
+
+    !> Volume-weighted restriction of one covered coarse cell (ci,cj,ck) for variable i: average of its ref_ratio^d fine children
+    !! from the owner's fine block, block-relative (fine origin (ci-rlo)*rr). Same child-sum order as the old device kernel.
+    impure real(wp) function f_amr_restrict_cell(i, ci, cj, ck, rlo, rr, dj_hi, dk_hi, nchild) result(v)
+        integer, intent(in) :: i, ci, cj, ck, rlo(3), rr, dj_hi, dk_hi, nchild
+        integer             :: fi0, fj0, fk0, ddj, ddk
+        real(wp)            :: acc
+        fi0 = (ci - rlo(1))*rr; fj0 = (cj - rlo(2))*rr; fk0 = (ck - rlo(3))*rr
+        acc = 0._wp
+        do ddk = 0, dk_hi
+            do ddj = 0, dj_hi
+                acc = acc + real(amr_slots(amr_cur)%q_cons(i)%sf(fi0, fj0 + ddj, fk0 + ddk), &
+                                 & wp) + real(amr_slots(amr_cur)%q_cons(i)%sf(fi0 + 1, fj0 + ddj, fk0 + ddk), wp)
+            end do
+        end do
+        v = acc/real(nchild, wp)
+
+    end function f_amr_restrict_cell
+
+    !> Owner overwrites the covered coarse cells in box [bl:bh] (global) that it holds locally, from the block restriction. LOCAL
+    !! coarse index = cell - start_idx (o1/o2/o3). stp cast of acc/nchild matches the old device restriction exactly.
+    impure subroutine s_amr_restrict_overwrite(coarse_tgt, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+        integer, intent(in)                                    :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
+        integer                                                :: i, ci, cj, ck
+
+        do i = 1, sys_size
+            do ck = bl(3), bh(3)
+                do cj = bl(2), bh(2)
+                    do ci = bl(1), bh(1)
+                        coarse_tgt(i)%sf(ci - o1, cj - o2, ck - o3) = real(f_amr_restrict_cell(i, ci, cj, ck, rlo, rr, dj_hi, &
+                                   & dk_hi, nchild), stp)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_amr_restrict_overwrite
 
     !> Apply phase-change relaxation (relax) to the current fine block's interior, BEFORE restriction. Relaxation is a cell-local,
     !! mass/energy-conserving equilibration (no stencil, no ghosts), so it needs no coarse/fine coupling: it just runs over the fine
@@ -987,50 +1514,6 @@ contains
         call s_amr_restore_coarse()
 
     end subroutine s_amr_update_mib_fine
-
-    !> Device restriction kernel over all sys_size variable pairs (fine source qf -> coarse target qc).
-    impure subroutine s_restrict_all_vars(qf, qc)
-
-        type(scalar_field), dimension(sys_size), intent(in)    :: qf
-        type(scalar_field), dimension(sys_size), intent(inout) :: qc
-        integer                                                :: i, ci, cj, ck, fi0, fj0, fk0, ddj, ddk, nchild, ox, oy, oz, rr
-        integer                                                :: c1lo, c1hi, c2lo, c2hi, c3lo, c3hi, dj_hi, dk_hi
-        real(wp)                                               :: acc
-
-        ! isect loop indices are GLOBAL (this rank's covered coarse cells); the coarse target is rank-LOCAL
-
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
-        rr = amr_slots(amr_cur)%ref_ratio
-        nchild = rr
-        if (n_glb > 0) nchild = nchild*rr
-        if (p_glb > 0) nchild = nchild*rr
-        c1lo = amr_isect_lo(1); c1hi = amr_isect_hi(1)
-        c2lo = amr_isect_lo(2); c2hi = merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
-        c3lo = amr_isect_lo(3); c3hi = merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
-        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, acc, ddj, ddk]')
-        do i = 1, sys_size
-            do ck = c3lo, c3hi
-                do cj = c2lo, c2hi
-                    do ci = c1lo, c1hi
-                        fi0 = (ci - c1lo)*rr; fj0 = (cj - c2lo)*rr; fk0 = (ck - c3lo)*rr
-                        acc = 0._wp
-                        do ddk = 0, dk_hi
-                            do ddj = 0, dj_hi
-                                acc = acc + real(qf(i)%sf(fi0, fj0 + ddj, fk0 + ddk), wp) + real(qf(i)%sf(fi0 + 1, fj0 + ddj, &
-                                                 & fk0 + ddk), wp)
-                            end do
-                        end do
-                        qc(i)%sf(ci - ox, cj - oy, ck - oz) = acc/real(nchild, wp)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_restrict_all_vars
 
     !> Non-polytropic QBMM: piecewise-constant prolongation of the block's pb/mv interior from the coarse side-state. HOST loops +
     !! device push; all three callers make the coarse host mirrors current first: init populate and restart read pb/mv on the host,
@@ -1179,7 +1662,7 @@ contains
     end subroutine s_amr_fine_rk_update_pbmv
 
     !> Non-polytropic QBMM: volume-weighted restriction of the block's pb/mv onto the coarse side-state under the block (device
-    !! kernel; mirror of s_restrict_all_vars' child average).
+    !! kernel; mirror of s_restrict_one_var's child average).
     impure subroutine s_restrict_pbmv(pb_c, mv_c, pb_fin, mv_fin)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_c, mv_c
@@ -1234,17 +1717,16 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         type(scalar_field), dimension(:), allocatable       :: scratch
-        integer                                             :: i, ci, cj, ck, ox, oy, oz
+        integer                                             :: i, ci, cj, ck
         real(wp)                                            :: err, e
 
         if (.not. amr) return
         if (.not. amr_rank_owns_block) return
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ! fine-level distribution: the block's coarse cells live in the gathered patch amr_cg (set by s_populate_amr_fine just
+        ! before this), not the owner's local q_cons_base. Compare restrict(fine) to amr_cg in the block-local patch frame.
         allocate (scratch(1:sys_size))
         do i = 1, sys_size
-            allocate (scratch(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
+            allocate (scratch(i)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
         end do
         ! host restriction path: the scratch target is host-only and the fine state is host-current at init
         do i = 1, sys_size
@@ -1255,8 +1737,8 @@ contains
             do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
                 do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
                     do ci = amr_isect_lo(1), amr_isect_hi(1)
-                        e = abs(real(scratch(i)%sf(ci - ox, cj - oy, ck - oz), wp) - real(q_cons_base(i)%sf(ci - ox, cj - oy, &
-                                & ck - oz), wp))
+                        e = abs(real(scratch(i)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), &
+                                & wp) - real(amr_cg(i)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), wp))
                         if (e > err) err = e
                     end do
                 end do
@@ -1311,31 +1793,30 @@ contains
             dz(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%dz(0:amr_slots(amr_cur)%p)
         end if
         ! Extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m).
-        ! Ghost cells use the EXACT parent-cell bisection - the same formula as the interior, with
-        ! floor division for negative indices. The parent boundaries beyond the block edge come from
-        ! the coarse coordinates saved in the sw_* bounce buffers moments ago; blocks stay buff_size
-        ! inside the domain, so every ghost parent is an interior (or rank-seam-exchanged) coarse
-        ! cell with exact coordinates. This makes the ghost shell stretched-grid-exact (the old
-        ! locally-uniform continuation was only exact on uniform bases).
+        ! Ghost cells use the EXACT parent-cell bisection - the same formula as the interior, with floor
+        ! division for negative indices. Fine-level distribution: the owner may not hold the block's coarse
+        ! coordinate slice locally, so the ghost parent boundaries come from the GLOBAL boundaries amr_g?cb
+        ! (cl is a GLOBAL coarse index, region_lo + floor(jg/2)), matching the interior build. Blocks stay
+        ! buff_size inside the domain, so every ghost parent is an in-domain coarse cell with exact coords.
         block
             integer :: jg, cl
             do jg = amr_slots(amr_cur)%m + 1, amr_slots(amr_cur)%m + buff_size
-                cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp) - start_idx(1)
+                cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp)
                 if (mod(jg, 2) == 0) then
-                    x_cb(jg) = 0.5_wp*(sw_x_cb(cl - 1) + sw_x_cb(cl))
+                    x_cb(jg) = 0.5_wp*(amr_gxcb(cl - 1) + amr_gxcb(cl))
                 else
-                    x_cb(jg) = sw_x_cb(cl)
+                    x_cb(jg) = amr_gxcb(cl)
                 end if
                 dx(jg) = x_cb(jg) - x_cb(jg - 1); x_cc(jg) = 0.5_wp*(x_cb(jg - 1) + x_cb(jg))
             end do
             ! unified boundary formula (matches the interior bisection): boundary k belongs to
             ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
             do jg = -1 - buff_size, -1
-                cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp) - start_idx(1)
+                cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp)
                 if (mod(abs(jg), 2) == 0) then
-                    x_cb(jg) = 0.5_wp*(sw_x_cb(cl - 1) + sw_x_cb(cl))
+                    x_cb(jg) = 0.5_wp*(amr_gxcb(cl - 1) + amr_gxcb(cl))
                 else
-                    x_cb(jg) = sw_x_cb(cl)
+                    x_cb(jg) = amr_gxcb(cl)
                 end if
             end do
             do jg = -buff_size, -1
@@ -1343,22 +1824,22 @@ contains
             end do
             if (n_glb > 0) then
                 do jg = amr_slots(amr_cur)%n + 1, amr_slots(amr_cur)%n + buff_size
-                    cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp) - start_idx(2)
+                    cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp)
                     if (mod(jg, 2) == 0) then
-                        y_cb(jg) = 0.5_wp*(sw_y_cb(cl - 1) + sw_y_cb(cl))
+                        y_cb(jg) = 0.5_wp*(amr_gycb(cl - 1) + amr_gycb(cl))
                     else
-                        y_cb(jg) = sw_y_cb(cl)
+                        y_cb(jg) = amr_gycb(cl)
                     end if
                     dy(jg) = y_cb(jg) - y_cb(jg - 1); y_cc(jg) = 0.5_wp*(y_cb(jg - 1) + y_cb(jg))
                 end do
                 ! unified boundary formula (matches the interior bisection): boundary k belongs to
                 ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
                 do jg = -1 - buff_size, -1
-                    cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp) - start_idx(2)
+                    cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp)
                     if (mod(abs(jg), 2) == 0) then
-                        y_cb(jg) = 0.5_wp*(sw_y_cb(cl - 1) + sw_y_cb(cl))
+                        y_cb(jg) = 0.5_wp*(amr_gycb(cl - 1) + amr_gycb(cl))
                     else
-                        y_cb(jg) = sw_y_cb(cl)
+                        y_cb(jg) = amr_gycb(cl)
                     end if
                 end do
                 do jg = -buff_size, -1
@@ -1367,22 +1848,22 @@ contains
             end if
             if (p_glb > 0) then
                 do jg = amr_slots(amr_cur)%p + 1, amr_slots(amr_cur)%p + buff_size
-                    cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp) - start_idx(3)
+                    cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp)
                     if (mod(jg, 2) == 0) then
-                        z_cb(jg) = 0.5_wp*(sw_z_cb(cl - 1) + sw_z_cb(cl))
+                        z_cb(jg) = 0.5_wp*(amr_gzcb(cl - 1) + amr_gzcb(cl))
                     else
-                        z_cb(jg) = sw_z_cb(cl)
+                        z_cb(jg) = amr_gzcb(cl)
                     end if
                     dz(jg) = z_cb(jg) - z_cb(jg - 1); z_cc(jg) = 0.5_wp*(z_cb(jg - 1) + z_cb(jg))
                 end do
                 ! unified boundary formula (matches the interior bisection): boundary k belongs to
                 ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
                 do jg = -1 - buff_size, -1
-                    cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp) - start_idx(3)
+                    cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp)
                     if (mod(abs(jg), 2) == 0) then
-                        z_cb(jg) = 0.5_wp*(sw_z_cb(cl - 1) + sw_z_cb(cl))
+                        z_cb(jg) = 0.5_wp*(amr_gzcb(cl - 1) + amr_gzcb(cl))
                     else
-                        z_cb(jg) = sw_z_cb(cl)
+                        z_cb(jg) = amr_gzcb(cl)
                     end if
                 end do
                 do jg = -buff_size, -1
@@ -1541,9 +2022,10 @@ contains
 
     end subroutine s_amr_sync_grid_state_to_device
 
-    !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse (device kernel: reads the coarse source
-    !! and writes the fine target in device memory). floor/modulo mapping is valid for negative fine indices (ghosts). Interior
-    !! untouched. Multi-fluid volume fractions get the same sum-preserving closure as the interior prolongation (second kernel).
+    !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse - the gathered block-local coarse patch
+    !! amr_cg (fine-level distribution; the caller gathers the source first). Device kernel: reads the patch and writes the fine
+    !! target in device memory. floor/modulo mapping is valid for negative fine indices (ghosts). Interior untouched. Multi-fluid
+    !! volume fractions get the same sum-preserving closure as the interior prolongation (second kernel).
     impure subroutine s_amr_fill_fine_ghosts(q_coarse, q_fine)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_coarse
@@ -1554,11 +2036,10 @@ contains
         logical                                                :: d2, d3, multi, shx, shy, shz, bubEE
         real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
 
-        ! fine indices are LOCAL to this rank's intersection; amr_isect_lo is GLOBAL; the coarse source q_coarse is rank-LOCAL
+        ! q_coarse is the gathered block-local patch amr_cg (fine-level distribution); amr_isect_lo (GLOBAL, == region_lo on
+        ! the owner) + f/rr - amr_cpat_off is the patch-local coarse index. Fine indices are LOCAL to this block.
 
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         d2 = n_glb > 0; d3 = p_glb > 0
         rr = amr_slots(amr_cur)%ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
@@ -1839,20 +2320,18 @@ contains
         ! the Lagrangian-cloud guard runs on EVERY rank (rank-local bubbles vs the block's
         ! GLOBAL box): a non-owner rank's bubbles can reach into a block across a rank seam
         call s_amr_check_lag_clear()
+        ! fine-level distribution: gather the block's coarse patch onto its owner (collective - ALL ranks, before the
+        ! owner-only return). The device ghost-fill below then reads the gathered patch amr_cg instead of local coarse.
+        call s_amr_gather_coarse_patch(q_cons_coarse, .true.)
         if (.not. amr_rank_owns_block) return
 
-        ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the
-        ! device-current coarse stage-entry state directly); rank_time brackets cover the fine-advance
-        ! compute segments and pause across the MPI exchanges (the inner s_compute_rhs pair nests to a no-op)
+        ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the gathered patch amr_cg);
+        ! rank_time brackets cover the fine-advance compute segments and pause across the MPI exchanges (the inner
+        ! s_compute_rhs pair nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
-        call s_amr_fill_fine_ghosts(q_cons_coarse, amr_slots(amr_cur)%q_cons)
-        if (rank_time_wrt) call s_rank_time_toc()
-
-        ! continuation faces (the block spans a rank boundary there): overwrite the prolonged ghosts with the
-        ! neighbor's true fine data (no exchange fires at np=1 / for fully-contained blocks)
-        call s_mpi_sendrecv_amr_fine_halo(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%m, amr_slots(amr_cur)%n, &
-                                          & amr_slots(amr_cur)%p)
-        if (rank_time_wrt) call s_rank_time_tic()
+        call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_cons)
+        ! whole-block-per-rank: the owner holds the entire block and adjacent blocks are >= buff_size apart, so there is no
+        ! fine-fine continuation halo - the prolonged ghost shell (from the gathered coarse patch) is the final ghost state.
 
         ! non-polytropic QBMM: prolong the block's pb/mv ghost shell from the coarse stage-entry
         ! side-state (its rhs is cell-local, so ghosts only feed the widened-idwint conversions)
@@ -1931,14 +2410,18 @@ contains
             call s_amr_exchange_coarse_cons_halo(q_new)
         end if
         call s_amr_check_lag_clear()  ! EVERY rank: non-owner bubbles can reach the block across a seam
+
+        ! fine-level distribution: gather each lerp source's coarse patch (collective - ALL ranks) then prolong its ghost shell
+        ! on the owner. Interleaved so the single amr_cg buffer is consumed by the fill before the next gather overwrites it.
+        call s_amr_gather_coarse_patch(q_old, .true.)
+        if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_ghost_a)
+        call s_amr_gather_coarse_patch(q_new, .true.)
+        if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_ghost_b)
         if (.not. amr_rank_owns_block) return
 
-        ! fill both lerp sources once: ghost shells prolonged from coarse t^n and t^{n+1} (device kernels
-        ! read the device-current coarse states directly); rank_time brackets cover the fine-advance
-        ! compute segments and pause across the MPI exchanges (the inner s_compute_rhs pair nests to a no-op)
+        ! rank_time brackets cover the fine-advance compute segments and pause across the MPI exchanges (the inner s_compute_rhs
+        ! pair nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
-        call s_amr_fill_fine_ghosts(q_old, amr_slots(amr_cur)%q_ghost_a)
-        call s_amr_fill_fine_ghosts(q_new, amr_slots(amr_cur)%q_ghost_b)
         ! non-polytropic QBMM: the pb/mv ghost shell gets the same two-source time-lerp treatment
         if (qbmm .and. .not. polytropic) then
             call s_amr_fill_fine_ghosts_pbmv(pb_old, mv_old, amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf)
@@ -1958,10 +2441,7 @@ contains
                     & amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf, th)
                 if (rank_time_wrt) call s_rank_time_toc()
 
-                ! continuation-face ghosts AFTER the lerp: the substeps run in lockstep across ranks, so the
-                ! neighbor's current fine q_cons is the same-time data (the lerp stays block-boundary-only)
-                call s_mpi_sendrecv_amr_fine_halo(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%m, amr_slots(amr_cur)%n, &
-                                                  & amr_slots(amr_cur)%p)
+                ! whole-block-per-rank: no fine-fine continuation halo (owner holds the whole block; blocks >= buff_size apart)
                 if (rank_time_wrt) call s_rank_time_tic()
 
                 ! substep-entry backup for the SSP-RK combination (device copy, interior only)
@@ -2703,8 +3183,11 @@ contains
                 any_xchg = any_xchg .or. amr_xchg_coarse_ghosts
                 if (proc_rank == 0) print '(A,I0,A,I0,A,I0,A,I0,A)', ' [amr]   block ', k, ': box x ', boxes(k)%lo(1), ':', &
                     & boxes(k)%hi(1), ' (', (boxes(k)%hi(1) - boxes(k)%lo(1) + 1), ' coarse cells)'
+                ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
+                ! q_cons_base is host-current with valid ghosts from the exchange at the top of s_amr_regrid)
+                call s_amr_gather_coarse_patch(q_cons_base, .false.)
                 if (.not. amr_rank_owns_block) cycle
-                call s_interpolate_coarse_to_fine(q_cons_base)
+                call s_interpolate_coarse_to_fine()
                 do kk = 1, old_np
                     if (.not. old_owns(kk)) cycle
                     sh = 2*(amr_isect_lo - old_ilo(:,kk))  ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
@@ -2751,7 +3234,7 @@ contains
                     end do
                     $:GPU_UPDATE(device='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f%sf]')
                 end if
-                call s_mpi_sendrecv_amr_fine_halo(amr_slots(k)%q_cons, amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p)
+                ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
             end do
             amr_xchg_coarse_ghosts = any_xchg  ! coarse halo exchanged once per step if ANY block needs it
             ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/
@@ -3134,24 +3617,30 @@ contains
         impure subroutine s_amr_operator_checks()
 
             type(scalar_field), allocatable :: cscr(:)
-            integer                         :: fi, fj, fk, ci, cj, ck, ox, oy, oz
-            real(wp)                        :: e, errb, errc, si_f, si_c, dvf, dvc, want
+            integer                         :: fi, fj, fk, ci, cj, ck, l1, l2, l3, g1, g2, g3
+            real(wp)                        :: e, errb, errc, si_f, si_c, dvf, dvc, want, xc, yc, zc
 
             if (.not. amr) return
             if (.not. amr_rank_owns_block) return
-            ox = start_idx(1); oy = 0; oz = 0
-            if (n_glb > 0) oy = start_idx(2)
-            if (p_glb > 0) oz = start_idx(3)
+            ! fine-level distribution: the owner's block need not lie in its coarse subdomain, so operate in the block-local patch
+            ! frame (the amr_cg frame: cell 0 == region_lo - nmar) and take coarse cell centres/spacings from the GLOBAL boundaries.
+            amr_cpat_off = 0
+            amr_cpat_off(1) = amr_isect_lo(1) - amr_cpat_mar
+            if (n_glb > 0) amr_cpat_off(2) = amr_isect_lo(2) - amr_cpat_mar
+            if (p_glb > 0) amr_cpat_off(3) = amr_isect_lo(3) - amr_cpat_mar
 
-            ! (b) fill a coarse scratch with an exactly-linear field, prolong, compare pointwise
+            ! (b) fill a coarse-patch scratch with an exactly-linear field (global coords), prolong, compare pointwise
             allocate (cscr(1:1))
-            allocate (cscr(1)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
-            do ck = idwbuff(3)%beg, idwbuff(3)%end
-                do cj = idwbuff(2)%beg, idwbuff(2)%end
-                    do ci = idwbuff(1)%beg, idwbuff(1)%end
-                        cscr(1)%sf(ci, cj, ck) = 1._wp + 2._wp*x_cc(ci)
-                        if (n_glb > 0) cscr(1)%sf(ci, cj, ck) = cscr(1)%sf(ci, cj, ck) + 3._wp*y_cc(cj)
-                        if (p_glb > 0) cscr(1)%sf(ci, cj, ck) = cscr(1)%sf(ci, cj, ck) + 4._wp*z_cc(ck)
+            allocate (cscr(1)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
+            do l3 = 0, amr_cpat_hi(3)
+                g3 = l3 + amr_cpat_off(3); zc = 0._wp; if (p_glb > 0) zc = 0.5_wp*(amr_gzcb(g3 - 1) + amr_gzcb(g3))
+                do l2 = 0, amr_cpat_hi(2)
+                    g2 = l2 + amr_cpat_off(2); yc = 0._wp; if (n_glb > 0) yc = 0.5_wp*(amr_gycb(g2 - 1) + amr_gycb(g2))
+                    do l1 = 0, amr_cpat_hi(1)
+                        g1 = l1 + amr_cpat_off(1); xc = 0.5_wp*(amr_gxcb(g1 - 1) + amr_gxcb(g1))
+                        cscr(1)%sf(l1, l2, l3) = 1._wp + 2._wp*xc
+                        if (n_glb > 0) cscr(1)%sf(l1, l2, l3) = cscr(1)%sf(l1, l2, l3) + 3._wp*yc
+                        if (p_glb > 0) cscr(1)%sf(l1, l2, l3) = cscr(1)%sf(l1, l2, l3) + 4._wp*zc
                     end do
                 end do
             end do
@@ -3196,10 +3685,10 @@ contains
             do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
                 do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
                     do ci = amr_isect_lo(1), amr_isect_hi(1)
-                        dvc = dx(ci - ox)
-                        if (n_glb > 0) dvc = dvc*dy(cj - oy)
-                        if (p_glb > 0) dvc = dvc*dz(ck - oz)
-                        si_c = si_c + dvc*real(cscr(1)%sf(ci - ox, cj - oy, ck - oz), wp)
+                        dvc = amr_gxcb(ci) - amr_gxcb(ci - 1)  ! GLOBAL coarse spacing (owner may not hold local dx here)
+                        if (n_glb > 0) dvc = dvc*(amr_gycb(cj) - amr_gycb(cj - 1))
+                        if (p_glb > 0) dvc = dvc*(amr_gzcb(ck) - amr_gzcb(ck - 1))
+                        si_c = si_c + dvc*real(cscr(1)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), wp)
                     end do
                 end do
             end do
@@ -3285,12 +3774,20 @@ contains
                 if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)
                 if (allocated(amr_slots(islot)%z_cb)) deallocate (amr_slots(islot)%z_cb, amr_slots(islot)%z_cc, amr_slots(islot)%dz)
             end do
+            do i = 1, sys_size
+                @:DEALLOCATE(amr_cg(i)%sf)
+            end do
+            @:DEALLOCATE(amr_cg)
+            deallocate (amr_decomp)
             deallocate (amr_slots)
             deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
             if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
             if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
             if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
             if (allocated(amr_block_owner)) deallocate (amr_block_owner)
+            if (allocated(amr_gxcb)) deallocate (amr_gxcb)
+            if (allocated(amr_gycb)) deallocate (amr_gycb)
+            if (allocated(amr_gzcb)) deallocate (amr_gzcb)
             if (igr) then
                 @:DEALLOCATE(sw_jac)
                 @:DEALLOCATE(sw_jac_old)

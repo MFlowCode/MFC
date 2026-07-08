@@ -17,7 +17,6 @@ module m_mpi_proxy
     use m_derived_types
     use m_global_parameters
     use m_mpi_common
-    use m_amr_registers, only: freg, s_amr_reflux_face_flags
     use m_nvtx
     use ieee_arithmetic
 
@@ -233,60 +232,6 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_amr_fine_halo
-
-    !> AMR reflux-register exchange: where a block face lies exactly ON a rank boundary, the fine side (freg) and the outside cells
-    !! (creg capture + apply) live on different ranks - the fine-side rank sends its freg face registers to the outside rank before
-    !! the apply. Whole-array MPI_SENDRECV_REPLACE (send-only keeps the buffer; the two sides allocate identical extents: cart
-    !! neighbors share transverse subdomains, and a rank is never both sender and receiver of the same face). ALL ranks must call
-    !! this at the same point (paired point-to-point; non-participants no-op). No-op without MPI, at np=1, or for interior faces.
-    impure subroutine s_mpi_sendrecv_amr_reflux_faces()
-
-#ifdef MFC_MPI
-        integer :: sidx(3), ext(3), dst, src, ierr
-        logical :: own_lo(3), own_hi(3), snd, rcv
-
-        if (.not. amr) return
-        if (num_procs == 1) return
-        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
-        #:for D, BCD in [(1, 'bc_x'), (2, 'bc_y'), (3, 'bc_z')]
-            if (${D}$ <= num_dims) then
-                ! low face of the block in dim ${D}$: fine side = rank whose subdomain STARTS at the face
-                snd = amr_rank_owns_block .and. amr_region_lo(${D}$) == sidx(${D}$)
-                rcv = own_lo(${D}$) .and. amr_region_lo(${D}$) - 1 == sidx(${D}$) + ext(${D}$)
-                if (snd .or. rcv) then
-                    dst = MPI_PROC_NULL; src = MPI_PROC_NULL
-                    if (snd) then
-                        dst = ${BCD}$%beg
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo]')
-                    end if
-                    if (rcv) src = ${BCD}$%end
-                    call MPI_SENDRECV_REPLACE(freg(${D}$)%lo, size(freg(${D}$)%lo), mpi_p, dst, ${2*D}$, src, ${2*D}$, &
-                                              & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    if (rcv) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo]')
-                    end if
-                end if
-                ! high face of the block in dim ${D}$: fine side = rank whose subdomain ENDS at the face
-                snd = amr_rank_owns_block .and. amr_region_hi(${D}$) == sidx(${D}$) + ext(${D}$)
-                rcv = own_hi(${D}$) .and. amr_region_hi(${D}$) + 1 == sidx(${D}$)
-                if (snd .or. rcv) then
-                    dst = MPI_PROC_NULL; src = MPI_PROC_NULL
-                    if (snd) then
-                        dst = ${BCD}$%end
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi]')
-                    end if
-                    if (rcv) src = ${BCD}$%beg
-                    call MPI_SENDRECV_REPLACE(freg(${D}$)%hi, size(freg(${D}$)%hi), mpi_p, dst, ${2*D + 1}$, src, ${2*D + 1}$, &
-                                              & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    if (rcv) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi]')
-                    end if
-                end if
-            end if
-        #:endfor
-#endif
-
-    end subroutine s_mpi_sendrecv_amr_reflux_faces
 
     !> Since only the processor with rank 0 reads and verifies the consistency of user inputs, these are initially not available to
     !! the other processors. Then, the purpose of this subroutine is to distribute the user inputs to the remaining processors in

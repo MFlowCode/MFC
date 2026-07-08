@@ -445,6 +445,22 @@ contains
 
     end subroutine s_mpi_allreduce_max
 
+    !> In-place elementwise max-reduction of a real array across all ranks. Assembles a rank-partitioned global array: each element
+    !! written (identically) by its owner(s), sentinel-low elsewhere, so MAX recovers the exact global array with no
+    !! double-counting.
+    impure subroutine s_mpi_allreduce_array_max(arr, arr_len)
+
+        integer, intent(in)                         :: arr_len
+        real(wp), dimension(arr_len), intent(inout) :: arr
+
+#ifdef MFC_MPI
+        integer :: ierr
+
+        call MPI_ALLREDUCE(MPI_IN_PLACE, arr, arr_len, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+#endif
+
+    end subroutine s_mpi_allreduce_array_max
+
     !> Reduce a local real value to its global minimum across all ranks
     impure subroutine s_mpi_reduce_min(var_loc)
 

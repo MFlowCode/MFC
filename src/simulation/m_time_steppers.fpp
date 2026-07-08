@@ -28,7 +28,8 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
-    use m_amr, only: s_advance_amr_fine_stage, s_advance_amr_fine_substeps, s_restrict_fine_to_coarse, s_amr_relax_fine
+    use m_amr, only: s_advance_amr_fine_stage, s_advance_amr_fine_substeps, s_restrict_fine_to_coarse, s_amr_relax_fine, &
+        & s_amr_p2p_reflux_faces
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -511,7 +512,7 @@ contains
                     call s_advance_amr_fine_stage(s, rk_coef(s,:), q_cons_ts(1)%vf, bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, &
                                                   & mv_ts(1)%sf, rhs_mv, t_step, time_avg)
                     ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
-                    call s_mpi_sendrecv_amr_reflux_faces()
+                    call s_amr_p2p_reflux_faces()
                     call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
                 end do
                 call s_amr_select_slot(1)
@@ -615,7 +616,7 @@ contains
                 if (relax) call s_amr_relax_fine()
                 call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
                 ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
-                if (amr_subcycle) call s_mpi_sendrecv_amr_reflux_faces()
+                if (amr_subcycle) call s_amr_p2p_reflux_faces()
                 if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
             end do
             call s_amr_select_slot(1)

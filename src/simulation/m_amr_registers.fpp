@@ -59,13 +59,17 @@ contains
 
     !> Reflux-face participation for THIS rank: own_lo(d)/own_hi(d) = it owns the coarse cell layer just OUTSIDE the block's
     !! low/high face in dim d (where the coarse capture and both reflux applies run; at an interior face the same rank also holds
-    !! the inside cells) - i.e. the outside layer lies in its subdomain in dim d and its block intersection is nonempty in the
-    !! transverse dims. All true at np=1. Also returns sidx/ext (collapsed dims pinned to 0). Reads the COARSE grid state in m/n/p -
-    !! never call from inside the fine advance (the swapped fine branch of the capture).
-    impure subroutine s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+    !! the inside cells) - i.e. the outside layer lies in its subdomain in dim d and the block's transverse range overlaps its
+    !! subdomain. Fine-level distribution: participation is derived from the REPLICATED block range vs this rank's coarse subdomain
+    !! (NOT amr_isect, which is owner-only under whole-block ownership); tlo/thi return the GLOBAL transverse overlap
+    !! [max(region_lo, sidx) : min(region_hi, sidx+ext)] per dim, so capture and apply share a block-relative frame aligned with the
+    !! owner's freg. All true / full-block at np=1. Also returns sidx/ext (collapsed dims pinned to 0). Reads the COARSE grid state
+    !! in m/n/p.
+    impure subroutine s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
 
         integer, intent(out) :: sidx(3), ext(3)
         logical, intent(out) :: own_lo(3), own_hi(3)
+        integer, intent(out) :: tlo(3), thi(3)
         logical              :: tv(3), tvd
         integer              :: d, t
 
@@ -73,9 +77,14 @@ contains
         sidx(1) = start_idx(1); ext(1) = m
         if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
         if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
-        tv(1) = amr_isect_lo(1) <= amr_isect_hi(1)
-        tv(2) = (n_glb == 0) .or. amr_isect_lo(2) <= amr_isect_hi(2)
-        tv(3) = (p_glb == 0) .or. amr_isect_lo(3) <= amr_isect_hi(3)
+        ! global transverse overlap of the block with this rank's coarse subdomain (collapsed dims pin to 0)
+        do d = 1, 3
+            tlo(d) = max(amr_region_lo(d), sidx(d))
+            thi(d) = min(amr_region_hi(d), sidx(d) + ext(d))
+        end do
+        tv(1) = tlo(1) <= thi(1)
+        tv(2) = (n_glb == 0) .or. tlo(2) <= thi(2)
+        tv(3) = (p_glb == 0) .or. tlo(3) <= thi(3)
         own_lo = .false.; own_hi = .false.
         do d = 1, num_dims
             tvd = .true.
@@ -88,21 +97,21 @@ contains
 
     end subroutine s_amr_reflux_face_flags
 
-    impure subroutine s_initialize_amr_registers()
+    impure subroutine s_initialize_amr_registers(maxc_fit)
 
-        integer :: maxc1, maxc2, maxc3, max_f1, max_f2, max_f3
+        integer, intent(in) :: maxc_fit(3)  !< amr_maxc_fit from m_amr (min-over-ranks local half-extent = max block a rank owns)
+        integer             :: maxc1, maxc2, maxc3, max_f1, max_f2, max_f3
 
         if (.not. amr) return
-        ! Registers on ALL ranks: regrid moves the block faces, so any rank can become a participant (fine
-        ! cells for freg; outside face layer for creg capture + apply and for RECEIVING freg slices when a
-        ! block face sits on a rank boundary). Participation is re-derived per call from the current box.
-        ! max coarse block cells per dim THIS rank can cover (must match m_amr's preallocation cap). The
-        ! transverse extents match the face-neighbor's by construction (cart neighbors share transverse
-        ! subdomains), so the whole-array freg sendrecvs in m_mpi_proxy pair up exactly.
-        maxc1 = min((m_glb + 1)/2, (m + 1)/2)
+        ! Registers on ALL ranks: regrid moves the block faces, so any rank can become a participant (fine cells for freg; outside
+        ! face layer for creg capture + apply and for RECEIVING freg from the block owner). Fine-level distribution: freg is
+        ! captured for the WHOLE block and indexed block-relative by every applier, so registers must span a whole block. The
+        ! largest block a rank can own is amr_maxc_fit (the scratch-constraint cap), so size to it - matches m_amr's fine arrays
+        ! and right-sizes the face registers to ~1/num_procs^(d-1) the global-half memory at scale.
+        maxc1 = maxc_fit(1)
         maxc2 = 1; maxc3 = 1
-        if (n_glb > 0) maxc2 = min((n_glb + 1)/2, (n + 1)/2)
-        if (p_glb > 0) maxc3 = min((p_glb + 1)/2, (p + 1)/2)
+        if (n_glb > 0) maxc2 = maxc_fit(2)
+        if (p_glb > 0) maxc3 = maxc_fit(3)
         max_f1 = 2*maxc1 - 1
         max_f2 = 0; max_f3 = 0
         if (n_glb > 0) max_f2 = 2*maxc2 - 1
@@ -138,8 +147,8 @@ contains
         type(vector_field), intent(in) :: flux_dir
         type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
-        integer                        :: eq, t1, t2, jlo, jhi, t1_hi, t2_hi, o1, o2, islot, save_cur
-        integer                        :: sidx(3), ext(3)
+        integer                        :: eq, t1, t2, jlo, jhi, t1_lo, t1_hi, t2_lo, t2_hi, o1, o2, islot, save_cur
+        integer                        :: sidx(3), ext(3), tlo(3), thi(3)
         logical                        :: own_lo(3), own_hi(3), cap_lo, cap_hi
         real(wp)                       :: coef
         logical                        :: accum
@@ -297,23 +306,25 @@ contains
             save_cur = amr_cur
             do islot = 1, amr_num_blocks
                 call s_amr_select_slot(islot)
-                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
                 cap_lo = own_lo(id); cap_hi = own_hi(id)
                 if (cap_lo .or. cap_hi) then
+                    ! block-relative transverse frame (0-based from region_lo, aligned with the owner's freg): this rank fills
+                    ! creg over its owned overlap [tlo-region_lo : thi-region_lo]; o1/o2 map that back to LOCAL flux indices.
                     select case (id)
                     case (1); jlo = amr_region_lo(1) - 1 - sidx(1); jhi = amr_region_hi(1) - sidx(1)
-                        t1_hi = amr_isect_hi(2) - amr_isect_lo(2); o1 = amr_isect_lo(2) - sidx(2)
-                        t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
+                        t1_lo = tlo(2) - amr_region_lo(2); t1_hi = thi(2) - amr_region_lo(2); o1 = amr_region_lo(2) - sidx(2)
+                        t2_lo = tlo(3) - amr_region_lo(3); t2_hi = thi(3) - amr_region_lo(3); o2 = amr_region_lo(3) - sidx(3)
                     case (2); jlo = amr_region_lo(2) - 1 - sidx(2); jhi = amr_region_hi(2) - sidx(2)
-                        t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
-                        t2_hi = amr_isect_hi(3) - amr_isect_lo(3); o2 = amr_isect_lo(3) - sidx(3)
+                        t1_lo = tlo(1) - amr_region_lo(1); t1_hi = thi(1) - amr_region_lo(1); o1 = amr_region_lo(1) - sidx(1)
+                        t2_lo = tlo(3) - amr_region_lo(3); t2_hi = thi(3) - amr_region_lo(3); o2 = amr_region_lo(3) - sidx(3)
                     case (3); jlo = amr_region_lo(3) - 1 - sidx(3); jhi = amr_region_hi(3) - sidx(3)
-                        t1_hi = amr_isect_hi(1) - amr_isect_lo(1); o1 = amr_isect_lo(1) - sidx(1)
-                        t2_hi = amr_isect_hi(2) - amr_isect_lo(2); o2 = amr_isect_lo(2) - sidx(2)
+                        t1_lo = tlo(1) - amr_region_lo(1); t1_hi = thi(1) - amr_region_lo(1); o1 = amr_region_lo(1) - sidx(1)
+                        t2_lo = tlo(2) - amr_region_lo(2); t2_hi = thi(2) - amr_region_lo(2); o2 = amr_region_lo(2) - sidx(2)
                     end select
                     $:GPU_PARALLEL_LOOP(collapse=3)
-                    do t2 = 0, t2_hi
-                        do t1 = 0, t1_hi
+                    do t2 = t2_lo, t2_hi
+                        do t1 = t1_lo, t1_hi
                             do eq = 1, sys_size
                                 select case (id)
                                 case (1)
@@ -376,8 +387,8 @@ contains
                     ! face gating and transverse offsets as the base capture; always accumulate.
                     if (viscous) then
                         $:GPU_PARALLEL_LOOP(collapse=3)
-                        do t2 = 0, t2_hi
-                            do t1 = 0, t1_hi
+                        do t2 = t2_lo, t2_hi
+                            do t1 = t1_lo, t1_hi
                                 do eq = eqn_idx%mom%beg, eqn_idx%E
                                     select case (id)
                                     case (1)
@@ -406,8 +417,8 @@ contains
                     ! gating and transverse offsets as the base capture; always accumulate.
                     if (chemistry .and. chem_params%diffusion) then
                         $:GPU_PARALLEL_LOOP(collapse=2)
-                        do t2 = 0, t2_hi
-                            do t1 = 0, t1_hi
+                        do t2 = t2_lo, t2_hi
+                            do t1 = t1_lo, t1_hi
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do eq = eqn_idx%species%beg, eqn_idx%species%end
                                     select case (id)
@@ -466,31 +477,29 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch, islot
-        integer                                                :: nx_c, ny_c, nz_c, ol1, ol2, ol3, oh1, oh2, oh3, tl1, tl2, tl3
-        integer                                                :: dd1_hi, dd2_hi, sidx(3), ext(3)
+        integer                                                :: bl1, bh1, bl2, bh2, bl3, bh3, ol1, ol2, ol3, oh1, oh2, oh3
+        integer                                                :: tl1, tl2, tl3, dd1_hi, dd2_hi, sidx(3), ext(3), tlo(3), thi(3)
         logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
         real(wp)                                               :: fblo, fbhi, mlo, mhi
 
         if (.not. amr) return
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
-        ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer
-        ! (all faces at np=1); freg slices from a rank-boundary face's fine side arrive via
-        ! s_mpi_sendrecv_amr_reflux_faces before this is called
-        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+        ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer (all faces at np=1);
+        ! the owner's freg is broadcast to every participant by s_mpi_bcast_amr_reflux_faces before this is called
+        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
         if (.not. (any(own_lo) .or. any(own_hi))) return
         ! device kernels: the coarse rhs stays device-resident for the coarse RK update kernel
         d2 = n_glb > 0; d3 = p_glb > 0
-        ! this rank's covered block cells (isect-relative, 0-based): 0..n{x,y,z}_c; matches creg/freg indexing
-        nx_c = amr_isect_hi(1) - amr_isect_lo(1)
-        ny_c = 0; nz_c = 0
-        if (n_glb > 0) ny_c = amr_isect_hi(2) - amr_isect_lo(2)
-        if (p_glb > 0) nz_c = amr_isect_hi(3) - amr_isect_lo(3)
-        ! LOCAL cell indices (rhs_vf/dx are rank-local): outside cells ol/oh, isect transverse origins tl
+        ! block-relative transverse frame (aligned with the owner's freg): loop c over each dim's owned overlap [bl:bh] =
+        ! [tlo-region_lo : thi-region_lo]; creg/freg use c directly, LOCAL cell = tl + c with tl = region_lo - sidx.
+        bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
+        bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
+        bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
         ol1 = amr_region_lo(1) - 1 - sidx(1); oh1 = amr_region_hi(1) + 1 - sidx(1)
         ol2 = amr_region_lo(2) - 1 - sidx(2); oh2 = amr_region_hi(2) + 1 - sidx(2)
         ol3 = amr_region_lo(3) - 1 - sidx(3); oh3 = amr_region_hi(3) + 1 - sidx(3)
-        tl1 = amr_isect_lo(1) - sidx(1); tl2 = amr_isect_lo(2) - sidx(2); tl3 = amr_isect_lo(3) - sidx(3)
+        tl1 = amr_region_lo(1) - sidx(1); tl2 = amr_region_lo(2) - sidx(2); tl3 = amr_region_lo(3) - sidx(3)
         ! x-faces: transverse dims (y, z); children in each active transverse dim
         has_lo = own_lo(1); has_hi = own_hi(1)
         if (has_lo .or. has_hi) then
@@ -503,8 +512,8 @@ contains
             if (has_hi) mhi = dx(oh1)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = 0, nz_c
-                    do c1 = 0, ny_c
+                do c2 = bl3, bh3
+                    do c1 = bl2, bh2
                         f20 = 0; if (d3) f20 = 2*c2
                         f10 = 0; if (d2) f10 = 2*c1
                         fblo = 0._wp; fbhi = 0._wp
@@ -535,8 +544,8 @@ contains
             if (has_hi) mhi = dy(oh2)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = 0, nz_c
-                    do c1 = 0, nx_c
+                do c2 = bl3, bh3
+                    do c1 = bl1, bh1
                         f20 = 0; if (d3) f20 = 2*c2
                         f10 = 2*c1
                         fblo = 0._wp; fbhi = 0._wp
@@ -565,8 +574,8 @@ contains
             if (has_hi) mhi = dz(oh3)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = 0, ny_c
-                    do c1 = 0, nx_c
+                do c2 = bl2, bh2
+                    do c1 = bl1, bh1
                         f20 = 2*c2
                         f10 = 2*c1
                         fblo = 0._wp; fbhi = 0._wp
@@ -623,28 +632,27 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
         integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch, islot
-        integer                                                :: nx_c, ny_c, nz_c, ol1, ol2, ol3, oh1, oh2, oh3, tl1, tl2, tl3
-        integer                                                :: dd1_hi, dd2_hi, sidx(3), ext(3)
+        integer                                                :: bl1, bh1, bl2, bh2, bl3, bh3, ol1, ol2, ol3, oh1, oh2, oh3
+        integer                                                :: tl1, tl2, tl3, dd1_hi, dd2_hi, sidx(3), ext(3), tlo(3), thi(3)
         logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
         real(wp)                                               :: fblo, fbhi, mlo, mhi, dtl
 
         if (.not. amr) return
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
-        ! per-face participation and index conventions: see s_amr_apply_reflux
-        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi)
+        ! per-face participation and block-relative index conventions: see s_amr_apply_reflux
+        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
         if (.not. (any(own_lo) .or. any(own_hi))) return
         ! device kernels: the restricted coarse state stays device-resident
         d2 = n_glb > 0; d3 = p_glb > 0
         dtl = dt
-        nx_c = amr_isect_hi(1) - amr_isect_lo(1)
-        ny_c = 0; nz_c = 0
-        if (n_glb > 0) ny_c = amr_isect_hi(2) - amr_isect_lo(2)
-        if (p_glb > 0) nz_c = amr_isect_hi(3) - amr_isect_lo(3)
+        bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
+        bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
+        bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
         ol1 = amr_region_lo(1) - 1 - sidx(1); oh1 = amr_region_hi(1) + 1 - sidx(1)
         ol2 = amr_region_lo(2) - 1 - sidx(2); oh2 = amr_region_hi(2) + 1 - sidx(2)
         ol3 = amr_region_lo(3) - 1 - sidx(3); oh3 = amr_region_hi(3) + 1 - sidx(3)
-        tl1 = amr_isect_lo(1) - sidx(1); tl2 = amr_isect_lo(2) - sidx(2); tl3 = amr_isect_lo(3) - sidx(3)
+        tl1 = amr_region_lo(1) - sidx(1); tl2 = amr_region_lo(2) - sidx(2); tl3 = amr_region_lo(3) - sidx(3)
         has_lo = own_lo(1); has_hi = own_hi(1)
         if (has_lo .or. has_hi) then
             nch = 1
@@ -656,8 +664,8 @@ contains
             if (has_hi) mhi = dx(oh1)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = 0, nz_c
-                    do c1 = 0, ny_c
+                do c2 = bl3, bh3
+                    do c1 = bl2, bh2
                         f20 = 0; if (d3) f20 = 2*c2
                         f10 = 0; if (d2) f10 = 2*c1
                         fblo = 0._wp; fbhi = 0._wp
@@ -687,8 +695,8 @@ contains
             if (has_hi) mhi = dy(oh2)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = 0, nz_c
-                    do c1 = 0, nx_c
+                do c2 = bl3, bh3
+                    do c1 = bl1, bh1
                         f20 = 0; if (d3) f20 = 2*c2
                         f10 = 2*c1
                         fblo = 0._wp; fbhi = 0._wp
@@ -716,8 +724,8 @@ contains
             if (has_hi) mhi = dz(oh3)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = 0, ny_c
-                    do c1 = 0, nx_c
+                do c2 = bl2, bh2
+                    do c1 = bl1, bh1
                         f20 = 2*c2
                         f10 = 2*c1
                         fblo = 0._wp; fbhi = 0._wp
