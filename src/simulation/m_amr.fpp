@@ -512,6 +512,15 @@ contains
         real(wp), allocatable :: rbuf(:,:), sbuf(:)
         integer, allocatable  :: reqs(:), srank(:)
 
+        ! multi-level: a level>=2 block's coarse side is its PARENT block's fine cells, not the L0 base grid q_coarse - gather
+        ! amr_cg from the parent's fine array in the parent-fine frame (isect already parent-fine from s_set_amr_fine_geometry).
+        ! np=1 is a local copy; the np>=2 P2P version (parent owner -> block owner, mirroring the L0 path) is future work.
+
+        if (amr_block_level(amr_cur) >= 2) then
+            call s_amr_gather_from_parent(pull_host)
+            return
+        end if
+
         if (pull_host) then
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_coarse(i)%sf]')
@@ -613,6 +622,45 @@ contains
         end if
 
     end subroutine s_amr_gather_coarse_patch
+
+    !> Multi-level gather: fill amr_cg (the current level>=2 block's coarse patch) from its PARENT block's fine array, in the
+    !! parent-fine cell frame (amr_isect_lo/hi are already parent-fine from s_set_amr_fine_geometry). np=1 = a local copy on the
+    !! owner (which also owns the parent); the np>=2 point-to-point version (parent owner -> block owner) is future work.
+    impure subroutine s_amr_gather_from_parent(pull_host)
+
+        logical, intent(in) :: pull_host
+        integer             :: i, g1, g2, g3, pblk, w1, w2, w3
+
+        pblk = f_amr_parent_block(amr_cur)
+        amr_cpat_off = 0
+        amr_cpat_off(1) = amr_isect_lo(1) - amr_cpat_mar
+        if (n_glb > 0) amr_cpat_off(2) = amr_isect_lo(2) - amr_cpat_mar
+        if (p_glb > 0) amr_cpat_off(3) = amr_isect_lo(3) - amr_cpat_mar
+        w1 = (amr_isect_hi(1) - amr_isect_lo(1)) + 2*amr_cpat_mar
+        w2 = 0; w3 = 0
+        if (n_glb > 0) w2 = (amr_isect_hi(2) - amr_isect_lo(2)) + 2*amr_cpat_mar
+        if (p_glb > 0) w3 = (amr_isect_hi(3) - amr_isect_lo(3)) + 2*amr_cpat_mar
+        if (.not. amr_rank_owns_block) return  ! np=1: the owner holds both this block and its parent
+        if (pull_host) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_slots(pblk)%q_cons(i)%sf]')
+            end do
+        end if
+        do i = 1, sys_size
+            do g3 = 0, w3
+                do g2 = 0, w2
+                    do g1 = 0, w1
+                        amr_cg(i)%sf(g1, g2, g3) = amr_slots(pblk)%q_cons(i)%sf(g1 + amr_cpat_off(1), g2 + amr_cpat_off(2), &
+                               & g3 + amr_cpat_off(3))
+                    end do
+                end do
+            end do
+        end do
+        do i = 1, sys_size
+            $:GPU_UPDATE(device='[amr_cg(i)%sf]')
+        end do
+
+    end subroutine s_amr_gather_from_parent
 
     !> This rank's (r's) contiguous owned coarse-cell range per dim from the replicated amr_decomp table: interior [start:start+ext]
     !! plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal to the set where
@@ -899,7 +947,7 @@ contains
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
-        integer             :: sidx(3), ext(3), nmar, bad_loc, bad_glb
+        integer             :: sidx(3), ext(3), nmar, bad_loc, bad_glb, pblk, d, rr
 
         amr_slots(amr_cur)%region%lo = lo; amr_slots(amr_cur)%region%hi = hi
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
@@ -912,8 +960,22 @@ contains
         ! At np=1 the owner is rank 0 and the footprint is the whole domain-resident block, so
         ! this reduces exactly to the old mirror (block \cap subdomain == whole block).
         amr_rank_owns_block = (amr_block_owner(amr_cur) == proc_rank)
+        pblk = 0
         if (amr_rank_owns_block) then
             amr_isect_lo = lo; amr_isect_hi = hi
+            if (amr_block_level(amr_cur) >= 2) then
+                ! multi-level: express the coarse footprint in the PARENT block's fine-cell frame (a level-l block's coarse side
+                ! is level l-1). parent-fine index of L0 cell c is rr*(c - R1.lo) where rr is the parent's ref_ratio; the block
+                ! spans rr fine cells per parent-covered L0 cell. m below then gets ref_ratio*(footprint) cells, as for a level-1
+                ! block over L0. amr_cg / the prolong read this frame, so no other coupling code changes for the local (np=1) path.
+                pblk = f_amr_parent_block(amr_cur); rr = amr_slots(pblk)%ref_ratio
+                do d = 1, 3
+                    amr_isect_lo(d) = rr*(lo(d) - amr_region_lo_all(d, pblk))
+                    amr_isect_hi(d) = rr*(hi(d) - amr_region_lo_all(d, pblk)) + (rr - 1)
+                end do
+                if (n_glb == 0) then; amr_isect_lo(2) = 0; amr_isect_hi(2) = 0; end if
+                if (p_glb == 0) then; amr_isect_lo(3) = 0; amr_isect_hi(3) = 0; end if
+            end if
         else
             amr_isect_lo = 1; amr_isect_hi = 0  ! empty footprint
             if (n_glb > 0) then; amr_isect_lo(2) = 1; amr_isect_hi(2) = 0; end if
@@ -937,10 +999,17 @@ contains
         end if
         ! coord building only on ranks with fine cells (others never read their coord arrays); the parent origin
         ! is this rank's INTERSECTION start, converted to LOCAL indexing so the bisection reads its x_cb slice
-        if (amr_rank_owns_block) then
-            ! whole-block fine coords from the GLOBAL boundaries (owner may not hold the coarse
-            ! coordinate slice for cells it now refines). amr_gxcb has lbound -1; the parent
-            ! origin is the block's GLOBAL low corner.
+        if (amr_rank_owns_block .and. amr_block_level(amr_cur) >= 2) then
+            ! level >= 2: bisect the PARENT block's fine coords (its x_cb, lbound -1), parent origin = the parent-fine footprint
+            call s_build_level_coords(amr_slots(pblk)%x_cb, -1, amr_isect_lo(1), amr_slots(amr_cur)%m, amr_slots(amr_cur)%x_cb, &
+                                      & amr_slots(amr_cur)%x_cc, amr_slots(amr_cur)%dx)
+            if (n_glb > 0) call s_build_level_coords(amr_slots(pblk)%y_cb, -1, amr_isect_lo(2), amr_slots(amr_cur)%n, &
+                & amr_slots(amr_cur)%y_cb, amr_slots(amr_cur)%y_cc, amr_slots(amr_cur)%dy)
+            if (p_glb > 0) call s_build_level_coords(amr_slots(pblk)%z_cb, -1, amr_isect_lo(3), amr_slots(amr_cur)%p, &
+                & amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, amr_slots(amr_cur)%dz)
+        else if (amr_rank_owns_block) then
+            ! level 1: whole-block fine coords from the GLOBAL L0 boundaries (owner may not hold the coarse coordinate slice for
+            ! cells it now refines). amr_gxcb has lbound -1; the parent origin is the block's GLOBAL low corner.
             call s_build_level_coords(amr_gxcb, -1, amr_isect_lo(1), amr_slots(amr_cur)%m, amr_slots(amr_cur)%x_cb, &
                                       & amr_slots(amr_cur)%x_cc, amr_slots(amr_cur)%dx)
             if (n_glb > 0) call s_build_level_coords(amr_gycb, -1, amr_isect_lo(2), amr_slots(amr_cur)%n, &
@@ -1185,9 +1254,71 @@ contains
                 if (qbmm .and. .not. polytropic) call s_amr_prolong_pbmv()
             end if
         end do
+        if (amr_max_level >= 2) call s_amr_test_multilevel(q_cons_base)
         call s_amr_select_slot(1)
 
     end subroutine s_populate_amr_fine
+
+    !> Multi-level coupling self-test (development milestone; np=1, static). Nest ONE level-2 block inside block 1, populate it from
+    !! the parent (level-aware gather + prolong), and check that restrict(level-2 fine) recovers the parent-fine coarse it was
+    !! prolonged from (conservation err ~ 0 => the level-aware geometry/gather/prolong/restrict are consistent). Non-intrusive: the
+    !! level-2 block is removed afterward, so the run continues single-level. The recursive advance/regrid (increments 3-4) follow.
+    impure subroutine s_amr_test_multilevel(q_cons_base)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
+        integer                                                :: L2, n1, i, ci, cj, ck, inset(3)
+        real(wp)                                               :: err, e
+        type(scalar_field), dimension(:), allocatable          :: scratch
+
+        if (amr_max_level < 2 .or. num_procs > 1) return
+        n1 = amr_num_blocks
+        if (n1 < 1 .or. n1 + 1 > amr_max_blocks) return
+        L2 = n1 + 1
+        inset = 0
+        inset(1) = max((amr_region_hi_all(1, 1) - amr_region_lo_all(1, 1) + 1)/4, amr_cpat_mar)
+        if (n_glb > 0) inset(2) = max((amr_region_hi_all(2, 1) - amr_region_lo_all(2, 1) + 1)/4, amr_cpat_mar)
+        if (p_glb > 0) inset(3) = max((amr_region_hi_all(3, 1) - amr_region_lo_all(3, 1) + 1)/4, amr_cpat_mar)
+        amr_region_lo_all(:,L2) = amr_region_lo_all(:,1) + inset
+        amr_region_hi_all(:,L2) = amr_region_hi_all(:,1) - inset
+        amr_block_level(L2) = 2
+        amr_block_owner(L2) = amr_block_owner(1)
+        amr_num_blocks = L2; amr_num_levels = 2
+        call s_amr_reconcile_slots()
+        amr_cur = L2
+        call s_set_amr_fine_geometry(amr_region_lo_all(:,L2), amr_region_hi_all(:,L2))
+        call s_amr_gather_coarse_patch(amr_slots(1)%q_cons, .false.)  ! q_coarse ignored for level>=2 (reads the parent block)
+        if (amr_rank_owns_block) then
+            call s_interpolate_coarse_to_fine()
+            allocate (scratch(1:sys_size))
+            do i = 1, sys_size
+                allocate (scratch(i)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
+                call s_restrict_one_var(amr_slots(amr_cur)%q_cons(i), scratch(i))
+            end do
+            err = 0._wp
+            do i = 1, sys_size
+                do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
+                    do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
+                        do ci = amr_isect_lo(1), amr_isect_hi(1)
+                            e = abs(real(scratch(i)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), &
+                                    & wp) - real(amr_cg(i)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), &
+                                    & wp))
+                            if (e > err) err = e
+                        end do
+                    end do
+                end do
+                deallocate (scratch(i)%sf)
+            end do
+            deallocate (scratch)
+            print '(A,I0,A,ES12.4)', ' [amr] MULTILEVEL self-test (L2 block ', L2, '): restrict-prolong conservation err = ', err
+        end if
+        call s_amr_free_slot(L2)
+        amr_block_level(L2) = 1; amr_num_blocks = n1; amr_num_levels = 1
+        ! restore amr_cg + the patch frame (amr_cpat_off) to block 1: the L2 gather above overwrote them with the parent-fine
+        ! frame, and the normal single-block conservation check that follows reads block 1's frame.
+        call s_amr_select_slot(1)
+        call s_amr_gather_coarse_patch(q_cons_base, .false.)
+
+    end subroutine s_amr_test_multilevel
 
     !> Volume-weighted restriction for a single variable pair. Reads from qf (fine, must include interior 0:amr_slots(amr_cur)%m
     !! etc.); writes to qc (coarse, over the block).
