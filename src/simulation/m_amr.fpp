@@ -3721,9 +3721,10 @@ contains
 
         !> Restore the fine level from the AMR restart file at t_step_start (n_start under cfl_dt), if one exists: for each saved
         !! block rebuild the box via s_set_amr_fine_geometry, then read each rank's intersection-local fine state (exact stp
-        !! round-trip). Requires the rank count + decomposition that wrote the file. restored = false on a fresh start, or - with a
-        !! one-line warning - on a legacy restart without the file; the caller then re-prolongs from coarse. Collective: ALL ranks
-        !! call together.
+        !! round-trip). parallel_io REPARTITIONS across rank counts (each block is one contiguous region-sized chunk under
+        !! whole-block ownership, re-assigned to this run's owners); serial (per-rank files) still needs the writing rank count.
+        !! restored = false on a fresh start, or - with a one-line warning - on a legacy restart without the file; the caller then
+        !! re-prolongs from coarse. Collective: ALL ranks call together.
         impure subroutine s_read_amr_restart(restored)
 
             logical, intent(out)                 :: restored
@@ -3734,7 +3735,7 @@ contains
             logical, allocatable                 :: had_data(:)
 
 #ifdef MFC_MPI
-            integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
+            integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes, np_old
             integer                                    :: myext(3)
             integer, allocatable                       :: wext(:), rext(:)
             integer, dimension(MPI_STATUS_SIZE)        :: status
@@ -3774,8 +3775,10 @@ contains
                 open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
                 read (2) ghdr
                 if (ghdr(1) /= num_procs) then
-                    write (msg, '(A,I0,A,I0,A)') 'amr restart rank-count mismatch: the AMR restart file was written with ', &
-                           & ghdr(1), ' ranks but this run has ', num_procs, '; restart with the same rank count'
+                    write (msg, &
+                           & '(A,I0,A,I0,A)') 'amr restart rank-count mismatch: the serial (non-parallel_io) AMR restart ' &
+                           & // 'file was written with ', ghdr(1), ' ranks but this run has ', num_procs, &
+                           & '; restart with the same rank count, or use parallel_io (which repartitions across rank counts)'
                     call s_mpi_abort(trim(msg))
                 end if
                 if (ghdr(3) /= sys_size) then
@@ -3839,10 +3842,14 @@ contains
                 if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart read: MPI_FILE_OPEN failed for ' // trim(file_loc))
                 call MPI_FILE_GET_SIZE(ifile, fsz, ierr)
                 call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
-                if (ghdr(1) /= num_procs) then
-                    write (msg, '(A,I0,A,I0,A)') 'amr restart rank-count mismatch: the AMR restart file was written with ', &
-                           & ghdr(1), ' ranks but this run has ', num_procs, '; restart with the same rank count'
-                    call s_mpi_abort(trim(msg))
+                ! Repartition-on-restart: the writer's rank count sets only the file layout (the 3*np_old per-block
+                ! extents record). Whole-block ownership makes each block's fine data one contiguous region-sized chunk,
+                ! so ANY new rank count can read it - pass 2 re-assigns owners for THIS run and each new owner reads its
+                ! whole blocks. np_old == num_procs is byte-identical to the same-rank path (and keeps the layout check).
+                np_old = ghdr(1)
+                if (np_old /= num_procs .and. proc_rank == 0) then
+                    print '(A,I0,A,I0,A)', ' [amr] restart: repartitioning a ', np_old, '-rank checkpoint onto ', num_procs, &
+                        & ' ranks (fine blocks re-assigned by this run''s SFC map)'
                 end if
                 if (ghdr(3) /= sys_size) then
                     write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
@@ -3856,7 +3863,7 @@ contains
                                      & // 'in this run; restart with amr_max_blocks at least the written block count')
                 end if
                 amr_num_blocks = ghdr(2)
-                allocate (wext(3*num_procs), rext(3*num_procs), blk_base(amr_num_blocks))
+                allocate (wext(3*np_old), rext(3*num_procs), blk_base(amr_num_blocks))
                 ! PASS 1: read every block's region (collective) and lay out the file offsets. Under whole-block
                 ! ownership the per-block data size is fixed by the region (one owner holds all sys_size*cells),
                 ! so all offsets are known before the owner map is rebuilt in pass 2.
@@ -3873,7 +3880,7 @@ contains
                     blk_base(k) = disp0
                     cnt = sys_size*(2*(reg(4) - reg(1) + 1))*merge(2*(reg(5) - reg(2) + 1), 1, &
                                     & n_glb > 0)*merge(2*(reg(6) - reg(3) + 1), 1, p_glb > 0)
-                    disp0 = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND) + int(cnt, MPI_OFFSET_KIND)*int(sbytes, &
+                    disp0 = disp0 + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND) + int(cnt, MPI_OFFSET_KIND)*int(sbytes, &
                                         & MPI_OFFSET_KIND)
                 end do
                 ! PASS 2: rebuild whole-block owners from the regions, then per block build geometry under the
@@ -3882,18 +3889,22 @@ contains
                 do k = 1, amr_num_blocks
                     amr_cur = k
                     call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
-                    ! validate the writer's per-rank layout against this run's decomposition: a
-                    ! mismatch (e.g. re-derived load_balance splits at restart) would silently
-                    ! misalign every rank's slice of the concatenated data
-                    call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, &
-                                              & MPI_INTEGER, status, ierr)
-                    myext = 0
-                    if (amr_rank_owns_block) myext = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
-                    call MPI_ALLGATHER(myext, 3, MPI_INTEGER, rext, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                    if (any(rext /= wext)) then
-                        call s_mpi_abort('amr restart: the per-rank fine-block layout in the file does not match ' &
-                                         & // 'this run''s decomposition; the rank count, ownership, and (with ' &
-                                         & // 'load_balance) the weighted splits must match the run that wrote the restart')
+                    ! same rank count: validate the writer's per-rank layout against this run's decomposition (a
+                    ! re-derived load_balance split would silently misalign every rank's slice). Repartitioning
+                    ! (np_old /= num_procs) intentionally uses a DIFFERENT decomposition, so the layout cannot match -
+                    ! skip the check; whole-block ownership makes each block one contiguous chunk the new owner reads
+                    ! wholly, and the file-size check below still fails closed on a truncated/corrupt file.
+                    if (np_old == num_procs) then
+                        call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*np_old, &
+                                                  & MPI_INTEGER, status, ierr)
+                        myext = 0
+                        if (amr_rank_owns_block) myext = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
+                        call MPI_ALLGATHER(myext, 3, MPI_INTEGER, rext, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        if (any(rext /= wext)) then
+                            call s_mpi_abort('amr restart: the per-rank fine-block layout in the file does not match ' &
+                                             & // 'this run''s decomposition; with the same rank count the ownership and ' &
+                                             & // '(with load_balance) the weighted splits must match the run that wrote the restart')
+                        end if
                     end if
                     cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
                     if (.not. amr_rank_owns_block) cnt = 0
@@ -3901,7 +3912,7 @@ contains
                     my_off = int(0, MPI_OFFSET_KIND)
                     call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
                     if (proc_rank == 0) my_off = int(0, MPI_OFFSET_KIND)
-                    ddisp = blk_base(k) + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
+                    ddisp = blk_base(k) + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND)
                     allocate (buf(max(cnt, 1)))
                     call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                               & status, ierr)
