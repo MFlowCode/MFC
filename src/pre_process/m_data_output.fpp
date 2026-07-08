@@ -19,6 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_boundary_common
     use m_boundary_conditions
+    use m_boundary_io
     use m_thermochem, only: species_names
     use m_helper
     use m_constants, only: model_eqns_5eq, precision_single

@@ -9,6 +9,7 @@ show_help() {
   echo "  -h, --help                  Display this help message and exit."
   echo "  -c, --computer COMPUTER     Configures for COMPUTER environment."
   echo "                 Options:     Ascent (a) | Frontier (f) | Frontier_amd (famd) | Summit (s) | Wombat (w)"
+  echo "                              AMD HPCFund (amdfund)"
   echo "                              Bridges2 (b) | Expanse (e) | Delta (d) | DeltaAI (dai)"
   echo "                              Phoenix (p) | Richardson (r) | Oscar (o)"
   echo "                              Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
@@ -48,6 +49,7 @@ if [ -v $u_c ]; then
     log   "$B""DoD$W:     Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
     log   "$OR""Florida$W: HiPerGator (h)"
     log   "$C""WPI $W:   Turing   (t)"
+    log   "$R""AMD$W:     HPCFund  (amdfund)"
     log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$B""tuo$W/$C""b$W/$C""e$CR/$C""d/$C""dai$CR/$Y""p$CR/$R""r$CR/$B""cc$CR/$B""c$CR/$B""n$CR/$BR""o$CR/$BR""pa"$CR"/$OR""h"$CR/$C""t""$CR"): "
     read u_c
     log
@@ -157,6 +159,39 @@ if [ "$u_c" '==' 'famd' ]; then
     export FC="${OLCF_AFAR_ROOT}/bin/amdflang"
 
     unset MPICH_GPU_SUPPORT_ENABLED
+fi
+
+# AMD HPCFund: AFAR LLVM Flang (amdflang) + system GNU-built OpenMPI, gfx90a.
+# The stock mpi.mod is GNU-built and binary-incompatible with amdflang, so we
+# point at a pre-generated flang-compatible one under $OLCF_AFAR_ROOT/include/mpi.
+# amdflang is only supported for OpenMP-offload GPU builds; CPU-mode (-m c) builds
+# use the gfortran + OpenMPI provided by the amdfund-all modules, so gate on GPU.
+if [ "$u_c" '==' 'amdfund' ] && [ "$cg" '==' 'gpu' ]; then
+    # Direct WORK-filesystem path (mounted at the same /work1 point on login and
+    # compute nodes); override OLCF_AFAR_ROOT before loading to use another drop.
+    export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b}"
+    # Track the loaded openmpi4 module's prefix (OpenHPC sets MPI_DIR) instead of
+    # pinning a path that can drift from the module.
+    _mfc_mpi_lib="${MPI_DIR:-/opt/ohpc/pub/mpi/openmpi4-gnu12/4.1.8}/lib"
+
+    export PATH="${OLCF_AFAR_ROOT}/lib/llvm/bin:${OLCF_AFAR_ROOT}/bin:${PATH}"
+    export LD_LIBRARY_PATH="${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${_mfc_mpi_lib}:${LD_LIBRARY_PATH}"
+    export CMAKE_PREFIX_PATH="${OLCF_AFAR_ROOT}:${CMAKE_PREFIX_PATH}"
+
+    export MFC_FLANG_MPI_INC="-I${OLCF_AFAR_ROOT}/include/mpi"
+    export MFC_FLANG_MPI_LIB="${_mfc_mpi_lib}/libmpi.so;${_mfc_mpi_lib}/libmpi_mpifh.so"
+    export MFC_FLANG_HIPFORT_LIB="${OLCF_AFAR_ROOT}/lib/llvm/lib/libhipfort-amdgcn.a;${OLCF_AFAR_ROOT}/lib/libhipfft.so"
+
+    export FC="${OLCF_AFAR_ROOT}/bin/amdflang"
+
+    unset _mfc_mpi_lib
+
+    if [ ! -x "$FC" ]; then
+        error "amdfund: amdflang not found at $M$FC$CR."
+        error "Set $M\$OLCF_AFAR_ROOT$CR to your AFAR drop, then reload, e.g.:"
+        error "  export OLCF_AFAR_ROOT=/path/to/therock-afar-<ver>-gfx90a-...; source ./mfc.sh load -c amdfund -m g"
+        return
+    fi
 fi
 
 ok 'All modules and environment variables have been loaded.'

@@ -15,6 +15,7 @@ module m_start_up
     use m_mpi_proxy
     use m_mpi_common
     use m_boundary_common
+    use m_boundary_io
     use m_variables_conversion
     use m_data_input
     use m_data_output

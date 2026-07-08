@@ -116,16 +116,15 @@ fi
 ) &
 PID_PARAM_DOCS=$!
 
-# Example case validation
+# Example case validation - validate ALL cases in ONE process (validate accepts multiple files) instead of a
+# per-case './mfc.sh validate' loop. Each invocation re-paid the mfc.sh/venv bootstrap (~2.4s), which dominated
+# (~90%) the ~6 min serial loop over 155 cases; batching drops it to well under a minute.
 (
-    failed=0
-    for case in examples/*/case.py; do
-        [ -f "$case" ] || continue
-        if ! ./mfc.sh validate "$case" > /dev/null 2>&1; then
-            failed=$((failed + 1))
-        fi
-    done
-    echo "$failed" > "$TMPDIR_PC/examples_exit"
+    if ./mfc.sh validate examples/*/case.py > /dev/null 2>&1; then
+        echo "0" > "$TMPDIR_PC/examples_exit"
+    else
+        echo "1" > "$TMPDIR_PC/examples_exit"
+    fi
 ) &
 PID_EXAMPLES=$!
 
@@ -195,7 +194,7 @@ EXAMPLES_FAILED=$(cat "$TMPDIR_PC/examples_exit" 2>/dev/null || echo "1")
 if [ "$EXAMPLES_FAILED" = "0" ]; then
     ok "All example cases are valid."
 else
-    error "$EXAMPLES_FAILED example case(s) failed validation. Run$MAGENTA ./mfc.sh validate examples/\*/case.py$COLOR_RESET for details."
+    error "Example case validation failed. Run$MAGENTA ./mfc.sh validate examples/\*/case.py$COLOR_RESET for the failing case(s)."
     FAILED=1
 fi
 

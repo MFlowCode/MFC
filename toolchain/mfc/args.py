@@ -175,6 +175,9 @@ def parse(config: MFCConfig):
             continue
 
         if args.get(e) is not None:
-            args[e] = os.path.abspath(args[e])
+            if isinstance(args[e], list):  # validate accepts multiple case files (nargs="+")
+                args[e] = [os.path.abspath(p) for p in args[e]]
+            else:
+                args[e] = os.path.abspath(args[e])
 
     return args
