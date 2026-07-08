@@ -3,6 +3,8 @@
 !! @brief Generates particle beds: converts particle_cloud specifications into
 !!        individual sphere/circle particle_cloud_ibs entries before reduction.
 
+#:include 'macros.fpp'
+
 !> @brief Generates particle beds by converting particle_cloud patch specifications into individual immersed boundary patches before
 !! domain reduction. Each rank runs the same deterministic placement so no MPI broadcast of particle positions is needed.
 module m_particle_cloud
@@ -10,6 +12,7 @@ module m_particle_cloud
     use m_global_parameters
     use m_constants
     use m_mpi_common
+    use m_collisions
 
     implicit none
 
@@ -19,11 +22,13 @@ module m_particle_cloud
 
 contains
 
-    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array.
+    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Particles
+    !! outside this rank's IB neighborhood (get_neighbor_bounds() must already have been called) are discarded as they are
+    !! generated, so particle_cloud_ibs never holds more than num_local_ibs_max entries regardless of the global particle count.
     impure subroutine s_generate_particle_clouds(particle_cloud_ibs)
 
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
-        integer                                                           :: cloud_idx, ib_idx, n_total_particles
+        integer                                                           :: cloud_idx, ib_idx, glbl_idx, n_total_particles
         real(wp)                                                          :: t_start, t_end
 
         if (num_particle_clouds == 0) then
@@ -33,34 +38,34 @@ contains
 
         call cpu_time(t_start)
 
-        ! Pre-count total particles across all beds so particle_cloud_ibs can be allocated exactly once.
         n_total_particles = 0
         do cloud_idx = 1, num_particle_clouds
             n_total_particles = n_total_particles + particle_cloud(cloud_idx)%num_particles
         end do
-        allocate (particle_cloud_ibs(n_total_particles))
+        allocate (particle_cloud_ibs(min(num_local_ibs_max, n_total_particles)))
 
-        ib_idx = 0  ! index into particle_cloud_ibs
+        ib_idx = 0    ! index into particle_cloud_ibs (this rank's in-neighborhood particles only)
+        glbl_idx = 0  ! running index across all generated particles, kept regardless of locality
 
         do cloud_idx = 1, num_particle_clouds
             select case (particle_cloud(cloud_idx)%packing_method)
             case (1)  ! random box packing method
-                call s_particle_cloud_random_box(cloud_idx, ib_idx, particle_cloud_ibs)
+                call s_particle_cloud_random_box(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
             case (2)  ! lattice packing method
-                call s_particle_cloud_lattice(cloud_idx, ib_idx, particle_cloud_ibs)
+                call s_particle_cloud_lattice(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
             end select
         end do
 
         call cpu_time(t_end)
-        if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', ib_idx, ' particles in ', t_end - t_start, ' seconds.'
+        if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', glbl_idx, ' particles in ', t_end - t_start, ' seconds.'
 
     end subroutine s_generate_particle_clouds
 
     !> Generates a random distributions of particles in a box with a minimum spacing
-    subroutine s_particle_cloud_random_box(cloud_idx, ib_idx, particle_cloud_ibs)
+    subroutine s_particle_cloud_random_box(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
 
         integer, intent(in)                                    :: cloud_idx
-        integer, intent(inout)                                 :: ib_idx
+        integer, intent(inout)                                 :: ib_idx, glbl_idx
         type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
         integer                                                :: n_placed, geom, seed
         integer(8)                                             :: n_attempts, max_attempts
@@ -161,7 +166,7 @@ contains
                 chain_next(n_placed) = hash_head(slot)
                 hash_head(slot) = n_placed
 
-                call s_add_cloud_particle(cloud_idx, ib_idx, geom, rx, ry, rz, particle_cloud_ibs)
+                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, rx, ry, rz, particle_cloud_ibs)
             end if
         end do
 
@@ -177,10 +182,10 @@ contains
     !! lattice in 3D. The lattice spacing is set by the particle density (num_particles over the region area/volume); if that
     !! spacing falls below the required centre-to-centre distance (2*radius + min_spacing), the region is too dense and the run is
     !! aborted.
-    subroutine s_particle_cloud_lattice(cloud_idx, ib_idx, particle_cloud_ibs)
+    subroutine s_particle_cloud_lattice(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
 
         integer, intent(in)                                    :: cloud_idx
-        integer, intent(inout)                                 :: ib_idx
+        integer, intent(inout)                                 :: ib_idx, glbl_idx
         type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
         integer                                                :: n_placed, n_target, geom
         integer                                                :: row, col, ncx, ncy, ix, jy, kz, b
@@ -225,7 +230,7 @@ contains
                 col = 0
                 px = x0
                 do while (px <= xmax .and. n_placed < n_target)
-                    call s_add_cloud_particle(cloud_idx, ib_idx, geom, px, py, particle_cloud(cloud_idx)%z_centroid, &
+                    call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, px, py, particle_cloud(cloud_idx)%z_centroid, &
                                               & particle_cloud_ibs)
                     n_placed = n_placed + 1
                     col = col + 1
@@ -247,7 +252,7 @@ contains
                     do ix = 0, ncx - 1
                         do b = 1, 4
                             if (n_placed >= n_target) exit
-                            call s_add_cloud_particle(cloud_idx, ib_idx, geom, xmin + real(ix, wp)*cell + bx_off(b), &
+                            call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, xmin + real(ix, wp)*cell + bx_off(b), &
                                                       & ymin + real(jy, wp)*cell + by_off(b), zmin + real(kz, &
                                                       & wp)*cell + bz_off(b), particle_cloud_ibs)
                             n_placed = n_placed + 1
@@ -260,19 +265,30 @@ contains
 
     end subroutine s_particle_cloud_lattice
 
-    !> Writes a single placed particle into particle_cloud_ibs at the next free slot, advancing ib_idx. Shared by all packing
-    !! methods so the per-particle ib_patch_parameters setup stays in one place.
-    subroutine s_add_cloud_particle(cloud_idx, ib_idx, geom, px, py, pz, particle_cloud_ibs)
+    !> Writes a single placed particle into particle_cloud_ibs at the next free slot if it falls within this rank's IB
+    !! neighborhood (get_neighbor_bounds() must already have run), advancing ib_idx; particles outside the neighborhood are
+    !! discarded here rather than stored. glbl_idx always advances so gbl_patch_id records the particle's position in the full,
+    !! unfiltered enumeration - s_reduce_ib_patch_array offsets it by the namelist IB count for final global indexing. Shared by
+    !! all packing methods so the per-particle ib_patch_parameters setup stays in one place.
+    subroutine s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, px, py, pz, particle_cloud_ibs)
 
         integer, intent(in)                                    :: cloud_idx, geom
-        integer, intent(inout)                                 :: ib_idx
+        integer, intent(inout)                                 :: ib_idx, glbl_idx
         real(wp), intent(in)                                   :: px, py, pz
         type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
+        real(wp), dimension(3)                                 :: centroid
+
+        glbl_idx = glbl_idx + 1
+
+        centroid = [px, py, 0._wp]
+        if (num_dims == 3) centroid(3) = pz
+        if (.not. f_neighborhood_ranks_own_location(centroid)) return
 
         ib_idx = ib_idx + 1
+        @:PROHIBIT(ib_idx > num_local_ibs_max, &
+                   & "Too many particle-cloud IBs in one rank's neighborhood. Modify case file or increase num_local_ibs_max.")
 
-        ! gbl_patch_id is relative within particle_cloud_ibs here; s_reduce_ib_patch_array adjusts to global indexing.
-        particle_cloud_ibs(ib_idx)%gbl_patch_id = ib_idx
+        particle_cloud_ibs(ib_idx)%gbl_patch_id = glbl_idx
         particle_cloud_ibs(ib_idx)%geometry = geom
         particle_cloud_ibs(ib_idx)%x_centroid = px
         particle_cloud_ibs(ib_idx)%y_centroid = py

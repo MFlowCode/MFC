@@ -65,8 +65,8 @@ contains
 
         ! get is distance used in the force calculation with each IB and each wall
         call s_detect_wall_collisions()
-        ! call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
-        call s_detect_ib_collisions_n2(num_considered_collisions)
+        call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
+        ! call s_detect_ib_collisions_n2(num_considered_collisions)
 
         select case (collision_model)
         case (1)  ! soft sphere model
