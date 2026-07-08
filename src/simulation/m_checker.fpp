@@ -192,6 +192,9 @@ contains
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_tag_eps <= 0._wp, "amr_tag_eps must be > 0 when regridding")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
             @:PROHIBIT(amr_max_blocks < 1, "amr_max_blocks must be >= 1")
+            @:PROHIBIT(amr_max_level < 1, "amr_max_level must be >= 1")
+            @:PROHIBIT(amr_max_level > 1, &
+                       & "amr_max_level > 1 (multi-level nesting) is not yet supported; see docs/documentation/amr_multilevel.md")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
                        & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
         end if

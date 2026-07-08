@@ -502,6 +502,7 @@ contains
         amr_buf = 3
         amr_subcycle = .false.
         amr_max_blocks = 4
+        amr_max_level = 1
         amr_cluster_eff = 0.7_wp
         hybrid_smooth_flux = 2
         partition_tile_size = 8
