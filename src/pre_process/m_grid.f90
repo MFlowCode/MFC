@@ -49,7 +49,7 @@ contains
 
         ! Hyperbolic tangent grid stretching
         if (stretch_x) then
-            length = abs(x_cb(m) - x_cb(-1))
+            length = abs(x_domain_glb%end - x_domain_glb%beg)
             x_cb = x_cb/length
             x_a = x_a/length
             x_b = x_b/length
@@ -96,7 +96,7 @@ contains
 
         ! Hyperbolic tangent grid stretching in y-direction
         if (stretch_y) then
-            length = abs(y_cb(n) - y_cb(-1))
+            length = abs(y_domain_glb%end - y_domain_glb%beg)
             y_cb = y_cb/length
             y_a = y_a/length
             y_b = y_b/length
@@ -130,7 +130,7 @@ contains
 
         ! Hyperbolic tangent grid stretching in z-direction
         if (stretch_z) then
-            length = abs(z_cb(p) - z_cb(-1))
+            length = abs(z_domain_glb%end - z_domain_glb%beg)
             z_cb = z_cb/length
             z_a = z_a/length
             z_b = z_b/length
