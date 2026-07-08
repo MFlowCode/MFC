@@ -2737,21 +2737,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # restart_check on the REGRIDDED layout: unlike the static block, a regridded block set
         # cannot be reconstructed from the ICs, so the roundtrip proves the restart file itself
         cases.append(define_case_d(stack, "", {}, restart_check=True))
-        # hybrid sensors on the fine level. eps 0.5 exceeds the Sod shock's Jameson phi (~0.3),
-        # putting the shock cells under the sensor's control (central weights/flux where
-        # phi < eps): a dead sensor moves the answer by ~5e-4. At physical eps (1e-2) the
-        # combination is bitwise-identical to plain AMR by design (only constant/eps-dominated
-        # cells go central, and those reconstruct identically under any convex weights).
-        # override_tol 5e-5, sized by decision theory rather than drift-chasing: the harness
-        # reports only the FIRST variable past tolerance, so each tighter bound just reveals
-        # the next quantile of the same deterministic deviation field (intel-CPU and Cray-acc
-        # produce IDENTICAL sensor-on results that differ from the gnu-generated golden by up
-        # to ~6e-6 - compiler FP-contraction behavior, not noise). 5e-5 sits an order below
-        # the ~5e-4 dead-sensor signal these goldens exist to catch and 8x above the worst
-        # observed legitimate drift; if a platform ever drifts past 5e-5 the golden design
-        # itself (static cross-compiler reference) stops being able to discriminate
-        cases.append(define_case_d(stack, "hybrid_weno sensor", {"hybrid_weno": "T", "hybrid_weno_eps": 0.5}, override_tol=5.0e-5))
-        cases.append(define_case_d(stack, "hybrid_riemann sensor", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.5, "hybrid_smooth_flux": 2}, override_tol=5.0e-5))
+        # hybrid sensors on the fine level. eps must be chosen so no cell's Jameson phi lands
+        # NEAR it on any timestep, or a compiler's FP-reordering flips a cell between central and
+        # WENO -> a percent-level local golden diff (the failure mode that killed eps=0.5, which
+        # sat right where a shock cell's phi crosses). An eps-sweep of this exact case shows a
+        # clean phi GAP over [0.20, 0.40] (bit-identical output across the whole range -> no cell
+        # sits there on any step): eps 0.30 is centred in it with a +/-0.10 margin (~1000x the
+        # ~1e-4 cross-compiler phi drift), so no compiler can flip a cell, while still moving the
+        # answer ~4e-4 vs a dead sensor (all-WENO). override_tol 5e-5 sits an order below that
+        # ~4e-4 dead-sensor signal and ~8x above the ~6e-6 flip-free FP drift.
+        cases.append(define_case_d(stack, "hybrid_weno sensor", {"hybrid_weno": "T", "hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
+        cases.append(define_case_d(stack, "hybrid_riemann sensor", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.3, "hybrid_smooth_flux": 2}, override_tol=5.0e-5))
         # 2 MPI ranks + parallel_io: the ONLY test that executes the MPI-IO AMR restart write/read
         # (EXSCAN offset arithmetic, per-rank-extents validation) and multi-rank dynamic regrid
         # (coarse-halo exchange before tagging, fine seam halo) - a rank-seam or restart-offset bug
@@ -3797,18 +3793,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         }
         stack.push("Hybrid -> 1D -> WENO sensor", {**hybrid_1d_base, "hybrid_weno": "T", "hybrid_weno_eps": 1.0e-2})
         cases.append(define_case_d(stack, "", {}))
-        # liveness golden: eps 0.5 > the shock's phi (~0.3) puts consequential cells under the
-        # sensor (answer moves ~5e-4 vs plain WENO); the eps=1e-2 case is bitwise-identical to
-        # plain by design (only constant/eps-dominated cells go central) so it protects
-        # no-corruption but cannot detect a dead sensor
-        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}, override_tol=5.0e-5))
+        # liveness golden: the eps=1e-2 case above is bitwise-identical to plain by design (only
+        # constant/eps-dominated cells go central) so it protects no-corruption but cannot detect
+        # a dead sensor. eps=0.3 puts consequential cells under the sensor (answer moves ~4e-4 vs
+        # plain WENO). eps is centred in the [0.20,0.40] phi GAP measured by an eps-sweep of this
+        # case (output bit-identical across that range -> no cell's Jameson phi sits there on any
+        # timestep), giving a +/-0.10 margin so no compiler's FP reordering can flip a cell across
+        # the threshold - the fragility that failed eps=0.5 (which sat where a shock cell flips).
+        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
         stack.pop()
         stack.push(
             "Hybrid -> 1D -> Riemann sensor",
             {**hybrid_1d_base, "hybrid_riemann": "T", "hybrid_weno_eps": 1.0e-2, "hybrid_smooth_flux": 2},
         )
         cases.append(define_case_d(stack, "", {}))
-        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.5}, override_tol=5.0e-5))
+        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
         # the central smooth-flux (enum 1) is a distinct flux path from Rusanov (2) - cover both
         cases.append(define_case_d(stack, "central flux", {"hybrid_smooth_flux": 1}))
         stack.pop()
