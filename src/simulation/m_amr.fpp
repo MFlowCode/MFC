@@ -183,8 +183,11 @@ contains
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
         allocate (amr_owns_all(amr_max_blocks))
         allocate (amr_block_owner(amr_max_blocks))
+        allocate (amr_block_level(amr_max_blocks))
         amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
         amr_block_owner = 0
+        amr_block_level = 1  ! single fine level today; the regrid tags each block's level once multi-level nesting lands
+        amr_num_levels = 1
         amr_num_blocks = 1
         amr_cur = 1
 
@@ -4277,6 +4280,7 @@ contains
             if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
             if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
             if (allocated(amr_block_owner)) deallocate (amr_block_owner)
+            if (allocated(amr_block_level)) deallocate (amr_block_level)
             if (allocated(amr_gxcb)) deallocate (amr_gxcb)
             if (allocated(amr_gycb)) deallocate (amr_gycb)
             if (allocated(amr_gzcb)) deallocate (amr_gzcb)
