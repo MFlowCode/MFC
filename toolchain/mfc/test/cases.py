@@ -1,4 +1,5 @@
 import itertools
+import math
 import os
 import typing
 
@@ -1333,6 +1334,72 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if ndims == 3:
             stack.pop()
 
+    def alter_synthetic_turbulence(dimInfo):
+        # 3-D solenoidal synthetic-turbulence forcing (m_body_forces): a quiescent,
+        # triply-periodic single-fluid box driven by a deterministic (compiler-independent)
+        # random-Fourier-mode volume force over two energy shells. Forced turbulence is
+        # chaotic: tiny cross-compiler libm differences (cos/exp) amplify to O(field) within
+        # ~20 steps (the reason the airfoil example is skipped). Run only 3 steps, where the
+        # solution is still ~dt*F -- the deterministic forcing itself -- so the golden holds
+        # across CI compilers while fully exercising mode generation + assembly + application.
+        if len(dimInfo[0]) == 3:
+            cases.append(
+                define_case_d(
+                    stack,
+                    "synthetic_turbulence",
+                    {
+                        "m": 24,
+                        "n": 24,
+                        "p": 24,
+                        "dt": 1e-2,
+                        "t_step_stop": 3,
+                        "t_step_save": 3,
+                        "num_fluids": 1,
+                        "x_domain%beg": 0.0,
+                        "x_domain%end": 1.0,
+                        "y_domain%beg": 0.0,
+                        "y_domain%end": 1.0,
+                        "z_domain%beg": 0.0,
+                        "z_domain%end": 1.0,
+                        "bc_x%beg": -1,
+                        "bc_x%end": -1,
+                        "bc_y%beg": -1,
+                        "bc_y%end": -1,
+                        "bc_z%beg": -1,
+                        "bc_z%end": -1,
+                        # Keep the base's three box-tiling patches (all active, vel=0) but set
+                        # them to a single uniform quiescent state, so the IC has no
+                        # discontinuity -- the forcing alone drives the field.
+                        "patch_icpp(1)%pres": 1.0,
+                        "patch_icpp(1)%alpha_rho(1)": 1.0,
+                        "patch_icpp(1)%alpha(1)": 1.0,
+                        "patch_icpp(2)%pres": 1.0,
+                        "patch_icpp(2)%alpha_rho(1)": 1.0,
+                        "patch_icpp(2)%alpha(1)": 1.0,
+                        "patch_icpp(3)%pres": 1.0,
+                        "patch_icpp(3)%alpha_rho(1)": 1.0,
+                        "patch_icpp(3)%alpha(1)": 1.0,
+                        "synthetic_turbulence": "T",
+                        "synth_seed": 1,
+                        "synth_n_shells": 2,
+                        "synth_U_inf": 1.0,
+                        "num_turbulent_sources": 1,
+                        "synth_k_shell(1)": 2 * math.pi / 0.5,
+                        "synth_k_shell(2)": 2 * math.pi / 0.25,
+                        "synth_amp_shell(1)": 0.02,
+                        "synth_amp_shell(2)": 0.01,
+                        "synth_n_waves_per_shell(1)": 2,
+                        "synth_n_waves_per_shell(2)": 3,
+                        "turb_pos(1,1)": 0.5,
+                        "turb_pos(1,2)": 0.5,
+                        "turb_pos(1,3)": 0.5,
+                        "synth_L(1,1)": 4.0,
+                        "synth_L(1,2)": 4.0,
+                        "synth_L(1,3)": 4.0,
+                    },
+                )
+            )
+
     def alter_mixlayer_perturb(dimInfo):
         if len(dimInfo[0]) == 3:
             cases.append(
@@ -1820,6 +1887,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_viscosity(dimInfo)
             alter_elliptic_smoothing()
             alter_body_forces(dimInfo)
+            alter_synthetic_turbulence(dimInfo)
             alter_mixlayer_perturb(dimInfo)
             alter_bc_patches(dimInfo)
             stack.pop()
