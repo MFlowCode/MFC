@@ -669,6 +669,17 @@ contains
 
     end subroutine s_amr_box_isect
 
+    !> Do two coarse-index boxes [alo:ahi] and [blo:bhi] overlap? Collapsed dims (n_glb/p_glb == 0) never disqualify.
+    pure logical function f_amr_boxes_overlap(alo, ahi, blo, bhi) result(ov)
+
+        integer, intent(in) :: alo(3), ahi(3), blo(3), bhi(3)
+
+        ov = alo(1) <= bhi(1) .and. ahi(1) >= blo(1)
+        if (n_glb > 0) ov = ov .and. alo(2) <= bhi(2) .and. ahi(2) >= blo(2)
+        if (p_glb > 0) ov = ov .and. alo(3) <= bhi(3) .and. ahi(3) >= blo(3)
+
+    end function f_amr_boxes_overlap
+
     !> Copy this rank's own coarse cells (box [bl:bh] GLOBAL, read from q_coarse at its own start-idx frame o1/o2/o3) into amr_cg in
     !! the block-local patch frame. stp -> stp, exact.
     impure subroutine s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)
@@ -3216,6 +3227,7 @@ contains
             type(t_box), allocatable                               :: boxes(:)
             integer                                                :: lo(3), hi(3), sh(3), old_np, k, kk
             integer                                                :: old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks)
+            integer                                                :: old_chi(3, amr_max_blocks)
             integer                                                :: old_owner(amr_max_blocks)
             logical                                                :: old_owns(amr_max_blocks), any_xchg, same, merged
             integer                                                :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, i
@@ -3404,6 +3416,7 @@ contains
                 ! GLOBAL block origin + extents (replicated, valid on every rank - not the owner-only isect), so the cross-rank
                 ! migration below and the overlap-copy's index shift are correct even where this rank did not own the old block
                 old_ilo(:,k) = amr_region_lo_all(:,k)
+                old_chi(:,k) = amr_region_hi_all(:,k)  ! old COARSE hi (for the P2P migration overlap test below)
                 old_ext(1, k) = 2*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
                 old_ext(2, k) = merge(2*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 0, n_glb > 0)
                 old_ext(3, k) = merge(2*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 0, p_glb > 0)
@@ -3433,65 +3446,98 @@ contains
                 $:GPU_UPDATE(host='[pb_ts(1)%sf, mv_ts(1)%sf]')
             end if
 
+            ! set the regions + assign owners BEFORE the migration (P2P needs the new owners) and before the owner-dependent
+            ! geometry (else s_set_amr_fine_geometry sizes the whole-block owner from a stale amr_block_owner)
+            amr_num_blocks = nboxes
+            do k = 1, nboxes
+                amr_region_lo_all(:,k) = boxes(k)%lo; amr_region_hi_all(:,k) = boxes(k)%hi
+            end do
+            call s_amr_assign_block_owners()
+
 #ifdef MFC_MPI
             ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by reading
-            ! amr_slots(kk)%q_cons_stor, but under fine-level distribution an old block may be owned by a rank OTHER than the one
-            ! now
-            ! owning a covering new block. Broadcast every old block's stashed fine state from its owner into the replicated slot's
-            ! q_cons_stor on all ranks, so the copy is correct regardless of ownership. Without this a cross-rank-covered new block
-            ! keeps only its coarse-prolonged values - exact on uniform grids but ~O(1e-4) wrong on stretched grids (prolongation is
-            ! not exact there). (Correctness-first collective; a per-block P2P version mirroring s_amr_gather_coarse_patch is future
-            ! work.) No-op at np=1 (single owner - the data is already local).
+            ! amr_slots(kk)%q_cons_stor, but an old block may be owned by a rank OTHER than the one now owning a covering new block.
+            ! POINT-TO-POINT (mirrors s_amr_gather_coarse_patch): each old owner sends its stashed fine state ONLY to the distinct
+            ! new-block owners whose region overlaps that old block. A rank that did not receive old block kk never reads it - the
+            ! overlap-copy's per-(k,kk) index guard skips every cell of a non-overlapping pair. No-op at np=1 (single owner, local).
             if (num_procs > 1) then
                 block
-                    integer               :: kk2, ii, gi, gj, gk, cnt2, idx2, ierr2
-                    real(wp), allocatable :: bcbuf(:)
-                    do kk2 = 1, old_np
-                        cnt2 = sys_size*(old_ext(1, kk2) + 1)*(old_ext(2, kk2) + 1)*(old_ext(3, kk2) + 1)
-                        allocate (bcbuf(cnt2))
-                        if (old_owns(kk2)) then
-                            idx2 = 0
-                            do ii = 1, sys_size
-                                do gk = 0, old_ext(3, kk2)
-                                    do gj = 0, old_ext(2, kk2)
-                                        do gi = 0, old_ext(1, kk2)
-                                            idx2 = idx2 + 1
-                                            bcbuf(idx2) = real(amr_slots(kk2)%q_cons_stor(ii)%sf(gi, gj, gk), wp)
-                                        end do
-                                    end do
-                                end do
+                    integer               :: kk, k2, ii, gi, gj, gk, idx2, ierr2, rr, maxcnt, nrq
+                    integer               :: cnt(old_np)
+                    logical               :: getk(old_np), isdest(0:num_procs - 1)
+                    real(wp), allocatable :: spack(:,:), rpack(:,:)
+                    integer, allocatable  :: rq(:)
+                    maxcnt = 0
+                    do kk = 1, old_np
+                        cnt(kk) = sys_size*(old_ext(1, kk) + 1)*(old_ext(2, kk) + 1)*(old_ext(3, kk) + 1)
+                        maxcnt = max(maxcnt, cnt(kk))
+                        ! I need old block kk iff I own a NEW block overlapping it (and do not already hold kk locally)
+                        getk(kk) = .false.
+                        if (.not. old_owns(kk)) then
+                            do k2 = 1, nboxes
+                                if (amr_block_owner(k2) == proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, &
+                                    & old_ilo(:,kk), old_chi(:,kk))) then
+                                    getk(kk) = .true.; exit
+                                end if
                             end do
                         end if
-                        call MPI_Bcast(bcbuf, cnt2, mpi_p, old_owner(kk2), MPI_COMM_WORLD, ierr2)
-                        if (.not. old_owns(kk2)) then
-                            idx2 = 0
-                            do ii = 1, sys_size
-                                do gk = 0, old_ext(3, kk2)
-                                    do gj = 0, old_ext(2, kk2)
-                                        do gi = 0, old_ext(1, kk2)
-                                            idx2 = idx2 + 1
-                                            amr_slots(kk2)%q_cons_stor(ii)%sf(gi, gj, gk) = real(bcbuf(idx2), stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end if
-                        deallocate (bcbuf)
                     end do
+                    allocate (rq(old_np*num_procs), spack(max(maxcnt, 1), old_np), rpack(max(maxcnt, 1), old_np))
+                    nrq = 0
+                    do kk = 1, old_np  ! post receives for the old blocks I need
+                        if (.not. getk(kk)) cycle
+                        nrq = nrq + 1
+                        call MPI_IRECV(rpack(1, kk), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
+                    end do
+                    do kk = 1, old_np  ! pack + send each old block I own to every distinct new-owner (/= me) overlapping it
+                        if (.not. old_owns(kk)) cycle
+                        isdest = .false.
+                        do k2 = 1, nboxes
+                            rr = amr_block_owner(k2)
+                            if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:, &
+                                & kk))) isdest(rr) = .true.
+                        end do
+                        if (.not. any(isdest)) cycle
+                        idx2 = 0
+                        do ii = 1, sys_size
+                            do gk = 0, old_ext(3, kk)
+                                do gj = 0, old_ext(2, kk)
+                                    do gi = 0, old_ext(1, kk)
+                                        idx2 = idx2 + 1
+                                        spack(idx2, kk) = real(amr_slots(kk)%q_cons_stor(ii)%sf(gi, gj, gk), wp)
+                                    end do
+                                end do
+                            end do
+                        end do
+                        do rr = 0, num_procs - 1
+                            if (.not. isdest(rr)) cycle
+                            nrq = nrq + 1
+                            call MPI_ISEND(spack(1, kk), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
+                        end do
+                    end do
+                    if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
+                    do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots
+                        if (.not. getk(kk)) cycle
+                        idx2 = 0
+                        do ii = 1, sys_size
+                            do gk = 0, old_ext(3, kk)
+                                do gj = 0, old_ext(2, kk)
+                                    do gi = 0, old_ext(1, kk)
+                                        idx2 = idx2 + 1
+                                        amr_slots(kk)%q_cons_stor(ii)%sf(gi, gj, gk) = real(rpack(idx2, kk), stp)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                    deallocate (rq, spack, rpack)
                 end block
             end if
 #endif
 
             ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
-            amr_num_blocks = nboxes
             any_xchg = .false.
             if (proc_rank == 0) print '(A,I0,A)', ' [amr] regrid: ', nboxes, ' block(s)'
-            ! set the regions + assign owners BEFORE the owner-dependent geometry (else s_set_amr_fine_geometry sizes the
-            ! whole-block owner from a stale amr_block_owner; harmless with one block, wrong once tiling makes several)
-            do k = 1, nboxes
-                amr_region_lo_all(:,k) = boxes(k)%lo; amr_region_hi_all(:,k) = boxes(k)%hi
-            end do
-            call s_amr_assign_block_owners()
             do k = 1, nboxes
                 amr_cur = k
                 call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
