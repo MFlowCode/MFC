@@ -1340,8 +1340,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # random-Fourier-mode volume force over two energy shells. Forced turbulence is
         # chaotic: tiny cross-compiler libm differences (cos/exp) amplify to O(field) within
         # ~20 steps (the reason the airfoil example is skipped). Run only 3 steps, where the
-        # solution is still ~dt*F -- the deterministic forcing itself -- so the golden holds
-        # across CI compilers while fully exercising mode generation + assembly + application.
+        # solution is still ~dt*F -- the deterministic forcing itself -- so the double-precision
+        # golden holds to <1e-12 across CI compilers while fully exercising mode generation +
+        # assembly + application. Single precision needs a looser tolerance (see
+        # compute_tolerance): roundoff-driven divergence reaches ~1e-3 by t_step 3.
         if len(dimInfo[0]) == 3:
             cases.append(
                 define_case_d(
