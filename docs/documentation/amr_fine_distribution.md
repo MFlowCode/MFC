@@ -113,12 +113,24 @@ once-at-init coordinate assembly.
 
 ## Phase 3 (remaining)
 
-1. **Block-splitting / tiling** (the coverage gap). A block must be ≤ `amr_maxc_fit` (the whole-block owner reuses
-   the rank-local solver scratch), so a large contiguous refined region cannot be one whole-owned block. Tiling it
-   into ≤`amr_maxc_fit` sub-blocks needs a **block-to-block fine-fine halo** (adjacent sub-blocks share a fine seam;
-   prolonging from coarse there is non-conservative) and removal of the min-separation merge — essentially a proper
-   tiled fine level with `FillBoundary`. The mirror model (up/mega) covers large blocks by splitting them across
-   ranks instead. Biggest remaining item.
+1. **Block-splitting / tiling** (the coverage gap) — IN PROGRESS.
+   - **1/3 DONE (committed)**: `s_amr_tile_box` splits any box > `amr_maxc_fit` into contiguous ≤`amr_maxc_fit`
+     sub-blocks, wired into the initial-block setup and the regrid pipeline (non-IB); `s_populate_amr_fine` loops
+     over all blocks refreshing per-block mirrors via `s_amr_select_slot`. np=1 bit-identical (a normal block is one
+     tile); np≥2 tiles into balanced sub-blocks (1.00x imbalance) but the adjacent SEAMS are not yet conservative.
+   - **2/3 TODO — block-to-block fine-fine halo.** Adjacent sub-blocks A|B share a fine seam; A's seam ghost must be
+     B's stage-entry interior (prolonging from coarse there is non-conservative). Correctness needs the halo to read
+     **stage-entry** neighbour data, but the driver advances blocks one-at-a-time, so a later block sees an earlier
+     block's post-update state. Fix = restructure the fine advance into three driver phases: **fill all** (gather +
+     coarse ghost-fill), **fine-fine halo** (overwrite seam ghosts from neighbours — every block's interior is still
+     stage-entry here), **advance all** (RHS + RK update). Split `s_advance_amr_fine_stage` into fill/advance halves;
+     add `s_amr_fine_fine_halo` (adjacency from the replicated `amr_region_*_all`; owner↔owner P2P exchange of the
+     buff_size-deep near-seam interior, reusing the `amr_decomp`/box-intersection machinery); do the same for the
+     subcycle path. The old within-block `s_mpi_sendrecv_amr_fine_halo` (now dead) is the template.
+   - **3/3 TODO — reflux seam-exclusion.** A sub-block face shared with another fine sub-block is fine-fine, not c/f:
+     exclude it from `s_amr_reflux_face_flags` `own_lo/own_hi` (else the subcycle state-reflux corrupts the neighbour's
+     restriction-overwritten cell). Detect via the replicated block list (outside cell is inside another block).
+   Validate: tiled np=2 conserves; existing 2-rank goldens (BD21A5C0, 5EFB3277, 79B334C7) pass (they pass on up/mega).
 2. **QBMM pb/mv** gather/scatter for np≥2 (still local; np≥2 QBMM+AMR ungated/untested — gate or scatter).
 3. Minor: the P2P routines scan all `num_procs` to find participants (integer-only, O(P) per block per stage);
    patch-only device transfers instead of whole-field host round-trips (GPU only); own-only slot allocation.

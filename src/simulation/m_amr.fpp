@@ -36,11 +36,12 @@ module m_amr
     implicit none
 
     private
-    public :: t_level, amr_maxc, amr_maxc_fit, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
-        & s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, s_amr_swap_to_fine, s_amr_restore_coarse, &
-        & s_amr_fill_fine_ghosts, s_amr_operator_checks, s_advance_amr_fine_stage, s_advance_amr_fine_substeps, &
-        & s_amr_conservation_defect, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, &
-        & s_amr_relax_fine, s_amr_setup_ib, s_amr_check_active_box_containment, s_amr_p2p_reflux_faces
+    public :: t_level, amr_maxc, amr_maxc_fit, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
+        & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
+        & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_amr_fine_stage_fill, &
+        & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_advance_amr_fine_substeps, s_amr_conservation_defect, &
+        & s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, s_amr_relax_fine, s_amr_setup_ib, &
+        & s_amr_check_active_box_containment, s_amr_p2p_reflux_faces
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -202,15 +203,19 @@ contains
         ! the WHOLE block's fine extent (2*block-1) must fit every rank's local extent (a big block cannot be whole-owned; it
         ! must be split into <= local-half boxes - the mirror model instead split the block ACROSS ranks). Checked on the
         ! replicated block box so all ranks agree. (np=1: local extent = global, so 2*block-1 <= m_glb always holds.)
+        ! non-IB: the block is TILED into <= amr_maxc_fit sub-blocks (each fits every rank's scratch), so no cap is needed. IB
+        ! keeps a single contiguous block per body, so an IB block must itself fit a rank's local half-extent.
         bad_loc = 0
-        if (2*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m) bad_loc = 1
-        if (n_glb > 0 .and. 2*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n) bad_loc = 1
-        if (p_glb > 0 .and. 2*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p) bad_loc = 1
+        if (ib) then
+            if (2*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m) bad_loc = 1
+            if (n_glb > 0 .and. 2*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n) bad_loc = 1
+            if (p_glb > 0 .and. 2*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p) bad_loc = 1
+        end if
         call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
         if (bad_glb == 1) then
-            call s_mpi_abort('amr fine extent exceeds a rank local grid (solver scratch is local-sized): under fine-level ' &
-                             & // 'distribution a block is owned whole, so it may cover at most about half of any rank ' &
-                             & // 'subdomain per dimension; shrink the block, split it, or use fewer ranks')
+            call s_mpi_abort('amr fine extent exceeds a rank local grid (solver scratch is local-sized): an immersed-body block ' &
+                             & // 'is owned whole and un-tiled, so it may cover at most about half of any rank subdomain per ' &
+                             & // 'dimension; shrink the body region or use fewer ranks')
         end if
 
         ! max coarse block cells per dim (upper bound for any future regrid box); 1 for collapsed dims
@@ -417,10 +422,33 @@ contains
         ! Under dynamic regrid with bodies the initial block gets the same body-containment
         ! expansion regrid boxes get (the moving-body containment guard requires it from step 1);
         ! for a static block (amr_regrid_int = 0) the user's placement is authoritative.
+        ! max_grid_size tiling: the initial block splits into <= amr_maxc_fit sub-blocks (at np=1 amr_maxc_fit == amr_maxc so a
+        ! normal block stays a single tile - unchanged), one per slot; IB keeps a single contiguous block.
         blk_lo = amr_block_beg; blk_hi = amr_block_end
         if (ib .and. amr_regrid_int > 0) call s_amr_expand_box_over_bodies(blk_lo, blk_hi)
-        call s_set_amr_fine_geometry(blk_lo, blk_hi)
-        call s_amr_assign_block_owners()  ! Phase 1: compute + report the fine-dist map (not applied)
+        block
+            type(t_box), allocatable :: tiled(:)
+            integer                  :: nt, capt, kk
+            allocate (tiled(amr_max_blocks)); nt = 0; capt = 0
+            if (ib) then
+                nt = 1; tiled(1)%lo = blk_lo; tiled(1)%hi = blk_hi
+            else
+                call s_amr_tile_box(blk_lo, blk_hi, tiled, nt, amr_max_blocks, capt)
+            end if
+            amr_num_blocks = nt
+            ! set the block regions FIRST so the owner assignment (which reads amr_region_*_all) can run BEFORE the owner-dependent
+            ! geometry - otherwise s_set_amr_fine_geometry would size the whole-block owner from a stale (default) amr_block_owner
+            do kk = 1, nt
+                amr_region_lo_all(:,kk) = tiled(kk)%lo; amr_region_hi_all(:,kk) = tiled(kk)%hi
+            end do
+            call s_amr_assign_block_owners()  ! Phase 1: compute + report the fine-dist map
+            do kk = 1, nt
+                amr_cur = kk
+                call s_set_amr_fine_geometry(tiled(kk)%lo, tiled(kk)%hi)
+            end do
+            call s_amr_select_slot(1)  ! refresh the per-block mirrors for slot 1 (geometry loop left them on the last tile)
+            deallocate (tiled)
+        end block
 
     end subroutine s_initialize_amr_module
 
@@ -1144,33 +1172,25 @@ contains
     impure subroutine s_populate_amr_fine(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-        integer                                                :: i
+        integer                                                :: i, islot
 
         if (.not. amr) return
-        ! interior prolongation slopes read one coarse cell past the intersection - valid CONS ghosts first
-        ! (ALL ranks call: pairwise halo). This runs BEFORE s_initialize_gpu_vars, and the halo packs the
-        ! DEVICE state, so push the host ICs first (redundant on CPU; repeated later by the GPU-vars init).
-        if (amr_xchg_coarse_ghosts) then
-            do i = 1, sys_size
-                $:GPU_UPDATE(device='[q_cons_base(i)%sf]')
-            end do
-            call s_amr_exchange_coarse_cons_halo(q_cons_base)
-            ! the exchange unpacks on the device; the init prolongation below runs on the HOST
-            do i = 1, sys_size
-                $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
-            end do
-        end if
-        ! fine-level distribution: gather the block's coarse patch onto its owner (collective - ALL ranks call before the
-        ! owner-only return below). Host source q_cons_base is IC-current here (and ghost-valid via the exchange above).
-        call s_amr_gather_coarse_patch(q_cons_base, .false.)
-        if (.not. amr_rank_owns_block) return
-        call s_interpolate_coarse_to_fine()
-        ! prolonged fine state to the device (host prolongation; device consumers: ghost-fill/RK/RHS kernels)
-        do i = 1, sys_size
-            $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
+        ! Prolong EVERY block (max_grid_size tiling can make several) from its gathered coarse patch. The P2P gather pulls each
+        ! patch's inter-rank coarse cells from neighbour interiors, so no coarse-ghost halo exchange is needed; host q_cons_base
+        ! holds the ICs here (this runs before s_initialize_gpu_vars). ALL ranks call the gather (P2P); only owners prolong.
+        do islot = 1, amr_num_blocks
+            call s_amr_select_slot(islot)
+            call s_amr_gather_coarse_patch(q_cons_base, .false.)
+            if (amr_rank_owns_block) then
+                call s_interpolate_coarse_to_fine()
+                do i = 1, sys_size
+                    $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
+                end do
+                ! non-polytropic QBMM: seed the block's quadrature side-state from the coarse fields
+                if (qbmm .and. .not. polytropic) call s_amr_prolong_pbmv()
+            end if
         end do
-        ! non-polytropic QBMM: seed the block's quadrature side-state from the coarse fields
-        if (qbmm .and. .not. polytropic) call s_amr_prolong_pbmv()
+        call s_amr_select_slot(1)
 
     end subroutine s_populate_amr_fine
 
@@ -1721,6 +1741,9 @@ contains
         real(wp)                                            :: err, e
 
         if (.not. amr) return
+        ! this self-test compares restrict(fine) to the gathered patch amr_cg for the CURRENT block; amr_cg holds only the LAST
+        ! block s_populate_amr_fine gathered, so it is meaningful only when there is a single block (the untiled np=1 case)
+        if (amr_num_blocks > 1) return
         if (.not. amr_rank_owns_block) return
         ! fine-level distribution: the block's coarse cells live in the gathered patch amr_cg (set by s_populate_amr_fine just
         ! before this), not the owner's local q_cons_base. Compare restrict(fine) to amr_cg in the block-local patch frame.
@@ -2298,21 +2321,139 @@ contains
 
     end subroutine s_amr_exchange_coarse_cons_halo
 
-    !> Advance the fine level through RK stage s (same dt as level-0, no subcycling). Called BETWEEN the coarse RHS and the coarse
-    !! RK update, so q_cons_coarse is the coarse STAGE-ENTRY state. Fine prim ghosts are obtained by widening idwint to the fine
-    !! buffer so the cons->prim conversion inside s_compute_rhs covers the (prolonged) cons ghost shell; the BC populate is skipped
-    !! via amr_in_fine_advance. The update mirrors the coarse non-IGR rk_coef form in s_tvd_rk.
-    impure subroutine s_advance_amr_fine_stage(s, coefs, q_cons_coarse, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-        & time_avg)
+    !> True iff sub-block yb sits immediately above sub-block xb on xb's HIGH face in dim d: yb's low coarse face is xb's high face
+    !! + 1, and (tiling produces a regular grid) they share the transverse coarse extents exactly. Each fine-fine seam is exactly
+    !! one such ordered (xb, yb) pair (the lower block is xb).
+    pure logical function f_amr_seam(xb, yb, d) result(seam)
 
-        integer, intent(in)                                        :: s, t_step
-        real(wp), intent(in)                                       :: coefs(4)
-        type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_coarse
-        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        type(scalar_field), intent(inout)                          :: q_T_sf
-        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
-        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-        real(wp), intent(inout)                                    :: time_avg
+        integer, intent(in) :: xb, yb, d
+        integer             :: t
+
+        seam = amr_region_lo_all(d, yb) == amr_region_hi_all(d, xb) + 1
+        do t = 1, 3
+            if (t /= d) seam = seam .and. amr_region_lo_all(t, xb) == amr_region_lo_all(t, yb) .and. amr_region_hi_all(t, &
+                & xb) == amr_region_hi_all(t, yb)
+        end do
+
+    end function f_amr_seam
+
+    !> Pack (dir=+1) / unpack (dir=-1) the fine cells of slot's q_cons over [dlo:dhi] in dim d, full transverse, all sys_size, in a
+    !! fixed (i, d-index, transverse) order so a packer and unpacker with matching extents align cell-for-cell. Host arrays.
+    impure subroutine s_amr_fine_slice(slot, d, dlo, dhi, buf, dir)
+
+        integer, intent(in)     :: slot, d, dlo, dhi, dir
+        real(wp), intent(inout) :: buf(:)
+        integer                 :: i, a, b, c, idx, fm(3)
+
+        fm(1) = amr_slots(slot)%m; fm(2) = amr_slots(slot)%n; fm(3) = amr_slots(slot)%p
+        idx = 0
+        do i = 1, sys_size
+            do c = dlo, dhi
+                #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+                    if (d == ${D}$) then
+                        do b = 0, fm(${TB}$)
+                            do a = 0, fm(${TA}$)
+                                idx = idx + 1
+                                #:set IDX = {1: '(c, a, b)', 2: '(a, c, b)', 3: '(a, b, c)'}[D]
+                                if (dir == 1) then
+                                    buf(idx) = real(amr_slots(slot)%q_cons(i)%sf${IDX}$, wp)
+                                else
+                                    amr_slots(slot)%q_cons(i)%sf${IDX}$ = real(buf(idx), stp)
+                                end if
+                            end do
+                        end do
+                    end if
+                #:endfor
+            end do
+        end do
+
+    end subroutine s_amr_fine_slice
+
+    !> Block-to-block fine-fine halo (max_grid_size tiling): overwrite each sub-block's seam ghost cells (faces shared with an
+    !! ADJACENT sub-block) with the neighbour's stage-entry fine interior, so the shared fine flux matches on both sides
+    !! (coarse-prolonged seam ghosts would be non-conservative). For each seam pair (xb below, yb above, dim d) the two owners
+    !! exchange the buff_size-deep near-seam interior (MPI_Sendrecv, or a local copy when one rank owns both). Buffer is wp, cast to
+    !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (incl. every np=1 case, untiled).
+    impure subroutine s_amr_fine_fine_halo()
+
+        integer               :: xb, yb, d, rX, rY, i, cnt, xm(3), ym(3), tsz, ierr
+        real(wp), allocatable :: xbuf(:), ybuf(:)
+
+        if (.not. amr) return
+        if (amr_num_blocks < 2) return
+
+        ! device-resident fine state -> host for the packs; pushed back after (owned blocks only)
+        do xb = 1, amr_num_blocks
+            if (amr_block_owner(xb) == proc_rank) then
+                call s_amr_select_slot(xb)
+                do i = 1, sys_size
+                    $:GPU_UPDATE(host='[amr_slots(xb)%q_cons(i)%sf]')
+                end do
+            end if
+        end do
+
+        do xb = 1, amr_num_blocks
+            do yb = 1, amr_num_blocks
+                if (xb == yb) cycle
+                d = 0
+                if (f_amr_seam(xb, yb, 1)) d = 1
+                if (n_glb > 0) then; if (f_amr_seam(xb, yb, 2)) d = 2; end if
+                if (p_glb > 0) then; if (f_amr_seam(xb, yb, 3)) d = 3; end if
+                if (d == 0) cycle
+                rX = amr_block_owner(xb); rY = amr_block_owner(yb)
+                if (proc_rank /= rX .and. proc_rank /= rY) cycle
+                xm(1) = amr_slots(xb)%m; xm(2) = amr_slots(xb)%n; xm(3) = amr_slots(xb)%p
+                ym(1) = amr_slots(yb)%m; ym(2) = amr_slots(yb)%n; ym(3) = amr_slots(yb)%p
+                ! transverse fine size (dims /= d); xb and yb share it (exact-match seam)
+                tsz = 1
+                if (d /= 1) tsz = tsz*(xm(1) + 1)
+                if (d /= 2 .and. n_glb > 0) tsz = tsz*(xm(2) + 1)
+                if (d /= 3 .and. p_glb > 0) tsz = tsz*(xm(3) + 1)
+                cnt = sys_size*buff_size*tsz
+                allocate (xbuf(cnt), ybuf(cnt))
+                if (rX == rY) then  ! same rank owns both: pack each near-seam interior, unpack into the other's seam ghost
+                    call s_amr_fine_slice(xb, d, xm(d) - buff_size + 1, xm(d), xbuf, 1)  ! xb high interior
+                    call s_amr_fine_slice(yb, d, 0, buff_size - 1, ybuf, 1)  ! yb low interior
+                    call s_amr_fine_slice(yb, d, -buff_size, -1, xbuf, -1)  ! -> yb low ghost
+                    call s_amr_fine_slice(xb, d, xm(d) + 1, xm(d) + buff_size, ybuf, -1)  ! -> xb high ghost
+                else if (proc_rank == rX) then
+                    call s_amr_fine_slice(xb, d, xm(d) - buff_size + 1, xm(d), xbuf, 1)  ! send xb high interior
+#ifdef MFC_MPI
+                    call MPI_SENDRECV(xbuf, cnt, mpi_p, rY, 4200, ybuf, cnt, mpi_p, rY, 4201, MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
+                                      & ierr)
+#endif
+                    call s_amr_fine_slice(xb, d, xm(d) + 1, xm(d) + buff_size, ybuf, -1)  ! recv yb low interior -> xb high ghost
+                else  ! proc_rank == rY
+                    call s_amr_fine_slice(yb, d, 0, buff_size - 1, ybuf, 1)  ! send yb low interior
+#ifdef MFC_MPI
+                    call MPI_SENDRECV(ybuf, cnt, mpi_p, rX, 4201, xbuf, cnt, mpi_p, rX, 4200, MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
+                                      & ierr)
+#endif
+                    call s_amr_fine_slice(yb, d, -buff_size, -1, xbuf, -1)  ! recv xb high interior -> yb low ghost
+                end if
+                deallocate (xbuf, ybuf)
+            end do
+        end do
+
+        do xb = 1, amr_num_blocks
+            if (amr_block_owner(xb) == proc_rank) then
+                do i = 1, sys_size
+                    $:GPU_UPDATE(device='[amr_slots(xb)%q_cons(i)%sf]')
+                end do
+            end if
+        end do
+        call s_amr_select_slot(1)
+
+    end subroutine s_amr_fine_fine_halo
+
+    !> FILL phase of a fine RK stage (same dt as level-0, no subcycling; called BETWEEN the coarse RHS and the coarse RK update, so
+    !! q_cons_coarse is the coarse STAGE-ENTRY state): valid coarse ghosts + gather the block's coarse patch + prolong the block's
+    !! fine ghost shell from it. ALL ranks call (gather is collective P2P); only the owner prolongs. Leaves the block's INTERIOR at
+    !! its stage-entry value (the advance phase updates it), so a later fine-fine halo reads stage-entry neighbour data.
+    impure subroutine s_amr_fine_stage_fill(q_cons_coarse, pb_in, mv_in)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
+        real(stp), dimension(:,:,:,:,:), intent(inout)         :: pb_in, mv_in
 
         if (.not. amr) return
         ! valid coarse CONS ghosts for the ghost prolongation below (ALL ranks call: pairwise halo)
@@ -2330,13 +2471,32 @@ contains
         ! s_compute_rhs pair nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
         call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_cons)
-        ! whole-block-per-rank: the owner holds the entire block and adjacent blocks are >= buff_size apart, so there is no
-        ! fine-fine continuation halo - the prolonged ghost shell (from the gathered coarse patch) is the final ghost state.
+        ! the coarse-prolonged ghost shell is the final ghost state EXCEPT at faces shared with an adjacent sub-block (tiling),
+        ! which the block-to-block fine-fine halo overwrites with the neighbour's fine interior after this fill.
 
         ! non-polytropic QBMM: prolong the block's pb/mv ghost shell from the coarse stage-entry
         ! side-state (its rhs is cell-local, so ghosts only feed the widened-idwint conversions)
         if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, amr_slots(amr_cur)%pb_f%sf, &
             & amr_slots(amr_cur)%mv_f%sf)
+        if (rank_time_wrt) call s_rank_time_toc()
+
+    end subroutine s_amr_fine_stage_fill
+
+    !> ADVANCE phase of a fine RK stage: fine RHS + RK update (+ QBMM/6eq/IB) for the current block. Owner-only. Reads the block's
+    !! ghost shell (coarse prolong + fine-fine halo already applied by the fill + halo phases).
+    impure subroutine s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
+
+        integer, intent(in)                                        :: s, t_step
+        real(wp), intent(in)                                       :: coefs(4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+        real(wp), intent(inout)                                    :: time_avg
+
+        if (.not. amr) return
+        if (.not. amr_rank_owns_block) return
+        if (rank_time_wrt) call s_rank_time_tic()
 
         ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
@@ -2380,7 +2540,7 @@ contains
         call s_amr_ib_correct_fine()
         if (rank_time_wrt) call s_rank_time_toc()
 
-    end subroutine s_advance_amr_fine_stage
+    end subroutine s_amr_fine_stage_advance
 
     !> Subcycled fine advance (amr_subcycle): two dt/2 SSP-RK3 substeps AFTER the coarse step. q_old/q_new are the coarse t^n and
     !! t^{n+1} states; each stage's ghosts are the linear time interpolation at the stage time theta = (substep-1 + c_s)/2 with
@@ -2863,6 +3023,41 @@ contains
 
     end subroutine s_amr_expand_box_over_bodies
 
+    !> max_grid_size tiling: split box [lo:hi] into a grid of contiguous sub-boxes each <= amr_maxc_fit per dim (the max a rank can
+    !! whole-own), appending them to out(nt+1:). Tiles are ADJACENT (share fine seams) - the block-to-block fine-fine halo makes
+    !! those seams conservative. Even split: ntl = ceil(ext/amr_maxc_fit) tiles, each of size ceil(ext/ntl) <= amr_maxc_fit. Sets
+    !! capped=1 and stops if the amr_max_blocks cap is hit. Collapsed dims stay [0:0].
+    pure subroutine s_amr_tile_box(lo, hi, out, nt, cap, capped)
+
+        integer, intent(in)        :: lo(3), hi(3), cap
+        type(t_box), intent(inout) :: out(:)
+        integer, intent(inout)     :: nt, capped
+        integer                    :: ntl(3), s(3), t1, t2, t3, qlo(3), qhi(3)
+
+        ntl = 1; s = 1
+        ntl(1) = (hi(1) - lo(1) + amr_maxc_fit(1))/amr_maxc_fit(1); s(1) = (hi(1) - lo(1) + ntl(1))/ntl(1)
+        if (n_glb > 0) then
+            ntl(2) = (hi(2) - lo(2) + amr_maxc_fit(2))/amr_maxc_fit(2); s(2) = (hi(2) - lo(2) + ntl(2))/ntl(2)
+        end if
+        if (p_glb > 0) then
+            ntl(3) = (hi(3) - lo(3) + amr_maxc_fit(3))/amr_maxc_fit(3); s(3) = (hi(3) - lo(3) + ntl(3))/ntl(3)
+        end if
+        do t3 = 0, ntl(3) - 1
+            qlo(3) = 0; qhi(3) = 0
+            if (p_glb > 0) then; qlo(3) = lo(3) + t3*s(3); qhi(3) = min(lo(3) + (t3 + 1)*s(3) - 1, hi(3)); end if
+            do t2 = 0, ntl(2) - 1
+                qlo(2) = 0; qhi(2) = 0
+                if (n_glb > 0) then; qlo(2) = lo(2) + t2*s(2); qhi(2) = min(lo(2) + (t2 + 1)*s(2) - 1, hi(2)); end if
+                do t1 = 0, ntl(1) - 1
+                    if (nt >= cap) then; capped = 1; return; end if
+                    qlo(1) = lo(1) + t1*s(1); qhi(1) = min(lo(1) + (t1 + 1)*s(1) - 1, hi(1))
+                    nt = nt + 1; out(nt)%lo = qlo; out(nt)%hi = qhi
+                end do
+            end do
+        end do
+
+    end subroutine s_amr_tile_box
+
     !> Cluster the local per-cell tag field into a LIST of separated block boxes (global level-0 cell indices), identically on every
     !! rank. Gathers the tags into a global field (allreduce MAX), runs Berger-Rigoutsos recursive bisection until each box's tag
     !! efficiency reaches amr_cluster_eff (or it is atomic / the amr_max_blocks cap is reached), then merges any two boxes whose
@@ -3048,16 +3243,18 @@ contains
             do kk = 1, nboxes
                 lo = boxes(kk)%lo; hi = boxes(kk)%hi
                 lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
-                if (hi(1) - lo(1) + 1 > amr_maxc_fit(1)) hi(1) = lo(1) + amr_maxc_fit(1) - 1
+                ! IB keeps the size-cap CLAMP (a body needs one contiguous block; splitting a body across tiles is untested); the
+                ! general path leaves boxes full-size and TILES them (below) into <= amr_maxc_fit sub-blocks with a fine-fine halo
+                if (ib .and. hi(1) - lo(1) + 1 > amr_maxc_fit(1)) hi(1) = lo(1) + amr_maxc_fit(1) - 1
                 if (n_glb > 0) then
                     lo(2) = max(lo(2) - amr_buf, buff_size); hi(2) = min(hi(2) + amr_buf, n_glb - buff_size)
-                    if (hi(2) - lo(2) + 1 > amr_maxc_fit(2)) hi(2) = lo(2) + amr_maxc_fit(2) - 1
+                    if (ib .and. hi(2) - lo(2) + 1 > amr_maxc_fit(2)) hi(2) = lo(2) + amr_maxc_fit(2) - 1
                 else
                     lo(2) = 0; hi(2) = 0
                 end if
                 if (p_glb > 0) then
                     lo(3) = max(lo(3) - amr_buf, buff_size); hi(3) = min(hi(3) + amr_buf, p_glb - buff_size)
-                    if (hi(3) - lo(3) + 1 > amr_maxc_fit(3)) hi(3) = lo(3) + amr_maxc_fit(3) - 1
+                    if (ib .and. hi(3) - lo(3) + 1 > amr_maxc_fit(3)) hi(3) = lo(3) + amr_maxc_fit(3) - 1
                 else
                     lo(3) = 0; hi(3) = 0
                 end if
@@ -3083,6 +3280,25 @@ contains
             end do
             nboxes = k
             if (nboxes == 0) return
+
+            ! max_grid_size tiling (non-IB): split any box larger than amr_maxc_fit into contiguous <= amr_maxc_fit sub-blocks so a
+            ! whole block fits a rank's local solver scratch. Tiles are adjacent; the block-to-block fine-fine halo (s_amr_fine_
+            ! fine_halo) makes the seams conservative and the reflux skips fine-fine faces. (IB keeps the clamp - see above.)
+            if (.not. ib) then
+                block
+                    type(t_box), allocatable :: tiled(:)
+                    integer                  :: kk2, ntl, capt
+                    allocate (tiled(amr_max_blocks))
+                    ntl = 0; capt = 0
+                    do kk2 = 1, nboxes
+                        call s_amr_tile_box(boxes(kk2)%lo, boxes(kk2)%hi, tiled, ntl, amr_max_blocks, capt)
+                    end do
+                    if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', &
+                        & amr_max_blocks
+                    deallocate (boxes); call move_alloc(tiled, boxes)
+                    nboxes = ntl
+                end block
+            end if
 
             if (ib) then
                 ! body-containment expansion can make boxes overlap (bisection guaranteed disjoint
@@ -3177,6 +3393,12 @@ contains
             amr_num_blocks = nboxes
             any_xchg = .false.
             if (proc_rank == 0) print '(A,I0,A)', ' [amr] regrid: ', nboxes, ' block(s)'
+            ! set the regions + assign owners BEFORE the owner-dependent geometry (else s_set_amr_fine_geometry sizes the
+            ! whole-block owner from a stale amr_block_owner; harmless with one block, wrong once tiling makes several)
+            do k = 1, nboxes
+                amr_region_lo_all(:,k) = boxes(k)%lo; amr_region_hi_all(:,k) = boxes(k)%hi
+            end do
+            call s_amr_assign_block_owners()
             do k = 1, nboxes
                 amr_cur = k
                 call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
@@ -3240,7 +3462,6 @@ contains
             ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/
             ! image points recomputed from the body definitions; no state carries across regrids)
             if (ib) call s_amr_setup_ib()
-            call s_amr_assign_block_owners()  ! Phase 1: recompute the fine-dist map for the new block set
             call s_amr_select_slot(1)
 
         end subroutine s_amr_regrid
@@ -3370,14 +3591,16 @@ contains
             character(LEN=300)                   :: msg
             logical                              :: file_exist
             integer                              :: i, k, ts, have_loc, have_glb, ghdr(3), reg(6), rm, rn, rp
+            logical, allocatable                 :: had_data(:)
 
 #ifdef MFC_MPI
-            integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
-            integer                             :: myext(3)
-            integer, allocatable                :: wext(:), rext(:)
-            integer, dimension(MPI_STATUS_SIZE) :: status
-            integer(kind=MPI_OFFSET_KIND)       :: my_cnt, my_off, tot_cnt, disp0, ddisp, fsz
-            real(stp), allocatable              :: buf(:)
+            integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
+            integer                                    :: myext(3)
+            integer, allocatable                       :: wext(:), rext(:)
+            integer, dimension(MPI_STATUS_SIZE)        :: status
+            integer(kind=MPI_OFFSET_KIND)              :: my_cnt, my_off, disp0, ddisp, fsz
+            integer(kind=MPI_OFFSET_KIND), allocatable :: blk_base(:)
+            real(stp), allocatable                     :: buf(:)
 #endif
 
             restored = .false.
@@ -3427,8 +3650,11 @@ contains
                                      & // 'in this run; restart with amr_max_blocks at least the written block count')
                 end if
                 amr_num_blocks = ghdr(2)
+                allocate (had_data(amr_num_blocks))
+                ! PASS 1: read every block's region + (present iff rm>=0, i.e. this rank owned it at write) the
+                ! owner's fine state. Whole-block ownership is decomposition-deterministic, so the file's
+                ! data-presence flag drives the read here; the owner map is rebuilt from the regions in pass 2.
                 do k = 1, amr_num_blocks
-                    amr_cur = k
                     read (2) reg, rm, rn, rp
                     ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
                     ! build and coordinate reads out of bounds silently in release builds
@@ -3436,18 +3662,33 @@ contains
                         & .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) > reg(6)))) then
                         call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
                     end if
-                    call s_set_amr_fine_geometry(reg(1:3), reg(4:6))
-                    if (rm /= amr_slots(k)%m .or. rn /= amr_slots(k)%n .or. rp /= amr_slots(k)%p) then
-                        call s_mpi_abort('amr restart decomposition mismatch: this rank''s fine extents differ from the file' &
-                                         & // ' (identical decomposition - rank count and load_balance settings - required)')
-                    end if
-                    if (amr_rank_owns_block) then
+                    amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
+                    had_data(k) = rm >= 0
+                    if (had_data(k)) then
+                        ! whole-block owner extents are region-derived (decomposition-independent); a file whose
+                        ! stored extent disagrees is corrupt/foreign - reject before the direct read
+                        if (rm /= 2*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge(2*(reg(5) - reg(2) + 1) - 1, 0, &
+                            & n_glb > 0) .or. rp /= merge(2*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
+                            call s_mpi_abort('amr restart: block fine extents disagree with the region (corrupt file)')
+                        end if
                         do i = 1, sys_size
-                            read (2) amr_slots(k)%q_cons(i)%sf(0:amr_slots(k)%m,0:amr_slots(k)%n,0:amr_slots(k)%p)
+                            read (2) amr_slots(k)%q_cons(i)%sf(0:rm,0:rn,0:rp)
                         end do
                     end if
                 end do
                 close (2)
+                ! PASS 2: rebuild whole-block owners from the regions, then each block's geometry under the
+                ! correct owner; verify the data read (write-owner) matches who owns the block in this run
+                call s_amr_assign_block_owners()
+                do k = 1, amr_num_blocks
+                    amr_cur = k
+                    call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
+                    if (had_data(k) .neqv. amr_owns_all(k)) then
+                        call s_mpi_abort('amr restart decomposition mismatch: the file''s block ownership differs from this' &
+                                         & // ' run''s (identical decomposition - rank count and load_balance settings - required)')
+                    end if
+                end do
+                deallocate (had_data)
             else
 #ifdef MFC_MPI
                 ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
@@ -3475,9 +3716,12 @@ contains
                                      & // 'in this run; restart with amr_max_blocks at least the written block count')
                 end if
                 amr_num_blocks = ghdr(2)
+                allocate (wext(3*num_procs), rext(3*num_procs), blk_base(amr_num_blocks))
+                ! PASS 1: read every block's region (collective) and lay out the file offsets. Under whole-block
+                ! ownership the per-block data size is fixed by the region (one owner holds all sys_size*cells),
+                ! so all offsets are known before the owner map is rebuilt in pass 2.
                 disp0 = int(3*ibytes, MPI_OFFSET_KIND)
                 do k = 1, amr_num_blocks
-                    amr_cur = k
                     call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
                     ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
                     ! build and coordinate reads out of bounds silently in release builds
@@ -3485,13 +3729,24 @@ contains
                         & .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) > reg(6)))) then
                         call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
                     end if
-                    if (.not. allocated(wext)) allocate (wext(3*num_procs), rext(3*num_procs))
-                    call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, &
-                                              & status, ierr)
-                    call s_set_amr_fine_geometry(reg(1:3), reg(4:6))
+                    amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
+                    blk_base(k) = disp0
+                    cnt = sys_size*(2*(reg(4) - reg(1) + 1))*merge(2*(reg(5) - reg(2) + 1), 1, &
+                                    & n_glb > 0)*merge(2*(reg(6) - reg(3) + 1), 1, p_glb > 0)
+                    disp0 = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND) + int(cnt, MPI_OFFSET_KIND)*int(sbytes, &
+                                        & MPI_OFFSET_KIND)
+                end do
+                ! PASS 2: rebuild whole-block owners from the regions, then per block build geometry under the
+                ! correct owner, validate the writer's layout, and read this rank's owned slice at its offset.
+                call s_amr_assign_block_owners()
+                do k = 1, amr_num_blocks
+                    amr_cur = k
+                    call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
                     ! validate the writer's per-rank layout against this run's decomposition: a
                     ! mismatch (e.g. re-derived load_balance splits at restart) would silently
                     ! misalign every rank's slice of the concatenated data
+                    call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, &
+                                              & MPI_INTEGER, status, ierr)
                     myext = 0
                     if (amr_rank_owns_block) myext = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
                     call MPI_ALLGATHER(myext, 3, MPI_INTEGER, rext, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -3506,8 +3761,7 @@ contains
                     my_off = int(0, MPI_OFFSET_KIND)
                     call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
                     if (proc_rank == 0) my_off = int(0, MPI_OFFSET_KIND)
-                    call MPI_ALLREDUCE(my_cnt, tot_cnt, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
-                    ddisp = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
+                    ddisp = blk_base(k) + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
                     allocate (buf(max(cnt, 1)))
                     call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                               & status, ierr)
@@ -3523,8 +3777,8 @@ contains
                         end do
                     end do
                     deallocate (buf)
-                    disp0 = ddisp + tot_cnt*int(sbytes, MPI_OFFSET_KIND)
                 end do
+                deallocate (blk_base)
                 ! disp0 now equals the exact byte count a complete file must have: a truncated file (crashed
                 ! writer, filesystem hiccup) passes every layout check above but returns short reads with
                 ! garbage tails - fail closed instead of restoring uninitialized data as the fine level

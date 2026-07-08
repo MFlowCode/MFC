@@ -93,9 +93,41 @@ contains
             end do
             own_lo(d) = tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d)
             own_hi(d) = tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d)
+            ! max_grid_size tiling: a face shared with an adjacent sub-block is fine-fine, NOT a c/f boundary - exclude it from
+            ! reflux (its outside cell is inside the neighbour block; refluxing there would corrupt that cell mid-step). The
+            ! block-to-block fine-fine halo already makes the shared flux match. (No seams without tiling, so np=1/untiled: no-op.)
+            if (own_lo(d) .and. f_amr_face_is_seam(d, -1)) own_lo(d) = .false.
+            if (own_hi(d) .and. f_amr_face_is_seam(d, 1)) own_hi(d) = .false.
         end do
 
     end subroutine s_amr_reflux_face_flags
+
+    !> True iff the current block's face on `side` (+1 high / -1 low) in dim d is shared with an ADJACENT sub-block (max_grid_size
+    !! tiling) - i.e. some other block's opposite face is exactly one cell away with matching transverse extents. Such a seam is
+    !! fine-fine, not a c/f boundary. Reads the replicated block list (amr_region_*_all) - no tiling means no match.
+    pure logical function f_amr_face_is_seam(d, side) result(seam)
+
+        integer, intent(in) :: d, side
+        integer             :: y, t
+        logical             :: match
+
+        seam = .false.
+        do y = 1, amr_num_blocks
+            if (y == amr_cur) cycle
+            if (side == 1) then
+                if (amr_region_lo_all(d, y) /= amr_region_hi(d) + 1) cycle
+            else
+                if (amr_region_hi_all(d, y) /= amr_region_lo(d) - 1) cycle
+            end if
+            match = .true.
+            do t = 1, num_dims
+                if (t /= d) match = match .and. amr_region_lo_all(t, y) == amr_region_lo(t) .and. amr_region_hi_all(t, &
+                    & y) == amr_region_hi(t)
+            end do
+            if (match) then; seam = .true.; return; end if
+        end do
+
+    end function f_amr_face_is_seam
 
     impure subroutine s_initialize_amr_registers(maxc_fit)
 
