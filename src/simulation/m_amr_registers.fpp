@@ -399,6 +399,85 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
+                ! total-flux matching (child creg): add the viscous momentum/energy face fluxes (flux_src) so the L2 reflux matches
+                ! the TOTAL advective+viscous flux, exactly as the single-level coarse creg does. Always accumulate onto the
+                ! advective.
+                if (viscous) then
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do t2 = 0, t2_hi
+                        do t1 = 0, t1_hi
+                            do eq = eqn_idx%mom%beg, eqn_idx%E
+                                select case (id)
+                                case (1)
+                                    creg(1)%lo(eq, t1, t2, kc) = creg(1)%lo(eq, t1, t2, kc) + ccoef*real(flux_src%vf(eq)%sf(jlo, &
+                                         & o1 + t1, o2 + t2), wp)
+                                    creg(1)%hi(eq, t1, t2, kc) = creg(1)%hi(eq, t1, t2, kc) + ccoef*real(flux_src%vf(eq)%sf(jhi, &
+                                         & o1 + t1, o2 + t2), wp)
+                                case (2)
+                                    creg(2)%lo(eq, t1, t2, kc) = creg(2)%lo(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                    creg(2)%hi(eq, t1, t2, kc) = creg(2)%hi(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                case (3)
+                                    creg(3)%lo(eq, t1, t2, kc) = creg(3)%lo(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                    creg(3)%hi(eq, t1, t2, kc) = creg(3)%hi(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                end select
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+                ! total-flux matching (child creg, chemistry species diffusion): species mass fluxes into creg, and the energy flux
+                ! only when NOT viscous (as on the single-level fine/coarse sides). Always accumulate onto the advective.
+                if (chemistry .and. chem_params%diffusion) then
+                    $:GPU_PARALLEL_LOOP(collapse=2)
+                    do t2 = 0, t2_hi
+                        do t1 = 0, t1_hi
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do eq = eqn_idx%species%beg, eqn_idx%species%end
+                                select case (id)
+                                case (1)
+                                    creg(1)%lo(eq, t1, t2, kc) = creg(1)%lo(eq, t1, t2, kc) + ccoef*real(flux_src%vf(eq)%sf(jlo, &
+                                         & o1 + t1, o2 + t2), wp)
+                                    creg(1)%hi(eq, t1, t2, kc) = creg(1)%hi(eq, t1, t2, kc) + ccoef*real(flux_src%vf(eq)%sf(jhi, &
+                                         & o1 + t1, o2 + t2), wp)
+                                case (2)
+                                    creg(2)%lo(eq, t1, t2, kc) = creg(2)%lo(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                    creg(2)%hi(eq, t1, t2, kc) = creg(2)%hi(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                case (3)
+                                    creg(3)%lo(eq, t1, t2, kc) = creg(3)%lo(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                    creg(3)%hi(eq, t1, t2, kc) = creg(3)%hi(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                end select
+                            end do
+                            if (.not. viscous) then
+                                select case (id)
+                                case (1)
+                                    creg(1)%lo(eqn_idx%E, t1, t2, kc) = creg(1)%lo(eqn_idx%E, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eqn_idx%E)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                    creg(1)%hi(eqn_idx%E, t1, t2, kc) = creg(1)%hi(eqn_idx%E, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eqn_idx%E)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                case (2)
+                                    creg(2)%lo(eqn_idx%E, t1, t2, kc) = creg(2)%lo(eqn_idx%E, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eqn_idx%E)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                    creg(2)%hi(eqn_idx%E, t1, t2, kc) = creg(2)%hi(eqn_idx%E, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eqn_idx%E)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                case (3)
+                                    creg(3)%lo(eqn_idx%E, t1, t2, kc) = creg(3)%lo(eqn_idx%E, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eqn_idx%E)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                    creg(3)%hi(eqn_idx%E, t1, t2, kc) = creg(3)%hi(eqn_idx%E, t1, t2, &
+                                         & kc) + ccoef*real(flux_src%vf(eqn_idx%E)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                end select
+                            end if
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
             end do
         else
             ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its

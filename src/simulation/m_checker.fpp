@@ -196,8 +196,6 @@ contains
             @:PROHIBIT(amr_max_level > 2, "amr_max_level > 2 is not yet supported; see docs/documentation/amr_multilevel.md")
             @:PROHIBIT(amr_max_level > 1 .and. num_procs > 1, &
                        & "amr_max_level > 1 currently runs a single-rank coupling self-test only (the recursive multi-level advance is under development); use num_procs = 1")
-            @:PROHIBIT(amr_max_level > 1 .and. (viscous .or. (chemistry .and. chem_params%diffusion)), &
-                       & "multi-level AMR (amr_max_level > 1) currently refluxes the ADVECTIVE flux only; viscous/chemistry-diffusion multi-level is not yet conservative across the level-2 c/f boundary")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
                        & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
         end if
