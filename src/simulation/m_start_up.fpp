@@ -896,7 +896,7 @@ contains
                 call s_write_ib_state_file(0)
             end if
         end if
-        if (bodyForces) call s_initialize_body_forces_module()
+        if (bodyForces .or. synthetic_turbulence) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
 
         ! Initialize the Temperature cache.
@@ -1102,7 +1102,7 @@ contains
         call s_finalize_mpi_proxy_module()
 
         if (surface_tension) call s_finalize_surface_tension_module()
-        if (bodyForces) call s_finalize_body_forces_module()
+        if (bodyForces .or. synthetic_turbulence) call s_finalize_body_forces_module()
         if (ib) call s_finalize_ibm_module()
 
         call s_mpi_finalize()
