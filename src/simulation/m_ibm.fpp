@@ -182,7 +182,7 @@ contains
         ! dynamic map on top of the declared entry corrupts CCE-OMP's descriptor (lib-4425)
         @:ALLOCATE(ghost_points(1:max_num_gps))
         ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
-        call s_find_ghost_points(ghost_points)
+        call s_find_ghost_points()
         call s_apply_levelset(ghost_points, num_gps)
 
         call s_compute_image_points(ghost_points)
@@ -605,14 +605,19 @@ contains
     end subroutine s_find_num_ghost_points
 
     !> Locate all ghost points in the domain
-    subroutine s_find_ghost_points(ghost_points_in)
+    subroutine s_find_ghost_points()
 
-        type(ghost_point), dimension(num_gps), intent(inout) :: ghost_points_in
-        integer                                              :: i, j, k, ii, jj, kk, gp_layers_z  !< Iterator variables
-        integer                                              :: xp, yp, zp                        !< periodicities
-        integer                                              :: count, count_i, local_idx
-        integer                                              :: patch_id, encoded_patch_id, neighborhood_patch_id
-        logical                                              :: is_gp
+        ! Operates on the declare-target module-global ghost_points directly (not via a dummy argument):
+        ! the on-device parallel loop writes it and the on-device sort below reorders it, both under the
+        ! SAME declare-target name and both on the device, so nothing ever crosses host<->device here.
+        integer           :: i, j, k, ii, jj, kk, gp_layers_z  !< Iterator variables
+        integer           :: xp, yp, zp                        !< periodicities
+        integer           :: count, count_i, local_idx
+        integer           :: patch_id, encoded_patch_id, neighborhood_patch_id
+        logical           :: is_gp
+        integer           :: a, b                              !< insertion-sort indices
+        logical           :: less                              !< lexicographic comparison result
+        type(ghost_point) :: tmp                               !< insertion-sort scratch element
 
         count = 0
         count_i = 0
@@ -645,39 +650,39 @@ contains
                             local_idx = count
                             $:END_GPU_ATOMIC_CAPTURE()
 
-                            ghost_points_in(local_idx)%loc = [i, j, k]
+                            ghost_points(local_idx)%loc = [i, j, k]
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             call s_get_neighborhood_idx(patch_id, neighborhood_patch_id)
-                            ghost_points_in(local_idx)%ib_patch_id = neighborhood_patch_id
-                            ghost_points_in(local_idx)%x_periodicity = xp
-                            ghost_points_in(local_idx)%y_periodicity = yp
-                            ghost_points_in(local_idx)%z_periodicity = zp
-                            ghost_points_in(local_idx)%slip = patch_ib(neighborhood_patch_id)%slip
+                            ghost_points(local_idx)%ib_patch_id = neighborhood_patch_id
+                            ghost_points(local_idx)%x_periodicity = xp
+                            ghost_points(local_idx)%y_periodicity = yp
+                            ghost_points(local_idx)%z_periodicity = zp
+                            ghost_points(local_idx)%slip = patch_ib(neighborhood_patch_id)%slip
 
                             if ((x_cc(i) - dx(i)) < x_domain%beg) then
-                                ghost_points_in(local_idx)%DB(1) = -1
+                                ghost_points(local_idx)%DB(1) = -1
                             else if ((x_cc(i) + dx(i)) > x_domain%end) then
-                                ghost_points_in(local_idx)%DB(1) = 1
+                                ghost_points(local_idx)%DB(1) = 1
                             else
-                                ghost_points_in(local_idx)%DB(1) = 0
+                                ghost_points(local_idx)%DB(1) = 0
                             end if
 
                             if ((y_cc(j) - dy(j)) < y_domain%beg) then
-                                ghost_points_in(local_idx)%DB(2) = -1
+                                ghost_points(local_idx)%DB(2) = -1
                             else if ((y_cc(j) + dy(j)) > y_domain%end) then
-                                ghost_points_in(local_idx)%DB(2) = 1
+                                ghost_points(local_idx)%DB(2) = 1
                             else
-                                ghost_points_in(local_idx)%DB(2) = 0
+                                ghost_points(local_idx)%DB(2) = 0
                             end if
 
                             if (p /= 0) then
                                 if ((z_cc(k) - dz(k)) < z_domain%beg) then
-                                    ghost_points_in(local_idx)%DB(3) = -1
+                                    ghost_points(local_idx)%DB(3) = -1
                                 else if ((z_cc(k) + dz(k)) > z_domain%end) then
-                                    ghost_points_in(local_idx)%DB(3) = 1
+                                    ghost_points(local_idx)%DB(3) = 1
                                 else
-                                    ghost_points_in(local_idx)%DB(3) = 0
+                                    ghost_points(local_idx)%DB(3) = 0
                                 end if
                             end if
                         end if
@@ -687,46 +692,36 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! The atomic capture above assigns array slots in thread-completion order, so the ghost-point
-        ! LIST order is nondeterministic on the GPU and differs from the CPU's serial (loop) order. Any
+        ! The atomic capture above assigns array slots in thread-completion order, so the ghost-point LIST
+        ! order is nondeterministic on the GPU and differs from the CPU's serial (loop) order. Any
         ! order-sensitive consumer downstream (e.g. the surface-force reduction) then produces a
-        ! backend-dependent result, which the discrete image-point stencil amplifies -> the moving
-        ! AMR-IB golden diverges across backends. (This is why only moving AMR-IB is affected: static
-        ! AMR-IB and non-AMR moving IB never rebuild the list on-device per substep.) Sort the list into
-        ! a deterministic lexicographic (i,j,k) cell order on the host so every backend iterates
-        ! identically; num_gps is O(1e2), so the round-trip is negligible.
-        $:GPU_UPDATE(host='[ghost_points_in]')
-        call s_sort_ghost_points_by_loc(ghost_points_in, num_gps)
-        $:GPU_UPDATE(device='[ghost_points_in]')
+        ! backend-dependent result, which the discrete image-point stencil amplifies -> the moving AMR-IB
+        ! golden diverges across backends. (Only moving AMR-IB rebuilds the list on-device per substep, so
+        ! only it is affected.) Reorder into deterministic lexicographic (i,j,k) order with a single-thread
+        ! ON-DEVICE insertion sort (num_gps ~ O(1e2); the single-trip outer loop pins it to one thread).
+        ! Sorting on the device is deliberate: a host round-trip here needs a GPU_UPDATE of the declare-target
+        ! ghost_points, which fails Cray OpenACC's present-table lookup and aborts CCE OpenMP-offload with
+        ! lib-4425 in the AMR fine path (this routine runs mid-swap, see s_ibm_swap_to_fine).
+        $:GPU_PARALLEL_LOOP(private='[a, b, tmp, less]')
+        do local_idx = 1, 1
+            do a = 2, num_gps
+                tmp = ghost_points(a)
+                b = a - 1
+                do
+                    if (b < 1) exit
+                    less = tmp%loc(1) < ghost_points(b)%loc(1) .or. (tmp%loc(1) == ghost_points(b)%loc(1) .and. (tmp%loc(2) &
+                                   & < ghost_points(b)%loc(2) .or. (tmp%loc(2) == ghost_points(b)%loc(2) .and. tmp%loc(3) &
+                                   & < ghost_points(b)%loc(3))))
+                    if (.not. less) exit
+                    ghost_points(b + 1) = ghost_points(b)
+                    b = b - 1
+                end do
+                ghost_points(b + 1) = tmp
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_find_ghost_points
-
-    !> Sort the ghost-point list into a deterministic lexicographic (loc(1), loc(2), loc(3)) cell order. Insertion sort on the host
-    !! (num_gps is O(1e2)); makes the on-device parallel search's slot order backend-independent so downstream order-sensitive
-    !! operations are reproducible.
-    pure subroutine s_sort_ghost_points_by_loc(gps, n)
-
-        integer, intent(in)                            :: n
-        type(ghost_point), dimension(n), intent(inout) :: gps
-        type(ghost_point)                              :: tmp
-        integer                                        :: a, b
-        logical                                        :: less
-
-        do a = 2, n
-            tmp = gps(a)
-            b = a - 1
-            do
-                if (b < 1) exit
-                less = tmp%loc(1) < gps(b)%loc(1) .or. (tmp%loc(1) == gps(b)%loc(1) .and. (tmp%loc(2) < gps(b)%loc(2) &
-                               & .or. (tmp%loc(2) == gps(b)%loc(2) .and. tmp%loc(3) < gps(b)%loc(3))))
-                if (.not. less) exit
-                gps(b + 1) = gps(b)
-                b = b - 1
-            end do
-            gps(b + 1) = tmp
-        end do
-
-    end subroutine s_sort_ghost_points_by_loc
 
     !> Compute the interpolation coefficients for image points
     subroutine s_compute_interpolation_coeffs(ghost_points_in)
@@ -1021,7 +1016,7 @@ contains
         ! list here, or the fine slot's own (larger) list when the AMR advance has swapped it in.
         @:PROHIBIT(num_gps > size(ghost_points), &
                    & "moving IB: the ghost-point count outgrew the ghost-point array capacity; the body's surface-cell count increased beyond the setup-time sizing")
-        call s_find_ghost_points(ghost_points)
+        call s_find_ghost_points()
         call nvtxEndRange
 
         call nvtxStartRange("COMPUTE-IMAGE-POINTS")
@@ -1766,7 +1761,7 @@ contains
         @:PROHIBIT(int(num_gps, 8) > size(ghost_points, kind=8), &
                    & "AMR fine IB: ghost-point count exceeds the ghost_points capacity sized at s_ibm_setup")
 
-        call s_find_ghost_points(ghost_points)
+        call s_find_ghost_points()
         call s_apply_levelset(ghost_points, num_gps)
         call s_compute_image_points(ghost_points)
         call s_compute_interpolation_coeffs(ghost_points)
