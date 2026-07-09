@@ -3795,33 +3795,115 @@ contains
             ! 3b) multi-level nesting: hierarchically append a box at level l nested inside each level-(l-1) box, for l =
             ! 2..amr_max_
             ! level. Parents-first ordering (every level-(l-1) box precedes its level-l children) so the build loop fills a parent
-            ! before its child's gather-from-parent reads it. A FIXED inset for now (a follow-up runs the density-gradient sensor on
-            ! each parent block's fine solution); np=1 + non-IB (multi-level distribution / IB nesting are future work). Regions
-            ! stay
-            ! in L0 cell indices at every level.
+            ! before its child's gather-from-parent reads it. SENSOR-ON-FINE: each child's extent is the density-gradient sensor run
+            ! on the parent-level FINE solution (the still-live OLD level-(l-1) blocks, read here BEFORE the step-5 stash),
+            ! coarsened
+            ! to L0-cell granularity and clustered - so children track features inside the parent instead of a fixed centre. A
+            ! brand-new region with no old fine data falls back to a centred inset (the sensor takes over next regrid); a parent
+            ! whose
+            ! fine solution is smooth gets no child. Tagging only places boxes - conservation (restrict/reflux) is independent of
+            ! where they sit. np=1 + non-IB (multi-level distribution / IB nesting are future work). Regions stay in L0 cell
+            ! indices.
             box_level(1:nboxes) = 1
             if (amr_max_level >= 2 .and. num_procs == 1 .and. .not. ib) then
                 block
-                    integer :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo
+                    integer                  :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
+                    logical, allocatable     :: ctag(:,:,:)
+                    logical                  :: covered, any_tag
+                    type(t_box), allocatable :: cboxes(:)
+
+                    ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads amr_slots(ob)%q_cons on the
+                    ! host, but the GPU_UPDATE host that the step-5 stash does runs AFTER this nesting - so the host copy is stale
+                    ! here
+                    do ob = 1, amr_num_blocks
+                        do obi = eqn_idx%cont%beg, eqn_idx%cont%end
+                            $:GPU_UPDATE(host='[amr_slots(ob)%q_cons(obi)%sf]')
+                        end do
+                    end do
+                    allocate (ctag(0:m,0:n,0:p))
+
                     plo = 1; phi = nboxes  ! [plo:phi] = the boxes at the previous level (lev-1) to nest inside
                     do lev = 2, amr_max_level
                         newlo = nboxes + 1
                         do kb = plo, phi
-                            ins = 0
-                            ins(1) = max((boxes(kb)%hi(1) - boxes(kb)%lo(1) + 1)/4, amr_cpat_mar)
-                            if (n_glb > 0) ins(2) = max((boxes(kb)%hi(2) - boxes(kb)%lo(2) + 1)/4, amr_cpat_mar)
-                            if (p_glb > 0) ins(3) = max((boxes(kb)%hi(3) - boxes(kb)%lo(3) + 1)/4, amr_cpat_mar)
-                            clo = boxes(kb)%lo + ins; chi = boxes(kb)%hi - ins
-                            if (chi(1) < clo(1)) cycle  ! inset left no interior in x
-                            if (n_glb > 0 .and. chi(2) < clo(2)) cycle
-                            if (p_glb > 0 .and. chi(3) < clo(3)) cycle
                             if (nboxes + 1 > amr_max_blocks) exit  ! pool full - stop nesting
-                            nboxes = nboxes + 1
-                            boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                            ! nesting window: children keep an amr_cpat_mar margin from the parent boundary so their ghost
+                            ! prolongation reads valid parent interior cells
+                            mlo = boxes(kb)%lo; mhi = boxes(kb)%hi
+                            mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
+                            if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
+                            if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
+                            if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
+                            if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
+                            if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
+
+                            ! sensor-on-fine: tag from every OLD level-(lev-1) block overlapping this parent window (amr_block_level
+                            ! still holds the old levels here - it is reset to box_level at step 5b, below)
+                            ctag = .false.; covered = .false.; any_tag = .false.
+                            do ob = 1, amr_num_blocks
+                                if (amr_block_level(ob) /= lev - 1) cycle
+                                if (boxes(kb)%lo(1) > amr_region_hi_all(1, ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, &
+                                    & ob)) cycle
+                                if (n_glb > 0) then
+                                    if (boxes(kb)%lo(2) > amr_region_hi_all(2, ob) .or. boxes(kb)%hi(2) < amr_region_lo_all(2, &
+                                        & ob)) cycle
+                                end if
+                                if (p_glb > 0) then
+                                    if (boxes(kb)%lo(3) > amr_region_hi_all(3, ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, &
+                                        & ob)) cycle
+                                end if
+                                covered = .true.
+                                call s_amr_tag_child_from_fine(ob, mlo, mhi, ctag, any_tag)
+                            end do
+
+                            if (covered .and. .not. any_tag) cycle  ! parent's fine solution is smooth here - no child
+
+                            if (covered) then
+                                ! cluster the fine-tagged L0 cells into child boxes, pad by amr_buf, clamp into the nesting window
+                                call s_amr_cluster(ctag, cboxes, ncb)
+                                do kc = 1, ncb
+                                    if (nboxes + 1 > amr_max_blocks) exit
+                                    clo = cboxes(kc)%lo; chi = cboxes(kc)%hi
+                                    clo(1) = max(clo(1) - amr_buf, mlo(1)); chi(1) = min(chi(1) + amr_buf, mhi(1))
+                                    if (n_glb > 0) then
+                                        clo(2) = max(clo(2) - amr_buf, mlo(2)); chi(2) = min(chi(2) + amr_buf, mhi(2))
+                                    else
+                                        clo(2) = 0; chi(2) = 0
+                                    end if
+                                    if (p_glb > 0) then
+                                        clo(3) = max(clo(3) - amr_buf, mlo(3)); chi(3) = min(chi(3) + amr_buf, mhi(3))
+                                    else
+                                        clo(3) = 0; chi(3) = 0
+                                    end if
+                                    ! slot cap: a level->=2 block's fine grid spans 4*(its L0 extent) cells while the slot holds
+                                    ! 2*amr_maxc_fit fine cells, so cap the child's L0 extent to amr_maxc_fit/2 - exactly the bound
+                                    ! the fixed inset (ins >= width/4) implicitly respected. A feature wider than that gets one
+                                    ! capped child rather than tiles (multi-level fine-fine tiling is future work).
+                                    chi(1) = min(chi(1), clo(1) + amr_maxc_fit(1)/2 - 1)
+                                    if (n_glb > 0) chi(2) = min(chi(2), clo(2) + amr_maxc_fit(2)/2 - 1)
+                                    if (p_glb > 0) chi(3) = min(chi(3), clo(3) + amr_maxc_fit(3)/2 - 1)
+                                    nboxes = nboxes + 1
+                                    boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                                end do
+                                if (allocated(cboxes)) deallocate (cboxes)
+                            else
+                                ! brand-new region (no old fine data yet): centred inset so the child still appears this regrid
+                                ins = 0
+                                ins(1) = max((boxes(kb)%hi(1) - boxes(kb)%lo(1) + 1)/4, amr_cpat_mar)
+                                if (n_glb > 0) ins(2) = max((boxes(kb)%hi(2) - boxes(kb)%lo(2) + 1)/4, amr_cpat_mar)
+                                if (p_glb > 0) ins(3) = max((boxes(kb)%hi(3) - boxes(kb)%lo(3) + 1)/4, amr_cpat_mar)
+                                clo = boxes(kb)%lo + ins; chi = boxes(kb)%hi - ins
+                                if (chi(1) < clo(1)) cycle  ! inset left no interior in x
+                                if (n_glb > 0 .and. chi(2) < clo(2)) cycle
+                                if (p_glb > 0 .and. chi(3) < clo(3)) cycle
+                                nboxes = nboxes + 1
+                                boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                            end if
                         end do
                         plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
                         if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
                     end do
+                    deallocate (ctag)
                     if (nboxes >= amr_max_blocks .and. proc_rank == 0) print '(A)', &
                         & ' [amr] NOTE: block pool full during multi-level nesting; some boxes were not refined further'
                 end block
@@ -4058,6 +4140,60 @@ contains
             call s_amr_select_slot(1)
 
         end subroutine s_amr_regrid
+
+        !> Sensor-on-fine child tagging: OR-accumulate density-gradient tags from an OLD fine block's solution into an L0-cell tag
+        !! grid, restricted to a parent nesting window. Reads amr_slots(ob)%q_cons on the HOST (the caller host-refreshes the cont
+        !! range first; the step-5 stash's GPU_UPDATE runs later). Fine cell (fi,fj,fk) covers L0 cell (ci,cj,ck) with fi =
+        !! rr*(ci-olo(1))+d etc.; the gradient uses one-sided differences at the fine-interior edges so no stale fine ghost is read.
+        !! Only decides placement - conservation is enforced downstream by restrict/reflux regardless of the box extent.
+        impure subroutine s_amr_tag_child_from_fine(ob, win_lo, win_hi, ctag, any_tag)
+
+            integer, intent(in)    :: ob, win_lo(3), win_hi(3)
+            logical, intent(inout) :: ctag(0:,0:,0:)
+            logical, intent(inout) :: any_tag
+            integer                :: rr, ci, cj, ck, fi, fj, fk, d1, d2, d3, fm1, fm2, fm3, olo(3), lo(3), hi(3)
+            real(wp)               :: r0, g
+            logical                :: tagged
+
+            rr = amr_slots(ob)%ref_ratio
+            olo = amr_region_lo_all(:,ob)
+            fm1 = amr_slots(ob)%m; fm2 = amr_slots(ob)%n; fm3 = amr_slots(ob)%p
+            ! overlap of this old block with the parent window, in L0 cells
+            lo(1) = max(win_lo(1), amr_region_lo_all(1, ob)); hi(1) = min(win_hi(1), amr_region_hi_all(1, ob))
+            lo(2) = merge(max(win_lo(2), amr_region_lo_all(2, ob)), 0, n_glb > 0)
+            hi(2) = merge(min(win_hi(2), amr_region_hi_all(2, ob)), 0, n_glb > 0)
+            lo(3) = merge(max(win_lo(3), amr_region_lo_all(3, ob)), 0, p_glb > 0)
+            hi(3) = merge(min(win_hi(3), amr_region_hi_all(3, ob)), 0, p_glb > 0)
+            do ck = lo(3), hi(3)
+                do cj = lo(2), hi(2)
+                    do ci = lo(1), hi(1)
+                        tagged = .false.
+                        do d3 = 0, merge(rr - 1, 0, p_glb > 0)
+                            fk = (ck - olo(3))*rr + d3
+                            do d2 = 0, merge(rr - 1, 0, n_glb > 0)
+                                fj = (cj - olo(2))*rr + d2
+                                do d1 = 0, rr - 1
+                                    fi = (ci - olo(1))*rr + d1
+                                    r0 = max(abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, fk)), 1.e-30_wp)
+                                    g = abs(f_amr_rho_tot(amr_slots(ob)%q_cons, min(fi + 1, fm1), fj, &
+                                            & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, max(fi - 1, 0), fj, fk))
+                                    if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, min(fj + 1, fm2), &
+                                        & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, max(fj - 1, 0), fk)))
+                                    if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, min(fk + 1, &
+                                        & fm3)) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, max(fk - 1, 0))))
+                                    if (g/(2._wp*r0) > amr_tag_eps) tagged = .true.
+                                end do
+                            end do
+                        end do
+                        if (tagged) then
+                            ctag(ci, cj, ck) = .true.
+                            any_tag = .true.
+                        end if
+                    end do
+                end do
+            end do
+
+        end subroutine s_amr_tag_child_from_fine
 
         !> Write the fine-level restart file for save step t_step alongside the level-0 restart (whose format stays untouched): the
         !! writing rank count, the active-block count, and for EACH block its box + each rank's intersection-local fine conservative
