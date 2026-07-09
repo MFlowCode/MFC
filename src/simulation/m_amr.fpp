@@ -167,9 +167,10 @@ contains
     !! (sys_size/buff_size set). Per-slot fine arrays are allocated lazily (s_amr_reconcile_slots) - only the blocks a rank owns.
     impure subroutine s_initialize_amr_module()
 
-        integer :: i, d, islot
-        integer :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
-        integer :: blk_lo(3), blk_hi(3)
+        integer                         :: i, d, islot
+        integer                         :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
+        integer                         :: blk_lo(3), blk_hi(3)
+        type(scalar_field), allocatable :: tmp_cg(:)
 
         if (.not. amr) return
 
@@ -355,7 +356,15 @@ contains
         amr_cpat_hi(1) = maxc_loc(1) - 1 + 2*amr_cpat_mar
         if (n_glb > 0) amr_cpat_hi(2) = maxc_loc(2) - 1 + 2*amr_cpat_mar
         if (p_glb > 0) amr_cpat_hi(3) = maxc_loc(3) - 1 + 2*amr_cpat_mar
-        @:ALLOCATE(amr_cg(1:sys_size))
+        ! CCE OpenMP-offload leaves a bare module-scope derived-type (scalar_field) allocatable's
+        ! descriptor uninitialized, so a direct allocate(amr_cg(1:sys_size)) aborts with lib-4425 at
+        ! program start (verified by an early module-init probe; a LOCAL scalar_field array and a
+        ! GPU_DECLARE'd module one like q_prim_vf both allocate fine - only this bare module array does
+        ! not). Allocate a local, which gets a valid descriptor, and hand it to the module variable via
+        ! move_alloc, then map. OpenACC is unaffected but takes the same path correctly.
+        allocate (tmp_cg(1:sys_size))
+        call move_alloc(tmp_cg, amr_cg)
+        $:GPU_ENTER_DATA(create='[amr_cg]')
         do i = 1, sys_size
             @:ALLOCATE(amr_cg(i)%sf(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3)))
             amr_cg(i)%sf = 0._stp  ! padding beyond a block's valid patch extent is never read; keep it finite for the device copy
