@@ -1707,7 +1707,10 @@ contains
         ! the coarse list as a host copy, then on the correct/moving path copy this slot's fine list in and
         ! push it to device. On the setup path the fine list does not exist yet - s_ibm_setup_fine fills
         ! ghost_points in place next.
-        $:GPU_UPDATE(host='[ghost_points]')
+        ! Update only the active 1:num_gps slice (all the host code below touches): amdflang lowers a
+        ! whole-array update of this array-of-derived-type to a per-element custom mapper that exhausts
+        ! the ROCm HSA resource pool (spurious OUT_OF_RESOURCES abort); elements past num_gps are stale.
+        $:GPU_UPDATE(host='[ghost_points(1:num_gps)]')
         n_c = num_gps
         @:PROHIBIT(int(n_c, 8) > size(ib_fine(ib_coarse_slot)%gps, kind=8), &
                    & "AMR fine IB: coarse ghost-point count exceeds the coarse park capacity")
@@ -1716,7 +1719,7 @@ contains
         num_gps = ib_fine(islot)%num_gps
         if (gps_on_device) then
             ghost_points(1:num_gps) = ib_fine(islot)%gps(1:num_gps)
-            $:GPU_UPDATE(device='[ghost_points]')
+            $:GPU_UPDATE(device='[ghost_points(1:num_gps)]')
         end if
         $:GPU_UPDATE(device='[num_gps]')
 
@@ -1736,12 +1739,12 @@ contains
         ib_markers%sf = ib_fine(ib_coarse_slot)%markers%sf
         $:GPU_UPDATE(device='[ib_markers%sf]')
 
-        $:GPU_UPDATE(host='[ghost_points]')
+        $:GPU_UPDATE(host='[ghost_points(1:num_gps)]')
         ib_fine(islot)%gps(1:num_gps) = ghost_points(1:num_gps)
         ib_fine(islot)%num_gps = num_gps
         num_gps = num_gps_save
         ghost_points(1:num_gps) = ib_fine(ib_coarse_slot)%gps(1:num_gps)
-        $:GPU_UPDATE(device='[ghost_points]')
+        $:GPU_UPDATE(device='[ghost_points(1:num_gps)]')
         $:GPU_UPDATE(device='[num_gps]')
 
     end subroutine s_ibm_restore_from_fine
