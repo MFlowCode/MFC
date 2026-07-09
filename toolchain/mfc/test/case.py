@@ -346,6 +346,12 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-7
         elif self.params.get("mixlayer_perturb", "F") == "T":
             tolerance = 1e-7
+        elif self.params.get("synthetic_turbulence", "F") == "T":
+            # Random-Fourier-mode forcing amplifies roundoff: by t_step 3 the double
+            # run still matches the golden to <1e-12, but the single run diverges to
+            # ~1e-3. Base 1e-10 keeps double tight (1e-10) while the ARG("single")
+            # 1e8 scaling below gives single a 1e-2 tolerance.
+            tolerance = 1e-10
         elif any(self.params.get(key, "F") == "T" for key in ["relax", "ib", "qbmm", "bubbles_euler", "bubbles_lagrange"]):
             tolerance = 1e-10
         elif self.params.get("low_Mach") in [1, 2]:
@@ -484,9 +490,9 @@ def create_input_lagrange(path_test):
 
 def copy_input_lagrange(path_example_input, path_test):
     folder_path_dest = path_test + "/input/"
-    fite_path_dest = folder_path_dest + "lag_bubbles.dat"
+    file_path_dest = folder_path_dest + "lag_bubbles.dat"
     file_path_src = common.MFC_EXAMPLE_DIRPATH + path_example_input + "/input/lag_bubbles.dat"
     if not os.path.exists(folder_path_dest):
         os.mkdir(folder_path_dest)
 
-    shutil.copyfile(file_path_src, fite_path_dest)
+    shutil.copyfile(file_path_src, file_path_dest)
