@@ -50,9 +50,8 @@ contains
         end do
         allocate (particle_cloud_ibs(min(num_ib_patches_max_namelist, n_total_particles)))
 
-        ib_idx = 0  ! index into particle_cloud_ibs (this rank's in-neighborhood particles only)
-        glbl_idx = num_ibs  ! running global patch id across all generated particles, kept regardless of locality; starts after
-        ! the namelist patches (1..num_ibs) so each particle's gbl_patch_id is already its final global id
+        ib_idx = 0  ! index into particle_cloud_ibs
+        glbl_idx = num_ibs
 
         do cloud_idx = 1, num_particle_clouds
             select case (particle_cloud(cloud_idx)%packing_method)
@@ -213,7 +212,7 @@ contains
         n_target = particle_cloud(cloud_idx)%num_particles
         n_placed = 0
 
-        if (p == 0) then
+        if (num_dims < 3) then
             geom = 2  ! circle for 2D
             ! Triangular lattice: area per particle = (sqrt(3)/2)*spacing**2.
             spacing = sqrt(2._wp*(xmax - xmin)*(ymax - ymin)/(sqrt(3._wp)*real(n_target, wp)))
@@ -228,7 +227,7 @@ contains
                              & // "reduce num_particles or min_spacing, or enlarge the cloud region")
         end if
 
-        if (p == 0) then
+        if (num_dims < 3) then
             ! Triangular lattice: rows pitched by spacing*sqrt(3)/2, odd rows shifted by half a spacing.
             row_dy = spacing*sqrt(3._wp)/2._wp
             row = 0

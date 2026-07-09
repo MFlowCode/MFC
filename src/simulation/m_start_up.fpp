@@ -877,8 +877,6 @@ contains
                 type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
                 integer                                :: num_particle_cloud_ibs
 
-                ! Neighborhood bounds must exist before s_generate_particle_clouds so it can discard out-of-neighborhood
-                ! particles as they are generated, instead of materializing the full global particle-cloud on every rank.
                 call get_neighbor_bounds()
 
                 if (cfl_dt .and. n_start > 0) then
@@ -1227,9 +1225,7 @@ contains
             num_bed_ibs = num_bed_ibs + particle_cloud(i)%num_particles
         end do
 
-        ! Check for moving IBs across both namelist and particle bed patches. moving_ibm is a per-cloud property (every particle
-        ! in a cloud shares particle_cloud(:)%moving_ibm), so checking the cloud list gives the same, globally-consistent answer
-        ! on every rank without needing this rank's full (neighborhood-filtered) particle_cloud_ibs.
+        ! Check for moving IBs across both namelist and particle cloud patches.
         moving_immersed_boundary_flag = .false.
         do i = 1, num_namelist_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
@@ -1282,9 +1278,7 @@ contains
                     end if
                 end if
             end do
-            ! particle_cloud_ibs entries already passed the neighborhood check at generation time (against the same
-            ! neighbor_domain_x/y/z computed by get_neighbor_bounds() before s_generate_particle_clouds ran), so no need to
-            ! recheck it here.
+            ! particle_cloud_ibs entries already passed the neighborhood check at generation time so no need to recheck it here.
             do i = 1, num_particle_cloud_ibs
                 centroid = [particle_cloud_ibs(i)%x_centroid, particle_cloud_ibs(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = particle_cloud_ibs(i)%z_centroid
