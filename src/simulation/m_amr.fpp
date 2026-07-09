@@ -1266,9 +1266,10 @@ contains
     impure subroutine s_amr_test_multilevel(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-        integer                                                :: L2, n1, i, ci, cj, ck, inset(3)
-        real(wp)                                               :: err, e
-        type(scalar_field), dimension(:), allocatable          :: scratch
+        integer :: L2, n1, i, ci, cj, ck, inset(3), bi
+        real(wp) :: err, e
+        type(scalar_field), dimension(:), allocatable :: scratch
+        real(stp), allocatable :: b1save(:,:,:,:)  !< full block-1 state, restored after the intrusive checks
 
         if (amr_max_level < 2 .or. num_procs > 1) return
         n1 = amr_num_blocks
@@ -1310,6 +1311,16 @@ contains
             end do
             deallocate (scratch)
             print '(A,I0,A,ES12.4)', ' [amr] MULTILEVEL self-test (L2 block ', L2, '): restrict-prolong conservation err = ', err
+            ! GPU-safe non-intrusiveness: the intrusive checks below fold L2 into block 1 and perturb its outside cells on the
+            ! DEVICE. Save block 1's full state now and restore it afterwards so the persistent parent enters the advance clean -
+            ! partial per-cell restores left the device copy inconsistent (a GPU-only NaN by step 3, invisible on CPU).
+            allocate (b1save(lbound(amr_slots(1)%q_cons(1)%sf, 1):ubound(amr_slots(1)%q_cons(1)%sf, 1), &
+                      & lbound(amr_slots(1)%q_cons(1)%sf, 2):ubound(amr_slots(1)%q_cons(1)%sf, 2), &
+                      & lbound(amr_slots(1)%q_cons(1)%sf, 3):ubound(amr_slots(1)%q_cons(1)%sf, 3),1:sys_size))
+            do bi = 1, sys_size
+                $:GPU_UPDATE(host='[amr_slots(1)%q_cons(bi)%sf]')
+                b1save(:,:,:,bi) = amr_slots(1)%q_cons(bi)%sf
+            end do
             ! restrict-to-parent (increment 3 step 1): fold L2 back into the parent block; the covered cells must be UNCHANGED
             ! (restrict(prolong) = identity), which exercises s_amr_restrict_to_parent via s_restrict_fine_to_coarse.
             block
@@ -1362,16 +1373,22 @@ contains
                     ah = real(amr_slots(1)%q_cons(e)%sf(oh, 0, 0), wp) - real(qh0(e), wp)
                     expl = (0.11_wp*e - 0.03_wp*e)/dxf; exph = (0.05_wp*e - 0.07_wp*e)/dxf
                     errr = max(errr, abs(al - expl), abs(ah - exph))
-                    ! restore the parent's outside cells (undo the injected reflux so block 1 keeps its real state)
-                    amr_slots(1)%q_cons(e)%sf(ol, 0, 0) = ql0(e); amr_slots(1)%q_cons(e)%sf(oh, 0, 0) = qh0(e)
-                    $:GPU_UPDATE(device='[amr_slots(1)%q_cons(e)%sf]')
                 end do
                 deallocate (ql0, qh0)
                 print '(A,ES12.4)', ' [amr] MULTILEVEL self-test: reflux-to-parent conservation err = ', errr
             end block
+            ! restore block 1's full state (buffer -> host -> device): undoes every intrusive-check write so the persistent
+            ! parent enters the advance exactly as s_populate_amr_fine left it (device-clean).
+            do bi = 1, sys_size
+                amr_slots(1)%q_cons(bi)%sf = b1save(:,:,:,bi)
+                $:GPU_UPDATE(device='[amr_slots(1)%q_cons(bi)%sf]')
+            end do
+            deallocate (b1save)
         end if
-        call s_amr_free_slot(L2)
-        amr_block_level(L2) = 1; amr_num_blocks = n1; amr_num_levels = 1
+        ! persistent L2 block (increment 3 step 3): KEEP the level-2 block in the active set (amr_num_blocks = L2, amr_num_levels =
+        ! 2,
+        ! level 2) so the advance driver can step it across timesteps. The self-test perturbations above are restored, so the block
+        ! holds its clean prolonged state. amr_num_blocks stays = L2 (set above); no free/revert.
         ! restore amr_cg + the patch frame (amr_cpat_off) to block 1: the L2 gather above overwrote them with the parent-fine
         ! frame, and the normal single-block conservation check that follows reads block 1's frame.
         call s_amr_select_slot(1)

@@ -511,6 +511,8 @@ contains
                 ! Phase 1 - FILL every block's ghost shell from the (gathered) coarse; interiors stay stage-entry.
                 do islot = 1, amr_num_blocks
                     call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
+                    ! persistent level>=2 blocks are inert until the level-loop driver (increment 3 step 4)
+                    if (amr_block_level(amr_cur) >= 2) cycle
                     call s_amr_fine_stage_fill(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 end do
                 ! Phase 2 - block-to-block fine-fine halo: overwrite adjacent-sub-block seam ghosts with neighbour fine interior.
@@ -518,6 +520,7 @@ contains
                 ! Phase 3 - ADVANCE every block (RHS + RK update) + reflux at its c/f faces.
                 do islot = 1, amr_num_blocks
                     call s_amr_select_slot(islot)
+                    if (amr_block_level(amr_cur) >= 2) cycle  ! level>=2 advance is increment 3 step 4 (level-loop driver)
                     call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                   & t_step, time_avg)
                     ! freg slices of the block faces move to the coarse-outside-owners (ALL ranks call; no-op at np=1)
@@ -620,6 +623,8 @@ contains
             ! is subcycled, restricted, and state-refluxed in turn; amr_cur resets to 1 afterwards.
             do islot = 1, amr_num_blocks
                 call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
+                ! persistent level>=2 blocks are inert until the level-loop driver (increment 3 step 4)
+                if (amr_block_level(amr_cur) >= 2) cycle
                 if (amr_subcycle) then
                     call s_advance_amr_fine_substeps(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, &
                                                      & pb_ts(stor)%sf, mv_ts(stor)%sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
