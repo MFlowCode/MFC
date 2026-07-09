@@ -180,10 +180,10 @@ contains
         type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
         integer                        :: eq, t1, t2, jlo, jhi, t1_lo, t1_hi, t2_lo, t2_hi, o1, o2, islot, save_cur
-        integer                        :: sidx(3), ext(3), tlo(3), thi(3)
+        integer                        :: sidx(3), ext(3), tlo(3), thi(3), kc, dch
         logical                        :: own_lo(3), own_hi(3), cap_lo, cap_hi
-        real(wp)                       :: coef
-        logical                        :: accum
+        real(wp)                       :: coef, ccoef
+        logical                        :: accum, cacc, is_child
 
         if (.not. amr) return
         if (igr) return  ! stage-1 IGR coupling is restriction-only: the fused IGR flux kernels do not expose face fluxes to capture
@@ -196,6 +196,10 @@ contains
             else
                 coef = rk3_w(stage); accum = (stage > 1)  ! stage 1 overwrites = implicit zero per coarse step
             end if
+        else if (amr_in_fine_advance .and. amr_block_level(amr_cur) >= 2) then
+            ! lock-step L2->L1 reflux: the parent already RK-updated by the time we reflux, so freg must hold the rk3_w-weighted
+            ! step-integral flux for the once-per-step STATE correction (stage 1 overwrites = implicit zero, cf. the coarse creg).
+            coef = rk3_w(stage); accum = (stage > 1)
         else
             coef = 1._wp; accum = .false.  ! overwrite each stage - default behavior, byte-identical
         end if
@@ -327,6 +331,75 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
+            ! multi-level lock-step: this fine block (amr_cur) is the COARSE side (parent) of its level+1 children. Capture creg for
+            ! each child from THIS block's fine flux at the child's footprint faces - the child's amr_isect_lo/hi is already in this
+            ! parent's fine frame, so it indexes flux_dir directly (face jlo=isect_lo-1, jhi=isect_hi; transverse origin o1/o2).
+            ! creg
+            ! holds the rk3_w-weighted step-integral flux for the once-per-step STATE reflux into this parent
+            ! (s_amr_reflux_to_parent).
+            ! Advective (flux_dir) only; viscous/chemistry multi-level reflux is gated in m_checker until captured here too. np=1
+            ! (children co-owned with the parent); np>=2 P2P delivery is future work.
+            ccoef = rk3_w(stage); cacc = (stage > 1)
+            do kc = 1, amr_num_blocks
+                if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1 .or. .not. amr_owns_all(kc)) cycle
+                is_child = .true.
+                do dch = 1, 3
+                    is_child = is_child .and. amr_region_lo_all(dch, kc) <= amr_region_hi_all(dch, &
+                        & amr_cur) .and. amr_region_hi_all(dch, kc) >= amr_region_lo_all(dch, amr_cur)
+                end do
+                if (.not. is_child) cycle
+                select case (id)
+                case (1); jlo = amr_isect_lo_all(1, kc) - 1; jhi = amr_isect_hi_all(1, kc)
+                    o1 = amr_isect_lo_all(2, kc); t1_hi = amr_isect_hi_all(2, kc) - amr_isect_lo_all(2, kc)
+                    o2 = amr_isect_lo_all(3, kc); t2_hi = amr_isect_hi_all(3, kc) - amr_isect_lo_all(3, kc)
+                case (2); jlo = amr_isect_lo_all(2, kc) - 1; jhi = amr_isect_hi_all(2, kc)
+                    o1 = amr_isect_lo_all(1, kc); t1_hi = amr_isect_hi_all(1, kc) - amr_isect_lo_all(1, kc)
+                    o2 = amr_isect_lo_all(3, kc); t2_hi = amr_isect_hi_all(3, kc) - amr_isect_lo_all(3, kc)
+                case (3); jlo = amr_isect_lo_all(3, kc) - 1; jhi = amr_isect_hi_all(3, kc)
+                    o1 = amr_isect_lo_all(1, kc); t1_hi = amr_isect_hi_all(1, kc) - amr_isect_lo_all(1, kc)
+                    o2 = amr_isect_lo_all(2, kc); t2_hi = amr_isect_hi_all(2, kc) - amr_isect_lo_all(2, kc)
+                end select
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do t2 = 0, t2_hi
+                    do t1 = 0, t1_hi
+                        do eq = 1, sys_size
+                            select case (id)
+                            case (1)
+                                if (cacc) then
+                                    creg(1)%lo(eq, t1, t2, kc) = creg(1)%lo(eq, t1, t2, kc) + ccoef*real(flux_dir%vf(eq)%sf(jlo, &
+                                         & o1 + t1, o2 + t2), wp)
+                                    creg(1)%hi(eq, t1, t2, kc) = creg(1)%hi(eq, t1, t2, kc) + ccoef*real(flux_dir%vf(eq)%sf(jhi, &
+                                         & o1 + t1, o2 + t2), wp)
+                                else
+                                    creg(1)%lo(eq, t1, t2, kc) = ccoef*real(flux_dir%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
+                                    creg(1)%hi(eq, t1, t2, kc) = ccoef*real(flux_dir%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
+                                end if
+                            case (2)
+                                if (cacc) then
+                                    creg(2)%lo(eq, t1, t2, kc) = creg(2)%lo(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                    creg(2)%hi(eq, t1, t2, kc) = creg(2)%hi(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                else
+                                    creg(2)%lo(eq, t1, t2, kc) = ccoef*real(flux_dir%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
+                                    creg(2)%hi(eq, t1, t2, kc) = ccoef*real(flux_dir%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
+                                end if
+                            case (3)
+                                if (cacc) then
+                                    creg(3)%lo(eq, t1, t2, kc) = creg(3)%lo(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                    creg(3)%hi(eq, t1, t2, kc) = creg(3)%hi(eq, t1, t2, &
+                                         & kc) + ccoef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                else
+                                    creg(3)%lo(eq, t1, t2, kc) = ccoef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
+                                    creg(3)%hi(eq, t1, t2, kc) = ccoef*real(flux_dir%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
+                                end if
+                            end select
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end do
         else
             ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its
             ! flux_n covers that face; at a rank-interior face the same rank also holds the inside cells).
@@ -337,6 +410,8 @@ contains
             ! ONE coarse s_compute_rhs pass fills EVERY active block's registers: revisit each slot's region+intersection in turn.
             save_cur = amr_cur
             do islot = 1, amr_num_blocks
+                ! a level>=2 block's coarse side is its PARENT (creg captured in the fine branch), not L0
+                if (amr_block_level(islot) >= 2) cycle
                 call s_amr_select_slot(islot)
                 call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
                 cap_lo = own_lo(id); cap_hi = own_hi(id)

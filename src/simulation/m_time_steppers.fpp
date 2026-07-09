@@ -29,7 +29,7 @@ module m_time_steppers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_advance_amr_fine_substeps, &
-        & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces
+        & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -641,6 +641,12 @@ contains
                 ! equilibrate the fine solution (phase change) before it restricts to the coarse level
                 if (relax) call s_amr_relax_fine()
                 call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
+                ! multi-level lock-step: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the parent's
+                ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured during
+                ! the
+                ! advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle multi-level
+                ! reflux is future work; dt is the shared lock-step step.
+                if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) call s_amr_reflux_to_parent(dt)
                 ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
                 if (amr_subcycle) call s_amr_p2p_reflux_faces()
                 if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
