@@ -22,17 +22,23 @@ module m_particle_cloud
 
 contains
 
-    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Particles
-    !! outside this rank's IB neighborhood (get_neighbor_bounds() must already have been called) are discarded as they are
-    !! generated, so particle_cloud_ibs never holds more than num_local_ibs_max entries regardless of the global particle count.
-    impure subroutine s_generate_particle_clouds(particle_cloud_ibs)
+    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Particles outside
+    !! this rank's IB neighborhood (get_neighbor_bounds() must already have been called) are discarded as they are generated, so
+    !! particle_cloud_ibs is allocated to a worst-case capacity of num_ib_patches_max_namelist entries (the same neighborhood-sized
+    !! cap patch_ib is bound by in s_reduce_ib_patch_array) regardless of the global particle count, but only the first
+    !! num_particle_cloud_ibs of them are actually written - callers must use that count, not size(particle_cloud_ibs), since the
+    !! remainder of the array is left uninitialized. Each entry's gbl_patch_id is already the final, absolute global patch id
+    !! (namelist patches occupy 1..num_ibs, so the running index here starts at num_ibs) - s_reduce_ib_patch_array copies it as-is.
+    impure subroutine s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
+        integer, intent(out)                                              :: num_particle_cloud_ibs
         integer                                                           :: cloud_idx, ib_idx, glbl_idx, n_total_particles
         real(wp)                                                          :: t_start, t_end
 
         if (num_particle_clouds == 0) then
             allocate (particle_cloud_ibs(0))
+            num_particle_cloud_ibs = 0
             return
         end if
 
@@ -42,10 +48,11 @@ contains
         do cloud_idx = 1, num_particle_clouds
             n_total_particles = n_total_particles + particle_cloud(cloud_idx)%num_particles
         end do
-        allocate (particle_cloud_ibs(min(num_local_ibs_max, n_total_particles)))
+        allocate (particle_cloud_ibs(min(num_ib_patches_max_namelist, n_total_particles)))
 
-        ib_idx = 0    ! index into particle_cloud_ibs (this rank's in-neighborhood particles only)
-        glbl_idx = 0  ! running index across all generated particles, kept regardless of locality
+        ib_idx = 0  ! index into particle_cloud_ibs (this rank's in-neighborhood particles only)
+        glbl_idx = num_ibs  ! running global patch id across all generated particles, kept regardless of locality; starts after
+        ! the namelist patches (1..num_ibs) so each particle's gbl_patch_id is already its final global id
 
         do cloud_idx = 1, num_particle_clouds
             select case (particle_cloud(cloud_idx)%packing_method)
@@ -55,9 +62,11 @@ contains
                 call s_particle_cloud_lattice(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
             end select
         end do
+        num_particle_cloud_ibs = ib_idx
 
         call cpu_time(t_end)
-        if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', glbl_idx, ' particles in ', t_end - t_start, ' seconds.'
+        if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', glbl_idx - num_ibs, ' particles in ', &
+            & t_end - t_start, ' seconds.'
 
     end subroutine s_generate_particle_clouds
 
@@ -265,11 +274,11 @@ contains
 
     end subroutine s_particle_cloud_lattice
 
-    !> Writes a single placed particle into particle_cloud_ibs at the next free slot if it falls within this rank's IB
-    !! neighborhood (get_neighbor_bounds() must already have run), advancing ib_idx; particles outside the neighborhood are
-    !! discarded here rather than stored. glbl_idx always advances so gbl_patch_id records the particle's position in the full,
-    !! unfiltered enumeration - s_reduce_ib_patch_array offsets it by the namelist IB count for final global indexing. Shared by
-    !! all packing methods so the per-particle ib_patch_parameters setup stays in one place.
+    !> Writes a single placed particle into particle_cloud_ibs at the next free slot if it falls within this rank's IB neighborhood
+    !! (get_neighbor_bounds() must already have run), advancing ib_idx; particles outside the neighborhood are discarded here rather
+    !! than stored. glbl_idx always advances (starting from num_ibs, see s_generate_particle_clouds) so gbl_patch_id is already the
+    !! particle's final, absolute global patch id - s_reduce_ib_patch_array copies it as-is. Shared by all packing methods so the
+    !! per-particle ib_patch_parameters setup stays in one place.
     subroutine s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, px, py, pz, particle_cloud_ibs)
 
         integer, intent(in)                                    :: cloud_idx, geom
@@ -285,8 +294,8 @@ contains
         if (.not. f_neighborhood_ranks_own_location(centroid)) return
 
         ib_idx = ib_idx + 1
-        @:PROHIBIT(ib_idx > num_local_ibs_max, &
-                   & "Too many particle-cloud IBs in one rank's neighborhood. Modify case file or increase num_local_ibs_max.")
+        @:PROHIBIT(ib_idx > num_ib_patches_max_namelist, &
+                   & "Too many particle-cloud IBs in one rank's neighborhood. Modify case file or increase num_ib_patches_max_namelist.")
 
         particle_cloud_ibs(ib_idx)%gbl_patch_id = glbl_idx
         particle_cloud_ibs(ib_idx)%geometry = geom

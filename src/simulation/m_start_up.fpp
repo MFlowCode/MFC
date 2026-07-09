@@ -875,6 +875,7 @@ contains
         if (ib) then
             block
                 type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
+                integer                                :: num_particle_cloud_ibs
 
                 ! Neighborhood bounds must exist before s_generate_particle_clouds so it can discard out-of-neighborhood
                 ! particles as they are generated, instead of materializing the full global particle-cloud on every rank.
@@ -883,15 +884,17 @@ contains
                 if (cfl_dt .and. n_start > 0) then
                     call s_read_ib_restart_data(n_start)
                     allocate (particle_cloud_ibs(0))
+                    num_particle_cloud_ibs = 0
                 else if (t_step_start > 0) then
                     call s_read_ib_restart_data(t_step_start)
                     allocate (particle_cloud_ibs(0))
+                    num_particle_cloud_ibs = 0
                 else
-                    call s_generate_particle_clouds(particle_cloud_ibs)
+                    call s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
                 end if
                 call s_instantiate_STL_models()
                 call s_initialize_ib_airfoils()
-                call s_reduce_ib_patch_array(particle_cloud_ibs)
+                call s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
                 deallocate (particle_cloud_ibs)
             end block
             call s_ibm_setup()
@@ -1205,23 +1208,24 @@ contains
     end subroutine s_read_ib_restart_data
 
     !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_cloud_ibs (already filtered by
-    !! s_generate_particle_clouds to this rank's IB neighborhood, using the gbl_patch_id each entry was tagged with at
-    !! generation time to recover its position in the full, unfiltered particle ordering) and reduces to only the patches in or
-    !! near the local computational domain. patch_ib is never reallocated; the local subset is written in-place from the front.
-    !! particle_cloud_ibs is owned by the caller and freed there after this returns.
-    subroutine s_reduce_ib_patch_array(particle_cloud_ibs)
+    !! s_generate_particle_clouds to this rank's IB neighborhood, each entry already tagged with its final, absolute gbl_patch_id)
+    !! and reduces to only the patches in or near the local computational domain. patch_ib is never reallocated; the local subset is
+    !! written in-place from the front. particle_cloud_ibs is owned by the caller and freed there after this returns.
+    !! num_particle_cloud_ibs is the number of entries s_generate_particle_clouds actually wrote into particle_cloud_ibs - it may be
+    !! allocated to a larger worst-case capacity, so size() of it must never be used as the valid-entry count.
+    subroutine s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(ib_patch_parameters), intent(in), dimension(:) :: particle_cloud_ibs
+        integer, intent(in)                                 :: num_particle_cloud_ibs
         real(wp), dimension(3)                              :: centroid
         integer                                             :: i
-        integer                                             :: num_namelist_ibs, num_bed_ibs, num_local_bed_ibs
+        integer                                             :: num_namelist_ibs, num_bed_ibs
 
         num_namelist_ibs = num_ibs
         num_bed_ibs = 0
         do i = 1, num_particle_clouds
             num_bed_ibs = num_bed_ibs + particle_cloud(i)%num_particles
         end do
-        num_local_bed_ibs = size(particle_cloud_ibs)
 
         ! Check for moving IBs across both namelist and particle bed patches. moving_ibm is a per-cloud property (every particle
         ! in a cloud shares particle_cloud(:)%moving_ibm), so checking the cloud list gives the same, globally-consistent answer
@@ -1251,9 +1255,8 @@ contains
             ! single-rank: all patches are local; append particle bed entries directly into patch_ib.
             @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
                        & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-            do i = 1, num_local_bed_ibs
+            do i = 1, num_particle_cloud_ibs
                 patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
-                patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + particle_cloud_ibs(i)%gbl_patch_id
             end do
             num_ibs = num_gbl_ibs
             num_local_ibs = num_gbl_ibs
@@ -1273,6 +1276,8 @@ contains
                     patch_ib(num_ibs)%gbl_patch_id = i
                     if (f_local_rank_owns_location(centroid)) then
                         num_local_ibs = num_local_ibs + 1
+                        @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
+                                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
                         local_ib_patch_ids(num_local_ibs) = num_ibs
                     end if
                 end if
@@ -1280,29 +1285,27 @@ contains
             ! particle_cloud_ibs entries already passed the neighborhood check at generation time (against the same
             ! neighbor_domain_x/y/z computed by get_neighbor_bounds() before s_generate_particle_clouds ran), so no need to
             ! recheck it here.
-            do i = 1, num_local_bed_ibs
+            do i = 1, num_particle_cloud_ibs
                 centroid = [particle_cloud_ibs(i)%x_centroid, particle_cloud_ibs(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = particle_cloud_ibs(i)%z_centroid
                 num_ibs = num_ibs + 1
                 @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
                            & "Local IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
                 patch_ib(num_ibs) = particle_cloud_ibs(i)
-                patch_ib(num_ibs)%gbl_patch_id = num_namelist_ibs + particle_cloud_ibs(i)%gbl_patch_id
                 if (f_local_rank_owns_location(centroid)) then
                     num_local_ibs = num_local_ibs + 1
+                    @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
+                               & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
                     local_ib_patch_ids(num_local_ibs) = num_ibs
                 end if
             end do
-            @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
-                       & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
         end if
 #else
         ! no-MPI: all patches are local; append particle bed entries directly into patch_ib.
         @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
                    & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-        do i = 1, num_local_bed_ibs
+        do i = 1, num_particle_cloud_ibs
             patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
-            patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + particle_cloud_ibs(i)%gbl_patch_id
         end do
         num_ibs = num_gbl_ibs
         num_local_ibs = num_gbl_ibs
