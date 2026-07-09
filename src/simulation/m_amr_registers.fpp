@@ -39,7 +39,7 @@ module m_amr_registers
     implicit none
 
     private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_amr_zero_fine_registers, &
-        & s_amr_apply_reflux_state, s_finalize_amr_registers, s_amr_reflux_face_flags, freg
+        & s_amr_apply_reflux_state, s_finalize_amr_registers, s_amr_reflux_face_flags, freg, creg
 
     !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]

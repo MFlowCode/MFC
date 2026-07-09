@@ -22,7 +22,7 @@ module m_amr
         & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k
-    use m_amr_registers, only: s_amr_zero_fine_registers, freg
+    use m_amr_registers, only: s_amr_zero_fine_registers, freg, creg
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps
@@ -1336,6 +1336,39 @@ contains
                 deallocate (psave)
                 print '(A,ES12.4)', ' [amr] MULTILEVEL self-test: restrict-to-parent identity err     = ', err2
             end block
+            ! reflux-to-parent (increment 3 step 2): inject a known C/F flux mismatch into this block's x-face registers and confirm
+            ! the Berger-Colella correction deposits exactly (F_coarse - Fbar_fine)/dxf into the parent's outside cells (reflux is
+            ! conservative - the flux crossing the c/f boundary is redeposited, not lost). 1D self-test drives the x-faces; the
+            ! 2D/3D faces run in the advance driver. Perturbation is restored below so the self-test stays non-intrusive.
+            block
+                integer                :: e, ol, oh
+                real(wp)               :: dxf, errr, expl, exph, al, ah
+                real(stp), allocatable :: ql0(:), qh0(:)
+                dxf = amr_slots(1)%dx(amr_isect_lo(1)); ol = amr_isect_lo(1) - 1; oh = amr_isect_hi(1) + 1
+                allocate (ql0(sys_size), qh0(sys_size))
+                do e = 1, sys_size
+                    $:GPU_UPDATE(host='[amr_slots(1)%q_cons(e)%sf]')
+                    ql0(e) = amr_slots(1)%q_cons(e)%sf(ol, 0, 0); qh0(e) = amr_slots(1)%q_cons(e)%sf(oh, 0, 0)
+                    creg(1)%lo(e,:,:,L2) = 0.11_wp*e; creg(1)%hi(e,:,:,L2) = 0.07_wp*e
+                    freg(1)%lo(e,:,:,L2) = 0.03_wp*e; freg(1)%hi(e,:,:,L2) = 0.05_wp*e
+                end do
+                $:GPU_UPDATE(device='[creg(1)%lo(:, :, :, L2), creg(1)%hi(:, :, :, L2), freg(1)%lo(:, :, :, L2), freg(1)%hi(:, :, &
+                             & :, L2)]')
+                call s_amr_reflux_to_parent(1._wp)
+                errr = 0._wp
+                do e = 1, sys_size
+                    $:GPU_UPDATE(host='[amr_slots(1)%q_cons(e)%sf]')
+                    al = real(amr_slots(1)%q_cons(e)%sf(ol, 0, 0), wp) - real(ql0(e), wp)
+                    ah = real(amr_slots(1)%q_cons(e)%sf(oh, 0, 0), wp) - real(qh0(e), wp)
+                    expl = (0.11_wp*e - 0.03_wp*e)/dxf; exph = (0.05_wp*e - 0.07_wp*e)/dxf
+                    errr = max(errr, abs(al - expl), abs(ah - exph))
+                    ! restore the parent's outside cells (undo the injected reflux so block 1 keeps its real state)
+                    amr_slots(1)%q_cons(e)%sf(ol, 0, 0) = ql0(e); amr_slots(1)%q_cons(e)%sf(oh, 0, 0) = qh0(e)
+                    $:GPU_UPDATE(device='[amr_slots(1)%q_cons(e)%sf]')
+                end do
+                deallocate (ql0, qh0)
+                print '(A,ES12.4)', ' [amr] MULTILEVEL self-test: reflux-to-parent conservation err = ', errr
+            end block
         end if
         call s_amr_free_slot(L2)
         amr_block_level(L2) = 1; amr_num_blocks = n1; amr_num_levels = 1
@@ -1537,6 +1570,128 @@ contains
             & 0, 0, 0, amr_isect_lo, rr, dj_hi, dk_hi, nchild)
 
     end subroutine s_amr_restrict_to_parent
+
+    !> Multi-level reflux: apply the Berger-Colella C/F flux correction from the current level>=2 block into its PARENT block's
+    !! cells just OUTSIDE the block footprint, in the parent-fine frame (mirror of the L0 s_amr_apply_reflux targeted at the parent
+    !! - "the coarse" is level l-1). State form: q_parent(outside) += dt*(F_coarse - Fbar_fine)/dxf on the low face and +=
+    !! dt*(Fbar_fine - F_coarse)/dxf on the high face, where Fbar_fine is the child-averaged fine register. creg/freg key off this
+    !! block's slot. np=1 local; the np>=2 P2P freg delivery is future work. Uniform parent-fine dx (stretched: coords TODO).
+    impure subroutine s_amr_reflux_to_parent(dt_reflux)
+
+        real(wp), intent(in) :: dt_reflux
+        integer              :: pblk
+        real(wp)             :: dxf, dyf, dzf
+
+        pblk = f_amr_parent_block(amr_cur)
+        ! uniform parent-fine cell widths (interior index; stretched-grid coords are future work). dy/dz only allocated when active.
+        dxf = amr_slots(pblk)%dx(amr_isect_lo(1)); dyf = dxf; dzf = dxf
+        if (n_glb > 0) dyf = amr_slots(pblk)%dy(amr_isect_lo(2))
+        if (p_glb > 0) dzf = amr_slots(pblk)%dz(amr_isect_lo(3))
+        call s_amr_reflux_apply_parent(amr_slots(pblk)%q_cons, dxf, dyf, dzf, dt_reflux)
+
+    end subroutine s_amr_reflux_to_parent
+
+    !> Device kernel for s_amr_reflux_to_parent: the parent's q_cons and (uniform) fine cell widths are passed as arguments
+    !! (present-table safe, like s_amr_restrict_overwrite_device). Reads creg/freg(:,:,:,amr_cur) and amr_isect_lo/hi (parent-fine
+    !! footprint = parent's local fine indices, offset 0). Three face blocks mirror s_amr_apply_reflux; collapsed dims pin to 0.
+    impure subroutine s_amr_reflux_apply_parent(qp, dxf, dyf, dzf, dt_reflux)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: qp
+        real(wp), intent(in)                                   :: dxf, dyf, dzf, dt_reflux
+        integer                                                :: rr, eq, c1, c2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, islot
+        integer                                                :: il1, ih1, il2, ih2, il3, ih3, ol1, oh1, ol2, oh2, ol3, oh3
+        real(wp)                                               :: fblo, fbhi, mlo, mhi
+
+        rr = amr_slots(amr_cur)%ref_ratio; islot = amr_cur
+        il1 = amr_isect_lo(1); ih1 = amr_isect_hi(1); ol1 = il1 - 1; oh1 = ih1 + 1
+        il2 = amr_isect_lo(2); ih2 = amr_isect_hi(2); ol2 = il2 - 1; oh2 = ih2 + 1
+        il3 = amr_isect_lo(3); ih3 = amr_isect_hi(3); ol3 = il3 - 1; oh3 = ih3 + 1
+
+        ! x-faces: transverse (y, z)
+        nch = 1; if (n_glb > 0) nch = nch*rr; if (p_glb > 0) nch = nch*rr
+        dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
+        mlo = dxf; mhi = dxf
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+        do eq = 1, sys_size
+            do c2 = il3, ih3
+                do c1 = il2, ih2
+                    f20 = 0; if (p_glb > 0) f20 = rr*(c2 - il3)
+                    f10 = 0; if (n_glb > 0) f10 = rr*(c1 - il2)
+                    fblo = 0._wp; fbhi = 0._wp
+                    do dd2 = 0, dd2_hi
+                        do dd1 = 0, dd1_hi
+                            fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                            fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                        end do
+                    end do
+                    fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                    qp(eq)%sf(ol1, c1, c2) = qp(eq)%sf(ol1, c1, c2) + real(dt_reflux*(creg(1)%lo(eq, c1 - il2, c2 - il3, &
+                       & islot) - fblo)/mlo, stp)
+                    qp(eq)%sf(oh1, c1, c2) = qp(eq)%sf(oh1, c1, c2) + real(dt_reflux*(fbhi - creg(1)%hi(eq, c1 - il2, c2 - il3, &
+                       & islot))/mhi, stp)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! y-faces (n_glb > 0): transverse (x, z); x always active
+        if (n_glb > 0) then
+            nch = rr; if (p_glb > 0) nch = nch*rr
+            dd2_hi = merge(rr - 1, 0, p_glb > 0)
+            mlo = dyf; mhi = dyf
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+            do eq = 1, sys_size
+                do c2 = il3, ih3
+                    do c1 = il1, ih1
+                        f20 = 0; if (p_glb > 0) f20 = rr*(c2 - il3)
+                        f10 = rr*(c1 - il1)
+                        fblo = 0._wp; fbhi = 0._wp
+                        do dd2 = 0, dd2_hi
+                            do dd1 = 0, rr - 1
+                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                            end do
+                        end do
+                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                        qp(eq)%sf(c1, ol2, c2) = qp(eq)%sf(c1, ol2, c2) + real(dt_reflux*(creg(2)%lo(eq, c1 - il1, c2 - il3, &
+                           & islot) - fblo)/mlo, stp)
+                        qp(eq)%sf(c1, oh2, c2) = qp(eq)%sf(c1, oh2, c2) + real(dt_reflux*(fbhi - creg(2)%hi(eq, c1 - il1, &
+                           & c2 - il3, islot))/mhi, stp)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        ! z-faces (p_glb > 0): transverse (x, y); both active in 3D
+        if (p_glb > 0) then
+            nch = rr*rr
+            mlo = dzf; mhi = dzf
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+            do eq = 1, sys_size
+                do c2 = il2, ih2
+                    do c1 = il1, ih1
+                        f20 = rr*(c2 - il2)
+                        f10 = rr*(c1 - il1)
+                        fblo = 0._wp; fbhi = 0._wp
+                        do dd2 = 0, rr - 1
+                            do dd1 = 0, rr - 1
+                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                            end do
+                        end do
+                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                        qp(eq)%sf(c1, c2, ol3) = qp(eq)%sf(c1, c2, ol3) + real(dt_reflux*(creg(3)%lo(eq, c1 - il1, c2 - il2, &
+                           & islot) - fblo)/mlo, stp)
+                        qp(eq)%sf(c1, c2, oh3) = qp(eq)%sf(c1, c2, oh3) + real(dt_reflux*(fbhi - creg(3)%hi(eq, c1 - il1, &
+                           & c2 - il2, islot))/mhi, stp)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+    end subroutine s_amr_reflux_apply_parent
 
     !> Rank r's coarse INTERIOR box (global) from the replicated amr_decomp table (no ghosts). Covered coarse cells are in-domain,
     !! so restriction targets are identified by interior overlap alone.
