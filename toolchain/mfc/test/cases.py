@@ -3861,6 +3861,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (h) multi-level (amr_max_level=2): the ONLY golden exercising a SECOND refinement level.
+        # Same 1D Sod as (a) but amr_max_level=2, so the initial block build nests a level-2 child
+        # (geometric inset) inside the level-1 block. Every coarse step the lock-step driver fills
+        # the L2 from its parent (top-down), advances all levels at the coarse dt, then restricts and
+        # total-flux refluxes bottom-up (L2->L1->L0) - the Berger-Colella C/F coupling that keeps mass
+        # and energy conserved to machine zero. np=1 only (the L2<->L1 coupling is local; cross-rank
+        # P2P is not yet implemented, and the checker prohibits amr_max_level>1 with num_procs>1).
+        # Kept STATIC (amr_regrid_int=0) on purpose: a rebuilding L2 has integer box boundaries that
+        # can flip a cell under a compiler's FP reordering -> a shifted golden; the static block fixes
+        # the hierarchy so this protects the multi-level advance/restrict/reflux path deterministically.
+        stack.push(
+            "AMR -> 1D -> multi-level static block",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():
