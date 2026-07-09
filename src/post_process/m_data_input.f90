@@ -15,6 +15,7 @@ module m_data_input
     use m_mpi_common
     use m_compile_specific
     use m_boundary_common
+    use m_boundary_io
     use m_helper
 
     implicit none

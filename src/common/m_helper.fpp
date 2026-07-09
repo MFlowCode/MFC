@@ -18,7 +18,7 @@ module m_helper
     public :: s_comp_n_from_prim, s_comp_n_from_cons, s_initialize_bubbles_model, s_initialize_nonpoly, s_simpson, s_transcoeff, &
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
-        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product
+        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul
 
 contains
 
@@ -296,6 +296,48 @@ contains
         c(3) = a(1)*b(2) - a(2)*b(1)
 
     end function f_cross
+
+    !> Generate a unit vector uniformly distributed on the sphere from two random parameters.
+    function f_unit_vector(theta, eta) result(vec)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in)   :: theta, eta
+        real(wp)               :: zeta, xi
+        real(wp), dimension(3) :: vec
+
+        xi = 2._wp*pi*theta
+        zeta = acos(2._wp*eta - 1._wp)
+        vec(1) = sin(zeta)*cos(xi)
+        vec(2) = sin(zeta)*sin(xi)
+        vec(3) = cos(zeta)
+
+    end function f_unit_vector
+
+    !> Generate a pseudo-random number between 0 and 1 using a linear congruential generator.
+    subroutine s_prng(var, seed)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(inout) :: seed
+        real(wp), intent(out)  :: var
+
+        seed = mod(modmul(seed), modulus)
+        var = seed/real(modulus, wp)
+
+    end subroutine s_prng
+
+    !> Compute a modular multiplication step for the linear congruential pseudo-random number generator.
+    function modmul(a) result(val)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in) :: a
+        integer             :: val
+        real(wp)            :: x, y
+
+        x = (multiplier/real(modulus, wp))*a + (increment/real(modulus, wp))
+        y = nint((x - floor(x))*decimal_trim)/decimal_trim
+        val = nint(y*modulus)
+
+    end function modmul
 
     !> @brief Computes the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)

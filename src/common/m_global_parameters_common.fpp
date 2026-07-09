@@ -98,6 +98,7 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[Bx0]')
     $:GPU_DECLARE(create='[tau_star, cont_damage_s, alpha_bar]')
     $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
+    $:GPU_DECLARE(create='[synthetic_turbulence, num_turbulent_sources, synth_U_inf]')
     #:if not MFC_CASE_OPTIMIZATION
         $:GPU_DECLARE(create='[num_dims, num_vels, weno_polyn, weno_order]')
         $:GPU_DECLARE(create='[weno_num_stencils, num_fluids, wenojs]')
