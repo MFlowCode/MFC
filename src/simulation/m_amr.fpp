@@ -3622,7 +3622,7 @@ contains
             integer                                                :: old_owner(amr_max_blocks), old_level(amr_max_blocks)
             logical                                                :: old_owns(amr_max_blocks), any_xchg, same, merged
             integer                                                :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, i
-            integer                                                :: sidx(3), tg_lo(3), tg_hi(3), nboxes, n_level1
+            integer                                                :: sidx(3), tg_lo(3), tg_hi(3), nboxes, box_level(amr_max_blocks)
             real(wp)                                               :: r0, g
 
             ! valid coarse CONS ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the rebuild
@@ -3792,32 +3792,38 @@ contains
                 end if
             end if
 
-            ! 3b) multi-level nesting: append a level-2 box nested inside each level-1 box (parents-first ordering so the build loop
-            ! below fills a parent before its child's gather-from-parent reads it). A1 uses a FIXED inset (like
-            ! s_amr_test_multilevel);
-            ! A2 replaces it with the density-gradient sensor run on each L1 block's fine solution. np=1 + non-IB for now
-            ! (multi-level
-            ! distribution / IB nesting are future work); regions stay in L0 cell indices at every level.
-            n_level1 = nboxes
+            ! 3b) multi-level nesting: hierarchically append a box at level l nested inside each level-(l-1) box, for l =
+            ! 2..amr_max_
+            ! level. Parents-first ordering (every level-(l-1) box precedes its level-l children) so the build loop fills a parent
+            ! before its child's gather-from-parent reads it. A FIXED inset for now (a follow-up runs the density-gradient sensor on
+            ! each parent block's fine solution); np=1 + non-IB (multi-level distribution / IB nesting are future work). Regions
+            ! stay
+            ! in L0 cell indices at every level.
+            box_level(1:nboxes) = 1
             if (amr_max_level >= 2 .and. num_procs == 1 .and. .not. ib) then
                 block
-                    integer :: kb, ins(3), l2lo(3), l2hi(3)
-                    do kb = 1, n_level1
-                        ins = 0
-                        ins(1) = max((boxes(kb)%hi(1) - boxes(kb)%lo(1) + 1)/4, amr_cpat_mar)
-                        if (n_glb > 0) ins(2) = max((boxes(kb)%hi(2) - boxes(kb)%lo(2) + 1)/4, amr_cpat_mar)
-                        if (p_glb > 0) ins(3) = max((boxes(kb)%hi(3) - boxes(kb)%lo(3) + 1)/4, amr_cpat_mar)
-                        l2lo = boxes(kb)%lo + ins; l2hi = boxes(kb)%hi - ins
-                        if (l2hi(1) < l2lo(1)) cycle  ! inset left no interior in x
-                        if (n_glb > 0 .and. l2hi(2) < l2lo(2)) cycle
-                        if (p_glb > 0 .and. l2hi(3) < l2lo(3)) cycle
-                        if (nboxes + 1 > amr_max_blocks) exit  ! pool full - stop nesting (warned once below)
-                        nboxes = nboxes + 1
-                        ! level tagged in the assembly (boxes > n_level1 are level 2)
-                        boxes(nboxes)%lo = l2lo; boxes(nboxes)%hi = l2hi
+                    integer :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo
+                    plo = 1; phi = nboxes  ! [plo:phi] = the boxes at the previous level (lev-1) to nest inside
+                    do lev = 2, amr_max_level
+                        newlo = nboxes + 1
+                        do kb = plo, phi
+                            ins = 0
+                            ins(1) = max((boxes(kb)%hi(1) - boxes(kb)%lo(1) + 1)/4, amr_cpat_mar)
+                            if (n_glb > 0) ins(2) = max((boxes(kb)%hi(2) - boxes(kb)%lo(2) + 1)/4, amr_cpat_mar)
+                            if (p_glb > 0) ins(3) = max((boxes(kb)%hi(3) - boxes(kb)%lo(3) + 1)/4, amr_cpat_mar)
+                            clo = boxes(kb)%lo + ins; chi = boxes(kb)%hi - ins
+                            if (chi(1) < clo(1)) cycle  ! inset left no interior in x
+                            if (n_glb > 0 .and. chi(2) < clo(2)) cycle
+                            if (p_glb > 0 .and. chi(3) < clo(3)) cycle
+                            if (nboxes + 1 > amr_max_blocks) exit  ! pool full - stop nesting
+                            nboxes = nboxes + 1
+                            boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                        end do
+                        plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
+                        if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
                     end do
                     if (nboxes >= amr_max_blocks .and. proc_rank == 0) print '(A)', &
-                        & ' [amr] NOTE: block pool full during level-2 nesting; some level-1 boxes were not refined'
+                        & ' [amr] NOTE: block pool full during multi-level nesting; some boxes were not refined further'
                 end block
             end if
 
@@ -3872,11 +3878,11 @@ contains
             amr_num_blocks = nboxes
             do k = 1, nboxes
                 amr_region_lo_all(:,k) = boxes(k)%lo; amr_region_hi_all(:,k) = boxes(k)%hi
-                ! boxes 1..n_level1 are the L0->L1 blocks; any appended above (k > n_level1) are the nested level-2 blocks. Setting
-                ! this every regrid resets a stale level when a slot is reused across levels.
-                amr_block_level(k) = merge(2, 1, k > n_level1)
+                ! box_level(k) is the refinement level assigned during the hierarchical nesting above (1 for the L0->L1 boxes, l for
+                ! a box nested at level l). Setting it every regrid resets a stale level when a slot is reused across levels.
+                amr_block_level(k) = box_level(k)
             end do
-            amr_num_levels = merge(2, 1, nboxes > n_level1)
+            amr_num_levels = maxval(box_level(1:nboxes))
             call s_amr_assign_block_owners()
 
 #ifdef MFC_MPI

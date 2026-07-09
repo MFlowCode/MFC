@@ -193,7 +193,6 @@ contains
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
             @:PROHIBIT(amr_max_blocks < 1, "amr_max_blocks must be >= 1")
             @:PROHIBIT(amr_max_level < 1, "amr_max_level must be >= 1")
-            @:PROHIBIT(amr_max_level > 2, "amr_max_level > 2 is not yet supported; see docs/documentation/amr_multilevel.md")
             @:PROHIBIT(amr_max_level > 1 .and. num_procs > 1, &
                        & "amr_max_level > 1 currently runs a single-rank coupling self-test only (the recursive multi-level advance is under development); use num_procs = 1")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
