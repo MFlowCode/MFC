@@ -629,7 +629,7 @@ contains
     impure subroutine s_amr_gather_from_parent(pull_host)
 
         logical, intent(in) :: pull_host
-        integer             :: i, g1, g2, g3, pblk, w1, w2, w3
+        integer             :: pblk, w1, w2, w3
 
         pblk = f_amr_parent_block(amr_cur)
         amr_cpat_off = 0
@@ -641,26 +641,40 @@ contains
         if (n_glb > 0) w2 = (amr_isect_hi(2) - amr_isect_lo(2)) + 2*amr_cpat_mar
         if (p_glb > 0) w3 = (amr_isect_hi(3) - amr_isect_lo(3)) + 2*amr_cpat_mar
         if (.not. amr_rank_owns_block) return  ! np=1: the owner holds both this block and its parent
-        if (pull_host) then
-            do i = 1, sys_size
-                $:GPU_UPDATE(host='[amr_slots(pblk)%q_cons(i)%sf]')
-            end do
-        end if
+        ! copy the parent's fine patch into amr_cg with a DEVICE kernel (the parent q_cons is passed as an argument, present-table
+        ! safe like s_amr_restrict_overwrite_device). np>=2 P2P (parent owner -> block owner) is future work; pull_host stays in the
+        ! signature for the level-1 path.
+        call s_amr_copy_parent_patch(amr_slots(pblk)%q_cons, w1, w2, w3)
+
+    end subroutine s_amr_gather_from_parent
+
+    !> Device kernel for s_amr_gather_from_parent: copy the parent block's fine patch into amr_cg over [amr_cpat_off : + w]. The
+    !! parent q_cons is passed as the qp ARGUMENT (not indexed as amr_slots(pblk) inside the kernel) so its deep %sf attach resolves
+    !! present-table safe, like s_amr_restrict_overwrite_device. amr_cg is then synced to host for host consumers (the init
+    !! self-test's restrict-prolong check).
+    impure subroutine s_amr_copy_parent_patch(qp, w1, w2, w3)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: qp
+        integer, intent(in)                                 :: w1, w2, w3
+        integer                                             :: i, g1, g2, g3, o1, o2, o3
+
+        o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
+        $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do g3 = 0, w3
                 do g2 = 0, w2
                     do g1 = 0, w1
-                        amr_cg(i)%sf(g1, g2, g3) = amr_slots(pblk)%q_cons(i)%sf(g1 + amr_cpat_off(1), g2 + amr_cpat_off(2), &
-                               & g3 + amr_cpat_off(3))
+                        amr_cg(i)%sf(g1, g2, g3) = qp(i)%sf(g1 + o1, g2 + o2, g3 + o3)
                     end do
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
         do i = 1, sys_size
-            $:GPU_UPDATE(device='[amr_cg(i)%sf]')
+            $:GPU_UPDATE(host='[amr_cg(i)%sf]')
         end do
 
-    end subroutine s_amr_gather_from_parent
+    end subroutine s_amr_copy_parent_patch
 
     !> This rank's (r's) contiguous owned coarse-cell range per dim from the replicated amr_decomp table: interior [start:start+ext]
     !! plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal to the set where
@@ -1290,6 +1304,12 @@ contains
         call s_amr_gather_coarse_patch(amr_slots(1)%q_cons, .false.)  ! q_coarse ignored for level>=2 (reads the parent block)
         if (amr_rank_owns_block) then
             call s_interpolate_coarse_to_fine()
+            ! push the host-side prolong to the device (mirror s_populate_amr_fine): s_prolong_one_var is a host loop, so without
+            ! this the persistent L2 block's device q_cons is never valued (NaN) - a GPU-only failure invisible on CPU
+            ! (host==device)
+            do i = 1, sys_size
+                $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
+            end do
             allocate (scratch(1:sys_size))
             do i = 1, sys_size
                 allocate (scratch(i)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
@@ -2223,13 +2243,32 @@ contains
         ! (cl is a GLOBAL coarse index, region_lo + floor(jg/2)), matching the interior build. Blocks stay
         ! buff_size inside the domain, so every ghost parent is an in-domain coarse cell with exact coords.
         block
-            integer :: jg, cl
+            integer               :: jg, cl, pblk2
+            real(wp), allocatable :: cxb(:), cyb(:), czb(:)
+            ! ghost parent boundaries: a level>=2 block's coarse side is its PARENT's fine grid (indexed in the parent-fine
+            ! amr_isect frame, matching the interior s_build_level_coords), NOT the L0 global boundaries. amr_isect_lo is a
+            ! parent-fine index, so indexing amr_g?cb (sized for L0) reads OUT OF BOUNDS -> garbage on host, NaN on the device
+            ! copy. Source the parent's fine coords for level>=2, the global L0 boundaries for level 1.
+            if (amr_block_level(amr_cur) >= 2) then
+                pblk2 = f_amr_parent_block(amr_cur)
+                allocate (cxb(lbound(amr_slots(pblk2)%x_cb, 1):ubound(amr_slots(pblk2)%x_cb, 1))); cxb = amr_slots(pblk2)%x_cb
+                if (n_glb > 0) then
+                    allocate (cyb(lbound(amr_slots(pblk2)%y_cb, 1):ubound(amr_slots(pblk2)%y_cb, 1))); cyb = amr_slots(pblk2)%y_cb
+                end if
+                if (p_glb > 0) then
+                    allocate (czb(lbound(amr_slots(pblk2)%z_cb, 1):ubound(amr_slots(pblk2)%z_cb, 1))); czb = amr_slots(pblk2)%z_cb
+                end if
+            else
+                allocate (cxb(lbound(amr_gxcb, 1):ubound(amr_gxcb, 1))); cxb = amr_gxcb
+                if (n_glb > 0) then; allocate (cyb(lbound(amr_gycb, 1):ubound(amr_gycb, 1))); cyb = amr_gycb; end if
+                if (p_glb > 0) then; allocate (czb(lbound(amr_gzcb, 1):ubound(amr_gzcb, 1))); czb = amr_gzcb; end if
+            end if
             do jg = amr_slots(amr_cur)%m + 1, amr_slots(amr_cur)%m + buff_size
                 cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp)
                 if (mod(jg, 2) == 0) then
-                    x_cb(jg) = 0.5_wp*(amr_gxcb(cl - 1) + amr_gxcb(cl))
+                    x_cb(jg) = 0.5_wp*(cxb(cl - 1) + cxb(cl))
                 else
-                    x_cb(jg) = amr_gxcb(cl)
+                    x_cb(jg) = cxb(cl)
                 end if
                 dx(jg) = x_cb(jg) - x_cb(jg - 1); x_cc(jg) = 0.5_wp*(x_cb(jg - 1) + x_cb(jg))
             end do
@@ -2238,9 +2277,9 @@ contains
             do jg = -1 - buff_size, -1
                 cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp)
                 if (mod(abs(jg), 2) == 0) then
-                    x_cb(jg) = 0.5_wp*(amr_gxcb(cl - 1) + amr_gxcb(cl))
+                    x_cb(jg) = 0.5_wp*(cxb(cl - 1) + cxb(cl))
                 else
-                    x_cb(jg) = amr_gxcb(cl)
+                    x_cb(jg) = cxb(cl)
                 end if
             end do
             do jg = -buff_size, -1
@@ -2250,9 +2289,9 @@ contains
                 do jg = amr_slots(amr_cur)%n + 1, amr_slots(amr_cur)%n + buff_size
                     cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp)
                     if (mod(jg, 2) == 0) then
-                        y_cb(jg) = 0.5_wp*(amr_gycb(cl - 1) + amr_gycb(cl))
+                        y_cb(jg) = 0.5_wp*(cyb(cl - 1) + cyb(cl))
                     else
-                        y_cb(jg) = amr_gycb(cl)
+                        y_cb(jg) = cyb(cl)
                     end if
                     dy(jg) = y_cb(jg) - y_cb(jg - 1); y_cc(jg) = 0.5_wp*(y_cb(jg - 1) + y_cb(jg))
                 end do
@@ -2261,9 +2300,9 @@ contains
                 do jg = -1 - buff_size, -1
                     cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp)
                     if (mod(abs(jg), 2) == 0) then
-                        y_cb(jg) = 0.5_wp*(amr_gycb(cl - 1) + amr_gycb(cl))
+                        y_cb(jg) = 0.5_wp*(cyb(cl - 1) + cyb(cl))
                     else
-                        y_cb(jg) = amr_gycb(cl)
+                        y_cb(jg) = cyb(cl)
                     end if
                 end do
                 do jg = -buff_size, -1
@@ -2274,9 +2313,9 @@ contains
                 do jg = amr_slots(amr_cur)%p + 1, amr_slots(amr_cur)%p + buff_size
                     cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp)
                     if (mod(jg, 2) == 0) then
-                        z_cb(jg) = 0.5_wp*(amr_gzcb(cl - 1) + amr_gzcb(cl))
+                        z_cb(jg) = 0.5_wp*(czb(cl - 1) + czb(cl))
                     else
-                        z_cb(jg) = amr_gzcb(cl)
+                        z_cb(jg) = czb(cl)
                     end if
                     dz(jg) = z_cb(jg) - z_cb(jg - 1); z_cc(jg) = 0.5_wp*(z_cb(jg - 1) + z_cb(jg))
                 end do
@@ -2285,9 +2324,9 @@ contains
                 do jg = -1 - buff_size, -1
                     cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp)
                     if (mod(abs(jg), 2) == 0) then
-                        z_cb(jg) = 0.5_wp*(amr_gzcb(cl - 1) + amr_gzcb(cl))
+                        z_cb(jg) = 0.5_wp*(czb(cl - 1) + czb(cl))
                     else
-                        z_cb(jg) = amr_gzcb(cl)
+                        z_cb(jg) = czb(cl)
                     end if
                 end do
                 do jg = -buff_size, -1
