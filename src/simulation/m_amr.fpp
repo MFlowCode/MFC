@@ -1300,7 +1300,7 @@ contains
         type(scalar_field), dimension(:), allocatable :: scratch
         real(stp), allocatable :: b1save(:,:,:,:)  !< full block-1 state, restored after the intrusive checks
 
-        if (amr_max_level < 2 .or. num_procs > 1) return
+        if (amr_max_level < 2) return  ! np>=2: the L2 is co-located with block 1 (owner-guarded intrusive checks below)
         n1 = amr_num_blocks
         if (n1 < 1 .or. n1 + 1 > amr_max_blocks) return
         L2 = n1 + 1
@@ -1613,6 +1613,7 @@ contains
 
         integer :: pblk, rr, nchild, dj_hi, dk_hi
 
+        if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner folds locally
         pblk = f_amr_parent_block(amr_cur)
         rr = amr_slots(amr_cur)%ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
@@ -1634,6 +1635,7 @@ contains
         integer              :: pblk
         real(wp)             :: dxf, dyf, dzf
 
+        if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner refluxes locally
         pblk = f_amr_parent_block(amr_cur)
         ! uniform parent-fine cell widths (interior index; stretched-grid coords are future work). dy/dz only allocated when active.
         dxf = amr_slots(pblk)%dx(amr_isect_lo(1)); dyf = dxf; dzf = dxf

@@ -3950,6 +3950,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (l) multi-level at np=2: same STATIC 2-level hierarchy as (h) but run on TWO ranks. Multi-level was
+        # np=1-gated (single-rank coupling self-test); this is the FIRST golden exercising the parallel path.
+        # The refinement tower (L1 parent + its L2 child) is co-located on ONE rank (the child inherits its
+        # parent's owner), so the L1<->L2 fold stays LOCAL (bit-identical to np=1) and only the L0<->L1 coupling
+        # crosses ranks via the existing single-level P2P. Protects the owner-guards on s_amr_restrict_to_parent
+        # / s_amr_reflux_to_parent (without them the lock-step L2->parent fold dereferences a non-owner's
+        # unallocated parent slot -> SIGSEGV on rank 1). Kept STATIC (amr_regrid_int=0): cross-rank sensor-on-fine
+        # regrid nesting is still np=1 (checker-gated). Same 1D Sod as (h); deterministic across the 2-way split.
+        stack.push(
+            "AMR -> 1D -> multi-level static np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():
