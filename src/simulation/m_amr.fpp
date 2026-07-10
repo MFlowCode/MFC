@@ -4189,12 +4189,22 @@ contains
             integer             :: i
 
             if (.not. amr_slot_live(islot)) return
+            ! Undo each field's ACC_SETUP_SFs (Cray descriptor + %sf copyin) BEFORE the @:DEALLOCATE - Cray
+            ! 'exit data delete' decrements the ref count, so the lone @:DEALLOCATE would leave the descriptor
+            ! and the ACC_SETUP %sf ref dangling; the leaked host address is later reused (e.g. by Gs_rs at
+            ! restart), tripping a Cray "Error placing / already present" present-table crash (gpu-acc).
             do i = 1, sys_size
+                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_cons(i))
                 @:DEALLOCATE(amr_slots(islot)%q_cons(i)%sf)
+                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_cons_stor(i))
                 @:DEALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf)
+                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_prim(i))
                 @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
+                @:ACC_TEARDOWN_SFs(amr_slots(islot)%rhs(i))
                 @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
+                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_ghost_a(i))
                 @:DEALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf)
+                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_ghost_b(i))
                 @:DEALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf)
             end do
             @:DEALLOCATE(amr_slots(islot)%q_cons)
@@ -4204,15 +4214,15 @@ contains
             @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
             @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
             if (qbmm .and. .not. polytropic) then
-                @:DEALLOCATE(amr_slots(islot)%pb_f%sf)
-                @:DEALLOCATE(amr_slots(islot)%mv_f%sf)
-                @:DEALLOCATE(amr_slots(islot)%pb_stor%sf)
-                @:DEALLOCATE(amr_slots(islot)%mv_stor%sf)
+                #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
+                    @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
+                    @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
+                #:endfor
                 if (amr_subcycle) then
-                    @:DEALLOCATE(amr_slots(islot)%pb_ghost_a%sf)
-                    @:DEALLOCATE(amr_slots(islot)%mv_ghost_a%sf)
-                    @:DEALLOCATE(amr_slots(islot)%pb_ghost_b%sf)
-                    @:DEALLOCATE(amr_slots(islot)%mv_ghost_b%sf)
+                    #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
+                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
+                        @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
+                    #:endfor
                 end if
             end if
             if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
