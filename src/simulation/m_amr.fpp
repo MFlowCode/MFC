@@ -633,7 +633,9 @@ contains
 
         pblk = f_amr_parent_block(amr_cur)
         ! lock-step fill: gather from the parent's CURRENT fine state. pull_host stays in the signature for the level-1 path.
-        call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons)
+        ! Owner-guard at the CALL SITE: on a non-owner rank the parent slot is unallocated (co-located tower - owner holds both
+        ! block and parent), and passing amr_slots(pblk)%q_cons would dereference it before the callee's internal early-return.
+        if (amr_rank_owns_block) call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons)
 
     end subroutine s_amr_gather_from_parent
 
@@ -1339,7 +1341,8 @@ contains
         call s_amr_reconcile_slots()
         amr_cur = L2
         call s_set_amr_fine_geometry(amr_region_lo_all(:,L2), amr_region_hi_all(:,L2))
-        call s_amr_gather_coarse_patch(amr_slots(1)%q_cons, .false.)  ! q_coarse ignored for level>=2 (reads the parent block)
+        call s_amr_gather_coarse_patch(q_cons_base, .false.)  ! q_coarse ignored for level>=2 (reads the parent block); pass the
+        ! always-allocated base field, not amr_slots(1) (the parent slot is unallocated on a non-owner rank at np>1)
         if (amr_rank_owns_block) then
             call s_interpolate_coarse_to_fine()
             ! push the host-side prolong to the device (mirror s_populate_amr_fine): s_prolong_one_var is a host loop, so without
@@ -1409,32 +1412,36 @@ contains
             ! the Berger-Colella correction deposits exactly (F_coarse - Fbar_fine)/dxf into the parent's outside cells (reflux is
             ! conservative - the flux crossing the c/f boundary is redeposited, not lost). 1D self-test drives the x-faces; the
             ! 2D/3D faces run in the advance driver. Perturbation is restored below so the self-test stays non-intrusive.
-            block
-                integer                :: e, ol, oh
-                real(wp)               :: dxf, errr, expl, exph, al, ah
-                real(stp), allocatable :: ql0(:), qh0(:)
-                dxf = amr_slots(1)%dx(amr_isect_lo(1)); ol = amr_isect_lo(1) - 1; oh = amr_isect_hi(1) + 1
-                allocate (ql0(sys_size), qh0(sys_size))
-                do e = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_slots(1)%q_cons(e)%sf]')
-                    ql0(e) = amr_slots(1)%q_cons(e)%sf(ol, 0, 0); qh0(e) = amr_slots(1)%q_cons(e)%sf(oh, 0, 0)
-                    creg(1)%lo(e,:,:,L2) = 0.11_wp*e; creg(1)%hi(e,:,:,L2) = 0.07_wp*e
-                    freg(1)%lo(e,:,:,L2) = 0.03_wp*e; freg(1)%hi(e,:,:,L2) = 0.05_wp*e
-                end do
-                $:GPU_UPDATE(device='[creg(1)%lo(:, :, :, L2), creg(1)%hi(:, :, :, L2), freg(1)%lo(:, :, :, L2), freg(1)%hi(:, :, &
-                             & :, L2)]')
-                call s_amr_reflux_to_parent(1._wp)
-                errr = 0._wp
-                do e = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_slots(1)%q_cons(e)%sf]')
-                    al = real(amr_slots(1)%q_cons(e)%sf(ol, 0, 0), wp) - real(ql0(e), wp)
-                    ah = real(amr_slots(1)%q_cons(e)%sf(oh, 0, 0), wp) - real(qh0(e), wp)
-                    expl = (0.11_wp*e - 0.03_wp*e)/dxf; exph = (0.05_wp*e - 0.07_wp*e)/dxf
-                    errr = max(errr, abs(al - expl), abs(ah - exph))
-                end do
-                deallocate (ql0, qh0)
-                print '(A,ES12.4)', ' [amr] MULTILEVEL self-test: reflux-to-parent conservation err = ', errr
-            end block
+            ! The expected-deposit check is x-face (1D) math; skip it in 2D/3D (the transverse faces make the single-cell
+            ! expectation invalid) - 2D/3D reflux conservation is exercised by the advance driver and its closed-system drift.
+            if (n_glb == 0) then
+                block
+                    integer                :: e, ol, oh
+                    real(wp)               :: dxf, errr, expl, exph, al, ah
+                    real(stp), allocatable :: ql0(:), qh0(:)
+                    dxf = amr_slots(1)%dx(amr_isect_lo(1)); ol = amr_isect_lo(1) - 1; oh = amr_isect_hi(1) + 1
+                    allocate (ql0(sys_size), qh0(sys_size))
+                    do e = 1, sys_size
+                        $:GPU_UPDATE(host='[amr_slots(1)%q_cons(e)%sf]')
+                        ql0(e) = amr_slots(1)%q_cons(e)%sf(ol, 0, 0); qh0(e) = amr_slots(1)%q_cons(e)%sf(oh, 0, 0)
+                        creg(1)%lo(e,:,:,L2) = 0.11_wp*e; creg(1)%hi(e,:,:,L2) = 0.07_wp*e
+                        freg(1)%lo(e,:,:,L2) = 0.03_wp*e; freg(1)%hi(e,:,:,L2) = 0.05_wp*e
+                    end do
+                    $:GPU_UPDATE(device='[creg(1)%lo(:, :, :, L2), creg(1)%hi(:, :, :, L2), freg(1)%lo(:, :, :, L2), &
+                                 & freg(1)%hi(:, :, :, L2)]')
+                    call s_amr_reflux_to_parent(1._wp)
+                    errr = 0._wp
+                    do e = 1, sys_size
+                        $:GPU_UPDATE(host='[amr_slots(1)%q_cons(e)%sf]')
+                        al = real(amr_slots(1)%q_cons(e)%sf(ol, 0, 0), wp) - real(ql0(e), wp)
+                        ah = real(amr_slots(1)%q_cons(e)%sf(oh, 0, 0), wp) - real(qh0(e), wp)
+                        expl = (0.11_wp*e - 0.03_wp*e)/dxf; exph = (0.05_wp*e - 0.07_wp*e)/dxf
+                        errr = max(errr, abs(al - expl), abs(ah - exph))
+                    end do
+                    deallocate (ql0, qh0)
+                    print '(A,ES12.4)', ' [amr] MULTILEVEL self-test: reflux-to-parent conservation err = ', errr
+                end block
+            end if
             ! restore block 1's full state (buffer -> host -> device): undoes every intrusive-check write so the persistent
             ! parent enters the advance exactly as s_populate_amr_fine left it (device-clean).
             do bi = 1, sys_size
@@ -2875,6 +2882,7 @@ contains
         do xb = 1, amr_num_blocks
             do yb = 1, amr_num_blocks
                 if (xb == yb) cycle
+                if (amr_block_level(xb) /= amr_block_level(yb)) cycle  ! fine-fine halo is same-level only (matched resolution)
                 d = 0
                 if (f_amr_seam(xb, yb, 1)) d = 1
                 if (n_glb > 0) then; if (f_amr_seam(xb, yb, 2)) d = 2; end if
@@ -2882,8 +2890,14 @@ contains
                 if (d == 0) cycle
                 rX = amr_block_owner(xb); rY = amr_block_owner(yb)
                 if (proc_rank /= rX .and. proc_rank /= rY) cycle
-                xm(1) = amr_slots(xb)%m; xm(2) = amr_slots(xb)%n; xm(3) = amr_slots(xb)%p
-                ym(1) = amr_slots(yb)%m; ym(2) = amr_slots(yb)%n; ym(3) = amr_slots(yb)%p
+                ! fine extents from the REPLICATED region metadata (fine = 2*coarse-1), not amr_slots%m/n/p: at np>1 this rank
+                ! may own only one of the pair, and the transverse size (used for the buffer count) must be valid for both
+                xm(1) = 2*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
+                xm(2) = merge(2*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
+                xm(3) = merge(2*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
+                ym(1) = 2*(amr_region_hi_all(1, yb) - amr_region_lo_all(1, yb) + 1) - 1
+                ym(2) = merge(2*(amr_region_hi_all(2, yb) - amr_region_lo_all(2, yb) + 1) - 1, 0, n_glb > 0)
+                ym(3) = merge(2*(amr_region_hi_all(3, yb) - amr_region_lo_all(3, yb) + 1) - 1, 0, p_glb > 0)
                 ! transverse fine size (dims /= d); xb and yb share it (exact-match seam)
                 tsz = 1
                 if (d /= 1) tsz = tsz*(xm(1) + 1)

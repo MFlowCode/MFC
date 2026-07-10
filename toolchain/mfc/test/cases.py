@@ -3993,6 +3993,62 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (n) 2D multi-level at np=2: goldens (h)-(m) validate the multi-level hierarchy along x only; this is the FIRST
+        # golden exercising the 2D cross-rank multi-level path. A planar Sod (BASE_CFG densities as full-height y-strips)
+        # on m=63 x n=31 at ppn=2 (x-split) tiles the level-1 block into same-level sub-blocks on BOTH ranks, so the
+        # block-to-block fine-fine halo runs across the rank seam (its transverse buffer count must come from the
+        # REPLICATED region metadata, not the owner-only slot m/n/p, or a rank owning only one side of a seam sizes the
+        # buffer from an unallocated slot -> a 2D-only crash), and the self-test L2 co-locates with its parent tile.
+        # Kept STATIC (amr_regrid_int=0) for determinism, like (h)/(l).
+        amr_2d_base = {
+            "m": 63,
+            "n": 31,
+            "p": 0,
+            "dt": 4.0e-4,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
+            "bc_y%end": -3,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.05,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 0.1,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.45,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.7,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": 0.0,
+            "patch_icpp(3)%geometry": 3,
+            "patch_icpp(3)%x_centroid": 0.9,
+            "patch_icpp(3)%y_centroid": 0.5,
+            "patch_icpp(3)%length_x": 0.2,
+            "patch_icpp(3)%length_y": 1.0,
+            "patch_icpp(3)%vel(1)": 0.0,
+            "patch_icpp(3)%vel(2)": 0.0,
+            "amr": "T",
+            "amr_block_beg(1)": 16,
+            "amr_block_end(1)": 47,
+            "amr_block_beg(2)": 8,
+            "amr_block_end(2)": 23,
+        }
+        stack.push(
+            "AMR -> 2D -> multi-level static np=2",
+            {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():
