@@ -3883,6 +3883,30 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (i) multi-level + dynamic regrid: (h) is a static hierarchy; this arms amr_regrid_int so the
+        # level-2 child is placed by SENSOR-ON-FINE (the density-gradient sensor run on the level-1 fine
+        # solution, coarsened + clustered into a nested child box), not a fixed inset. This is the ONLY
+        # golden protecting the sensor-on-fine child-tagging path (s_amr_tag_child_from_fine + the 3b
+        # nesting loop) and its slot-size cap. Same eps=0.1 on the same sharp Sod as the (b) single-level
+        # dynamic golden - the shock cells sit far from the threshold, so the fine tag set (and the L0-
+        # coarsened, integer-padded, window-clamped L2 box built from it) is cross-compiler stable. amr_buf
+        # is 6 (not 2): the L1 block must be wider than the amr_cpat_mar nesting margin for the L2 to be a
+        # stable MULTI-cell box - buf=2 pins it to a single cell that a one-cell tag flip would move.
+        # np=1 only (multi-level coupling is local).
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():
