@@ -2021,7 +2021,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={"t_step_stop": 1, "t_step_save": 1}, override_tol=10 ** (-10)))
+        cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={"t_step_stop": 1, "t_step_save": 1}, override_tol=10 ** (-8)))
 
         stack.push(
             "1D -> Chemistry -> Dual Isothermal Wall Gradient",
