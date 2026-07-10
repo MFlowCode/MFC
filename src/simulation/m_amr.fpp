@@ -3157,17 +3157,22 @@ contains
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
         integer, intent(in)                                        :: t_step
         real(wp), intent(inout)                                    :: time_avg
-        integer                                                    :: kc
+        integer                                                    :: kc, pslot_l
 
+        ! pslot is argument-associated with the module variable amr_cur (the caller passes amr_cur as
+        ! pslot); the s_amr_select_slot(kc) below reassigns amr_cur and would silently corrupt pslot.
+        ! Copy it to a local read before any slot switch.
+
+        pslot_l = pslot
         do kc = 1, amr_num_blocks
-            if (amr_block_level(kc) /= amr_block_level(pslot) + 1) cycle
-            if (f_amr_parent_block(kc) /= pslot) cycle
+            if (amr_block_level(kc) /= amr_block_level(pslot_l) + 1) cycle
+            if (f_amr_parent_block(kc) /= pslot_l) cycle
             call s_amr_select_slot(kc)  ! amr_cur = kc; mirrors (isect already parent-fine)
             if (.not. amr_rank_owns_block) cycle  ! np>=2: child on another rank - future work (#27)
             ! two ghost-lerp sources from the parent's substep endpoints (parent-fine frame)
-            call s_amr_gather_from_parent_field(pslot, amr_slots(pslot)%q_cons_stor)  ! parent @ t_a
+            call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons_stor)  ! parent @ t_a
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_a)
-            call s_amr_gather_from_parent_field(pslot, amr_slots(pslot)%q_cons)  ! parent @ t_b
+            call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons)  ! parent @ t_b
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_b)
             ! recurse: the child subcycles its ref_ratio substeps (and its own children) over [t_a, t_b]
             call s_amr_advance_subtree(dt_sub*0.5_wp, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
@@ -3176,7 +3181,7 @@ contains
             call s_amr_restrict_to_parent()
             call s_amr_reflux_to_parent(dt_sub)
         end do
-        call s_amr_select_slot(pslot)  ! restore the parent's mirrors for its next substep
+        call s_amr_select_slot(pslot_l)  ! restore the parent's mirrors for its next substep
 
     end subroutine s_amr_advance_children
 

@@ -3927,6 +3927,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (k) multi-level + dynamic regrid + SUBCYCLE: the union of (i) and (j). (i) rebuilds the L2 by
+        # sensor-on-fine regrid but advances lock-step; (j) subcycles but keeps a static L2. This arms
+        # BOTH, so the L2 child is created/destroyed by regrid WHILE the recursive subcycle driver steps
+        # each level at its own dt. Protects the regrid x subcycle x multi-level interaction: the L1->L0
+        # fold must operate on the L1 parent (not the child slot) after the recursion returns - an
+        # argument-aliasing slip that left amr_cur on the child silently discarded the fine solution and
+        # broke conservation (drift ~1e-3 with a moving L2). Uses (i)'s robust eps=0.1/amr_buf=6 so the
+        # rebuilt L2 box is cross-compiler stable. np=1 only.
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic subcycle",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 6,
+                "amr_subcycle": "T",
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():

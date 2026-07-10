@@ -1,10 +1,44 @@
-This file was created on 2026-07-10 09:47:22.332886.
+This file was created on 2026-07-10 09:49:27.304533.
 
 mfc.sh:
 
-    Invocation: test --generate --only D95E1B08 -- -b mpirun
+    Invocation: test --generate --only 00E15144 -- -b mpirun
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
     Git:        fe60e30b319a8f1368db1a2d5afbe7951566cd4f on amr-multilevel (dirty)
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.26.5 on atl1-1-03-002-27-0.pace.gatech.edu
+    
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/MFC-lomach/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 syscheck:
 
@@ -40,18 +74,18 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-03-002-27-0.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-01-006-24-0.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -108,40 +142,6 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.26.5 on atl1-1-01-006-24-0.pace.gatech.edu
-    
-        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
-        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/MFC-lomach/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
-        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
-        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
 CPU:
 
     CPU Info:
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               2
     Stepping:                                7
-    CPU(s) scaling MHz:                      77%
+    CPU(s) scaling MHz:                      79%
     CPU max MHz:                             2700.0000
     CPU min MHz:                             1200.0000
     BogoMIPS:                                5400.00
