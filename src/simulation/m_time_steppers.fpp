@@ -633,6 +633,12 @@ contains
             ! forward order for single-level runs.
             do islot = amr_num_blocks, 1, -1
                 call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
+                ! recursive subcycle multi-level: a level>=2 block is advanced, restricted, AND Berger-Colella refluxed into its
+                ! parent INSIDE the parent's recursive subcycle (s_amr_advance_children within s_advance_amr_fine_substeps), so it
+                ! is
+                ! skipped in this top-level per-block loop. Only level-1 blocks are driven here (they recurse into their L2
+                ! children).
+                if (amr_subcycle .and. amr_block_level(amr_cur) >= 2) cycle
                 if (amr_subcycle) then
                     call s_advance_amr_fine_substeps(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, &
                                                      & pb_ts(stor)%sf, mv_ts(stor)%sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &

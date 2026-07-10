@@ -3907,6 +3907,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (j) multi-level + SUBCYCLE: (h) advances every level lock-step at the coarse dt; this arms
+        # amr_subcycle so each level steps at its OWN dt (L1 at dt/2, L2 at dt/4) via the recursive
+        # driver - s_amr_advance_subtree recurses into s_amr_advance_children, which subcycles each L2
+        # child within every L1 substep (two ghost-lerp sources gathered from the parent's t^n/t^{n+1}
+        # snapshots) and folds it back with a per-substep Berger-Colella reflux-to-parent. The ONLY
+        # golden protecting the recursive multi-level subcycle path. Kept STATIC (amr_regrid_int=0) for
+        # the same determinism reason as (h). np=1 only.
+        stack.push(
+            "AMR -> 1D -> multi-level subcycle",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_subcycle": "T",
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():
