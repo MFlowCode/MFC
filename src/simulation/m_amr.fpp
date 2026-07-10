@@ -2998,9 +2998,6 @@ contains
         real(wp), dimension(:,:,:,:,:), intent(inout)                                           :: rhs_pb, rhs_mv
         integer, intent(in)                                                                     :: t_step
         real(wp), intent(inout)                                                                 :: time_avg
-        real(wp), parameter                                                                     :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
-        integer                                                                                 :: sub, s
-        real(wp)                                                                                :: th
 
         if (.not. amr) return
         ! valid coarse CONS ghosts on both lerp sources (ALL ranks call: pairwise halo); the exchanged t^n /
@@ -3019,14 +3016,39 @@ contains
         if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_ghost_b)
         if (.not. amr_rank_owns_block) return
 
-        ! rank_time brackets cover the fine-advance compute segments and pause across the MPI exchanges (the inner s_compute_rhs
-        ! pair nests to a no-op)
-        if (rank_time_wrt) call s_rank_time_tic()
         ! non-polytropic QBMM: the pb/mv ghost shell gets the same two-source time-lerp treatment
         if (qbmm .and. .not. polytropic) then
             call s_amr_fill_fine_ghosts_pbmv(pb_old, mv_old, amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf)
             call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf)
         end if
+
+        ! recurse into this block's subtree: subcycle its substeps (children advance within each substep - future increment)
+        call s_amr_advance_subtree(coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
+
+    end subroutine s_advance_amr_fine_substeps
+
+    !> Advance the currently-selected fine block (amr_cur) through its subcycle: two amr_dt_fine SSP-RK3 substeps whose ghost shell
+    !! is the two-source time-lerp of the block's q_ghost_a (parent t^n) / q_ghost_b (parent t^{n+1}) sources, filled by the caller
+    !! before this call. Fine flux registers are zeroed here and accumulate over all six stages so the end-of-step reflux sees the
+    !! time-averaged effective fine flux. RECURSIVE: children of this block subcycle within each of its substeps; the child clause
+    !! is added in a later increment, so today this reduces exactly to the single-level L0<->L1 advance.
+    recursive subroutine s_amr_advance_subtree(coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
+
+        real(wp), dimension(:,:), intent(in)                       :: coefs  !< rk_coef(1:3, 1:4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+        integer, intent(in)                                        :: t_step
+        real(wp), intent(inout)                                    :: time_avg
+        real(wp), parameter                                        :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
+        integer                                                    :: sub, s
+        real(wp)                                                   :: th
+
+        ! rank_time brackets cover the fine-advance compute segments and pause across the MPI exchanges (the inner s_compute_rhs
+        ! pair nests to a no-op)
+
+        if (rank_time_wrt) call s_rank_time_tic()
         call s_amr_zero_fine_registers()
 
         do sub = 1, 2
@@ -3089,7 +3111,7 @@ contains
         end do
         if (rank_time_wrt) call s_rank_time_toc()
 
-    end subroutine s_advance_amr_fine_substeps
+    end subroutine s_amr_advance_subtree
 
     !> Shrink box [blo:bhi] to the tight bounding box of the tagged (gtag==1) cells inside it. ok=.false. if no tagged cell.
     !! Collapsed dims (lo=hi=0) survive unchanged. Deterministic (integer scan of the identical global tag field).
