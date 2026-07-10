@@ -234,6 +234,13 @@ def generate_case_opt_decls_fpp() -> str:
 # These are kept in the manual residue of m_mpi_proxy.fpp.
 _STRUCT_ROOTS = frozenset({"bc_x", "bc_y", "bc_z", "x_domain", "y_domain", "z_domain", "x_output", "y_output", "z_output"})
 
+# Plain (non-struct) namelist arrays registered only as indexed variants (e.g.
+# synth_L(i,d)). The generator's array path (FORTRAN_ARRAY_DIMS) emits a 1D
+# broadcast only, so these — including the 2D turb_pos/synth_L — are declared and
+# broadcast by hand in m_mpi_proxy.fpp. Skipped here so the scalar classifier does
+# not treat the base name as a missing-registry scalar.
+_MANUAL_ARRAY_RESIDUE = frozenset({"synth_n_waves_per_shell", "synth_k_shell", "synth_amp_shell", "turb_pos", "synth_L"})
+
 # Variables excluded from broadcast generation (derived post-broadcast or non-namelist).
 # muscl_eps was previously excluded here on the assumption that it was derived
 # post-broadcast, but the derivation only fires under f_is_default(muscl_eps),
@@ -272,16 +279,18 @@ def _bcast_scalar(name: str, mpi_type: str, count: str = "1") -> str:
     return f"        call MPI_BCAST({name}, {count}, {mpi_type}, 0, MPI_COMM_WORLD, ierr)"
 
 
-def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str], List[str]]:
-    """Return (int_vars, log_vars, real_vars, case_opt_vars) for class-(a) scalars.
+def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
+    """Return (int_vars, log_vars, real_vars, str_vars, case_opt_vars) for class-(a) scalars.
 
     case_opt_vars are sim CASE_OPT_PARAMS (wrapped in #:if not MFC_CASE_OPTIMIZATION).
-    All four lists contain variable names suitable for a 1-element MPI_BCAST.
+    str_vars are character scalars, broadcast with the len() form like case_dir.
+    The other lists contain variable names suitable for a 1-element MPI_BCAST.
     Struct roots, TYPED_DECLS, FORTRAN_ARRAY_DIMS, case_dir, and _BCAST_EXCLUDE are removed.
     """
     int_vars: List[str] = []
     log_vars: List[str] = []
     real_vars: List[str] = []
+    str_vars: List[str] = []
     case_opt_vars: List[str] = []  # (name, mpi_type) pairs for sim case-opt section
 
     for name in sorted(NAMELIST_VARS):
@@ -292,6 +301,8 @@ def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str],
         if target == "post" and name in _POST_BCAST_EXCLUDE:
             continue
         if name in _STRUCT_ROOTS:
+            continue
+        if name in _MANUAL_ARRAY_RESIDUE:
             continue
         if name in TYPED_DECLS:
             continue
@@ -319,10 +330,12 @@ def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str],
             int_vars.append(name)
         elif mpi_type == "MPI_LOGICAL":
             log_vars.append(name)
+        elif mpi_type == "MPI_CHARACTER":
+            str_vars.append(name)
         else:
             real_vars.append(name)
 
-    return sorted(int_vars), sorted(log_vars), sorted(real_vars), sorted(case_opt_vars)
+    return sorted(int_vars), sorted(log_vars), sorted(real_vars), sorted(str_vars), sorted(case_opt_vars)
 
 
 def _emit_bcast_group(lines: List[str], vars_list: List[str], mpi_type: str) -> None:
@@ -439,7 +452,13 @@ def generate_bcast_fpp(target: str) -> str:
     lines.append("")
 
     # -- Class (a): simple scalar broadcasts --
-    int_vars, log_vars, real_vars, case_opt_vars = _classify_scalar_vars(target)
+    int_vars, log_vars, real_vars, str_vars, case_opt_vars = _classify_scalar_vars(target)
+
+    if str_vars:
+        lines.append("        ! Character scalars")
+        for name in str_vars:
+            lines.append(f"        call MPI_BCAST({name}, len({name}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)")
+        lines.append("")
 
     if int_vars:
         lines.append("        ! Integer scalars")

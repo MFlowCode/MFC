@@ -147,6 +147,8 @@ DESCRIPTIONS = {
     "rdma_mpi": "Enable RDMA for MPI communication (GPUs)",
     # Misc
     "case_dir": "Case directory path",
+    "files_dir": "The relative path to the directory containing the extrusion IC files",
+    "file_extension": "The last 6 digits of the extrusion files prim.XX.YY.123456.dat",
     "cantera_file": "Cantera mechanism file for chemistry",
     "old_grid": "Use grid from previous simulation",
     "old_ic": "Use initial conditions from previous simulation",
@@ -233,6 +235,12 @@ DESCRIPTIONS = {
     "p_x": "Body force phase in x-direction",
     "p_y": "Body force phase in y-direction",
     "p_z": "Body force phase in z-direction",
+    # Synthetic turbulence
+    "synthetic_turbulence": "Enable synthetic turbulence forcing",
+    "synth_seed": "Random seed for wave vector generation",
+    "synth_n_shells": "Number of energy shells for synthetic turbulence",
+    "num_turbulent_sources": "Number of Gaussian forcing zones",
+    "synth_U_inf": "Advection velocity for synthetic turbulence field",
     # Output flags
     "mom_wrt": "Write momentum to database",
     "flux_wrt": "Write flux data",

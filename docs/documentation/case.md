@@ -197,7 +197,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 
 The Table lists the patch parameters.
 The parameters define the geometries and physical parameters of fluid components (patch) in the domain at initial condition.
-Note that the domain must be fully filled with patche(s).
+Note that the domain must be fully filled with patches.
 The code outputs error messages when an empty region is left in the domain.
 
 - `tau_e(i)` is the `i`-th component of the elastic stress tensor, ordered as `tau_xx`, `tau_xy`, `tau_yy`, `tau_xz`, `tau_yz`, and `tau_zz`. 1D simulation requires `tau(1)`, 2D `tau(1:3)`, and 3D `tau(1:6)`.
@@ -272,8 +272,8 @@ The code provides three pre-built patches for dimensional extrusion of initial c
 - `case(270)`: Extrude 1D data to 2D domain
 - `case(370)`: Extrude 2D data to 3D domain
 
-Setup: Only requires specifying `init_dir` and filename pattern via `zeros_default`. Grid dimensions are automatically detected from the data files.
-Implementation: All variables and file handling are managed in `src/common/include/ExtrusionHardcodedIC.fpp` with no manual grid configuration needed.
+Setup: Only requires specifying `files_dir` and filename pattern via `file_extension`. The files are located, for example, at `examples/1D_flamelet/IC`, and their format is `prim.XX.YY.file_extension.dat`.
+Implementation: All variables and file handling are managed in the `case.py` file of the simulation.
 Usage: Ideal for initializing simulations from lower-dimensional solutions, enabling users to add perturbations or modifications to the base extruded fields for flow instability studies.
 
 #### Parameter Descriptions
@@ -1172,6 +1172,29 @@ Usage notes:
 | `nv_uvm_igr_temps_on_gpu` | Integer | Store IGR temporaries on GPU with UVM                    |
 
 - These parameters are for NVIDIA Grace-Hopper and similar architectures with hardware-managed unified memory. They allow MFC to run problems larger than GPU memory by paging data between host and device.
+
+### 20. Synthetic Turbulence
+
+| Parameter                          | Type    | Description                                            |
+| ---:                                | :---:   | :---                                                    |
+| `synthetic_turbulence`              | Logical | Enable synthetic turbulence forcing                    |
+| `synth_seed`                        | Integer | Random seed for wave vector generation                 |
+| `synth_n_shells`                    | Integer | Number of energy shells                                |
+| `synth_U_inf`                       | Real    | Advection velocity for the synthetic turbulence field  |
+| `synth_n_waves_per_shell(s)`        | Integer | Number of random wave vectors in shell `s`             |
+| `synth_k_shell(s)`                  | Real    | Wave-number magnitude of shell `s`                     |
+| `synth_amp_shell(s)`                | Real    | Forcing amplitude of shell `s`                         |
+| `num_turbulent_sources`             | Integer | Number of Gaussian forcing zones                       |
+| `turb_pos(i,1[,2,3])`                | Real    | Center of forcing zone `i` (x[,y,z])                   |
+| `synth_L(i,1[,2,3])`                 | Real    | Full extent of forcing zone `i` (x[,y,z])              |
+
+- `synthetic_turbulence` superimposes a divergence-free, time-advected sum of Fourier modes onto the momentum and energy equations to mimic isotropic turbulence entering the domain.
+
+- Each of the `synth_n_shells` energy shells is defined by a wave-number magnitude `synth_k_shell(s)`, a forcing amplitude `synth_amp_shell(s)`, and `synth_n_waves_per_shell(s)` randomly oriented wave vectors drawn using `synth_seed`.
+
+- `synth_U_inf` advects the turbulent field in the x-direction at a constant velocity.
+
+- Forcing is applied only within Gaussian-windowed zones. Each of the `num_turbulent_sources` zones must specify its center `turb_pos(i,:)` and full extents `synth_L(i,:)` for every active dimension (x, and y, z if `n > 0`/`p > 0`).
 
 ## Enumerations
 

@@ -200,6 +200,12 @@ PHYSICS_DOCS = {
         "category": "Acoustic Sources",
         "explanation": ("Dimension-specific support types. Pulse type in {1,2,3,4}. Non-planar sources require foc_length and aperture."),
     },
+    # IC Extrusion
+    "check_ic_extrusion": {
+        "title": "IC Extrusion File Parameters",
+        "category": "IC Extrusion",
+        "explanation": "Extrusion hcids (170, 270, 271, 272, 370) read initial condition data from files. Both files_dir and file_extension must be set.",
+    },
     # Post-Processing
     "check_vorticity": {
         "title": "Vorticity Output",
@@ -2236,6 +2242,26 @@ class CaseValidator:
 
     # Main Validation Entry Points
 
+    def check_ic_extrusion(self):
+        """Checks that files_dir and file_extension are set for extrusion hcids."""
+        extrusion_hcids = {170, 270, 271, 272, 370}
+        num_patches = self.get("num_patches", 0)
+        if not self._is_numeric(num_patches) or num_patches <= 0:
+            return
+
+        for i in range(1, num_patches + 1):
+            hcid = self.get(f"patch_icpp({i})%hcid")
+            if hcid not in extrusion_hcids:
+                continue
+            self.prohibit(
+                not self.is_set("files_dir"),
+                f"patch_icpp({i})%hcid={hcid} requires files_dir to be set",
+            )
+            self.prohibit(
+                not self.is_set("file_extension"),
+                f"patch_icpp({i})%hcid={hcid} requires file_extension to be set",
+            )
+
     def validate_common(self):
         """Validate parameters common to all stages"""
         self.check_parameter_types()  # Type validation first
@@ -2284,7 +2310,6 @@ class CaseValidator:
         self.check_continuum_damage()
         self.check_grcbc()
         self.check_probe_integral_output()
-        self.check_chemistry()
 
     def validate_pre_process(self):
         """Validate pre-process-specific parameters"""
@@ -2294,7 +2319,6 @@ class CaseValidator:
         self.check_parallel_io_pre_process()
         self.check_grid_stretching()
         self.check_perturb_density()
-        self.check_chemistry()
         self.check_misc_pre_process()
         self.check_patch_physics()
         self.check_volume_fraction_sum()
@@ -2302,6 +2326,7 @@ class CaseValidator:
         self.check_patch_within_domain()
         self.check_velocity_components()
         self.check_bc_patches()
+        self.check_ic_extrusion()
 
     def validate_post_process(self):
         """Validate post-process-specific parameters"""
@@ -2322,7 +2347,6 @@ class CaseValidator:
         self.check_schlieren()
         self.check_surface_tension_post()
         self.check_no_flow_variables()
-        self.check_chemistry()
 
     def validate(self, stage: str = "simulation"):
         """Main validation method

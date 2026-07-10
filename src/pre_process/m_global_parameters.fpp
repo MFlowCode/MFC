@@ -38,6 +38,9 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
     real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
+    !> Global (pre-decomposition) domain bounds, needed by s_generate_serial_grid to stretch the grid using the full domain length
+    !! rather than a local processor's sub-domain length
+    type(bounds_info) :: x_domain_glb, y_domain_glb, z_domain_glb
 
     ! Simulation Algorithm Parameters
     ! sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*: in m_global_parameters_common
@@ -127,6 +130,8 @@ contains
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
         ! Logistics (pre-specific)
+        file_extension = '000000'
+        files_dir = './'
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int

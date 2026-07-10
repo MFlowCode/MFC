@@ -98,6 +98,7 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[Bx0]')
     $:GPU_DECLARE(create='[tau_star, cont_damage_s, alpha_bar]')
     $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
+    $:GPU_DECLARE(create='[synthetic_turbulence, num_turbulent_sources, synth_U_inf]')
     #:if not MFC_CASE_OPTIMIZATION
         $:GPU_DECLARE(create='[num_dims, num_vels, weno_polyn, weno_order]')
         $:GPU_DECLARE(create='[weno_num_stencils, num_fluids, wenojs]')
@@ -109,8 +110,11 @@ module m_global_parameters_common
 
     !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)
     !> @{
-    integer, allocatable, dimension(:) :: proc_coords  !< Processor coordinates in MPI_CART_COMM
-    integer, allocatable, dimension(:) :: start_idx    !< Starting cell-center index of local processor in global grid
+    integer, allocatable, dimension(:) :: proc_coords      !< Processor coordinates in MPI_CART_COMM
+    integer, allocatable, dimension(:) :: start_idx        !< Starting cell-center index of local processor in global grid
+    integer                            :: num_procs_x = 1  !< Number of MPI ranks in x-direction
+    integer                            :: num_procs_y = 1  !< Number of MPI ranks in y-direction
+    integer                            :: num_procs_z = 1  !< Number of MPI ranks in z-direction
     !> @}
 
     !> @name MPI info for parallel IO with Lustre file systems (identical across all three targets)
