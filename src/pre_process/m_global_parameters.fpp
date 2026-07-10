@@ -130,6 +130,8 @@ contains
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
         ! Logistics (pre-specific)
+        file_extension = '000000'
+        files_dir = './'
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int
