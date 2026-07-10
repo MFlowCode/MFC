@@ -235,6 +235,14 @@ contains
                 call MPI_BCAST(integral(j)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
+
+        ! manual: synthetic turbulence namelist arrays (registered as indexed
+        ! variants only; scalars are broadcast by generated_bcast.fpp)
+        call MPI_BCAST(synth_n_waves_per_shell, num_synth_shells_max, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(synth_k_shell, num_synth_shells_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(synth_amp_shell, num_synth_shells_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(turb_pos, num_turb_sources_max*3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(synth_L, num_turb_sources_max*3, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 
     end subroutine s_mpi_bcast_user_inputs

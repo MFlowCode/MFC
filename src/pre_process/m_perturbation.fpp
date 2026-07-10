@@ -334,45 +334,6 @@ contains
 
     end subroutine s_generate_random_perturbation
 
-    !> Generate a unit vector uniformly distributed on the sphere from two random parameters.
-    function f_unit_vector(theta, eta) result(vec)
-
-        real(wp), intent(in)   :: theta, eta
-        real(wp)               :: zeta, xi
-        real(wp), dimension(3) :: vec
-
-        xi = 2._wp*pi*theta
-        zeta = acos(2._wp*eta - 1._wp)
-        vec(1) = sin(zeta)*cos(xi)
-        vec(2) = sin(zeta)*sin(xi)
-        vec(3) = cos(zeta)
-
-    end function f_unit_vector
-
-    !> Generate a pseudo-random number between 0 and 1 using a linear congruential generator.
-    subroutine s_prng(var, seed)
-
-        integer, intent(inout) :: seed
-        real(wp), intent(out)  :: var
-
-        seed = mod(modmul(seed), modulus)
-        var = seed/real(modulus, wp)
-
-    end subroutine s_prng
-
-    !> Compute a modular multiplication step for the linear congruential pseudo-random number generator.
-    function modmul(a) result(val)
-
-        integer, intent(in) :: a
-        integer             :: val
-        real(wp)            :: x, y
-
-        x = (multiplier/real(modulus, wp))*a + (increment/real(modulus, wp))
-        y = nint((x - floor(x))*decimal_trim)/decimal_trim
-        val = nint(y*modulus)
-
-    end function modmul
-
     !> Deallocate the temporary primitive variable array used by elliptic smoothing.
     impure subroutine s_finalize_perturbation_module()
 

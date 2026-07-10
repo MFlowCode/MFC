@@ -234,6 +234,13 @@ def generate_case_opt_decls_fpp() -> str:
 # These are kept in the manual residue of m_mpi_proxy.fpp.
 _STRUCT_ROOTS = frozenset({"bc_x", "bc_y", "bc_z", "x_domain", "y_domain", "z_domain", "x_output", "y_output", "z_output"})
 
+# Plain (non-struct) namelist arrays registered only as indexed variants (e.g.
+# synth_L(i,d)). The generator's array path (FORTRAN_ARRAY_DIMS) emits a 1D
+# broadcast only, so these — including the 2D turb_pos/synth_L — are declared and
+# broadcast by hand in m_mpi_proxy.fpp. Skipped here so the scalar classifier does
+# not treat the base name as a missing-registry scalar.
+_MANUAL_ARRAY_RESIDUE = frozenset({"synth_n_waves_per_shell", "synth_k_shell", "synth_amp_shell", "turb_pos", "synth_L"})
+
 # Variables excluded from broadcast generation (derived post-broadcast or non-namelist).
 # muscl_eps was previously excluded here on the assumption that it was derived
 # post-broadcast, but the derivation only fires under f_is_default(muscl_eps),
@@ -294,6 +301,8 @@ def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str],
         if target == "post" and name in _POST_BCAST_EXCLUDE:
             continue
         if name in _STRUCT_ROOTS:
+            continue
+        if name in _MANUAL_ARRAY_RESIDUE:
             continue
         if name in TYPED_DECLS:
             continue

@@ -797,6 +797,23 @@ def _load():
     _r("normFac", REAL)
     _r("interface_file", STR)
 
+    # Synthetic turbulence forcing
+    _r("synthetic_turbulence", LOG, {"synthetic_turbulence"})
+    _r("synth_seed", INT, {"synthetic_turbulence"})
+    _r("synth_n_shells", INT, {"synthetic_turbulence"})
+    _r("num_turbulent_sources", INT, {"synthetic_turbulence"})
+    _r("synth_U_inf", REAL, {"synthetic_turbulence"}, math=r"\f$U_\infty\f$")
+    NSS = _fc("num_synth_shells_max", 50)
+    NTS = _fc("num_turb_sources_max", 10)
+    for i in range(1, NSS + 1):
+        _r(f"synth_n_waves_per_shell({i})", INT, {"synthetic_turbulence"})
+        _r(f"synth_k_shell({i})", REAL, {"synthetic_turbulence"}, math=r"\f$k_s\f$")
+        _r(f"synth_amp_shell({i})", REAL, {"synthetic_turbulence"}, math=r"\f$A_s\f$")
+    for i in range(1, NTS + 1):
+        for d in range(1, 4):
+            _r(f"turb_pos({i},{d})", REAL, {"synthetic_turbulence"})
+            _r(f"synth_L({i},{d})", REAL, {"synthetic_turbulence"})
+
     # INDEXED PARAMETERS
 
     # patch_icpp (10 patches)
@@ -1308,6 +1325,16 @@ _nv(
     "g_x",
     "g_y",
     "g_z",
+    "synthetic_turbulence",
+    "synth_seed",
+    "synth_n_shells",
+    "num_turbulent_sources",
+    "synth_U_inf",
+    "synth_n_waves_per_shell",
+    "synth_k_shell",
+    "synth_amp_shell",
+    "turb_pos",
+    "synth_L",
     "collision_model",
     "coefficient_of_restitution",
     "collision_time",
