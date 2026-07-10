@@ -3774,6 +3774,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "t_step_save": 4,
                 "patch_ib(1)%x_centroid": 0.4180,
                 "patch_ib(1)%radius": 0.06,
+                # restore body 1's original wall speed: the single-body case above was slowed to 0.02 to dodge
+                # the un-GCL'd blow-up (MFlowCode/MFC#1636), but this two-body golden was generated at 0.2 and
+                # its shorter run stays stable at 0.2 - keep it independent of that softening
+                "patch_ib(1)%vel(2)": 0.2,
                 "patch_ib(2)%geometry": 2,
                 "patch_ib(2)%x_centroid": 0.6060,
                 "patch_ib(2)%y_centroid": 0.4840,
