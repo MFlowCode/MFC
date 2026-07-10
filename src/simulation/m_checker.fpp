@@ -193,8 +193,11 @@ contains
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
             @:PROHIBIT(amr_max_blocks < 1, "amr_max_blocks must be >= 1")
             @:PROHIBIT(amr_max_level < 1, "amr_max_level must be >= 1")
-            @:PROHIBIT(amr_max_level > 1 .and. num_procs > 1 .and. ib, &
-                       & "multi-level AMR (amr_max_level > 1) with immersed boundaries at num_procs > 1 is not yet supported (fine-grid IB nesting is under development); use num_procs = 1 or amr_max_level = 1 with IB")
+            ! n/p are the raw namelist grid sizes (set in s_read_input_file, before decomposition); num_dims is
+            ! NOT yet assigned at checker time in a non-case-optimized build, so test the grid extents directly.
+            ! n > 0 => 2D or 3D.
+            @:PROHIBIT(amr_max_level > 1 .and. num_procs > 1 .and. (n > 0 .or. ib), &
+                       & "multi-level AMR (amr_max_level > 1) at num_procs > 1 is currently validated for 1D non-IB only (the cross-rank 2D/3D fine-block migration and fine-grid IB nesting are under development); use num_procs = 1, or amr_max_level = 1, for 2D/3D or IB")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
                        & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
         end if
