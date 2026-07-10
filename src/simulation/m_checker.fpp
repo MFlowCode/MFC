@@ -193,14 +193,21 @@ contains
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
             @:PROHIBIT(amr_max_blocks < 1, "amr_max_blocks must be >= 1")
             @:PROHIBIT(amr_max_level < 1, "amr_max_level must be >= 1")
-            @:PROHIBIT(amr_max_level > 1 .and. num_procs > 1 .and. amr_regrid_int > 0, &
-                       & "dynamic multi-level regrid (amr_regrid_int > 0) with amr_max_level > 1 is np=1 only (the cross-rank sensor-on-fine nesting is under development); a STATIC multi-level hierarchy (amr_regrid_int = 0) is supported at num_procs > 1")
+            @:PROHIBIT(amr_max_level > 1 .and. num_procs > 1 .and. ib, &
+                       & "multi-level AMR (amr_max_level > 1) with immersed boundaries at num_procs > 1 is not yet supported (fine-grid IB nesting is under development); use num_procs = 1 or amr_max_level = 1 with IB")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
                        & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
         end if
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")
         @:PROHIBIT(amr_subcycle .and. cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
+        ! Pre-existing (independent of level count): subcycled fine advance + dynamic regrid at np>1 leaks
+        ! conservation (~1e-4 in a closed system) - a subcycle's accumulated L0<->L1 reflux is not applied
+        ! across a regrid rebuild under the P2P reflux path. Static (amr_regrid_int = 0) subcycle and
+        ! lock-step (amr_subcycle = F) dynamic regrid both conserve to machine zero at np>1; fail closed on the
+        ! leaking combination until the reflux/regrid ordering is fixed.
+        @:PROHIBIT(amr_subcycle .and. amr_regrid_int > 0 .and. num_procs > 1, &
+                   & "amr_subcycle with dynamic regrid (amr_regrid_int > 0) is not yet conservation-safe at num_procs > 1; use amr_subcycle = F (lock-step) for dynamic multi-rank runs, or amr_regrid_int = 0 (static) with subcycling")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds

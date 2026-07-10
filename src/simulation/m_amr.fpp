@@ -885,20 +885,33 @@ contains
     !! is untouched; this only fills amr_block_owner for the Phase-2 switch and prints a predicted-imbalance line.
     impure subroutine s_amr_assign_block_owners()
 
-        integer         :: k, kk, r, ord(amr_num_blocks)
-        integer(kind=8) :: wt(amr_num_blocks), key(amr_num_blocks), tmpk, cum, tgt, total
+        integer         :: k, kk, r, a, lev, maxlev, ord(amr_num_blocks)
+        integer(kind=8) :: wt(amr_num_blocks), twt(amr_num_blocks), key(amr_num_blocks), tmpk, cum, tgt, total
         integer         :: tmpo
         real(wp)        :: rank_load(0:num_procs - 1), imbal
 
         if (amr_num_blocks < 1) return
 
-        ! per-block fine-work weight = fine cell count (product of 2*extent-1 over active dims)
+        ! per-block own fine-work weight = fine cell count (product of 2*extent-1 over active dims)
         do k = 1, amr_num_blocks
             wt(k) = int(2*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1, 8)
             if (n_glb > 0) wt(k) = wt(k)*int(2*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 8)
             if (p_glb > 0) wt(k) = wt(k)*int(2*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 8)
             key(k) = f_amr_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
             ord(k) = k
+        end do
+
+        ! CO-LOCATE refinement towers: a level-1 block and all its nested descendants are owned WHOLE by one rank so every
+        ! parent<->child gather/restrict/reflux stays LOCAL (no new MPI - only L0<->L1 crosses ranks). Roll each block's own
+        ! work up onto its top-level (level-1) ancestor, SFC-balance only the level-1 anchors, then let descendants inherit.
+        ! Single-level (all blocks level 1): twt == wt and the inherit pass is empty, so this is byte-identical to before.
+        twt = 0_8
+        do k = 1, amr_num_blocks
+            a = k
+            do while (amr_block_level(a) > 1)
+                a = f_amr_parent_block(a)
+            end do
+            twt(a) = twt(a) + wt(k)
         end do
 
         ! sort block indices by Morton key (insertion sort - amr_num_blocks is small, <= amr_max_blocks)
@@ -911,19 +924,29 @@ contains
             ord(kk + 1) = tmpo
         end do
 
-        ! chains-on-chains: walk blocks in SFC order, advance the owner rank when the cumulative weight crosses the next even share
+        ! chains-on-chains over the level-1 anchors in SFC order, weighted by whole-tower work; advance the owner rank when the
+        ! cumulative tower weight crosses the next even share
         total = 0_8
         do k = 1, amr_num_blocks
-            total = total + wt(k)
+            if (amr_block_level(k) == 1) total = total + twt(k)
         end do
         rank_load = 0._wp
         r = 0; cum = 0_8
         do k = 1, amr_num_blocks
+            if (amr_block_level(ord(k)) /= 1) cycle
             tgt = (int(r + 1, 8)*total)/int(num_procs, 8)
             if (cum >= tgt .and. r < num_procs - 1) r = r + 1
             amr_block_owner(ord(k)) = r
-            rank_load(r) = rank_load(r) + real(wt(ord(k)), wp)
-            cum = cum + wt(ord(k))
+            rank_load(r) = rank_load(r) + real(twt(ord(k)), wp)
+            cum = cum + twt(ord(k))
+        end do
+
+        ! descendants inherit their parent's owner (top-down, level by level - parents already assigned when their children run)
+        maxlev = maxval(amr_block_level(1:amr_num_blocks))
+        do lev = 2, maxlev
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) == lev) amr_block_owner(k) = amr_block_owner(f_amr_parent_block(k))
+            end do
         end do
 
         if (proc_rank == 0) then
@@ -3901,22 +3924,36 @@ contains
             ! where they sit. np=1 + non-IB (multi-level distribution / IB nesting are future work). Regions stay in L0 cell
             ! indices.
             box_level(1:nboxes) = 1
-            if (amr_max_level >= 2 .and. num_procs == 1 .and. .not. ib) then
+            if (amr_max_level >= 2 .and. .not. ib) then
                 block
                     integer                  :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
-                    logical, allocatable     :: ctag(:,:,:)
+                    integer                  :: mg, ng, pg, ci, cj, ck, sidx(3)
+                    logical, allocatable     :: ctag(:,:,:), gctag(:,:,:)
                     logical                  :: covered, any_tag
                     type(t_box), allocatable :: cboxes(:)
+#ifdef MFC_MPI
+                    integer :: ierr
+#endif
 
                     ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads amr_slots(ob)%q_cons on the
                     ! host, but the GPU_UPDATE host that the step-5 stash does runs AFTER this nesting - so the host copy is stale
                     ! here
                     do ob = 1, amr_num_blocks
+                        if (.not. amr_owns_all(ob)) cycle  ! np>1: only the owner holds this old block's fine q_cons
                         do obi = eqn_idx%cont%beg, eqn_idx%cont%end
                             $:GPU_UPDATE(host='[amr_slots(ob)%q_cons(obi)%sf]')
                         end do
                     end do
-                    allocate (ctag(0:m,0:n,0:p))
+                    ! Fine-sensor tags accumulate in a GLOBAL L0 frame: at np>1 an old block is read only by its owner, but its
+                    ! tag footprint can fall in ANOTHER rank's subdomain, so the local (0:m) frame the clusterer uses cannot hold
+                    ! it. Each owner ORs its tags into gctag; an ALLREDUCE unions them; the clusterer then consumes the local slice.
+                    mg = m_glb; ng = 0; pg = 0
+                    if (n_glb > 0) ng = n_glb
+                    if (p_glb > 0) pg = p_glb
+                    sidx = 0; sidx(1) = start_idx(1)
+                    if (n_glb > 0) sidx(2) = start_idx(2)
+                    if (p_glb > 0) sidx(3) = start_idx(3)
+                    allocate (ctag(0:m,0:n,0:p), gctag(0:mg,0:ng,0:pg))
 
                     plo = 1; phi = nboxes  ! [plo:phi] = the boxes at the previous level (lev-1) to nest inside
                     do lev = 2, amr_max_level
@@ -3935,7 +3972,7 @@ contains
 
                             ! sensor-on-fine: tag from every OLD level-(lev-1) block overlapping this parent window (amr_block_level
                             ! still holds the old levels here - it is reset to box_level at step 5b, below)
-                            ctag = .false.; covered = .false.; any_tag = .false.
+                            gctag = .false.; covered = .false.; any_tag = .false.
                             do ob = 1, amr_num_blocks
                                 if (amr_block_level(ob) /= lev - 1) cycle
                                 if (boxes(kb)%lo(1) > amr_region_hi_all(1, ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, &
@@ -3948,13 +3985,28 @@ contains
                                     if (boxes(kb)%lo(3) > amr_region_hi_all(3, ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, &
                                         & ob)) cycle
                                 end if
-                                covered = .true.
-                                call s_amr_tag_child_from_fine(ob, mlo, mhi, ctag, any_tag)
+                                covered = .true.  ! replicated (metadata) - identical on every rank regardless of ownership
+                                if (amr_owns_all(ob)) call s_amr_tag_child_from_fine(ob, mlo, mhi, gctag, any_tag)
                             end do
+#ifdef MFC_MPI
+                            ! union the distributed owners' fine tags so every rank clusters the SAME child boxes (regrid must be
+                            ! deterministic); no-op at np=1 (the single owner already holds the whole global tag field)
+                            if (num_procs > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, gctag, (mg + 1)*(ng + 1)*(pg + 1), MPI_LOGICAL, &
+                                & MPI_LOR, MPI_COMM_WORLD, ierr)
+#endif
+                            any_tag = any(gctag)  ! recompute from the reduced field (a rank's local any_tag saw only its own obs)
 
                             if (covered .and. .not. any_tag) cycle  ! parent's fine solution is smooth here - no child
 
                             if (covered) then
+                                ! slice the reduced global tag field into this rank's local (0:m) frame for the clusterer
+                                do ck = 0, p
+                                    do cj = 0, n
+                                        do ci = 0, m
+                                            ctag(ci, cj, ck) = gctag(ci + sidx(1), cj + sidx(2), ck + sidx(3))
+                                        end do
+                                    end do
+                                end do
                                 ! cluster the fine-tagged L0 cells into child boxes, pad by amr_buf, clamp into the nesting window
                                 call s_amr_cluster(ctag, cboxes, ncb)
                                 do kc = 1, ncb
@@ -3999,7 +4051,7 @@ contains
                         plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
                         if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
                     end do
-                    deallocate (ctag)
+                    deallocate (ctag, gctag)
                     if (nboxes >= amr_max_blocks .and. proc_rank == 0) print '(A)', &
                         & ' [amr] NOTE: block pool full during multi-level nesting; some boxes were not refined further'
                 end block

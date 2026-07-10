@@ -3970,6 +3970,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (m) multi-level + dynamic regrid at np=2: (l) is a STATIC 2-level hierarchy on two ranks; this arms
+        # amr_regrid_int so the level-2 children are placed by DISTRIBUTED sensor-on-fine nesting. Each rank tags
+        # children only for the level-1 parents it owns (its local fine data), the tags are OR-reduced across ranks
+        # into one global field, and the SFC owner map keeps every child co-located with its parent (tower weight
+        # rolled onto the level-1 anchor). This is the FIRST golden exercising the cross-rank dynamic multi-level
+        # path (the distributed 3b nesting + the co-located owner reassignment as towers are created/moved). Uses
+        # (i)'s robust eps=0.1/amr_buf=6 so the rebuilt L2 box is cross-compiler stable across the 2-way split.
+        # LOCK-STEP (amr_subcycle=F): subcycle + dynamic regrid at np>1 is checker-gated (a pre-existing reflux/
+        # regrid-ordering leak, independent of level count).
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():
