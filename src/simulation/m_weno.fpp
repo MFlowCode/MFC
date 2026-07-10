@@ -903,6 +903,11 @@ contains
         integer, intent(in)                                                                    :: weno_dir
         type(int_bounds_info), intent(in)                                                      :: is1_weno_d, is2_weno_d, is3_weno_d
 
+        ! Non-case-optimized amdflang path: weno_num_stencils is not a compile constant, so these are sized
+        ! to the max (0:4). Only 0:weno_num_stencils is meaningful - whole-array assignments (e.g. from the
+        ! 0:weno_num_stencils d_cbL/R) MUST slice the target to 0:weno_num_stencils, or amdflang's runtime
+        ! array-shape check aborts (Assign: mismatching element counts, to 5 from 3).
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(-3:2) :: dvd
             real(wp), dimension(0:4)  :: poly
@@ -1013,7 +1018,7 @@ contains
                                     use_central = .false.
                                     if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                     if (use_central) then
-                                        omega(:) = d_cbL_${XYZ}$ (:,${SV}$)
+                                        omega(0:weno_num_stencils) = d_cbL_${XYZ}$ (:,${SV}$)
                                     else
                                         if (wenojs) then
                                             do q = 0, weno_num_stencils
@@ -1049,7 +1054,7 @@ contains
                                     use_central = .false.
                                     if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                     if (use_central) then
-                                        omega(:) = d_cbR_${XYZ}$ (:,${SV}$)
+                                        omega(0:weno_num_stencils) = d_cbR_${XYZ}$ (:,${SV}$)
                                     else
                                         if (wenojs) then
                                             do q = 0, weno_num_stencils
@@ -1140,7 +1145,7 @@ contains
                                         use_central = .false.
                                         if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                         if (use_central) then
-                                            omega(:) = d_cbL_${XYZ}$ (:,${SV}$)
+                                            omega(0:weno_num_stencils) = d_cbL_${XYZ}$ (:,${SV}$)
                                         else
                                             if (wenojs) then
                                                 do q = 0, weno_num_stencils
@@ -1208,7 +1213,7 @@ contains
                                         use_central = .false.
                                         if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                         if (use_central) then
-                                            omega(:) = d_cbR_${XYZ}$ (:,${SV}$)
+                                            omega(0:weno_num_stencils) = d_cbR_${XYZ}$ (:,${SV}$)
                                         else
                                             if (wenojs) then
                                                 do q = 0, weno_num_stencils
@@ -1375,7 +1380,7 @@ contains
                                         use_central = .false.
                                         if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                         if (use_central) then
-                                            omega(:) = d_cbL_${XYZ}$ (:,${SV}$)
+                                            omega(0:weno_num_stencils) = d_cbL_${XYZ}$ (:,${SV}$)
                                         else
                                             if (wenojs) then
                                                 do q = 0, weno_num_stencils
@@ -1457,7 +1462,7 @@ contains
                                         use_central = .false.
                                         if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                         if (use_central) then
-                                            omega(:) = d_cbR_${XYZ}$ (:,${SV}$)
+                                            omega(0:weno_num_stencils) = d_cbR_${XYZ}$ (:,${SV}$)
                                         else
                                             if (wenojs) then
                                                 do q = 0, weno_num_stencils
