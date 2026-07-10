@@ -240,6 +240,12 @@ DESCRIPTIONS = {
     "p_x": "Body force phase in x-direction",
     "p_y": "Body force phase in y-direction",
     "p_z": "Body force phase in z-direction",
+    # Synthetic turbulence
+    "synthetic_turbulence": "Enable synthetic turbulence forcing",
+    "synth_seed": "Random seed for wave vector generation",
+    "synth_n_shells": "Number of energy shells for synthetic turbulence",
+    "num_turbulent_sources": "Number of Gaussian forcing zones",
+    "synth_U_inf": "Advection velocity for synthetic turbulence field",
     # Output flags
     "mom_wrt": "Write momentum to database",
     "flux_wrt": "Write flux data",

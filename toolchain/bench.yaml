@@ -8,6 +8,26 @@
   path: benchmarks/5eq_rk3_weno3_hllc/case.py
   args: []
 
+# Benchmark model_equations_2_time_stepper_3_weno_order_3_riemann_solver_hll
+# Additional Benchmarked Features
+# - model_equations : 2
+# - time_stepper : 3
+# - weno_order : 3
+# - riemann_solver : hll
+- slug: 5eq_rk3_weno3_hll
+  path: benchmarks/5eq_rk3_weno3_hll/case.py
+  args: []
+
+# Benchmark model_equations_2_time_stepper_3_weno_order_3_riemann_solver_lax_friedrichs
+# Additional Benchmarked Features
+# - model_equations : 2
+# - time_stepper : 3
+# - weno_order : 3
+# - riemann_solver : lax_friedrichs
+- slug: 5eq_rk3_weno3_lf
+  path: benchmarks/5eq_rk3_weno3_lf/case.py
+  args: []
+
 # Benchmark viscosity_weno_Re_flux_T_weno_order_5_bubbles_T_bubble_mode_3_acoustic_T
 # Additional Benchmarked Features
 # - viscosity enabled
