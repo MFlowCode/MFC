@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Bubble-dynamics procedures for ensemble- and volume-averaged models
+!> @brief Bubble-dynamics procedures for ensemble- and volume-averaged model
 module m_bubbles
 
     use m_derived_types
