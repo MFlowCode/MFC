@@ -12,6 +12,7 @@ module m_ibm
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_jwl
     use m_helper
     use m_helper_basic
     use m_constants
@@ -30,6 +31,14 @@ module m_ibm
 
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
+
+    ! Snapshot of ib_markers taken just before each body move. Used ONLY on JWL
+    ! moving-IB cases to detect fresh (solid->fluid) cells so they can be rebuilt
+    ! through the JWL closure instead of being left at the p=1 Pa solid seed
+    ! (a near-vacuum at detonation pressures). Allocated only when jwl_idx > 0,
+    ! so base moving-IB behaviour is bit-identical.
+    type(integer_field) :: ib_markers_prev
+    $:GPU_DECLARE(create='[ib_markers_prev]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
@@ -59,6 +68,16 @@ contains
         end if
 
         @:ACC_SETUP_SFs(ib_markers)
+
+        ! JWL moving-IB fresh-cell repopulation needs the pre-move marker state.
+        if (jwl_idx > 0) then
+            if (p > 0) then
+                @:ALLOCATE(ib_markers_prev%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
+            else
+                @:ALLOCATE(ib_markers_prev%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
+            end if
+            @:ACC_SETUP_SFs(ib_markers_prev)
+        end if
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
 
@@ -144,9 +163,13 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
-        integer :: i, j, k, l, q, r                                          !< Iterator variables
-        integer :: patch_id, patch_id_temp                                   !< Patch ID of ghost point
-        real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
+        integer :: i, j, k, l, q, r  !< Iterator variables
+        integer :: patch_id, patch_id_temp  !< Patch ID of ghost point
+        real(wp) :: rho, gamma, pi_inf, dyn_pres  !< Mixture variables
+        real(wp) :: Y_jwl, e_mix_jwl  !< JWL ghost-cell energy rebuild
+        real(wp) :: b_IP, lam_IP  !< JWL reaction-progress rebuild (afterburn b, reactive lambda)
+        real(wp) :: wsum, w  !< JWL fresh-cell extrapolation weights
+        integer :: di, dj, dk, jn, kn, ln, z_stencil  !< JWL fresh-cell neighbour stencil
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
         real(wp) :: qv_K
@@ -207,10 +230,129 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! JWL moving-IB fresh-cell repopulation: a cell that just changed from
+        ! solid to fluid (prev marker /= 0, current marker == 0) is otherwise left
+        ! holding the p=1 Pa solid seed set above, which is a near-vacuum at
+        ! detonation pressures and drives a spurious rarefaction at the body's
+        ! trailing edge. Rebuild it by inverse-distance extrapolation from
+        ! established-fluid neighbours (fluid now AND before the move) and recover
+        ! energy through the JWL closure. Guarded on jwl_idx so base moving-IB
+        ! cases keep the p=1 seed bit-identically. The %abn/%rxn reaction-progress
+        ! variables are material scalars (prim = cons, like the color function), so
+        ! a fresh cell takes the same inverse-distance neighbour average as alpha.
+        #:if not MFC_CASE_OPTIMIZATION or jwl_active
+            if (jwl_idx > 0 .and. moving_immersed_boundary_flag) then
+                z_stencil = 0; if (p > 0) z_stencil = 1
+                $:GPU_PARALLEL_LOOP(private='[j, k, l, q, di, dj, dk, jn, kn, ln, wsum, w, rho, Y_jwl, e_mix_jwl, dyn_pres, &
+                                    & alpha_rho_IP, alpha_IP, vel_IP, pres_IP, b_IP, lam_IP]', collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            if (ib_markers_prev%sf(j, k, l) /= 0 .and. ib_markers%sf(j, k, l) == 0) then
+                                wsum = 0._wp
+                                pres_IP = 0._wp
+                                b_IP = 0._wp
+                                lam_IP = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, num_fluids
+                                    alpha_rho_IP(q) = 0._wp
+                                    alpha_IP(q) = 0._wp
+                                end do
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, 3
+                                    vel_IP(q) = 0._wp
+                                end do
+                                ! inverse-distance average over the 1-cell neighbourhood,
+                                ! established-fluid neighbours only (no solid, no other fresh cells)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do dk = -z_stencil, z_stencil
+                                    do dj = -1, 1
+                                        do di = -1, 1
+                                            jn = j + di; kn = k + dj; ln = l + dk
+                                            if ((di /= 0 .or. dj /= 0 .or. dk /= 0) .and. ib_markers%sf(jn, kn, &
+                                                & ln) == 0 .and. ib_markers_prev%sf(jn, kn, ln) == 0) then
+                                                w = 1._wp/sqrt(real(di*di + dj*dj + dk*dk, wp))
+                                                wsum = wsum + w
+                                                do q = 1, num_fluids
+                                                    alpha_rho_IP(q) = alpha_rho_IP(q) + w*q_prim_vf(eqn_idx%cont%beg + q &
+                                                                 & - 1)%sf(jn, kn, ln)
+                                                    alpha_IP(q) = alpha_IP(q) + w*q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(jn, kn, ln)
+                                                end do
+                                                do q = 1, num_dims
+                                                    vel_IP(q) = vel_IP(q) + w*q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(jn, kn, ln)
+                                                end do
+                                                pres_IP = pres_IP + w*q_prim_vf(eqn_idx%E)%sf(jn, kn, ln)
+                                                if (jwl_afterburn) b_IP = b_IP + w*q_prim_vf(eqn_idx%abn)%sf(jn, kn, ln)
+                                                if (jwl_reactive) lam_IP = lam_IP + w*q_prim_vf(eqn_idx%rxn)%sf(jn, kn, ln)
+                                            end if
+                                        end do
+                                    end do
+                                end do
+
+                                ! wsum == 0 (fully surrounded by solid/fresh) is unreachable under
+                                ! the acoustic CFL since the body moves << 1 cell/stage; if it ever
+                                ! happens the cell keeps the p=1 seed (no worse than base).
+                                if (wsum > 0._wp) then
+                                    rho = 0._wp
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do q = 1, num_fluids
+                                        alpha_rho_IP(q) = alpha_rho_IP(q)/wsum
+                                        alpha_IP(q) = alpha_IP(q)/wsum
+                                        rho = rho + alpha_rho_IP(q)
+                                    end do
+                                    pres_IP = pres_IP/wsum
+                                    dyn_pres = 0._wp
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do q = 1, num_dims
+                                        vel_IP(q) = vel_IP(q)/wsum
+                                        dyn_pres = dyn_pres + 0.5_wp*rho*vel_IP(q)*vel_IP(q)
+                                    end do
+
+                                    if (jwl_afterburn) then
+                                        b_IP = min(max(b_IP/wsum, 0._wp), 1._wp)
+                                        q_cons_vf(eqn_idx%abn)%sf(j, k, l) = b_IP
+                                        q_prim_vf(eqn_idx%abn)%sf(j, k, l) = b_IP
+                                    end if
+                                    if (jwl_reactive) lam_IP = min(max(lam_IP/wsum, 0._wp), 1._wp)
+
+                                    Y_jwl = alpha_rho_IP(jwl_idx)/max(rho, sgm_eps)
+                                    if (jwl_reactive) then
+                                        ! The delta_e Hugoniot offset makes the inverse lambda-dependent.
+                                        call s_jwl_mix_energy_pr(rho, pres_IP, Y_jwl, jwl_idx, e_mix_jwl, lam_IP)
+                                        q_cons_vf(eqn_idx%rxn)%sf(j, k, l) = lam_IP
+                                        q_prim_vf(eqn_idx%rxn)%sf(j, k, l) = lam_IP
+                                    else
+                                        call s_jwl_mix_energy_pr(rho, pres_IP, Y_jwl, jwl_idx, e_mix_jwl)
+                                    end if
+
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do q = 1, num_fluids
+                                        q_cons_vf(eqn_idx%cont%beg + q - 1)%sf(j, k, l) = alpha_rho_IP(q)
+                                        q_prim_vf(eqn_idx%cont%beg + q - 1)%sf(j, k, l) = alpha_rho_IP(q)
+                                        q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
+                                        q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
+                                    end do
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do q = 1, num_dims
+                                        q_cons_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l) = rho*vel_IP(q)
+                                        q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l) = vel_IP(q)
+                                    end do
+                                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_mix_jwl + dyn_pres
+                                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
+                                end if
+                            end if
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endif
+
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
-                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id]')
+                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
+                                & Y_jwl, e_mix_jwl, b_IP, lam_IP]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -235,6 +377,14 @@ contains
                 else if (qbmm .and. .not. polytropic) then
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
                                                    & pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                    else if (jwl_idx > 0 .and. (jwl_afterburn .or. jwl_reactive)) then
+                        ! Reaction-progress variables are material scalars: the rigid-wall condition
+                        ! is zero normal flux, so the ghost value is the image-point value (same
+                        ! constant-extrapolation treatment as alpha; Fedkiw et al., JCP 154, 1999).
+                        call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, b_IP=b_IP, &
+                                                       & lam_IP=lam_IP)
+                    #:endif
                 else
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
@@ -337,11 +487,40 @@ contains
                 end if
 
                 ! Set Energy
-                if (bubbles_euler) then
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
-                else
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
-                end if
+                #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                    if (jwl_idx > 0) then
+                        ! JWL ghost cell: rebuild energy through the JWL closure so near-body
+                        ! pressure and loads match the interior EOS, not the stiffened-gas relation.
+                        ! Reaction-progress ghost values take the image-point value (zero normal
+                        ! gradient at the wall), clamped like every other Y/lambda consumer; the
+                        ! reactive lambda also enters the energy inverse via the delta_e offset.
+                        if (jwl_afterburn) then
+                            b_IP = min(max(b_IP, 0._wp), 1._wp)
+                            q_cons_vf(eqn_idx%abn)%sf(j, k, l) = b_IP
+                            q_prim_vf(eqn_idx%abn)%sf(j, k, l) = b_IP
+                        end if
+                        Y_jwl = alpha_rho_IP(jwl_idx)/max(rho, sgm_eps)
+                        if (jwl_reactive) then
+                            lam_IP = min(max(lam_IP, 0._wp), 1._wp)
+                            q_cons_vf(eqn_idx%rxn)%sf(j, k, l) = lam_IP
+                            q_prim_vf(eqn_idx%rxn)%sf(j, k, l) = lam_IP
+                            call s_jwl_mix_energy_pr(rho, pres_IP, Y_jwl, jwl_idx, e_mix_jwl, lam_IP)
+                        else
+                            call s_jwl_mix_energy_pr(rho, pres_IP, Y_jwl, jwl_idx, e_mix_jwl)
+                        end if
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_mix_jwl + dyn_pres
+                    else if (bubbles_euler) then
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
+                    else
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
+                    end if
+                #:else
+                    if (bubbles_euler) then
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
+                    else
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
+                    end if
+                #:endif
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then
                     call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
@@ -742,7 +921,7 @@ contains
 
     !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
-                                         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                                         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP, b_IP, lam_IP)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -760,6 +939,7 @@ contains
         real(wp), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), optional, dimension(:), intent(inout) :: nmom_IP
         real(wp), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
+        real(wp), optional, intent(inout)               :: b_IP, lam_IP            !< JWL reaction-progress at the image point
         integer                                         :: i, j, k, l, q           !< Iterator variables
         integer                                         :: i1, i2, j1, j2, k1, k2  !< Iterator variables
         real(wp)                                        :: coeff
@@ -779,6 +959,11 @@ contains
         vel_IP = 0._wp
 
         if (surface_tension) c_IP = 0._wp
+
+        #:if not MFC_CASE_OPTIMIZATION or jwl_active
+            if (present(b_IP)) b_IP = 0._wp
+            if (present(lam_IP)) lam_IP = 0._wp
+        #:endif
 
         if (bubbles_euler) then
             r_IP = 0._wp
@@ -821,6 +1006,17 @@ contains
                     if (surface_tension) then
                         c_IP = c_IP + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
                     end if
+
+                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                        ! eqn_idx%abn/%rxn are only assigned under their model flags, so gate on
+                        ! the flag (not just presence) to keep the index access in bounds.
+                        if (present(b_IP)) then
+                            if (jwl_afterburn) b_IP = b_IP + coeff*q_prim_vf(eqn_idx%abn)%sf(i, j, k)
+                        end if
+                        if (present(lam_IP)) then
+                            if (jwl_reactive) lam_IP = lam_IP + coeff*q_prim_vf(eqn_idx%rxn)%sf(i, j, k)
+                        end if
+                    #:endif
 
                     if (bubbles_euler .and. .not. qbmm) then
                         $:GPU_LOOP(parallelism='[seq]')
@@ -869,6 +1065,17 @@ contains
 
         ! Clears the existing immersed boundary indices
         z_gp_layers = 0; if (p /= 0) z_gp_layers = gp_layers + 1
+
+        ! JWL only: snapshot markers before they are cleared/recomputed so
+        ! s_ibm_correct_state can find cells that just changed solid->fluid.
+        if (jwl_idx > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k]')
+            do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -z_gp_layers, p + z_gp_layers
+                ib_markers_prev%sf(i, j, k) = ib_markers%sf(i, j, k)
+            end do; end do; end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
         $:GPU_PARALLEL_LOOP(private='[i, j, k]')
         do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -z_gp_layers, p + z_gp_layers
             ib_markers%sf(i, j, k) = 0._wp
@@ -1511,6 +1718,9 @@ contains
         integer :: i
 
         @:DEALLOCATE(ib_markers%sf)
+        if (jwl_idx > 0) then
+            @:DEALLOCATE(ib_markers_prev%sf)
+        end if
         @:DEALLOCATE(ib_gbl_idx_lookup)
         do i = 1, num_ib_airfoils_max
             if (allocated(ib_airfoil_grids(i)%upper)) then
