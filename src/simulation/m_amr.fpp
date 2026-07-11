@@ -1662,29 +1662,43 @@ contains
     impure subroutine s_amr_reflux_to_parent(dt_reflux)
 
         real(wp), intent(in) :: dt_reflux
-        integer              :: pblk
-        real(wp)             :: dxf, dyf, dzf
+        integer              :: pblk, d, y
+        real(wp)             :: dxf, dyf, dzf, w_lo(3), w_hi(3)
 
         if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner refluxes locally
         pblk = f_amr_parent_block(amr_cur)
+        ! max_grid_size tiling of a level>=2 feature: a face shared with an ADJACENT sibling tile (same parent) is fine-fine, not a
+        ! c/f boundary - its "outside" parent cell is covered by the sibling's restrict, so refluxing there double-writes and leaks.
+        ! Skip those faces (weight 0); the fine-fine halo already matched the shared seam flux. No siblings -> all weights 1
+        ! (no-op).
+        w_lo = 1._wp; w_hi = 1._wp
+        do d = 1, num_dims
+            do y = 1, amr_num_blocks
+                if (y == amr_cur) cycle
+                if (f_amr_parent_block(y) /= pblk) cycle  ! same-parent sibling tile only (guarantees same level)
+                if (f_amr_seam(amr_cur, y, d)) w_hi(d) = 0._wp  ! sibling just above -> shared high face
+                if (f_amr_seam(y, amr_cur, d)) w_lo(d) = 0._wp  ! sibling just below -> shared low face
+            end do
+        end do
         ! uniform parent-fine cell widths (interior index; stretched-grid coords are future work). dy/dz only allocated when active.
         dxf = amr_slots(pblk)%dx(amr_isect_lo(1)); dyf = dxf; dzf = dxf
         if (n_glb > 0) dyf = amr_slots(pblk)%dy(amr_isect_lo(2))
         if (p_glb > 0) dzf = amr_slots(pblk)%dz(amr_isect_lo(3))
-        call s_amr_reflux_apply_parent(amr_slots(pblk)%q_cons, dxf, dyf, dzf, dt_reflux)
+        call s_amr_reflux_apply_parent(amr_slots(pblk)%q_cons, dxf, dyf, dzf, dt_reflux, w_lo, w_hi)
 
     end subroutine s_amr_reflux_to_parent
 
     !> Device kernel for s_amr_reflux_to_parent: the parent's q_cons and (uniform) fine cell widths are passed as arguments
     !! (present-table safe, like s_amr_restrict_overwrite_device). Reads creg/freg(:,:,:,amr_cur) and amr_isect_lo/hi (parent-fine
     !! footprint = parent's local fine indices, offset 0). Three face blocks mirror s_amr_apply_reflux; collapsed dims pin to 0.
-    impure subroutine s_amr_reflux_apply_parent(qp, dxf, dyf, dzf, dt_reflux)
+    impure subroutine s_amr_reflux_apply_parent(qp, dxf, dyf, dzf, dt_reflux, w_lo, w_hi)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: qp
-        real(wp), intent(in)                                   :: dxf, dyf, dzf, dt_reflux
-        integer                                                :: rr, eq, c1, c2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, islot
-        integer                                                :: il1, ih1, il2, ih2, il3, ih3, ol1, oh1, ol2, oh2, ol3, oh3
-        real(wp)                                               :: fblo, fbhi, mlo, mhi
+        real(wp), intent(in) :: dxf, dyf, dzf, dt_reflux
+        real(wp), dimension(3), intent(in) :: w_lo, w_hi  !< per-dim low/high face weights (0 skips a fine-fine seam)
+        integer :: rr, eq, c1, c2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, islot
+        integer :: il1, ih1, il2, ih2, il3, ih3, ol1, oh1, ol2, oh2, ol3, oh3
+        real(wp) :: fblo, fbhi, mlo, mhi, wl, wh
 
         rr = amr_slots(amr_cur)%ref_ratio; islot = amr_cur
         il1 = amr_isect_lo(1); ih1 = amr_isect_hi(1); ol1 = il1 - 1; oh1 = ih1 + 1
@@ -1694,7 +1708,7 @@ contains
         ! x-faces: transverse (y, z)
         nch = 1; if (n_glb > 0) nch = nch*rr; if (p_glb > 0) nch = nch*rr
         dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
-        mlo = dxf; mhi = dxf
+        mlo = dxf; mhi = dxf; wl = w_lo(1); wh = w_hi(1)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
         do eq = 1, sys_size
             do c2 = il3, ih3
@@ -1709,10 +1723,10 @@ contains
                         end do
                     end do
                     fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                    qp(eq)%sf(ol1, c1, c2) = qp(eq)%sf(ol1, c1, c2) + real(dt_reflux*(creg(1)%lo(eq, c1 - il2, c2 - il3, &
+                    qp(eq)%sf(ol1, c1, c2) = qp(eq)%sf(ol1, c1, c2) + real(wl*dt_reflux*(creg(1)%lo(eq, c1 - il2, c2 - il3, &
                        & islot) - fblo)/mlo, stp)
-                    qp(eq)%sf(oh1, c1, c2) = qp(eq)%sf(oh1, c1, c2) + real(dt_reflux*(fbhi - creg(1)%hi(eq, c1 - il2, c2 - il3, &
-                       & islot))/mhi, stp)
+                    qp(eq)%sf(oh1, c1, c2) = qp(eq)%sf(oh1, c1, c2) + real(wh*dt_reflux*(fbhi - creg(1)%hi(eq, c1 - il2, &
+                       & c2 - il3, islot))/mhi, stp)
                 end do
             end do
         end do
@@ -1722,7 +1736,7 @@ contains
         if (n_glb > 0) then
             nch = rr; if (p_glb > 0) nch = nch*rr
             dd2_hi = merge(rr - 1, 0, p_glb > 0)
-            mlo = dyf; mhi = dyf
+            mlo = dyf; mhi = dyf; wl = w_lo(2); wh = w_hi(2)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
                 do c2 = il3, ih3
@@ -1737,9 +1751,9 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        qp(eq)%sf(c1, ol2, c2) = qp(eq)%sf(c1, ol2, c2) + real(dt_reflux*(creg(2)%lo(eq, c1 - il1, c2 - il3, &
+                        qp(eq)%sf(c1, ol2, c2) = qp(eq)%sf(c1, ol2, c2) + real(wl*dt_reflux*(creg(2)%lo(eq, c1 - il1, c2 - il3, &
                            & islot) - fblo)/mlo, stp)
-                        qp(eq)%sf(c1, oh2, c2) = qp(eq)%sf(c1, oh2, c2) + real(dt_reflux*(fbhi - creg(2)%hi(eq, c1 - il1, &
+                        qp(eq)%sf(c1, oh2, c2) = qp(eq)%sf(c1, oh2, c2) + real(wh*dt_reflux*(fbhi - creg(2)%hi(eq, c1 - il1, &
                            & c2 - il3, islot))/mhi, stp)
                     end do
                 end do
@@ -1750,7 +1764,7 @@ contains
         ! z-faces (p_glb > 0): transverse (x, y); both active in 3D
         if (p_glb > 0) then
             nch = rr*rr
-            mlo = dzf; mhi = dzf
+            mlo = dzf; mhi = dzf; wl = w_lo(3); wh = w_hi(3)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
                 do c2 = il2, ih2
@@ -1765,9 +1779,9 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        qp(eq)%sf(c1, c2, ol3) = qp(eq)%sf(c1, c2, ol3) + real(dt_reflux*(creg(3)%lo(eq, c1 - il1, c2 - il2, &
+                        qp(eq)%sf(c1, c2, ol3) = qp(eq)%sf(c1, c2, ol3) + real(wl*dt_reflux*(creg(3)%lo(eq, c1 - il1, c2 - il2, &
                            & islot) - fblo)/mlo, stp)
-                        qp(eq)%sf(c1, c2, oh3) = qp(eq)%sf(c1, c2, oh3) + real(dt_reflux*(fbhi - creg(3)%hi(eq, c1 - il1, &
+                        qp(eq)%sf(c1, c2, oh3) = qp(eq)%sf(c1, c2, oh3) + real(wh*dt_reflux*(fbhi - creg(3)%hi(eq, c1 - il1, &
                            & c2 - il2, islot))/mhi, stp)
                     end do
                 end do
@@ -2863,7 +2877,7 @@ contains
     !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (incl. every np=1 case, untiled).
     impure subroutine s_amr_fine_fine_halo()
 
-        integer               :: xb, yb, d, rX, rY, i, cnt, xm(3), ym(3), tsz, ierr
+        integer               :: xb, yb, d, rX, rY, i, cnt, xm(3), ym(3), tsz, ierr, fmul
         real(wp), allocatable :: xbuf(:), ybuf(:)
 
         if (.not. amr) return
@@ -2890,14 +2904,18 @@ contains
                 if (d == 0) cycle
                 rX = amr_block_owner(xb); rY = amr_block_owner(yb)
                 if (proc_rank /= rX .and. proc_rank /= rY) cycle
-                ! fine extents from the REPLICATED region metadata (fine = 2*coarse-1), not amr_slots%m/n/p: at np>1 this rank
-                ! may own only one of the pair, and the transverse size (used for the buffer count) must be valid for both
-                xm(1) = 2*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
-                xm(2) = merge(2*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
-                xm(3) = merge(2*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
-                ym(1) = 2*(amr_region_hi_all(1, yb) - amr_region_lo_all(1, yb) + 1) - 1
-                ym(2) = merge(2*(amr_region_hi_all(2, yb) - amr_region_lo_all(2, yb) + 1) - 1, 0, n_glb > 0)
-                ym(3) = merge(2*(amr_region_hi_all(3, yb) - amr_region_lo_all(3, yb) + 1) - 1, 0, p_glb > 0)
+                ! fine extents from the REPLICATED region metadata (not amr_slots%m/n/p: at np>1 this rank may own only one of the
+                ! pair, and the transverse size (used for the buffer count) must be valid for both). A level-L block's region is in
+                ! L0-coarse cells but its own grid is 2**L finer (each level halves dx), so fine = 2**L*(coarse extent)-1; xb, yb
+                ! share the level (same-level seam). 2**1 keeps L1 byte-identical; L2 tiles need 2**2 (an L1-frame 2* mislocates the
+                ! seam slice to half the block, filling the seam ghost from the wrong cells - the source of the L2-L2 leak).
+                fmul = 2**amr_block_level(xb)
+                xm(1) = fmul*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
+                xm(2) = merge(fmul*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
+                xm(3) = merge(fmul*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
+                ym(1) = fmul*(amr_region_hi_all(1, yb) - amr_region_lo_all(1, yb) + 1) - 1
+                ym(2) = merge(fmul*(amr_region_hi_all(2, yb) - amr_region_lo_all(2, yb) + 1) - 1, 0, n_glb > 0)
+                ym(3) = merge(fmul*(amr_region_hi_all(3, yb) - amr_region_lo_all(3, yb) + 1) - 1, 0, p_glb > 0)
                 ! transverse fine size (dims /= d); xb and yb share it (exact-match seam)
                 tsz = 1
                 if (d /= 1) tsz = tsz*(xm(1) + 1)
@@ -3689,20 +3707,22 @@ contains
     !! whole-own), appending them to out(nt+1:). Tiles are ADJACENT (share fine seams) - the block-to-block fine-fine halo makes
     !! those seams conservative. Even split: ntl = ceil(ext/amr_maxc_fit) tiles, each of size ceil(ext/ntl) <= amr_maxc_fit. Sets
     !! capped=1 and stops if the amr_max_blocks cap is hit. Collapsed dims stay [0:0].
-    pure subroutine s_amr_tile_box(lo, hi, out, nt, cap, capped)
+    pure subroutine s_amr_tile_box(lo, hi, out, nt, cap, capped, tsz)
 
-        integer, intent(in)        :: lo(3), hi(3), cap
-        type(t_box), intent(inout) :: out(:)
-        integer, intent(inout)     :: nt, capped
-        integer                    :: ntl(3), s(3), t1, t2, t3, qlo(3), qhi(3)
+        integer, intent(in)           :: lo(3), hi(3), cap
+        type(t_box), intent(inout)    :: out(:)
+        integer, intent(inout)        :: nt, capped
+        integer, intent(in), optional :: tsz(3)  !< per-dim tile size (default amr_maxc_fit; level>=2 passes amr_maxc_fit/2)
+        integer                       :: ntl(3), s(3), t1, t2, t3, qlo(3), qhi(3), tc(3)
 
+        tc = amr_maxc_fit; if (present(tsz)) tc = tsz
         ntl = 1; s = 1
-        ntl(1) = (hi(1) - lo(1) + amr_maxc_fit(1))/amr_maxc_fit(1); s(1) = (hi(1) - lo(1) + ntl(1))/ntl(1)
+        ntl(1) = (hi(1) - lo(1) + tc(1))/tc(1); s(1) = (hi(1) - lo(1) + ntl(1))/ntl(1)
         if (n_glb > 0) then
-            ntl(2) = (hi(2) - lo(2) + amr_maxc_fit(2))/amr_maxc_fit(2); s(2) = (hi(2) - lo(2) + ntl(2))/ntl(2)
+            ntl(2) = (hi(2) - lo(2) + tc(2))/tc(2); s(2) = (hi(2) - lo(2) + ntl(2))/ntl(2)
         end if
         if (p_glb > 0) then
-            ntl(3) = (hi(3) - lo(3) + amr_maxc_fit(3))/amr_maxc_fit(3); s(3) = (hi(3) - lo(3) + ntl(3))/ntl(3)
+            ntl(3) = (hi(3) - lo(3) + tc(3))/tc(3); s(3) = (hi(3) - lo(3) + ntl(3))/ntl(3)
         end if
         do t3 = 0, ntl(3) - 1
             qlo(3) = 0; qhi(3) = 0
@@ -4127,14 +4147,35 @@ contains
                                         clo(3) = 0; chi(3) = 0
                                     end if
                                     ! slot cap: a level->=2 block's fine grid spans 4*(its L0 extent) cells while the slot holds
-                                    ! 2*amr_maxc_fit fine cells, so cap the child's L0 extent to amr_maxc_fit/2 - exactly the bound
-                                    ! the fixed inset (ins >= width/4) implicitly respected. A feature wider than that gets one
-                                    ! capped child rather than tiles (multi-level fine-fine tiling is future work).
-                                    chi(1) = min(chi(1), clo(1) + amr_maxc_fit(1)/2 - 1)
-                                    if (n_glb > 0) chi(2) = min(chi(2), clo(2) + amr_maxc_fit(2)/2 - 1)
-                                    if (p_glb > 0) chi(3) = min(chi(3), clo(3) + amr_maxc_fit(3)/2 - 1)
-                                    nboxes = nboxes + 1
-                                    boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                                    ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. In LOCK-STEP a
+                                    ! feature wider than that TILES into adjacent <= amr_maxc_fit/2 sub-blocks (like the L1 tiling):
+                                    ! the per-stage fine-fine halo (s_amr_fine_fine_halo, level-aware) matches the shared seam flux
+                                    ! and the L2->L1 reflux skips those fine-fine faces. SUBCYCLE advances level-2 children
+                                    ! per-block
+                                    ! (s_amr_advance_children) with no L2-L2 halo, so it keeps ONE capped child (adjacent tiles
+                                    ! would
+                                    ! leak at their seam there - transposing that path is future work); a wide feature is under-
+                                    ! refined rather than non-conservative.
+                                    if (amr_subcycle) then
+                                        chi(1) = min(chi(1), clo(1) + amr_maxc_fit(1)/2 - 1)
+                                        if (n_glb > 0) chi(2) = min(chi(2), clo(2) + amr_maxc_fit(2)/2 - 1)
+                                        if (p_glb > 0) chi(3) = min(chi(3), clo(3) + amr_maxc_fit(3)/2 - 1)
+                                        nboxes = nboxes + 1
+                                        boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                                    else
+                                        block
+                                            type(t_box) :: l2t(amr_max_blocks)
+                                            integer     :: nl2, cpd, it
+                                            nl2 = 0; cpd = 0
+                                            call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, amr_maxc_fit/2)
+                                            do it = 1, nl2
+                                                if (nboxes + 1 > amr_max_blocks) exit
+                                                nboxes = nboxes + 1
+                                                boxes(nboxes)%lo = l2t(it)%lo; boxes(nboxes)%hi = l2t(it)%hi
+                                                box_level(nboxes) = lev
+                                            end do
+                                        end block
+                                    end if
                                 end do
                                 if (allocated(cboxes)) deallocate (cboxes)
                             else

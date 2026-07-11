@@ -4063,6 +4063,39 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (p) multi-level + dynamic regrid at np=2 with a WIDE level-2 feature that max_grid_size TILES: (m) uses
+        # eps=0.1 so the sensor-on-fine L2 stays a single sub-block; this uses a tiny eps=1e-4 on three sharp jumps
+        # placed INSIDE the level-1 block, so at np=2 the L2 tag exceeds amr_maxc_fit/2 and SPLITS into adjacent
+        # same-parent L2 sub-blocks. The ONLY golden exercising the level-2 fine-fine SEAM: the per-stage halo must
+        # reconcile the shared L2 ghosts using the level-aware fine extent (fine = 2**level*coarse, so an L1-frame
+        # 2*coarse mislocates the L2 seam slice and fills the ghost from the wrong cells -> ~2e-2 mass drift), AND the
+        # L2->L1 reflux must SKIP the sibling-tile seam faces (a fine-fine seam is not a c/f boundary; refluxing there
+        # double-writes -> a residual ~3e-5). Closed walls (bc=-2) make it a clean conservation problem; eps=1e-4
+        # keeps every tagged cell far from the threshold so the tag set (hence the deterministic tile boundaries) is
+        # cross-compiler stable. LOCK-STEP (amr_subcycle=F): subcycle advances L2 children per-block with no L2-L2
+        # halo, so it keeps ONE capped child (tiling that path is future work) and is unaffected here.
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid tiled L2 np=2",
+            {
+                **amr_1d_base,
+                "bc_x%beg": -2,
+                "bc_x%end": -2,
+                "patch_icpp(1)%x_centroid": 0.15,
+                "patch_icpp(1)%length_x": 0.3,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.4,
+                "patch_icpp(3)%x_centroid": 0.85,
+                "patch_icpp(3)%length_x": 0.3,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 1.0e-4,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 16,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():
