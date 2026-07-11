@@ -403,7 +403,8 @@ contains
             jwl_air_gammas(i) = 0._wp
             jwl_air_pi_infs(i) = 0._wp
             jwl_ej_rho_refs(i) = fluid_pp(i)%jwl_ej_rho_ref
-            jwl_delta_es(i) = fluid_pp(i)%jwl_delta_e
+            jwl_delta_es(i) = 0._wp
+            if (.not. f_is_default(fluid_pp(i)%jwl_delta_e)) jwl_delta_es(i) = fluid_pp(i)%jwl_delta_e
             if (fluid_pp(i)%eos == eos_jwl) then
                 jwl_idx = i
                 n_jwl = n_jwl + 1
