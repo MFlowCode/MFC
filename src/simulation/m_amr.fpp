@@ -1308,7 +1308,7 @@ contains
                 if (qbmm .and. .not. polytropic) call s_amr_prolong_pbmv()
             end if
         end do
-        if (amr_max_level >= 2) call s_amr_test_multilevel(q_cons_base)
+        if (amr_max_level >= 2) call s_amr_build_static_multilevel(q_cons_base)
         call s_amr_select_slot(1)
 
     end subroutine s_populate_amr_fine
@@ -1317,15 +1317,16 @@ contains
     !! the parent (level-aware gather + prolong), and check that restrict(level-2 fine) recovers the parent-fine coarse it was
     !! prolonged from (conservation err ~ 0 => the level-aware geometry/gather/prolong/restrict are consistent). Non-intrusive: the
     !! level-2 block is removed afterward, so the run continues single-level. The recursive advance/regrid (increments 3-4) follow.
-    impure subroutine s_amr_test_multilevel(q_cons_base)
+    !> Build the STATIC multi-level hierarchy (amr_regrid_int = 0): nest exactly one level-2 block inside level-1 block 1 by a fixed
+    !! geometric inset (a regrid would place it by sensor-on-fine instead), prolong the parent state into it, and keep it persistent
+    !! so the advance driver steps it every timestep. The restrict/reflux identity that this construction relies on is protected by
+    !! the static multi-level goldens (75AD6885 et al.) and the runtime conservation-defect probe.
+    impure subroutine s_amr_build_static_multilevel(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-        integer :: L2, n1, i, ci, cj, ck, inset(3), bi
-        real(wp) :: err, e
-        type(scalar_field), dimension(:), allocatable :: scratch
-        real(stp), allocatable :: b1save(:,:,:,:)  !< full block-1 state, restored after the intrusive checks
+        integer                                                :: L2, n1, i, inset(3)
 
-        if (amr_max_level < 2) return  ! np>=2: the L2 is co-located with block 1 (owner-guarded intrusive checks below)
+        if (amr_max_level < 2) return  ! np>=2: the L2 is co-located with block 1
         n1 = amr_num_blocks
         if (n1 < 1) return
         ! the static hierarchy nests exactly one level-2 block; without pool room it would SILENTLY refine only to level 1
@@ -1356,115 +1357,15 @@ contains
             do i = 1, sys_size
                 $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
             end do
-            allocate (scratch(1:sys_size))
-            do i = 1, sys_size
-                allocate (scratch(i)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
-                call s_restrict_one_var(amr_slots(amr_cur)%q_cons(i), scratch(i))
-            end do
-            err = 0._wp
-            do i = 1, sys_size
-                do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
-                    do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
-                        do ci = amr_isect_lo(1), amr_isect_hi(1)
-                            e = abs(real(scratch(i)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), &
-                                    & wp) - real(amr_cg(i)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), &
-                                    & wp))
-                            if (e > err) err = e
-                        end do
-                    end do
-                end do
-                deallocate (scratch(i)%sf)
-            end do
-            deallocate (scratch)
-            print '(A,I0,A,ES12.4)', ' [amr] MULTILEVEL self-test (L2 block ', L2, '): restrict-prolong conservation err = ', err
-            ! GPU-safe non-intrusiveness: the intrusive checks below fold L2 into block 1 and perturb its outside cells on the
-            ! DEVICE. Save block 1's full state now and restore it afterwards so the persistent parent enters the advance clean -
-            ! partial per-cell restores left the device copy inconsistent (a GPU-only NaN by step 3, invisible on CPU).
-            allocate (b1save(lbound(amr_slots(1)%q_cons(1)%sf, 1):ubound(amr_slots(1)%q_cons(1)%sf, 1), &
-                      & lbound(amr_slots(1)%q_cons(1)%sf, 2):ubound(amr_slots(1)%q_cons(1)%sf, 2), &
-                      & lbound(amr_slots(1)%q_cons(1)%sf, 3):ubound(amr_slots(1)%q_cons(1)%sf, 3),1:sys_size))
-            do bi = 1, sys_size
-                $:GPU_UPDATE(host='[amr_slots(1)%q_cons(bi)%sf]')
-                b1save(:,:,:,bi) = amr_slots(1)%q_cons(bi)%sf
-            end do
-            ! restrict-to-parent (increment 3 step 1): fold L2 back into the parent block; the covered cells must be UNCHANGED
-            ! (restrict(prolong) = identity), which exercises s_amr_restrict_to_parent via s_restrict_fine_to_coarse.
-            block
-                real(wp)               :: err2, e2
-                real(stp), allocatable :: psave(:,:,:,:)
-                allocate (psave(amr_isect_lo(1):amr_isect_hi(1),amr_isect_lo(2):amr_isect_hi(2),amr_isect_lo(3):amr_isect_hi(3), &
-                          & 1:sys_size))
-                do i = 1, sys_size
-                    psave(:,:,:,i) = amr_slots(1)%q_cons(i)%sf(amr_isect_lo(1):amr_isect_hi(1),amr_isect_lo(2):amr_isect_hi(2), &
-                          & amr_isect_lo(3):amr_isect_hi(3))
-                end do
-                call s_restrict_fine_to_coarse(amr_slots(1)%q_cons)  ! coarse_tgt ignored for level>=2 (folds into the parent)
-                err2 = 0._wp
-                do i = 1, sys_size
-                    do ck = amr_isect_lo(3), amr_isect_hi(3)
-                        do cj = amr_isect_lo(2), amr_isect_hi(2)
-                            do ci = amr_isect_lo(1), amr_isect_hi(1)
-                                e2 = abs(real(psave(ci, cj, ck, i), wp) - real(amr_slots(1)%q_cons(i)%sf(ci, cj, ck), wp))
-                                if (e2 > err2) err2 = e2
-                            end do
-                        end do
-                    end do
-                end do
-                deallocate (psave)
-                print '(A,ES12.4)', ' [amr] MULTILEVEL self-test: restrict-to-parent identity err     = ', err2
-            end block
-            ! reflux-to-parent (increment 3 step 2): inject a known C/F flux mismatch into this block's x-face registers and confirm
-            ! the Berger-Colella correction deposits exactly (F_coarse - Fbar_fine)/dxf into the parent's outside cells (reflux is
-            ! conservative - the flux crossing the c/f boundary is redeposited, not lost). 1D self-test drives the x-faces; the
-            ! 2D/3D faces run in the advance driver. Perturbation is restored below so the self-test stays non-intrusive.
-            ! The expected-deposit check is x-face (1D) math; skip it in 2D/3D (the transverse faces make the single-cell
-            ! expectation invalid) - 2D/3D reflux conservation is exercised by the advance driver and its closed-system drift.
-            if (n_glb == 0) then
-                block
-                    integer                :: e, ol, oh
-                    real(wp)               :: dxf, errr, expl, exph, al, ah
-                    real(stp), allocatable :: ql0(:), qh0(:)
-                    dxf = amr_slots(1)%dx(amr_isect_lo(1)); ol = amr_isect_lo(1) - 1; oh = amr_isect_hi(1) + 1
-                    allocate (ql0(sys_size), qh0(sys_size))
-                    do e = 1, sys_size
-                        $:GPU_UPDATE(host='[amr_slots(1)%q_cons(e)%sf]')
-                        ql0(e) = amr_slots(1)%q_cons(e)%sf(ol, 0, 0); qh0(e) = amr_slots(1)%q_cons(e)%sf(oh, 0, 0)
-                        creg(1)%lo(e,:,:,L2) = 0.11_wp*e; creg(1)%hi(e,:,:,L2) = 0.07_wp*e
-                        freg(1)%lo(e,:,:,L2) = 0.03_wp*e; freg(1)%hi(e,:,:,L2) = 0.05_wp*e
-                    end do
-                    $:GPU_UPDATE(device='[creg(1)%lo(:, :, :, L2), creg(1)%hi(:, :, :, L2), freg(1)%lo(:, :, :, L2), &
-                                 & freg(1)%hi(:, :, :, L2)]')
-                    call s_amr_reflux_to_parent(1._wp)
-                    errr = 0._wp
-                    do e = 1, sys_size
-                        $:GPU_UPDATE(host='[amr_slots(1)%q_cons(e)%sf]')
-                        al = real(amr_slots(1)%q_cons(e)%sf(ol, 0, 0), wp) - real(ql0(e), wp)
-                        ah = real(amr_slots(1)%q_cons(e)%sf(oh, 0, 0), wp) - real(qh0(e), wp)
-                        expl = (0.11_wp*e - 0.03_wp*e)/dxf; exph = (0.05_wp*e - 0.07_wp*e)/dxf
-                        errr = max(errr, abs(al - expl), abs(ah - exph))
-                    end do
-                    deallocate (ql0, qh0)
-                    print '(A,ES12.4)', ' [amr] MULTILEVEL self-test: reflux-to-parent conservation err = ', errr
-                end block
-            end if
-            ! restore block 1's full state (buffer -> host -> device): undoes every intrusive-check write so the persistent
-            ! parent enters the advance exactly as s_populate_amr_fine left it (device-clean).
-            do bi = 1, sys_size
-                amr_slots(1)%q_cons(bi)%sf = b1save(:,:,:,bi)
-                $:GPU_UPDATE(device='[amr_slots(1)%q_cons(bi)%sf]')
-            end do
-            deallocate (b1save)
         end if
-        ! persistent L2 block (increment 3 step 3): KEEP the level-2 block in the active set (amr_num_blocks = L2, amr_num_levels =
-        ! 2,
-        ! level 2) so the advance driver can step it across timesteps. The self-test perturbations above are restored, so the block
-        ! holds its clean prolonged state. amr_num_blocks stays = L2 (set above); no free/revert.
+        ! persistent L2 block: KEEP the level-2 block in the active set (amr_num_blocks = L2, amr_num_levels = 2) so the advance
+        ! driver steps it across timesteps. amr_num_blocks stays = L2 (set above); no free/revert.
         ! restore amr_cg + the patch frame (amr_cpat_off) to block 1: the L2 gather above overwrote them with the parent-fine
         ! frame, and the normal single-block conservation check that follows reads block 1's frame.
         call s_amr_select_slot(1)
         call s_amr_gather_coarse_patch(q_cons_base, .false.)
 
-    end subroutine s_amr_test_multilevel
+    end subroutine s_amr_build_static_multilevel
 
     !> Volume-weighted restriction for a single variable pair. Reads from qf (fine, must include interior 0:amr_slots(amr_cur)%m
     !! etc.); writes to qc (coarse, over the block).
