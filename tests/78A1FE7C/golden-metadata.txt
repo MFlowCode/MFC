@@ -1,10 +1,10 @@
-This file was created on 2026-07-10 20:10:54.814754.
+This file was created on 2026-07-10 21:59:26.563363.
 
 mfc.sh:
 
-    Invocation: test --generate --only 78A1FE7C --gpu mp --no-build -j 1
-    Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        7ac0a881b1af1b49f24515a6b387d1c83a1c6c7b on up/mega (dirty)
+    Invocation: test --generate --only 6ABA55B2 01A16919 78A1FE7C --no-gpu --no-build -j 2
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        416e414836f4dac0f790ed22f24bedba4ddbc2bb on up/mega (dirty)
 
 simulation:
 
@@ -24,7 +24,7 @@ simulation:
     
         MPI     : ON
         OpenACC : OFF
-        OpenMP  : ON
+        OpenMP  : OFF
     
         Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/MFC-amr/build/venv/bin/fypp
         Doxygen : 
@@ -33,77 +33,9 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
-        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.30.5 on login10
-    
-        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
-        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : ON
-    
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/MFC-amr/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
-        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.30.5 on login10
-    
-        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
-        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : ON
-    
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/MFC-amr/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
-        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -126,7 +58,7 @@ syscheck:
     
         MPI     : ON
         OpenACC : OFF
-        OpenMP  : ON
+        OpenMP  : OFF
     
         Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/MFC-amr/build/venv/bin/fypp
         Doxygen : 
@@ -135,9 +67,43 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
-        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.5 on login10
+    
+        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/MFC-amr/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
