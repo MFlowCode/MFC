@@ -47,10 +47,13 @@ contains
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(3) :: alpha_L, alpha_R
+            real(wp), dimension(3) :: alpha_lim_L, alpha_lim_R
             real(wp), dimension(3) :: vel_L, vel_R
         #:else
             real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(num_fluids) :: alpha_L, alpha_R
+            !> Post-limiter volume fractions (alpha_L/R retain the pre-limiter loads used downstream)
+            real(wp), dimension(num_fluids) :: alpha_lim_L, alpha_lim_R
             real(wp), dimension(num_dims)   :: vel_L, vel_R
         #:endif
 
@@ -118,10 +121,9 @@ contains
         real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(wp) :: flux_ene_e
         real(wp) :: zcoef, pcorr                !< low Mach number correction
-        integer  :: Re_max, i, j, k, l, q       !< Generic loop iterators
-        integer  :: Re_size_loc1, Re_size_loc2  !< host copy of Re_size; amdflang reads the declare-target original stale cross-TU
-        logical  :: face_smooth                 !< per-face smooth/discontinuous flag
-        real(wp) :: FL, FR, UL, UR, lam         !< cheap-flux temporaries
+        integer  :: i, j, k, l, q               !< Generic loop iterators
+        integer  :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
+        logical  :: face_smooth                 !< hybrid Riemann: use central/Rusanov flux at a WENO-smooth face
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -130,6 +132,7 @@ contains
         ! Reshaping inputted data based on dimensional splitting direction
 
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+
         Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
 
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
@@ -142,17 +145,17 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC HLLC star-state flux with contact wave speed s_S
                 if (model_eqns == model_eqns_6eq) then
                     ! 6-equation model (model_eqns=3): separate phasic internal energies
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, Ys_L, &
-                                        & Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, &
-                                        & h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, xi_field_R, pcorr, zcoef, rho_L, &
-                                        & rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, &
-                                        & T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, &
-                                        & Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, &
-                                        & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
-                                        & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
-                                        & alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, &
-                                        & xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, face_smooth, FL, FR, UL, UR, &
-                                        & lam]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[face_smooth, i, j, k, l, vel_L, vel_R, Re_L, Re_R, alpha_L, &
+                                        & alpha_R, alpha_rho_L, alpha_rho_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, &
+                                        & Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, &
+                                        & xi_field_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, &
+                                        & Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, &
+                                        & Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, &
+                                        & qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, &
+                                        & vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, &
+                                        & alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, &
+                                        & s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP]', &
+                                        & firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -215,68 +218,24 @@ contains
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    rho_L = rho_L + qL_prim_rsx_vf(${SF('')}$, i)
-                                    gamma_L = gamma_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*pi_infs(i)
-                                    qv_L = qv_L + qL_prim_rsx_vf(${SF('')}$, i)*qvs(i)
-
-                                    rho_R = rho_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                    gamma_R = gamma_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*pi_infs(i)
-                                    qv_R = qv_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)*qvs(i)
-
+                                    alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                    alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                                     alpha_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%adv%beg + i - 1)
                                     alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%adv%beg + i - 1)
                                 end do
 
+                                call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, &
+                                                                     & qv_L)
+                                call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, &
+                                                                     & qv_R)
+
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_L(i) = dflt_real
-                                        Re_R(i) = dflt_real
-                                        if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_L(i) = 0._wp
-                                        if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_R(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
-                                            Re_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                            Re_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + Re_idx(i, q))/Res_gs(i, &
-                                                 & q) + Re_R(i)
-                                        end do
-                                        Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                        Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                    end do
+                                    call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
+                                    call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                                 end if
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
-
-                                ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
-                                if (hypoelasticity) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
-                                        tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    end do
-                                    G_L = 0._wp; G_R = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                        G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                    end do
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        ! Elastic contribution to energy if G large enough
-                                        if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            end if
-                                        end if
-                                    end do
-                                end if
 
                                 ! Hyperelastic stress contribution: strain energy added to total energy
                                 if (hyperelasticity) then
@@ -332,298 +291,219 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
+                                ! COMPUTING THE DIRECT WAVE SPEEDS
+                                if (wave_speeds == wave_speeds_direct) then
+                                    if (elasticity) then
+                                        ! Elastic wave speed, Rodriguez et al. JCP (2019)
+                                        s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
+                                                  & ))/rho_L), &
+                                                  & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
+                                                  & + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                        s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1) &
+                                                  & ))/rho_R), &
+                                                  & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) &
+                                                  & + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                        s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
+                                               & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
+                                               & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &
+                                               & - vel_R(dir_idx(1))))
+                                    else
+                                        s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
+                                        s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
+                                        s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
+                                               & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L &
+                                               & - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))))
+                                    end if
+                                else if (wave_speeds == wave_speeds_pressure) then
+                                    pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
+
+                                    pres_SR = pres_SL
+
+                                    ! Low Mach correction: Thornber et al. JCP (2008)
+                                    Ms_L = max(1._wp, &
+                                               & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
+                                               & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                    Ms_R = max(1._wp, &
+                                               & sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))*(pres_SR/pres_R - 1._wp) &
+                                               & *pres_R/((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+
+                                    s_L = vel_L(dir_idx(1)) - c_L*Ms_L
+                                    s_R = vel_R(dir_idx(1)) + c_R*Ms_R
+
+                                    s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + (pres_L - pres_R)/(rho_avg*c_avg))
+                                end if
+
+                                ! follows Einfeldt et al. s_M/P = min/max(0.,s_L/R)
+                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+
+                                ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
+                                xi_L_m1 = (s_S - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R_m1 = (s_S - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
+
+                                ! goes with numerical star velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
+                                xi_M = (5.e-1_wp + sign(0.5_wp, s_S))
+                                xi_P = (5.e-1_wp - sign(0.5_wp, s_S))
+
+                                ! goes with the numerical velocity in x/y/z directions xi_P/M (pressure) = min/max(0. sgn(1,sL/sR))
+                                xi_MP = -min(0._wp, sign(1._wp, s_L))
+                                xi_PP = max(0._wp, sign(1._wp, s_R))
+
+                                E_star = xi_M*(E_L + xi_MP*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L &
+                                               & - vel_L(dir_idx(1))))) - E_L)) + xi_P*(E_R + xi_PP*(xi_R*(E_R + (s_S &
+                                               & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R))
+                                p_Star = xi_M*(pres_L + xi_MP*(rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))))) &
+                                               & + xi_P*(pres_R + xi_PP*(rho_R*(s_R - vel_R(dir_idx(1)))*(s_S - vel_R(dir_idx(1)))))
+
+                                rho_Star = xi_M*(rho_L*(xi_MP*xi_L + 1._wp - xi_MP)) + xi_P*(rho_R*(xi_PP*xi_R + 1._wp - xi_PP))
+
+                                vel_K_Star = vel_L(dir_idx(1))*(1._wp - xi_MP) + xi_MP*vel_R(dir_idx(1)) + xi_MP*xi_PP*(s_S &
+                                                   & - vel_R(dir_idx(1)))
+
+                                ! Low Mach correction
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0._wp
+                                end if
+
+                                ! COMPUTING FLUXES MASS FLUX.
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, eqn_idx%cont%end
+                                    flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                end do
+
+                                ! MOMENTUM FLUX. f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    flux_rsx_vf(${SF('')}$, &
+                                                & eqn_idx%cont%end + dir_idx(i)) = rho_Star*vel_K_Star*(dir_flg(dir_idx(i)) &
+                                                & *vel_K_Star + (1._wp - dir_flg(dir_idx(i)))*(xi_M*vel_L(dir_idx(i)) &
+                                                & + xi_P*vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star + (s_M/s_L)*(s_P/s_R) &
+                                                & *dir_flg(dir_idx(i))*pcorr
+                                end do
+
+                                ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
+                                flux_rsx_vf(${SF('')}$, eqn_idx%E) = (E_star + p_Star)*vel_K_Star + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
+
+                                ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
+                                if (elasticity) then
+                                    flux_ene_e = 0._wp
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_dims
+                                        ! MOMENTUM ELASTIC FLUX.
+                                        flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(i)) = flux_rsx_vf(${SF('')}$, &
+                                                    & eqn_idx%cont%end + dir_idx(i)) - xi_M*tau_e_L(dir_idx_tau(i)) &
+                                                    & - xi_P*tau_e_R(dir_idx_tau(i))
+                                        ! ENERGY ELASTIC FLUX.
+                                        flux_ene_e = flux_ene_e - xi_M*(vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) &
+                                                                        & + s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i)) &
+                                                                        & /(s_L - vel_L(i)))))) - xi_P*(vel_R(dir_idx(i)) &
+                                                                        & *tau_e_R(dir_idx_tau(i)) + s_P*(xi_R*((s_S - vel_R(i)) &
+                                                                        & *(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
+                                    end do
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%E) = flux_rsx_vf(${SF('')}$, eqn_idx%E) + flux_ene_e
+                                end if
+
+                                ! VOLUME FRACTION FLUX.
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                    flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & i)*s_S + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, i)*s_S
+                                end do
+
+                                ! Advection velocity source: interface velocity for volume fraction transport
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    vel_src_rsx_vf(${SF('')}$, &
+                                                   & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) &
+                                                   & *(s_S*(xi_MP*xi_L_m1 + 1) - vel_L(dir_idx(i)))) + xi_P*(vel_R(dir_idx(i)) &
+                                                   & + dir_flg(dir_idx(i))*(s_S*(xi_PP*xi_R_m1 + 1) - vel_R(dir_idx(i))))
+                                end do
+
+                                ! INTERNAL ENERGIES ADVECTION FLUX. K-th pressure and velocity in preparation for the internal
+                                ! energy flux
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1._wp + gammas(i)))*xi_L**(1._wp/gammas(i) &
+                                                     & + 1._wp) - pi_infs(i)/(1._wp + gammas(i)) - pres_L) + pres_L) &
+                                                     & + xi_P*(xi_PP*((pres_R + pi_infs(i)/(1._wp + gammas(i))) &
+                                                     & *xi_R**(1._wp/gammas(i) + 1._wp) - pi_infs(i)/(1._wp + gammas(i)) - pres_R) &
+                                                     & + pres_R)
+
+                                    flux_rsx_vf(${SF('')}$, i + eqn_idx%int_en%beg - 1) = ((xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & i + eqn_idx%adv%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & i + eqn_idx%adv%beg - 1))*(gammas(i)*p_K_Star + pi_infs(i)) &
+                                                & + (xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & i + eqn_idx%cont%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & i + eqn_idx%cont%beg - 1))*qvs(i))*vel_K_Star + (s_M/s_L)*(s_P/s_R) &
+                                                & *pcorr*s_S*(xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & i + eqn_idx%adv%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & i + eqn_idx%adv%beg - 1))
+                                end do
+
+                                flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
+
+                                ! Hyperelastic reference map flux for material deformation tracking
+                                if (hyperelasticity) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_dims
+                                        flux_rsx_vf(${SF('')}$, &
+                                                    & eqn_idx%xi%beg - 1 + i) = xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) &
+                                                    & - rho_L*vel_L(dir_idx(1))*xi_field_L(i)) + xi_P*(s_S/(s_R - s_S)) &
+                                                    & *(s_R*rho_R*xi_field_R(i) - rho_R*vel_R(dir_idx(1))*xi_field_R(i))
+                                    end do
+                                end if
+
+                                ! COLOR FUNCTION FLUX
+                                if (surface_tension) then
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%c) = (xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & eqn_idx%c) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%c))*s_S
+                                end if
+
+                                ! Geometrical source flux for cylindrical coordinates
+                                #:if (NORM_DIR == 2)
+                                    if (cyl_coord) then
+                                        ! Substituting the advective flux into the inviscid geometrical source flux
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, eqn_idx%E
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        end do
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        end do
+                                        ! Recalculating the radial momentum geometric source flux
+                                        flux_gsrc_rsx_vf(${SF('')}$, &
+                                                         & eqn_idx%mom%beg - 1 + dir_idx(1)) = flux_gsrc_rsx_vf(${SF('')}$, &
+                                                         & eqn_idx%mom%beg - 1 + dir_idx(1)) - p_Star
+                                        ! Geometrical source of the void fraction(s) is zero
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                        end do
+                                    end if
+                                #:endif
+                                #:if (NORM_DIR == 3)
+                                    if (grid_geometry == 3) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, sys_size
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                        end do
+                                        flux_gsrc_rsx_vf(${SF('')}$, &
+                                                         & eqn_idx%mom%beg - 1 + dir_idx(1)) = flux_gsrc_rsx_vf(${SF('')}$, &
+                                                         & eqn_idx%mom%beg - 1 + dir_idx(1)) - p_Star
+
+                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
+                                    end if
+                                #:endif
                                 if (hybrid_riemann) then
                                     face_smooth = .not. (weno_full(${SF('')}$) .or. weno_full(${SF(' + 1')}$))
-                                else
-                                    face_smooth = .false.
-                                end if
-                                if (face_smooth) then
-                                    lam = max(abs(vel_L(dir_idx(1))) + c_L, abs(vel_R(dir_idx(1))) + c_R)
-                                    ! continuity
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%cont%end
-                                        FL = qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
-                                        FR = qR_prim_rsx_vf(${SF(' + 1')}$, i)*vel_R(dir_idx(1))
-                                        UL = qL_prim_rsx_vf(${SF('')}$, i)
-                                        UR = qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                        flux_rsx_vf(${SF('')}$, i) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
-                                                    & wp)*0.5_wp*lam*(UR - UL)
-                                    end do
-                                    ! momentum
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        FL = rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
-                                        FR = rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
-                                        UL = rho_L*vel_L(dir_idx(i))
-                                        UR = rho_R*vel_R(dir_idx(i))
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%cont%end + dir_idx(i)) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux &
-                                                    & - 1, wp)*0.5_wp*lam*(UR - UL)
-                                    end do
-                                    ! energy
-                                    FL = vel_L(dir_idx(1))*(E_L + pres_L)
-                                    FR = vel_R(dir_idx(1))*(E_R + pres_R)
-                                    flux_rsx_vf(${SF('')}$, eqn_idx%E) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
-                                                & wp)*0.5_wp*lam*(E_R - E_L)
-                                    ! volume fractions (advection)
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        FL = qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
-                                        FR = qR_prim_rsx_vf(${SF(' + 1')}$, i)*vel_R(dir_idx(1))
-                                        UL = qL_prim_rsx_vf(${SF('')}$, i)
-                                        UR = qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                        flux_rsx_vf(${SF('')}$, i) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
-                                                    & wp)*0.5_wp*lam*(UR - UL)
-                                    end do
-                                    ! internal energies (6eq)
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        UL = qL_prim_rsx_vf(${SF('')}$, &
-                                                            & i + eqn_idx%adv%beg - 1)*(gammas(i)*pres_L + pi_infs(i)) &
-                                                            & + qL_prim_rsx_vf(${SF('')}$, i + eqn_idx%cont%beg - 1)*qvs(i)
-                                        UR = qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                            & i + eqn_idx%adv%beg - 1)*(gammas(i)*pres_R + pi_infs(i)) &
-                                                            & + qR_prim_rsx_vf(${SF(' + 1')}$, i + eqn_idx%cont%beg - 1)*qvs(i)
-                                        FL = UL*vel_L(dir_idx(1))
-                                        FR = UR*vel_R(dir_idx(1))
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & i + eqn_idx%int_en%beg - 1) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux &
-                                                    & - 1, wp)*0.5_wp*lam*(UR - UL)
-                                    end do
-                                    ! non-conservative source terms (central)
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        vel_src_rsx_vf(${SF('')}$, dir_idx(i)) = 0.5_wp*(vel_L(dir_idx(i)) + vel_R(dir_idx(i)))
-                                    end do
-                                    flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
-                                else
-                                    ! COMPUTING THE DIRECT WAVE SPEEDS
-                                    if (wave_speeds == wave_speeds_direct) then
-                                        if (elasticity) then
-                                            ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                            s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) &
-                                                      & + tau_e_L(dir_idx_tau(1)))/rho_L), &
-                                                      & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
-                                                      & + tau_e_R(dir_idx_tau(1)))/rho_R))
-                                            s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
-                                                      & + tau_e_R(dir_idx_tau(1)))/rho_R), &
-                                                      & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) &
-                                                      & + tau_e_L(dir_idx_tau(1)))/rho_L))
-                                            s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
-                                                   & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
-                                                   & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &
-                                                   & - vel_R(dir_idx(1))))
-                                        else
-                                            s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                            s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
-                                            s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
-                                                   & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L &
-                                                   & - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))))
-                                        end if
-                                    else if (wave_speeds == wave_speeds_pressure) then
-                                        pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
-
-                                        pres_SR = pres_SL
-
-                                        ! Low Mach correction: Thornber et al. JCP (2008)
-                                        Ms_L = max(1._wp, &
-                                                   & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L &
-                                                   & - 1._wp)*pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                        Ms_R = max(1._wp, &
-                                                   & sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))*(pres_SR/pres_R &
-                                                   & - 1._wp)*pres_R/((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-
-                                        s_L = vel_L(dir_idx(1)) - c_L*Ms_L
-                                        s_R = vel_R(dir_idx(1)) + c_R*Ms_R
-
-                                        s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + (pres_L - pres_R)/(rho_avg*c_avg))
-                                    end if
-
-                                    ! follows Einfeldt et al. s_M/P = min/max(0.,s_L/R)
-                                    s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
-
-                                    ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                    xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
-                                    xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
-                                    xi_L_m1 = (s_S - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
-                                    xi_R_m1 = (s_S - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
-
-                                    ! goes with numerical star velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                    xi_M = (5.e-1_wp + sign(0.5_wp, s_S))
-                                    xi_P = (5.e-1_wp - sign(0.5_wp, s_S))
-
-                                    ! goes with the numerical velocity in x/y/z directions xi_P/M (pressure) = min/max(0.
-                                    ! sgn(1,sL/sR))
-                                    xi_MP = -min(0._wp, sign(1._wp, s_L))
-                                    xi_PP = max(0._wp, sign(1._wp, s_R))
-
-                                    E_star = xi_M*(E_L + xi_MP*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L &
-                                                   & - vel_L(dir_idx(1))))) - E_L)) + xi_P*(E_R + xi_PP*(xi_R*(E_R + (s_S &
-                                                   & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1))))) - E_R))
-                                    p_Star = xi_M*(pres_L + xi_MP*(rho_L*(s_L - vel_L(dir_idx(1)))*(s_S - vel_L(dir_idx(1))))) &
-                                                   & + xi_P*(pres_R + xi_PP*(rho_R*(s_R - vel_R(dir_idx(1)))*(s_S &
-                                                   & - vel_R(dir_idx(1)))))
-
-                                    rho_Star = xi_M*(rho_L*(xi_MP*xi_L + 1._wp - xi_MP)) + xi_P*(rho_R*(xi_PP*xi_R + 1._wp - xi_PP))
-
-                                    vel_K_Star = vel_L(dir_idx(1))*(1._wp - xi_MP) + xi_MP*vel_R(dir_idx(1)) + xi_MP*xi_PP*(s_S &
-                                                       & - vel_R(dir_idx(1)))
-
-                                    ! Low Mach correction
-                                    if (low_Mach == 1) then
-                                        @:compute_low_Mach_correction()
-                                    else
-                                        pcorr = 0._wp
-                                    end if
-
-                                    ! COMPUTING FLUXES MASS FLUX.
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%cont%end
-                                        flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                    & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
-                                    end do
-
-                                    ! MOMENTUM FLUX. f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w)
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%cont%end + dir_idx(i)) = rho_Star*vel_K_Star*(dir_flg(dir_idx(i)) &
-                                                    & *vel_K_Star + (1._wp - dir_flg(dir_idx(i)))*(xi_M*vel_L(dir_idx(i)) &
-                                                    & + xi_P*vel_R(dir_idx(i)))) + dir_flg(dir_idx(i))*p_Star + (s_M/s_L) &
-                                                    & *(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
-                                    end do
-
-                                    ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%E) = (E_star + p_Star)*vel_K_Star + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
-
-                                    ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
-                                    if (elasticity) then
-                                        flux_ene_e = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, num_dims
-                                            ! MOMENTUM ELASTIC FLUX.
-                                            flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(i)) = flux_rsx_vf(${SF('')}$, &
-                                                        & eqn_idx%cont%end + dir_idx(i)) - xi_M*tau_e_L(dir_idx_tau(i)) &
-                                                        & - xi_P*tau_e_R(dir_idx_tau(i))
-                                            ! ENERGY ELASTIC FLUX.
-                                            flux_ene_e = flux_ene_e - xi_M*(vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) &
-                                                                            & + s_M*(xi_L*((s_S - vel_L(i)) &
-                                                                            & *(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) &
-                                                                            & - xi_P*(vel_R(dir_idx(i))*tau_e_R(dir_idx_tau(i)) &
-                                                                            & + s_P*(xi_R*((s_S - vel_R(i)) &
-                                                                            & *(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
-                                        end do
-                                        flux_rsx_vf(${SF('')}$, eqn_idx%E) = flux_rsx_vf(${SF('')}$, eqn_idx%E) + flux_ene_e
-                                    end if
-
-                                    ! VOLUME FRACTION FLUX.
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & i)*s_S + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, i)*s_S
-                                    end do
-
-                                    ! Advection velocity source: interface velocity for volume fraction transport
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        vel_src_rsx_vf(${SF('')}$, &
-                                                       & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) &
-                                                       & *(s_S*(xi_MP*xi_L_m1 + 1) - vel_L(dir_idx(i)))) + xi_P*(vel_R(dir_idx(i)) &
-                                                       & + dir_flg(dir_idx(i))*(s_S*(xi_PP*xi_R_m1 + 1) - vel_R(dir_idx(i))))
-                                    end do
-
-                                    ! INTERNAL ENERGIES ADVECTION FLUX. K-th pressure and velocity in preparation for the internal
-                                    ! energy flux
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1._wp + gammas(i)))*xi_L**(1._wp/gammas(i) &
-                                                         & + 1._wp) - pi_infs(i)/(1._wp + gammas(i)) - pres_L) + pres_L) &
-                                                         & + xi_P*(xi_PP*((pres_R + pi_infs(i)/(1._wp + gammas(i))) &
-                                                         & *xi_R**(1._wp/gammas(i) + 1._wp) - pi_infs(i)/(1._wp + gammas(i)) &
-                                                         & - pres_R) + pres_R)
-
-                                        flux_rsx_vf(${SF('')}$, i + eqn_idx%int_en%beg - 1) = ((xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & i + eqn_idx%adv%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                    & i + eqn_idx%adv%beg - 1))*(gammas(i)*p_K_Star + pi_infs(i)) &
-                                                    & + (xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & i + eqn_idx%cont%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                    & i + eqn_idx%cont%beg - 1))*qvs(i))*vel_K_Star + (s_M/s_L)*(s_P/s_R) &
-                                                    & *pcorr*s_S*(xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & i + eqn_idx%adv%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                    & i + eqn_idx%adv%beg - 1))
-                                    end do
-
-                                    flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
-
-                                    ! HYPOELASTIC STRESS EVOLUTION FLUX.
-                                    if (hypoelasticity) then
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                            flux_rsx_vf(${SF('')}$, &
-                                                        & eqn_idx%stress%beg - 1 + i) = xi_M*(s_S/(s_L - s_S)) &
-                                                        & *(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(dir_idx(1))*tau_e_L(i)) &
-                                                        & + xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(dir_idx(1)) &
-                                                        & *tau_e_R(i))
-                                        end do
-                                    end if
-
-                                    ! Hyperelastic reference map flux for material deformation tracking
-                                    if (hyperelasticity) then
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, num_dims
-                                            flux_rsx_vf(${SF('')}$, &
-                                                        & eqn_idx%xi%beg - 1 + i) = xi_M*(s_S/(s_L - s_S)) &
-                                                        & *(s_L*rho_L*xi_field_L(i) - rho_L*vel_L(dir_idx(1))*xi_field_L(i)) &
-                                                        & + xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) &
-                                                        & - rho_R*vel_R(dir_idx(1))*xi_field_R(i))
-                                        end do
-                                    end if
-
-                                    ! COLOR FUNCTION FLUX
-                                    if (surface_tension) then
-                                        flux_rsx_vf(${SF('')}$, eqn_idx%c) = (xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%c) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%c))*s_S
-                                    end if
-
-                                    ! Geometrical source flux for cylindrical coordinates
-                                    #:if (NORM_DIR == 2)
-                                        if (cyl_coord) then
-                                            ! Substituting the advective flux into the inviscid geometrical source flux
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = 1, eqn_idx%E
-                                                flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
-                                            end do
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
-                                                flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
-                                            end do
-                                            ! Recalculating the radial momentum geometric source flux
-                                            flux_gsrc_rsx_vf(${SF('')}$, &
-                                                             & eqn_idx%mom%beg - 1 + dir_idx(1)) = flux_gsrc_rsx_vf(${SF('')}$, &
-                                                             & eqn_idx%mom%beg - 1 + dir_idx(1)) - p_Star
-                                            ! Geometrical source of the void fraction(s) is zero
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                                flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
-                                            end do
-                                        end if
-                                    #:endif
-                                    #:if (NORM_DIR == 3)
-                                        if (grid_geometry == 3) then
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = 1, sys_size
-                                                flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
-                                            end do
-                                            flux_gsrc_rsx_vf(${SF('')}$, &
-                                                             & eqn_idx%mom%beg - 1 + dir_idx(1)) = flux_gsrc_rsx_vf(${SF('')}$, &
-                                                             & eqn_idx%mom%beg - 1 + dir_idx(1)) - p_Star
-
-                                            flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, &
-                                                             & eqn_idx%mom%beg + 1)
-                                        end if
-                                    #:endif
+                                    if (face_smooth) call s_compute_hybrid_smooth_flux(${SF('')}$, alpha_rho_L, alpha_L, &
+                                        & alpha_rho_R, alpha_R, vel_L, vel_R, c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R)
                                 end if
                             end do
                         end do
@@ -674,18 +554,10 @@ contains
                                     alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
                                 end do
 
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    rho_L = rho_L + alpha_rho_L(i)
-                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-                                    qv_L = qv_L + alpha_rho_L(i)*qvs(i)
-
-                                    rho_R = rho_R + alpha_rho_R(i)
-                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                    qv_R = qv_R + alpha_rho_R(i)*qvs(i)
-                                end do
+                                call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, &
+                                                                     & qv_L)
+                                call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, &
+                                                                     & qv_R)
 
                                 pres_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
                                 pres_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
@@ -818,12 +690,10 @@ contains
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
                                         flux_gsrc_rsx_vf(${SF('')}$, &
-                                                         & eqn_idx%cont%end + dir_idx(1)) = xi_M*(rho_L*(vel_L(dir_idx(1)) &
-                                                         & *vel_L(dir_idx(1)) + s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + (1._wp &
-                                                         & - dir_flg(dir_idx(1)))*vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                                         & + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(1)) &
-                                                         & + s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + (1._wp - dir_flg(dir_idx(1))) &
-                                                         & *vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                                         & eqn_idx%cont%end + dir_idx(1)) &
+                                                         & = f_compute_hllc_star_momentum_flux(rho_L, rho_R, vel_L(dir_idx(1)), &
+                                                         & vel_R(dir_idx(1)), s_M, s_P, s_S, xi_L, xi_R, xi_M, xi_P, &
+                                                         & dir_flg(dir_idx(1)))
                                         ! Geometrical source of the void fraction(s) is zero
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
@@ -838,12 +708,9 @@ contains
                                             flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
                                         end do
                                         flux_gsrc_rsx_vf(${SF('')}$, &
-                                                         & eqn_idx%mom%beg + 1) = -xi_M*(rho_L*(vel_L(dir_idx(1))*vel_L(dir_idx(1) &
-                                                         & ) + s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + (1._wp - dir_flg(dir_idx(1))) &
-                                                         & *vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                                         & - xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(1)) &
-                                                         & + s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + (1._wp - dir_flg(dir_idx(1))) &
-                                                         & *vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                                         & eqn_idx%mom%beg + 1) = -f_compute_hllc_star_momentum_flux(rho_L, &
+                                                         & rho_R, vel_L(dir_idx(1)), vel_R(dir_idx(1)), s_M, s_P, s_S, xi_L, &
+                                                         & xi_R, xi_M, xi_P, dir_flg(dir_idx(1)))
                                         flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
                                     end if
                                 #:endif
@@ -854,13 +721,14 @@ contains
                 else if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
                     ! 5-equation model with Euler-Euler bubble dynamics
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, &
-                                        & vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, Re_L, Re_R, pcorr, zcoef, rho_L, &
-                                        & rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, &
-                                        & qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, &
-                                        & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, &
-                                        & xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, &
-                                        & R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, &
-                                        & Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & vel_R, rho_avg, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, h_avg, gamma_avg, Re_L, &
+                                        & Re_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, gamma_L, gamma_R, &
+                                        & pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, vel_R_rms, &
+                                        & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
+                                        & alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, &
+                                        & xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar, Ys_L, &
+                                        & Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, &
+                                        & h_avg_2]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -872,6 +740,8 @@ contains
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
+                                    alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                    alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                                     alpha_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
                                     alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
                                 end do
@@ -888,29 +758,15 @@ contains
 
                                 ! Retain this in the refactor
                                 if (mpp_lim .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        rho_L = rho_L + qL_prim_rsx_vf(${SF('')}$, i)
-                                        gamma_L = gamma_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*pi_infs(i)
-                                        qv_L = qv_L + qL_prim_rsx_vf(${SF('')}$, i)*qvs(i)
-                                        rho_R = rho_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                        gamma_R = gamma_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*pi_infs(i)
-                                        qv_R = qv_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)*qvs(i)
-                                    end do
+                                    call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_L, rho_L, gamma_L, &
+                                                                         & pi_inf_L, qv_L)
+                                    call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, &
+                                                                         & pi_inf_R, qv_R)
                                 else if (num_fluids > 2) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids - 1
-                                        rho_L = rho_L + qL_prim_rsx_vf(${SF('')}$, i)
-                                        gamma_L = gamma_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*gammas(i)
-                                        pi_inf_L = pi_inf_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*pi_infs(i)
-                                        qv_L = qv_L + qL_prim_rsx_vf(${SF('')}$, i)*qvs(i)
-                                        rho_R = rho_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                        gamma_R = gamma_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*gammas(i)
-                                        pi_inf_R = pi_inf_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*pi_infs(i)
-                                        qv_R = qv_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)*qvs(i)
-                                    end do
+                                    call s_accumulate_mixture_properties(num_fluids - 1, alpha_rho_L, alpha_L, rho_L, gamma_L, &
+                                                                         & pi_inf_L, qv_L)
+                                    call s_accumulate_mixture_properties(num_fluids - 1, alpha_rho_R, alpha_R, rho_R, gamma_R, &
+                                                                         & pi_inf_R, qv_R)
                                 else
                                     rho_L = qL_prim_rsx_vf(${SF('')}$, 1)
                                     gamma_L = gammas(1)
@@ -1213,12 +1069,10 @@ contains
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
                                         flux_gsrc_rsx_vf(${SF('')}$, &
-                                                         & eqn_idx%cont%end + dir_idx(1)) = xi_M*(rho_L*(vel_L(dir_idx(1)) &
-                                                         & *vel_L(dir_idx(1)) + s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + (1._wp &
-                                                         & - dir_flg(dir_idx(1)))*vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                                         & + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(1)) &
-                                                         & + s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + (1._wp - dir_flg(dir_idx(1))) &
-                                                         & *vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                                         & eqn_idx%cont%end + dir_idx(1)) &
+                                                         & = f_compute_hllc_star_momentum_flux(rho_L, rho_R, vel_L(dir_idx(1)), &
+                                                         & vel_R(dir_idx(1)), s_M, s_P, s_S, xi_L, xi_R, xi_M, xi_P, &
+                                                         & dir_flg(dir_idx(1)))
                                         ! Geometrical source of the void fraction(s) is zero
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
@@ -1234,12 +1088,9 @@ contains
                                         end do
 
                                         flux_gsrc_rsx_vf(${SF('')}$, &
-                                                         & eqn_idx%mom%beg + 1) = -xi_M*(rho_L*(vel_L(dir_idx(1))*vel_L(dir_idx(1) &
-                                                         & ) + s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + (1._wp - dir_flg(dir_idx(1))) &
-                                                         & *vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                                         & - xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(1)) &
-                                                         & + s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + (1._wp - dir_flg(dir_idx(1))) &
-                                                         & *vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                                         & eqn_idx%mom%beg + 1) = -f_compute_hllc_star_momentum_flux(rho_L, &
+                                                         & rho_R, vel_L(dir_idx(1)), vel_R(dir_idx(1)), s_M, s_P, s_S, xi_L, &
+                                                         & xi_R, xi_M, xi_P, dir_flg(dir_idx(1)))
                                         flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
                                     end if
                                 #:endif
@@ -1249,16 +1100,16 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 else
                     ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, &
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[face_smooth, i, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, &
                                         & rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, &
                                         & alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, &
                                         & Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, &
                                         & s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, &
-                                        & vel_R, Re_L, Re_R, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, &
-                                        & vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, &
-                                        & tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, &
-                                        & G_R, c_sum_Yi_Phi, flux_ene_e, face_smooth, FL, FR, UL, UR, lam]', copyin='[is1, is2, &
-                                        & is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, &
+                                        & alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, &
+                                        & Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, &
+                                        & xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]', &
+                                        & firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -1309,38 +1160,24 @@ contains
                                     end do
                                 end if
 
+                                ! Post-limiter loads for the mixture properties; alpha_L/R keep the pre-limiter loads used
+                                ! downstream
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    rho_L = rho_L + qL_prim_rsx_vf(${SF('')}$, i)
-                                    gamma_L = gamma_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*pi_infs(i)
-                                    qv_L = qv_L + qL_prim_rsx_vf(${SF('')}$, i)*qvs(i)
-
-                                    rho_R = rho_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                    gamma_R = gamma_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*pi_infs(i)
-                                    qv_R = qv_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)*qvs(i)
+                                    alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                    alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                    alpha_lim_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
+                                    alpha_lim_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
                                 end do
 
-                                Re_max = 0
-                                if (Re_size_loc1 > 0) Re_max = 1
-                                if (Re_size_loc2 > 0) Re_max = 2
+                                call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_lim_L, rho_L, gamma_L, &
+                                                                     & pi_inf_L, qv_L)
+                                call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_lim_R, rho_R, gamma_R, &
+                                                                     & pi_inf_R, qv_R)
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, Re_max
-                                        Re_L(i) = 0._wp
-                                        Re_R(i) = 0._wp
-
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
-                                            Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                            Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                                        end do
-
-                                        Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                        Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                    end do
+                                    call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
+                                    call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                                 end if
 
                                 if (chemistry) then
@@ -1397,35 +1234,6 @@ contains
 
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
-                                end if
-
-                                ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
-                                if (hypoelasticity) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
-                                        tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    end do
-                                    G_L = 0._wp
-                                    G_R = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                        G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                    end do
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        ! Elastic contribution to energy if G large enough
-                                        if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            end if
-                                        end if
-                                    end do
                                 end if
 
                                 ! Hyperelastic stress contribution: strain energy added to total energy
@@ -1486,273 +1294,205 @@ contains
                                     @:compute_low_Mach_correction()
                                 end if
 
+                                if (wave_speeds == wave_speeds_direct) then
+                                    if (elasticity) then
+                                        ! Elastic wave speed, Rodriguez et al. JCP (2019)
+                                        s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1) &
+                                                  & ))/rho_L), &
+                                                  & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
+                                                  & + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                        s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1) &
+                                                  & ))/rho_R), &
+                                                  & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) &
+                                                  & + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                        s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
+                                               & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
+                                               & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &
+                                               & - vel_R(dir_idx(1))))
+                                    else
+                                        s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
+                                        s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
+                                        s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
+                                               & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L &
+                                               & - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))))
+                                    end if
+                                else if (wave_speeds == wave_speeds_pressure) then
+                                    pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
+
+                                    pres_SR = pres_SL
+
+                                    ! Low Mach correction: Thornber et al. JCP (2008)
+                                    Ms_L = max(1._wp, &
+                                               & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
+                                               & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                    Ms_R = max(1._wp, &
+                                               & sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))*(pres_SR/pres_R - 1._wp) &
+                                               & *pres_R/((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+
+                                    s_L = vel_L(dir_idx(1)) - c_L*Ms_L
+                                    s_R = vel_R(dir_idx(1)) + c_R*Ms_R
+
+                                    s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + (pres_L - pres_R)/(rho_avg*c_avg))
+                                end if
+
+                                ! follows Einfeldt et al. s_M/P = min/max(0.,s_L/R)
+                                s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
+
+                                ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
+                                xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
+                                ! xi_L/R - 1 = (s_S - u_L/R)/(s_L/R - s_star): avoids cancellation when xi \approx 1
+                                xi_L_m1 = (s_S - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
+                                xi_R_m1 = (s_S - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
+
+                                ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
+                                xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
+                                xi_P = (5.e-1_wp - sign(5.e-1_wp, s_S))
+
+                                ! Low Mach correction
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
+                                else
+                                    pcorr = 0._wp
+                                end if
+
+                                ! COMPUTING THE HLLC FLUXES MASS FLUX.
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, eqn_idx%cont%end
+                                    flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                end do
+
+                                ! MOMENTUM FLUX. f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w) identity:
+                                ! xi*(dir_flg*s_S+(1-dir_flg)*u_i)-u_i = (dir_flg*s_L/R+(1-dir_flg)*u_i)*xi_m1
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    flux_rsx_vf(${SF('')}$, &
+                                                & eqn_idx%cont%end + dir_idx(i)) = xi_M*(rho_L*(vel_L(dir_idx(1))*vel_L(dir_idx(i) &
+                                                & ) + s_M*(dir_flg(dir_idx(i))*s_L + (1._wp - dir_flg(dir_idx(i))) &
+                                                & *vel_L(dir_idx(i)))*xi_L_m1) + dir_flg(dir_idx(i))*(pres_L)) &
+                                                & + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(i)) + s_P*(dir_flg(dir_idx(i)) &
+                                                & *s_R + (1._wp - dir_flg(dir_idx(i)))*vel_R(dir_idx(i)))*xi_R_m1) &
+                                                & + dir_flg(dir_idx(i))*(pres_R)) + (s_M/s_L)*(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
+                                end do
+
+                                ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
+                                ! xi*(E+expr)-E = E*xi_m1 + xi*expr avoids E*(xi-1) cancellation
+                                flux_rsx_vf(${SF('')}$, &
+                                            & eqn_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(E_L*xi_L_m1 + xi_L*(s_S &
+                                            & - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1)))))) &
+                                            & + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(E_R*xi_R_m1 + xi_R*(s_S &
+                                            & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))) + (s_M/s_L) &
+                                            & *(s_P/s_R)*pcorr*s_S
+
+                                ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
+                                if (elasticity) then
+                                    flux_ene_e = 0._wp
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_dims
+                                        ! MOMENTUM ELASTIC FLUX.
+                                        flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(i)) = flux_rsx_vf(${SF('')}$, &
+                                                    & eqn_idx%cont%end + dir_idx(i)) - xi_M*tau_e_L(dir_idx_tau(i)) &
+                                                    & - xi_P*tau_e_R(dir_idx_tau(i))
+                                        ! ENERGY ELASTIC FLUX.
+                                        flux_ene_e = flux_ene_e - xi_M*(vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) &
+                                                                        & + s_M*(xi_L*((s_S - vel_L(i))*(tau_e_L(dir_idx_tau(i)) &
+                                                                        & /(s_L - vel_L(i)))))) - xi_P*(vel_R(dir_idx(i)) &
+                                                                        & *tau_e_R(dir_idx_tau(i)) + s_P*(xi_R*((s_S - vel_R(i)) &
+                                                                        & *(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
+                                    end do
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%E) = flux_rsx_vf(${SF('')}$, eqn_idx%E) + flux_ene_e
+                                end if
+
+                                ! VOLUME FRACTION FLUX.
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                    flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                end do
+
+                                ! VOLUME FRACTION SOURCE FLUX.
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    vel_src_rsx_vf(${SF('')}$, &
+                                                   & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*s_M*xi_L_m1) &
+                                                   & + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*s_P*xi_R_m1)
+                                end do
+
+                                ! COLOR FUNCTION FLUX
+                                if (surface_tension) then
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%c) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & eqn_idx%c)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
+                                                & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%c)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                end if
+
+                                ! Hyperelastic reference map flux for material deformation tracking
+                                if (hyperelasticity) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_dims
+                                        flux_rsx_vf(${SF('')}$, &
+                                                    & eqn_idx%xi%beg - 1 + i) = xi_M*(s_S/(s_L - s_S))*(s_L*rho_L*xi_field_L(i) &
+                                                    & - rho_L*vel_L(dir_idx(1))*xi_field_L(i)) + xi_P*(s_S/(s_R - s_S)) &
+                                                    & *(s_R*rho_R*xi_field_R(i) - rho_R*vel_R(dir_idx(1))*xi_field_R(i))
+                                    end do
+                                end if
+
+                                flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
+
+                                if (chemistry) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = eqn_idx%species%beg, eqn_idx%species%end
+                                        Y_L = qL_prim_rsx_vf(${SF('')}$, i)
+                                        Y_R = qR_prim_rsx_vf(${SF(' + 1')}$, i)
+
+                                        flux_rsx_vf(${SF('')}$, &
+                                                    & i) = xi_M*rho_L*Y_L*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
+                                                    & + xi_P*rho_R*Y_R*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                        flux_src_rsx_vf(${SF('')}$, i) = 0.0_wp
+                                    end do
+                                end if
+
+                                ! Geometrical source flux for cylindrical coordinates
+                                #:if (NORM_DIR == 2)
+                                    if (cyl_coord) then
+                                        ! Substituting the advective flux into the inviscid geometrical source flux
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, eqn_idx%E
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        end do
+                                        ! Recalculating the radial momentum geometric source flux
+                                        flux_gsrc_rsx_vf(${SF('')}$, &
+                                                         & eqn_idx%cont%end + dir_idx(1)) &
+                                                         & = f_compute_hllc_star_momentum_flux(rho_L, rho_R, vel_L(dir_idx(1)), &
+                                                         & vel_R(dir_idx(1)), s_M, s_P, s_S, xi_L, xi_R, xi_M, xi_P, &
+                                                         & dir_flg(dir_idx(1)))
+                                        ! Geometrical source of the void fraction(s) is zero
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                        end do
+                                    end if
+                                #:endif
+                                #:if (NORM_DIR == 3)
+                                    if (grid_geometry == 3) then
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, sys_size
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                        end do
+
+                                        flux_gsrc_rsx_vf(${SF('')}$, &
+                                                         & eqn_idx%mom%beg + 1) = -f_compute_hllc_star_momentum_flux(rho_L, &
+                                                         & rho_R, vel_L(dir_idx(1)), vel_R(dir_idx(1)), s_M, s_P, s_S, xi_L, &
+                                                         & xi_R, xi_M, xi_P, dir_flg(dir_idx(1)))
+                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
+                                    end if
+                                #:endif
                                 if (hybrid_riemann) then
                                     face_smooth = .not. (weno_full(${SF('')}$) .or. weno_full(${SF(' + 1')}$))
-                                else
-                                    face_smooth = .false.
-                                end if
-                                if (face_smooth) then
-                                    lam = max(abs(vel_L(dir_idx(1))) + c_L, abs(vel_R(dir_idx(1))) + c_R)
-                                    ! continuity
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%cont%end
-                                        FL = qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
-                                        FR = qR_prim_rsx_vf(${SF(' + 1')}$, i)*vel_R(dir_idx(1))
-                                        UL = qL_prim_rsx_vf(${SF('')}$, i)
-                                        UR = qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                        flux_rsx_vf(${SF('')}$, i) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
-                                                    & wp)*0.5_wp*lam*(UR - UL)
-                                    end do
-                                    ! momentum
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        FL = rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
-                                        FR = rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
-                                        UL = rho_L*vel_L(dir_idx(i))
-                                        UR = rho_R*vel_R(dir_idx(i))
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%cont%end + dir_idx(i)) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux &
-                                                    & - 1, wp)*0.5_wp*lam*(UR - UL)
-                                    end do
-                                    ! energy
-                                    FL = vel_L(dir_idx(1))*(E_L + pres_L)
-                                    FR = vel_R(dir_idx(1))*(E_R + pres_R)
-                                    flux_rsx_vf(${SF('')}$, eqn_idx%E) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
-                                                & wp)*0.5_wp*lam*(E_R - E_L)
-                                    ! volume fractions (advection)
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        FL = qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
-                                        FR = qR_prim_rsx_vf(${SF(' + 1')}$, i)*vel_R(dir_idx(1))
-                                        UL = qL_prim_rsx_vf(${SF('')}$, i)
-                                        UR = qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                        flux_rsx_vf(${SF('')}$, i) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
-                                                    & wp)*0.5_wp*lam*(UR - UL)
-                                    end do
-                                    ! non-conservative source terms (central)
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        vel_src_rsx_vf(${SF('')}$, dir_idx(i)) = 0.5_wp*(vel_L(dir_idx(i)) + vel_R(dir_idx(i)))
-                                    end do
-                                    flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
-                                else
-                                    if (wave_speeds == wave_speeds_direct) then
-                                        if (elasticity) then
-                                            ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                            s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) &
-                                                      & + tau_e_L(dir_idx_tau(1)))/rho_L), &
-                                                      & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
-                                                      & + tau_e_R(dir_idx_tau(1)))/rho_R))
-                                            s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) &
-                                                      & + tau_e_R(dir_idx_tau(1)))/rho_R), &
-                                                      & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) &
-                                                      & + tau_e_L(dir_idx_tau(1)))/rho_L))
-                                            s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
-                                                   & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
-                                                   & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &
-                                                   & - vel_R(dir_idx(1))))
-                                        else
-                                            s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                            s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
-                                            s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) &
-                                                   & - rho_R*vel_R(dir_idx(1))*(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L &
-                                                   & - vel_L(dir_idx(1))) - rho_R*(s_R - vel_R(dir_idx(1))))
-                                        end if
-                                    else if (wave_speeds == wave_speeds_pressure) then
-                                        pres_SL = 5.e-1_wp*(pres_L + pres_R + rho_avg*c_avg*(vel_L(dir_idx(1)) - vel_R(dir_idx(1))))
-
-                                        pres_SR = pres_SL
-
-                                        ! Low Mach correction: Thornber et al. JCP (2008)
-                                        Ms_L = max(1._wp, &
-                                                   & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L &
-                                                   & - 1._wp)*pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
-                                        Ms_R = max(1._wp, &
-                                                   & sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))*(pres_SR/pres_R &
-                                                   & - 1._wp)*pres_R/((pres_R + pi_inf_R/(1._wp + gamma_R)))))
-
-                                        s_L = vel_L(dir_idx(1)) - c_L*Ms_L
-                                        s_R = vel_R(dir_idx(1)) + c_R*Ms_R
-
-                                        s_S = 5.e-1_wp*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + (pres_L - pres_R)/(rho_avg*c_avg))
-                                    end if
-
-                                    ! follows Einfeldt et al. s_M/P = min/max(0.,s_L/R)
-                                    s_M = min(0._wp, s_L); s_P = max(0._wp, s_R)
-
-                                    ! goes with q_star_L/R = xi_L/R * (variable) xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                    xi_L = (s_L - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
-                                    xi_R = (s_R - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
-                                    ! xi_L/R - 1 = (s_S - u_L/R)/(s_L/R - s_star): avoids cancellation when xi \approx 1
-                                    xi_L_m1 = (s_S - vel_L(dir_idx(1)))/min(s_L - s_S, -sgm_eps)
-                                    xi_R_m1 = (s_S - vel_R(dir_idx(1)))/max(s_R - s_S, sgm_eps)
-
-                                    ! goes with numerical velocity in x/y/z directions xi_P/M = 0.5 +/m sgn(0.5,s_star)
-                                    xi_M = (5.e-1_wp + sign(5.e-1_wp, s_S))
-                                    xi_P = (5.e-1_wp - sign(5.e-1_wp, s_S))
-
-                                    ! Low Mach correction
-                                    if (low_Mach == 1) then
-                                        @:compute_low_Mach_correction()
-                                    else
-                                        pcorr = 0._wp
-                                    end if
-
-                                    ! COMPUTING THE HLLC FLUXES MASS FLUX.
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%cont%end
-                                        flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                    & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
-                                    end do
-
-                                    ! MOMENTUM FLUX. f = \rho u u - \sigma, q = \rho u, q_star = \xi * \rho*(s_star, v, w) identity:
-                                    ! xi*(dir_flg*s_S+(1-dir_flg)*u_i)-u_i = (dir_flg*s_L/R+(1-dir_flg)*u_i)*xi_m1
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%cont%end + dir_idx(i)) = xi_M*(rho_L*(vel_L(dir_idx(1)) &
-                                                    & *vel_L(dir_idx(i)) + s_M*(dir_flg(dir_idx(i))*s_L + (1._wp &
-                                                    & - dir_flg(dir_idx(i)))*vel_L(dir_idx(i)))*xi_L_m1) + dir_flg(dir_idx(i)) &
-                                                    & *(pres_L)) + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(i)) &
-                                                    & + s_P*(dir_flg(dir_idx(i))*s_R + (1._wp - dir_flg(dir_idx(i))) &
-                                                    & *vel_R(dir_idx(i)))*xi_R_m1) + dir_flg(dir_idx(i))*(pres_R)) + (s_M/s_L) &
-                                                    & *(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
-                                    end do
-
-                                    ! ENERGY FLUX. f = u*(E-\sigma), q = E, q_star = \xi*E+(s-u)(\rho s_star - \sigma/(s-u))
-                                    ! xi*(E+expr)-E = E*xi_m1 + xi*expr avoids E*(xi-1) cancellation
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%E) = xi_M*(vel_L(dir_idx(1))*(E_L + pres_L) + s_M*(E_L*xi_L_m1 &
-                                                & + xi_L*(s_S - vel_L(dir_idx(1)))*(rho_L*s_S + pres_L/(s_L - vel_L(dir_idx(1))))) &
-                                                & ) + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R) + s_P*(E_R*xi_R_m1 + xi_R*(s_S &
-                                                & - vel_R(dir_idx(1)))*(rho_R*s_S + pres_R/(s_R - vel_R(dir_idx(1)))))) &
-                                                & + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
-
-                                    ! ELASTICITY. Elastic shear stress additions for the momentum and energy flux
-                                    if (elasticity) then
-                                        flux_ene_e = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, num_dims
-                                            ! MOMENTUM ELASTIC FLUX.
-                                            flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(i)) = flux_rsx_vf(${SF('')}$, &
-                                                        & eqn_idx%cont%end + dir_idx(i)) - xi_M*tau_e_L(dir_idx_tau(i)) &
-                                                        & - xi_P*tau_e_R(dir_idx_tau(i))
-                                            ! ENERGY ELASTIC FLUX.
-                                            flux_ene_e = flux_ene_e - xi_M*(vel_L(dir_idx(i))*tau_e_L(dir_idx_tau(i)) &
-                                                                            & + s_M*(xi_L*((s_S - vel_L(i)) &
-                                                                            & *(tau_e_L(dir_idx_tau(i))/(s_L - vel_L(i)))))) &
-                                                                            & - xi_P*(vel_R(dir_idx(i))*tau_e_R(dir_idx_tau(i)) &
-                                                                            & + s_P*(xi_R*((s_S - vel_R(i)) &
-                                                                            & *(tau_e_R(dir_idx_tau(i))/(s_R - vel_R(i))))))
-                                        end do
-                                        flux_rsx_vf(${SF('')}$, eqn_idx%E) = flux_rsx_vf(${SF('')}$, eqn_idx%E) + flux_ene_e
-                                    end if
-
-                                    ! HYPOELASTIC STRESS EVOLUTION FLUX.
-                                    if (hypoelasticity) then
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                            flux_rsx_vf(${SF('')}$, &
-                                                        & eqn_idx%stress%beg - 1 + i) = xi_M*(s_S/(s_L - s_S)) &
-                                                        & *(s_L*rho_L*tau_e_L(i) - rho_L*vel_L(dir_idx(1))*tau_e_L(i)) &
-                                                        & + xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*tau_e_R(i) - rho_R*vel_R(dir_idx(1)) &
-                                                        & *tau_e_R(i))
-                                        end do
-                                    end if
-
-                                    ! VOLUME FRACTION FLUX.
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        flux_rsx_vf(${SF('')}$, i) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & i)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                    & i)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
-                                    end do
-
-                                    ! VOLUME FRACTION SOURCE FLUX.
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        vel_src_rsx_vf(${SF('')}$, &
-                                                       & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*s_M*xi_L_m1) &
-                                                       & + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*s_P*xi_R_m1)
-                                    end do
-
-                                    ! COLOR FUNCTION FLUX
-                                    if (surface_tension) then
-                                        flux_rsx_vf(${SF('')}$, eqn_idx%c) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%c)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
-                                                    & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                    & eqn_idx%c)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
-                                    end if
-
-                                    ! Hyperelastic reference map flux for material deformation tracking
-                                    if (hyperelasticity) then
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, num_dims
-                                            flux_rsx_vf(${SF('')}$, &
-                                                        & eqn_idx%xi%beg - 1 + i) = xi_M*(s_S/(s_L - s_S)) &
-                                                        & *(s_L*rho_L*xi_field_L(i) - rho_L*vel_L(dir_idx(1))*xi_field_L(i)) &
-                                                        & + xi_P*(s_S/(s_R - s_S))*(s_R*rho_R*xi_field_R(i) &
-                                                        & - rho_R*vel_R(dir_idx(1))*xi_field_R(i))
-                                        end do
-                                    end if
-
-                                    flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
-
-                                    if (chemistry) then
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = eqn_idx%species%beg, eqn_idx%species%end
-                                            Y_L = qL_prim_rsx_vf(${SF('')}$, i)
-                                            Y_R = qR_prim_rsx_vf(${SF(' + 1')}$, i)
-
-                                            flux_rsx_vf(${SF('')}$, &
-                                                        & i) = xi_M*rho_L*Y_L*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
-                                                        & + xi_P*rho_R*Y_R*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
-                                            flux_src_rsx_vf(${SF('')}$, i) = 0.0_wp
-                                        end do
-                                    end if
-
-                                    ! Geometrical source flux for cylindrical coordinates
-                                    #:if (NORM_DIR == 2)
-                                        if (cyl_coord) then
-                                            ! Substituting the advective flux into the inviscid geometrical source flux
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = 1, eqn_idx%E
-                                                flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
-                                            end do
-                                            ! Recalculating the radial momentum geometric source flux
-                                            flux_gsrc_rsx_vf(${SF('')}$, &
-                                                             & eqn_idx%cont%end + dir_idx(1)) = xi_M*(rho_L*(vel_L(dir_idx(1)) &
-                                                             & *vel_L(dir_idx(1)) + s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + (1._wp &
-                                                             & - dir_flg(dir_idx(1)))*vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                                             & + xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(1)) &
-                                                             & + s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + (1._wp - dir_flg(dir_idx(1)) &
-                                                             & )*vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
-                                            ! Geometrical source of the void fraction(s) is zero
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                                flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
-                                            end do
-                                        end if
-                                    #:endif
-                                    #:if (NORM_DIR == 3)
-                                        if (grid_geometry == 3) then
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = 1, sys_size
-                                                flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
-                                            end do
-
-                                            flux_gsrc_rsx_vf(${SF('')}$, &
-                                                             & eqn_idx%mom%beg + 1) = -xi_M*(rho_L*(vel_L(dir_idx(1)) &
-                                                             & *vel_L(dir_idx(1)) + s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + (1._wp &
-                                                             & - dir_flg(dir_idx(1)))*vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                                             & - xi_P*(rho_R*(vel_R(dir_idx(1))*vel_R(dir_idx(1)) &
-                                                             & + s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + (1._wp - dir_flg(dir_idx(1)) &
-                                                             & )*vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
-                                            flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, &
-                                                             & eqn_idx%mom%beg + 1)
-                                        end if
-                                    #:endif
+                                    if (face_smooth) call s_compute_hybrid_smooth_flux(${SF('')}$, alpha_rho_L, alpha_L, &
+                                        & alpha_rho_R, alpha_R, vel_L, vel_R, c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R)
                                 end if
                             end do
                         end do

@@ -19,6 +19,7 @@ module m_riemann_solver_hll
         & get_mixture_energy_mass, get_species_specific_heats_r, get_species_enthalpies_rt, get_mixture_specific_heat_cp_mass, &
         & molecular_weights
     use m_riemann_state
+    use m_weno, only: weno_full
 
     implicit none
 
@@ -74,6 +75,7 @@ contains
         real(wp) :: c_L, c_R
         real(wp), dimension(6) :: tau_e_L, tau_e_R
         real(wp) :: G_L, G_R
+        real(wp) :: damage_L, damage_R
         real(wp), dimension(2) :: Re_L, Re_R
         real(wp), dimension(3) :: xi_field_L, xi_field_R
         real(wp) :: rho_avg
@@ -95,8 +97,9 @@ contains
         type(riemann_states) :: vdotB, B2
         type(riemann_states_vec3) :: b4        !< 4-magnetic field components (spatial: b4x, b4y, b4z)
         type(riemann_states_vec3) :: cm        !< Conservative momentum variables
-        integer :: i, j, k, l, q               !< Generic loop iterators
-        integer :: Re_size_loc1, Re_size_loc2  !< host copy of Re_size; amdflang reads the declare-target original stale cross-TU
+        integer :: i, j, k, l                  !< Generic loop iterators
+        integer :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
+        logical :: face_smooth                 !< hybrid Riemann: use central/Rusanov flux at a WENO-smooth face
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -112,16 +115,16 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, &
-                                    & alpha_R, tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, &
-                                    & Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, &
-                                    & pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, &
-                                    & pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, &
-                                    & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
-                                    & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, &
-                                    & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, s_M, s_P, xi_M, xi_P]', &
-                                    & copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[face_smooth, i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, &
+                                    & alpha_L, alpha_R, tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, Ys_L, &
+                                    & Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, &
+                                    & Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, &
+                                    & vel_L_tmp, vel_R_tmp, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, &
+                                    & T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, &
+                                    & Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, &
+                                    & c_R, G_L, G_R, damage_L, damage_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, &
+                                    & vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, &
+                                    & flux_tau_L, flux_tau_R]', copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -199,37 +202,12 @@ contains
                                 alpha_R = alpha_R/max(alpha_R_sum, sgm_eps)
                             end if
 
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                rho_L = rho_L + alpha_rho_L(i)
-                                gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-                                qv_L = qv_L + alpha_rho_L(i)*qvs(i)
-
-                                rho_R = rho_R + alpha_rho_R(i)
-                                gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                qv_R = qv_R + alpha_rho_R(i)*qvs(i)
-                            end do
+                            call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_L)
+                            call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
                             if (viscous) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 2
-                                    Re_L(i) = dflt_real
-                                    Re_R(i) = dflt_real
-
-                                    if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_L(i) = 0._wp
-                                    if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_R(i) = 0._wp
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
-                                        Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) + Re_L(i)
-                                        Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) + Re_R(i)
-                                    end do
-
-                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                    Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                end do
+                                call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
+                                call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                             end if
 
                             if (chemistry) then
@@ -325,34 +303,20 @@ contains
 
                             ! elastic energy update
                             if (hypoelasticity) then
-                                G_L = 0._wp; G_R = 0._wp
-
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                    G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                end do
-
-                                if (cont_damage) then
-                                    G_L = G_L*max((1._wp - qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)), 0._wp)
-                                    G_R = G_R*max((1._wp - qR_prim_rsx_vf(${SF('')}$, eqn_idx%damage)), 0._wp)
-                                end if
-
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
                                     tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
                                     tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    ! Elastic contribution to energy if G large enough TODO take out if statement if stable without
-                                    if ((G_L > 1000) .and. (G_R > 1000)) then
-                                        E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                        E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                        ! Double for shear stresses
-                                        if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                        end if
-                                    end if
                                 end do
+
+                                damage_L = 0._wp; damage_R = 0._wp
+                                if (cont_damage) then
+                                    damage_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                    damage_R = qR_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                end if
+
+                                call s_compute_hypoelastic_interface_energy(num_fluids, alpha_L, alpha_R, damage_L, damage_R, &
+                                    & tau_e_L, tau_e_R, G_L, G_R, E_L, E_R)
                             end if
 
                             @:compute_average_state()
@@ -672,6 +636,11 @@ contains
                                     end do
                                 end if
                             #:endif
+                            if (hybrid_riemann) then
+                                face_smooth = .not. (weno_full(${SF('')}$) .or. weno_full(${SF(' + 1')}$))
+                                if (face_smooth) call s_compute_hybrid_smooth_flux(${SF('')}$, alpha_rho_L, alpha_L, alpha_rho_R, &
+                                    & alpha_R, vel_L, vel_R, c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R)
+                            end if
                         end do
                     end do
                 end do

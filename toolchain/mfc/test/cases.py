@@ -2957,6 +2957,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("AMR -> 1D -> MHD -> HLLD", {**mhd_1d_base, "amr_regrid_int": 0})
         cases.append(define_case_d(stack, "", {}))
         cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 0.05, "amr_buf": 3}))
+        # hlld hybrid: the smooth-flux override reuses HLLD's own F_L/F_R physical fluxes (Rusanov at a
+        # WENO-smooth face) - exercise it on the Brio-Wu shock tube whose rarefaction fans are smooth
+        cases.append(define_case_d(stack, "hybrid_riemann", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.3, "hybrid_smooth_flux": 2}, override_tol=5.0e-5))
         stack.pop()
         stack.push(
             "AMR -> 1D -> RMHD",
@@ -3907,6 +3910,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
         # the central smooth-flux (enum 1) is a distinct flux path from Rusanov (2) - cover both
         cases.append(define_case_d(stack, "central flux", {"hybrid_smooth_flux": 1}))
+        # the smooth-flux block is shared across solvers (s_compute_hybrid_smooth_flux) - cover HLL and
+        # Lax-Friedrichs at consequential eps so a solver-specific break in the shared path is caught
+        cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1, "hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
+        cases.append(define_case_d(stack, "Lax-Friedrichs", {"riemann_solver": 5, "hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
         stack.pop()
 
     hybrid_sensor_tests()

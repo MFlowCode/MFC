@@ -74,7 +74,6 @@ exit 0
 
     foreach (a_target ${IPO_TARGETS})
         set_target_properties(${a_target} PROPERTIES Fortran_PREPROCESS ON)
-	    message(STATUS ${CMAKE_Fortran_COMPILER_ID})
 
         target_include_directories(${a_target} PRIVATE
             "${CMAKE_SOURCE_DIR}/src/common"
@@ -178,7 +177,6 @@ exit 0
                 if (NOT TARGET OpenMP::OpenMP_Fortran)
                     message(FATAL_ERROR "OpenMP + Fortran is unsupported.")
                 endif()
-                set(ENV{OMP_TARGET_OFFLOAD} [MANDATORY])
                 # target_link_libraries(${a_target} PRIVATE OpenMP::OpenMP_Fortran)
                 target_compile_definitions(${a_target} PRIVATE MFC_OpenMP MFC_GPU)
 
@@ -226,11 +224,11 @@ exit 0
 
                 # GH-200 Unified Memory Support
                 if (MFC_Unified)
-                    target_compile_options(${ARGS_TARGET}
+                    target_compile_options(${a_target}
                         PRIVATE -gpu=mem:unified:managedalloc -cuda
                     )
                     # "This option must appear in both the compile and link lines" -- NVHPC Docs
-                    target_link_options(${ARGS_TARGET}
+                    target_link_options(${a_target}
                         PRIVATE -gpu=mem:unified:managedalloc -cuda
                     )
                 endif()
@@ -243,7 +241,7 @@ exit 0
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
                 # Frontier Unified Memory Support
                 if (MFC_Unified)
-                    target_compile_options(${ARGS_TARGET}
+                    target_compile_options(${a_target}
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
@@ -256,7 +254,7 @@ exit 0
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
 
                 if (MFC_Unified)
-                    target_compile_options(${ARGS_TARGET}
+                    target_compile_options(${a_target}
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 

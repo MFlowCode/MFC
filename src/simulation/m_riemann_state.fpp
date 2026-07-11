@@ -11,7 +11,7 @@ module m_riemann_state
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: riemann_solver_hll, riemann_solver_hlld
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, verysmall
     use m_hb_function
 
     implicit none
@@ -1008,6 +1008,208 @@ contains
         end do
 
     end subroutine s_calculate_bulk_stress_tensor
+
+    !> Accumulate the mixture density, specific heat ratio function, liquid stiffness function, and internal energy reference of one
+    !! Riemann state from its partial densities and volume fractions. The number of fluids is an explicit argument because the
+    !! 5-equation bubble model accumulates over num_fluids - 1 fluids.
+    subroutine s_accumulate_mixture_properties(nf, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
+
+        $:GPU_ROUTINE(function_name='s_accumulate_mixture_properties', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in)                 :: nf  !< Number of fluids to accumulate over
+        real(wp), dimension(nf), intent(in) :: alpha_rho_K, alpha_K
+        real(wp), intent(out)               :: rho_K, gamma_K, pi_inf_K, qv_K
+        integer                             :: i   !< Loop iterator over fluids
+
+        rho_K = 0._wp
+        gamma_K = 0._wp
+        pi_inf_K = 0._wp
+        qv_K = 0._wp
+
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, nf
+            rho_K = rho_K + alpha_rho_K(i)
+            gamma_K = gamma_K + alpha_K(i)*gammas(i)
+            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+            qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+        end do
+
+    end subroutine s_accumulate_mixture_properties
+
+    !> Compute the shear and volume Reynolds numbers of one Riemann state by inverse-weighting the fluid Reynolds numbers with the
+    !! volume fractions.
+    subroutine s_compute_interface_reynolds(alpha_K, Re_K, Re_size_loc1, Re_size_loc2)
+
+        $:GPU_ROUTINE(function_name='s_compute_interface_reynolds', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha_K
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha_K
+        #:endif
+        real(wp), dimension(2), intent(out) :: Re_K
+        !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
+        integer, intent(in) :: Re_size_loc1, Re_size_loc2
+        integer             :: i, q  !< Loop iterators
+
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, 2
+            Re_K(i) = dflt_real
+
+            if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_K(i) = 0._wp
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
+                Re_K(i) = alpha_K(Re_idx(i, q))/Res_gs(i, q) + Re_K(i)
+            end do
+
+            Re_K(i) = 1._wp/max(Re_K(i), sgm_eps)
+        end do
+
+    end subroutine s_compute_interface_reynolds
+
+    !> Accumulate the hypoelastic stress contribution to the energies of the left and right Riemann states: mix the shear modulus
+    !! over the fluids, scale it by the continuum damage state when damage is modeled, and add the elastic energy of each stress
+    !! component (doubled for the shear components) when both mixture moduli are non-negligible. The elastic shear stresses are
+    !! loaded from the state buffers by the caller, which reuses them for the stress fluxes and elastic wave speeds. The G >
+    !! verysmall gate is a deliberate maintainer ruling that replaces HLL's former hard-coded G > 1000 stability floor, retiring its
+    !! "TODO take out if statement if stable without".
+    subroutine s_compute_hypoelastic_interface_energy(nf, alpha_L, alpha_R, damage_L, damage_R, tau_e_L, tau_e_R, G_L, G_R, E_L, &
+        & E_R)
+
+        $:GPU_ROUTINE(function_name='s_compute_hypoelastic_interface_energy', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in)                 :: nf                  !< Number of fluids to mix the shear modulus over
+        real(wp), dimension(nf), intent(in) :: alpha_L, alpha_R    !< Left and right volume fractions
+        real(wp), intent(in)                :: damage_L, damage_R  !< Continuum damage states (referenced only when cont_damage)
+        real(wp), dimension(6), intent(in)  :: tau_e_L, tau_e_R    !< Left and right elastic shear stresses
+        real(wp), intent(out)               :: G_L, G_R            !< Left and right mixture shear moduli
+        real(wp), intent(inout)             :: E_L, E_R            !< Left and right state energies
+        integer                             :: i                   !< Loop iterator
+
+        G_L = 0._wp; G_R = 0._wp
+
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, nf
+            G_L = G_L + alpha_L(i)*Gs_rs(i)
+            G_R = G_R + alpha_R(i)*Gs_rs(i)
+        end do
+
+        if (cont_damage) then
+            G_L = G_L*max((1._wp - damage_L), 0._wp)
+            G_R = G_R*max((1._wp - damage_R), 0._wp)
+        end if
+
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
+            ! Elastic contribution to energy if G large enough
+            if ((G_L > verysmall) .and. (G_R > verysmall)) then
+                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
+                ! Double for shear stresses
+                if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
+                    E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                    E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
+                end if
+            end if
+        end do
+
+    end subroutine s_compute_hypoelastic_interface_energy
+
+    !> Compute the advective part of the HLLC star-state momentum flux in the wave-normal direction (pressure excluded), used to
+    !! assemble the geometrical source flux of the cylindrical and azimuthal sweeps.
+    function f_compute_hllc_star_momentum_flux(rho_L, rho_R, vel_L_norm, vel_R_norm, s_M, s_P, s_S, xi_L, xi_R, xi_M, xi_P, &
+        & dir_flg_norm) result(flux_mom)
+
+        $:GPU_ROUTINE(function_name='f_compute_hllc_star_momentum_flux', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: rho_L, rho_R            !< Left and right densities
+        real(wp), intent(in) :: vel_L_norm, vel_R_norm  !< Left and right wave-normal velocities
+        real(wp), intent(in) :: s_M, s_P, s_S           !< Clamped left/right and contact wave speeds
+        real(wp), intent(in) :: xi_L, xi_R, xi_M, xi_P  !< Star-state compression factors and upwind selectors
+        real(wp), intent(in) :: dir_flg_norm            !< Direction flag of the wave-normal direction
+        real(wp)             :: flux_mom
+
+        flux_mom = xi_M*(rho_L*(vel_L_norm*vel_L_norm + s_M*(xi_L*(dir_flg_norm*s_S + (1._wp - dir_flg_norm)*vel_L_norm) &
+                         & - vel_L_norm))) + xi_P*(rho_R*(vel_R_norm*vel_R_norm + s_P*(xi_R*(dir_flg_norm*s_S + (1._wp &
+                         & - dir_flg_norm)*vel_R_norm) - vel_R_norm)))
+
+    end function f_compute_hllc_star_momentum_flux
+
+    !> Hybrid-Riemann smooth-face flux: overwrite the Riemann flux at a WENO-smooth face with either a central (hybrid_smooth_flux
+    !! == 1) or a local Lax-Friedrichs / Rusanov (hybrid_smooth_flux == 2) flux, reusing the left/right states the calling solver
+    !! already reconstructed. Shared by hll/hllc/lf so the smooth-flux path stays identical across solvers; the reshaped flux
+    !! buffers are module-scope so only the (j,k,l) index and the small per-fluid/per-dim state arrays need to be passed.
+    subroutine s_compute_hybrid_smooth_flux(j, k, l, alpha_rho_L, alpha_L, alpha_rho_R, alpha_R, vel_L, vel_R, c_L, c_R, rho_L, &
+                                            & rho_R, pres_L, pres_R, E_L, E_R)
+
+        $:GPU_ROUTINE(function_name='s_compute_hybrid_smooth_flux', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in)                         :: j, k, l
+        real(wp), dimension(num_fluids), intent(in) :: alpha_rho_L, alpha_L, alpha_rho_R, alpha_R
+        real(wp), dimension(num_dims), intent(in)   :: vel_L, vel_R
+        real(wp), intent(in)                        :: c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R
+        real(wp)                                    :: lam, FL, FR, UL, UR
+        integer                                     :: i
+
+        ! Rusanov dissipation coefficient (dropped for the pure-central flux, hybrid_smooth_flux == 1)
+        lam = max(abs(vel_L(dir_idx(1))) + c_L, abs(vel_R(dir_idx(1))) + c_R)
+
+        ! Continuity
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, eqn_idx%cont%end
+            FL = alpha_rho_L(i)*vel_L(dir_idx(1))
+            FR = alpha_rho_R(i)*vel_R(dir_idx(1))
+            flux_rsx_vf(j, k, l, i) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
+                        & wp)*0.5_wp*lam*(alpha_rho_R(i) - alpha_rho_L(i))
+        end do
+
+        ! Momentum
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_dims
+            FL = rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*pres_L
+            FR = rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*pres_R
+            UL = rho_L*vel_L(dir_idx(i))
+            UR = rho_R*vel_R(dir_idx(i))
+            flux_rsx_vf(j, k, l, eqn_idx%cont%end + dir_idx(i)) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
+                        & wp)*0.5_wp*lam*(UR - UL)
+        end do
+
+        ! Energy
+        FL = vel_L(dir_idx(1))*(E_L + pres_L)
+        FR = vel_R(dir_idx(1))*(E_R + pres_R)
+        flux_rsx_vf(j, k, l, eqn_idx%E) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, wp)*0.5_wp*lam*(E_R - E_L)
+
+        ! Volume fractions (advection)
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            FL = alpha_L(i)*vel_L(dir_idx(1))
+            FR = alpha_R(i)*vel_R(dir_idx(1))
+            flux_rsx_vf(j, k, l, eqn_idx%adv%beg + i - 1) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
+                        & wp)*0.5_wp*lam*(alpha_R(i) - alpha_L(i))
+        end do
+
+        ! Internal energies (6-equation model only)
+        if (model_eqns == model_eqns_6eq) then
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                UL = alpha_L(i)*(gammas(i)*pres_L + pi_infs(i)) + alpha_rho_L(i)*qvs(i)
+                UR = alpha_R(i)*(gammas(i)*pres_R + pi_infs(i)) + alpha_rho_R(i)*qvs(i)
+                FL = UL*vel_L(dir_idx(1))
+                FR = UR*vel_R(dir_idx(1))
+                flux_rsx_vf(j, k, l, eqn_idx%int_en%beg + i - 1) = 0.5_wp*(FL + FR) - real(hybrid_smooth_flux - 1, &
+                            & wp)*0.5_wp*lam*(UR - UL)
+            end do
+        end if
+
+        ! Non-conservative advection source: central interface velocity
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_dims
+            vel_src_rsx_vf(j, k, l, dir_idx(i)) = 0.5_wp*(vel_L(dir_idx(i)) + vel_R(dir_idx(i)))
+        end do
+        flux_src_rsx_vf(j, k, l, eqn_idx%adv%beg) = vel_src_rsx_vf(j, k, l, dir_idx(1))
+
+    end subroutine s_compute_hybrid_smooth_flux
 
     !> Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver
     subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir)
