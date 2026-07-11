@@ -21,10 +21,10 @@ jobs:
       checkall: ${{ steps.changes.outputs.checkall }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: ".github/file-filter.yml"
@@ -95,13 +95,13 @@ jobs:
         run: rm -f *.out
 
       - name: Clone - PR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: pr
           clean: false
 
       - name: Clone - Master
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: MFlowCode/MFC
           ref: master
@@ -174,7 +174,7 @@ jobs:
       # All other runners (non-Phoenix) just run without special env
       - name: Archive Logs (Frontier)
         if: always() && matrix.cluster != 'phoenix'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
           path: |

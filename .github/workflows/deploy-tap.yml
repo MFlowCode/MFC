@@ -31,7 +31,7 @@ jobs:
       url: https://github.com/MFlowCode/homebrew-mfc
     steps:
       - name: Checkout MFC repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 

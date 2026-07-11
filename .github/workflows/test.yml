@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -56,10 +56,10 @@ jobs:
       changed_files: ${{ steps.changes.outputs.checkall_files }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: ".github/file-filter.yml"
@@ -150,7 +150,7 @@ jobs:
           df -h /
 
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # ── NVHPC: pull image and start a long-lived container ──────────────
       # Replaces the container: directive so we can free disk space first.
@@ -416,7 +416,7 @@ jobs:
       NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # clean: false preserves .slurm_job_id files across reruns so
           # submit-slurm-job.sh can detect and cancel stale SLURM jobs on retry.
@@ -465,7 +465,7 @@ jobs:
           done
 
       - name: Archive Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if:   matrix.cluster != 'phoenix'
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.test_slug }}
@@ -513,7 +513,7 @@ jobs:
       labels: ${{ matrix.runner }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
 
@@ -575,7 +575,7 @@ jobs:
           done
 
       - name: Archive Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if:   always()
         with:
           name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
