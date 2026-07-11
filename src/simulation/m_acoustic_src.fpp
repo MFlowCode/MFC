@@ -350,9 +350,9 @@ contains
         ! compilers (e.g. nvhpc <= 24.3) in 2D, and 1/foc_length = wrong-sign or Inf in 3D/cylindrical.
         if (n == 0 .or. foc_length(ai) <= 0._wp) then
             foc_length_factor = 1._wp
-        else if (p == 0 .and. (.not. cyl_coord)) then  ! 2D axisymmetric case is physically 3D
-            foc_length_factor = foc_length(ai)**(-0.85_wp)  ! Empirical correction
-        else
+        else if (p == 0 .and. (.not. cyl_coord)) then  ! 2D Cartesian: cylindrical (line-source) spreading
+            foc_length_factor = foc_length(ai)**(-0.85_wp)  ! Empirical correction to 1/sqrt(r)
+        else  ! 3D or axisymmetric: spherical spreading
             foc_length_factor = 1._wp/foc_length(ai)
         end if
 
