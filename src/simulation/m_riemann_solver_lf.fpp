@@ -16,7 +16,6 @@ module m_riemann_solver_lf
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cv_mass, &
         & get_mixture_energy_mass, get_species_specific_heats_r, get_mixture_specific_heat_cp_mass, molecular_weights
     use m_riemann_state
-    use m_weno, only: weno_full
 
     implicit none
 
@@ -93,7 +92,6 @@ contains
         type(riemann_states_vec3) :: cm  !< Conservative momentum variables
         integer :: i, j, k, l  !< Generic loop iterators
         integer :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
-        logical :: face_smooth  !< hybrid Riemann: use central/Rusanov flux at a WENO-smooth face
         integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
@@ -110,15 +108,15 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[face_smooth, i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, &
-                                    & alpha_L, alpha_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, Cp_iL, &
-                                    & Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, &
-                                    & pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_grad_L, vel_grad_R, idx_right_phys, &
-                                    & vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, &
-                                    & alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, &
-                                    & pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, H_L, H_R, ptilde_L, ptilde_R, s_M, s_P, xi_M, &
-                                    & xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, &
-                                    & MW_L, MW_R, T_L, T_R, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
+                                    & Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, &
+                                    & Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, &
+                                    & B2, b4, cm, pcorr, zcoef, vel_grad_L, vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, &
+                                    & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, &
+                                    & c_avg, pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, &
+                                    & c_R, E_L, E_R, H_L, H_R, ptilde_L, ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, &
+                                    & eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, &
+                                    & Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -315,7 +313,17 @@ contains
                             s_L = sqrt(s_L)
                             s_R = sqrt(s_R)
 
-                            s_P = max(s_L, s_R) + max(c_L, c_R)
+                            if (hybrid_riemann) then
+                                ! For LF, hybrid_riemann simply switches the dissipation to the local (normal-
+                                ! velocity) wave speed, turning LF into local Lax-Friedrichs everywhere. LF does
+                                ! NOT call the shared smooth-flux helper: LF's flux carries extra terms (pcorr,
+                                ! its own advection form) the generic Rusanov helper lacks, so overwriting only
+                                ! smooth faces would inject a sensor-flip discontinuity. Using LF's own flux with
+                                ! the local wave speed keeps it a single consistent, backend-stable scheme.
+                                s_P = max(abs(vel_L(dir_idx(1))) + c_L, abs(vel_R(dir_idx(1))) + c_R)
+                            else
+                                s_P = max(s_L, s_R) + max(c_L, c_R)
+                            end if
                             s_M = -s_P
 
                             s_L = s_M
@@ -491,11 +499,6 @@ contains
                                     end do
                                 end if
                             #:endif
-                            if (hybrid_riemann) then
-                                face_smooth = .not. (weno_full(${SF('')}$) .or. weno_full(${SF(' + 1')}$))
-                                if (face_smooth) call s_compute_hybrid_smooth_flux(${SF('')}$, alpha_rho_L, alpha_L, alpha_rho_R, &
-                                    & alpha_R, vel_L, vel_R, c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R)
-                            end if
                         end do
                     end do
                 end do

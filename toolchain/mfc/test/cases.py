@@ -3911,16 +3911,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
         # the central smooth-flux (enum 1) is a distinct flux path from Rusanov (2) - cover both
         cases.append(define_case_d(stack, "central flux", {"hybrid_smooth_flux": 1}))
-        # the smooth-flux block is shared across all Riemann solvers (s_compute_hybrid_smooth_flux). Cover HLL at
-        # the liveness eps (inherited 1e-2, bit-identical to plain by design) to confirm per-solver wiring; a
-        # consequential eps is NOT reusable here (the 0.3 gap is tuned to the HLLC Jameson-phi distribution, so
-        # another solver places a cell at the threshold and flips smooth/discontinuous under FP reordering).
+        # Cover HLL and Lax-Friedrichs at the liveness eps (inherited 1e-2). HLL shares the smooth-flux helper
+        # (s_compute_hybrid_smooth_flux). LF instead just switches to the local (normal-velocity) wave speed
+        # under hybrid_riemann - i.e. LF becomes local-LF everywhere - because LF's own flux carries pcorr and a
+        # distinct advection form the generic helper lacks; overwriting only smooth faces injected a sensor-flip
+        # discontinuity that made LF diverge ~2% across compilers. Local-LF is a single consistent scheme.
         cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
+        cases.append(define_case_d(stack, "Lax-Friedrichs", {"riemann_solver": 5}))
         stack.pop()
-        # No Lax-Friedrichs (riemann_solver=5) golden here: LF is enabled for hybrid_riemann and shares the same
-        # s_compute_hybrid_smooth_flux path (covered by the HLLC consequential case + the HLL liveness case), but
-        # LF's heavy base dissipation minus the reduced-dissipation smooth flux amplifies FP noise from any
-        # gradient, so no non-trivial case yields a golden that is stable across compilers/backends.
 
     hybrid_sensor_tests()
 
