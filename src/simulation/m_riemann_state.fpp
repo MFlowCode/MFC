@@ -1148,7 +1148,7 @@ contains
     !! already reconstructed. Shared by hll/hllc/lf so the smooth-flux path stays identical across solvers; the reshaped flux
     !! buffers are module-scope so only the (j,k,l) index and the small per-fluid/per-dim state arrays need to be passed.
     subroutine s_compute_hybrid_smooth_flux(j, k, l, alpha_rho_L, alpha_L, alpha_rho_R, alpha_R, vel_L, vel_R, c_L, c_R, rho_L, &
-                                            & rho_R, pres_L, pres_R, E_L, E_R)
+                                            & rho_R, pres_L, pres_R, E_L, E_R, hybrid_smooth_flux)
 
         $:GPU_ROUTINE(function_name='s_compute_hybrid_smooth_flux', parallelism='[seq]', cray_inline=True)
 
@@ -1156,8 +1156,11 @@ contains
         real(wp), dimension(num_fluids), intent(in) :: alpha_rho_L, alpha_L, alpha_rho_R, alpha_R
         real(wp), dimension(num_dims), intent(in)   :: vel_L, vel_R
         real(wp), intent(in)                        :: c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R
-        real(wp)                                    :: lam, FL, FR, UL, UR
-        integer                                     :: i
+        ! hybrid_smooth_flux is passed as an arg (not read from the module): CCE's --case-optimization
+        ! OMP clone of this device routine cannot resolve that common-module global (ftn-7066).
+        integer, intent(in) :: hybrid_smooth_flux
+        real(wp)            :: lam, FL, FR, UL, UR
+        integer             :: i
 
         ! Rusanov dissipation coefficient (dropped for the pure-central flux, hybrid_smooth_flux == 1)
         lam = max(abs(vel_L(dir_idx(1))) + c_L, abs(vel_R(dir_idx(1))) + c_R)

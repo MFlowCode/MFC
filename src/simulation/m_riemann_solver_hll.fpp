@@ -639,7 +639,7 @@ contains
                             if (hybrid_riemann) then
                                 face_smooth = .not. (weno_full(${SF('')}$) .or. weno_full(${SF(' + 1')}$))
                                 if (face_smooth) call s_compute_hybrid_smooth_flux(${SF('')}$, alpha_rho_L, alpha_L, alpha_rho_R, &
-                                    & alpha_R, vel_L, vel_R, c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R)
+                                    & alpha_R, vel_L, vel_R, c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, hybrid_smooth_flux)
                             end if
                         end do
                     end do
