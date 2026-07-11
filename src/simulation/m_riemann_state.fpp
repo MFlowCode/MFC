@@ -1086,6 +1086,7 @@ contains
         real(wp), intent(out)               :: G_L, G_R            !< Left and right mixture shear moduli
         real(wp), intent(inout)             :: E_L, E_R            !< Left and right state energies
         integer                             :: i                   !< Loop iterator
+        real(wp)                            :: G_gate              !< Floor below which the elastic energy term is skipped
 
         G_L = 0._wp; G_R = 0._wp
 
@@ -1100,10 +1101,16 @@ contains
             G_R = G_R*max((1._wp - damage_R), 0._wp)
         end if
 
+        ! Under continuum damage a heavily-damaged interface can drive G -> 0 while the reconstructed stress does
+        ! not relax with it, so tau^2/(4G) blows up. It stays finite (and negligible) on most backends but goes
+        ! NaN under macOS gfortran's libm. Restore HLL's former stability floor for the damage case only; for
+        ! undamaged states G >> this floor so master's verysmall gate is unchanged.
+        G_gate = merge(1.e3_wp, verysmall, cont_damage)
+
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
             ! Elastic contribution to energy if G large enough
-            if ((G_L > verysmall) .and. (G_R > verysmall)) then
+            if ((G_L > G_gate) .and. (G_R > G_gate)) then
                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 ! Double for shear stresses
