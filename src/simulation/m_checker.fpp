@@ -201,11 +201,17 @@ contains
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")
         @:PROHIBIT(amr_subcycle .and. cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
-        ! Pre-existing (independent of level count): subcycled fine advance + dynamic regrid at np>1 leaks
-        ! conservation (~1e-4 in a closed system) - a subcycle's accumulated L0<->L1 reflux is not applied
-        ! across a regrid rebuild under the P2P reflux path. Static (amr_regrid_int = 0) subcycle and
-        ! lock-step (amr_subcycle = F) dynamic regrid both conserve to machine zero at np>1; fail closed on the
-        ! leaking combination until the reflux/regrid ordering is fixed.
+        ! ROOT-CAUSED (per-step probe, 2026-07-10): subcycled fine advance at np>1 leaks conservation (~1e-4 in a
+        ! closed system) when max_grid_size TILING splits a feature into ADJACENT same-level sub-blocks. The
+        ! block-to-block fine-fine seam halo (s_amr_fine_fine_halo, which overwrites the shared-face ghosts with the
+        ! neighbour's fine interior so both sides compute a MATCHING seam flux) runs only in the LOCK-STEP path
+        ! (m_time_steppers, gated `.not. amr_subcycle`); the subcycle path re-fills ghosts from the coarse each
+        ! substep, so the two sub-blocks' shared fine fluxes disagree and mass leaks at the seam - the leak switches
+        ! on exactly when a 2nd adjacent block appears, and d_regrid is identically 0 (regrid is NOT the culprit).
+        ! Fixing it needs the fine-fine halo run PER SUBSTEP inside the subcycle with same-level blocks advanced in
+        ! lockstep (a subcycle-driver restructure, not a one-liner). np=1 never tiles into adjacent blocks (no leak);
+        ! lock-step (amr_subcycle = F) does the halo (no leak). Dynamic regrid is prohibited as the practical trigger
+        ! (a growing feature splits into adjacent tiles); fail closed until the per-substep seam halo lands.
         @:PROHIBIT(amr_subcycle .and. amr_regrid_int > 0 .and. num_procs > 1, &
                    & "amr_subcycle with dynamic regrid (amr_regrid_int > 0) is not yet conservation-safe at num_procs > 1; use amr_subcycle = F (lock-step) for dynamic multi-rank runs, or amr_regrid_int = 0 (static) with subcycling")
 
