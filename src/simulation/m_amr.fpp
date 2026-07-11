@@ -1327,7 +1327,12 @@ contains
 
         if (amr_max_level < 2) return  ! np>=2: the L2 is co-located with block 1 (owner-guarded intrusive checks below)
         n1 = amr_num_blocks
-        if (n1 < 1 .or. n1 + 1 > amr_max_blocks) return
+        if (n1 < 1) return
+        ! the static hierarchy nests exactly one level-2 block; without pool room it would SILENTLY refine only to level 1
+        ! (an under-resolved but "successful" run). n1 (the level-1 tile count) is only known here, not at checker time, so abort
+        ! at the point of failure. Replicated inputs -> every rank takes the same branch (collective-safe).
+        if (n1 + 1 > amr_max_blocks) call s_mpi_abort('amr static multi-level (amr_max_level > 1, amr_regrid_int = 0): ' &
+            & // 'amr_max_blocks is too small to nest the level-2 block (need >= level-1 block count + 1); increase amr_max_blocks')
         L2 = n1 + 1
         inset = 0
         inset(1) = max((amr_region_hi_all(1, 1) - amr_region_lo_all(1, 1) + 1)/4, amr_cpat_mar)
@@ -3716,6 +3721,8 @@ contains
         integer                       :: ntl(3), s(3), t1, t2, t3, qlo(3), qhi(3), tc(3)
 
         tc = amr_maxc_fit; if (present(tsz)) tc = tsz
+        tc = max(tc, 1)  ! a level>=2 caller passes amr_maxc_fit/2, which is 0 when a rank's fine half-extent is 1 (small
+        !                  subdomain at high np) - a 0 tile size would divide-by-zero below; a 1-cell tile is the valid floor
         ntl = 1; s = 1
         ntl(1) = (hi(1) - lo(1) + tc(1))/tc(1); s(1) = (hi(1) - lo(1) + ntl(1))/ntl(1)
         if (n_glb > 0) then
