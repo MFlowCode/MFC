@@ -16,7 +16,7 @@ module m_global_parameters_common
     use m_derived_types
     use m_thermochem, only: num_species
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, &
-        & recon_type_muscl, name_len, dflt_int, dflt_real
+        & recon_type_muscl, eos_stiffened_gas, eos_jwl, name_len, dflt_int, dflt_real
 
     implicit none
 
@@ -307,6 +307,16 @@ contains
                 eqn_idx%psi = sys_size + 1
                 sys_size = eqn_idx%psi
             end if
+
+            if (jwl_afterburn) then
+                eqn_idx%abn = sys_size + 1
+                sys_size = eqn_idx%abn
+            end if
+
+            if (jwl_reactive) then
+                eqn_idx%rxn = sys_size + 1
+                sys_size = eqn_idx%rxn
+            end if
         end if
 
         if (chemistry) then
@@ -415,6 +425,27 @@ contains
         cont_damage = .false.
         hyper_cleaning = .false.
 
+        ! JWL reaction sources (afterburn, program burn, JWL++ reactive burn)
+        jwl_afterburn = .false.
+        jwl_reactive = .false.
+#ifdef MFC_SIMULATION
+        jwl_ab_model = 2  ! Rocflu-style Arrhenius release by default
+        jwl_q_ab = dflt_real
+        jwl_ab_tau = dflt_real
+        jwl_ab_A = dflt_real
+        jwl_ab_theta = dflt_real
+        jwl_ab_n = 0._wp
+        prog_burn = .false.
+        pb_D_cj = dflt_real
+        pb_width = dflt_real
+        pb_x_det = 0._wp
+        pb_y_det = 0._wp
+        pb_z_det = 0._wp
+        pb_t_det = 0._wp
+        jwl_G = dflt_real
+        jwl_b_exp = dflt_real
+#endif
+
         ! Case-optimization params: under case-opt these are compile-time constants in sim (skip assignment); in pre/post
         ! MFC_CASE_OPTIMIZATION is always False so the block always executes there.
         #:if not MFC_CASE_OPTIMIZATION
@@ -457,5 +488,27 @@ contains
         fft_wrt = .false.
 
     end subroutine s_assign_common_defaults
+
+    !> Assign default (unset) values to a fluid's JWL parameters. Shared by all three targets so the JWL block stays identical; air
+    !! parameters default to dflt_real and are validated in m_checker_common when a JWL fluid is present.
+    impure subroutine s_assign_jwl_fluid_defaults(fluid)
+
+        type(physical_parameters), intent(inout) :: fluid
+
+        fluid%jwl_A = dflt_real
+        fluid%jwl_B = dflt_real
+        fluid%jwl_R1 = dflt_real
+        fluid%jwl_R2 = dflt_real
+        fluid%jwl_omega = dflt_real
+        fluid%jwl_rho0 = dflt_real
+        fluid%jwl_Q = dflt_real
+        fluid%jwl_E0 = dflt_real
+        fluid%jwl_air_e0 = dflt_real
+        fluid%jwl_air_rho0 = dflt_real
+        fluid%jwl_air_p0 = dflt_real
+        fluid%jwl_ej_rho_ref = dflt_real
+        fluid%jwl_delta_e = 0._wp
+
+    end subroutine s_assign_jwl_fluid_defaults
 
 end module m_global_parameters_common

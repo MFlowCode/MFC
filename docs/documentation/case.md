@@ -70,6 +70,37 @@ For example, to run the `scaling` case in "weak-scaling" mode:
 
 ## Parameters
 
+## Capabilities Overview
+
+MFC is a multi-component, multi-phase, high-order compressible flow solver. The table
+below maps the physics and numerics it supports to the parameters and sections that
+configure them, so a new user can see the available capabilities before reading the
+full parameter reference.
+
+| Capability | What it covers | Configured by |
+| :--- | :--- | :--- |
+| Governing model | 4-equation (`model_eqns = 1, 4`), 5-equation Allaire interface capturing (`2`), 6-equation with pressure relaxation (`3`) | `model_eqns`, [Simulation Algorithm](#sec-simulation-algorithm) |
+| Geometry | 1D, 2D, 3D Cartesian; 2D axisymmetric and 3D cylindrical | `m`, `n`, `p`, `cyl_coord`, [Computational Domain](#sec-computational-domain) |
+| Equation of state | Stiffened gas (ideal gas, liquids, solids) and Jones-Wilkins-Lee detonation products | `fluid_pp(i)%%eos`, [Fluid Materials](#sec-fluid-materials) |
+| Reconstruction | WENO orders 1/3/5/7 with mapped, WENO-Z, and TENO variants; MUSCL with limiters | `recon_type`, `weno_order`, `muscl_order`, [Simulation Algorithm](#sec-simulation-algorithm) |
+| Riemann solver | HLL, HLLC (restores the contact wave for interfaces), and HLLD for MHD | `riemann_solver`, [Simulation Algorithm](#sec-simulation-algorithm) |
+| Time integration | Strong-stability-preserving Runge-Kutta orders 1/2/3, fixed or adaptive CFL | `time_stepper`, `cfl_adap_dt`, [Simulation Algorithm](#sec-simulation-algorithm) |
+| Sub-grid bubbles | Euler-Euler ensemble-averaged cavitation, with QBMM moment closure | `bubbles_euler`, `qbmm`, [Sub-grid Bubble Models](#sec-bubble-models) |
+| Lagrangian bubbles | Euler-Lagrange bubble parcels with two-way coupling | `bubbles_lagrange` |
+| Immersed boundaries | Static and moving solids from analytic patches or STL/OBJ models | `ib`, [Immersed Boundary Patches](#sec-immersed-boundary-patches) |
+| Detonation | JWL program burn, products-air afterburn, and JWL++ pressure-driven reactive burn | `prog_burn`, `jwl_afterburn`, `jwl_reactive`, [Fluid Materials](#sec-fluid-materials) |
+| Phase change | 6-equation pressure-temperature-chemical-potential relaxation | `relax`, [Phase Change Model](#sec-phase-change) |
+| Reacting flow | Multi-species chemistry with Cantera-derived kinetics | `chemistry`, [Chemistry](#sec-chemistry) |
+| Magnetohydrodynamics | Ideal and resistive MHD with the HLLD solver | `mhd`, [Magnetohydrodynamics](#sec-mhd) |
+| Solid mechanics | Hypoelasticity and hyperelasticity | `hypoelasticity`, `hyperelasticity`, [Elasticity](#sec-elasticity) |
+| Surface tension | Continuum-surface-force model via a color function | `surface_tension` |
+| Body forces | Constant and time-dependent acceleration fields (e.g. gravity) | `bf_x`, [Body Forces](#body-forces) |
+| Acoustic sources | Monopole, dipole, and transducer array excitation | `acoustic_source`, [Acoustic Source](#sec-acoustic-source) |
+| Acceleration | GPU offload (OpenACC and OpenMP target) and multi-node MPI, including RDMA | build flags `--gpu acc|mp`, `rdma_mpi` |
+
+Not every capability combines with every other; the compatibility rules below and the
+Feature Compatibility Guide record the supported combinations.
+
 ## Feature Compatibility
 
 Before diving into parameter details, check the **@ref case_constraints "Feature Compatibility Guide"** to understand:
@@ -86,7 +117,7 @@ There are multiple sets of parameters that must be specified in the python input
 2. [Computational Domain Parameters](#sec-computational-domain)
 3. [Patch Parameters](#sec-patches)
 4. [Immersed Boundary Patches](#sec-immersed-boundary-patches)
-5. [Fluid Material's Parameters](#sec-fluid-materials)
+5. [Fluid Materials Parameters](#sec-fluid-materials)
 6. [Simulation Algorithm Parameters](#sec-simulation-algorithm)
 7. [Formatted Database and Structure Parameters](#sec-formatted-output)
 8. [(Optional) Acoustic Source Parameters](#sec-acoustic-source)
@@ -409,7 +440,7 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
   - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
   - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
 
-### 5. Fluid Material's {#sec-fluid-materials}
+### 5. Fluid Materials {#sec-fluid-materials}
 
 | Parameter | Type   | Description                                    |
 | ---:      | :----: |          :---                                  |
@@ -417,7 +448,7 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `pi_inf`  | Real   | Stiffened-gas parameter \f$\Pi_\infty\f$ of fluid. |
 | `Re(1)` * | Real   | Shear viscosity of fluid.                      |
 | `Re(2)` * | Real   | Volume viscosity of fluid.                     |
-| `cv`   ** | Real   | Sffened-gas parameter $c_v$ of fluid.          |
+| `cv`   ** | Real   | Stiffened-gas parameter $c_v$ of fluid.          |
 | `qv`   ** | Real   | Stiffened-gas parameter $q$ of fluid.          |
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
 | `sigma`   | Real   | Surface tension coefficient                    |
@@ -442,6 +473,10 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
+
+- `fluid_pp(i)%%eos` selects the equation of state for the $i$-th fluid: [1] stiffened gas (default); [2] Jones-Wilkins-Lee (JWL) for detonation products, supported with `model_eqns = 2` and at most one JWL fluid. A JWL fluid requires `jwl_A`, `jwl_B`, `jwl_R1`, `jwl_R2`, `jwl_omega`, `jwl_rho0`, and either `jwl_Q` (specific detonation energy, J/kg) or `jwl_E0` (volumetric detonation energy, J/m³; MFC derives `jwl_E0 = jwl_rho0*jwl_Q`), plus `jwl_air_rho0` and either `jwl_air_e0` (specific internal energy) or `jwl_air_p0` (pressure) describing the co-existing ideal gas. The ideal gas Grüneisen coefficient \f$\Gamma_{\mathrm{air}} = 1/\gamma\f$ is taken from that gas fluid's own `gamma`; with a single JWL fluid and no separate ideal-gas fluid, the JWL fluid's own `gamma` is used. The optional `jwl_ej_rho_ref` sets the products-energy reference density (default `jwl_rho0`, so \f$e_j = E_0/\rho_0\f$). Products are mixed with the surrounding gas by a composition (heat-capacity) weighted closure that recovers pressure, temperature, and sound speed from \f$(\rho, e, Y)\f$ in closed form and degenerates exactly to the pure-JWL law at \f$Y=1\f$ and the ambient law at \f$Y=0\f$; it requires positive products and air `cv`. A stiffened-gas ambient (e.g. water) is supported by setting the non-JWL fluid's `pi_inf`; see README-JWL-EOS.md.
+
+- JWL reaction sources (simulation stage, require a JWL fluid): `prog_burn` enables a Rocflu-style kinematic program burn — a front expands from the detonation point (`pb_x_det`, `pb_y_det`, `pb_z_det`) starting at time `pb_t_det` with speed `pb_D_cj`, releasing the detonation energy `jwl_Q` over a reaction zone of width `pb_width`. `jwl_afterburn` enables products-air afterburn energy release with an advected progress variable (adds one equation): `jwl_ab_model` selects the rate law ([1] mixing-rate with time scale `jwl_ab_tau`; [2] Arrhenius, the default, with prefactor `jwl_ab_A`, activation temperature `jwl_ab_theta`, and pressure exponent `jwl_ab_n`), and `jwl_q_ab` is the specific afterburn energy (J/kg products, in addition to `jwl_Q` — use a detonation-only JWL fit to avoid double counting). Afterburn requires `riemann_solver = 2` and an ideal-gas ambient. `jwl_reactive` enables a JWL++ (Souers 2000) pressure-driven reactive burn (adds one equation): the reaction progress evolves as `dλ/dt = jwl_G * p^jwl_b_exp * (1 - λ)` and releases `jwl_Q` as the explosive reacts, so a detonation self-propagates from a high-pressure hot spot rather than a prescribed front (mutually exclusive with `prog_burn`; requires `riemann_solver = 2`). The optional `fluid_pp(i)%%jwl_delta_e` (J/kg, must be ≤ 0; default 0 = off) adds a reactant/product energy offset after Garno et al. (2020): the thermal term of the JWL pressure law uses \f$e_{\mathrm{eff}} = e + Y\,(1-\lambda)\,\Delta e\f$ (scaled by the JWL mass fraction \f$Y\f$ so pure ambient gas is untouched and the offset fades as products mix into air), so unreacted explosive (\f$\lambda = 0\f$) sits on a stiffer Hugoniot than the products and a resolved `jwl_reactive` detonation exhibits genuine ZND structure (a von Neumann pressure spike decaying to the Chapman-Jouguet state through a finite reaction zone) instead of a monotonic energy-source profile. With the default `jwl_delta_e = 0` the closure is unchanged regardless of \f$\lambda\f$.
 
 > **Stored-form parameters:** The values `gamma`, `pi_inf`, and `Re(1)`/`Re(2)` are **not** the raw physical quantities. MFC expects transformed stored forms:
 > - `gamma` = \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself
@@ -1019,7 +1054,7 @@ The parameters are optionally used to define initial velocity profiles and pertu
 - `pi_fac` specifies the ratio of artificial and true `pi_\infty` values (`=` artificial `pi_\infty` / true `pi_\infty`).
 This parameter enables the use of true `pi_\infty` in bubble dynamics models when the `pi_\infty` given in the `case.py` file is an artificial value.
 
-### 13. Body Forces
+### 13. Body Forces {#body-forces}
 
 | Parameter         | Type    | Description                                |
 | ---:              | :---:   | :---                                       |
@@ -1035,7 +1070,7 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models whe
 
 By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
 
-### 14. Magnetohydrodynamics (MHD)
+### 14. Magnetohydrodynamics (MHD) {#sec-mhd}
 
 | Parameter                | Type    | Description                                              |
 | ---:                     | :---:   | :---                                                     |
@@ -1065,7 +1100,7 @@ Note: In 1D/2D/3D simulations, all three velocity components are treated as stat
 
 Note: For relativistic flow, the conservative and primitive densities are different. `rho_wrt` outputs the primitive (rest mass) density.
 
-### 15. Elasticity
+### 15. Elasticity {#sec-elasticity}
 
 | Parameter         | Type    | Description                                         |
 | ---:              | :---:   | :---                                                |
@@ -1094,7 +1129,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `bc_y%%beg = -2` to enable reflective boundary conditions
 
-### 17. Chemistry
+### 17. Chemistry {#sec-chemistry}
 
 | Parameter                     | Type    | Description                                              |
 | ---:                          | :---:   | :---                                                     |
@@ -1173,7 +1208,7 @@ Usage notes:
 
 - These parameters are for NVIDIA Grace-Hopper and similar architectures with hardware-managed unified memory. They allow MFC to run problems larger than GPU memory by paging data between host and device.
 
-### 20. Synthetic Turbulence
+### 21. Synthetic Turbulence
 
 | Parameter                          | Type    | Description                                            |
 | ---:                                | :---:   | :---                                                    |

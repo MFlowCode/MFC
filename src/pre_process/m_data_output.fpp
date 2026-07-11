@@ -15,6 +15,7 @@ module m_data_output
 
     use m_compile_specific
     use m_variables_conversion
+    use m_jwl, only: jwl_idx
     use m_helper
     use m_delay_file_access
     use m_boundary_common
@@ -72,6 +73,7 @@ contains
         real(wp)                                                    :: pres, T
         real(wp)                                                    :: rhoYks(1:num_species)
         real(wp)                                                    :: pres_mag
+        real(wp)                                                    :: lambda_jwl  !< JWL reaction progress (1 unless jwl_reactive)
         type(scalar_field), intent(inout), optional                 :: q_T_sf
 
         pres_mag = 0._wp
@@ -196,9 +198,22 @@ contains
                                                    & 0)**2 + q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)**2)
                             end if
 
-                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
-                                                    & 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, &
-                                                    & rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
+                            if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                                ! Pass the cell's products mass fraction so pure-air cells do not evaluate the pure-products branch,
+                                ! and the reaction progress so an unreacted (rxn=0) IC gets the delta_e-shifted Hugoniot, matching
+                                ! the simulation/post-process diagnostics.
+                                lambda_jwl = 1._wp
+                                if (jwl_reactive) lambda_jwl = min(max(q_cons_vf(eqn_idx%rxn)%sf(j, 0, 0), 0._wp), 1._wp)
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
+                                                        & 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, &
+                                                        & gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag, &
+                                                        & jwl_Y=q_cons_vf(jwl_idx)%sf(j, 0, 0)/max(rho, sgm_eps), &
+                                                        & jwl_lambda=lambda_jwl)
+                            else
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
+                                                        & 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, &
+                                                        & gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
+                            end if
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
                             if (i == eqn_idx%mom%beg + 1) then  ! v
@@ -228,6 +243,10 @@ contains
                         else if (i == eqn_idx%n .and. adv_n .and. bubbles_euler) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         else if (i == eqn_idx%damage) then
+                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                        else if (jwl_afterburn .and. i == eqn_idx%abn) then
+                            write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
+                        else if (jwl_reactive .and. i == eqn_idx%rxn) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                         end if
                     end do

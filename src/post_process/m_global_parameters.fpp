@@ -213,6 +213,8 @@ contains
             fluid_pp(i)%mu_min = dflt_real
             fluid_pp(i)%mu_max = dflt_real
             fluid_pp(i)%mu_bulk = dflt_real
+            fluid_pp(i)%eos = eos_stiffened_gas
+            call s_assign_jwl_fluid_defaults(fluid_pp(i))
         end do
 
         ! Subgrid bubble parameters (bub_pp struct + scalar companions; bub_pp%R0ref is set in common

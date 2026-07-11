@@ -152,6 +152,8 @@ module m_derived_types
         integer               :: c        !< Color function equation
         integer               :: damage   !< Damage variable equation
         integer               :: psi      !< Psi variable equation
+        integer               :: abn      !< JWL afterburn progress equation
+        integer               :: rxn      !< JWL++ reaction progress equation
     end type eqn_idx_info
 
     !> Initial-condition state assembled by pre_process: working primitive and
@@ -379,21 +381,35 @@ module m_derived_types
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
     type physical_parameters
-        real(wp)               :: gamma          !< Sp. heat ratio
-        real(wp)               :: pi_inf         !< Liquid stiffness
-        real(wp), dimension(2) :: Re             !< Reynolds number
-        real(wp)               :: cv             !< heat capacity
-        real(wp)               :: qv             !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
-        real(wp)               :: qvp            !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
+        real(wp)               :: gamma           !< Sp. heat ratio
+        real(wp)               :: pi_inf          !< Liquid stiffness
+        real(wp), dimension(2) :: Re              !< Reynolds number
+        real(wp)               :: cv              !< heat capacity
+        real(wp)               :: qv              !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
+        real(wp)               :: qvp             !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(wp)               :: G
-        logical                :: non_newtonian  !< Enable Herschel-Bulkley non-Newtonian viscosity
-        real(wp)               :: K              !< HB consistency index
-        real(wp)               :: nn             !< HB flow behavior index
-        real(wp)               :: tau0           !< HB yield stress (0 => power-law)
-        real(wp)               :: hb_m           !< Papanastasiou regularization parameter
-        real(wp)               :: mu_min         !< Lower viscosity clamp (inactive sentinel = dflt_real)
-        real(wp)               :: mu_max         !< Upper viscosity clamp (required when non_newtonian)
-        real(wp)               :: mu_bulk        !< Bulk viscosity for NN (inactive sentinel = dflt_real)
+        logical                :: non_newtonian   !< Enable Herschel-Bulkley non-Newtonian viscosity
+        real(wp)               :: K               !< HB consistency index
+        real(wp)               :: nn              !< HB flow behavior index
+        real(wp)               :: tau0            !< HB yield stress (0 => power-law)
+        real(wp)               :: hb_m            !< Papanastasiou regularization parameter
+        real(wp)               :: mu_min          !< Lower viscosity clamp (inactive sentinel = dflt_real)
+        real(wp)               :: mu_max          !< Upper viscosity clamp (required when non_newtonian)
+        real(wp)               :: mu_bulk         !< Bulk viscosity for NN (inactive sentinel = dflt_real)
+        integer                :: eos             !< EOS selector: 1 = stiffened gas, 2 = JWL
+        real(wp)               :: jwl_A           !< JWL high-pressure coefficient A (Pa)
+        real(wp)               :: jwl_B           !< JWL low-pressure coefficient B (Pa)
+        real(wp)               :: jwl_R1          !< JWL high-pressure decay rate R1
+        real(wp)               :: jwl_R2          !< JWL low-pressure decay rate R2
+        real(wp)               :: jwl_omega       !< JWL Gruneisen coefficient omega
+        real(wp)               :: jwl_rho0        !< JWL reference (crystal) density (kg/m³)
+        real(wp)               :: jwl_Q           !< JWL reference detonation energy per unit mass (J/kg)
+        real(wp)               :: jwl_E0          !< JWL reference detonation energy (J/m³)
+        real(wp)               :: jwl_air_e0      !< Ambient gas specific internal energy for mixture blend
+        real(wp)               :: jwl_air_rho0    !< Ambient gas density for mixture blend (kg/m³)
+        real(wp)               :: jwl_air_p0      !< Ambient gas pressure; when set, derives jwl_air_e0
+        real(wp)               :: jwl_ej_rho_ref  !< Products-energy reference density; e_j = jwl_E0/this (default jwl_rho0)
+        real(wp)               :: jwl_delta_e     !< Reactant/product energy offset for jwl_reactive (0 = feature off; must be <= 0)
     end type physical_parameters
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models

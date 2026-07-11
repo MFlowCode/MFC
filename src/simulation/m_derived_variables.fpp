@@ -21,6 +21,8 @@ module m_derived_variables
     private; public :: s_initialize_derived_variables_module, s_initialize_derived_variables, s_compute_derived_variables, &
         & s_finalize_derived_variables_module
 
+    ! fd_coeff_x, fd_coeff_y, fd_coeff_z: declared in m_global_parameters so m_viscous can see them too
+
     ! @name Variables for computing acceleration
     !> @{
     real(wp), public, allocatable, dimension(:,:,:) :: accel_mag

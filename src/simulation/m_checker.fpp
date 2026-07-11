@@ -12,7 +12,8 @@ module m_checker
     use m_mpi_proxy
     use m_helper
     use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order
+    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, eos_jwl, wave_speeds_pressure, &
+        & BC_CHAR_SLIP_WALL, BC_CHAR_SUP_OUTFLOW, model_eqns_5eq, bubble_model_gilmore
 
     implicit none
 
@@ -36,6 +37,73 @@ contains
         end if
 
         call s_check_inputs_time_stepping
+
+        ! Paths that evaluate stiffened-gas gamma/pi_inf mixture relations, which are
+        ! meaningless for a JWL fluid: the pressure-based wave-speed shock-Mach
+        ! correction, characteristic (CBC) boundary treatments, the alternative
+        ! (Wood-like) sound speed, and the elastic pressure recovery.
+        if (any(fluid_pp(1:num_fluids)%eos == eos_jwl)) then
+            @:PROHIBIT(wave_speeds == wave_speeds_pressure, &
+                       & "wave_speeds = 2 (pressure-based) is not supported with eos_jwl; use wave_speeds = 1")
+            @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) <= BC_CHAR_SLIP_WALL .and. (/bc_x%beg, &
+                       & bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) >= BC_CHAR_SUP_OUTFLOW), &
+                       & "characteristic (CBC) boundary conditions are not supported with eos_jwl")
+            @:PROHIBIT(alt_soundspeed, "alt_soundspeed is not supported with eos_jwl")
+            @:PROHIBIT(hypoelasticity .or. hyperelasticity, "elasticity is not supported with eos_jwl")
+            ! These solver paths compute pressure from stiffened-gas relations and
+            ! bypass the JWL closure entirely, so JWL cells would be silently wrong.
+            @:PROHIBIT(igr, "igr is not supported with eos_jwl (IGR evaluates stiffened-gas pressure on JWL cells)")
+            @:PROHIBIT(bubbles_euler .or. mhd .or. chemistry, &
+                       & "bubbles_euler, mhd, and chemistry are not supported with eos_jwl (their pressure paths bypass the JWL closure)")
+
+            ! ib is compatible: ghost/fresh cells (including %rxn/%abn) are rebuilt through
+            ! the JWL closure in m_ibm, and reaction sources are gated off solid cells.
+        else
+            @:PROHIBIT(jwl_afterburn .or. prog_burn .or. jwl_reactive, &
+                       & "jwl_afterburn, prog_burn, and jwl_reactive require a fluid with eos_jwl")
+        end if
+
+        if (jwl_reactive) then
+            @:PROHIBIT(riemann_solver /= 2, "jwl_reactive requires riemann_solver = 2 (HLLC)")
+            @:PROHIBIT(prog_burn, "jwl_reactive and prog_burn are mutually exclusive detonation models")
+            @:PROHIBIT(f_is_default(jwl_G) .or. jwl_G <= 0._wp, "jwl_reactive requires positive jwl_G")
+            @:PROHIBIT(f_is_default(jwl_b_exp) .or. jwl_b_exp <= 0._wp, "jwl_reactive requires positive jwl_b_exp")
+        end if
+
+        if (jwl_afterburn) then
+            @:PROHIBIT(riemann_solver /= 2, "jwl_afterburn requires riemann_solver = 2 (HLLC)")
+            @:PROHIBIT(jwl_ab_model /= 1 .and. jwl_ab_model /= 2, "jwl_ab_model must be 1 (mixing-rate) or 2 (Arrhenius)")
+            @:PROHIBIT(f_is_default(jwl_q_ab) .or. jwl_q_ab <= 0._wp, "jwl_afterburn requires positive jwl_q_ab")
+            @:PROHIBIT(jwl_ab_model == 1 .and. (f_is_default(jwl_ab_tau) .or. jwl_ab_tau <= 0._wp), &
+                       & "jwl_ab_model = 1 requires positive jwl_ab_tau")
+            @:PROHIBIT(jwl_ab_model == 2 .and. (f_is_default(jwl_ab_A) .or. jwl_ab_A <= 0._wp .or. f_is_default(jwl_ab_theta) &
+                       & .or. jwl_ab_theta <= 0._wp), "jwl_ab_model = 2 requires positive jwl_ab_A and jwl_ab_theta")
+            ! Afterburn is oxygen combustion with air; a stiffened (liquid) ambient has none.
+            @:PROHIBIT(any(fluid_pp(1:num_fluids)%eos /= eos_jwl .and. fluid_pp(1:num_fluids)%pi_inf > 0._wp), &
+                       & "jwl_afterburn requires an ideal-gas ambient fluid")
+        end if
+
+        if (prog_burn) then
+            @:PROHIBIT(f_is_default(pb_D_cj) .or. pb_D_cj <= 0._wp, "prog_burn requires positive pb_D_cj")
+            @:PROHIBIT(f_is_default(pb_width) .or. pb_width <= 0._wp, "prog_burn requires positive pb_width")
+            ! In 3D cylindrical coordinates z is the azimuthal angle, so the Cartesian
+            ! front distance sqrt(dx^2 + dy^2 + dz^2) would mix radians into meters.
+            @:PROHIBIT(cyl_coord .and. p > 0, "prog_burn is not supported in 3D cylindrical coordinates")
+            ! The burn front advances pb_D_cj*dt per step; if that exceeds the band
+            ! width, annuli of cells are never swept and detonation energy is lost.
+            @:PROHIBIT(.not. cfl_dt .and. .not. f_is_default(pb_D_cj) .and. .not. f_is_default(pb_width) &
+                       & .and. pb_D_cj*dt > pb_width, &
+                       & "prog_burn requires pb_D_cj*dt <= pb_width so the front advances at most one band width per step")
+        end if
+
+        ! Gilmore radial dynamics assume a barotropic Tait liquid (f_H/f_cgas in
+        ! m_bubbles.fpp): the 5-equation model supplies no Tait constants (mirrors
+        ! case_validator.py), and the Euler-Lagrange path passes dummy ntait/Btait
+        ! that are never assigned, so Gilmore is invalid there for any flow model.
+        @:PROHIBIT(bubbles_euler .and. model_eqns == model_eqns_5eq .and. bubble_model == bubble_model_gilmore, &
+                   & "The 5-equation bubbly flow model does not support bubble_model = 1 (Gilmore)")
+        @:PROHIBIT(bubbles_lagrange .and. bubble_model == bubble_model_gilmore, &
+                   & "bubbles_lagrange does not support bubble_model = 1 (Gilmore); use 2 (Keller-Miksis) or 3 (Rayleigh-Plesset)")
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")

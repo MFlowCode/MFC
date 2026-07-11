@@ -68,6 +68,17 @@
     end if
 #:enddef compute_average_state
 
+#:def JWL_RECONSTRUCT_ENERGY()
+    ! JWL five-equation face energy from the inverse mixture EOS e(rho, p, Y, lambda).
+    ! The caller sets the bounded Y_jwl_L/Y_jwl_R and lambda_jwl_L/lambda_jwl_R first
+    ! (the partial-density/reaction-progress buffers differ per solver); the same
+    ! bounded values also feed the JWL sound-speed estimate.
+    call s_jwl_mix_energy_pr(rho_L, pres_L, Y_jwl_L, jwl_idx, e_jwl_L, lambda_jwl_L)
+    call s_jwl_mix_energy_pr(rho_R, pres_R, Y_jwl_R, jwl_idx, e_jwl_R, lambda_jwl_R)
+    E_L = rho_L*e_jwl_L + 5.e-1_wp*rho_L*vel_L_rms
+    E_R = rho_R*e_jwl_R + 5.e-1_wp*rho_R*vel_R_rms
+#:enddef JWL_RECONSTRUCT_ENERGY
+
 #:def compute_low_Mach_correction()
     if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_lax_friedrichs) then
         zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))

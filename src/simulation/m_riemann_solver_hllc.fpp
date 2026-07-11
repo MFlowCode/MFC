@@ -12,6 +12,7 @@ module m_riemann_solver_hllc
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_jwl
     use m_bubbles
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs, model_eqns_5eq, &
         & model_eqns_6eq, model_eqns_4eq, avg_state_roe, avg_state_arithmetic, wave_speeds_direct, wave_speeds_pressure
@@ -59,6 +60,7 @@ contains
         real(wp) :: rho_L, rho_R
         real(wp) :: pres_L, pres_R
         real(wp) :: E_L, E_R
+        real(wp) :: e_jwl_L, e_jwl_R
         real(wp) :: H_L, H_R
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(10) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
@@ -75,6 +77,7 @@ contains
         real(wp)               :: Cv_L, Cv_R
         real(wp)               :: Gamm_L, Gamm_R
         real(wp)               :: Y_L, Y_R
+        real(wp)               :: Y_jwl_L, Y_jwl_R, lambda_jwl_L, lambda_jwl_R
         real(wp)               :: gamma_L, gamma_R
         real(wp)               :: pi_inf_L, pi_inf_R
         real(wp)               :: qv_L, qv_R
@@ -232,6 +235,7 @@ contains
                                     call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                                 end if
 
+                                ! Six-equation model: JWL (five-equation only) never reaches this loop.
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
 
@@ -462,6 +466,18 @@ contains
                                                 & eqn_idx%c) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%c))*s_S
                                 end if
 
+                                ! JWL afterburn progress flux (advected with the flow, color-function treatment)
+                                if (jwl_afterburn) then
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%abn) = (xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & eqn_idx%abn) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%abn))*s_S
+                                end if
+
+                                ! JWL++ reaction progress flux
+                                if (jwl_reactive) then
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%rxn) = (xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & eqn_idx%rxn) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%rxn))*s_S
+                                end if
+
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
@@ -555,6 +571,7 @@ contains
                                 pres_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
                                 pres_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
 
+                                ! Four-equation model: JWL (five-equation only) never reaches this loop.
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
 
@@ -721,7 +738,7 @@ contains
                                         & alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, &
                                         & xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar, Ys_L, &
                                         & Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, &
-                                        & h_avg_2]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & h_avg_2, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -798,6 +815,7 @@ contains
                                 pres_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
                                 pres_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
 
+                                ! Bubbles (five-equation): JWL is excluded from bubbles_euler, so this loop never sees it.
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms
 
@@ -1093,15 +1111,17 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 else
                     ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, &
-                                        & pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, &
-                                        & MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, &
-                                        & H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, &
-                                        & xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, &
-                                        & alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, &
-                                        & vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, &
-                                        & Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, &
-                                        & h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, &
+                                        & rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, &
+                                        & alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, &
+                                        & Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, &
+                                        & s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, &
+                                        & vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, &
+                                        & alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, &
+                                        & Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, &
+                                        & xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, c_sum_Yi_Phi, flux_ene_e, &
+                                        & e_jwl_L, e_jwl_R, Y_jwl_L, Y_jwl_R, lambda_jwl_L, lambda_jwl_R]', copyin='[is1, is2, &
+                                        & is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -1220,10 +1240,23 @@ contains
                                     E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
+                                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                                    else if (jwl_idx > 0 .and. model_eqns == model_eqns_5eq) then
+                                        Y_jwl_L = min(max(qL_prim_rsx_vf(${SF('')}$, jwl_idx)/max(rho_L, sgm_eps), 0._wp), 1._wp)
+                                        Y_jwl_R = min(max(qR_prim_rsx_vf(${SF(' + 1')}$, jwl_idx)/max(rho_R, sgm_eps), 0._wp), &
+                                                      & 1._wp)
+                                        lambda_jwl_L = 1._wp; lambda_jwl_R = 1._wp
+                                        if (jwl_reactive) then
+                                            lambda_jwl_L = min(max(qL_prim_rsx_vf(${SF('')}$, eqn_idx%rxn), 0._wp), 1._wp)
+                                            lambda_jwl_R = min(max(qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%rxn), 0._wp), 1._wp)
+                                        end if
+                                        @:JWL_RECONSTRUCT_ENERGY()
+                                        H_L = (E_L + pres_L)/rho_L
+                                        H_R = (E_R + pres_R)/rho_R
+                                    #:endif
                                 else
-                                    E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
-                                    E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
-
+                                    E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
+                                    E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
                                 end if
@@ -1260,16 +1293,35 @@ contains
 
                                 @:compute_average_state()
 
-                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, vel_L_rms, 0._wp, &
-                                                              & c_L, qv_L)
+                                #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                                    if (jwl_idx > 0) then
+                                        call s_compute_jwl_speed_of_sound(pres_L, rho_L, Y_jwl_L, c_L, lambda_jwl_L)
+                                        call s_compute_jwl_speed_of_sound(pres_R, rho_R, Y_jwl_R, c_R, lambda_jwl_R)
+                                    else
+                                    #:endif
+                                    call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, vel_L_rms, &
+                                                                  & 0._wp, c_L, qv_L)
 
-                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, vel_R_rms, 0._wp, &
-                                                              & c_R, qv_R)
+                                    call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, vel_R_rms, &
+                                                                  & 0._wp, c_R, qv_R)
+                                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                                    end if
+                                #:endif
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 !  variables are placeholders to call the subroutine.
-                                call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, vel_avg_rms, &
-                                                              & c_sum_Yi_Phi, c_avg, qv_avg)
+                                #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                                    if (jwl_idx > 0) then
+                                        call s_compute_jwl_speed_of_sound(5.e-1_wp*(pres_L + pres_R), rho_avg, &
+                                                                          & 5.e-1_wp*(Y_jwl_L + Y_jwl_R), c_avg, &
+                                                                          & 5.e-1_wp*(lambda_jwl_L + lambda_jwl_R))
+                                    else
+                                    #:endif
+                                    call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
+                                                                  & vel_avg_rms, c_sum_Yi_Phi, c_avg, qv_avg)
+                                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                                    end if
+                                #:endif
 
                                 if (viscous) then
                                     if (chemistry) then
@@ -1418,6 +1470,22 @@ contains
                                     flux_rsx_vf(${SF('')}$, eqn_idx%c) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
                                                 & eqn_idx%c)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
                                                 & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%c)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                end if
+
+                                ! JWL afterburn progress flux (advected with the flow, color-function treatment)
+                                if (jwl_afterburn) then
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%abn) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & eqn_idx%abn)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
+                                                & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & eqn_idx%abn)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                end if
+
+                                ! JWL++ reaction progress flux
+                                if (jwl_reactive) then
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%rxn) = xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & eqn_idx%rxn)*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
+                                                & + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & eqn_idx%rxn)*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
                                 end if
 
                                 ! Hyperelastic reference map flux for material deformation tracking
