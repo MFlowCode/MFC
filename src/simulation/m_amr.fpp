@@ -1677,10 +1677,10 @@ contains
         ! Skip those faces (weight 0); the fine-fine halo already matched the shared seam flux. No siblings -> all weights 1
         ! (no-op).
         w_lo = 1._wp; w_hi = 1._wp
-        do d = 1, num_dims
-            do y = 1, amr_num_blocks
-                if (y == amr_cur) cycle
-                if (f_amr_parent_block(y) /= pblk) cycle  ! same-parent sibling tile only (guarantees same level)
+        do y = 1, amr_num_blocks  ! block outer, dim inner: f_amr_parent_block (a linear scan) is evaluated once per sibling
+            if (y == amr_cur) cycle
+            if (f_amr_parent_block(y) /= pblk) cycle  ! same-parent sibling tile only (guarantees same level)
+            do d = 1, num_dims
                 if (f_amr_seam(amr_cur, y, d)) w_hi(d) = 0._wp  ! sibling just above -> shared high face
                 if (f_amr_seam(y, amr_cur, d)) w_lo(d) = 0._wp  ! sibling just below -> shared low face
             end do
@@ -2844,7 +2844,10 @@ contains
     end function f_amr_seam
 
     !> Pack (dir=+1) / unpack (dir=-1) the fine cells of slot's q_cons over [dlo:dhi] in dim d, full transverse, all sys_size, in a
-    !! fixed (i, d-index, transverse) order so a packer and unpacker with matching extents align cell-for-cell. Host arrays.
+    !! fixed (i, d-index, transverse) order so a packer and unpacker with matching extents align cell-for-cell. GPU: only this
+    !! buff_size-deep near-seam slab is moved device<->host (host<-device before a pack, device<-host after an unpack), interior
+    !! transverse (0:fm) only - exactly the cells touched below, so the round-trip is byte-identical to a full-field update at a
+    !! tiny fraction of the volume (the halo runs per stage, 6x per fine step).
     impure subroutine s_amr_fine_slice(slot, d, dlo, dhi, buf, dir)
 
         integer, intent(in)     :: slot, d, dlo, dhi, dir
@@ -2852,6 +2855,17 @@ contains
         integer                 :: i, a, b, c, idx, fm(3)
 
         fm(1) = amr_slots(slot)%m; fm(2) = amr_slots(slot)%n; fm(3) = amr_slots(slot)%p
+        if (dir == 1) then  ! host <- device: make the slab current before the pack reads it
+            do i = 1, sys_size
+                #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+                    #:set SEC = {1: '(dlo:dhi, 0:fm(2), 0:fm(3))', 2: '(0:fm(1), dlo:dhi, 0:fm(3))', &
+                        & 3: '(0:fm(1), 0:fm(2), dlo:dhi)'}[D]
+                    if (d == ${D}$) then
+                        $:GPU_UPDATE(host='[amr_slots(slot)%q_cons(i)%sf' + SEC + ']')
+                    end if
+                #:endfor
+            end do
+        end if
         idx = 0
         do i = 1, sys_size
             do c = dlo, dhi
@@ -2872,6 +2886,17 @@ contains
                 #:endfor
             end do
         end do
+        if (dir == -1) then  ! device <- host: push the freshly unpacked seam ghosts back to the device
+            do i = 1, sys_size
+                #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+                    #:set SEC = {1: '(dlo:dhi, 0:fm(2), 0:fm(3))', 2: '(0:fm(1), dlo:dhi, 0:fm(3))', &
+                        & 3: '(0:fm(1), 0:fm(2), dlo:dhi)'}[D]
+                    if (d == ${D}$) then
+                        $:GPU_UPDATE(device='[amr_slots(slot)%q_cons(i)%sf' + SEC + ']')
+                    end if
+                #:endfor
+            end do
+        end if
 
     end subroutine s_amr_fine_slice
 
@@ -2882,22 +2907,14 @@ contains
     !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (incl. every np=1 case, untiled).
     impure subroutine s_amr_fine_fine_halo()
 
-        integer               :: xb, yb, d, rX, rY, i, cnt, xm(3), ym(3), tsz, ierr, fmul
+        integer               :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul
         real(wp), allocatable :: xbuf(:), ybuf(:)
 
         if (.not. amr) return
         if (amr_num_blocks < 2) return
 
-        ! device-resident fine state -> host for the packs; pushed back after (owned blocks only)
-        do xb = 1, amr_num_blocks
-            if (amr_block_owner(xb) == proc_rank) then
-                call s_amr_select_slot(xb)
-                do i = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_slots(xb)%q_cons(i)%sf]')
-                end do
-            end if
-        end do
-
+        ! device<->host of the fine state is done per-seam inside s_amr_fine_slice, moving only the buff_size-deep near-seam
+        ! slab each pack/unpack touches (not the whole block) - a large PCIe saving since this runs per stage (6x per fine step)
         do xb = 1, amr_num_blocks
             do yb = 1, amr_num_blocks
                 if (xb == yb) cycle
@@ -2950,14 +2967,6 @@ contains
                 end if
                 deallocate (xbuf, ybuf)
             end do
-        end do
-
-        do xb = 1, amr_num_blocks
-            if (amr_block_owner(xb) == proc_rank) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[amr_slots(xb)%q_cons(i)%sf]')
-                end do
-            end if
         end do
         call s_amr_select_slot(1)
 
