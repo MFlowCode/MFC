@@ -39,7 +39,7 @@ module m_amr
     public :: t_level, amr_maxc, amr_maxc_fit, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
         & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
         & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_amr_fine_stage_fill, &
-        & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_advance_amr_fine_substeps, s_amr_conservation_defect, &
+        & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_amr_conservation_defect, &
         & s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, s_amr_relax_fine, s_amr_setup_ib, &
         & s_amr_check_active_box_containment, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
 
@@ -3036,26 +3036,19 @@ contains
 
     end subroutine s_amr_fine_stage_advance
 
-    !> Subcycled fine advance (amr_subcycle): two dt/2 SSP-RK3 substeps AFTER the coarse step. q_old/q_new are the coarse t^n and
-    !! t^{n+1} states; each stage's ghosts are the linear time interpolation at the stage time theta = (substep-1 + c_s)/2 with
-    !! SSP-RK3 abscissae c = [0, 1, 1/2]. Fine flux registers are zeroed here and accumulate over all six stages (0.5*rk3_w each) so
-    !! the end-of-step state reflux sees the time-averaged effective fine flux.
-    impure subroutine s_advance_amr_fine_substeps(q_old, q_new, coefs, bc_type, q_T_sf, pb_old, mv_old, pb_in, rhs_pb, mv_in, &
-        & rhs_mv, t_step, time_avg)
+    !> Per-block SETUP for the transposed subcycle advance (amr_subcycle): exchange valid coarse ghosts, gather+prolong the selected
+    !! block's two time-lerp ghost sources (parent t^n in q_ghost_a, t^{n+1} in q_ghost_b), and zero its flux registers. The
+    !! collective exchanges/gathers run on ALL ranks; the owner-only fills and register-zero are guarded. Called once per level-1
+    !! block before the transposed stage loop (which then reuses the prepared ghost sources every substep).
+    impure subroutine s_amr_subcycle_setup_block(q_old, q_new, pb_old, mv_old, pb_in, mv_in)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                  :: q_old, q_new
-        real(wp), dimension(:,:), intent(in)                                                    :: coefs  !< rk_coef(1:3, 1:4)
-        type(integer_field), dimension(1:num_dims,1:2), intent(in)                              :: bc_type
-        type(scalar_field), intent(inout)                                                       :: q_T_sf
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_old, mv_old
         real(stp), dimension(:,:,:,:,:), intent(inout)                                          :: pb_in, mv_in
-        real(wp), dimension(:,:,:,:,:), intent(inout)                                           :: rhs_pb, rhs_mv
-        integer, intent(in)                                                                     :: t_step
-        real(wp), intent(inout)                                                                 :: time_avg
 
-        if (.not. amr) return
         ! valid coarse CONS ghosts on both lerp sources (ALL ranks call: pairwise halo); the exchanged t^n /
         ! t^{n+1} ghost layers make the prolonged block-boundary ghosts correct even at rank boundaries
+
         if (amr_xchg_coarse_ghosts) then
             call s_amr_exchange_coarse_cons_halo(q_old)
             call s_amr_exchange_coarse_cons_halo(q_new)
@@ -3076,17 +3069,171 @@ contains
             call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf)
         end if
 
-        ! recurse into this block's subtree: subcycle its substeps at amr_dt_fine; children (if any) subcycle within each substep
-        call s_amr_advance_subtree(amr_dt_fine, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
+        ! registers accumulate over all six stages of the transposed loop, so zero them once at setup (the stage-1 overwrite
+        ! trick cannot span two substeps)
+        call s_amr_zero_fine_registers()
 
-    end subroutine s_advance_amr_fine_substeps
+    end subroutine s_amr_subcycle_setup_block
+
+    !> Subcycled fine advance (amr_subcycle) over ALL level-1 blocks, TRANSPOSED: instead of each block running its full 2x3-stage
+    !! subcycle in turn, every same-level block advances stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo
+    !! (s_amr_fine_fine_halo) interposed between the ghost lerp and the RHS at each stage. That is what makes max_grid_size-tiled
+    !! ADJACENT sub-blocks (which appear at np>1 when a feature exceeds a rank's slot) compute a MATCHING shared-face flux, so the
+    !! subcycle conserves at the seam - the per-block order did not run the halo and leaked there. Two dt/2 SSP-RK3 substeps AFTER
+    !! the coarse step: q_old/q_new are the coarse t^n / t^{n+1} states; each stage's ghosts are the linear time interpolation at
+    !! stage time theta = (substep-1 + c_s)/2 with SSP-RK3 abscissae c = [0, 1, 1/2]. Level-1 blocks drive their level-2 children
+    !! per substep (s_amr_advance_children); the L2-L2 seam halo is future work. A single owned level-1 block is byte-identical to
+    !! the old per-block subcycle (the halo is a no-op with < 2 adjacent same-level blocks, and is skipped at np=1).
+    impure subroutine s_amr_advance_fine_subcycle_all(q_old, q_new, coefs, bc_type, q_T_sf, pb_old, mv_old, pb_in, rhs_pb, mv_in, &
+        & rhs_mv, t_step, time_avg)
+
+        type(scalar_field), dimension(sys_size), intent(inout)                                  :: q_old, q_new
+        real(wp), dimension(:,:), intent(in)                                                    :: coefs  !< rk_coef(1:3, 1:4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in)                              :: bc_type
+        type(scalar_field), intent(inout)                                                       :: q_T_sf
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_old, mv_old
+        real(stp), dimension(:,:,:,:,:), intent(inout)                                          :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)                                           :: rhs_pb, rhs_mv
+        integer, intent(in)                                                                     :: t_step
+        real(wp), intent(inout)                                                                 :: time_avg
+        real(wp), parameter                                                                     :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
+        integer                                                                                 :: islot, sub, s
+        real(wp)                                                                                :: th
+
+        if (.not. amr) return
+
+        ! SETUP: each level-1 block prepares its two time-lerp ghost sources and zeros its registers (collective; ALL ranks call)
+        do islot = 1, amr_num_blocks
+            if (amr_block_level(islot) /= 1) cycle
+            call s_amr_select_slot(islot)
+            call s_amr_subcycle_setup_block(q_old, q_new, pb_old, mv_old, pb_in, mv_in)
+        end do
+
+        do sub = 1, 2
+            do s = 1, 3
+                th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
+                ! lerp every block's ghost shell to the stage time (+ substep-entry backup) BEFORE the seam halo reads interiors
+                do islot = 1, amr_num_blocks
+                    if (amr_block_level(islot) /= 1) cycle
+                    call s_amr_select_slot(islot)
+                    if (.not. amr_rank_owns_block) cycle
+                    call s_amr_subtree_stage_lerp(s, th)
+                end do
+                ! reconcile shared seam ghosts among ADJACENT same-level blocks so both sides compute a matching flux. Only np>1
+                ! tiles a feature into adjacent sub-blocks; at np=1 this is skipped, keeping the single-rank path byte-identical.
+                if (num_procs > 1) call s_amr_fine_fine_halo()
+                ! RHS + RK update every block from the reconciled ghost shell
+                do islot = 1, amr_num_blocks
+                    if (amr_block_level(islot) /= 1) cycle
+                    call s_amr_select_slot(islot)
+                    if (.not. amr_rank_owns_block) cycle
+                    call s_amr_subtree_stage_advance(amr_dt_fine, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
+                                                     & time_avg, s, th)
+                end do
+            end do
+            ! after this substep each level-1 block is at t_b (q_cons) with t_a in q_cons_stor: its level-2 children subcycle
+            ! within [t_a, t_b] then fold back (restrict + Berger-Colella reflux). No-op for single-level.
+            if (amr_max_level >= 2) then
+                do islot = 1, amr_num_blocks
+                    if (amr_block_level(islot) /= 1) cycle
+                    call s_amr_select_slot(islot)
+                    if (.not. amr_rank_owns_block) cycle
+                    call s_amr_advance_children(islot, amr_dt_fine, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
+                                                & time_avg)
+                end do
+            end if
+        end do
+        call s_amr_select_slot(1)
+
+    end subroutine s_amr_advance_fine_subcycle_all
+
+    !> Ghost-lerp half of one subcycled fine substage for the selected block (amr_cur): time-interpolate the ghost shell to stage
+    !! time th and, on substep stage 1, back up the substep-entry state. Split from the RHS half so that same-level blocks can run
+    !! this together and the block-to-block fine-fine seam halo can be interposed before any block reads a neighbour's interior.
+    !! Owner-only (the caller guards); no numerical coupling between blocks here.
+    impure subroutine s_amr_subtree_stage_lerp(s, th)
+
+        integer, intent(in)  :: s
+        real(wp), intent(in) :: th
+
+        if (rank_time_wrt) call s_rank_time_tic()
+        ! lerp the ghost shell into q_cons at the stage time (device kernel; interior untouched)
+        call s_amr_lerp_fine_ghosts(amr_slots(amr_cur)%q_ghost_a, amr_slots(amr_cur)%q_ghost_b, amr_slots(amr_cur)%q_cons, th)
+        if (qbmm .and. .not. polytropic) call s_amr_lerp_fine_ghosts_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
+            & amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf, amr_slots(amr_cur)%pb_ghost_b%sf, &
+            & amr_slots(amr_cur)%mv_ghost_b%sf, th)
+
+        ! substep-entry backup for the SSP-RK combination (device copy, interior only)
+        if (s == 1) then
+            call s_amr_copy_fine_fields(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, 0, amr_slots(amr_cur)%m, 0, &
+                                        & amr_slots(amr_cur)%n, 0, amr_slots(amr_cur)%p)
+            if (qbmm .and. .not. polytropic) call s_amr_backup_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
+                & amr_slots(amr_cur)%pb_stor%sf, amr_slots(amr_cur)%mv_stor%sf)
+        end if
+        if (rank_time_wrt) call s_rank_time_toc()
+
+    end subroutine s_amr_subtree_stage_lerp
+
+    !> RHS + RK-update half of one subcycled fine substage for the selected block (amr_cur): compute the fine RHS from the (already
+    !! halo-reconciled) ghost shell and apply the SSP-RK stage update at the fine substep dt_sub, plus per-stage pressure relaxation
+    !! and IB correction. Split from the lerp half so the fine-fine seam halo runs between them. Owner-only (the caller guards).
+    impure subroutine s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, &
+        & s, th)
+
+        real(wp), intent(in)                                       :: dt_sub  !< this block's substep dt (parent step / ref_ratio)
+        real(wp), dimension(:,:), intent(in)                       :: coefs   !< rk_coef(1:3, 1:4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+        integer, intent(in)                                        :: t_step, s
+        real(wp), intent(in)                                       :: th
+        real(wp), intent(inout)                                    :: time_avg
+
+        if (rank_time_wrt) call s_rank_time_tic()
+        amr_in_fine_advance = .true.
+        call s_amr_swap_to_fine()
+        ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
+        idwint = amr_slots(amr_cur)%idwbuff
+        $:GPU_UPDATE(device='[idwint]')
+        if (qbmm .and. .not. polytropic) then
+            ! the block's OWN side-state and rhs scratch (the coarse arrays stay untouched)
+            call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
+                               & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, &
+                               & time_avg, s)
+        else
+            call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
+                               & pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, s)
+        end if
+        call s_amr_restore_coarse()
+        amr_in_fine_advance = .false.
+
+        ! RK stage update at the FINE time step (device kernel)
+        call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(s, 1), &
+                                  & coefs(s, 2), coefs(s, 3), coefs(s, 4), dt_sub)
+        if (qbmm .and. .not. polytropic) then
+            call s_amr_fine_rk_update_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, amr_slots(amr_cur)%pb_stor%sf, &
+                                           & amr_slots(amr_cur)%mv_stor%sf, amr_rhs_pb_f, amr_rhs_mv_f, coefs(s, 1), coefs(s, 2), &
+                                           & coefs(s, 3), coefs(s, 4), dt_sub)
+        end if
+        ! 6-equation model: per-substage pressure relaxation (instantaneous equilibration - per stage at fine dt is the same
+        ! infinite-rate limit the coarse applies per stage)
+        if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
+        ! moving body: rebuild the fine-block IB state at the body's fine sub-time position (th matches the fluid-ghost lerp)
+        if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(th)
+        ! IB state correction on the fine block after each substep RK update (no-op unless ib)
+        call s_amr_ib_correct_fine()
+        if (rank_time_wrt) call s_rank_time_toc()
+
+    end subroutine s_amr_subtree_stage_advance
 
     !> Advance the currently-selected fine block (amr_cur) through its subcycle: two amr_dt_fine SSP-RK3 substeps whose ghost shell
     !! is the two-source time-lerp of the block's q_ghost_a (parent t^n) / q_ghost_b (parent t^{n+1}) sources, filled by the caller
     !! before this call. Fine flux registers are zeroed here and accumulate over all six stages so the end-of-step reflux sees the
     !! time-averaged effective fine flux. RECURSIVE: after each of this block's substeps, its level+1 children subcycle within that
     !! substep (s_amr_advance_children) at dt_sub/ref_ratio, so per-level dt falls out of the recursion. With no children this is
-    !! exactly the single-level L0<->L1 advance.
+    !! exactly the single-level L0<->L1 advance. Used for level>=2 children (per-block); level-1 blocks run the transposed,
+    !! seam-halo'd s_amr_advance_fine_subcycle_all instead.
     recursive subroutine s_amr_advance_subtree(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
 
         real(wp), intent(in)                                       :: dt_sub  !< this block's substep dt (parent step / ref_ratio)
@@ -3101,78 +3248,20 @@ contains
         integer                                                    :: sub, s
         real(wp)                                                   :: th
 
-        ! rank_time brackets cover the fine-advance compute segments and pause across the MPI exchanges (the inner s_compute_rhs
-        ! pair nests to a no-op)
-
-        if (rank_time_wrt) call s_rank_time_tic()
         call s_amr_zero_fine_registers()
-
         do sub = 1, 2
             do s = 1, 3
                 th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
-
-                ! lerp the ghost shell into q_cons at the stage time (device kernel; interior untouched)
-                call s_amr_lerp_fine_ghosts(amr_slots(amr_cur)%q_ghost_a, amr_slots(amr_cur)%q_ghost_b, &
-                                            & amr_slots(amr_cur)%q_cons, th)
-                if (qbmm .and. .not. polytropic) call s_amr_lerp_fine_ghosts_pbmv(amr_slots(amr_cur)%pb_f%sf, &
-                    & amr_slots(amr_cur)%mv_f%sf, amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf, &
-                    & amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf, th)
-                if (rank_time_wrt) call s_rank_time_toc()
-
-                ! whole-block-per-rank: no fine-fine continuation halo (owner holds the whole block; blocks >= buff_size apart)
-                if (rank_time_wrt) call s_rank_time_tic()
-
-                ! substep-entry backup for the SSP-RK combination (device copy, interior only)
-                if (s == 1) then
-                    call s_amr_copy_fine_fields(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, 0, &
-                                                & amr_slots(amr_cur)%m, 0, amr_slots(amr_cur)%n, 0, amr_slots(amr_cur)%p)
-                    if (qbmm .and. .not. polytropic) call s_amr_backup_pbmv(amr_slots(amr_cur)%pb_f%sf, &
-                        & amr_slots(amr_cur)%mv_f%sf, amr_slots(amr_cur)%pb_stor%sf, amr_slots(amr_cur)%mv_stor%sf)
-                end if
-
-                amr_in_fine_advance = .true.
-                call s_amr_swap_to_fine()
-                ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
-                idwint = amr_slots(amr_cur)%idwbuff
-                $:GPU_UPDATE(device='[idwint]')
-                if (qbmm .and. .not. polytropic) then
-                    ! the block's OWN side-state and rhs scratch (the coarse arrays stay untouched)
-                    call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, &
-                                       & amr_slots(amr_cur)%rhs, amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, &
-                                       & amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, time_avg, s)
-                else
-                    call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, &
-                                       & amr_slots(amr_cur)%rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, s)
-                end if
-                call s_amr_restore_coarse()
-                amr_in_fine_advance = .false.
-
-                ! RK stage update at the FINE time step (device kernel)
-                call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, &
-                                          & coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, 4), dt_sub)
-                if (qbmm .and. .not. polytropic) then
-                    call s_amr_fine_rk_update_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
-                                                   & amr_slots(amr_cur)%pb_stor%sf, amr_slots(amr_cur)%mv_stor%sf, amr_rhs_pb_f, &
-                                                   & amr_rhs_mv_f, coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, 4), dt_sub)
-                end if
-                ! 6-equation model: per-substage pressure relaxation (instantaneous equilibration -
-                ! per stage at fine dt is the same infinite-rate limit the coarse applies per stage)
-                if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
-                ! moving body: rebuild the fine-block IB state at the body's fine sub-time position (th matches the fluid-ghost
-                ! lerp)
-                if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(th)
-                ! IB state correction on the fine block after each substep RK update (no-op unless ib)
-                call s_amr_ib_correct_fine()
+                call s_amr_subtree_stage_lerp(s, th)
+                call s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, &
+                                                 & s, th)
             end do
-
             ! multi-level: this block is now at t_b (q_cons) with t_a preserved in q_cons_stor. Each level+1 child subcycles WITHIN
             ! this substep - gathering its two ghost-lerp sources from those two snapshots - then folds back (restrict +
-            ! Berger-Colella
-            ! reflux) into this block over dt_sub. No-op when this block has no children (single-level, or the finest level).
+            ! Berger-Colella reflux) into this block over dt_sub. No-op when this block has no children (single-level / finest).
             if (amr_max_level >= 2) call s_amr_advance_children(amr_cur, dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, &
                 & rhs_mv, t_step, time_avg)
         end do
-        if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_amr_advance_subtree
 

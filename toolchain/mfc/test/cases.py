@@ -4049,6 +4049,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
+        # ADJACENT same-level sub-blocks across the x rank seam (one per rank) - but amr_subcycle=T. The subcycle
+        # advances every level-1 block stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo interposed
+        # each substep (s_amr_advance_fine_subcycle_all), so the two sub-blocks compute a MATCHING shared-face flux and
+        # conserve at the seam. Before that per-substep halo the subcycle re-prolonged the seam ghosts from the coarse
+        # each substep and the adjacent fluxes disagreed - mass leaked at the seam (~1e-4). This is the ONLY golden
+        # exercising the subcycle seam halo at np>1. Single-level (amr_max_level=1); STATIC for determinism.
+        stack.push(
+            "AMR -> 2D -> single-level subcycle np=2",
+            {**amr_2d_base, "amr_regrid_int": 0, "amr_subcycle": "T", "amr_max_blocks": 16},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
     amr_golden_tests()
 
     def hybrid_sensor_tests():

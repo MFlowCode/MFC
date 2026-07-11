@@ -28,7 +28,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
-    use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_advance_amr_fine_substeps, &
+    use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
         & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
@@ -625,25 +625,27 @@ contains
         if (amr) then
             ! ghost lerp sources, restriction target, and state-reflux target are all device-resident:
             ! the substep/restriction/reflux machinery runs as device kernels (M2). Each active block slot
-            ! is subcycled, restricted, and state-refluxed in turn; amr_cur resets to 1 afterwards.
+            ! is restricted and state-refluxed in turn (the subcycle advance ran above); amr_cur resets to 1 afterwards.
             ! RESTRICT bottom-up: a level>=2 block folds into its PARENT (level-aware s_restrict_fine_to_coarse =
             ! restrict-to-parent)
             ! and must do so BEFORE the parent folds into L0, so the L0 covered cells reflect the finest data. Finer levels live at
             ! higher slots (child after parent), so iterate slots in REVERSE. Disjoint same-level blocks make this bit-identical to
             ! forward order for single-level runs.
-            do islot = amr_num_blocks, 1, -1
-                call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
-                ! recursive subcycle multi-level: a level>=2 block is advanced, restricted, AND Berger-Colella refluxed into its
-                ! parent INSIDE the parent's recursive subcycle (s_amr_advance_children within s_advance_amr_fine_substeps), so it
-                ! is
-                ! skipped in this top-level per-block loop. Only level-1 blocks are driven here (they recurse into their L2
-                ! children).
-                if (amr_subcycle .and. amr_block_level(amr_cur) >= 2) cycle
-                if (amr_subcycle) then
-                    call s_advance_amr_fine_substeps(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, &
+            ! subcycle: advance ALL level-1 blocks together, transposed stage-by-stage with the per-substep fine-fine seam halo
+            ! (s_amr_advance_fine_subcycle_all), so max_grid_size-tiled adjacent sub-blocks conserve at their shared seam. Each
+            ! block's level-2 children subcycle within it (s_amr_advance_children). The restrict + reflux fold below is then a
+            ! separate per-block pass (block footprints are disjoint, so order-independent).
+            if (amr_subcycle) then
+                call s_amr_advance_fine_subcycle_all(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, &
                                                      & pb_ts(stor)%sf, mv_ts(stor)%sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                      & t_step, time_avg)
-                end if
+            end if
+            do islot = amr_num_blocks, 1, -1
+                call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
+                ! subcycle multi-level: a level>=2 block was advanced, restricted, AND Berger-Colella refluxed into its parent
+                ! INSIDE the parent's subcycle (s_amr_advance_children), so it is skipped in this per-block restrict/reflux loop.
+                ! Only level-1 blocks fold to L0 here.
+                if (amr_subcycle .and. amr_block_level(amr_cur) >= 2) cycle
                 ! equilibrate the fine solution (phase change) before it restricts to the coarse level
                 if (relax) call s_amr_relax_fine()
                 call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
