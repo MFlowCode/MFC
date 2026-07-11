@@ -2,8 +2,8 @@
 # End-to-end detonation chain into a free-flight immersed body:
 #   program burn -> full JWL products -> products/air mixing -> blast shock -> moving IB particle.
 #
-# This replaces the static high-pressure driver slab used in 2D_jwl_ibm_freeflight_cylinder
-# with a real program burn. A reduced-density TNT-products charge (fluid 1 at about 100 kg/m3,
+# Unlike a static high-pressure driver slab, this case lights the charge with a real
+# program burn. A reduced-density TNT-products charge (fluid 1 at about 100 kg/m3,
 # sitting at ambient pressure until it is lit) is center-initiated on the y=0 axis. A radial
 # lighting-time front at pb_D_cj releases the detonation energy (prog_burn). The products expand,
 # drive a shock into the ambient air, and the shock strikes a rigid cylinder that starts at rest.

@@ -60,7 +60,6 @@
 !! non-finite sound speed, or if the p<->e round trip fails, so a bad parameter set fails fast.
 !!
 !! Pressure-driven and afterburn reaction sources built on this EOS live in m_jwl_sources.
-!! Full design notes and validation: README-JWL-EOS.md.
 module m_jwl
 
     use m_global_parameters
