@@ -22,7 +22,7 @@ module m_amr
         & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k
-    use m_amr_registers, only: s_amr_zero_fine_registers, freg, creg
+    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, freg, creg
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps
@@ -1568,8 +1568,8 @@ contains
     impure subroutine s_amr_reflux_to_parent(dt_reflux)
 
         real(wp), intent(in) :: dt_reflux
-        integer              :: pblk, d, y
-        real(wp)             :: dxf, dyf, dzf, w_lo(3), w_hi(3)
+        integer              :: pblk, d, y, olo(3), ohi(3), glo(3), ghi(3), woff(3)
+        real(wp)             :: dxf, w_lo(3), w_hi(3), mlo(3), mhi(3)
 
         if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner refluxes locally
         pblk = f_amr_parent_block(amr_cur)
@@ -1586,116 +1586,22 @@ contains
                 if (f_amr_seam(y, amr_cur, d)) w_lo(d) = 0._wp  ! sibling just below -> shared low face
             end do
         end do
-        ! uniform parent-fine cell widths (interior index; stretched-grid coords are future work). dy/dz only allocated when active.
-        dxf = amr_slots(pblk)%dx(amr_isect_lo(1)); dyf = dxf; dzf = dxf
-        if (n_glb > 0) dyf = amr_slots(pblk)%dy(amr_isect_lo(2))
-        if (p_glb > 0) dzf = amr_slots(pblk)%dz(amr_isect_lo(3))
-        call s_amr_reflux_apply_parent(amr_slots(pblk)%q_cons, dxf, dyf, dzf, dt_reflux, w_lo, w_hi)
+        ! parent-fine frame for the shared reflux kernel: outside cell = isect boundary +/-1; creg-local loop range 0:extent;
+        ! transverse write at the isect origin; uniform parent-fine cell widths (interior index; stretched-grid coords are TODO).
+        olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; mlo = 1._wp; mhi = 1._wp
+        dxf = amr_slots(pblk)%dx(amr_isect_lo(1))
+        do d = 1, num_dims
+            olo(d) = amr_isect_lo(d) - 1; ohi(d) = amr_isect_hi(d) + 1
+            ghi(d) = amr_isect_hi(d) - amr_isect_lo(d)
+            woff(d) = amr_isect_lo(d)
+        end do
+        mlo(1) = dxf; mhi(1) = dxf
+        if (n_glb > 0) then; mlo(2) = amr_slots(pblk)%dy(amr_isect_lo(2)); mhi(2) = mlo(2); end if
+        if (p_glb > 0) then; mlo(3) = amr_slots(pblk)%dz(amr_isect_lo(3)); mhi(3) = mlo(3); end if
+        call s_amr_reflux_apply_faces(amr_slots(pblk)%q_cons, amr_cur, amr_slots(amr_cur)%ref_ratio, dt_reflux, olo, ohi, glo, &
+                                      & ghi, woff, w_lo, w_hi, mlo, mhi)
 
     end subroutine s_amr_reflux_to_parent
-
-    !> Device kernel for s_amr_reflux_to_parent: the parent's q_cons and (uniform) fine cell widths are passed as arguments
-    !! (present-table safe, like s_amr_restrict_overwrite_device). Reads creg/freg(:,:,:,amr_cur) and amr_isect_lo/hi (parent-fine
-    !! footprint = parent's local fine indices, offset 0). Three face blocks mirror s_amr_apply_reflux; collapsed dims pin to 0.
-    impure subroutine s_amr_reflux_apply_parent(qp, dxf, dyf, dzf, dt_reflux, w_lo, w_hi)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: qp
-        real(wp), intent(in) :: dxf, dyf, dzf, dt_reflux
-        real(wp), dimension(3), intent(in) :: w_lo, w_hi  !< per-dim low/high face weights (0 skips a fine-fine seam)
-        integer :: rr, eq, c1, c2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, islot
-        integer :: il1, ih1, il2, ih2, il3, ih3, ol1, oh1, ol2, oh2, ol3, oh3
-        real(wp) :: fblo, fbhi, mlo, mhi, wl, wh
-
-        rr = amr_slots(amr_cur)%ref_ratio; islot = amr_cur
-        il1 = amr_isect_lo(1); ih1 = amr_isect_hi(1); ol1 = il1 - 1; oh1 = ih1 + 1
-        il2 = amr_isect_lo(2); ih2 = amr_isect_hi(2); ol2 = il2 - 1; oh2 = ih2 + 1
-        il3 = amr_isect_lo(3); ih3 = amr_isect_hi(3); ol3 = il3 - 1; oh3 = ih3 + 1
-
-        ! x-faces: transverse (y, z)
-        nch = 1; if (n_glb > 0) nch = nch*rr; if (p_glb > 0) nch = nch*rr
-        dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
-        mlo = dxf; mhi = dxf; wl = w_lo(1); wh = w_hi(1)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-        do eq = 1, sys_size
-            do c2 = il3, ih3
-                do c1 = il2, ih2
-                    f20 = 0; if (p_glb > 0) f20 = rr*(c2 - il3)
-                    f10 = 0; if (n_glb > 0) f10 = rr*(c1 - il2)
-                    fblo = 0._wp; fbhi = 0._wp
-                    do dd2 = 0, dd2_hi
-                        do dd1 = 0, dd1_hi
-                            fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                            fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
-                        end do
-                    end do
-                    fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                    qp(eq)%sf(ol1, c1, c2) = qp(eq)%sf(ol1, c1, c2) + real(wl*dt_reflux*(creg(1)%lo(eq, c1 - il2, c2 - il3, &
-                       & islot) - fblo)/mlo, stp)
-                    qp(eq)%sf(oh1, c1, c2) = qp(eq)%sf(oh1, c1, c2) + real(wh*dt_reflux*(fbhi - creg(1)%hi(eq, c1 - il2, &
-                       & c2 - il3, islot))/mhi, stp)
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        ! y-faces (n_glb > 0): transverse (x, z); x always active
-        if (n_glb > 0) then
-            nch = rr; if (p_glb > 0) nch = nch*rr
-            dd2_hi = merge(rr - 1, 0, p_glb > 0)
-            mlo = dyf; mhi = dyf; wl = w_lo(2); wh = w_hi(2)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do c2 = il3, ih3
-                    do c1 = il1, ih1
-                        f20 = 0; if (p_glb > 0) f20 = rr*(c2 - il3)
-                        f10 = rr*(c1 - il1)
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, dd2_hi
-                            do dd1 = 0, rr - 1
-                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, islot)
-                            end do
-                        end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        qp(eq)%sf(c1, ol2, c2) = qp(eq)%sf(c1, ol2, c2) + real(wl*dt_reflux*(creg(2)%lo(eq, c1 - il1, c2 - il3, &
-                           & islot) - fblo)/mlo, stp)
-                        qp(eq)%sf(c1, oh2, c2) = qp(eq)%sf(c1, oh2, c2) + real(wh*dt_reflux*(fbhi - creg(2)%hi(eq, c1 - il1, &
-                           & c2 - il3, islot))/mhi, stp)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-        ! z-faces (p_glb > 0): transverse (x, y); both active in 3D
-        if (p_glb > 0) then
-            nch = rr*rr
-            mlo = dzf; mhi = dzf; wl = w_lo(3); wh = w_hi(3)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do c2 = il2, ih2
-                    do c1 = il1, ih1
-                        f20 = rr*(c2 - il2)
-                        f10 = rr*(c1 - il1)
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, rr - 1
-                            do dd1 = 0, rr - 1
-                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, islot)
-                            end do
-                        end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        qp(eq)%sf(c1, c2, ol3) = qp(eq)%sf(c1, c2, ol3) + real(wl*dt_reflux*(creg(3)%lo(eq, c1 - il1, c2 - il2, &
-                           & islot) - fblo)/mlo, stp)
-                        qp(eq)%sf(c1, c2, oh3) = qp(eq)%sf(c1, c2, oh3) + real(wh*dt_reflux*(fbhi - creg(3)%hi(eq, c1 - il1, &
-                           & c2 - il2, islot))/mhi, stp)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-    end subroutine s_amr_reflux_apply_parent
 
     !> Rank r's coarse INTERIOR box (global) from the replicated amr_decomp table (no ghosts). Covered coarse cells are in-domain,
     !! so restriction targets are identified by interior overlap alone.

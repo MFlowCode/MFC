@@ -39,7 +39,7 @@ module m_amr_registers
     implicit none
 
     private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_amr_zero_fine_registers, &
-        & s_amr_apply_reflux_state, s_finalize_amr_registers, s_amr_reflux_face_flags, freg, creg
+        & s_amr_apply_reflux_state, s_finalize_amr_registers, s_amr_reflux_face_flags, s_amr_reflux_apply_faces, freg, creg
 
     !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
@@ -817,43 +817,74 @@ contains
     impure subroutine s_amr_apply_reflux_state(q_cons)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
-        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch, islot
-        integer                                                :: bl1, bh1, bl2, bh2, bl3, bh3, ol1, ol2, ol3, oh1, oh2, oh3
-        integer                                                :: tl1, tl2, tl3, dd1_hi, dd2_hi, sidx(3), ext(3), tlo(3), thi(3)
-        logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
-        real(wp)                                               :: fblo, fbhi, mlo, mhi, dtl
+        integer :: d, sidx(3), ext(3), tlo(3), thi(3), olo(3), ohi(3), glo(3), ghi(3), woff(3)
+        logical :: own_lo(3), own_hi(3)
+        real(wp) :: w_lo(3), w_hi(3), mlo(3), mhi(3)
 
         if (.not. amr) return
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
-        islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
-        ! per-face participation and block-relative index conventions: see s_amr_apply_reflux
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
         if (.not. (any(own_lo) .or. any(own_hi))) return
-        ! device kernels: the restricted coarse state stays device-resident
-        d2 = n_glb > 0; d3 = p_glb > 0
-        dtl = dt
-        bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
-        bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
-        bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
-        ol1 = amr_region_lo(1) - 1 - sidx(1); oh1 = amr_region_hi(1) + 1 - sidx(1)
-        ol2 = amr_region_lo(2) - 1 - sidx(2); oh2 = amr_region_hi(2) + 1 - sidx(2)
-        ol3 = amr_region_lo(3) - 1 - sidx(3); oh3 = amr_region_hi(3) + 1 - sidx(3)
-        tl1 = amr_region_lo(1) - sidx(1); tl2 = amr_region_lo(2) - sidx(2); tl3 = amr_region_lo(3) - sidx(3)
-        has_lo = own_lo(1); has_hi = own_hi(1)
-        if (has_lo .or. has_hi) then
-            nch = 1
-            if (n_glb > 0) nch = nch*2
-            if (p_glb > 0) nch = nch*2
-            dd1_hi = merge(1, 0, n_glb > 0); dd2_hi = merge(1, 0, p_glb > 0)
-            mlo = 1._wp; mhi = 1._wp
-            if (has_lo) mlo = dx(ol1)
-            if (has_hi) mhi = dx(oh1)
+        ! L0/L1 (coarse) frame for the shared kernel: outside cell = region boundary +/-1 in local (sidx-offset) coords; the
+        ! creg-local loop range is the owned transverse overlap [tlo:thi] block-relative; ownership -> unit face weights; cell
+        ! widths from the global coarse grid (ref_ratio = 2, dt = coarse step).
+        olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; w_lo = 0._wp; w_hi = 0._wp; mlo = 1._wp; mhi = 1._wp
+        do d = 1, num_dims
+            olo(d) = amr_region_lo(d) - 1 - sidx(d); ohi(d) = amr_region_hi(d) + 1 - sidx(d)
+            glo(d) = tlo(d) - amr_region_lo(d); ghi(d) = thi(d) - amr_region_lo(d)
+            woff(d) = amr_region_lo(d) - sidx(d)
+            if (own_lo(d)) w_lo(d) = 1._wp
+            if (own_hi(d)) w_hi(d) = 1._wp
+        end do
+        if (own_lo(1)) mlo(1) = dx(olo(1))
+        if (own_hi(1)) mhi(1) = dx(ohi(1))
+        if (n_glb > 0) then
+            if (own_lo(2)) mlo(2) = dy(olo(2))
+            if (own_hi(2)) mhi(2) = dy(ohi(2))
+        end if
+        if (p_glb > 0) then
+            if (own_lo(3)) mlo(3) = dz(olo(3))
+            if (own_hi(3)) mhi(3) = dz(ohi(3))
+        end if
+        call s_amr_reflux_apply_faces(q_cons, amr_cur, 2, dt, olo, ohi, glo, ghi, woff, w_lo, w_hi, mlo, mhi)
+
+    end subroutine s_amr_apply_reflux_state
+
+    !> Shared Berger-Colella STATE reflux kernel: apply q(outside) += w*dtl*(F_coarse - Fbar_fine)/m on the low face and +=
+    !! w*dtl*(Fbar_fine - F_coarse)/m on the high face for each active dim, where F_coarse is creg and Fbar_fine averages freg over
+    !! the rr**(ndim-1) covering fine faces. Used by BOTH s_amr_apply_reflux_state (L0/L1, coarse/sidx frame, unit weights from
+    !! ownership, rr=2) and s_amr_reflux_to_parent (L2->L1, parent-fine frame, sibling-seam weights, rr=ref_ratio). All framing is
+    !! passed by the caller so the flux-correction math is single-sourced: islot - register slot (amr_cur) rr - refinement ratio
+    !! (fine faces per coarse face per transverse dim) dtl - reflux dt olo/ohi(d) - the outside coarse-cell index just below/above
+    !! the block face in dim d glo/ghi(d) - creg-local loop range in dim d (transverse for the two faces d' /= d) woff(d) -
+    !! transverse write origin so the cell index is woff(d) + g w_lo/w_hi(d) - per-face weight (0 skips the write: unowned face at
+    !! np>1, or a fine-fine sibling-tile seam) mlo/mhi(d) - outside-cell width for the low/high face (invalid/unused where the
+    !! weight is 0) A zero weight SKIPS the write (not multiply-by-0) because the outside index may be out of bounds on an unowned
+    !! face.
+    impure subroutine s_amr_reflux_apply_faces(q, islot, rr, dtl, olo, ohi, glo, ghi, woff, w_lo, w_hi, mlo, mhi)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        integer, intent(in) :: islot, rr, olo(3), ohi(3), glo(3), ghi(3), woff(3)
+        real(wp), intent(in) :: dtl, w_lo(3), w_hi(3), mlo(3), mhi(3)
+        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, w2, w3, w1, gl1, gh1, gl2, gh2, gl3, gh3
+        real(wp) :: fblo, fbhi, wl, wh, ml, mh
+
+        ! loop bounds hoisted to scalars: array-element bounds (glo(d)/ghi(d)) drive the collapsed inner loop and would force the
+        ! host arrays present on the device (an ACC present error)
+
+        gl1 = glo(1); gh1 = ghi(1); gl2 = glo(2); gh2 = ghi(2); gl3 = glo(3); gh3 = ghi(3)
+
+        ! x-faces: transverse (y, z)
+        if (w_lo(1) /= 0._wp .or. w_hi(1) /= 0._wp) then
+            nch = 1; if (n_glb > 0) nch = nch*rr; if (p_glb > 0) nch = nch*rr
+            dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
+            ol = olo(1); oh = ohi(1); w2 = woff(2); w3 = woff(3); wl = w_lo(1); wh = w_hi(1); ml = mlo(1); mh = mhi(1)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = bl3, bh3
-                    do c1 = bl2, bh2
-                        f20 = 0; if (d3) f20 = 2*c2
-                        f10 = 0; if (d2) f10 = 2*c1
+                do g2 = gl3, gh3
+                    do g1 = gl2, gh2
+                        f20 = 0; if (p_glb > 0) f20 = rr*g2
+                        f10 = 0; if (n_glb > 0) f10 = rr*g1
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, dd2_hi
                             do dd1 = 0, dd1_hi
@@ -862,77 +893,72 @@ contains
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (has_lo) q_cons(eq)%sf(ol1, tl2 + c1, tl3 + c2) = q_cons(eq)%sf(ol1, tl2 + c1, &
-                            & tl3 + c2) + dtl*(creg(1)%lo(eq, c1, c2, islot) - fblo)/mlo
-                        if (has_hi) q_cons(eq)%sf(oh1, tl2 + c1, tl3 + c2) = q_cons(eq)%sf(oh1, tl2 + c1, &
-                            & tl3 + c2) + dtl*(fbhi - creg(1)%hi(eq, c1, c2, islot))/mhi
+                        if (wl /= 0._wp) q(eq)%sf(ol, w2 + g1, w3 + g2) = q(eq)%sf(ol, w2 + g1, w3 + g2) + wl*dtl*(creg(1)%lo(eq, &
+                            & g1, g2, islot) - fblo)/ml
+                        if (wh /= 0._wp) q(eq)%sf(oh, w2 + g1, w3 + g2) = q(eq)%sf(oh, w2 + g1, &
+                            & w3 + g2) + wh*dtl*(fbhi - creg(1)%hi(eq, g1, g2, islot))/mh
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-        has_lo = own_lo(2); has_hi = own_hi(2)
-        if (n_glb > 0 .and. (has_lo .or. has_hi)) then
-            nch = 2
-            if (p_glb > 0) nch = nch*2
-            dd2_hi = merge(1, 0, p_glb > 0)
-            mlo = 1._wp; mhi = 1._wp
-            if (has_lo) mlo = dy(ol2)
-            if (has_hi) mhi = dy(oh2)
+        ! y-faces (n_glb > 0): transverse (x, z); x always active
+        if (n_glb > 0 .and. (w_lo(2) /= 0._wp .or. w_hi(2) /= 0._wp)) then
+            nch = rr; if (p_glb > 0) nch = nch*rr
+            dd2_hi = merge(rr - 1, 0, p_glb > 0)
+            ol = olo(2); oh = ohi(2); w1 = woff(1); w3 = woff(3); wl = w_lo(2); wh = w_hi(2); ml = mlo(2); mh = mhi(2)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = bl3, bh3
-                    do c1 = bl1, bh1
-                        f20 = 0; if (d3) f20 = 2*c2
-                        f10 = 2*c1
+                do g2 = gl3, gh3
+                    do g1 = gl1, gh1
+                        f20 = 0; if (p_glb > 0) f20 = rr*g2
+                        f10 = rr*g1
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, dd2_hi
-                            do dd1 = 0, 1
+                            do dd1 = 0, rr - 1
                                 fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, islot)
                                 fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (has_lo) q_cons(eq)%sf(tl1 + c1, ol2, tl3 + c2) = q_cons(eq)%sf(tl1 + c1, ol2, &
-                            & tl3 + c2) + dtl*(creg(2)%lo(eq, c1, c2, islot) - fblo)/mlo
-                        if (has_hi) q_cons(eq)%sf(tl1 + c1, oh2, tl3 + c2) = q_cons(eq)%sf(tl1 + c1, oh2, &
-                            & tl3 + c2) + dtl*(fbhi - creg(2)%hi(eq, c1, c2, islot))/mhi
+                        if (wl /= 0._wp) q(eq)%sf(w1 + g1, ol, w3 + g2) = q(eq)%sf(w1 + g1, ol, w3 + g2) + wl*dtl*(creg(2)%lo(eq, &
+                            & g1, g2, islot) - fblo)/ml
+                        if (wh /= 0._wp) q(eq)%sf(w1 + g1, oh, w3 + g2) = q(eq)%sf(w1 + g1, oh, &
+                            & w3 + g2) + wh*dtl*(fbhi - creg(2)%hi(eq, g1, g2, islot))/mh
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-        has_lo = own_lo(3); has_hi = own_hi(3)
-        if (p_glb > 0 .and. (has_lo .or. has_hi)) then
-            nch = 4
-            mlo = 1._wp; mhi = 1._wp
-            if (has_lo) mlo = dz(ol3)
-            if (has_hi) mhi = dz(oh3)
+        ! z-faces (p_glb > 0): transverse (x, y); both active in 3D
+        if (p_glb > 0 .and. (w_lo(3) /= 0._wp .or. w_hi(3) /= 0._wp)) then
+            nch = rr*rr
+            ol = olo(3); oh = ohi(3); w1 = woff(1); w2 = woff(2); wl = w_lo(3); wh = w_hi(3); ml = mlo(3); mh = mhi(3)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
-                do c2 = bl2, bh2
-                    do c1 = bl1, bh1
-                        f20 = 2*c2
-                        f10 = 2*c1
+                do g2 = gl2, gh2
+                    do g1 = gl1, gh1
+                        f20 = rr*g2
+                        f10 = rr*g1
                         fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, 1
-                            do dd1 = 0, 1
+                        do dd2 = 0, rr - 1
+                            do dd1 = 0, rr - 1
                                 fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, islot)
                                 fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
                         end do
                         fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (has_lo) q_cons(eq)%sf(tl1 + c1, tl2 + c2, ol3) = q_cons(eq)%sf(tl1 + c1, tl2 + c2, &
-                            & ol3) + dtl*(creg(3)%lo(eq, c1, c2, islot) - fblo)/mlo
-                        if (has_hi) q_cons(eq)%sf(tl1 + c1, tl2 + c2, oh3) = q_cons(eq)%sf(tl1 + c1, tl2 + c2, &
-                            & oh3) + dtl*(fbhi - creg(3)%hi(eq, c1, c2, islot))/mhi
+                        if (wl /= 0._wp) q(eq)%sf(w1 + g1, w2 + g2, ol) = q(eq)%sf(w1 + g1, w2 + g2, ol) + wl*dtl*(creg(3)%lo(eq, &
+                            & g1, g2, islot) - fblo)/ml
+                        if (wh /= 0._wp) q(eq)%sf(w1 + g1, w2 + g2, oh) = q(eq)%sf(w1 + g1, w2 + g2, &
+                            & oh) + wh*dtl*(fbhi - creg(3)%hi(eq, g1, g2, islot))/mh
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-    end subroutine s_amr_apply_reflux_state
+    end subroutine s_amr_reflux_apply_faces
 
     impure subroutine s_finalize_amr_registers()
 
