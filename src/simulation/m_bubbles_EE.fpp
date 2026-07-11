@@ -141,12 +141,13 @@ contains
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), intent(in)                         :: divu_in  !< matrix for div(u)
-        real(wp)                                               :: rddot
-        real(wp)                                               :: pb_local, mv_local, vflux, pbdot
-        real(wp)                                               :: n_tait, B_tait
+        type(scalar_field), intent(in) :: divu_in  !< matrix for div(u)
+        real(wp) :: rddot
+        real(wp) :: pb_local, mv_local, vflux, pbdot
+        real(wp) :: n_tait, B_tait
+        real(wp) :: chi_vw_l, k_mw_l, rho_mw_l     !< Per-thread bubble-wall scratch (avoid module-scalar race)
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: Rtmp, Vtmp
@@ -182,7 +183,7 @@ contains
 
         adap_dt_stop_max = 0
         $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, &
-                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait]', collapse=3, &
+                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, chi_vw_l, k_mw_l, rho_mw_l]', collapse=3, &
                             & reduction = '[[adap_dt_stop_max]]', reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
         do l = 0, p
             do k = 0, n
@@ -262,9 +263,9 @@ contains
                             if (.not. polytropic) then
                                 pb_local = q_prim_vf(ps(q))%sf(j, k, l)
                                 mv_local = q_prim_vf(ms(q))%sf(j, k, l)
-                                call s_bwproperty(pb_local, q, chi_vw, k_mw, rho_mw)
-                                call s_vflux(myR, myV, pb_local, mv_local, q, vflux)
-                                pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q)
+                                call s_bwproperty(pb_local, q, chi_vw_l, k_mw_l, rho_mw_l)
+                                call s_vflux(myR, myV, pb_local, mv_local, q, vflux, fchi_vw=chi_vw_l, frho_mw=rho_mw_l)
+                                pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q, fk_mw=k_mw_l)
                                 bub_p_src(j, k, l, q) = nbub*pbdot
                                 bub_m_src(j, k, l, q) = nbub*vflux*4._wp*pi*(myR**2._wp)
                             else

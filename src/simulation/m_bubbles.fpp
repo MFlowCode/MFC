@@ -16,11 +16,6 @@ module m_bubbles
 
     implicit none
 
-    real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
-    real(wp) :: k_mw    !< Bubble wall properties (Ando 2010)
-    real(wp) :: rho_mw  !< Bubble wall properties (Ando 2010)
-    $:GPU_DECLARE(create='[chi_vw, k_mw, rho_mw]')
-
 contains
 
     !> Compute the bubble radial acceleration based on the selected bubble model
@@ -250,7 +245,7 @@ contains
     end subroutine s_bwproperty
 
     !> Compute the vapour flux
-    elemental subroutine s_vflux(fR, fV, fpb, fmass_v, iR0, vflux, fmass_g, fbeta_c, fR_m, fgamma_m)
+    elemental subroutine s_vflux(fR, fV, fpb, fmass_v, iR0, vflux, fmass_g, fbeta_c, fR_m, fgamma_m, fchi_vw, frho_mw)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)            :: fR
@@ -261,6 +256,7 @@ contains
         real(wp), intent(out)           :: vflux
         real(wp), intent(in), optional  :: fmass_g, fbeta_c
         real(wp), intent(out), optional :: fR_m, fgamma_m
+        real(wp), intent(in), optional  :: fchi_vw, frho_mw  !< Per-thread bubble-wall scratch (Euler-Euler path)
         real(wp)                        :: chi_bar
         real(wp)                        :: rho_mw_lag
         real(wp)                        :: grad_chi
@@ -287,8 +283,8 @@ contains
                 end if
             else
                 chi_bar = fmass_v/(fmass_v + mass_g0(iR0))
-                grad_chi = -Re_trans_c(iR0)*(chi_bar - chi_vw)
-                vflux = rho_mw*grad_chi/Pe_c/(1._wp - chi_vw)/fR
+                grad_chi = -Re_trans_c(iR0)*(chi_bar - fchi_vw)
+                vflux = frho_mw*grad_chi/Pe_c/(1._wp - fchi_vw)/fR
             end if
         else
             ! polytropic
@@ -298,7 +294,7 @@ contains
     end subroutine s_vflux
 
     !> Compute the time derivative of the internal bubble pressure
-    elemental function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m)
+    elemental function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0, fbeta_t, fR_m, fgamma_m, fk_mw)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)           :: fvflux
@@ -308,6 +304,7 @@ contains
         real(wp), intent(in)           :: fmass_v
         integer, intent(in)            :: iR0
         real(wp), intent(in), optional :: fbeta_t, fR_m, fgamma_m
+        real(wp), intent(in), optional :: fk_mw  !< Per-thread bubble-wall conductivity scratch (Euler-Euler path)
         real(wp)                       :: T_bar
         real(wp)                       :: grad_T
         real(wp)                       :: f_bpres_dot
@@ -323,7 +320,7 @@ contains
             end if
             grad_T = -Re_trans_T(iR0)*((fpb/pb0(iR0))*(fR/R0(iR0))**3*(mass_g0(iR0) + mass_v0(iR0))/(mass_g0(iR0) + fmass_v) &
                                  & - 1._wp)
-            f_bpres_dot = 3._wp*gam_m*(-fV*fpb + fvflux*R_v*Tw + pb0(iR0)*k_mw*grad_T/Pe_T(iR0)/fR)/fR
+            f_bpres_dot = 3._wp*gam_m*(-fV*fpb + fvflux*R_v*Tw + pb0(iR0)*fk_mw*grad_T/Pe_T(iR0)/fR)/fR
         else
             f_bpres_dot = -3._wp*gam_m*fV/fR*(fpb - pv)
         end if
