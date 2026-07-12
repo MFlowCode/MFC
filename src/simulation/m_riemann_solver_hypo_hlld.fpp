@@ -340,15 +340,17 @@ contains
                             E%L = gamma%L*pres%L + pi_inf%L + 5e-1_wp*rho%L*vel_rms%L + qv%L
                             E%R = gamma%R*pres%R + pi_inf%R + 5e-1_wp*rho%R*vel_rms%R + qv%R
 
+                            ! Freeze the thermal/kinetic enthalpy used by the EOS sound-speed call before
+                            ! adding hypoelastic strain energy to the conservative total energy.
+                            H%L = (E%L + pres%L)/rho%L
+                            H%R = (E%R + pres%R)/rho%R
+
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
                                 @:compute_hypo_elastic_energy(E%L, E%R, &
                                                               & (n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 &
                                                               & .or. i == 4 .or. i == 5)))
                             end do
-
-                            H%L = (E%L + pres%L)/rho%L
-                            H%R = (E%R + pres%R)/rho%R
 
                             ! Compute Riemann states
 

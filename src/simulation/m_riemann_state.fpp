@@ -1124,12 +1124,17 @@ contains
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
             ! Elastic contribution to energy if G large enough
-            if ((G_L > verysmall) .and. (G_R > verysmall)) then
+            if (G_L > verysmall) then
                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
-                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 ! Double for shear stresses
                 if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
                     E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                end if
+            end if
+            if (G_R > verysmall) then
+                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
+                ! Double for shear stresses
+                if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
                     E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 end if
             end if

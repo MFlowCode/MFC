@@ -1,78 +1,10 @@
-This file was created on 2026-04-20 21:59:21.226161.
+This file was created on 2026-07-11 19:06:08.114203.
 
 mfc.sh:
 
-    Invocation: test --generate --only E04B6502 D222AFB8 6BB67897 5D536A45 36DF737F F5705D1B -j 8
-    Lock:       mpi=Yes & gpu=No & debug=Yes & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        c32a52b08f6e999ead9c8b3223f99272ed98d58f on hypo_HLLC_new (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on 9950X3D
-    
-        C       : GNU v13.3.0 (/usr/bin/cc)
-        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on 9950X3D
-    
-        C       : GNU v13.3.0 (/usr/bin/cc)
-        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --generate --only 879C490D 4FBA4023 34F3999B E04B6502 6AF90F3C F31EAABF 2097140E 6BB67897 481CA4B4 D41FFB94 5D405BF9 36DF737F -j 12
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        9ab0b377dac1efe2978fed2c4a4c439ee4793ff6 on hypo_hlld (dirty)
 
 pre_process:
 
@@ -97,13 +29,13 @@ pre_process:
         Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -131,13 +63,81 @@ post_process:
         Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on 9950X3D
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on 9950X3D
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/chris/source/MFC_hypo_hlld_pre_merge/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

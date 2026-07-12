@@ -1335,8 +1335,13 @@ contains
                                     end do
                                 end if
 
-                                H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
+                                ! The acoustic EOS sound speed is based on thermal/kinetic enthalpy. The
+                                ! hypoelastic stress energy remains in E_L/E_R for the conservative state,
+                                ! but must not inflate the base acoustic sound speed used below.
+                                if (.not. hypoelasticity) then
+                                    H_L = (E_L + pres_L)/rho_L
+                                    H_R = (E_R + pres_R)/rho_R
+                                end if
 
                                 @:compute_average_state()
 

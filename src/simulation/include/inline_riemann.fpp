@@ -93,11 +93,15 @@
 #:enddef compute_low_Mach_correction
 
 #:def compute_hypo_elastic_energy(EL, ER, shear_cond)
-    if ((G_L > verysmall) .and. (G_R > verysmall)) then
+    if (G_L > verysmall) then
         ${EL}$ = ${EL}$ + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
-        ${ER}$ = ${ER}$ + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
         if (${shear_cond}$) then
             ${EL}$ = ${EL}$ + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+        end if
+    end if
+    if (G_R > verysmall) then
+        ${ER}$ = ${ER}$ + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
+        if (${shear_cond}$) then
             ${ER}$ = ${ER}$ + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
         end if
     end if
