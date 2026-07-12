@@ -312,7 +312,7 @@ contains
                                 damage_L = 0._wp; damage_R = 0._wp
                                 if (cont_damage) then
                                     damage_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
-                                    damage_R = qR_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                    damage_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%damage)
                                 end if
 
                                 call s_compute_hypoelastic_interface_energy(num_fluids, alpha_L, alpha_R, damage_L, damage_R, &

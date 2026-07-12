@@ -114,13 +114,14 @@ contains
             real(wp), dimension(num_dims) :: xi_field_L, xi_field_R
         #:endif
         real(wp) :: G_L, G_R
+        real(wp) :: damage_L, damage_R
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
         real(wp) :: vel_L_tmp, vel_R_tmp
         real(wp) :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_star
         real(wp) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(wp) :: flux_ene_e
         real(wp) :: zcoef, pcorr                !< low Mach number correction
-        integer  :: Re_max, i, j, k, l, q       !< Generic loop iterators
+        integer  :: i, j, k, l, q               !< Generic loop iterators
         integer  :: Re_size_loc1, Re_size_loc2  !< host copy of Re_size; amdflang reads the declare-target original stale cross-TU
 
         ! HLLC star-state helpers
@@ -274,27 +275,6 @@ contains
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms + qv_R
-
-                                ! ENERGY ADJUSTMENTS FOR HYPOELASTIC ENERGY
-                                ! HLLC handles hypoelasticity as inline branches like this one - one of three code
-                                ! shapes (cf. HLL inline, and the separate HLLD dual-pass module). See s_riemann_solver.
-                                if (hypoelasticity) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
-                                        tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
-                                    end do
-                                    G_L = 0._wp; G_R = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                        G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                    end do
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        @:compute_hypo_elastic_energy(E_L, E_R, any(eqn_idx%stress%beg - 1 + i == shear_indices))
-                                    end do
-                                end if
 
                                 ! Hyperelastic stress contribution: strain energy added to total energy
                                 if (hyperelasticity) then
@@ -1148,7 +1128,7 @@ contains
                 else
                     ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection Private list split across
                     ! _hllc_p1/p2/p3 for Fypp line-length limits
-                    #:set _hllc_p1 = '[Re_max, i, j, k, l, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, ptilde_L, ptilde_R, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, flux_ene_e,'
+                    #:set _hllc_p1 = '[i, j, k, l, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, ptilde_L, ptilde_R, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, damage_L, damage_R, flux_ene_e,'
                     #:set _hllc_p2 = 'U_L, U_R, F_L, F_R, F_star_L, F_star_R, F_HLLC, u_n_HLLC, u_t_HLLC, u_t2_HLLC, pres_tot_L, pres_tot_R, u_n_L, u_n_R, u_t_L, u_t_R, u_t2_L, u_t2_R, tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R, tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R, tau_qq_L, tau_qq_R, p_face, tau_qq_face, A_L, A_R, denom_A, u_t_star, tau_nt_star, u_t2_star, tau_nt2_star, pres_tot_star,'
                     #:set _hllc_p3 = 'F_HLL, u_n_HLL_trace, u_t_HLL_trace, u_t2_HLL_trace, p_face_HLL, tau_qq_face_HLL, tau_nn_HLL, phi, Sigma_L, Sigma_R, dSigma, Sigma_ref, a_L_ref, a_R_ref, a_ref, du_t, dtau_nt, du_t2, dtau_nt2, sensor_ptot, sensor_vt, sensor_tnt, sensor_combined, idx_phys]'
                     $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_p1 + _hllc_p2 + _hllc_p3, copyin='[is1, is2, is3]', &
@@ -1318,17 +1298,14 @@ contains
                                         tau_e_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%stress%beg - 1 + i)
                                         tau_e_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%stress%beg - 1 + i)
                                     end do
-                                    G_L = 0._wp
-                                    G_R = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        G_L = G_L + alpha_L(i)*Gs_rs(i)
-                                        G_R = G_R + alpha_R(i)*Gs_rs(i)
-                                    end do
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                        @:compute_hypo_elastic_energy(E_L, E_R, any(eqn_idx%stress%beg - 1 + i == shear_indices))
-                                    end do
+                                    damage_L = 0._wp; damage_R = 0._wp
+                                    if (cont_damage) then
+                                        damage_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                        damage_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%damage)
+                                    end if
+
+                                    call s_compute_hypoelastic_interface_energy(num_fluids, alpha_L, alpha_R, damage_L, damage_R, &
+                                        & tau_e_L, tau_e_R, G_L, G_R, E_L, E_R)
                                 end if
 
                                 ! Hyperelastic stress contribution: strain energy added to total energy
