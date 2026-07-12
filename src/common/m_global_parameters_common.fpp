@@ -79,6 +79,12 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[cont_damage, hyper_cleaning]')
+    $:GPU_DECLARE(create='[jwl_afterburn, jwl_reactive]')
+#ifdef MFC_SIMULATION
+    $:GPU_DECLARE(create='[jwl_ab_model, jwl_q_ab, jwl_ab_tau, jwl_ab_A, jwl_ab_theta, jwl_ab_n]')
+    $:GPU_DECLARE(create='[prog_burn, pb_D_cj, pb_width, pb_x_det, pb_y_det, pb_z_det, pb_t_det]')
+    $:GPU_DECLARE(create='[jwl_G, jwl_b_exp]')
+#endif
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
     $:GPU_DECLARE(create='[down_sample]')
     $:GPU_DECLARE(create='[fd_order]')
