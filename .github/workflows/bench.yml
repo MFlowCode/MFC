@@ -38,7 +38,7 @@ jobs:
       matrix:
         include:
           - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
+            name: Georgia Tech | Phoenix (GNU)
             group: phoenix
             labels: gt
             flag: p
