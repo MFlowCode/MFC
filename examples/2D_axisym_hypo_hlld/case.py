@@ -2,7 +2,7 @@
 import json
 
 # 2D axisymmetric hypoelastic case with HLLD solver.
-# Epoxy sphere in water hit by focused acoustic pulse.
+# Epoxy rectangular inclusion in water hit by focused acoustic pulse.
 # Water: gamma=4.4, pi_inf=6.0e8, G=0
 # Epoxy: gamma=4.4, pi_inf=2.4e9, rho=1180, G=1.5e9
 
@@ -67,7 +67,7 @@ config = {
     "patch_icpp(1)%alpha(1)": 1.0 - 1e-8,
     "patch_icpp(1)%alpha_rho(2)": rho_e * 1e-8,
     "patch_icpp(1)%alpha(2)": 1e-8,
-    # Patch 2: Epoxy square (cylinder in axisym)
+    # Patch 2: Epoxy rectangular inclusion
     "patch_icpp(2)%alter_patch(1)": "T",
     "patch_icpp(2)%geometry": 3,
     "patch_icpp(2)%x_centroid": 0.6,

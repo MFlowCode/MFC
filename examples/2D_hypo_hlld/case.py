@@ -2,7 +2,7 @@
 import json
 
 # 2D hypoelastic case with HLLD solver.
-# Epoxy circle in water hit by focused acoustic pulse.
+# Epoxy square in water hit by focused acoustic pulse.
 # Water: gamma=4.4, pi_inf=6.0e8, G=0
 # Epoxy: gamma=4.4, pi_inf=2.4e9, rho=1180, G=1.5e9
 

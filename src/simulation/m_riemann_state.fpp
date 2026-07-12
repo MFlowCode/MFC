@@ -1091,10 +1091,10 @@ contains
 
     !> Accumulate the hypoelastic stress contribution to the energies of the left and right Riemann states: mix the shear modulus
     !! over the fluids, scale it by the continuum damage state when damage is modeled, and add the elastic energy of each stress
-    !! component (doubled for the shear components) when both mixture moduli are non-negligible. The elastic shear stresses are
-    !! loaded from the state buffers by the caller, which reuses them for the stress fluxes and elastic wave speeds. The G >
-    !! verysmall gate is a deliberate maintainer ruling that replaces HLL's former hard-coded G > 1000 stability floor, retiring its
-    !! "TODO take out if statement if stable without".
+    !! component (doubled for the shear components) on each side whose mixture modulus is non-negligible. The elastic shear stresses
+    !! are loaded from the state buffers by the caller, which reuses them for the stress fluxes and elastic wave speeds. The G >
+    !! verysmall per-side gate is a deliberate maintainer ruling that replaces HLL's former hard-coded G > 1000 stability floor,
+    !! retiring its "TODO take out if statement if stable without".
     subroutine s_compute_hypoelastic_interface_energy(nf, alpha_L, alpha_R, damage_L, damage_R, tau_e_L, tau_e_R, G_L, G_R, E_L, &
         & E_R)
 

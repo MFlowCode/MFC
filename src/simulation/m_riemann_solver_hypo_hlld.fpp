@@ -222,13 +222,12 @@ contains
                                 alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                             end do
 
-                            ! IMP: vel%L(1:3) has (3) uninitiated for 2D
+                            ! Initialize the unused third velocity component in 2D
                             vel%L = 0._wp
                             vel%R = 0._wp
 
-                            ! NOTE: unlike HLL & HLLC, vel%L here is permutated by dir_idx for simpler logic
+                            ! Load velocities in physical-coordinate order; map directional aliases below via dir_idx
                             do i = 1, num_vels
-                                ! Don't permutate here; permutate u <-> v later at u_n_L = vel%L(1)
                                 vel%L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%cont%end + i)
                                 vel%R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%cont%end + i)
                             end do
