@@ -27,7 +27,7 @@ jobs:
       # token embedded in the push URL below — making the push authenticate as
       # github-actions[bot] (which cannot bypass the require-PR rule) instead of
       # the CACHE_PUSH_TOKEN identity.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: { clean: false, persist-credentials: false }
       - name: Build + collect coverage map (SLURM)
         run: bash .github/scripts/submit-slurm-job.sh .github/workflows/common/coverage-refresh.sh cpu none phoenix

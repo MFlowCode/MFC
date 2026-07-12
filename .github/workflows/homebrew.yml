@@ -19,7 +19,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
@@ -121,7 +121,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Set up Homebrew
         run: |
@@ -197,7 +197,7 @@ jobs:
       
       - name: Upload Homebrew logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: homebrew-logs
           path: |

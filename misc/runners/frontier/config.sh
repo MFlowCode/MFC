@@ -45,7 +45,6 @@ find_runner_dirs() {
 sync_runner_nodes() {
     local tmpdir node
     tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' RETURN
 
     sweep_all_nodes "$tmpdir"
 
@@ -62,4 +61,10 @@ sync_runner_nodes() {
             fi
         done < <(grep '^RUNNER ' "$tmpdir/$node.out" 2>/dev/null || true)
     done
+
+    # Clean up explicitly rather than via a RETURN trap: this function is
+    # sourced into the calling script, and a RETURN trap referencing the local
+    # tmpdir would fire again when the sourced script returns — by then tmpdir
+    # is out of scope, which aborts with "tmpdir: unbound variable" under set -u.
+    rm -rf "$tmpdir"
 }

@@ -28,7 +28,10 @@ fi
 echo "==> Locating $RUNNER_NAME..."
 node=$(find_node "$runner_dir")
 
-if [ "$node" != "offline" ]; then
+if [ "$node" = "unknown" ]; then
+    echo "WARNING: could not confirm where $RUNNER_NAME is running (SSH failures)." >&2
+    echo "         Skipping process stop; still attempting GitHub deregistration." >&2
+elif [ "$node" != "offline" ]; then
     echo "==> Stopping $RUNNER_NAME on $node..."
     stop_runner "$node" "$runner_dir"
     echo "==> Process stopped."
