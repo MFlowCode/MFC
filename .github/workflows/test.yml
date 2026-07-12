@@ -530,21 +530,21 @@ jobs:
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'frontier_amd'
-        # AMD flang is slow enough that one serial pre-build job exceeds its
-        # walltime, so split the case list across two concurrent SLURM jobs.
-        # The shards share this workspace and skip their in-job staging clean,
-        # so clean once here on the login node before submitting.
+        # AMD flang case-opt builds are ~30 min/case, so one serial pre-build
+        # job exceeds its walltime. Split the case list across three concurrent
+        # SLURM jobs (heavy shard ~2 cases). The shards share this workspace and
+        # skip their in-job staging clean, so clean once here first.
         run:  |
           find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
           find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
-          rm -f build/.prebuild-shared-targets-done
-          bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }} 1/2 &
-          pid1=$!
-          bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }} 2/2 &
-          pid2=$!
+          rm -f build/.prebuild-shared-targets-done build/.prebuild-shared-targets-failed
+          pids=""
+          for s in 1/3 2/3 3/3; do
+            bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }} "$s" &
+            pids="$pids $!"
+          done
           rc=0
-          wait "$pid1" || rc=1
-          wait "$pid2" || rc=1
+          for p in $pids; do wait "$p" || rc=1; done
           exit $rc
 
       - name: Build & Run Case-Optimization Tests
@@ -552,8 +552,22 @@ jobs:
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Run Case-Optimization Tests
-        if:   matrix.cluster == 'phoenix' || matrix.cluster == 'frontier_amd'
+        if:   matrix.cluster == 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+
+      - name: Run Case-Optimization Tests
+        if:   matrix.cluster == 'frontier_amd'
+        # Mirror the pre-build sharding so each run job executes only the cases
+        # it has binaries for, concurrently within the batch walltime.
+        run:  |
+          pids=""
+          for s in 1/3 2/3 3/3; do
+            bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} "$s" &
+            pids="$pids $!"
+          done
+          rc=0
+          for p in $pids; do wait "$p" || rc=1; done
+          exit $rc
 
       - name: Cancel SLURM Jobs
         if: cancelled()
@@ -567,10 +581,7 @@ jobs:
       - name: Print Logs
         if:   always()
         run:  |
-          for f in prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out \
-                   prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}-1-of-2.out \
-                   prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}-2-of-2.out \
-                   run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out; do
+          for f in prebuild-case-optimization-*.out run-case-optimization-*.out; do
             [ -f "$f" ] && echo "=== $f ===" && cat "$f"
           done
 
@@ -580,5 +591,5 @@ jobs:
         with:
           name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
           path: |
-            prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}*.out
-            run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+            prebuild-case-optimization-*.out
+            run-case-optimization-*.out

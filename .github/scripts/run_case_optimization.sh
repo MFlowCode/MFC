@@ -13,13 +13,11 @@ if [ "$job_device" = "gpu" ] && [ "$ngpus" -eq 0 ]; then
     ngpus=1
 fi
 
-benchmarks=(
-    benchmarks/5eq_rk3_weno3_hllc/case.py
-    benchmarks/viscous_weno5_sgb_acoustic/case.py
-    benchmarks/hypo_hll/case.py
-    benchmarks/ibm/case.py
-    benchmarks/igr/case.py
-)
+# Benchmark list (single source of truth shared with the pre-build) + optional
+# sharding: a sharded run executes only the subset it has pre-built binaries
+# for. $job_shard mirrors the pre-build shard so the two stay aligned.
+source .github/scripts/case-optimization-benchmarks.sh
+caseopt_parse_shard
 
 # For Frontier/Frontier AMD: deps were fetched on the login node via --deps-only;
 # build case-optimized binaries here on the compute node before running.
@@ -39,7 +37,10 @@ if [ "$job_cluster" != "phoenix" ] && [ "$job_cluster" != "frontier_amd" ]; then
     find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
 
     echo "=== Building case-optimized binaries on compute node ==="
+    idx=0
     for case in "${benchmarks[@]}"; do
+        idx=$((idx + 1))
+        caseopt_case_in_shard "$idx" || continue
         echo "--- Building: $case ---"
         ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
     done
@@ -50,7 +51,10 @@ passed=0
 failed=0
 failed_cases=""
 
+idx=0
 for case in "${benchmarks[@]}"; do
+    idx=$((idx + 1))
+    caseopt_case_in_shard "$idx" || continue
     case_dir="$(dirname "$case")"
     case_name="$(basename "$case_dir")"
     echo ""
