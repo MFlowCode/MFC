@@ -493,9 +493,7 @@ contains
         sfc_partition_wrt = .false.
         load_balance = .false.
         rank_time_wrt = .false.
-        hybrid_weno = .false.
         hybrid_weno_eps = 1.0e-2_wp
-        hybrid_riemann = .false.
         amr = .false.
         amr_block_beg(:) = 0
         amr_block_end(:) = 0
@@ -517,6 +515,8 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
             muscl_lim = dflt_int
+            hybrid_weno = .false.
+            hybrid_riemann = .false.
         #:endif
 
         adv_n = .false.

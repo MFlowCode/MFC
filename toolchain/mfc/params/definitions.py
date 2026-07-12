@@ -61,6 +61,8 @@ CASE_OPT_PARAMS = {
     "recon_type",
     "muscl_order",
     "muscl_lim",
+    "hybrid_riemann",
+    "hybrid_weno",
 }
 
 
