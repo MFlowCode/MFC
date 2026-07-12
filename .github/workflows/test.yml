@@ -535,8 +535,8 @@ jobs:
         # SLURM jobs (heavy shard ~2 cases). The shards share this workspace and
         # skip their in-job staging clean, so clean once here first.
         run:  |
-          find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
-          find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+          find build/staging -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
+          find build/install -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
           rm -f build/.prebuild-shared-targets-done build/.prebuild-shared-targets-failed
           pids=""
           for s in 1/3 2/3 3/3; do

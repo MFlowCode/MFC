@@ -42,8 +42,8 @@ if [ "$cluster" = "phoenix" ]; then
     source .github/scripts/clean-build.sh
     clean_build
 elif [ -z "$shard" ]; then
-    find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
-    find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+    find build/staging -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
+    find build/install -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
 fi
 
 . ./mfc.sh load -c "$flag" -m g

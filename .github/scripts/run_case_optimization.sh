@@ -33,8 +33,8 @@ if [ "$job_cluster" != "phoenix" ] && [ "$job_cluster" != "frontier_amd" ]; then
     # preserve dependency dirs (hipfort, fftw, etc.) since the compute
     # node has no internet to re-fetch them.
     echo "=== Cleaning stale MFC target staging/install ==="
-    find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
-    find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+    find build/staging -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
+    find build/install -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
 
     echo "=== Building case-optimized binaries on compute node ==="
     idx=0
