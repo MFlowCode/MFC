@@ -97,7 +97,7 @@ jobs:
 
       - name: Checkout homebrew-mfc tap
         if: ${{ github.event_name != 'pull_request' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: MFlowCode/homebrew-mfc
           token: ${{ secrets.TAP_REPO_TOKEN }}

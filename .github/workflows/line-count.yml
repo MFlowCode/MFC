@@ -14,10 +14,10 @@ jobs:
       checkall: ${{ steps.changes.outputs.checkall }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with: 
           filters: ".github/file-filter.yml"
@@ -32,12 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code from PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: pr
 
       - name: Checkout code from MFC master
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ github.event.pull_request.repository }}
           ref:        ${{ github.event.pull_request.base.ref }}
