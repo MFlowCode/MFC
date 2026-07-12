@@ -105,7 +105,6 @@ DESCRIPTIONS = {
     "ADC_kappa": "ADC sensor scaling parameter",
     "hypo_hll_interface_rhs": "HLL uses interface-consistent hypo RHS",
     "hll_u_interface": "HLL Method 2 (u-interface) selector",
-    "hypo_energy_guard": "Guard elastic energy when shear modulus is near zero",
     "hyperelasticity": "Enable hyperelastic model",
     "surface_tension": "Enable surface tension effects",
     "chemistry": "Enable chemical reactions",

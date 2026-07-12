@@ -1298,6 +1298,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if num_fluids == 1:
                 cases.append(define_case_d(stack, "cont_damage", {"cont_damage": "T", "tau_star": 0.0, "cont_damage_s": 2.0, "alpha_bar": 1e-4}))
+                if len(dimInfo[0]) == 2:
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "cont_damage -> HLLC -> nonuniform stress",
+                            {
+                                "riemann_solver": 2,
+                                "cont_damage": "T",
+                                "tau_star": 0.0,
+                                "cont_damage_s": 2.0,
+                                "alpha_bar": 1e-4,
+                                "patch_icpp(1)%tau_e(1)": 100.0,
+                                "patch_icpp(1)%tau_e(2)": 25.0,
+                                "patch_icpp(1)%tau_e(3)": -100.0,
+                                "patch_icpp(2)%tau_e(1)": 200.0,
+                                "patch_icpp(2)%tau_e(2)": 50.0,
+                                "patch_icpp(2)%tau_e(3)": -200.0,
+                                "patch_icpp(3)%tau_e(1)": 300.0,
+                                "patch_icpp(3)%tau_e(2)": 75.0,
+                                "patch_icpp(3)%tau_e(3)": -300.0,
+                            },
+                        )
+                    )
                 if len(dimInfo[0]) >= 2:
                     cases.append(define_case_d(stack, "bc=-2", reflective_params))
                 if len(dimInfo[0]) == 2:
@@ -1915,7 +1938,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "rho_wrt": "T",
             "parallel_io": "T",
             "hypoelasticity": "T",
-            "hypo_energy_guard": "F",
             "fd_order": 4,
             **_fluids,
         }
@@ -2086,6 +2108,39 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             functor=lambda case, bc=base_cfg, sm=solver_mods, alt_ss=alt_soundspeed: apply_solver(case, bc, sm, alt_ss),
                         )
                     )
+
+        multifluid_cfg = {
+            **base_configs["2D -> Hypoelasticity"],
+            "num_fluids": 3,
+            "alt_soundspeed": "F",
+            "fluid_pp(3)%gamma": _fl_g,
+            "fluid_pp(3)%pi_inf": _fl_p,
+            "fluid_pp(3)%G": 5e6,
+            "patch_icpp(1)%alpha_rho(1)": 600.0,
+            "patch_icpp(1)%alpha(1)": 0.6,
+            "patch_icpp(1)%alpha_rho(2)": 300.0,
+            "patch_icpp(1)%alpha(2)": 0.3,
+            "patch_icpp(1)%alpha_rho(3)": 100.0,
+            "patch_icpp(1)%alpha(3)": 0.1,
+            "patch_icpp(2)%alpha_rho(1)": 100.0,
+            "patch_icpp(2)%alpha(1)": 0.1,
+            "patch_icpp(2)%alpha_rho(2)": 300.0,
+            "patch_icpp(2)%alpha(2)": 0.3,
+            "patch_icpp(2)%alpha_rho(3)": 600.0,
+            "patch_icpp(2)%alpha(3)": 0.6,
+        }
+        multifluid_solvers = [
+            ("HLL -> u-interface -> Interface RHS", {"riemann_solver": 1, "hypo_hll_interface_rhs": "T", "hll_u_interface": "T"}),
+            ("HLLC", {"riemann_solver": 2}),
+        ]
+        for solver_trace, solver_mods in multifluid_solvers:
+            cases.append(
+                define_case_f(
+                    f"2D -> Hypoelasticity -> 3 Fluid(s) -> {solver_trace} -> alt_soundspeed=F",
+                    "",
+                    mods={**multifluid_cfg, **solver_mods},
+                )
+            )
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():

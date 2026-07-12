@@ -512,7 +512,6 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `riemann_hypo_ADC`         | Logical | Enable hypo anti-diffusion correction for HLLC/HLLD (default F) |
 | `ADC_kappa`                | Real    | ADC sensor scaling parameter (default 1.0) |
 | `hypo_hll_interface_rhs`   | Logical | HLL uses interface-consistent hypo RHS (default F) |
-| `hypo_energy_guard`        | Logical | Guard elastic energy when shear modulus is near zero (default T) |
 | `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |

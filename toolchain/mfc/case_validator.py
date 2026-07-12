@@ -594,6 +594,8 @@ class CaseValidator:
         cont_damage = self.get("cont_damage", "F") == "T"
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
         chemistry = self.get("chemistry", "F") == "T"
+        mhd = self.get("mhd", "F") == "T"
+        hyperelasticity = self.get("hyperelasticity", "F") == "T"
         n = self.get("n", 0)
         p = self.get("p", 0)
         cyl_coord = self.get("cyl_coord", "F") == "T"
@@ -603,8 +605,10 @@ class CaseValidator:
         self.prohibit(riemann_solver == 4 and n == 0, "HLLD hypoelasticity requires at least 2D (n > 0)")
         self.prohibit(riemann_solver == 4 and num_fluids is not None and num_fluids != 2, "HLLD hypoelasticity requires exactly 2 fluid components")
         self.prohibit(alt_soundspeed and num_fluids is not None and num_fluids != 2, "hypoelastic alt_soundspeed requires exactly 2 fluid components")
+        self.prohibit(mhd, "MHD and hypoelasticity cannot be enabled together")
+        self.prohibit(hyperelasticity, "Hypoelasticity and hyperelasticity cannot be enabled together")
+        self.prohibit(bubbles_euler, "Hypoelasticity does not support Euler-Euler bubbles")
         self.prohibit(riemann_solver == 4 and cont_damage, "HLLD hypoelasticity does not support continuum damage (the dual-pass does not damage-scale the shear modulus)")
-        self.prohibit(riemann_solver == 4 and bubbles_euler, "HLLD hypoelasticity does not support Euler-Euler bubbles (the dual-pass omits the bubble source and divergence term)")
         self.prohibit(riemann_solver == 4 and chemistry, "HLLD hypoelasticity does not support chemistry")
         self.prohibit(
             riemann_hypo_ADC and (bubbles_euler or surface_tension or chemistry or cont_damage),
@@ -1080,7 +1084,6 @@ class CaseValidator:
         self.prohibit(mhd and wave_speeds is not None and wave_speeds == 2, "MHD requires wave_speeds = 1")
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
         self.prohibit(riemann_solver == 4 and not mhd and not hypoelasticity, "HLLD (riemann_solver = 4) requires MHD or hypoelasticity")
-        self.prohibit(riemann_solver == 4 and mhd and hypoelasticity, "HLLD does not support combined MHD and hypoelasticity")
         self.prohibit(riemann_solver == 4 and relativity, "HLLD is not available for RMHD (relativity)")
         self.prohibit(hyper_cleaning and not mhd, "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0, "Hyperbolic cleaning is not supported for 1D simulations")
@@ -1356,11 +1359,13 @@ class CaseValidator:
         cont_damage_s = self.get("cont_damage_s")
         alpha_bar = self.get("alpha_bar")
         model_eqns = self.get("model_eqns")
+        alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
 
         self.prohibit(tau_star is None, "tau_star must be specified for cont_damage")
         self.prohibit(cont_damage_s is None, "cont_damage_s must be specified for cont_damage")
         self.prohibit(alpha_bar is None, "alpha_bar must be specified for cont_damage")
         self.prohibit(model_eqns is not None and model_eqns != 2, "cont_damage requires model_eqns = 2")
+        self.prohibit(alt_soundspeed, "Continuum damage does not support alt_soundspeed")
 
     def check_grcbc(self):
         """Checks Generalized Relaxation Characteristics BC (simulation)"""

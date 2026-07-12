@@ -166,7 +166,6 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         igr_order = dflt_int
-        hypo_energy_guard = .true.
         pre_stress = .false.
 
         precision = 2

@@ -155,8 +155,6 @@ contains
 
         call s_assign_common_defaults
 
-        hypo_energy_guard = .true.
-
         ! Boundary conditions (bc_x/y/z are per-target declarations, not visible in common)
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int

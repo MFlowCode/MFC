@@ -369,7 +369,6 @@ contains
         ADC_kappa = 1.0_wp
         hll_u_interface = .false.
         hypo_hll_interface_rhs = .false.
-        hypo_energy_guard = .true.
         hypo_nc_mode = hypo_nc_mode_none
         adv_src_mode = adv_src_mode_unset
         use_nc_iface_vel = .false.
@@ -938,7 +937,7 @@ contains
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
                      & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
                      & hyperelasticity, hyper_model, elasticity, low_Mach]')
-        $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_energy_guard, hypo_nc_mode]')
+        $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_nc_mode]')
 
         $:GPU_UPDATE(device='[Bx0]')
 

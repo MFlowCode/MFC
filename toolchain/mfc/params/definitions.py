@@ -646,7 +646,6 @@ def _load():
     _r("riemann_hypo_ADC", LOG, {"elasticity"})
     _r("ADC_kappa", REAL, {"elasticity"})
     _r("hypo_hll_interface_rhs", LOG, {"elasticity"})
-    _r("hypo_energy_guard", LOG, {"elasticity"})
     _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension
@@ -1301,7 +1300,6 @@ _nv(
 _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
-_nv(_ALL, "hypo_energy_guard")
 _nv(
     _SIM,
     "dt",

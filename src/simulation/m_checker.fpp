@@ -142,17 +142,15 @@ contains
                    & "HLLD hypoelasticity requires at least 2D (n must be > 0)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
                    & "HLLD hypoelasticity currently requires exactly 2 fluid components")
-        @:PROHIBIT(riemann_solver == 4 .and. mhd .and. hypoelasticity, "HLLD does not support combined MHD and hypoelasticity")
-        @:PROHIBIT(hypoelasticity .and. (riemann_solver == 1 .or. riemann_solver == 2) .and. num_fluids > 2, &
-                   & "HLL/HLLC hypoelasticity supports at most 2 fluid components (blkmod uses fluid_pp(1:2) only)")
+        @:PROHIBIT(hypoelasticity .and. mhd, "MHD and hypoelasticity cannot be enabled together")
+        @:PROHIBIT(hypoelasticity .and. hyperelasticity, "Hypoelasticity and hyperelasticity cannot be enabled together")
+        @:PROHIBIT(hypoelasticity .and. bubbles_euler, "Hypoelasticity does not support Euler-Euler bubbles")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. viscous, &
                    & "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. surface_tension, &
                    & "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. cont_damage, &
                    & "HLLD hypoelasticity does not support continuum damage (the dual-pass does not damage-scale the shear modulus)")
-        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. bubbles_euler, &
-                   & "HLLD hypoelasticity does not support Euler-Euler bubbles (the dual-pass omits the bubble source and divergence term)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. chemistry, "HLLD hypoelasticity does not support chemistry")
         @:PROHIBIT(riemann_solver == 4 .and. (.not. mhd) .and. (.not. hypoelasticity), &
                    & "HLLD is only available for MHD or hypoelasticity")
@@ -170,6 +168,7 @@ contains
                    & "alt_soundspeed with HLLD requires hypoelasticity = T")
         @:PROHIBIT(hypoelasticity .and. alt_soundspeed .and. num_fluids /= 2, &
                    & "hypoelastic alt_soundspeed requires exactly 2 fluid components")
+        @:PROHIBIT(cont_damage .and. alt_soundspeed, "Continuum damage does not support alt_soundspeed")
         @:PROHIBIT(hypoelasticity .and. igr, "Hypoelasticity is not compatible with IGR")
 
     end subroutine s_check_inputs_hypo_branch

@@ -737,7 +737,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             ! Elastic energy subtraction (guard skips when G near zero from alpha undershoot)
-                            if (.not. hypo_energy_guard .or. G_K > verysmall) then
+                            if (G_K > verysmall) then
                                 qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, l) - ((qK_prim_vf(i)%sf(j, k, &
                                            & l)**2._wp)/max(4._wp*G_K, verysmall))/gamma_K
                                 ! Double for shear stresses
@@ -989,7 +989,7 @@ contains
                         if (cont_damage) G = G*max((1._wp - q_prim_vf(eqn_idx%damage)%sf(j, k, l)), 0._wp)
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             ! Elastic energy addition (guard skips when G near zero from alpha undershoot)
-                            if (.not. hypo_energy_guard .or. G > verysmall) then
+                            if (G > verysmall) then
                                 q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
                                           & l)**2._wp)/max(4._wp*G, verysmall)
                                 ! Double for shear stresses
