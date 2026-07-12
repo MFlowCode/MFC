@@ -2191,7 +2191,7 @@ contains
         end if
 
         if (alt_soundspeed) then
-            @:DEALLOCATE(blkmod1)
+            @:DEALLOCATE(blkmod1, blkmod2, alpha1, alpha2, Kterm)
         end if
 
         if (qbmm) then
