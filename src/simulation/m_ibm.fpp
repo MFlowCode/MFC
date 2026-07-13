@@ -1662,24 +1662,24 @@ contains
     end subroutine s_update_ib_lookup
 
     !> Compute the deepest-level marker-field bounds into the module mkr_lo/mkr_hi. Sized to enclose BOTH the coarse block (m/n/p
-    !! with ghosts) AND the deepest fine block a rank can own (level amr_max_level). A level-l block has 2**l * base_ext - 1
+    !! with ghosts) AND the deepest fine block a rank can own (level amr_max_level). A level-l block has ref_ratio**l * base_ext - 1
     !! interior cells per active dim, where base_ext = amr_block_end(d) - amr_block_beg(d) + 1 (the user-specified block footprint
     !! in coarse cells). The max() keeps the coarse extent as the floor so the coarse layout is never shrunk. At amr_max_level = 1,
-    !! 2**1 = 2 gives the same sizing as the plain coarse bounds (byte-identical for existing single-level IB+AMR cases). Called
-    !! from both s_initialize_ibm_module (to size the declare-target ib_markers before the device map) and s_ibm_alloc_fine.
+    !! ref_ratio**1 = ref_ratio gives the correct sizing for any supported refinement ratio. Called from both
+    !! s_initialize_ibm_module (to size the declare-target ib_markers before the device map) and s_ibm_alloc_fine.
     impure subroutine s_ibm_marker_bounds()
 
         mkr_lo(1) = -buff_size
-        mkr_hi(1) = max(m, 2**amr_max_level*(amr_block_end(1) - amr_block_beg(1) + 1) - 1) + buff_size
+        mkr_hi(1) = max(m, ref_ratio**amr_max_level*(amr_block_end(1) - amr_block_beg(1) + 1) - 1) + buff_size
         mkr_lo(2) = -buff_size
         if (n_glb > 0) then
-            mkr_hi(2) = max(n, 2**amr_max_level*(amr_block_end(2) - amr_block_beg(2) + 1) - 1) + buff_size
+            mkr_hi(2) = max(n, ref_ratio**amr_max_level*(amr_block_end(2) - amr_block_beg(2) + 1) - 1) + buff_size
         else
             mkr_hi(2) = n + buff_size
         end if
         if (p > 0) then
             mkr_lo(3) = -buff_size
-            mkr_hi(3) = max(p, 2**amr_max_level*(amr_block_end(3) - amr_block_beg(3) + 1) - 1) + buff_size
+            mkr_hi(3) = max(p, ref_ratio**amr_max_level*(amr_block_end(3) - amr_block_beg(3) + 1) - 1) + buff_size
         else
             mkr_lo(3) = 0; mkr_hi(3) = 0
         end if
