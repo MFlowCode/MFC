@@ -519,7 +519,7 @@ contains
     impure subroutine s_amr_apply_reflux(rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch, islot
+        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch, islot, rr
         integer                                                :: bl1, bh1, bl2, bh2, bl3, bh3, ol1, ol2, ol3, oh1, oh2, oh3
         integer                                                :: tl1, tl2, tl3, dd1_hi, dd2_hi, sidx(3), ext(3), tlo(3), thi(3)
         logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
@@ -528,6 +528,7 @@ contains
         if (.not. amr) return
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
+        rr = ref_ratio
         ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer (all faces at np=1);
         ! the owner's freg is broadcast to every participant by s_mpi_bcast_amr_reflux_faces before this is called
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
@@ -547,9 +548,9 @@ contains
         has_lo = own_lo(1); has_hi = own_hi(1)
         if (has_lo .or. has_hi) then
             nch = 1
-            if (n_glb > 0) nch = nch*2
-            if (p_glb > 0) nch = nch*2
-            dd1_hi = merge(1, 0, n_glb > 0); dd2_hi = merge(1, 0, p_glb > 0)
+            if (n_glb > 0) nch = nch*rr
+            if (p_glb > 0) nch = nch*rr
+            dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
             mlo = 1._wp; mhi = 1._wp
             if (has_lo) mlo = dx(ol1)
             if (has_hi) mhi = dx(oh1)
@@ -557,8 +558,8 @@ contains
             do eq = 1, sys_size
                 do c2 = bl3, bh3
                     do c1 = bl2, bh2
-                        f20 = 0; if (d3) f20 = 2*c2
-                        f10 = 0; if (d2) f10 = 2*c1
+                        f20 = 0; if (d3) f20 = rr*c2
+                        f10 = 0; if (d2) f10 = rr*c1
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, dd2_hi
                             do dd1 = 0, dd1_hi
@@ -579,9 +580,9 @@ contains
         ! y-faces (n_glb > 0): transverse dims (x, z); x is always active (2 children)
         has_lo = own_lo(2); has_hi = own_hi(2)
         if (n_glb > 0 .and. (has_lo .or. has_hi)) then
-            nch = 2
-            if (p_glb > 0) nch = nch*2
-            dd2_hi = merge(1, 0, p_glb > 0)
+            nch = rr
+            if (p_glb > 0) nch = nch*rr
+            dd2_hi = merge(rr - 1, 0, p_glb > 0)
             mlo = 1._wp; mhi = 1._wp
             if (has_lo) mlo = dy(ol2)
             if (has_hi) mhi = dy(oh2)
@@ -589,11 +590,11 @@ contains
             do eq = 1, sys_size
                 do c2 = bl3, bh3
                     do c1 = bl1, bh1
-                        f20 = 0; if (d3) f20 = 2*c2
-                        f10 = 2*c1
+                        f20 = 0; if (d3) f20 = rr*c2
+                        f10 = rr*c1
                         fblo = 0._wp; fbhi = 0._wp
                         do dd2 = 0, dd2_hi
-                            do dd1 = 0, 1
+                            do dd1 = 0, rr - 1
                                 fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, islot)
                                 fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
@@ -611,7 +612,7 @@ contains
         ! z-faces (p_glb > 0): transverse dims (x, y); both always active in 3D (4 children)
         has_lo = own_lo(3); has_hi = own_hi(3)
         if (p_glb > 0 .and. (has_lo .or. has_hi)) then
-            nch = 4
+            nch = rr*rr
             mlo = 1._wp; mhi = 1._wp
             if (has_lo) mlo = dz(ol3)
             if (has_hi) mhi = dz(oh3)
@@ -619,11 +620,11 @@ contains
             do eq = 1, sys_size
                 do c2 = bl2, bh2
                     do c1 = bl1, bh1
-                        f20 = 2*c2
-                        f10 = 2*c1
+                        f20 = rr*c2
+                        f10 = rr*c1
                         fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, 1
-                            do dd1 = 0, 1
+                        do dd2 = 0, rr - 1
+                            do dd1 = 0, rr - 1
                                 fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, islot)
                                 fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, islot)
                             end do
