@@ -21,6 +21,7 @@ module m_ibm
     use m_model
     use m_patch_geometries
     use m_collisions
+    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass
 
     implicit none
 
@@ -160,13 +161,16 @@ contains
             real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(18) :: nmom_IP
             real(wp), dimension(12) :: presb_IP, massv_IP
+            real(wp), dimension(10) :: Ys_IP
         #:else
-            real(wp), dimension(num_fluids) :: Gs
-            real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
-            real(wp), dimension(nb)         :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(nb*nmom)    :: nmom_IP
-            real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
+            real(wp), dimension(num_fluids)  :: Gs
+            real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP
+            real(wp), dimension(nb)          :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(nb*nmom)     :: nmom_IP
+            real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
+            real(wp), dimension(num_species) :: Ys_IP
         #:endif
+        real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
@@ -189,7 +193,13 @@ contains
                         call s_decode_patch_periodicity(patch_id, patch_id_temp)
                         call s_get_neighborhood_idx(patch_id_temp, patch_id)
                         if (patch_id > 0) then
-                            q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
+                            ! Placeholder low pressure inside the IB solid. Skip it with
+                            ! chemistry on: it would force an unphysical temperature
+                            ! (P=1 Pa at the ambient density -> T~0.01 K), which the
+                            ! Cantera temperature/transport evaluation (run grid-wide
+                            ! before the IB mask is applied) cannot handle -> NaN/hang.
+                            ! The interior is masked from the RHS regardless.
+                            if (.not. chemistry) q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                             rho = 0._wp
                             do i = 1, num_fluids
                                 rho = rho + q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
@@ -210,7 +220,8 @@ contains
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
-                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id]')
+                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
+                                & Ys_IP, T_IP, mw_IP, e_IP]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -235,6 +246,8 @@ contains
                 else if (qbmm .and. .not. polytropic) then
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
                                                    & pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                else if (chemistry) then
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, Ys_IP=Ys_IP)
                 else
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
@@ -337,7 +350,21 @@ contains
                 end if
 
                 ! Set Energy
-                if (bubbles_euler) then
+                if (chemistry) then
+                    ! Mirror the reacting-mixture state at the ghost point: interpolated species,
+                    ! plus a thermodynamically consistent conserved energy from the mixture EOS.
+                    ! (The gamma*pres_IP closure below is only valid for a calorically perfect gas
+                    ! and yields an out-of-range temperature when inverted against the Cantera model.)
+                    mw_IP = 0._wp
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    T_IP = pres_IP*mw_IP/(rho*gas_constant)
+                    call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_species
+                        q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
+                    end do
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_IP + dyn_pres
+                else if (bubbles_euler) then
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
                 else
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
@@ -741,7 +768,7 @@ contains
 
     !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
-                                         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                                         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP, Ys_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Primitive Variables
@@ -758,7 +785,8 @@ contains
         real(wp), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), optional, dimension(:), intent(inout) :: nmom_IP
         real(wp), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
-        integer                                         :: i, j, k, l, q           !< Iterator variables
+        real(wp), optional, dimension(:), intent(inout) :: Ys_IP  !< Interpolated species mass fractions (chemistry)
+        integer                                         :: i, j, k, l, q  !< Iterator variables
         integer                                         :: i1, i2, j1, j2, k1, k2  !< Iterator variables
         real(wp)                                        :: coeff
 
@@ -775,6 +803,8 @@ contains
         alpha_IP = 0._wp
         pres_IP = 0._wp
         vel_IP = 0._wp
+
+        if (chemistry) Ys_IP = 0._wp
 
         if (surface_tension) c_IP = 0._wp
 
@@ -818,6 +848,13 @@ contains
 
                     if (surface_tension) then
                         c_IP = c_IP + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
+                    end if
+
+                    if (chemistry) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_species
+                            Ys_IP(q) = Ys_IP(q) + coeff*q_prim_vf(eqn_idx%species%beg + q - 1)%sf(i, j, k)
+                        end do
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then
