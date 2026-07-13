@@ -106,7 +106,15 @@ contains
     !> Allocates memory for the variables in the IBM module
     impure subroutine s_initialize_ibm_module()
 
-        if (p > 0) then
+        if (amr .and. ib) then
+            ! Size the declare-target ib_markers for the DEEPEST fine level: it must both hold an L2 (4x) block's
+            ! markers when swapped to a fine block and conform to the level-aware park slots (s_ibm_alloc_fine)
+            ! that the whole-array park/restore copies assign to/from. ib_markers is device-mapped once here and
+            ! never reallocated (Cray present-table), so the widening must happen at this ALLOCATE. At
+            ! amr_max_level = 1 the bounds reduce to the plain coarse extents (byte-identical).
+            call s_ibm_marker_bounds()
+            @:ALLOCATE(ib_markers%sf(mkr_lo(1):mkr_hi(1), mkr_lo(2):mkr_hi(2), mkr_lo(3):mkr_hi(3)))
+        else if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
         else
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
@@ -1653,20 +1661,13 @@ contains
 
     end subroutine s_update_ib_lookup
 
-    !> Allocate the per-slot fine-IB marker fields (static-body AMR). One integer field per AMR slot, sized to the max buffered fine
-    !! extents (mirrors the coarse ib_markers bounds); ghost-point lists start empty and are filled by s_ibm_setup_fine. No-op
-    !! unless amr .and. ib.
-    impure subroutine s_ibm_alloc_fine(nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi)
-
-        integer, intent(in) :: nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi
-        integer             :: islot
-
-        ! Marker-field bounds: sized to enclose BOTH the coarse block (m/n/p with ghosts) AND the deepest
-        ! fine block a rank can own (level amr_max_level). A level-l block has 2**l * base_ext - 1 interior
-        ! cells per active dim, where base_ext = amr_block_end(d) - amr_block_beg(d) + 1 (the user-specified
-        ! block footprint in coarse cells). The max() keeps the coarse extent as the floor so the coarse
-        ! ib_markers layout (set by s_initialize_ibm_module) is never shrunk. At amr_max_level = 1,
-        ! 2**1 = 2 gives the same sizing as today (byte-identical for existing single-level IB+AMR cases).
+    !> Compute the deepest-level marker-field bounds into the module mkr_lo/mkr_hi. Sized to enclose BOTH the coarse block (m/n/p
+    !! with ghosts) AND the deepest fine block a rank can own (level amr_max_level). A level-l block has 2**l * base_ext - 1
+    !! interior cells per active dim, where base_ext = amr_block_end(d) - amr_block_beg(d) + 1 (the user-specified block footprint
+    !! in coarse cells). The max() keeps the coarse extent as the floor so the coarse layout is never shrunk. At amr_max_level = 1,
+    !! 2**1 = 2 gives the same sizing as the plain coarse bounds (byte-identical for existing single-level IB+AMR cases). Called
+    !! from both s_initialize_ibm_module (to size the declare-target ib_markers before the device map) and s_ibm_alloc_fine.
+    impure subroutine s_ibm_marker_bounds()
 
         mkr_lo(1) = -buff_size
         mkr_hi(1) = max(m, 2**amr_max_level*(amr_block_end(1) - amr_block_beg(1) + 1) - 1) + buff_size
@@ -1682,6 +1683,18 @@ contains
         else
             mkr_lo(3) = 0; mkr_hi(3) = 0
         end if
+
+    end subroutine s_ibm_marker_bounds
+
+    !> Allocate the per-slot fine-IB marker fields (static-body AMR). One integer field per AMR slot, sized to the max buffered fine
+    !! extents (mirrors the coarse ib_markers bounds); ghost-point lists start empty and are filled by s_ibm_setup_fine. No-op
+    !! unless amr .and. ib.
+    impure subroutine s_ibm_alloc_fine(nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi)
+
+        integer, intent(in) :: nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi
+        integer             :: islot
+
+        call s_ibm_marker_bounds()
         @:PROHIBIT(f1_hi > mkr_hi(1) .or. f2_hi > mkr_hi(2) .or. (p > 0 .and. f3_hi > mkr_hi(3)), &
                    & "AMR fine IB: fine block extent exceeds the deepest-level ib_markers bounds; the copy-based fine-marker swap needs ib_markers sized to enclose the fine block")
 
