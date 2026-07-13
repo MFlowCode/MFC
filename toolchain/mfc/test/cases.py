@@ -3701,6 +3701,70 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (n3) MULTI-LEVEL STATIC IB AMR (SP22): a single fixed circular body refined to LEVEL 2. Same 2D
+        # quiescent-drift setup as (n) with dynamic regrid, but amr_max_level=2 so the body-containment
+        # cascade nests a level-2 child inside the level-1 block over the body. Conservation is NOT machine-
+        # zero here (the IB overwrites body cells, so s_amr_conservation_defect reads a bounded non-zero) -
+        # the golden field values are the correctness oracle. np=1, static body only (the checker still fails
+        # closed for np>1 and moving bodies). amr_max_blocks is raised to nest the extra level-2 child.
+        stack.push(
+            "AMR -> 2D -> multi-level IB (static cylinder, np=1)",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-4,
+                "t_step_stop": 20,
+                "t_step_save": 20,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.1,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # static circular body at the domain center
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.1,
+                "patch_ib(1)%slip": "F",
+                # initial 2:1 fine block over the body (regrid rebuilds it from the sensor each step)
+                "amr": "T",
+                "amr_block_beg(1)": 20,
+                "amr_block_beg(2)": 20,
+                "amr_block_end(1)": 43,
+                "amr_block_end(2)": 43,
+                # dynamic regrid refining the body to level 2
+                "amr_max_level": 2,
+                "amr_max_blocks": 16,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 1.0e-4,
+                "amr_buf": 2,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         # (o) PRESCRIBED-MOTION MOVING IMMERSED BOUNDARY (SP21): a single circular body translating at a
         # prescribed velocity (moving_ibm=1) through quiescent flow, resolved on a STATIC fine block that
         # contains its whole trajectory. Each fine RK substage rebuilds the block's IB markers/ghost points
