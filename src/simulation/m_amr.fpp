@@ -1647,7 +1647,7 @@ contains
 
         type(scalar_field), intent(in)    :: qf
         type(scalar_field), intent(inout) :: qc
-        integer                           :: ci, cj, ck, fi0, fj0, fk0, ddj, ddk, nchild, ox, oy, oz
+        integer                           :: ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, nchild, ox, oy, oz
         real(wp)                          :: acc
 
         ! host operator-check diagnostic only: coarse target qc is the block-local patch (amr_cg frame), so the covered global
@@ -1666,7 +1666,9 @@ contains
                     acc = 0._wp
                     do ddk = 0, merge(amr_slots(amr_cur)%ref_ratio - 1, 0, p_glb > 0)
                         do ddj = 0, merge(amr_slots(amr_cur)%ref_ratio - 1, 0, n_glb > 0)
-                            acc = acc + real(qf%sf(fi0, fj0 + ddj, fk0 + ddk), wp) + real(qf%sf(fi0 + 1, fj0 + ddj, fk0 + ddk), wp)
+                            do ddi = 0, amr_slots(amr_cur)%ref_ratio - 1
+                                acc = acc + real(qf%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)
+                            end do
                         end do
                     end do
                     qc%sf(ci - ox, cj - oy, ck - oz) = acc/real(nchild, wp)
@@ -1897,14 +1899,15 @@ contains
     !! from the owner's fine block, block-relative (fine origin (ci-rlo)*rr). Same child-sum order as the old device kernel.
     impure real(wp) function f_amr_restrict_cell(i, ci, cj, ck, rlo, rr, dj_hi, dk_hi, nchild) result(v)
         integer, intent(in) :: i, ci, cj, ck, rlo(3), rr, dj_hi, dk_hi, nchild
-        integer             :: fi0, fj0, fk0, ddj, ddk
+        integer             :: fi0, fj0, fk0, ddi, ddj, ddk
         real(wp)            :: acc
         fi0 = (ci - rlo(1))*rr; fj0 = (cj - rlo(2))*rr; fk0 = (ck - rlo(3))*rr
         acc = 0._wp
         do ddk = 0, dk_hi
             do ddj = 0, dj_hi
-                acc = acc + real(amr_slots(amr_cur)%q_cons(i)%sf(fi0, fj0 + ddj, fk0 + ddk), &
-                                 & wp) + real(amr_slots(amr_cur)%q_cons(i)%sf(fi0 + 1, fj0 + ddj, fk0 + ddk), wp)
+                do ddi = 0, rr - 1
+                    acc = acc + real(amr_slots(amr_cur)%q_cons(i)%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)
+                end do
             end do
         end do
         v = acc/real(nchild, wp)
@@ -1942,12 +1945,12 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
         type(scalar_field), dimension(sys_size), intent(in) :: q_fine
         integer, intent(in) :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
-        integer :: i, ci, cj, ck, fi0, fj0, fk0, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
+        integer :: i, ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
         real(wp) :: acc
 
         bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
         rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddj, ddk, acc]')
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]')
         do i = 1, sys_size
             do ck = bl3, bh3
                 do cj = bl2, bh2
@@ -1956,8 +1959,9 @@ contains
                         acc = 0._wp
                         do ddk = 0, dk_hi
                             do ddj = 0, dj_hi
-                                acc = acc + real(q_fine(i)%sf(fi0, fj0 + ddj, fk0 + ddk), wp) + real(q_fine(i)%sf(fi0 + 1, &
-                                                 & fj0 + ddj, fk0 + ddk), wp)
+                                do ddi = 0, rr - 1
+                                    acc = acc + real(q_fine(i)%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)
+                                end do
                             end do
                         end do
                         coarse_tgt(i)%sf(ci - o1, cj - o2, ck - o3) = real(acc/real(nchild, wp), stp)
@@ -2260,7 +2264,7 @@ contains
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pb_fin, mv_fin
-        integer  :: ci, cj, ck, q, ib_, fi0, fj0, fk0, ddj, ddk, nchild, ox, oy, oz, rr
+        integer  :: ci, cj, ck, q, ib_, fi0, fj0, fk0, ddi, ddj, ddk, nchild, ox, oy, oz, rr
         integer  :: c1lo, c1hi, c2lo, c2hi, c3lo, c3hi, dj_hi, dk_hi
         real(wp) :: accp, accm
 
@@ -2275,7 +2279,7 @@ contains
         c2lo = amr_isect_lo(2); c2hi = merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
         c3lo = amr_isect_lo(3); c3hi = merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
-        $:GPU_PARALLEL_LOOP(collapse=5, private='[fi0, fj0, fk0, accp, accm, ddj, ddk]')
+        $:GPU_PARALLEL_LOOP(collapse=5, private='[fi0, fj0, fk0, ddi, accp, accm, ddj, ddk]')
         do ib_ = 1, nb
             do q = 1, nnode
                 do ck = c3lo, c3hi
@@ -2285,10 +2289,10 @@ contains
                             accp = 0._wp; accm = 0._wp
                             do ddk = 0, dk_hi
                                 do ddj = 0, dj_hi
-                                    accp = accp + real(pb_fin(fi0, fj0 + ddj, fk0 + ddk, q, ib_), wp) + real(pb_fin(fi0 + 1, &
-                                                       & fj0 + ddj, fk0 + ddk, q, ib_), wp)
-                                    accm = accm + real(mv_fin(fi0, fj0 + ddj, fk0 + ddk, q, ib_), wp) + real(mv_fin(fi0 + 1, &
-                                                       & fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                                    do ddi = 0, rr - 1
+                                        accp = accp + real(pb_fin(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                                        accm = accm + real(mv_fin(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                                    end do
                                 end do
                             end do
                             pb_c(ci - ox, cj - oy, ck - oz, q, ib_) = accp/real(nchild, wp)
@@ -2308,7 +2312,7 @@ contains
     impure real(wp) function f_amr_restrict_cell_pbmv(ispb, ci, cj, ck, q, ib_, rlo, rr, dj_hi, dk_hi, nchild) result(v)
         logical, intent(in) :: ispb
         integer, intent(in) :: ci, cj, ck, q, ib_, rlo(3), rr, dj_hi, dk_hi, nchild
-        integer             :: fi0, fj0, fk0, ddj, ddk
+        integer             :: fi0, fj0, fk0, ddi, ddj, ddk
         real(wp)            :: acc
 
         fi0 = (ci - rlo(1))*rr; fj0 = (cj - rlo(2))*rr; fk0 = (ck - rlo(3))*rr
@@ -2316,15 +2320,17 @@ contains
         if (ispb) then
             do ddk = 0, dk_hi
                 do ddj = 0, dj_hi
-                    acc = acc + real(amr_slots(amr_cur)%pb_f%sf(fi0, fj0 + ddj, fk0 + ddk, q, ib_), &
-                                     & wp) + real(amr_slots(amr_cur)%pb_f%sf(fi0 + 1, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                    do ddi = 0, rr - 1
+                        acc = acc + real(amr_slots(amr_cur)%pb_f%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                    end do
                 end do
             end do
         else
             do ddk = 0, dk_hi
                 do ddj = 0, dj_hi
-                    acc = acc + real(amr_slots(amr_cur)%mv_f%sf(fi0, fj0 + ddj, fk0 + ddk, q, ib_), &
-                                     & wp) + real(amr_slots(amr_cur)%mv_f%sf(fi0 + 1, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                    do ddi = 0, rr - 1
+                        acc = acc + real(amr_slots(amr_cur)%mv_f%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                    end do
                 end do
             end do
         end if
@@ -2342,12 +2348,12 @@ contains
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pb_fin, mv_fin
         integer, intent(in) :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
-        integer             :: ci, cj, ck, q, ib_, fi0, fj0, fk0, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
+        integer             :: ci, cj, ck, q, ib_, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
         real(wp)            :: accp, accm
 
         bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
         rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
-        $:GPU_PARALLEL_LOOP(collapse=5, private='[fi0, fj0, fk0, accp, accm, ddj, ddk]')
+        $:GPU_PARALLEL_LOOP(collapse=5, private='[fi0, fj0, fk0, ddi, accp, accm, ddj, ddk]')
         do ib_ = 1, nb
             do q = 1, nnode
                 do ck = bl3, bh3
@@ -2357,10 +2363,10 @@ contains
                             accp = 0._wp; accm = 0._wp
                             do ddk = 0, dk_hi
                                 do ddj = 0, dj_hi
-                                    accp = accp + real(pb_fin(fi0, fj0 + ddj, fk0 + ddk, q, ib_), wp) + real(pb_fin(fi0 + 1, &
-                                                       & fj0 + ddj, fk0 + ddk, q, ib_), wp)
-                                    accm = accm + real(mv_fin(fi0, fj0 + ddj, fk0 + ddk, q, ib_), wp) + real(mv_fin(fi0 + 1, &
-                                                       & fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                                    do ddi = 0, rr - 1
+                                        accp = accp + real(pb_fin(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                                        accm = accm + real(mv_fin(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                                    end do
                                 end do
                             end do
                             pb_c(ci - o1, cj - o2, ck - o3, q, ib_) = real(accp/real(nchild, wp), stp)
@@ -4772,7 +4778,7 @@ contains
                         ! same-level overlap only (a child's stash is 4x-framed)
                         if (old_level(kk) /= amr_block_level(amr_cur)) cycle
                         ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
-                        sh = 2*(amr_isect_lo - old_ilo(:,kk))
+                        sh = ref_ratio*(amr_isect_lo - old_ilo(:,kk))
                         do i = 1, sys_size
                             do fk = 0, amr_slots(k)%p
                                 ofk = fk + sh(3)
@@ -4802,7 +4808,7 @@ contains
                         do kk = 1, old_np
                             if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
                             if (.not. old_owns(kk)) cycle
-                            sh = 2*(amr_isect_lo - old_ilo(:,kk))
+                            sh = ref_ratio*(amr_isect_lo - old_ilo(:,kk))
                             do fk = 0, amr_slots(k)%p
                                 ofk = fk + sh(3)
                                 if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
@@ -5092,8 +5098,8 @@ contains
                     if (had_data(k)) then
                         ! whole-block owner extents are region-derived (decomposition-independent); a file whose
                         ! stored extent disagrees is corrupt/foreign - reject before the direct read
-                        if (rm /= 2*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge(2*(reg(5) - reg(2) + 1) - 1, 0, &
-                            & n_glb > 0) .or. rp /= merge(2*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
+                        if (rm /= ref_ratio*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge(ref_ratio*(reg(5) - reg(2) + 1) - 1, 0, &
+                            & n_glb > 0) .or. rp /= merge(ref_ratio*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
                             call s_mpi_abort('amr restart: block fine extents disagree with the region (corrupt file)')
                         end if
                         ! serial (same rank count): had_data == this run's ownership, so this is the owned slot
@@ -5163,8 +5169,8 @@ contains
                     end if
                     amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
                     blk_base(k) = disp0
-                    cnt = sys_size*(2*(reg(4) - reg(1) + 1))*merge(2*(reg(5) - reg(2) + 1), 1, &
-                                    & n_glb > 0)*merge(2*(reg(6) - reg(3) + 1), 1, p_glb > 0)
+                    cnt = sys_size*(ref_ratio*(reg(4) - reg(1) + 1))*merge(ref_ratio*(reg(5) - reg(2) + 1), 1, &
+                                    & n_glb > 0)*merge(ref_ratio*(reg(6) - reg(3) + 1), 1, p_glb > 0)
                     disp0 = disp0 + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND) + int(cnt, MPI_OFFSET_KIND)*int(sbytes, &
                                         & MPI_OFFSET_KIND)
                 end do
