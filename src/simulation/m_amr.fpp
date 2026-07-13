@@ -154,6 +154,11 @@ module m_amr
     integer                         :: amr_cpat_mar = 0     !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
     integer                         :: amr_cpat_hi(3) = 0   !< amr_cg upper local bounds per dim (0 in collapsed dims)
     integer                         :: amr_cpat_off(3) = 0  !< GLOBAL coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar)
+    !> Gathered coarse pb/mv patch for non-polytropic QBMM (analogue of amr_cg): the block's coarse-side pb/mv side-state,
+    !! P2P-gathered from the coarse-cell owners into the block owner in the amr_cg patch-local frame (cell 0 == amr_cpat_off). Read
+    !! by the pb/mv prolong + ghost-fill so np>=2 couples to the correct coarse rank. Allocated only for non-polytropic QBMM.
+    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cg_pb, amr_cg_mv
+    $:GPU_DECLARE(create='[amr_cg_pb, amr_cg_mv]')
 
     !> Replicated coarse-decomposition table (fine-level distribution, point-to-point coupling): amr_decomp(1:3, r) = rank r's
     !! coarse start_idx per dim, amr_decomp(4:6, r) = its coarse extent (m/n/p). Allgathered once at init (the coarse decomposition
@@ -373,6 +378,14 @@ contains
             amr_cg(i)%sf = 0._stp  ! padding beyond a block's valid patch extent is never read; keep it finite for the device copy
             @:ACC_SETUP_SFs(amr_cg(i))
         end do
+
+        ! non-polytropic QBMM: gathered coarse pb/mv patch (analogue of amr_cg, same patch footprint + trailing (nnode, nb) dims).
+        ! Plain 5D arrays (amr_rhs_pb_f idiom): the module GPU_DECLARE + @:ALLOCATE handle device mapping - no @:ACC_SETUP_SFs.
+        if (qbmm .and. .not. polytropic) then
+            @:ALLOCATE(amr_cg_pb(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3), 1:nnode, 1:nb))
+            @:ALLOCATE(amr_cg_mv(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3), 1:nnode, 1:nb))
+            amr_cg_pb = 0._stp; amr_cg_mv = 0._stp
+        end if
 
         ! replicated coarse-decomposition table for point-to-point coupling (see decl). The coarse decomposition is fixed for the
         ! run, so this is allgathered once. Row r = [start_idx(1:3), m, n, p] for rank r (collapsed dims pinned to 0).
@@ -649,6 +662,202 @@ contains
         end if
 
     end subroutine s_amr_gather_coarse_patch
+
+    !> Non-polytropic QBMM analogue of s_amr_gather_coarse_patch: gather the current block's coarse pb/mv patch into amr_cg_pb/
+    !! amr_cg_mv (block-local/patch frame, cell 0 == amr_cpat_off), P2P from the coarse-cell owners into the block owner. Per-cell
+    !! payload = 2*nnode*nb (pb block then mv block). Single-level only (level>=2 QBMM np>=2 is checker-gated); wire is wp, cast to
+    !! stp on unpack (identity for stp coarse), so at np=1 the owner copies its own coarse over the patch bit-for-bit.
+    impure subroutine s_amr_gather_coarse_patch_pbmv(pb_coarse, mv_coarse, pull_host)
+
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
+        !> runtime callers pass .true. (coarse device-current); init/regrid pass .false. (host is truth)
+        logical, intent(in)   :: pull_host
+        integer               :: q, ib_, g1, g2, g3, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
+        integer               :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), cellsz
+        real(wp), allocatable :: rbuf(:,:), sbuf(:)
+        integer, allocatable  :: reqs(:), srank(:)
+
+        ! single-level only: a level>=2 block's coarse side is its parent's fine pb/mv, distributed only at np=1 - Task 4's checker
+        ! gate keeps multi-level QBMM np>=2 fail-closed, so this must never be reached at level>=2.
+
+        if (amr_block_level(amr_cur) >= 2) return
+
+        cellsz = 2*nnode*nb
+
+        ! block-local patch frame (cell 0 == global region_lo-nmar; collapsed dims -> 0) + its GLOBAL cell range [plo:phi]
+        amr_cpat_off = 0
+        amr_cpat_off(1) = amr_region_lo_all(1, amr_cur) - amr_cpat_mar
+        if (n_glb > 0) amr_cpat_off(2) = amr_region_lo_all(2, amr_cur) - amr_cpat_mar
+        if (p_glb > 0) amr_cpat_off(3) = amr_region_lo_all(3, amr_cur) - amr_cpat_mar
+        v1hi = (amr_region_hi_all(1, amr_cur) - amr_region_lo_all(1, amr_cur)) + 2*amr_cpat_mar
+        v2hi = 0; v3hi = 0
+        if (n_glb > 0) v2hi = (amr_region_hi_all(2, amr_cur) - amr_region_lo_all(2, amr_cur)) + 2*amr_cpat_mar
+        if (p_glb > 0) v3hi = (amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur)) + 2*amr_cpat_mar
+        plo = amr_cpat_off
+        phi(1) = amr_cpat_off(1) + v1hi; phi(2) = amr_cpat_off(2) + v2hi; phi(3) = amr_cpat_off(3) + v3hi
+
+        owner = amr_block_owner(amr_cur)
+        o1 = start_idx(1); o2 = 0; o3 = 0
+        if (n_glb > 0) o2 = start_idx(2)
+        if (p_glb > 0) o3 = start_idx(3)
+        maxsz = cellsz*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
+
+        ! np=1 runtime: the sole owner holds every covered coarse cell and pb/mv are device-current (pull_host), so copy
+        ! pb_coarse/mv_coarse (device) -> amr_cg_pb/mv (device) with a DEVICE kernel over the in-domain patch. At init/regrid
+        ! (.not. pull_host) the device copy may be stale, so fall through to the host path.
+        if (num_procs == 1 .and. pull_host) then
+            block
+                integer :: bl1, bh1, bl2, bh2, bl3, bh3, coff1, coff2, coff3
+                call f_amr_rank_coarse_range(owner, crlo, crhi)
+                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
+                coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
+                $:GPU_PARALLEL_LOOP(collapse=5)
+                do ib_ = 1, nb
+                    do q = 1, nnode
+                        do g3 = bl3, bh3
+                            do g2 = bl2, bh2
+                                do g1 = bl1, bh1
+                                    amr_cg_pb(g1 - coff1, g2 - coff2, g3 - coff3, q, ib_) = pb_coarse(g1 - o1, g2 - o2, g3 - o3, &
+                                              & q, ib_)
+                                    amr_cg_mv(g1 - coff1, g2 - coff2, g3 - coff3, q, ib_) = mv_coarse(g1 - o1, g2 - o2, g3 - o3, &
+                                              & q, ib_)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end block
+            return
+        end if
+
+        ! np>1 runtime: pull pb/mv to host for the owner's local unpack and the non-owner MPI pack below.
+        if (pull_host) then
+            $:GPU_UPDATE(host='[pb_coarse, mv_coarse]')
+        end if
+
+        if (proc_rank == owner) then
+            ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
+            call f_amr_rank_coarse_range(proc_rank, crlo, crhi)
+            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+            do ib_ = 1, nb
+                do q = 1, nnode
+                    do g3 = bl(3), bh(3)
+                        do g2 = bl(2), bh(2)
+                            do g1 = bl(1), bh(1)
+                                amr_cg_pb(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
+                                          & ib_) = pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
+                                amr_cg_mv(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
+                                          & ib_) = mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+            ! count + post recvs from every OTHER rank whose owned range overlaps the patch
+            nsrc = 0
+            do r = 0, num_procs - 1
+                if (r == owner) cycle
+                call f_amr_rank_coarse_range(r, crlo, crhi)
+                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
+            end do
+            if (nsrc > 0) then
+                allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc))
+                nsrc = 0
+                do r = 0, num_procs - 1
+                    if (r == owner) cycle
+                    call f_amr_rank_coarse_range(r, crlo, crhi)
+                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                    if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
+                    boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    nsrc = nsrc + 1; srank(nsrc) = r
+#ifdef MFC_MPI
+                    call MPI_IRECV(rbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
+#endif
+                end do
+#ifdef MFC_MPI
+                call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+#endif
+                do idx = 1, nsrc
+                    call f_amr_rank_coarse_range(srank(idx), crlo, crhi)
+                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                    ! unpack in the SAME (ib_, q, g3, g2, g1) order the sender packed - pb block then mv block
+                    r = 0
+                    do ib_ = 1, nb
+                        do q = 1, nnode
+                            do g3 = bl(3), bh(3)
+                                do g2 = bl(2), bh(2)
+                                    do g1 = bl(1), bh(1)
+                                        r = r + 1
+                                        amr_cg_pb(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
+                                                  & ib_) = real(rbuf(r, idx), stp)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                    do ib_ = 1, nb
+                        do q = 1, nnode
+                            do g3 = bl(3), bh(3)
+                                do g2 = bl(2), bh(2)
+                                    do g1 = bl(1), bh(1)
+                                        r = r + 1
+                                        amr_cg_mv(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
+                                                  & ib_) = real(rbuf(r, idx), stp)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                deallocate (rbuf, reqs, srank)
+            end if
+            $:GPU_UPDATE(device='[amr_cg_pb, amr_cg_mv]')
+        else
+            ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
+            call f_amr_rank_coarse_range(proc_rank, crlo, crhi)
+            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
+                boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                allocate (sbuf(boxsz))
+                idx = 0
+                do ib_ = 1, nb
+                    do q = 1, nnode
+                        do g3 = bl(3), bh(3)
+                            do g2 = bl(2), bh(2)
+                                do g1 = bl(1), bh(1)
+                                    idx = idx + 1; sbuf(idx) = real(pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                do ib_ = 1, nb
+                    do q = 1, nnode
+                        do g3 = bl(3), bh(3)
+                            do g2 = bl(2), bh(2)
+                                do g1 = bl(1), bh(1)
+                                    idx = idx + 1; sbuf(idx) = real(mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+#ifdef MFC_MPI
+                call MPI_SEND(sbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
+#endif
+                deallocate (sbuf)
+            end if
+        end if
+
+        ! host-consumer callers (init/regrid prolong) need the gathered patch on the host
+        if (.not. pull_host) then
+            $:GPU_UPDATE(host='[amr_cg_pb, amr_cg_mv]')
+        end if
+
+    end subroutine s_amr_gather_coarse_patch_pbmv
 
     !> Multi-level gather: fill amr_cg (the current level>=2 block's coarse patch) from its PARENT block's fine array, in the
     !! parent-fine cell frame (amr_isect_lo/hi are already parent-fine from s_set_amr_fine_geometry). np=1 = a local copy on the
@@ -1338,6 +1547,8 @@ contains
         do islot = 1, amr_num_blocks
             call s_amr_select_slot(islot)
             call s_amr_gather_coarse_patch(q_cons_base, .false.)
+            ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners prolong from it below)
+            if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (amr_rank_owns_block) then
                 call s_interpolate_coarse_to_fine()
                 do i = 1, sys_size
@@ -1881,9 +2092,9 @@ contains
 
     end subroutine s_amr_update_mib_fine
 
-    !> Non-polytropic QBMM: piecewise-constant prolongation of the block's pb/mv interior from the coarse side-state. HOST loops +
-    !! device push; all three callers make the coarse host mirrors current first: init populate and restart read pb/mv on the host,
-    !! the regrid path refreshes them from the device before re-prolonging.
+    !> Non-polytropic QBMM: piecewise-constant prolongation of the block's pb/mv interior from the gathered coarse side-state
+    !! amr_cg_pb/mv (patch-local frame; the callers run s_amr_gather_coarse_patch_pbmv on ALL ranks first, so np>=2 couples to the
+    !! correct coarse rank). HOST loops + device push; the gather is host-current (.not. pull_host).
     impure subroutine s_amr_prolong_pbmv()
 
         integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
@@ -1892,9 +2103,10 @@ contains
         ! init writes them on the host, regrid refreshes them from the device); the device copy of the fine
         ! side-state is pushed at the end
 
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ! coarse pb/mv are read from the gathered block-local patch amr_cg_pb/mv (fine-level distribution): patch-local frame,
+        ! cell 0 == amr_cpat_off (matching s_prolong_one_var). The gather is a host loop (.not. pull_host) done by the callers.
+
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         rr = amr_slots(amr_cur)%ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
         do ib_ = 1, nb
@@ -1907,8 +2119,8 @@ contains
                         if (n_glb > 0) cj = lo2 + fj/rr - oy
                         do fi = 0, amr_slots(amr_cur)%m
                             ci = lo1 + fi/rr - ox
-                            amr_slots(amr_cur)%pb_f%sf(fi, fj, fk, q, ib_) = pb_ts(1)%sf(ci, cj, ck, q, ib_)
-                            amr_slots(amr_cur)%mv_f%sf(fi, fj, fk, q, ib_) = mv_ts(1)%sf(ci, cj, ck, q, ib_)
+                            amr_slots(amr_cur)%pb_f%sf(fi, fj, fk, q, ib_) = amr_cg_pb(ci, cj, ck, q, ib_)
+                            amr_slots(amr_cur)%mv_f%sf(fi, fj, fk, q, ib_) = amr_cg_mv(ci, cj, ck, q, ib_)
                         end do
                     end do
                 end do
@@ -4314,6 +4526,8 @@ contains
                 ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
                 ! q_cons_base is host-current with valid ghosts from the exchange at the top of s_amr_regrid)
                 call s_amr_gather_coarse_patch(q_cons_base, .false.)
+                ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners re-prolong from it below)
+                if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
                 if (.not. amr_rank_owns_block) cycle
                 call s_interpolate_coarse_to_fine()
                 ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy
@@ -4796,6 +5010,8 @@ contains
             if (qbmm .and. .not. polytropic) then
                 do k = 1, amr_num_blocks
                     call s_amr_select_slot(k)
+                    ! gather the coarse pb/mv patch on ALL ranks (P2P), then owners re-prolong from it
+                    call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
                     if (amr_owns_all(k)) call s_amr_prolong_pbmv()
                 end do
             end if
@@ -5120,6 +5336,8 @@ contains
             if (qbmm .and. .not. polytropic) then
                 @:DEALLOCATE(amr_rhs_pb_f)
                 @:DEALLOCATE(amr_rhs_mv_f)
+                @:DEALLOCATE(amr_cg_pb)
+                @:DEALLOCATE(amr_cg_mv)
             end if
             deallocate (amr_slot_live)
             do i = 1, sys_size
