@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import json
 
-# 1D air + JWL mixing shock tube exercising the Rocflu state-interpolated closure.
+# 1D air + JWL mixing shock tube exercising the weighted-composition closure.
 # Fluid 1 = TNT JWL products (eos=2); fluid 2 = ambient air (ideal gas, eos=1).
 # A high-pressure products slug (0 <= x <= 0.3 m) drives a shock into ambient air,
-# so the mixed band 0 < Y < 1 forms at the contact and rides the Rocflu closure.
+# so the mixed band 0 < Y < 1 forms at the contact and rides the weighted-composition closure.
 jwl_A = 3.712e11
 jwl_B = 3.231e9
 jwl_R1 = 4.15
@@ -69,7 +69,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": 1.225e-8,
             "patch_icpp(2)%alpha(1)": 0.99999999,
             "patch_icpp(2)%alpha(2)": 1.0e-8,
-            # Fluid 1: TNT JWL products (Rocflu closure).
+            # Fluid 1: TNT JWL products (weighted-composition closure).
             "fluid_pp(1)%eos": 2,
             "fluid_pp(1)%gamma": 2.5,
             "fluid_pp(1)%pi_inf": 0.0,

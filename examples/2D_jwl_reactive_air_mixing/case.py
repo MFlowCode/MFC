@@ -22,7 +22,7 @@
 #
 #   2. Full products-air mixing. Once the detonation reaches the charge edge the products
 #      (Y=1) expand violently into the air (Y=0), and the whole 0 < Y < 1 range of the
-#      Rocflu state-interpolated mixture closure is exercised across the contact -- the
+#      weighted-composition mixture closure is exercised across the contact -- the
 #      Richtmyer-Meshkov-unstable products/air interface is where the mixture EOS does its
 #      real work, rather than only the pure endpoints.
 #

@@ -790,18 +790,18 @@ class CaseValidator:
             self.prohibit(model_eqns != 2, "eos_jwl requires model_eqns = 2 (five-equation model)")
             jwl_ids = [i for i in range(1, num_fluids + 1) if self.get(f"fluid_pp({i})%eos") == 2]
             self.prohibit(len(jwl_ids) > 1, "At most one fluid may use eos_jwl")
-            self.prohibit(num_fluids > 1 and num_fluids - len(jwl_ids) != 1, "the Rocflu closure requires exactly one non-JWL ambient fluid")
+            self.prohibit(num_fluids > 1 and num_fluids - len(jwl_ids) != 1, "the weighted-composition closure requires exactly one non-JWL ambient fluid")
             ji = jwl_ids[0]
             cv_jwl = self.get(f"fluid_pp({ji})%cv")
-            self.prohibit(cv_jwl is None or cv_jwl <= 0, f"the Rocflu closure requires positive fluid_pp({ji})%cv for the JWL fluid")
+            self.prohibit(cv_jwl is None or cv_jwl <= 0, f"the weighted-composition closure requires positive fluid_pp({ji})%cv for the JWL fluid")
             air_ids = [i for i in range(1, num_fluids + 1) if self.get(f"fluid_pp({i})%eos") != 2]
             if air_ids:
                 cv_air = self.get(f"fluid_pp({air_ids[0]})%cv")
-                self.prohibit(cv_air is None or cv_air <= 0, f"the Rocflu closure requires positive fluid_pp({air_ids[0]})%cv for the non-JWL ambient fluid")
+                self.prohibit(cv_air is None or cv_air <= 0, f"the weighted-composition closure requires positive fluid_pp({air_ids[0]})%cv for the non-JWL ambient fluid")
             rho0 = self.get(f"fluid_pp({ji})%jwl_rho0")
             air_rho0 = self.get(f"fluid_pp({ji})%jwl_air_rho0")
             if rho0 is not None and air_rho0 is not None:
-                self.prohibit(rho0 <= air_rho0, "the Rocflu closure requires products reference density above the ambient-gas density")
+                self.prohibit(rho0 <= air_rho0, "the weighted-composition closure requires products reference density above the ambient-gas density")
             E0 = self.get(f"fluid_pp({ji})%jwl_E0")
             Q = self.get(f"fluid_pp({ji})%jwl_Q")
             if E0 is None and Q is not None and rho0 is not None:
@@ -820,7 +820,7 @@ class CaseValidator:
                 if air_p0 is not None and air_rho0 is not None and gamma_mfc is not None:
                     air_e0 = (air_p0 * gamma_mfc + (pi_inf_amb or 0.0)) / air_rho0
             if E0 is not None and rho_ref is not None and air_e0 is not None:
-                self.prohibit(E0 / rho_ref <= air_e0, "the Rocflu closure requires products reference energy above the ambient-gas energy")
+                self.prohibit(E0 / rho_ref <= air_e0, "the weighted-composition closure requires products reference energy above the ambient-gas energy")
 
         # JWL reaction sources
         afterburn = self.get("jwl_afterburn", "F") == "T"

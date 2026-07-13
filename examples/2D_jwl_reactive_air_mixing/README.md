@@ -22,7 +22,7 @@ This case exercises two things the shipped program-burn example
 
 2. **Full products–air mixing.** Once the detonation reaches the charge edge,
    the products (`Y=1`) drive into the air (`Y=0`) and the whole `0 < Y < 1`
-   range of the Rocflu state-interpolated mixture closure is exercised across a
+   range of the weighted-composition mixture closure is exercised across a
    Richtmyer–Meshkov-unstable contact — the mixture EOS's real workload, not
    just the pure endpoints.
 

@@ -68,16 +68,17 @@
     end if
 #:enddef compute_average_state
 
-#:def JWL_RECONSTRUCT_ENERGY()
-    ! JWL five-equation face energy from the inverse mixture EOS e(rho, p, Y, lambda).
-    ! The caller sets the bounded Y_jwl_L/Y_jwl_R and lambda_jwl_L/lambda_jwl_R first
-    ! (the partial-density/reaction-progress buffers differ per solver); the same
-    ! bounded values also feed the JWL sound-speed estimate.
-    call s_jwl_mix_energy_pr(rho_L, pres_L, Y_jwl_L, jwl_idx, e_jwl_L, lambda_jwl_L)
-    call s_jwl_mix_energy_pr(rho_R, pres_R, Y_jwl_R, jwl_idx, e_jwl_R, lambda_jwl_R)
+#:def JWL_RECONSTRUCT_ENERGY_C()
+    ! JWL five-equation face state: one fused inverse-EOS pass per side yields both the
+    ! reconstructed energy e(rho, p, Y, lambda) and the wave-speed sound speed c, sharing the
+    ! coefficient/exponential work instead of inverting once for e and again for c. Sets c_L/c_R,
+    ! so the JWL branch of the later sound-speed block is skipped. The caller sets the bounded
+    ! Y_jwl_L/Y_jwl_R and lambda_jwl_L/lambda_jwl_R first (buffers differ per solver).
+    call s_jwl_mix_energy_sound_speed_pr(rho_L, pres_L, Y_jwl_L, jwl_idx, e_jwl_L, c_L, lambda_jwl_L)
+    call s_jwl_mix_energy_sound_speed_pr(rho_R, pres_R, Y_jwl_R, jwl_idx, e_jwl_R, c_R, lambda_jwl_R)
     E_L = rho_L*e_jwl_L + 5.e-1_wp*rho_L*vel_L_rms
     E_R = rho_R*e_jwl_R + 5.e-1_wp*rho_R*vel_R_rms
-#:enddef JWL_RECONSTRUCT_ENERGY
+#:enddef JWL_RECONSTRUCT_ENERGY_C
 
 #:def compute_low_Mach_correction()
     if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_lax_friedrichs) then

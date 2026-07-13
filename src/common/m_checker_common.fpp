@@ -107,16 +107,17 @@ contains
         @:PROHIBIT(jwl_fluid > 0 .and. model_eqns /= model_eqns_5eq, "JWL EOS is only supported with model_eqns_5eq")
 
         if (jwl_fluid > 0) then
-            @:PROHIBIT(num_fluids > 1 .and. air_count /= 1, "Rocflu closure requires exactly one non-JWL ideal-gas fluid")
+            @:PROHIBIT(num_fluids > 1 .and. air_count /= 1, &
+                       & "weighted-composition closure requires exactly one non-JWL ideal-gas fluid")
             @:PROHIBIT(f_is_default(fluid_pp(jwl_fluid)%cv) .or. fluid_pp(jwl_fluid)%cv <= 0._wp, &
-                       & "Rocflu closure requires positive fluid_pp%cv for the JWL fluid")
+                       & "weighted-composition closure requires positive fluid_pp%cv for the JWL fluid")
             if (air_fluid > 0) then
                 @:PROHIBIT(f_is_default(fluid_pp(air_fluid)%cv) .or. fluid_pp(air_fluid)%cv <= 0._wp, &
-                           & "Rocflu closure requires positive fluid_pp%cv for the non-JWL air fluid")
+                           & "weighted-composition closure requires positive fluid_pp%cv for the non-JWL air fluid")
                 ! The ambient fluid may be ideal gas (pi_inf = 0/unset) or stiffened gas
                 ! (pi_inf > 0, e.g. water); negative stiffness is meaningless.
                 @:PROHIBIT(.not. f_is_default(fluid_pp(air_fluid)%pi_inf) .and. fluid_pp(air_fluid)%pi_inf < 0._wp, &
-                           & "Rocflu closure requires non-negative fluid_pp%pi_inf for the non-JWL fluid")
+                           & "weighted-composition closure requires non-negative fluid_pp%pi_inf for the non-JWL fluid")
             end if
             if (.not. f_is_default(fluid_pp(jwl_fluid)%jwl_ej_rho_ref)) then
                 rho_ref = fluid_pp(jwl_fluid)%jwl_ej_rho_ref
@@ -124,10 +125,10 @@ contains
                 rho_ref = fluid_pp(jwl_fluid)%jwl_rho0
             end if
             @:PROHIBIT(fluid_pp(jwl_fluid)%jwl_rho0 <= fluid_pp(jwl_fluid)%jwl_air_rho0, &
-                       & "Rocflu closure requires products reference density above the ambient-gas density")
+                       & "weighted-composition closure requires products reference density above the ambient-gas density")
             @:PROHIBIT(.not. f_is_default(fluid_pp(jwl_fluid)%jwl_air_e0) &
                        & .and. fluid_pp(jwl_fluid)%jwl_E0/rho_ref <= fluid_pp(jwl_fluid)%jwl_air_e0, &
-                       & "Rocflu closure requires products reference energy above the ambient-gas energy")
+                       & "weighted-composition closure requires products reference energy above the ambient-gas energy")
         end if
 
     end subroutine s_check_jwl_inputs

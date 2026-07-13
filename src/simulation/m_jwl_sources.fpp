@@ -19,6 +19,11 @@
 !! [0, 1] driven by the local pressure, dlambda/dt = jwl_G*p**jwl_b_exp*(1-lambda),
 !! releasing jwl_Q as the explosive reacts. Unlike program burn the front is not
 !! prescribed - it self-propagates from a hot spot in the initial condition.
+!!
+!! Both progress rates are linear in (1 - x), so each step applies the exact
+!! frozen-coefficient solution x_new = 1 - (1-x)exp(-k dt) as an effective rate:
+!! unconditionally bounded for stiff k*dt, identical to the explicit rate as
+!! k*dt -> 0. This replaces the former hard (1-x)/dt clamp.
 module m_jwl_sources
 
     use m_derived_types
@@ -37,7 +42,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp) :: rho, dyn_p, e_sp, Y, b, dbdt, pres, T, c
+        real(wp) :: rho, dyn_p, e_sp, Y, b, dbdt, pres, T
         real(wp) :: q_det, r_det, r_front, lambda, dldt
         integer :: i, j, k, l
         integer :: solid_marker  !< /= 0 inside an immersed body: no reaction in solid or ghost cells
@@ -50,9 +55,9 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            r_det = (x_cc(j) - pb_x_det)**2._wp
-                            if (n > 0) r_det = r_det + (y_cc(k) - pb_y_det)**2._wp
-                            if (p > 0) r_det = r_det + (z_cc(l) - pb_z_det)**2._wp
+                            r_det = (x_cc(j) - pb_x_det)**2
+                            if (n > 0) r_det = r_det + (y_cc(k) - pb_y_det)**2
+                            if (p > 0) r_det = r_det + (z_cc(l) - pb_z_det)**2
                             r_det = sqrt(r_det)
                             solid_marker = 0
                             if (ib) solid_marker = ib_markers%sf(j, k, l)
@@ -68,7 +73,7 @@ contains
         end if
 
         if (jwl_afterburn) then
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, rho, dyn_p, e_sp, Y, b, dbdt, pres, T, c, lambda, solid_marker]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, rho, dyn_p, e_sp, Y, b, dbdt, pres, T, lambda, solid_marker]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -89,25 +94,26 @@ contains
                         if (ib) solid_marker = ib_markers%sf(j, k, l)
                         if (solid_marker == 0 .and. Y*(1._wp - Y)*(1._wp - b) > sgm_eps) then
                             if (jwl_ab_model == 1) then
-                                dbdt = (1._wp - b)*(1._wp - Y)/jwl_ab_tau
+                                dbdt = (1._wp - Y)/jwl_ab_tau
                             else
                                 dyn_p = 0._wp
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%mom%beg, eqn_idx%mom%end
-                                    dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)**2._wp/rho
+                                    dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)**2/rho
                                 end do
                                 e_sp = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p)/rho
                                 ! Rate must see the same lambda-aware pressure/temperature the
                                 ! solver computes (afterburn may combine with jwl_reactive).
                                 lambda = 1._wp
                                 if (jwl_reactive) lambda = min(max(q_cons_vf(eqn_idx%rxn)%sf(j, k, l), 0._wp), 1._wp)
-                                call s_jwl_mix_state_er(rho, e_sp, Y, jwl_idx, pres, T, c, lambda)
-                                dbdt = jwl_ab_A*pres**jwl_ab_n*(1._wp - b)*(1._wp - Y)*exp(-jwl_ab_theta/T)
+                                call s_jwl_mix_state_er(rho, e_sp, Y, jwl_idx, pres, T, lambda=lambda)
+                                dbdt = jwl_ab_A*pres**jwl_ab_n*(1._wp - Y)*exp(-jwl_ab_theta/T)
                             end if
-                            ! Clamp so b cannot overshoot 1 within an RK substep, capping the
-                            ! release at the remaining Y*jwl_q_ab budget (mirrors the
-                            ! jwl_reactive clamp below); stiff rates otherwise over-release.
-                            dbdt = min(dbdt, (1._wp - b)/dt)
+                            ! Exact frozen-coefficient solution of db/dt = k(1-b) over the step
+                            ! (same reasoning as the jwl_reactive rate below): b cannot overshoot
+                            ! 1 within an RK substep, so the release stays capped at the
+                            ! remaining Y*jwl_q_ab budget for arbitrarily stiff rates.
+                            dbdt = (1._wp - b)*(1._wp - exp(-dbdt*dt))/dt
                             rhs_vf(eqn_idx%abn)%sf(j, k, l) = rhs_vf(eqn_idx%abn)%sf(j, k, l) + dbdt
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_cons_vf(jwl_idx)%sf(j, k, &
                                    & l)*jwl_q_ab*dbdt
@@ -120,7 +126,7 @@ contains
 
         if (jwl_reactive) then
             q_det = jwl_E0s(jwl_idx)/jwl_rho0s(jwl_idx)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, rho, dyn_p, e_sp, Y, lambda, dldt, pres, T, c, solid_marker]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, rho, dyn_p, e_sp, Y, lambda, dldt, pres, T, solid_marker]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -141,13 +147,18 @@ contains
                             dyn_p = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%mom%beg, eqn_idx%mom%end
-                                dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)**2._wp/rho
+                                dyn_p = dyn_p + 0.5_wp*q_cons_vf(i)%sf(j, k, l)**2/rho
                             end do
                             e_sp = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_p)/rho
-                            call s_jwl_mix_state_er(rho, e_sp, Y, jwl_idx, pres, T, c, lambda)
-                            dldt = jwl_G*pres**jwl_b_exp*(1._wp - lambda)
-                            ! Clamp so lambda cannot overshoot 1 within an RK substep.
-                            dldt = min(dldt, (1._wp - lambda)/dt)
+                            call s_jwl_mix_state_er(rho, e_sp, Y, jwl_idx, pres, T, lambda=lambda)
+                            dldt = jwl_G*pres**jwl_b_exp
+                            ! Exact frozen-pressure solution of dl/dt = k(1-l) over the step,
+                            ! written as an effective rate. It saturates smoothly at (1-l)/dt
+                            ! for stiff k*dt and recovers the explicit rate as k*dt -> 0, so
+                            ! lambda stays bounded for ANY G/p/dt: the stiff-source dt collapse
+                            ! seen in multi-D reactive runs cannot occur, and G no longer needs
+                            ! de-tuning below its 1D-calibrated value to survive flow focusing.
+                            dldt = (1._wp - lambda)*(1._wp - exp(-dldt*dt))/dt
                             rhs_vf(eqn_idx%rxn)%sf(j, k, l) = rhs_vf(eqn_idx%rxn)%sf(j, k, l) + dldt
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_cons_vf(jwl_idx)%sf(j, k, &
                                    & l)*q_det*dldt

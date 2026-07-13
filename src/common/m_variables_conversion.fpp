@@ -103,7 +103,7 @@ contains
         real(wp)                                       :: E_e
         real(wp)                                       :: e_Per_Kg, Pdyn_Per_Kg
         real(wp)                                       :: T_guess
-        real(wp)                                       :: eint, e_sp, Y_jwl, lambda_jwl, c_jwl
+        real(wp)                                       :: eint, e_sp, Y_jwl, lambda_jwl
         integer                                        :: s  !< Generic loop iterator
         #:if not chemistry
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure for computing pressure is targeted by the
@@ -117,7 +117,8 @@ contains
                     if (present(jwl_lambda)) lambda_jwl = jwl_lambda
                     eint = energy - dyn_p
                     e_sp = eint/max(rho, sgm_eps)
-                    call s_jwl_mix_state_er(rho, e_sp, Y_jwl, jwl_idx, pres, T, c_jwl, lambda_jwl)
+                    ! Pressure only here; the sound speed is recomputed at the faces.
+                    call s_jwl_mix_state_er(rho, e_sp, Y_jwl, jwl_idx, pres, T, lambda=lambda_jwl)
                 else
                 #:endif
                 if (mhd) then
@@ -158,7 +159,7 @@ contains
                         lambda_jwl = 1._wp
                         if (present(jwl_lambda)) lambda_jwl = jwl_lambda
                         e_sp = (energy - 0.5_wp*(mom**2._wp)/rho - E_e)/max(rho, sgm_eps)
-                        call s_jwl_mix_state_er(rho, e_sp, Y_jwl, jwl_idx, pres, T, c_jwl, lambda_jwl)
+                        call s_jwl_mix_state_er(rho, e_sp, Y_jwl, jwl_idx, pres, T, lambda=lambda_jwl)
                     else
                     #:endif
                     pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma

@@ -301,7 +301,7 @@ contains
                                     Y_jwl_R = min(max(alpha_rho_R(jwl_idx)/max(rho_R, sgm_eps), 0._wp), 1._wp)
                                     ! jwl_reactive requires HLLC, so this solver only sees fully-reacted states.
                                     lambda_jwl_L = 1._wp; lambda_jwl_R = 1._wp
-                                    @:JWL_RECONSTRUCT_ENERGY()
+                                    @:JWL_RECONSTRUCT_ENERGY_C()
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
                                 #:endif
@@ -333,10 +333,8 @@ contains
                             @:compute_average_state()
 
                             #:if not MFC_CASE_OPTIMIZATION or jwl_active
-                                if (jwl_idx > 0) then
-                                    call s_compute_jwl_speed_of_sound(pres_L, rho_L, Y_jwl_L, c_L)
-                                    call s_compute_jwl_speed_of_sound(pres_R, rho_R, Y_jwl_R, c_R)
-                                else
+                                ! JWL c_L/c_R were produced with the face energy above.
+                                if (jwl_idx <= 0) then
                                 #:endif
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, vel_L_rms, 0._wp, &
                                                               & c_L, qv_L)

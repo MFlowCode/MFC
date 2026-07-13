@@ -1,12 +1,12 @@
-This file was created on 2026-07-10 17:43:43.339157.
+This file was created on 2026-07-12 22:14:57.477657.
 
 mfc.sh:
 
-    Invocation: test --generate --only 879CA44F
+    Invocation: test -j 4 --generate --only 8527A26D 9D7B606B 879CA44F
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        9234b4693e29caeae358027507c7b1202f817623 on jwl-upstream-rebase (dirty)
+    Git:        df3e0694e83abbc17503871c12941af6eb996170 on jwl-upstream-rebase (dirty)
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -15,10 +15,10 @@ pre_process:
         C       : AppleClang v21.0.0.21000099 (/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -33,9 +33,9 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -67,9 +67,9 @@ simulation:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -101,14 +101,14 @@ post_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -117,10 +117,10 @@ syscheck:
         C       : AppleClang v21.0.0.21000099 (/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -135,9 +135,9 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

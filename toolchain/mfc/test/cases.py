@@ -2591,14 +2591,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "patch_icpp(3)%alpha(1)": 0.5,
             "patch_icpp(3)%alpha(2)": 0.5,
         }
-        cases.append(define_case_d(stack, "Rocflu", overrides, override_tol=1e-7))
+        cases.append(define_case_d(stack, "Weighted_Composition", overrides, override_tol=1e-7))
 
         # Mild stiffened-gas ambient (non-water): exercises the cold-stiffness offset
         # pi_c = (Gamma+1)*(1-w)*pi of the weighted closure and the stiffened p <-> e inverse.
         # Water-scale stiffness (pi ~ 3.4e8) is deliberately NOT used: a single-fluid weight
         # cannot reach p-T equilibrium there, so water mixtures are unsupported by this closure;
         # a future Kuhl / Mie-Grueneisen pressure-equilibrium closure is the sanctioned path for
-        # condensed (products+water) mixtures and would hook into s_jwl_rocflu_coeffs.
+        # condensed (products+water) mixtures and would hook into s_jwl_weighted_composition_coeffs.
         # An air-like Grueneisen (gamma_mfc = 2.5 => Gamma_air = 0.4) keeps the mixture
         # sound speed convex under compression; a water-scale Grueneisen (~5) drives the JWL
         # cold-curve coefficient negative at cold compressed states (another reason water needs
