@@ -1661,24 +1661,34 @@ contains
         integer, intent(in) :: nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi
         integer             :: islot
 
-        ! ghost-point capacity for any fine block = its buffered cell count (a block can hold no more
-        ! ghost points than cells). s_ibm_setup reads this to size the shared declare-target ghost_points.
+        ! Marker-field bounds: sized to enclose BOTH the coarse block (m/n/p with ghosts) AND the deepest
+        ! fine block a rank can own (level amr_max_level). A level-l block has 2**l * base_ext - 1 interior
+        ! cells per active dim, where base_ext = amr_block_end(d) - amr_block_beg(d) + 1 (the user-specified
+        ! block footprint in coarse cells). The max() keeps the coarse extent as the floor so the coarse
+        ! ib_markers layout (set by s_initialize_ibm_module) is never shrunk. At amr_max_level = 1,
+        ! 2**1 = 2 gives the same sizing as today (byte-identical for existing single-level IB+AMR cases).
 
-        fine_gps_cap = int(f1_hi - f1_lo + 1, 8)*int(f2_hi - f2_lo + 1, 8)*int(f3_hi - f3_lo + 1, 8)
-
-        ! Marker-field bounds = the coarse ib_markers bounds (m,n,p are the coarse grid here - alloc_fine runs
-        ! before any fine swap, and ib_markers was already allocated to these in s_initialize_ibm_module). The
-        ! host park copies must match ib_markers for the whole-array swap copy. The fine block's local index
-        ! range must fit inside these (it does for a body smaller than the coarse block); guarded below.
-        mkr_lo(1) = -buff_size; mkr_hi(1) = m + buff_size
-        mkr_lo(2) = -buff_size; mkr_hi(2) = n + buff_size
+        mkr_lo(1) = -buff_size
+        mkr_hi(1) = max(m, 2**amr_max_level*(amr_block_end(1) - amr_block_beg(1) + 1) - 1) + buff_size
+        mkr_lo(2) = -buff_size
+        if (n_glb > 0) then
+            mkr_hi(2) = max(n, 2**amr_max_level*(amr_block_end(2) - amr_block_beg(2) + 1) - 1) + buff_size
+        else
+            mkr_hi(2) = n + buff_size
+        end if
         if (p > 0) then
-            mkr_lo(3) = -buff_size; mkr_hi(3) = p + buff_size
+            mkr_lo(3) = -buff_size
+            mkr_hi(3) = max(p, 2**amr_max_level*(amr_block_end(3) - amr_block_beg(3) + 1) - 1) + buff_size
         else
             mkr_lo(3) = 0; mkr_hi(3) = 0
         end if
         @:PROHIBIT(f1_hi > mkr_hi(1) .or. f2_hi > mkr_hi(2) .or. (p > 0 .and. f3_hi > mkr_hi(3)), &
-                   & "AMR fine IB: fine block extent exceeds the coarse ib_markers bounds; the copy-based fine-marker swap needs ib_markers sized to enclose the fine block")
+                   & "AMR fine IB: fine block extent exceeds the deepest-level ib_markers bounds; the copy-based fine-marker swap needs ib_markers sized to enclose the fine block")
+
+        ! ghost-point capacity: upper bound for the deepest fine block = its buffered cell count. Computed from
+        ! the widened mkr bounds so it matches ib_markers (the declare-target never reallocated on Cray GPU).
+        ! s_ibm_setup reads this to size the shared declare-target ghost_points.
+        fine_gps_cap = int(mkr_hi(1) - mkr_lo(1) + 1, 8)*int(mkr_hi(2) - mkr_lo(2) + 1, 8)*int(max(mkr_hi(3) - mkr_lo(3) + 1, 1), 8)
 
         ! Extra slot (nslots+1) parks the coarse markers during a fine swap - reusing an ib_fine slot avoids
         ! adding a new module-level derived-type allocatable (which corrupts descriptors on CCE OpenMP,
