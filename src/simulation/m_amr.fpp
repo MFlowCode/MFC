@@ -635,7 +635,9 @@ contains
         ! lock-step fill: gather from the parent's CURRENT fine state. pull_host stays in the signature for the level-1 path.
         ! Owner-guard at the CALL SITE: on a non-owner rank the parent slot is unallocated (co-located tower - owner holds both
         ! block and parent), and passing amr_slots(pblk)%q_cons would dereference it before the callee's internal early-return.
-        if (amr_rank_owns_block) call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons)
+        ! to_host = .not. pull_host: init/regrid (pull_host=F) feed the host prolong/self-test; runtime (pull_host=T) reads amr_cg
+        ! on the device in the C/F ghost-fill, so skip the device->host copy.
+        if (amr_rank_owns_block) call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons, .not. pull_host)
 
     end subroutine s_amr_gather_from_parent
 
@@ -644,10 +646,11 @@ contains
     !! substep - qp = the parent slot's q_cons_stor (t^n bracket) then q_cons (t^{n+1} bracket) - to build the child's two
     !! ghost-lerp sources. np=1 = a local copy on the owner (which also owns the parent); the np>=2 P2P version (parent owner ->
     !! block owner) is future work.
-    impure subroutine s_amr_gather_from_parent_field(pblk, qp)
+    impure subroutine s_amr_gather_from_parent_field(pblk, qp, to_host)
 
         integer, intent(in)                                 :: pblk
         type(scalar_field), dimension(sys_size), intent(in) :: qp
+        logical, intent(in)                                 :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
         integer                                             :: w1, w2, w3
 
         amr_cpat_off = 0
@@ -661,7 +664,7 @@ contains
         if (.not. amr_rank_owns_block) return  ! np=1: the owner holds both this block and its parent
         ! copy the parent's fine patch into amr_cg with a DEVICE kernel (qp passed as an argument, present-table safe like
         ! s_amr_restrict_overwrite_device). np>=2 P2P (parent owner -> block owner) is future work.
-        call s_amr_copy_parent_patch(qp, w1, w2, w3)
+        call s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
 
     end subroutine s_amr_gather_from_parent_field
 
@@ -669,11 +672,14 @@ contains
     !! parent q_cons is passed as the qp ARGUMENT (not indexed as amr_slots(pblk) inside the kernel) so its deep %sf attach resolves
     !! present-table safe, like s_amr_restrict_overwrite_device. amr_cg is then synced to host for host consumers (the init
     !! self-test's restrict-prolong check).
-    impure subroutine s_amr_copy_parent_patch(qp, w1, w2, w3)
+    impure subroutine s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qp
         integer, intent(in)                                 :: w1, w2, w3
-        integer                                             :: i, g1, g2, g3, o1, o2, o3
+        !> .true. only for the init/regrid HOST consumers (the whole-block host prolong + the restrict-prolong self-test). The
+        !! runtime C/F ghost-fill reads amr_cg on the DEVICE (filled by the kernel below), so no device->host copy is needed.
+        logical, intent(in) :: to_host
+        integer             :: i, g1, g2, g3, o1, o2, o3
 
         o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
         $:GPU_PARALLEL_LOOP(collapse=4)
@@ -687,9 +693,12 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-        do i = 1, sys_size
-            $:GPU_UPDATE(host='[amr_cg(i)%sf]')
-        end do
+        ! amr_cg is now device-current for the runtime C/F ghost-fill. Only sync to host when a host consumer follows.
+        if (to_host) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_cg(i)%sf]')
+            end do
+        end if
 
     end subroutine s_amr_copy_parent_patch
 
@@ -3153,9 +3162,9 @@ contains
             call s_amr_select_slot(kc)  ! amr_cur = kc; mirrors (isect already parent-fine)
             if (.not. amr_rank_owns_block) cycle  ! np>=2: child on another rank - future work (#27)
             ! two ghost-lerp sources from the parent's substep endpoints (parent-fine frame)
-            call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons_stor)  ! parent @ t_a
+            call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons_stor, .false.)  ! parent @ t_a (device C/F fill)
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_a)
-            call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons)  ! parent @ t_b
+            call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons, .false.)  ! parent @ t_b (device C/F fill)
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_b)
             ! recurse: the child subcycles its ref_ratio substeps (and its own children) over [t_a, t_b]
             call s_amr_advance_subtree(dt_sub*0.5_wp, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
