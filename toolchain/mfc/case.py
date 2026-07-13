@@ -27,6 +27,7 @@ QPVF_IDX_VARS = {
     "tau_e": "eqn_idx%stress%beg",
     "Y": "eqn_idx%species%beg",
     "cf_val": "eqn_idx%c",
+    "rxn_val": "eqn_idx%rxn",
     "Bx": "eqn_idx%B%beg",
     "By": "eqn_idx%B%end-1",
     "Bz": "eqn_idx%B%end",

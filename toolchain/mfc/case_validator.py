@@ -833,6 +833,13 @@ class CaseValidator:
             for name in ["jwl_G", "jwl_b_exp"]:
                 v = self.get(name)
                 self.prohibit(v is None or v <= 0, f"jwl_reactive requires positive {name}")
+        for i in range(1, (self.get("num_patches") or 0) + 1):
+            rxn_val = self.get(f"patch_icpp({i})%rxn_val")
+            if rxn_val is None:
+                continue
+            self.prohibit(not reactive, f"patch_icpp({i})%rxn_val requires jwl_reactive")
+            if isinstance(rxn_val, (int, float)):
+                self.prohibit(not 0 <= rxn_val <= 1, f"patch_icpp({i})%rxn_val must be in [0, 1]")
         if afterburn:
             self.prohibit(self.get("riemann_solver") != 2, "jwl_afterburn requires riemann_solver = 2 (HLLC)")
             model = self.get("jwl_ab_model", 2)

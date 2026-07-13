@@ -99,8 +99,8 @@ contains
             ic%q_prim_vf(eqn_idx%abn)%sf = 0._wp
         end if
 
-        ! Initial JWL++ reaction progress is always zero (explosive starts unreacted;
-        ! detonation is initiated by a high-pressure hot spot in the patch IC)
+        ! Initial JWL++ reaction progress defaults to zero (unreacted); booster
+        ! patches can seed it via patch_icpp(i)%rxn_val in s_assign_variables
         if (jwl_reactive) then
             ic%q_cons_vf(eqn_idx%rxn)%sf = 0._wp
             ic%q_prim_vf(eqn_idx%rxn)%sf = 0._wp

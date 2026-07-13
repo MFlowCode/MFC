@@ -309,6 +309,7 @@ module m_derived_types
         real(wp) :: m0  !< Bubble velocity
         integer :: hcid  !< Hardcoded initial condition ID
         real(wp) :: cf_val  !< Color function value
+        real(wp) :: rxn_val  !< Initial JWL++ reaction progress lambda (booster patches; 0 = unreacted)
         real(wp) :: Y(1:num_species)  !< Species mass fractions
 
         ! STL/OBJ model patch: index into the shared stl_models(:) table
