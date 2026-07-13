@@ -1797,9 +1797,10 @@ contains
             end if
         end if
 
-        ! non-polytropic QBMM: pb/mv restriction stays LOCAL (np>=2 QBMM fold-back is not yet distributed; np=1 exact)
-        if (qbmm .and. .not. polytropic .and. amr_rank_owns_block) call s_restrict_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, &
-            & amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
+        ! non-polytropic QBMM: distributed pb/mv fold-back - the owner restricts the covered cells it holds and scatters each other
+        ! coarse-owner its slice (mirror of the q_cons scatter above). Called on ALL ranks so the P2P send/recv pair up (np=1 is
+        ! handled by the direct s_restrict_pbmv in the num_procs==1 branch above, which returns before reaching here)
+        if (qbmm .and. .not. polytropic) call s_amr_scatter_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
         if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
@@ -2288,6 +2289,210 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_restrict_pbmv
+
+    !> Non-polytropic QBMM np>=2: host volume-weighted average of one covered coarse cell (ci,cj,ck), quadrature node (q,ib_), from
+    !! the owner's fine block (pb side if ispb, else mv), for packing an MPI send slice. Same child-sum as s_restrict_pbmv, fine
+    !! origin (ci-rlo)*rr. Reads the host-current fine side-state (the caller pulls it to host first).
+    impure real(wp) function f_amr_restrict_cell_pbmv(ispb, ci, cj, ck, q, ib_, rlo, rr, dj_hi, dk_hi, nchild) result(v)
+        logical, intent(in) :: ispb
+        integer, intent(in) :: ci, cj, ck, q, ib_, rlo(3), rr, dj_hi, dk_hi, nchild
+        integer             :: fi0, fj0, fk0, ddj, ddk
+        real(wp)            :: acc
+
+        fi0 = (ci - rlo(1))*rr; fj0 = (cj - rlo(2))*rr; fk0 = (ck - rlo(3))*rr
+        acc = 0._wp
+        if (ispb) then
+            do ddk = 0, dk_hi
+                do ddj = 0, dj_hi
+                    acc = acc + real(amr_slots(amr_cur)%pb_f%sf(fi0, fj0 + ddj, fk0 + ddk, q, ib_), &
+                                     & wp) + real(amr_slots(amr_cur)%pb_f%sf(fi0 + 1, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                end do
+            end do
+        else
+            do ddk = 0, dk_hi
+                do ddj = 0, dj_hi
+                    acc = acc + real(amr_slots(amr_cur)%mv_f%sf(fi0, fj0 + ddj, fk0 + ddk, q, ib_), &
+                                     & wp) + real(amr_slots(amr_cur)%mv_f%sf(fi0 + 1, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                end do
+            end do
+        end if
+        v = acc/real(nchild, wp)
+
+    end function f_amr_restrict_cell_pbmv
+
+    !> Non-polytropic QBMM np>=2: DEVICE restriction of pb/mv over the covered box [bl:bh] GLOBAL into pb_c/mv_c (device), fine
+    !! origin (ci-rlo)*rr, LOCAL coarse index cell - o. Only the covered cells the owner holds are touched (no whole-array push -
+    !! same GPU-only clobber the q_cons device overwrite avoids). Same child-sum as s_restrict_pbmv.
+    impure subroutine s_amr_restrict_pbmv_box_device(pb_c, mv_c, pb_fin, mv_fin, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_c, mv_c
+
+        real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
+             & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pb_fin, mv_fin
+        integer, intent(in) :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
+        integer             :: ci, cj, ck, q, ib_, fi0, fj0, fk0, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
+        real(wp)            :: accp, accm
+
+        bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
+        rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
+        $:GPU_PARALLEL_LOOP(collapse=5, private='[fi0, fj0, fk0, accp, accm, ddj, ddk]')
+        do ib_ = 1, nb
+            do q = 1, nnode
+                do ck = bl3, bh3
+                    do cj = bl2, bh2
+                        do ci = bl1, bh1
+                            fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
+                            accp = 0._wp; accm = 0._wp
+                            do ddk = 0, dk_hi
+                                do ddj = 0, dj_hi
+                                    accp = accp + real(pb_fin(fi0, fj0 + ddj, fk0 + ddk, q, ib_), wp) + real(pb_fin(fi0 + 1, &
+                                                       & fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                                    accm = accm + real(mv_fin(fi0, fj0 + ddj, fk0 + ddk, q, ib_), wp) + real(mv_fin(fi0 + 1, &
+                                                       & fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                                end do
+                            end do
+                            pb_c(ci - o1, cj - o2, ck - o3, q, ib_) = real(accp/real(nchild, wp), stp)
+                            mv_c(ci - o1, cj - o2, ck - o3, q, ib_) = real(accm/real(nchild, wp), stp)
+                        end do
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_restrict_pbmv_box_device
+
+    !> Non-polytropic QBMM: distributed fine->coarse fold-back of the block's pb/mv onto the coarse side-state pb_ts/mv_ts,
+    !! mirroring the q_cons scatter in s_restrict_fine_to_coarse. The owner restricts the covered cells it holds (device, owned box)
+    !! and SENDS each other coarse-owner its covered pb/mv slice (host averages, pb block then mv block); that owner overwrites its
+    !! local coarse. Called on ALL ranks at np>=2 (owner/non-owner split inside) so the P2P send/recv pair up; np=1 is handled
+    !! locally by the direct s_restrict_pbmv call (this routine is reached only when num_procs > 1).
+    impure subroutine s_amr_scatter_pbmv(pb_fin, mv_fin)
+
+        real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
+             & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pb_fin, mv_fin
+        integer :: ci, cj, ck, q, ib_, nchild, rr, dj_hi, dk_hi, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr, cellsz
+        integer :: rlo(3), rhi(3), ilo(3), ihi(3), bl(3), bh(3)
+        real(wp), allocatable :: sbuf(:,:), rbuf(:)
+        integer, allocatable :: reqs(:), drank(:)
+
+        rr = amr_slots(amr_cur)%ref_ratio
+        nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
+        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
+        cellsz = 2*nnode*nb
+        rlo = 0; rhi = 0
+        rlo(1) = amr_region_lo_all(1, amr_cur); rhi(1) = amr_region_hi_all(1, amr_cur)
+        if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, amr_cur); rhi(2) = amr_region_hi_all(2, amr_cur); end if
+        if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, amr_cur); rhi(3) = amr_region_hi_all(3, amr_cur); end if
+        owner = amr_block_owner(amr_cur)
+        o1 = start_idx(1); o2 = 0; o3 = 0
+        if (n_glb > 0) o2 = start_idx(2)
+        if (p_glb > 0) o3 = start_idx(3)
+        maxsz = cellsz*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
+
+        if (proc_rank == owner) then
+            ! overwrite the covered cells this rank owns (device, owned box), then send each other coarse-owner its covered slice
+            call f_amr_rank_interior(proc_rank, ilo, ihi)
+            call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+            $:GPU_UPDATE(host='[amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf]')
+            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_pbmv_box_device(pb_ts(1)%sf, &
+                & mv_ts(1)%sf, pb_fin, mv_fin, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+            nsrc = 0
+            do r = 0, num_procs - 1
+                if (r == owner) cycle
+                call f_amr_rank_interior(r, ilo, ihi)
+                call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
+            end do
+            if (nsrc > 0) then
+                allocate (sbuf(maxsz, nsrc), reqs(nsrc), drank(nsrc))
+                nsrc = 0
+                do r = 0, num_procs - 1
+                    if (r == owner) cycle
+                    call f_amr_rank_interior(r, ilo, ihi)
+                    call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+                    if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
+                    nsrc = nsrc + 1; drank(nsrc) = r
+                    boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    idx = 0
+                    do ib_ = 1, nb
+                        do q = 1, nnode
+                            do ck = bl(3), bh(3)
+                                do cj = bl(2), bh(2)
+                                    do ci = bl(1), bh(1)
+                                        idx = idx + 1
+                                        sbuf(idx, nsrc) = f_amr_restrict_cell_pbmv(.true., ci, cj, ck, q, ib_, rlo, rr, dj_hi, &
+                                             & dk_hi, nchild)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                    do ib_ = 1, nb
+                        do q = 1, nnode
+                            do ck = bl(3), bh(3)
+                                do cj = bl(2), bh(2)
+                                    do ci = bl(1), bh(1)
+                                        idx = idx + 1
+                                        sbuf(idx, nsrc) = f_amr_restrict_cell_pbmv(.false., ci, cj, ck, q, ib_, rlo, rr, dj_hi, &
+                                             & dk_hi, nchild)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+#ifdef MFC_MPI
+                    call MPI_ISEND(sbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
+#endif
+                end do
+#ifdef MFC_MPI
+                call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+#endif
+                deallocate (sbuf, reqs, drank)
+            end if
+        else
+            ! coarse-owner: if I hold covered cells, receive my pb/mv slice from the owner and overwrite my local coarse
+            call f_amr_rank_interior(proc_rank, ilo, ihi)
+            call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
+                boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                allocate (rbuf(boxsz))
+#ifdef MFC_MPI
+                call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+                idx = 0
+                do ib_ = 1, nb
+                    do q = 1, nnode
+                        do ck = bl(3), bh(3)
+                            do cj = bl(2), bh(2)
+                                do ci = bl(1), bh(1)
+                                    idx = idx + 1
+                                    pb_ts(1)%sf(ci - o1, cj - o2, ck - o3, q, ib_) = real(rbuf(idx), stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                do ib_ = 1, nb
+                    do q = 1, nnode
+                        do ck = bl(3), bh(3)
+                            do cj = bl(2), bh(2)
+                                do ci = bl(1), bh(1)
+                                    idx = idx + 1
+                                    mv_ts(1)%sf(ci - o1, cj - o2, ck - o3, q, ib_) = real(rbuf(idx), stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                deallocate (rbuf)
+                ! push ONLY the covered cells to the device (a whole-array update would clobber device-advanced non-covered coarse)
+                $:GPU_UPDATE(device='[pb_ts(1)%sf(bl(1) - o1:bh(1) - o1, bl(2) - o2:bh(2) - o2, bl(3) - o3:bh(3) - o3, :, :)]')
+                $:GPU_UPDATE(device='[mv_ts(1)%sf(bl(1) - o1:bh(1) - o1, bl(2) - o2:bh(2) - o2, bl(3) - o3:bh(3) - o3, :, :)]')
+            end if
+        end if
+
+    end subroutine s_amr_scatter_pbmv
 
     !> SP2 gate: restrict(prolong(coarse)) must reproduce coarse over the block interior (conservation). Init-only diagnostic;
     !! allocates a scratch coarse target, never touches level-0 or the solve.
