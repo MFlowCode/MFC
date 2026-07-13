@@ -474,7 +474,7 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
-- `fluid_pp(i)%%eos` selects the equation of state for the $i$-th fluid: `[1]` stiffened gas (default), or `[2]` Jones-Wilkins-Lee (JWL) for detonation products. JWL setup is described in [JWL equation of state](#sec-jwl-eos) and [JWL reaction sources](#sec-jwl-reaction-sources) below.
+- `fluid_pp(i)%%eos` selects the equation of state for the `i`-th fluid: `[1]` stiffened gas (default), or `[2]` Jones-Wilkins-Lee (JWL) for detonation products. JWL setup is described in [JWL equation of state](#sec-jwl-eos) and [JWL reaction sources](#sec-jwl-reaction-sources) below.
 
 #### JWL equation of state {#sec-jwl-eos}
 
@@ -483,15 +483,15 @@ The JWL equation of state models detonation products. It is supported only with 
 | Parameter | Meaning | Requirement |
 | :--- | :--- | :--- |
 | `jwl_A`, `jwl_B`, `jwl_R1`, `jwl_R2`, `jwl_omega` | JWL products EOS coefficients | required |
-| `jwl_rho0` | products reference density \f$\rho_0\f$ | required |
+| `jwl_rho0` | products reference density `ρ₀` | required |
 | `jwl_Q` or `jwl_E0` | detonation energy: specific (J/kg) or volumetric (J/m³). Given `jwl_Q`, MFC sets `jwl_E0 = jwl_rho0 * jwl_Q` | one of the two |
 | `jwl_air_rho0` | density of the co-existing ideal gas | required |
 | `jwl_air_e0` or `jwl_air_p0` | ideal-gas specific internal energy or pressure | one of the two |
-| `jwl_ej_rho_ref` | products-energy reference density (default `jwl_rho0`, so \f$e_j = E_0 / \rho_0\f$) | optional |
+| `jwl_ej_rho_ref` | products-energy reference density (default `jwl_rho0`, so `e_j = E₀ / ρ₀`) | optional |
 
-The ideal-gas Grüneisen coefficient is \f$\gamma - 1\f$, obtained from the ambient gas fluid's own stored `gamma` (which holds \f$1/(\gamma - 1)\f$, so its reciprocal recovers \f$\gamma - 1\f$). With a single JWL fluid and no separate ideal-gas fluid, the JWL fluid's own `gamma` is used.
+The ideal-gas Grüneisen coefficient is `γ - 1`, obtained from the ambient gas fluid's own stored `gamma` (which holds `1/(γ - 1)`, so its reciprocal recovers `γ - 1`). With a single JWL fluid and no separate ideal-gas fluid, the JWL fluid's own `gamma` is used.
 
-Products mix with the surrounding gas through a composition (heat-capacity) weighted closure. It recovers pressure, temperature, and sound speed from \f$(\rho, e, Y)\f$ in closed form, and degenerates exactly to the pure-JWL law at \f$Y = 1\f$ and to the ambient law at \f$Y = 0\f$; it requires positive products and air `cv`. A stiffened-gas ambient (e.g. water) is supported by setting the non-JWL fluid's `pi_inf`. See `src/common/m_jwl.fpp` for the full closure derivation.
+Products mix with the surrounding gas through a composition (heat-capacity) weighted closure. It recovers pressure, temperature, and sound speed from `(ρ, e, Y)` in closed form, and degenerates exactly to the pure-JWL law at `Y = 1` and to the ambient law at `Y = 0`; it requires positive products and air `cv`. A stiffened-gas ambient (e.g. water) is supported by setting the non-JWL fluid's `pi_inf`. See `src/common/m_jwl.fpp` for the full closure derivation.
 
 #### JWL reaction sources {#sec-jwl-reaction-sources}
 
@@ -538,12 +538,12 @@ digraph jwl_reaction_sources {
 | `1` | mixing-rate | `jwl_ab_tau` (time scale) |
 | `2` (default) | Arrhenius | `jwl_ab_A` (prefactor), `jwl_ab_theta` (activation temperature), `jwl_ab_n` (pressure exponent) |
 
-**Optional energy offset.** `fluid_pp(i)%%jwl_delta_e` (J/kg, must be `≤ 0`; default `0`, disabled) applies a reactant/product energy offset after Garno et al. (2020) and requires `jwl_reactive`. The thermal term of the JWL pressure law uses \f$e_{\mathrm{eff}} = e + Y\,(1-\lambda)\,\Delta e\f$, scaled by the JWL mass fraction \f$Y\f$ so pure ambient gas is untouched and the offset fades as products mix into air. Unreacted explosive (\f$\lambda = 0\f$) then sits on a stiffer Hugoniot than the products, so a resolved `jwl_reactive` detonation shows genuine ZND structure (a von Neumann pressure spike decaying to the Chapman-Jouguet state through a finite reaction zone) instead of a monotonic energy-source profile. With `jwl_delta_e = 0` the closure is unchanged regardless of \f$\lambda\f$.
+**Optional energy offset.** `fluid_pp(i)%%jwl_delta_e` (J/kg, must be `≤ 0`; default `0`, disabled) applies a reactant/product energy offset after Garno et al. (2020) and requires `jwl_reactive`. The thermal term of the JWL pressure law uses `e_eff = e + Y(1 - λ)Δe`, scaled by the JWL mass fraction `Y` so pure ambient gas is untouched and the offset fades as products mix into air. Unreacted explosive (`λ = 0`) then sits on a stiffer Hugoniot than the products, so a resolved `jwl_reactive` detonation shows genuine ZND structure (a von Neumann pressure spike decaying to the Chapman-Jouguet state through a finite reaction zone) instead of a monotonic energy-source profile. With `jwl_delta_e = 0` the closure is unchanged regardless of `λ`.
 
 > **Stored-form parameters:** The values `gamma`, `pi_inf`, and `Re(1)`/`Re(2)` are **not** the raw physical quantities. MFC expects transformed stored forms:
-> - `gamma` = \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself
-> - `pi_inf` = \f$\gamma\,\pi_\infty / (\gamma - 1)\f$, not \f$\pi_\infty\f$ itself
-> - `Re(1)` = \f$1/\mu\f$ (inverse viscosity), not \f$\mu\f$ itself
+> - `gamma` = `1/(γ - 1)`, not `γ` itself
+> - `pi_inf` = `γ·π∞ / (γ - 1)`, not `π∞` itself
+> - `Re(1)` = `1/μ` (inverse viscosity), not `μ` itself
 >
 > Setting `gamma = 1.4` for air is a common mistake; the correct value is `1.0 / (1.4 - 1.0) = 2.5`.
 > See @ref sec-stored-forms and @ref sec-material-values in the Equations reference for the full table.

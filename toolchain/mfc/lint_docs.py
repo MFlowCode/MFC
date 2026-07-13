@@ -64,6 +64,8 @@ CASE_MD_SKIP = {
     "scaling",
     "c_h",
     "thickness",
+    "e_j",
+    "e_eff",
     # Hardcoded Fortran constants (not case-file params)
     "init_dir",
     "zeros_default",
