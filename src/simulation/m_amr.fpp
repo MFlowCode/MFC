@@ -449,22 +449,23 @@ contains
         real(wp), intent(in)                 :: pcb(:)
         integer, intent(in)                  :: pcb_lb, lo, nfine
         real(wp), allocatable, intent(inout) :: fcb(:), fcc(:), fdx(:)
-        integer                              :: fi, c, idx_offset
-        real(wp)                             :: xl, xr, xm
+        integer                              :: fi, c, idx_offset, k, rr
+        real(wp)                             :: xl, xr
         ! pcb(k) = parent_cb(k + pcb_lb - 1); to access parent_cb(j): k = j - pcb_lb + 1
 
+        rr = amr_slots(amr_cur)%ref_ratio
         idx_offset = 1 - pcb_lb
-        ! fine cell fi (0..nfine) bisects coarse cell c = lo + fi/2
+        ! fine cell fi (0..nfine) subdivides coarse cell c = lo + fi/rr into rr equal parts
+        fcb(-1) = pcb(lo - 1 + idx_offset)  ! left boundary of the fine region
         do fi = 0, nfine
-            c = lo + fi/2
+            c = lo + fi/rr
             xl = pcb(c - 1 + idx_offset)  ! left boundary of coarse cell c
             xr = pcb(c + idx_offset)  ! right boundary of coarse cell c
-            xm = 0.5_wp*(xl + xr)
-            if (mod(fi, 2) == 0) then
-                fcb(fi - 1) = xl
-                fcb(fi) = xm
+            k = mod(fi, rr)  ! fi >= 0, so mod gives the sub-position in [0, rr-1]
+            if (k == rr - 1) then
+                fcb(fi) = xr  ! right edge of parent cell c
             else
-                fcb(fi) = xr
+                fcb(fi) = (real(rr - 1 - k, wp)*xl + real(k + 1, wp)*xr)/real(rr, wp)
             end if
         end do
         do fi = 0, nfine
@@ -2593,11 +2594,12 @@ contains
         ! Ghost cells use the EXACT parent-cell bisection - the same formula as the interior, with floor
         ! division for negative indices. Fine-level distribution: the owner may not hold the block's coarse
         ! coordinate slice locally, so the ghost parent boundaries come from the GLOBAL boundaries amr_g?cb
-        ! (cl is a GLOBAL coarse index, region_lo + floor(jg/2)), matching the interior build. Blocks stay
+        ! (cl is a GLOBAL coarse index, region_lo + floor(jg/rr)), matching the interior build. Blocks stay
         ! buff_size inside the domain, so every ghost parent is an in-domain coarse cell with exact coords.
         block
-            integer               :: jg, cl, pblk2
+            integer               :: jg, cl, pblk2, k, rr
             real(wp), allocatable :: cxb(:), cyb(:), czb(:)
+            rr = amr_slots(amr_cur)%ref_ratio
             ! ghost parent boundaries: a level>=2 block's coarse side is its PARENT's fine grid (indexed in the parent-fine
             ! amr_isect frame, matching the interior s_build_level_coords), NOT the L0 global boundaries. amr_isect_lo is a
             ! parent-fine index, so indexing amr_g?cb (sized for L0) reads OUT OF BOUNDS -> garbage on host, NaN on the device
@@ -2617,22 +2619,24 @@ contains
                 if (p_glb > 0) then; allocate (czb(lbound(amr_gzcb, 1):ubound(amr_gzcb, 1))); czb = amr_gzcb; end if
             end if
             do jg = amr_slots(amr_cur)%m + 1, amr_slots(amr_cur)%m + buff_size
-                cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp)
-                if (mod(jg, 2) == 0) then
-                    x_cb(jg) = 0.5_wp*(cxb(cl - 1) + cxb(cl))
-                else
+                cl = amr_isect_lo(1) + floor(real(jg, wp)/real(rr, wp))
+                k = modulo(jg, rr)
+                if (k == rr - 1) then
                     x_cb(jg) = cxb(cl)
+                else
+                    x_cb(jg) = (real(rr - 1 - k, wp)*cxb(cl - 1) + real(k + 1, wp)*cxb(cl))/real(rr, wp)
                 end if
                 dx(jg) = x_cb(jg) - x_cb(jg - 1); x_cc(jg) = 0.5_wp*(x_cb(jg - 1) + x_cb(jg))
             end do
-            ! unified boundary formula (matches the interior bisection): boundary k belongs to
-            ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
+            ! unified boundary formula (matches the interior subdivision): boundary jg belongs to
+            ! parent c = isect_lo + floor(jg/rr); sub-position k=modulo(jg,rr) picks the rr-way split
             do jg = -1 - buff_size, -1
-                cl = amr_isect_lo(1) + floor(real(jg, wp)/2._wp)
-                if (mod(abs(jg), 2) == 0) then
-                    x_cb(jg) = 0.5_wp*(cxb(cl - 1) + cxb(cl))
-                else
+                cl = amr_isect_lo(1) + floor(real(jg, wp)/real(rr, wp))
+                k = modulo(jg, rr)
+                if (k == rr - 1) then
                     x_cb(jg) = cxb(cl)
+                else
+                    x_cb(jg) = (real(rr - 1 - k, wp)*cxb(cl - 1) + real(k + 1, wp)*cxb(cl))/real(rr, wp)
                 end if
             end do
             do jg = -buff_size, -1
@@ -2640,22 +2644,24 @@ contains
             end do
             if (n_glb > 0) then
                 do jg = amr_slots(amr_cur)%n + 1, amr_slots(amr_cur)%n + buff_size
-                    cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp)
-                    if (mod(jg, 2) == 0) then
-                        y_cb(jg) = 0.5_wp*(cyb(cl - 1) + cyb(cl))
-                    else
+                    cl = amr_isect_lo(2) + floor(real(jg, wp)/real(rr, wp))
+                    k = modulo(jg, rr)
+                    if (k == rr - 1) then
                         y_cb(jg) = cyb(cl)
+                    else
+                        y_cb(jg) = (real(rr - 1 - k, wp)*cyb(cl - 1) + real(k + 1, wp)*cyb(cl))/real(rr, wp)
                     end if
                     dy(jg) = y_cb(jg) - y_cb(jg - 1); y_cc(jg) = 0.5_wp*(y_cb(jg - 1) + y_cb(jg))
                 end do
-                ! unified boundary formula (matches the interior bisection): boundary k belongs to
-                ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
+                ! unified boundary formula (matches the interior subdivision): boundary jg belongs to
+                ! parent c = isect_lo + floor(jg/rr); sub-position k=modulo(jg,rr) picks the rr-way split
                 do jg = -1 - buff_size, -1
-                    cl = amr_isect_lo(2) + floor(real(jg, wp)/2._wp)
-                    if (mod(abs(jg), 2) == 0) then
-                        y_cb(jg) = 0.5_wp*(cyb(cl - 1) + cyb(cl))
-                    else
+                    cl = amr_isect_lo(2) + floor(real(jg, wp)/real(rr, wp))
+                    k = modulo(jg, rr)
+                    if (k == rr - 1) then
                         y_cb(jg) = cyb(cl)
+                    else
+                        y_cb(jg) = (real(rr - 1 - k, wp)*cyb(cl - 1) + real(k + 1, wp)*cyb(cl))/real(rr, wp)
                     end if
                 end do
                 do jg = -buff_size, -1
@@ -2664,22 +2670,24 @@ contains
             end if
             if (p_glb > 0) then
                 do jg = amr_slots(amr_cur)%p + 1, amr_slots(amr_cur)%p + buff_size
-                    cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp)
-                    if (mod(jg, 2) == 0) then
-                        z_cb(jg) = 0.5_wp*(czb(cl - 1) + czb(cl))
-                    else
+                    cl = amr_isect_lo(3) + floor(real(jg, wp)/real(rr, wp))
+                    k = modulo(jg, rr)
+                    if (k == rr - 1) then
                         z_cb(jg) = czb(cl)
+                    else
+                        z_cb(jg) = (real(rr - 1 - k, wp)*czb(cl - 1) + real(k + 1, wp)*czb(cl))/real(rr, wp)
                     end if
                     dz(jg) = z_cb(jg) - z_cb(jg - 1); z_cc(jg) = 0.5_wp*(z_cb(jg - 1) + z_cb(jg))
                 end do
-                ! unified boundary formula (matches the interior bisection): boundary k belongs to
-                ! parent c = isect_lo + floor(k/2); even k -> parent midpoint, odd k -> parent right edge
+                ! unified boundary formula (matches the interior subdivision): boundary jg belongs to
+                ! parent c = isect_lo + floor(jg/rr); sub-position k=modulo(jg,rr) picks the rr-way split
                 do jg = -1 - buff_size, -1
-                    cl = amr_isect_lo(3) + floor(real(jg, wp)/2._wp)
-                    if (mod(abs(jg), 2) == 0) then
-                        z_cb(jg) = 0.5_wp*(czb(cl - 1) + czb(cl))
-                    else
+                    cl = amr_isect_lo(3) + floor(real(jg, wp)/real(rr, wp))
+                    k = modulo(jg, rr)
+                    if (k == rr - 1) then
                         z_cb(jg) = czb(cl)
+                    else
+                        z_cb(jg) = (real(rr - 1 - k, wp)*czb(cl - 1) + real(k + 1, wp)*czb(cl))/real(rr, wp)
                     end if
                 end do
                 do jg = -buff_size, -1
