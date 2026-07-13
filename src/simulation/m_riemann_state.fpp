@@ -419,7 +419,7 @@ contains
         ! Reshaping Inputted Data in x-direction
 
         if (norm_dir == 1) then
-            if ((viscous .and. (.not. igr)) .or. surface_tension) then
+            if (viscous .or. surface_tension) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do l = is3%beg, is3%end
@@ -465,7 +465,7 @@ contains
 
             ! Reshaping Inputted Data in y-direction
         else if (norm_dir == 2) then
-            if ((viscous .and. (.not. igr)) .or. surface_tension) then
+            if (viscous .or. surface_tension) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do l = is3%beg, is3%end
@@ -511,7 +511,7 @@ contains
 
             ! Reshaping Inputted Data in z-direction
         else
-            if ((viscous .and. (.not. igr)) .or. surface_tension) then
+            if (viscous .or. surface_tension) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = eqn_idx%mom%beg, eqn_idx%E
                     do j = is1%beg, is1%end

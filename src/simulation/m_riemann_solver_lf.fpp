@@ -200,7 +200,7 @@ contains
                             call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_L)
                             call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
-                            if (viscous .and. (.not. igr)) then
+                            if (viscous) then
                                 call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
                                 call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                             end if
@@ -499,7 +499,7 @@ contains
             end if
         #:endfor
 
-        if (viscous .and. .not. igr) then
+        if (viscous) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, &
                                 & vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
             do l = isz%beg, isz%end
