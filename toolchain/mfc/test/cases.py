@@ -3567,6 +3567,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, override_tol=5 * 10 ** (-9)))
+        # np=2: the pb/mv side-state coupling is now DISTRIBUTED across ranks for single-level AMR. The static block
+        # [16,47] straddles the rank split ([0,31]/[32,63] at np=2), so the block owner P2P-gathers the far-rank coarse
+        # pb/mv for its prolong/ghost-fill (s_amr_gather_coarse_patch_pbmv) and P2P-scatters the fold-back back to the
+        # far-rank coarse owner (s_amr_scatter_pbmv). The bit-uniform grid makes this byte-identical to the np=1 golden
+        # above (the np-cross validation oracle for the non-conservative side-state).
+        cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2, override_tol=5 * 10 ** (-9)))
         # dynamic regrid + subcycle: the pb/mv side-state now regrids (stor bounce + re-prolong +
         # overlap copy) and subcycles (two-source ghost time-lerp) exactly like q_cons
         stack.push("regrid subcycle", {"amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "amr_subcycle": "T"})

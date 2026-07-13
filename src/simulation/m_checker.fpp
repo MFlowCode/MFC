@@ -99,12 +99,11 @@ contains
             ! each fine block, mirroring the coarse stage order.
             @:PROHIBIT(model_eqns /= 2 .and. model_eqns /= 3, "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
             ! Non-polytropic QBMM carries a pb/mv quadrature side-state whose coarse<->fine coupling (prolong +
-            ! restriction) reads/writes the block owner's LOCAL coarse pb/mv. Under fine-level distribution the
-            ! SFC-assigned block owner need not hold the block's coarse cells, so at np>=2 the pb/mv would couple to
-            ! the wrong coarse side-state - a silent wrong answer. The pb/mv gather/scatter is not yet implemented
-            ! (only q_cons is distributed); fail closed until it is. np=1 is exact (one owner holds all coarse).
-            @:PROHIBIT(qbmm .and. (.not. polytropic) .and. num_procs > 1, &
-                       & "amr with non-polytropic QBMM is not yet supported on more than one MPI rank: the pb/mv quadrature side-state coarse/fine coupling is not distributed across ranks (gather/scatter TODO). Run on a single rank.")
+            ! restriction) is distributed across ranks for SINGLE-LEVEL AMR via the pb/mv P2P gather/scatter
+            ! (s_amr_gather_coarse_patch_pbmv / s_amr_scatter_pbmv, mirroring the q_cons distribution). The MULTI-level
+            ! (parent-side) pb/mv coupling is not yet distributed, so amr_max_level > 1 stays fail-closed at np>=2.
+            @:PROHIBIT(qbmm .and. (.not. polytropic) .and. amr_max_level > 1 .and. num_procs > 1, &
+                       & "amr with non-polytropic QBMM on more than one MPI rank is only supported at amr_max_level = 1: the multi-level (parent-side) pb/mv quadrature side-state coarse/fine coupling is not yet distributed. Run multi-level non-polytropic QBMM on a single rank.")
             ! Riemann-extrapolation BCs modify the WENO coefficient rows near the domain boundary;
             ! the fine advance reuses (or block-locally recomputes) those arrays, and neither form
             ! can carry the coarse boundary special-casing onto an interior block correctly
