@@ -144,10 +144,10 @@ contains
         maxc2 = 1; maxc3 = 1
         if (n_glb > 0) maxc2 = maxc_fit(2)
         if (p_glb > 0) maxc3 = maxc_fit(3)
-        max_f1 = 2*maxc1 - 1
+        max_f1 = ref_ratio*maxc1 - 1
         max_f2 = 0; max_f3 = 0
-        if (n_glb > 0) max_f2 = 2*maxc2 - 1
-        if (p_glb > 0) max_f3 = 2*maxc3 - 1
+        if (n_glb > 0) max_f2 = ref_ratio*maxc2 - 1
+        if (p_glb > 0) max_f3 = ref_ratio*maxc3 - 1
         ! creg: relative 0-based transverse (0:maxc_t-1); freg: 0-based fine (0:max_f_t).
         ! Device-resident (@:ALLOCATE): capture and both applies run as kernels; no host copies are read.
         @:ALLOCATE(creg(1)%lo(1:sys_size,0:maxc2 - 1,0:maxc3 - 1,1:amr_max_blocks), creg(1)%hi(1:sys_size,0:maxc2 - 1, &

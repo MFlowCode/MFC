@@ -686,6 +686,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `amr_max_blocks`       | Integer | Number of fixed refined-block slots preallocated (each max-block sized; ~N x device memory); must be >= 1 (default 4) |
 | `amr_max_level`        | Integer | Maximum AMR refinement depth (number of refined levels above L0); must be >= 1 (default 1). Multi-level nesting (>= 2) is supported: static AMR (`amr_regrid_int = 0`) nests up to level 2, dynamic regrid (`amr_regrid_int > 0`) nests deeper (see `docs/documentation/amr_multilevel.md`) |
 | `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered block box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
+| `ref_ratio`             | Integer | AMR refinement ratio between coarse and fine levels; must be 2 or 4 (default 2). Only ref_ratio = 2 is supported with multi-level AMR or subcycling (v1). |
 | `hybrid_weno`           | Logical | Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities (requires WENO reconstruction) |
 | `hybrid_weno_eps`       | Real    | Smoothness threshold for hybrid WENO shock flagging; must be > 0 (default 1e-2) |
 | `hybrid_riemann`        | Logical | Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq) |

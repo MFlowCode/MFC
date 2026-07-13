@@ -241,16 +241,16 @@ contains
         end if
 
         ! max coarse block cells per dim (upper bound for any future regrid box); 1 for collapsed dims
-        amr_maxc(1) = (m_glb + 1)/2
+        amr_maxc(1) = (m_glb + 1)/ref_ratio
         amr_maxc(2) = 1; amr_maxc(3) = 1
-        if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/2
-        if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/2
+        if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/ref_ratio
+        if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/ref_ratio
 
         ! regrid size cap: min over ranks of the local half-extent (see the declaration; = amr_maxc at np=1),
         ! so any clamped box satisfies every rank's scratch constraint and can move freely across ranks
         amr_maxc_fit = amr_maxc
         do d = 1, num_dims
-            call s_mpi_allreduce_integer_min((ext(d) + 1)/2, fit_d)
+            call s_mpi_allreduce_integer_min((ext(d) + 1)/ref_ratio, fit_d)
             amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
         end do
 
@@ -262,10 +262,10 @@ contains
         maxc_loc = amr_maxc_fit
 
         ! max fine extents and buffered bounds for preallocation
-        max_f1 = 2*maxc_loc(1) - 1
+        max_f1 = ref_ratio*maxc_loc(1) - 1
         max_f2 = 0; max_f3 = 0
-        if (n_glb > 0) max_f2 = 2*maxc_loc(2) - 1
-        if (p_glb > 0) max_f3 = 2*maxc_loc(3) - 1
+        if (n_glb > 0) max_f2 = ref_ratio*maxc_loc(2) - 1
+        if (p_glb > 0) max_f3 = ref_ratio*maxc_loc(3) - 1
 
         ! MPI exchange buffers for the fine halo (all ranks; no-op without MFC_MPI)
         call s_initialize_amr_mpi_buffers(max_f1, max_f2, max_f3)
@@ -359,7 +359,7 @@ contains
 
         ! fine-level distribution: coarse-patch gather buffer (see decl). Sized to the largest block's coarse footprint
         ! (block coarse cells + 2*nmar halo, block-local frame). Device-mapped so the runtime ghost-fill reads it on the owner.
-        amr_cpat_mar = (buff_size + 1)/2 + 1
+        amr_cpat_mar = (buff_size + ref_ratio - 1)/ref_ratio + 1
         amr_cpat_hi = 0
         amr_cpat_hi(1) = maxc_loc(1) - 1 + 2*amr_cpat_mar
         if (n_glb > 0) amr_cpat_hi(2) = maxc_loc(2) - 1 + 2*amr_cpat_mar
@@ -1143,9 +1143,11 @@ contains
         ! ref_ratio**l = 2**l finer than L0, so its work is 4x (not 2x) the L0 footprint at level 2; using the level factor keeps
         ! the co-located-tower load balance honest. Level-1 blocks (2**1 = 2) are byte-identical to the previous form.
         do k = 1, amr_num_blocks
-            wt(k) = int((2**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1, 8)
-            if (n_glb > 0) wt(k) = wt(k)*int((2**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 8)
-            if (p_glb > 0) wt(k) = wt(k)*int((2**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 8)
+            wt(k) = int((ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1, 8)
+            if (n_glb > 0) wt(k) = wt(k)*int((ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, &
+                & k) + 1) - 1, 8)
+            if (p_glb > 0) wt(k) = wt(k)*int((ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, &
+                & k) + 1) - 1, 8)
             key(k) = f_amr_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
             ord(k) = k
         end do
@@ -1286,10 +1288,10 @@ contains
         amr_isect_lo_all(:,amr_cur) = amr_isect_lo; amr_isect_hi_all(:,amr_cur) = amr_isect_hi
         amr_owns_all(amr_cur) = amr_rank_owns_block
         ! fine extents cover the WHOLE block on the owner; -1 (empty) on non-owners
-        amr_slots(amr_cur)%m = 2*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
+        amr_slots(amr_cur)%m = ref_ratio*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
         amr_slots(amr_cur)%n = 0; amr_slots(amr_cur)%p = 0
-        if (n_glb > 0) amr_slots(amr_cur)%n = 2*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
-        if (p_glb > 0) amr_slots(amr_cur)%p = 2*max(amr_isect_hi(3) - amr_isect_lo(3) + 1, 0) - 1
+        if (n_glb > 0) amr_slots(amr_cur)%n = ref_ratio*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
+        if (p_glb > 0) amr_slots(amr_cur)%p = ref_ratio*max(amr_isect_hi(3) - amr_isect_lo(3) + 1, 0) - 1
         amr_slots(amr_cur)%idwbuff(1)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(1)%end = amr_slots(amr_cur)%m + buff_size
         amr_slots(amr_cur)%idwbuff(2)%beg = 0; amr_slots(amr_cur)%idwbuff(2)%end = 0
         amr_slots(amr_cur)%idwbuff(3)%beg = 0; amr_slots(amr_cur)%idwbuff(3)%end = 0
@@ -1328,7 +1330,7 @@ contains
         sidx(1) = start_idx(1); ext(1) = m
         if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
         if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
-        nmar = (buff_size + 1)/2 + 1
+        nmar = (buff_size + ref_ratio - 1)/ref_ratio + 1
         bad_loc = 0
         if (amr_rank_owns_block) then
             if (amr_isect_lo(1) - sidx(1) < nmar .or. sidx(1) + ext(1) - amr_isect_hi(1) < nmar) bad_loc = 1
@@ -1596,9 +1598,9 @@ contains
             & L2) > amr_region_hi_all(2, L2)) .or. (p_glb > 0 .and. amr_region_lo_all(3, L2) > amr_region_hi_all(3, &
             & L2))) call s_mpi_abort('amr static multi-level: level-1 block 1 is too small to nest a level-2 block (the fixed ' &
             & // 'inset inverts the box); enlarge the base amr block or reduce amr_cpat_mar')
-        if (2*(amr_region_hi_all(1, L2) - amr_region_lo_all(1, &
-            & L2) + 1) > amr_maxc_fit(1) .or. (n_glb > 0 .and. 2*(amr_region_hi_all(2, L2) - amr_region_lo_all(2, &
-            & L2) + 1) > amr_maxc_fit(2)) .or. (p_glb > 0 .and. 2*(amr_region_hi_all(3, L2) - amr_region_lo_all(3, &
+        if (ref_ratio*(amr_region_hi_all(1, L2) - amr_region_lo_all(1, &
+            & L2) + 1) > amr_maxc_fit(1) .or. (n_glb > 0 .and. ref_ratio*(amr_region_hi_all(2, L2) - amr_region_lo_all(2, &
+            & L2) + 1) > amr_maxc_fit(2)) .or. (p_glb > 0 .and. ref_ratio*(amr_region_hi_all(3, L2) - amr_region_lo_all(3, &
             & L2) + 1) > amr_maxc_fit(3))) &
             & call s_mpi_abort('amr static multi-level: the nested level-2 block exceeds the per-rank scratch cap ' &
             & // '(2*L0-extent > amr_maxc_fit); static multi-level does not tile the level-2 block - use a smaller base amr ' &
@@ -2754,10 +2756,10 @@ contains
         do l = fb3, fe3
             do k = fb2, fe2
                 do j = fb1, fe1
-                    ci = lo1 + floor(real(j, wp)/2._wp) - ox
+                    ci = lo1 + floor(real(j, wp)/real(ref_ratio, wp)) - ox
                     cj = 0; ck = 0
-                    if (n_glb > 0) cj = lo2 + floor(real(k, wp)/2._wp) - oy
-                    if (p_glb > 0) ck = lo3 + floor(real(l, wp)/2._wp) - oz
+                    if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(ref_ratio, wp)) - oy
+                    if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(ref_ratio, wp)) - oz
                     ci = min(max(ci, cb1), ce1)
                     cj = min(max(cj, cb2), ce2)
                     ck = min(max(ck, cb3), ce3)
@@ -3207,7 +3209,7 @@ contains
                 ! L0-coarse cells but its own grid is 2**L finer (each level halves dx), so fine = 2**L*(coarse extent)-1; xb, yb
                 ! share the level (same-level seam). 2**1 keeps L1 byte-identical; L2 tiles need 2**2 (an L1-frame 2* mislocates the
                 ! seam slice to half the block, filling the seam ghost from the wrong cells - the source of the L2-L2 leak).
-                fmul = 2**amr_block_level(xb)
+                fmul = ref_ratio**amr_block_level(xb)
                 xm(1) = fmul*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
                 xm(2) = merge(fmul*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
                 xm(3) = merge(fmul*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
@@ -4577,11 +4579,11 @@ contains
                 old_chi(:,k) = amr_region_hi_all(:,k)  ! old COARSE hi (for the P2P migration overlap test below)
                 ! fine extent = (2**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating it with the
                 ! level-1 factor (2x) truncates half its fine cells. Level-1 blocks (2**1 = 2) are byte-identical to before.
-                old_ext(1, k) = (2**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
-                old_ext(2, k) = merge((2**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 0, &
-                        & n_glb > 0)
-                old_ext(3, k) = merge((2**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 0, &
-                        & p_glb > 0)
+                old_ext(1, k) = (ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
+                old_ext(2, k) = merge((ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, &
+                        & k) + 1) - 1, 0, n_glb > 0)
+                old_ext(3, k) = merge((ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, &
+                        & k) + 1) - 1, 0, p_glb > 0)
                 old_owner(k) = amr_block_owner(k)
                 old_level(k) = amr_block_level(k)  ! overlap-copy must match levels: an old L2's stash is in the 4x parent-fine frame
                 old_owns(k) = amr_owns_all(k)
@@ -5415,7 +5417,7 @@ contains
             integer             :: i
 
             if (amr_slot_live(islot)) return
-            amr_slots(islot)%ref_ratio = 2
+            amr_slots(islot)%ref_ratio = ref_ratio
             amr_slots(islot)%buff_size = buff_size
             allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
             if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), &

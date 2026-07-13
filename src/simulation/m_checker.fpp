@@ -202,6 +202,9 @@ contains
                        & "static multi-level AMR (amr_regrid_int = 0) nests exactly one level-2 block in block 1, so it supports at most amr_max_level = 2; use amr_regrid_int > 0 for deeper or multi-block nesting")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
                        & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
+            @:PROHIBIT(ref_ratio /= 2 .and. ref_ratio /= 4, "ref_ratio must be 2 or 4")
+            @:PROHIBIT(ref_ratio /= 2 .and. (amr_max_level > 1 .or. amr_subcycle), &
+                       & "ref_ratio /= 2 is only supported at amr_max_level = 1 without subcycling (v1)")
         end if
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")
