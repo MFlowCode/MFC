@@ -497,31 +497,22 @@ Products mix with the surrounding gas through a composition (heat-capacity) weig
 
 Reaction sources release the explosive's chemical energy during the simulation stage; every one requires a JWL fluid. Two burn models drive the detonation and are mutually exclusive: `prog_burn` (a prescribed front) and `jwl_reactive` (self-propagating). `jwl_afterburn` is independent and may be added to either model, or used on its own. The optional `jwl_delta_e` offset applies only with `jwl_reactive`.
 
-\dot
-digraph jwl_reaction_sources {
-  rankdir = TB;
-  bgcolor = "transparent";
-  node [shape = box, style = "rounded", fontname = "Helvetica", fontsize = 10];
-  edge [fontname = "Helvetica", fontsize = 9];
+```text
+              JWL fluid defined  (eos = 2, model_eqns = 2)
+                              |
+                    How is the burn driven?
+        +---------------------+---------------------+
+        |                     |                     |
+    prog_burn            jwl_reactive             none
+    prescribed           self-propagating         inert products
+    kinematic front      (pressure)               expansion
+                              |
+                              +--> optional jwl_delta_e
+                                   (adds resolved ZND structure)
 
-  jwl   [label = "JWL fluid defined\n(eos = 2, model_eqns = 2)"];
-  pick  [label = "How is the burn driven?", shape = diamond];
-  prog  [label = "prog_burn\nprescribed kinematic front"];
-  react [label = "jwl_reactive\nself-propagating (pressure)"];
-  inert [label = "none\ninert products expansion"];
-  after [label = "optional jwl_afterburn\nproducts-air mixing energy", style = "rounded,dashed"];
-  znd   [label = "optional jwl_delta_e\nadds resolved ZND structure", style = "rounded,dashed"];
-
-  jwl -> pick;
-  pick -> prog  [label = "prescribed front"];
-  pick -> react [label = "self-propagating"];
-  pick -> inert [label = "no burn"];
-  prog  -> after [label = "may add"];
-  react -> after [label = "may add"];
-  inert -> after [label = "may add"];
-  react -> znd  [label = "may add"];
-}
-\enddot
+  optional jwl_afterburn (products-air mixing energy)
+  may be added to any of the three branches above
+```
 
 | Model (toggle) | Driven by | Key parameters | Requirements |
 | :--- | :--- | :--- | :--- |
