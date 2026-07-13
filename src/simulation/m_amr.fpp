@@ -2136,16 +2136,16 @@ contains
     !! raw derived-type 5D members as actuals tripped nvfortran's component-section data clauses on device.
     impure subroutine s_amr_fill_fine_ghosts_pbmv(pb_c, mv_c, pb_t, mv_t)
 
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_c, mv_c
+        !> coarse pb/mv are read from the gathered block-local patch amr_cg_pb/mv (0-based patch frame, cell 0 == amr_cpat_off): the
+        !! callers run s_amr_gather_coarse_patch_pbmv on ALL ranks first, so np>=2 reads the correct coarse rank's side-state
+        real(stp), dimension(0:,0:,0:,1:,1:), intent(in) :: pb_c, mv_c
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_t, mv_t
         integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, fm, fn, fp, b1, e1, b2, e2, b3, e3, ox, oy, oz
         logical :: d2, d3
 
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         d2 = n_glb > 0; d3 = p_glb > 0
         rr = amr_slots(amr_cur)%ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
@@ -3061,6 +3061,9 @@ contains
         ! fine-level distribution: gather the block's coarse patch onto its owner (collective - ALL ranks, before the
         ! owner-only return). The device ghost-fill below then reads the gathered patch amr_cg instead of local coarse.
         call s_amr_gather_coarse_patch(q_cons_coarse, .true.)
+        ! non-polytropic QBMM: gather the coarse pb/mv patch too (collective - ALL ranks, before the owner return; owners fill
+        ! below)
+        if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_in, mv_in, .true.)
         if (.not. amr_rank_owns_block) return
 
         ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the gathered patch amr_cg);
@@ -3071,9 +3074,9 @@ contains
         ! the coarse-prolonged ghost shell is the final ghost state EXCEPT at faces shared with an adjacent sub-block (tiling),
         ! which the block-to-block fine-fine halo overwrites with the neighbour's fine interior after this fill.
 
-        ! non-polytropic QBMM: prolong the block's pb/mv ghost shell from the coarse stage-entry
-        ! side-state (its rhs is cell-local, so ghosts only feed the widened-idwint conversions)
-        if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, amr_slots(amr_cur)%pb_f%sf, &
+        ! non-polytropic QBMM: prolong the block's pb/mv ghost shell from the gathered coarse patch amr_cg_pb/mv (its rhs is
+        ! cell-local, so ghosts only feed the widened-idwint conversions)
+        if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, amr_slots(amr_cur)%pb_f%sf, &
             & amr_slots(amr_cur)%mv_f%sf)
         if (rank_time_wrt) call s_rank_time_toc()
 
@@ -3160,17 +3163,20 @@ contains
 
         ! fine-level distribution: gather each lerp source's coarse patch (collective - ALL ranks) then prolong its ghost shell
         ! on the owner. Interleaved so the single amr_cg buffer is consumed by the fill before the next gather overwrites it.
+        ! non-polytropic QBMM: the pb/mv ghost shell gets the same two-source time-lerp treatment, gathered + filled INTERLEAVED
+        ! with q_cons so the single amr_cg_pb/mv buffer is consumed by each fill before the next gather overwrites it. Gathers are
+        ! collective (ALL ranks - P2P); fills are owner-only.
         call s_amr_gather_coarse_patch(q_old, .true.)
+        if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_old, mv_old, .true.)
         if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_ghost_a)
+        if (amr_rank_owns_block .and. qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &
+            & amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf)
         call s_amr_gather_coarse_patch(q_new, .true.)
+        if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_in, mv_in, .true.)
         if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_ghost_b)
+        if (amr_rank_owns_block .and. qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &
+            & amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf)
         if (.not. amr_rank_owns_block) return
-
-        ! non-polytropic QBMM: the pb/mv ghost shell gets the same two-source time-lerp treatment
-        if (qbmm .and. .not. polytropic) then
-            call s_amr_fill_fine_ghosts_pbmv(pb_old, mv_old, amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf)
-            call s_amr_fill_fine_ghosts_pbmv(pb_in, mv_in, amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf)
-        end if
 
         ! registers accumulate over all six stages of the transposed loop, so zero them once at setup (the stage-1 overwrite
         ! trick cannot span two substeps)
