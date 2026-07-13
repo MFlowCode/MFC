@@ -229,9 +229,9 @@ contains
         ! keeps a single contiguous block per body, so an IB block must itself fit a rank's local half-extent.
         bad_loc = 0
         if (ib) then
-            if (2*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m) bad_loc = 1
-            if (n_glb > 0 .and. 2*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n) bad_loc = 1
-            if (p_glb > 0 .and. 2*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p) bad_loc = 1
+            if (ref_ratio*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m) bad_loc = 1
+            if (n_glb > 0 .and. ref_ratio*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n) bad_loc = 1
+            if (p_glb > 0 .and. ref_ratio*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p) bad_loc = 1
         end if
         call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
         if (bad_glb == 1) then

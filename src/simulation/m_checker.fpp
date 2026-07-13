@@ -181,11 +181,11 @@ contains
                        & .and. amr_block_end(3) > p_glb), "amr_block_end must be <= global cell max per axis")
             @:PROHIBIT(any(amr_block_end(1:num_dims) <= amr_block_beg(1:num_dims)), &
                        & "amr_block_end must exceed amr_block_beg on each active axis")
-            @:PROHIBIT(2*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m_glb, &
+            @:PROHIBIT(ref_ratio*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m_glb, &
                        & "amr fine x-extent exceeds the base grid (module scratch is sized to the base)")
-            @:PROHIBIT(num_dims >= 2 .and. 2*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n_glb, &
+            @:PROHIBIT(num_dims >= 2 .and. ref_ratio*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n_glb, &
                        & "amr fine y-extent exceeds the base grid")
-            @:PROHIBIT(num_dims >= 3 .and. 2*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p_glb, &
+            @:PROHIBIT(num_dims >= 3 .and. ref_ratio*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p_glb, &
                        & "amr fine z-extent exceeds the base grid")
             @:PROHIBIT(amr_regrid_int < 0, "amr_regrid_int must be >= 0")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_tag_eps <= 0._wp, "amr_tag_eps must be > 0 when regridding")
