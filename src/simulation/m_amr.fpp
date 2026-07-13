@@ -521,12 +521,6 @@ contains
             return
         end if
 
-        if (pull_host) then
-            do i = 1, sys_size
-                $:GPU_UPDATE(host='[q_coarse(i)%sf]')
-            end do
-        end if
-
         ! block-local patch frame (cell 0 == global region_lo-nmar; collapsed dims -> 0) + its GLOBAL cell range [plo:phi]
         amr_cpat_off = 0
         amr_cpat_off(1) = amr_region_lo_all(1, amr_cur) - amr_cpat_mar
@@ -544,6 +538,39 @@ contains
         if (n_glb > 0) o2 = start_idx(2)
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = sys_size*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
+
+        ! np=1 runtime: the sole owner holds every covered coarse cell and q_coarse is device-current (pull_host), so copy
+        ! q_coarse (device) -> amr_cg (device) with a DEVICE kernel over the in-domain patch, avoiding the device->host->device
+        ! round-trip (q_coarse pull + host unpack + amr_cg push). Same index map as s_amr_unpack_patch. At init/regrid
+        ! (.not. pull_host) q_coarse's device copy may be stale, so fall through to the host path.
+        if (num_procs == 1 .and. pull_host) then
+            block
+                integer :: bl1, bh1, bl2, bh2, bl3, bh3, coff1, coff2, coff3
+                call f_amr_rank_coarse_range(owner, crlo, crhi)
+                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
+                coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do g3 = bl3, bh3
+                        do g2 = bl2, bh2
+                            do g1 = bl1, bh1
+                                amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end block
+            return
+        end if
+
+        ! np>1 runtime: pull q_coarse to host for the owner's local unpack and the non-owner MPI pack below.
+        if (pull_host) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[q_coarse(i)%sf]')
+            end do
+        end if
 
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
