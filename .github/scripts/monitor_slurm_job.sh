@@ -122,62 +122,39 @@ done
 
 echo "=== Streaming output for job $job_id ==="
 
-# Start tail and redirect its output to file descriptor 3 for multiplexing
-# This allows us to stream tail output while also printing heartbeat messages
-exec 3< <(stdbuf -oL -eL tail -f "$output_file" 2>&1)
+# Stream the job's output to the step log with a plain backgrounded `tail`.
+# This previously used a timed read (`read -t 1`) over a `tail -f` process
+# substitution; when that pipe broke, bash could crash in the read-builtin's
+# alarm/longjmp unwind path (SIGSEGV), and the EXIT trap would then cancel a
+# still-healthy job. A backgrounded tail avoids that construct entirely, and
+# the final `cat` below reprints the whole file so nothing is lost if tail is
+# killed mid-flush.
+stdbuf -oL -eL tail -f "$output_file" 2>&1 &
 tail_pid=$!
 
-# Monitor job status and stream output simultaneously
+# Poll job status until it reaches a terminal state; streaming happens
+# independently in the background tail above.
 last_heartbeat=$(date +%s)
-
 while true; do
-  # Try to read from tail output (non-blocking via timeout)
-  # Read multiple lines if available to avoid falling behind
-  lines_read=0
-  while IFS= read -r -t 1 line <&3 2>/dev/null; do
-    echo "$line"
-    lines_read=$((lines_read + 1))
-    last_heartbeat=$(date +%s)
-    # Limit burst reads to avoid starving the status check
-    if [ $lines_read -ge 100 ]; then
-      break
-    fi
-  done
-
-  # Check job status
-  current_time=$(date +%s)
   state=$(get_job_state "$job_id")
 
   if is_terminal_state "$state"; then
     echo "[$(date +%H:%M:%S)] Job $job_id reached terminal state: $state"
     break
-  else
-    # Print heartbeat if no output for 60 seconds
-    if [ $((current_time - last_heartbeat)) -ge 60 ]; then
-      echo "[$(date +%H:%M:%S)] Job $job_id state=$state (no new output for 60s)..."
-      last_heartbeat=$current_time
-    fi
   fi
 
-  # Sleep briefly between status checks
-  sleep 1
-done
-
-# Drain any remaining output from tail after job completes
-echo "Draining remaining output..."
-drain_count=0
-while IFS= read -r -t 1 line <&3 2>/dev/null; do
-  echo "$line"
-  drain_count=$((drain_count + 1))
-  # Safety limit to avoid infinite loop
-  if [ $drain_count -ge 10000 ]; then
-    echo "Warning: Truncating remaining output after 10000 lines"
-    break
+  # Periodic heartbeat so the CI log never looks stalled during quiet phases.
+  current_time=$(date +%s)
+  if [ $((current_time - last_heartbeat)) -ge 60 ]; then
+    echo "[$(date +%H:%M:%S)] Job $job_id state=$state..."
+    last_heartbeat=$current_time
   fi
+
+  sleep 5
 done
 
-# Close the file descriptor and kill tail
-exec 3<&-
+# Give tail a moment to flush the final lines, then stop streaming.
+sleep 2
 kill "${tail_pid}" 2>/dev/null || true
 tail_pid=""
 
