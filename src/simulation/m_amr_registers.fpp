@@ -435,11 +435,10 @@ contains
             ! multi-level lock-step: this fine block (amr_cur) is the COARSE side (parent) of its level+1 children. Capture creg for
             ! each child from THIS block's fine flux at the child's footprint faces - the child's amr_isect_lo/hi is already in this
             ! parent's fine frame, so it indexes flux_dir directly (face jlo=isect_lo-1, jhi=isect_hi; transverse origin o1/o2).
-            ! creg
-            ! holds the rk3_w-weighted step-integral flux for the once-per-step STATE reflux into this parent
-            ! (s_amr_reflux_to_parent).
-            ! Advective (flux_dir) only; viscous/chemistry multi-level reflux is gated in m_checker until captured here too. np=1
-            ! (children co-owned with the parent); np>=2 P2P delivery is future work.
+            ! creg holds the rk3_w-weighted step-integral flux for the once-per-step STATE reflux into this parent
+            ! (s_amr_reflux_to_parent). Captures the TOTAL flux - advective (flux_dir), then viscous (flux_src, mom..E), then
+            ! chemistry species+energy - mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves (no
+            ! checker gate). np=1 (children co-owned with the parent); np>=2 P2P delivery is future work.
             ccoef = rk3_w(stage); cacc = (stage > 1)
             do kc = 1, amr_num_blocks
                 if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1 .or. .not. amr_owns_all(kc)) cycle

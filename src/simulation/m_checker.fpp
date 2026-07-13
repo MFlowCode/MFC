@@ -195,8 +195,10 @@ contains
             @:PROHIBIT(amr_max_level < 1, "amr_max_level must be >= 1")
             @:PROHIBIT(amr_max_level > 1 .and. amr_max_blocks < 2, &
                        & "multi-level AMR (amr_max_level > 1) needs amr_max_blocks >= 2 (at least one level-1 block plus one nested level-2 block); a run-time abort catches the tiled case where even more blocks are required")
-            @:PROHIBIT(amr_max_level > 1 .and. num_procs > 1 .and. ib, &
-                       & "multi-level AMR (amr_max_level > 1) with immersed boundaries at num_procs > 1 is not yet supported (fine-grid IB nesting is under development); use num_procs = 1, or amr_max_level = 1, with IB")
+            @:PROHIBIT(amr_max_level > 1 .and. ib, &
+                       & "multi-level AMR (amr_max_level > 1) with immersed boundaries is not yet supported at any rank count (fine-grid IB nesting is under development); use amr_max_level = 1 with IB")
+            @:PROHIBIT(amr_regrid_int == 0 .and. amr_max_level > 2, &
+                       & "static multi-level AMR (amr_regrid_int = 0) nests exactly one level-2 block in block 1, so it supports at most amr_max_level = 2; use amr_regrid_int > 0 for deeper or multi-block nesting")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
                        & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
         end if

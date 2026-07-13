@@ -894,11 +894,13 @@ contains
 
         if (amr_num_blocks < 1) return
 
-        ! per-block own fine-work weight = fine cell count (product of 2*extent-1 over active dims)
+        ! per-block own fine-work weight = fine cell count (product of (2**level)*extent-1 over active dims). A level-l block is
+        ! ref_ratio**l = 2**l finer than L0, so its work is 4x (not 2x) the L0 footprint at level 2; using the level factor keeps
+        ! the co-located-tower load balance honest. Level-1 blocks (2**1 = 2) are byte-identical to the previous form.
         do k = 1, amr_num_blocks
-            wt(k) = int(2*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1, 8)
-            if (n_glb > 0) wt(k) = wt(k)*int(2*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 8)
-            if (p_glb > 0) wt(k) = wt(k)*int(2*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 8)
+            wt(k) = int((2**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1, 8)
+            if (n_glb > 0) wt(k) = wt(k)*int((2**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 8)
+            if (p_glb > 0) wt(k) = wt(k)*int((2**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 8)
             key(k) = f_amr_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
             ord(k) = k
         end do
@@ -911,6 +913,7 @@ contains
         do k = 1, amr_num_blocks
             a = k
             do while (amr_block_level(a) > 1)
+                if (f_amr_parent_block(a) < 1) exit  ! proper-nesting invariant broken; stop before indexing amr_block_level(0)
                 a = f_amr_parent_block(a)
             end do
             twt(a) = twt(a) + wt(k)
@@ -1313,10 +1316,6 @@ contains
 
     end subroutine s_populate_amr_fine
 
-    !> Multi-level coupling self-test (development milestone; np=1, static). Nest ONE level-2 block inside block 1, populate it from
-    !! the parent (level-aware gather + prolong), and check that restrict(level-2 fine) recovers the parent-fine coarse it was
-    !! prolonged from (conservation err ~ 0 => the level-aware geometry/gather/prolong/restrict are consistent). Non-intrusive: the
-    !! level-2 block is removed afterward, so the run continues single-level. The recursive advance/regrid (increments 3-4) follow.
     !> Build the STATIC multi-level hierarchy (amr_regrid_int = 0): nest exactly one level-2 block inside level-1 block 1 by a fixed
     !! geometric inset (a regrid would place it by sensor-on-fine instead), prolong the parent state into it, and keep it persistent
     !! so the advance driver steps it every timestep. The restrict/reflux identity that this construction relies on is protected by
@@ -1341,6 +1340,22 @@ contains
         if (p_glb > 0) inset(3) = max((amr_region_hi_all(3, 1) - amr_region_lo_all(3, 1) + 1)/4, amr_cpat_mar)
         amr_region_lo_all(:,L2) = amr_region_lo_all(:,1) + inset
         amr_region_hi_all(:,L2) = amr_region_hi_all(:,1) - inset
+        ! Guard the fixed-inset box against configs this single-block static builder cannot represent - the dynamic regrid path
+        ! has the analogous checks (proper-nesting skip + amr_maxc_fit/2 clamp), but the static path bypasses them. Replicated
+        ! inputs -> every rank takes the same branch (collective-safe). (a) a level-1 block smaller than 2*inset inverts the box;
+        ! (b) a level-2 L0-extent > amr_maxc_fit/2 makes its parent-fine transverse extent (2*L0) overrun the creg register
+        ! (allocated 0:amr_maxc_fit-1), a silent out-of-bounds device write in the L2->L1 reflux capture.
+        if (amr_region_lo_all(1, L2) > amr_region_hi_all(1, L2) .or. (n_glb > 0 .and. amr_region_lo_all(2, &
+            & L2) > amr_region_hi_all(2, L2)) .or. (p_glb > 0 .and. amr_region_lo_all(3, L2) > amr_region_hi_all(3, &
+            & L2))) call s_mpi_abort('amr static multi-level: level-1 block 1 is too small to nest a level-2 block (the fixed ' &
+            & // 'inset inverts the box); enlarge the base amr block or reduce amr_cpat_mar')
+        if (2*(amr_region_hi_all(1, L2) - amr_region_lo_all(1, &
+            & L2) + 1) > amr_maxc_fit(1) .or. (n_glb > 0 .and. 2*(amr_region_hi_all(2, L2) - amr_region_lo_all(2, &
+            & L2) + 1) > amr_maxc_fit(2)) .or. (p_glb > 0 .and. 2*(amr_region_hi_all(3, L2) - amr_region_lo_all(3, &
+            & L2) + 1) > amr_maxc_fit(3))) &
+            & call s_mpi_abort('amr static multi-level: the nested level-2 block exceeds the per-rank scratch cap ' &
+            & // '(2*L0-extent > amr_maxc_fit); static multi-level does not tile the level-2 block - use a smaller base amr ' &
+            & // 'block or the dynamic regrid path (amr_regrid_int > 0)')
         amr_block_level(L2) = 2
         amr_block_owner(L2) = amr_block_owner(1)
         amr_num_blocks = L2; amr_num_levels = 2
@@ -1564,12 +1579,12 @@ contains
     !! cells just OUTSIDE the block footprint, in the parent-fine frame (mirror of the L0 s_amr_apply_reflux targeted at the parent
     !! - "the coarse" is level l-1). State form: q_parent(outside) += dt*(F_coarse - Fbar_fine)/dxf on the low face and +=
     !! dt*(Fbar_fine - F_coarse)/dxf on the high face, where Fbar_fine is the child-averaged fine register. creg/freg key off this
-    !! block's slot. np=1 local; the np>=2 P2P freg delivery is future work. Uniform parent-fine dx (stretched: coords TODO).
+    !! block's slot. np=1 local; the np>=2 P2P freg delivery is future work. Per-face parent-fine dx (stretched-grid safe).
     impure subroutine s_amr_reflux_to_parent(dt_reflux)
 
         real(wp), intent(in) :: dt_reflux
         integer              :: pblk, d, y, olo(3), ohi(3), glo(3), ghi(3), woff(3)
-        real(wp)             :: dxf, w_lo(3), w_hi(3), mlo(3), mhi(3)
+        real(wp)             :: w_lo(3), w_hi(3), mlo(3), mhi(3)
 
         if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner refluxes locally
         pblk = f_amr_parent_block(amr_cur)
@@ -1587,17 +1602,18 @@ contains
             end do
         end do
         ! parent-fine frame for the shared reflux kernel: outside cell = isect boundary +/-1; creg-local loop range 0:extent;
-        ! transverse write at the isect origin; uniform parent-fine cell widths (interior index; stretched-grid coords are TODO).
+        ! transverse write at the isect origin. Per-face parent-fine cell widths - dx at the low/high OUTSIDE cell (olo/ohi),
+        ! mirroring the L0/L1 s_amr_apply_reflux_state so a stretched parent grid corrects each C/F face with its own width
+        ! (on a uniform grid dx is constant, so this is byte-identical to the previous single-dxf form).
         olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; mlo = 1._wp; mhi = 1._wp
-        dxf = amr_slots(pblk)%dx(amr_isect_lo(1))
         do d = 1, num_dims
             olo(d) = amr_isect_lo(d) - 1; ohi(d) = amr_isect_hi(d) + 1
             ghi(d) = amr_isect_hi(d) - amr_isect_lo(d)
             woff(d) = amr_isect_lo(d)
         end do
-        mlo(1) = dxf; mhi(1) = dxf
-        if (n_glb > 0) then; mlo(2) = amr_slots(pblk)%dy(amr_isect_lo(2)); mhi(2) = mlo(2); end if
-        if (p_glb > 0) then; mlo(3) = amr_slots(pblk)%dz(amr_isect_lo(3)); mhi(3) = mlo(3); end if
+        mlo(1) = amr_slots(pblk)%dx(olo(1)); mhi(1) = amr_slots(pblk)%dx(ohi(1))
+        if (n_glb > 0) then; mlo(2) = amr_slots(pblk)%dy(olo(2)); mhi(2) = amr_slots(pblk)%dy(ohi(2)); end if
+        if (p_glb > 0) then; mlo(3) = amr_slots(pblk)%dz(olo(3)); mhi(3) = amr_slots(pblk)%dz(ohi(3)); end if
         call s_amr_reflux_apply_faces(amr_slots(pblk)%q_cons, amr_cur, amr_slots(amr_cur)%ref_ratio, dt_reflux, olo, ohi, glo, &
                                       & ghi, woff, w_lo, w_hi, mlo, mhi)
 
@@ -4024,11 +4040,14 @@ contains
                 end block
             end if
 
-            ! 4) unchanged? (same count and boxes as the live slots -> keep them; a rebuild would reproduce them exactly anyway)
+            ! 4) unchanged? (same count, boxes AND levels as the live slots -> keep them; a rebuild would reproduce them exactly
+            ! anyway). The level must be compared too: a box that keeps its coordinates but changes refinement level would
+            ! otherwise slip through with a stale amr_block_level, corrupting the level-aware coupling.
             if (nboxes == amr_num_blocks) then
                 same = .true.
                 do k = 1, nboxes
-                    if (any(boxes(k)%lo /= amr_slots(k)%region%lo) .or. any(boxes(k)%hi /= amr_slots(k)%region%hi)) same = .false.
+                    if (any(boxes(k)%lo /= amr_slots(k)%region%lo) .or. any(boxes(k)%hi /= amr_slots(k)%region%hi) &
+                        & .or. box_level(k) /= amr_block_level(k)) same = .false.
                 end do
                 if (same) return
             end if
@@ -4040,9 +4059,13 @@ contains
                 ! migration below and the overlap-copy's index shift are correct even where this rank did not own the old block
                 old_ilo(:,k) = amr_region_lo_all(:,k)
                 old_chi(:,k) = amr_region_hi_all(:,k)  ! old COARSE hi (for the P2P migration overlap test below)
-                old_ext(1, k) = 2*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
-                old_ext(2, k) = merge(2*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 0, n_glb > 0)
-                old_ext(3, k) = merge(2*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 0, p_glb > 0)
+                ! fine extent = (2**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating it with the
+                ! level-1 factor (2x) truncates half its fine cells. Level-1 blocks (2**1 = 2) are byte-identical to before.
+                old_ext(1, k) = (2**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
+                old_ext(2, k) = merge((2**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 0, &
+                        & n_glb > 0)
+                old_ext(3, k) = merge((2**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 0, &
+                        & p_glb > 0)
                 old_owner(k) = amr_block_owner(k)
                 old_level(k) = amr_block_level(k)  ! overlap-copy must match levels: an old L2's stash is in the 4x parent-fine frame
                 old_owns(k) = amr_owns_all(k)
@@ -4079,6 +4102,24 @@ contains
                 ! a box nested at level l). Setting it every regrid resets a stale level when a slot is reused across levels.
                 amr_block_level(k) = box_level(k)
             end do
+            ! Proper-nesting guard: each level>=2 block must be covered by EXACTLY ONE parent-level block. f_amr_parent_block (and
+            ! the gather/reflux that key off it) take the FIRST overlap, so a fine tile straddling two parent tiles - an internal
+            ! parent-level tile seam crossed by a nested feature - would silently couple to only one parent (wrong coarse BC + a
+            ! conservation leak on the other). Abort fail-closed instead. Replicated boxes -> every rank aborts together.
+            block
+                integer :: bk, bkk, npar
+                do bk = 1, nboxes
+                    if (box_level(bk) < 2) cycle
+                    npar = 0
+                    do bkk = 1, nboxes
+                        if (box_level(bkk) == box_level(bk) - 1 .and. f_amr_boxes_overlap(boxes(bk)%lo, boxes(bk)%hi, &
+                            & boxes(bkk)%lo, boxes(bkk)%hi)) npar = npar + 1
+                    end do
+                    if (npar /= 1) call s_mpi_abort('amr multi-level: a level>=2 block overlaps more than one (or no) ' &
+                        & // 'parent-level block - a fine tile straddling a parent-tile seam is unsupported (gather/reflux ' &
+                        & // 'couple to a single parent); reduce max_grid_size or the refined feature extent')
+                end do
+            end block
             amr_num_levels = maxval(box_level(1:nboxes))
             call s_amr_assign_block_owners()
 
