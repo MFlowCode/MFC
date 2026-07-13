@@ -3922,7 +3922,7 @@ contains
             ! where they sit. np=1 + non-IB (multi-level distribution / IB nesting are future work). Regions stay in L0 cell
             ! indices.
             box_level(1:nboxes) = 1
-            if (amr_max_level >= 2 .and. .not. ib) then
+            if (amr_max_level >= 2) then
                 block
                     integer                  :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
                     integer                  :: mg, ng, pg, ci, cj, ck, sidx(3)
@@ -3986,6 +3986,34 @@ contains
                                 covered = .true.  ! replicated (metadata) - identical on every rank regardless of ownership
                                 if (amr_owns_all(ob)) call s_amr_tag_child_from_fine(ob, mlo, mhi, gctag, any_tag)
                             end do
+                            ! IB: always refine the body region at this level, even where the density sensor is quiet - mark the
+                            ! body's L0-frame bbox into gctag so it is clustered into a child (mirrors the L1 expand at :3836).
+                            ! Containment margin = max(amr_buf, 4) + amr_cpat_mar: the child window (mlo:mhi) is the parent inset by
+                            ! amr_cpat_mar, and clamping the tag to that window can eat up to amr_cpat_mar of the body's stencil
+                            ! margin at the parent-adjacent side - so tag out to the IB image-point reach (max(amr_buf, 4)) PLUS the
+                            ! inset it must survive, keeping the C/F boundary in fluid a full stencil off the body.
+                            if (ib) then
+                                block
+                                    integer :: ib_i, bb_lo(3), bb_hi(3), gi, gj, gk
+                                    do ib_i = 1, num_ibs
+                                        call s_amr_body_bbox(ib_i, max(amr_buf, 4) + amr_cpat_mar, bb_lo, bb_hi)
+                                        ! clamp the body bbox to this parent's nesting window (global L0 frame - s_amr_body_bbox
+                                        ! returns GLOBAL L0 cell indices, same frame as mlo/mhi)
+                                        bb_lo = max(bb_lo, mlo); bb_hi = min(bb_hi, mhi)
+                                        if (bb_hi(1) < bb_lo(1)) cycle
+                                        if (n_glb > 0 .and. bb_hi(2) < bb_lo(2)) cycle
+                                        if (p_glb > 0 .and. bb_hi(3) < bb_lo(3)) cycle
+                                        covered = .true.
+                                        do gk = bb_lo(3), bb_hi(3)
+                                            do gj = bb_lo(2), bb_hi(2)
+                                                do gi = bb_lo(1), bb_hi(1)
+                                                    gctag(gi, gj, gk) = .true.
+                                                end do
+                                            end do
+                                        end do
+                                    end do
+                                end block
+                            end if
 #ifdef MFC_MPI
                             ! union the distributed owners' fine tags so every rank clusters the SAME child boxes (regrid must be
                             ! deterministic); no-op at np=1 (the single owner already holds the whole global tag field)
@@ -4020,6 +4048,17 @@ contains
                                         clo(3) = max(clo(3) - amr_buf, mlo(3)); chi(3) = min(chi(3) + amr_buf, mhi(3))
                                     else
                                         clo(3) = 0; chi(3) = 0
+                                    end if
+                                    ! IB: a child clustered from the (widened) body tag must fully contain every overlapping body -
+                                    ! expand over bodies (mirrors the L1 expand at :3836), then re-clamp to the nesting window so
+                                    ! the
+                                    ! child stays nested (the expand uses max(amr_buf, 4); the window re-clamp is the binding limit,
+                                    ! and the Step-2 tag already carried the +amr_cpat_mar so mlo/mhi sit clear of the body stencil)
+                                    if (ib) then
+                                        call s_amr_expand_box_over_bodies(clo, chi)
+                                        clo(1) = max(clo(1), mlo(1)); chi(1) = min(chi(1), mhi(1))
+                                        if (n_glb > 0) then; clo(2) = max(clo(2), mlo(2)); chi(2) = min(chi(2), mhi(2)); end if
+                                        if (p_glb > 0) then; clo(3) = max(clo(3), mlo(3)); chi(3) = min(chi(3), mhi(3)); end if
                                     end if
                                     ! slot cap: a level->=2 block's fine grid spans 4*(its L0 extent) cells while the slot holds
                                     ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. In LOCK-STEP a
