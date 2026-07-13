@@ -1,10 +1,10 @@
 # Multi-level AMR nesting — design and implementation plan
 
-Status: **in progress.** The block-structured AMR core today supports a single refined
-level (L1, 2:1 over the L0 base grid). This document is the roadmap for generalizing it to
-arbitrary refinement depth (L0, L1, …, L`amr_max_level`). It is implemented in
-behavior-preserving increments: at `amr_max_level = 1` the code is bit-identical to the
-single-level core.
+Status: **multi-level nesting implemented.** The block-structured AMR core supports arbitrary
+refinement depth (L0, L1, …, L`amr_max_level`, 2:1 per level): static AMR (`amr_regrid_int = 0`)
+nests one level-2 block, dynamic regrid (`amr_regrid_int > 0`) nests deeper and per-level. This
+document is the design record. It was implemented in behavior-preserving increments: at
+`amr_max_level = 1` the code is bit-identical to the single-level core.
 
 ## The one assumption to generalize
 
