@@ -3703,10 +3703,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # (n3) MULTI-LEVEL STATIC IB AMR (SP22): a single fixed circular body refined to LEVEL 2. Same 2D
         # quiescent-drift setup as (n) with dynamic regrid, but amr_max_level=2 so the body-containment
-        # cascade nests a level-2 child inside the level-1 block over the body. Conservation is NOT machine-
-        # zero here (the IB overwrites body cells, so s_amr_conservation_defect reads a bounded non-zero) -
-        # the golden field values are the correctness oracle. np=1, static body only (the checker still fails
-        # closed for np>1 and moving bodies). amr_max_blocks is raised to nest the extra level-2 child.
+        # cascade nests a level-2 child inside the level-1 block over the body. The body-containment margin
+        # is widened by (amr_max_level-1)*amr_cpat_mar (s_amr_expand_box_over_bodies) so the level-1 block
+        # clears the body far enough that the level-2 window CONTAINS the body plus a full IB stencil - the
+        # body SURFACE lands at the finest level and the C/F boundary sits a stencil off it, in fluid. The
+        # body is r=0.05 (~8 L0 cells) so the widened level-1 (extent 28) still fits: 2*28-1 = 55 <= 63.
+        # Conservation is NOT machine-zero here (the IB overwrites body cells, so s_amr_conservation_defect
+        # reads a bounded non-zero) - the golden field values are the correctness oracle. np=1, static body
+        # only (the checker still fails closed for np>1 and moving bodies). amr_max_blocks nests the L2 child.
         stack.push(
             "AMR -> 2D -> multi-level IB (static cylinder, np=1)",
             {
@@ -3746,14 +3750,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_ib(1)%geometry": 2,
                 "patch_ib(1)%x_centroid": 0.5,
                 "patch_ib(1)%y_centroid": 0.5,
-                "patch_ib(1)%radius": 0.1,
+                "patch_ib(1)%radius": 0.05,
                 "patch_ib(1)%slip": "F",
                 # initial 2:1 fine block over the body (regrid rebuilds it from the sensor each step)
                 "amr": "T",
-                "amr_block_beg(1)": 20,
-                "amr_block_beg(2)": 20,
-                "amr_block_end(1)": 43,
-                "amr_block_end(2)": 43,
+                "amr_block_beg(1)": 18,
+                "amr_block_beg(2)": 18,
+                "amr_block_end(1)": 45,
+                "amr_block_end(2)": 45,
                 # dynamic regrid refining the body to level 2
                 "amr_max_level": 2,
                 "amr_max_blocks": 16,

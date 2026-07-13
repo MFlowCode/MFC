@@ -3546,9 +3546,12 @@ contains
 
         ! containment margin: the IB image-point stencil reaches a few cells beyond the surface
         ! (the validated static-block goldens keep ~5); buff_size (floored to 10 by ib) would
-        ! exceed the per-rank block cap for ordinary bodies
+        ! exceed the per-rank block cap for ordinary bodies. For amr_max_level > 1 the body must
+        ! survive every child nesting inset (amr_cpat_mar per level down to amr_max_level), so the
+        ! parent block clears the body by that many extra cells - keeping the finest C/F boundary a
+        ! full image-point stencil off the surface (refining the surface, not the interior).
 
-        mrg = max(amr_buf, 4)
+        mrg = max(amr_buf, 4) + max(0, amr_max_level - 1)*amr_cpat_mar
 
         do i = 1, num_ibs
             call s_amr_body_bbox(i, mrg, blo, bhi)
@@ -4001,8 +4004,10 @@ contains
                             ! body's L0-frame bbox into gctag so it is clustered into a child (mirrors the L1 expand at :3836).
                             ! Containment margin = max(amr_buf, 4) + amr_cpat_mar: the child window (mlo:mhi) is the parent inset by
                             ! amr_cpat_mar, and clamping the tag to that window can eat up to amr_cpat_mar of the body's stencil
-                            ! margin at the parent-adjacent side - so tag out to the IB image-point reach (max(amr_buf, 4)) PLUS the
-                            ! inset it must survive, keeping the C/F boundary in fluid a full stencil off the body.
+                            ! margin at the parent-adjacent side. The parent (widened in s_amr_expand_box_over_bodies by
+                            ! (amr_max_level-1)*amr_cpat_mar) now clears the body by enough that this window contains the body plus
+                            ! max(amr_buf, 4), so the tag survives the inset with a full image-point stencil of fluid on every side:
+                            ! the body SURFACE is refined at every level and the C/F boundary sits a full stencil off it, in fluid.
                             if (ib) then
                                 block
                                     integer :: ib_i, bb_lo(3), bb_hi(3), gi, gj, gk
@@ -4063,8 +4068,10 @@ contains
                                     ! IB: a child clustered from the (widened) body tag must fully contain every overlapping body -
                                     ! expand over bodies (mirrors the L1 expand at :3836), then re-clamp to the nesting window so
                                     ! the
-                                    ! child stays nested (the expand uses max(amr_buf, 4); the window re-clamp is the binding limit,
-                                    ! and the Step-2 tag already carried the +amr_cpat_mar so mlo/mhi sit clear of the body stencil)
+                                    ! child stays nested. Because the parent was widened by (amr_max_level-1)*amr_cpat_mar, its
+                                    ! nesting window (mlo:mhi) already contains the body plus max(amr_buf, 4), so the re-clamp does
+                                    ! NOT cut the body's stencil: the child CONTAINS the body bbox and the C/F boundary lands a full
+                                    ! image-point stencil off the surface, in fluid (surface refined, not just the interior).
                                     if (ib) then
                                         call s_amr_expand_box_over_bodies(clo, chi)
                                         clo(1) = max(clo(1), mlo(1)); chi(1) = min(chi(1), mhi(1))
