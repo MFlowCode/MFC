@@ -192,12 +192,30 @@ contains
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_tag_eps <= 0._wp, "amr_tag_eps must be > 0 when regridding")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_buf < 1, "amr_buf must be >= 1 when regridding")
             @:PROHIBIT(amr_max_blocks < 1, "amr_max_blocks must be >= 1")
+            @:PROHIBIT(amr_max_level < 1, "amr_max_level must be >= 1")
+            @:PROHIBIT(amr_max_level > 1 .and. amr_max_blocks < 2, &
+                       & "multi-level AMR (amr_max_level > 1) needs amr_max_blocks >= 2 (at least one level-1 block plus one nested level-2 block); a run-time abort catches the tiled case where even more blocks are required")
+            @:PROHIBIT(amr_max_level > 1 .and. ib .and. num_procs > 1, &
+                       & "multi-level AMR (amr_max_level > 1) with immersed boundaries is only supported at num_procs = 1 (the fine-IB image-point stencil is not decomposition-exact across a rank seam)")
+            @:PROHIBIT(amr_max_level > 1 .and. ib .and. any(patch_ib(1:num_ibs)%moving_ibm /= 0), &
+                       & "multi-level AMR (amr_max_level > 1) with a MOVING immersed body is not yet supported; use a static body")
+            @:PROHIBIT(amr_regrid_int == 0 .and. amr_max_level > 2, &
+                       & "static multi-level AMR (amr_regrid_int = 0) nests exactly one level-2 block in block 1, so it supports at most amr_max_level = 2; use amr_regrid_int > 0 for deeper or multi-block nesting")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
                        & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
         end if
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")
         @:PROHIBIT(amr_subcycle .and. cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
+        ! Subcycled fine advance at np>1 needs the block-to-block fine-fine seam halo (s_amr_fine_fine_halo) run PER SUBSTEP:
+        ! max_grid_size TILING can split a feature into ADJACENT same-level sub-blocks, and the halo overwrites their shared-face
+        ! ghosts with the neighbour's fine interior so both sides compute a MATCHING seam flux (else mass leaks at the seam).
+        ! s_amr_advance_fine_subcycle_all advances all LEVEL-1 blocks stage-by-stage in lockstep with the halo interposed, so
+        ! single-level subcycle np>1 is conservation-safe. The level-2 children still advance per-block (s_amr_advance_children),
+        ! so L2-L2 seams are not yet reconciled - keep multi-level (amr_max_level > 1) subcycle gated at np>1 until the recursive
+        ! per-substep L2 halo lands. np=1 never tiles into adjacent blocks (halo skipped there, byte-identical to before).
+        @:PROHIBIT(amr_subcycle .and. amr_regrid_int > 0 .and. num_procs > 1 .and. amr_max_level > 1, &
+                   & "multi-level (amr_max_level > 1) amr_subcycle with dynamic regrid is not yet conservation-safe at num_procs > 1: the level-2 seam halo is per-block, not lockstep (single-level subcycling IS supported at np > 1). Use amr_subcycle = F (lock-step) for multi-level dynamic multi-rank runs")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
