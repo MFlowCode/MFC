@@ -22,34 +22,16 @@ case "$cluster" in
     *) echo "ERROR: Unknown cluster '$cluster'"; exit 1 ;;
 esac
 
-# Optional sharding (format "i/N", e.g. "1/2"), set by submit-slurm-job.sh's
-# [shard] argument via $job_shard: shard i builds every Nth case of the sorted
-# case list. Unset = build all cases in one job (default; other clusters).
+# Benchmark list + optional sharding ("i/N", e.g. "1/3", set by
+# submit-slurm-job.sh's [shard] argument via $job_shard): shard i builds every
+# Nth case of the shared list. Unset = build all cases in one job (default;
+# other clusters). The list is the single source of truth shared with
+# run_case_optimization.sh so pre-built binaries and run cases never drift.
+source .github/scripts/case-optimization-benchmarks.sh
+caseopt_parse_shard
 shard="${job_shard:-}"
-if [ -n "$shard" ]; then
-    # Validate full shape: must be exactly "digits/digits" — one slash with
-    # non-empty, purely numeric, non-leading-zero parts on both sides.
-    # Split first, then validate each part independently so that inputs like
-    # "1/" "/2" "//" "1/2/3" "a/b" "12" are all caught before any arithmetic.
-    shard_idx="${shard%%/*}"
-    shard_count="${shard##*/}"
-    # Reject if no slash (idx and count are equal and equal to the whole string)
-    case "$shard_idx" in
-        ''|*[!0-9]*|0*) echo "ERROR: bad shard '$shard' (expected i/N)"; exit 1 ;;
-    esac
-    case "$shard_count" in
-        ''|*[!0-9]*|0*) echo "ERROR: bad shard '$shard' (expected i/N)"; exit 1 ;;
-    esac
-    # Confirm the string is exactly "idx/count" — catches "12" (no slash) and
-    # "1/2/3" (extra slash, where idx=1 and count=2/3 would have failed above,
-    # but this is an extra safety net).
-    if [ "$shard" != "$shard_idx/$shard_count" ]; then
-        echo "ERROR: bad shard '$shard' (expected i/N)"; exit 1
-    fi
-    if [ "$shard_idx" -lt 1 ] || [ "$shard_idx" -gt "$shard_count" ]; then
-        echo "ERROR: bad shard '$shard' (expected i/N with 1 <= i <= N)"; exit 1
-    fi
-fi
+shard_idx="$caseopt_shard_idx"
+shard_count="$caseopt_shard_count"
 
 # Phoenix starts fresh (no prior dep build); other clusters pre-build deps via
 # build.sh first, so we must preserve them and only clean MFC target staging.
@@ -60,8 +42,8 @@ if [ "$cluster" = "phoenix" ]; then
     source .github/scripts/clean-build.sh
     clean_build
 elif [ -z "$shard" ]; then
-    find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
-    find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
+    find build/staging -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
+    find build/install -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
 fi
 
 . ./mfc.sh load -c "$flag" -m g
@@ -80,8 +62,7 @@ esac
 if [ -n "$shard" ] && [ "$shard_count" -gt 1 ]; then
     shared_marker_done="build/.prebuild-shared-targets-done"
     shared_marker_failed="build/.prebuild-shared-targets-failed"
-    set -- benchmarks/*/case.py
-    first_case="$1"
+    first_case="${benchmarks[0]}"
     if [ "$shard_idx" -eq 1 ]; then
         # Remove both markers at the start so reruns and manual invocations
         # never observe stale state from a prior run.
@@ -110,11 +91,9 @@ if [ -n "$shard" ] && [ "$shard_count" -gt 1 ]; then
 fi
 
 idx=0
-for case in benchmarks/*/case.py; do
+for case in "${benchmarks[@]}"; do
     idx=$((idx + 1))
-    if [ -n "$shard" ] && [ $(((idx - 1) % shard_count)) -ne $((shard_idx - 1)) ]; then
-        continue
-    fi
+    caseopt_case_in_shard "$idx" || continue
     echo "=== Pre-building: $case ==="
     ./mfc.sh run "$case" --case-optimization $gpu_opts -j 8 --dry-run
 done
