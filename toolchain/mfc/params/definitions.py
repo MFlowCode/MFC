@@ -683,6 +683,7 @@ def _load():
     _r("amr_max_blocks", INT)
     _r("amr_max_level", INT)
     _r("amr_cluster_eff", REAL)
+    _r("ref_ratio", INT)
     _r("hybrid_weno_eps", REAL, {"output"})
     _r("hybrid_smooth_flux", INT, {"output"})
     _r("partition_tile_size", INT, {"output"})
@@ -1400,6 +1401,7 @@ _nv(
     "amr_max_blocks",
     "amr_max_level",
     "amr_cluster_eff",
+    "ref_ratio",
     "alf_factor",
     "num_igr_iters",
     "num_igr_warm_start_iters",

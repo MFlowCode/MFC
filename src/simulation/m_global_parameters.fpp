@@ -509,6 +509,7 @@ contains
         amr_max_blocks = 4
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
+        ref_ratio = 2
         hybrid_smooth_flux = 2
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.
