@@ -51,6 +51,10 @@ APPLY=1 FORCE=1 $R rebalance-runners  # move busy runners too
 # Restart all runners in place (e.g. after a node reboot)
 APPLY=1 $R restart-all
 
+# Find and remove duplicate listeners (same runner on two nodes)
+$R dedupe-runners                # dry run
+APPLY=1 $R dedupe-runners       # execute
+
 # Restart one specific runner
 $R restart-runner login01 /path/to/runner-dir
 
@@ -95,3 +99,16 @@ to GitHub. Run `rebalance-runners` to recover and redistribute all at once.
 lag. `rebalance-runners` uses EXE-based process discovery first: if a
 process is found running, it will stop it before restarting, preventing
 duplicate runner processes.
+
+**Jobs fail with `The file '.../_diag/pages/....log' already exists` or get
+cancelled seconds after starting** — the same runner is listening on two login
+nodes at once (a duplicate). Because binaries live on shared storage, the two
+processes share one `_diag/` directory and fight over the single GitHub
+registration, which cancels in-progress jobs. This can happen if a move/restart
+runs while SSH to the login nodes is being throttled. Fix it with:
+```bash
+APPLY=1 bash misc/runners/runner.sh frontier dedupe-runners
+```
+`list-runners` also flags duplicates in the NODE column. Under normal SSH
+conditions the tooling avoids creating them: a runner whose location cannot be
+confirmed (SSH failure) is skipped rather than restarted elsewhere.

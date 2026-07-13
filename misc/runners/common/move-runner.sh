@@ -44,6 +44,12 @@ declare -f sync_runner_nodes > /dev/null 2>&1 && {
 echo "==> Locating $RUNNER_NAME..."
 current_node=$(find_node "$runner_dir")
 
+if [ "$current_node" = "unknown" ]; then
+    echo "ERROR: could not determine where $RUNNER_NAME is running (SSH failures to" >&2
+    echo "       one or more nodes). Moving now risks a duplicate listener. Try again." >&2
+    exit 1
+fi
+
 if [ "$current_node" = "$TARGET_NODE" ]; then
     echo "==> $RUNNER_NAME is already running on $TARGET_NODE. Nothing to do."
     exit 0

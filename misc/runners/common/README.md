@@ -13,7 +13,7 @@ bash misc/runners/runner.sh <site> <command> [args...]
 
 | Script | Purpose |
 |---|---|
-| `runner-lib.sh` | Shared library: GitHub API helpers, EXE-based process discovery, parallel node sweep, start/stop primitives. Sourced by site `config.sh` files. |
+| `runner-lib.sh` | Shared library: GitHub API helpers, EXE-based process discovery, parallel node sweep, start/stop primitives. Sourced by site `config.sh` files. Process discovery distinguishes an unreachable node (SSH failure) from "no runner here" so callers can fail safe instead of restarting a runner that is actually still running elsewhere. |
 | `check-runners.sh` | Per-node health check: Runner.Listener processes with name, idle/BUSY, slurm PATH, RSS. Optional cgroup memory footer. |
 | `list-runners.sh` | Full table: GitHub API status × parallel node sweep. Shows slurm status, flags stale `runner.node`. |
 | `rebalance-runners.sh` | Compute optimal distribution and move runners across nodes. Handles offline runners. Writes `runner.node`. Dry run by default. |
@@ -21,5 +21,6 @@ bash misc/runners/runner.sh <site> <command> [args...]
 | `restart-all.sh` | Restart all runners in place. Skips busy unless `FORCE=1`. Dry run by default. |
 | `move-runner.sh` | Move a runner to a different login node by name. Stops on current node, starts on target. Writes `runner.node`. |
 | `stop-runner.sh` | Stop a runner process and remove its GitHub registration. |
+| `dedupe-runners.sh` | Find runners listening on more than one node (a duplicate created by a botched move/restart) and stop the extra listeners, keeping one. Prefers the busy listener, then the `runner.node` one. Dry run by default. |
 | `rerun-failed.sh` | Rerun failed GitHub Actions workflows on open non-draft PRs and master. Dry run by default. |
 | `create-runner.sh` | Download, register, and start a new runner. Requires `runner_install_dir()` and `TARBALL_CACHE_DIR` from site config. Usage: `create-runner <name> <node> [install-dir]` |
