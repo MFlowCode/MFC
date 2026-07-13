@@ -167,7 +167,7 @@ contains
         ! manual: patch_ib (sim member subset differs from pre; uses count=3, adds mass/moving_ibm)
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', 'length_z', &
-                & 'x_centroid', 'y_centroid', 'z_centroid', 'slip', 'mass']
+                & 'x_centroid', 'y_centroid', 'z_centroid', 'slip', 'mass', 'v_blow']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             #:for VAR in ['vel', 'angular_vel', 'angles']
@@ -177,6 +177,7 @@ contains
             call MPI_BCAST(patch_ib(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%airfoil_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%inj_species, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do
 
         ! manual: ib_airfoil (kept manual alongside patch_ib)

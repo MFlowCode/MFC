@@ -665,6 +665,8 @@ contains
             patch_ib(i)%airfoil_id = 0
             patch_ib(i)%model_id = 0
             patch_ib(i)%slip = .false.
+            patch_ib(i)%v_blow = 0._wp
+            patch_ib(i)%inj_species = 0
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0

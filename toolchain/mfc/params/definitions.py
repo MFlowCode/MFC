@@ -926,9 +926,9 @@ def _load():
     # grow patch_ib beyond this at runtime, but those entries are never in the namelist.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
-    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id"]:
+    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("v_blow", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)

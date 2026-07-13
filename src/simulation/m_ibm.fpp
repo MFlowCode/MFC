@@ -252,6 +252,19 @@ contains
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
 
+                ! Injecting (burning) surface: replace the mirrored ghost composition with pure
+                ! injected fuel at the local pressure and the ambient (image-point) temperature.
+                ! Setting a consistent injected density here (rather than reusing the heavy ambient
+                ! rho) keeps the light fuel at a physical temperature and feeds the surface flame.
+                if (chemistry .and. patch_ib(patch_id)%inj_species > 0) then
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    T_IP = pres_IP*mw_IP/(alpha_rho_IP(1)*gas_constant)
+                    Ys_IP = 0._wp
+                    Ys_IP(patch_ib(patch_id)%inj_species) = 1._wp
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    alpha_rho_IP(1) = pres_IP*mw_IP/(T_IP*gas_constant)
+                end if
+
                 dyn_pres = 0._wp
 
                 ! Set q_prim_vf params at GP so that mixture vars calculated properly
@@ -328,6 +341,14 @@ contains
                             vel_g(q) = vel_g(q) + rotation_velocity(q)  ! add the rotational velocity
                         end do
                     end if
+                end if
+
+                ! Burning/injecting surface: superimpose wall-normal (outward) blowing on the
+                ! ghost velocity so the immersed surface transpires/injects gas into the flow.
+                if (patch_ib(patch_id)%v_blow > 0._wp) then
+                    norm(1:3) = gp%levelset_norm
+                    buf = sqrt(sum(norm**2))
+                    if (buf > 0._wp) vel_g = vel_g + patch_ib(patch_id)%v_blow*norm/buf
                 end if
 
                 ! Set momentum
