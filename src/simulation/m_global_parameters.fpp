@@ -309,6 +309,11 @@ module m_global_parameters
     integer, allocatable :: amr_region_lo_all(:,:), amr_region_hi_all(:,:)
     integer, allocatable :: amr_isect_lo_all(:,:), amr_isect_hi_all(:,:)
     logical, allocatable :: amr_owns_all(:)
+    !> Multi-level nesting (amr_multilevel.md): the refinement level of each active block (1..amr_max_level). A level-l block
+    !! refines a covering level-(l-1) region, so its coupling coarse side is level l-1 (L0 when l==1). amr_num_levels is the deepest
+    !! level currently populated. Both are 1 today (single fine level); the block region stays in L0 cell indices at every level.
+    integer, allocatable :: amr_block_level(:)
+    integer              :: amr_num_levels = 1
 
     !> Fine-level distribution map (fine-SFC-distribution work): SFC/work-balanced single-owner rank per active block. PHASE 1
     !! computes and reports it but does NOT apply it - the mirror decomposition (amr_owns_all) still governs ownership, so behavior
@@ -502,6 +507,7 @@ contains
         amr_buf = 3
         amr_subcycle = .false.
         amr_max_blocks = 4
+        amr_max_level = 1
         amr_cluster_eff = 0.7_wp
         hybrid_smooth_flux = 2
         partition_tile_size = 8

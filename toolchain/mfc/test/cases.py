@@ -3701,6 +3701,74 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (n3) MULTI-LEVEL STATIC IB AMR (SP22): a single fixed circular body refined to LEVEL 2. Same 2D
+        # quiescent-drift setup as (n) with dynamic regrid, but amr_max_level=2 so the body-containment
+        # cascade nests a level-2 child inside the level-1 block over the body. The body-containment margin
+        # is widened by (amr_max_level-1)*amr_cpat_mar (s_amr_expand_box_over_bodies) so the level-1 block
+        # clears the body far enough that the level-2 window CONTAINS the body plus a full IB stencil - the
+        # body SURFACE lands at the finest level and the C/F boundary sits a stencil off it, in fluid. The
+        # body is r=0.05 (~8 L0 cells) so the widened level-1 (extent 28) still fits: 2*28-1 = 55 <= 63.
+        # Conservation is NOT machine-zero here (the IB overwrites body cells, so s_amr_conservation_defect
+        # reads a bounded non-zero) - the golden field values are the correctness oracle. np=1, static body
+        # only (the checker still fails closed for np>1 and moving bodies). amr_max_blocks nests the L2 child.
+        stack.push(
+            "AMR -> 2D -> multi-level IB (static cylinder, np=1)",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-4,
+                "t_step_stop": 20,
+                "t_step_save": 20,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.1,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # static circular body at the domain center
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.05,
+                "patch_ib(1)%slip": "F",
+                # initial 2:1 fine block over the body (regrid rebuilds it from the sensor each step)
+                "amr": "T",
+                "amr_block_beg(1)": 18,
+                "amr_block_beg(2)": 18,
+                "amr_block_end(1)": 45,
+                "amr_block_end(2)": 45,
+                # dynamic regrid refining the body to level 2
+                "amr_max_level": 2,
+                "amr_max_blocks": 16,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 1.0e-4,
+                "amr_buf": 2,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         # (o) PRESCRIBED-MOTION MOVING IMMERSED BOUNDARY (SP21): a single circular body translating at a
         # prescribed velocity (moving_ibm=1) through quiescent flow, resolved on a STATIC fine block that
         # contains its whole trajectory. Each fine RK substage rebuilds the block's IB markers/ghost points
@@ -3859,6 +3927,241 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (h) multi-level (amr_max_level=2): the ONLY golden exercising a SECOND refinement level.
+        # Same 1D Sod as (a) but amr_max_level=2, so the initial block build nests a level-2 child
+        # (geometric inset) inside the level-1 block. Every coarse step the lock-step driver fills
+        # the L2 from its parent (top-down), advances all levels at the coarse dt, then restricts and
+        # total-flux refluxes bottom-up (L2->L1->L0) - the Berger-Colella C/F coupling that keeps mass
+        # and energy conserved to machine zero. np=1 only (the L2<->L1 coupling is local; cross-rank
+        # P2P is not yet implemented, and the checker prohibits amr_max_level>1 with num_procs>1).
+        # Kept STATIC (amr_regrid_int=0) on purpose: a rebuilding L2 has integer box boundaries that
+        # can flip a cell under a compiler's FP reordering -> a shifted golden; the static block fixes
+        # the hierarchy so this protects the multi-level advance/restrict/reflux path deterministically.
+        stack.push(
+            "AMR -> 1D -> multi-level static block",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (i) multi-level + dynamic regrid: (h) is a static hierarchy; this arms amr_regrid_int so the
+        # level-2 child is placed by SENSOR-ON-FINE (the density-gradient sensor run on the level-1 fine
+        # solution, coarsened + clustered into a nested child box), not a fixed inset. This is the ONLY
+        # golden protecting the sensor-on-fine child-tagging path (s_amr_tag_child_from_fine + the 3b
+        # nesting loop) and its slot-size cap. Same eps=0.1 on the same sharp Sod as the (b) single-level
+        # dynamic golden - the shock cells sit far from the threshold, so the fine tag set (and the L0-
+        # coarsened, integer-padded, window-clamped L2 box built from it) is cross-compiler stable. amr_buf
+        # is 6 (not 2): the L1 block must be wider than the amr_cpat_mar nesting margin for the L2 to be a
+        # stable MULTI-cell box - buf=2 pins it to a single cell that a one-cell tag flip would move.
+        # np=1 only (multi-level coupling is local).
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (j) multi-level + SUBCYCLE: (h) advances every level lock-step at the coarse dt; this arms
+        # amr_subcycle so each level steps at its OWN dt (L1 at dt/2, L2 at dt/4) via the recursive
+        # driver - s_amr_advance_subtree recurses into s_amr_advance_children, which subcycles each L2
+        # child within every L1 substep (two ghost-lerp sources gathered from the parent's t^n/t^{n+1}
+        # snapshots) and folds it back with a per-substep Berger-Colella reflux-to-parent. The ONLY
+        # golden protecting the recursive multi-level subcycle path. Kept STATIC (amr_regrid_int=0) for
+        # the same determinism reason as (h). np=1 only.
+        stack.push(
+            "AMR -> 1D -> multi-level subcycle",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_subcycle": "T",
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (k) multi-level + dynamic regrid + SUBCYCLE: the union of (i) and (j). (i) rebuilds the L2 by
+        # sensor-on-fine regrid but advances lock-step; (j) subcycles but keeps a static L2. This arms
+        # BOTH, so the L2 child is created/destroyed by regrid WHILE the recursive subcycle driver steps
+        # each level at its own dt. Protects the regrid x subcycle x multi-level interaction: the L1->L0
+        # fold must operate on the L1 parent (not the child slot) after the recursion returns - an
+        # argument-aliasing slip that left amr_cur on the child silently discarded the fine solution and
+        # broke conservation (drift ~1e-3 with a moving L2). Uses (i)'s robust eps=0.1/amr_buf=6 so the
+        # rebuilt L2 box is cross-compiler stable. np=1 only.
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic subcycle",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 6,
+                "amr_subcycle": "T",
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (l) multi-level at np=2: same STATIC 2-level hierarchy as (h) but run on TWO ranks. Multi-level was
+        # np=1-gated (single-rank coupling self-test); this is the FIRST golden exercising the parallel path.
+        # The refinement tower (L1 parent + its L2 child) is co-located on ONE rank (the child inherits its
+        # parent's owner), so the L1<->L2 fold stays LOCAL (bit-identical to np=1) and only the L0<->L1 coupling
+        # crosses ranks via the existing single-level P2P. Protects the owner-guards on s_amr_restrict_to_parent
+        # / s_amr_reflux_to_parent (without them the lock-step L2->parent fold dereferences a non-owner's
+        # unallocated parent slot -> SIGSEGV on rank 1). Kept STATIC (amr_regrid_int=0): cross-rank sensor-on-fine
+        # regrid nesting is still np=1 (checker-gated). Same 1D Sod as (h); deterministic across the 2-way split.
+        stack.push(
+            "AMR -> 1D -> multi-level static np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+        # (m) multi-level + dynamic regrid at np=2: (l) is a STATIC 2-level hierarchy on two ranks; this arms
+        # amr_regrid_int so the level-2 children are placed by DISTRIBUTED sensor-on-fine nesting. Each rank tags
+        # children only for the level-1 parents it owns (its local fine data), the tags are OR-reduced across ranks
+        # into one global field, and the SFC owner map keeps every child co-located with its parent (tower weight
+        # rolled onto the level-1 anchor). This is the FIRST golden exercising the cross-rank dynamic multi-level
+        # path (the distributed 3b nesting + the co-located owner reassignment as towers are created/moved). Uses
+        # (i)'s robust eps=0.1/amr_buf=6 so the rebuilt L2 box is cross-compiler stable across the 2-way split.
+        # LOCK-STEP (amr_subcycle=F): subcycle + dynamic regrid at np>1 is checker-gated (a pre-existing reflux/
+        # regrid-ordering leak, independent of level count).
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+        # (n) 2D multi-level at np=2: goldens (h)-(m) validate the multi-level hierarchy along x only; this is the FIRST
+        # golden exercising the 2D cross-rank multi-level path. A planar Sod (BASE_CFG densities as full-height y-strips)
+        # on m=63 x n=31 at ppn=2 (x-split) tiles the level-1 block into same-level sub-blocks on BOTH ranks, so the
+        # block-to-block fine-fine halo runs across the rank seam (its transverse buffer count must come from the
+        # REPLICATED region metadata, not the owner-only slot m/n/p, or a rank owning only one side of a seam sizes the
+        # buffer from an unallocated slot -> a 2D-only crash), and the self-test L2 co-locates with its parent tile.
+        # Kept STATIC (amr_regrid_int=0) for determinism, like (h)/(l).
+        amr_2d_base = {
+            "m": 63,
+            "n": 31,
+            "p": 0,
+            "dt": 4.0e-4,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
+            "bc_y%end": -3,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.05,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 0.1,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.45,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.7,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": 0.0,
+            "patch_icpp(3)%geometry": 3,
+            "patch_icpp(3)%x_centroid": 0.9,
+            "patch_icpp(3)%y_centroid": 0.5,
+            "patch_icpp(3)%length_x": 0.2,
+            "patch_icpp(3)%length_y": 1.0,
+            "patch_icpp(3)%vel(1)": 0.0,
+            "patch_icpp(3)%vel(2)": 0.0,
+            "amr": "T",
+            "amr_block_beg(1)": 16,
+            "amr_block_end(1)": 47,
+            "amr_block_beg(2)": 8,
+            "amr_block_end(2)": 23,
+        }
+        stack.push(
+            "AMR -> 2D -> multi-level static np=2",
+            {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+        # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
+        # ADJACENT same-level sub-blocks across the x rank seam (one per rank) - but amr_subcycle=T. The subcycle
+        # advances every level-1 block stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo interposed
+        # each substep (s_amr_advance_fine_subcycle_all), so the two sub-blocks compute a MATCHING shared-face flux and
+        # conserve at the seam. Before that per-substep halo the subcycle re-prolonged the seam ghosts from the coarse
+        # each substep and the adjacent fluxes disagreed - mass leaked at the seam (~1e-4). This is the ONLY golden
+        # exercising the subcycle seam halo at np>1. Single-level (amr_max_level=1); STATIC for determinism.
+        stack.push(
+            "AMR -> 2D -> single-level subcycle np=2",
+            {**amr_2d_base, "amr_regrid_int": 0, "amr_subcycle": "T", "amr_max_blocks": 16},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+        # (p) multi-level + dynamic regrid at np=2 with a WIDE level-2 feature that max_grid_size TILES: (m) uses
+        # eps=0.1 so the sensor-on-fine L2 stays a single sub-block; this uses a tiny eps=1e-4 on three sharp jumps
+        # placed INSIDE the level-1 block, so at np=2 the L2 tag exceeds amr_maxc_fit/2 and SPLITS into adjacent
+        # same-parent L2 sub-blocks. The ONLY golden exercising the level-2 fine-fine SEAM: the per-stage halo must
+        # reconcile the shared L2 ghosts using the level-aware fine extent (fine = 2**level*coarse, so an L1-frame
+        # 2*coarse mislocates the L2 seam slice and fills the ghost from the wrong cells -> ~2e-2 mass drift), AND the
+        # L2->L1 reflux must SKIP the sibling-tile seam faces (a fine-fine seam is not a c/f boundary; refluxing there
+        # double-writes -> a residual ~3e-5). Closed walls (bc=-2) make it a clean conservation problem; eps=1e-4
+        # keeps every tagged cell far from the threshold so the tag set (hence the deterministic tile boundaries) is
+        # cross-compiler stable. LOCK-STEP (amr_subcycle=F): subcycle advances L2 children per-block with no L2-L2
+        # halo, so it keeps ONE capped child (tiling that path is future work) and is unaffected here.
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid tiled L2 np=2",
+            {
+                **amr_1d_base,
+                "bc_x%beg": -2,
+                "bc_x%end": -2,
+                "patch_icpp(1)%x_centroid": 0.15,
+                "patch_icpp(1)%length_x": 0.3,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.4,
+                "patch_icpp(3)%x_centroid": 0.85,
+                "patch_icpp(3)%length_x": 0.3,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 1.0e-4,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 16,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
     amr_golden_tests()
