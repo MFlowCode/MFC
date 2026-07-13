@@ -1362,13 +1362,16 @@ contains
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
             ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), &
+                             & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
             do fj = 0, amr_slots(amr_cur)%n
                 cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), &
+                                 & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
                 do fi = 0, amr_slots(amr_cur)%m
                     ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - real(amr_slots(amr_cur)%ref_ratio - 1, &
+                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
                     u0 = real(qc%sf(ci, cj, ck), wp)
                     sx = minmod(real(qc%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc%sf(ci - 1, cj, ck), wp))
                     sy = 0._wp
@@ -1436,13 +1439,16 @@ contains
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
             ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), &
+                             & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
             do fj = 0, amr_slots(amr_cur)%n
                 cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), &
+                                 & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
                 do fi = 0, amr_slots(amr_cur)%m
                     ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - real(amr_slots(amr_cur)%ref_ratio - 1, &
+                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
                     call s_alpha_shared_switch(qc, ci, cj, ck, shx, shy, shz)
                     asum = 0._wp
                     do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
@@ -1483,13 +1489,16 @@ contains
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
             ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), &
+                             & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
             do fj = 0, amr_slots(amr_cur)%n
                 cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), &
+                                 & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
                 do fi = 0, amr_slots(amr_cur)%m
                     ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - 0.5_wp)*0.5_wp
+                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - real(amr_slots(amr_cur)%ref_ratio - 1, &
+                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
                     rsum = 0._wp
                     do i = eqn_idx%species%beg, eqn_idx%species%end
                         u0 = real(qc(i)%sf(ci, cj, ck), wp)
@@ -2870,15 +2879,15 @@ contains
                             ck = 0; xiz = 0._wp
                             if (d3) then
                                 ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                                xiz = (real(modulo(fk, rr), wp) - 0.5_wp)*0.5_wp
+                                xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                             end if
                             cj = 0; xiy = 0._wp
                             if (d2) then
                                 cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                                xiy = (real(modulo(fj, rr), wp) - 0.5_wp)*0.5_wp
+                                xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                             end if
                             ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                            xix = (real(modulo(fi, rr), wp) - 0.5_wp)*0.5_wp
+                            xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                             u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
                             sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
                                         & wp))
@@ -2919,15 +2928,15 @@ contains
                             ck = 0; xiz = 0._wp
                             if (d3) then
                                 ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                                xiz = (real(modulo(fk, rr), wp) - 0.5_wp)*0.5_wp
+                                xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                             end if
                             cj = 0; xiy = 0._wp
                             if (d2) then
                                 cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                                xiy = (real(modulo(fj, rr), wp) - 0.5_wp)*0.5_wp
+                                xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                             end if
                             ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                            xix = (real(modulo(fi, rr), wp) - 0.5_wp)*0.5_wp
+                            xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                             shx = .true.; shy = d2; shz = d3
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = advb, adve
