@@ -3923,6 +3923,17 @@ contains
             ! indices.
             box_level(1:nboxes) = 1
             if (amr_max_level >= 2) then
+                ! the nesting loop below APPENDS level-l child boxes into `boxes` (up to amr_max_blocks total). The non-IB
+                ! path already grew `boxes` to amr_max_blocks via the tiling move_alloc; the IB path (which only merges, never
+                ! grows) leaves `boxes` at the cluster count, so grow it here or the child appends overrun the allocation.
+                if (size(boxes) < amr_max_blocks) then
+                    block
+                        type(t_box), allocatable :: grown(:)
+                        allocate (grown(amr_max_blocks))
+                        grown(1:nboxes) = boxes(1:nboxes)
+                        call move_alloc(grown, boxes)
+                    end block
+                end if
                 block
                     integer                  :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
                     integer                  :: mg, ng, pg, ci, cj, ck, sidx(3)
