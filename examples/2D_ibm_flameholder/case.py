@@ -1,45 +1,57 @@
 #!/usr/bin/env python3
-# 2D immersed-boundary flame-holder geometry: a solid cylinder in a hot,
-# near-ignition H2/O2/Ar premix. IBM + chemistry with temperature-dependent
-# transport used to hang/diverge; that is now fixed in m_ibm.fpp (species and a
-# consistent energy are set at immersed-boundary points). Chemistry + diffusion
-# are on here (species transport around the cylinder + wake). Reactions are off
-# to avoid a separate explicit-chemistry ignition-stiffness issue; enable
-# chem_params%reactions with a smaller dt to attempt a wake-anchored flame.
+# 2D bluff-body flame holder: a solid cylinder (immersed boundary) injects H2 off
+# its surface into a hot O2/Ar crossflow. The freestream carries no fuel, so it
+# cannot auto-ignite; the flame anchors only where the injected H2 meets the hot
+# oxidizer -- in the recirculating wake behind the cylinder. This is the classic
+# bluff-body-stabilized (afterburner/ramjet) flame, and it exercises the IBM
+# surface-injection knobs (patch_ib%v_blow, %inj_species) together with the
+# IBM+chemistry ghost-state fix.
+import argparse
 import json
+import sys
 
 import cantera as ct
 
-ctfile = "h2o2.yaml"
-X = "H2:2,O2:1,AR:5"
-T0, P0 = 1000.0, 101325.0  # near-ignition inflow temperature, 1 atm
-u0 = 40.0  # inflow velocity [m/s]
+parser = argparse.ArgumentParser(prog="2D_ibm_flameholder")
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC toolchain state.")
+parser.add_argument("--tend", type=float, default=3.0e-4, help="Physical end time [s].")
+parser.add_argument("--res", type=float, default=1.0, help="Resolution multiplier: m=300*res, n=112*res.")
+parser.add_argument("--frames", type=int, default=80, help="Number of saved output frames.")
+args = parser.parse_args()
 
-gas = ct.Solution(ctfile)
-gas.TPX = T0, P0, X
-rho0 = gas.density
-mu0 = gas.viscosity
-c0 = gas.sound_speed
+ctfile = "h2o2.yaml"
+
+# Hot oxidizer crossflow (fills the domain, enters at bc_x%beg). No fuel -> the
+# freestream cannot burn on its own; T above the ~1100 K H2/O2 crossover so the
+# injected fuel ignites promptly on contact.
+ox = ct.Solution(ctfile)
+ox.TPX = 1200.0, 101325.0, "O2:1,AR:3"
+u_ox = 60.0  # crossflow velocity [m/s]
+c0 = ox.sound_speed
+mu0 = ox.viscosity
 
 # Domain: 8 cm x 3 cm channel, cylinder near the inlet.
 Lx, Ly = 0.08, 0.03
-m, n = 200, 75
+m = int(300 * args.res)
+n = int(112 * args.res)
 dx = Lx / m
 
 r_cyl = 0.004
-x_cyl = 0.016
+x_cyl = 0.02
 y_cyl = Ly / 2.0
+v_blow = 12.0  # wall-normal H2 injection speed off the cylinder [m/s] (gentle: strong
+#   injection drives an unstable, super-heated ignition transient that NaNs)
 
-# dt from the acoustic CFL (H2-rich mixture -> high sound speed, low Mach).
+print(f"oxidizer: T={ox.T:.1f} K rho={ox.density:.4f} c={c0:.1f} m/s", file=sys.stderr)
+
+# Acoustic CFL; small for explicit-chemistry stability (reacting hot spots need headroom).
 cfl = 0.05
-dt = cfl * dx / (u0 + c0)
-tend = 4.0e-4  # a few cylinder flow-through times (D/u0 ~ 0.2 ms)
-NT = int(tend / dt)
-NS = max(1, NT // 4)
+dt = cfl * dx / (u_ox + c0)
+NT = int(args.tend / dt)
+NS = max(1, NT // args.frames)
 
 case = {
     "run_time_info": "T",
-    # Domain
     "x_domain%beg": 0.0,
     "x_domain%end": Lx,
     "y_domain%beg": 0.0,
@@ -52,11 +64,10 @@ case = {
     "t_step_start": 0,
     "t_step_stop": NT,
     "t_step_save": NS,
-    "t_step_print": NS,
+    "t_step_print": max(1, NT // 20),
     "parallel_io": "T",
     # Algorithm
     "model_eqns": 2,
-    "alt_soundspeed": "F",
     "num_fluids": 1,
     "num_patches": 1,
     "mpp_lim": "F",
@@ -74,18 +85,18 @@ case = {
     "avg_state": "arithmetic",
     "fd_order": 2,
     "viscous": "T",
-    # BCs: characteristic inflow, extrapolation outflow, slip channel walls
+    # BCs: characteristic inflow, extrapolated outflow, slip channel walls
     "bc_x%beg": -7,
     "bc_x%end": -3,
     "bc_y%beg": -15,
     "bc_y%end": -15,
-    # Chemistry on (species transport); reactions off (see header note)
+    # Chemistry + diffusion + reactions ON (fuel/oxidizer mixing and combustion)
     "chemistry": "T",
     "chem_params%diffusion": "T",
-    "chem_params%reactions": "F",
+    "chem_params%reactions": "T",
     "cantera_file": ctfile,
     "chem_wrt_T": "T",
-    # Immersed boundary: inert solid cylinder (flame-holder)
+    # Immersed boundary: solid cylinder that injects H2 off its surface
     "ib": "T",
     "num_ibs": 1,
     "patch_ib(1)%geometry": 2,
@@ -93,30 +104,33 @@ case = {
     "patch_ib(1)%y_centroid": y_cyl,
     "patch_ib(1)%radius": r_cyl,
     "patch_ib(1)%slip": "F",
+    "patch_ib(1)%v_blow": v_blow,
+    "patch_ib(1)%inj_species": 1,  # inject pure H2
     # Output
     "format": "silo",
     "precision": "double",
     "prim_vars_wrt": "T",
     "ib_state_wrt": "T",
-    # Patch: hot H2/O2/Ar premix fills the domain
+    # Patch: hot O2/Ar oxidizer fills the domain
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": Lx / 2,
     "patch_icpp(1)%y_centroid": Ly / 2,
     "patch_icpp(1)%length_x": Lx,
     "patch_icpp(1)%length_y": Ly,
-    "patch_icpp(1)%vel(1)": u0,
+    "patch_icpp(1)%vel(1)": u_ox,
     "patch_icpp(1)%vel(2)": 0.0,
-    "patch_icpp(1)%pres": P0,
-    "patch_icpp(1)%alpha_rho(1)": rho0,
+    "patch_icpp(1)%pres": ox.P,
+    "patch_icpp(1)%alpha_rho(1)": ox.density,
     "patch_icpp(1)%alpha(1)": 1.0,
-    # Fluid EOS (calorically perfect gas matched to the mixture at T0, P0)
+    # Fluid EOS (calorically perfect closure; chemistry supplies the real thermo)
     "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": 1.0 / mu0,
 }
 
-for i in range(len(gas.Y)):
-    case[f"patch_icpp(1)%Y({i + 1})"] = float(gas.Y[i])
+for i in range(len(ox.Y)):
+    case[f"patch_icpp(1)%Y({i + 1})"] = float(ox.Y[i])
+    case[f"chem_wrt_Y({i + 1})"] = "T"
 
 if __name__ == "__main__":
     print(json.dumps(case))
