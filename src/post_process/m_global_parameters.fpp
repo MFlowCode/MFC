@@ -264,6 +264,7 @@ contains
         prim_vars_wrt = .false.
         cons_vars_wrt = .false.
         c_wrt = .false.
+        jwl_wrt = .false.
         omega_wrt = .false.
         qm_wrt = .false.
         liutex_wrt = .false.

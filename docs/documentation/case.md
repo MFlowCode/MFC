@@ -771,6 +771,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
 | `c_wrt`                 | Logical | Add the sound speed to the database	 |
+| `jwl_wrt`               | Logical | Add the JWL temperature, products mass fraction, and reaction progress to the database |
 | `omega_wrt(i)`          | Logical | Add the $i$-direction vorticity to the database	 |
 | `schlieren_wrt`         | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`                | Logical | Add the Q-criterion to the database|

@@ -28,6 +28,7 @@ module m_start_up
     use m_finite_differences
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
     use m_chemistry
+    use m_jwl, only: jwl_idx, s_jwl_mix_state_er, s_jwl_mix_energy_pr
 
 #ifdef MFC_MPI
     use mpi
@@ -181,6 +182,7 @@ contains
         character(50) :: filename
         logical       :: file_exists
         integer       :: x_beg, x_end, y_beg, y_end, z_beg, z_end
+        real(wp)      :: e_jwl, T_jwl, Y_jwl, lambda_jwl  !< JWL viz scratch (jwl_wrt)
 
         if (output_partial_domain) then
             call s_define_output_region
@@ -546,6 +548,49 @@ contains
 
             write (varname, '(A)') 'c'
             call s_write_field(varname, t_step)
+        end if
+
+        ! JWL-only viz arrays: temperature, products mass fraction, and reaction
+        ! progress, all through the closure so they match the solved pressure field.
+        if (jwl_wrt .and. jwl_idx > 0) then
+            do k = -offset_z%beg, p + offset_z%end
+                do j = -offset_y%beg, n + offset_y%end
+                    do i = -offset_x%beg, m + offset_x%end
+                        Y_jwl = min(max(q_prim_vf(jwl_idx)%sf(i, j, k)/max(rho_sf(i, j, k), sgm_eps), 0._wp), 1._wp)
+                        lambda_jwl = 1._wp
+                        if (jwl_reactive) lambda_jwl = min(max(q_prim_vf(eqn_idx%rxn)%sf(i, j, k), 0._wp), 1._wp)
+                        ! Invert the closure-consistent pressure to e, then read T off the same closure.
+                        call s_jwl_mix_energy_pr(rho_sf(i, j, k), q_prim_vf(eqn_idx%E)%sf(i, j, k), Y_jwl, jwl_idx, e_jwl, &
+                                                 & lambda=lambda_jwl)
+                        call s_jwl_mix_state_er(rho_sf(i, j, k), e_jwl, Y_jwl, jwl_idx, pres, T_jwl, lambda=lambda_jwl)
+                        out%q_sf(i, j, k) = T_jwl
+                    end do
+                end do
+            end do
+            write (varname, '(A)') 'T'
+            call s_write_field(varname, t_step)
+
+            do k = -offset_z%beg, p + offset_z%end
+                do j = -offset_y%beg, n + offset_y%end
+                    do i = -offset_x%beg, m + offset_x%end
+                        out%q_sf(i, j, k) = min(max(q_prim_vf(jwl_idx)%sf(i, j, k)/max(rho_sf(i, j, k), sgm_eps), 0._wp), 1._wp)
+                    end do
+                end do
+            end do
+            write (varname, '(A)') 'Y_products'
+            call s_write_field(varname, t_step)
+
+            if (jwl_reactive) then
+                do k = -offset_z%beg, p + offset_z%end
+                    do j = -offset_y%beg, n + offset_y%end
+                        do i = -offset_x%beg, m + offset_x%end
+                            out%q_sf(i, j, k) = min(max(q_prim_vf(eqn_idx%rxn)%sf(i, j, k), 0._wp), 1._wp)
+                        end do
+                    end do
+                end do
+                write (varname, '(A)') 'lambda'
+                call s_write_field(varname, t_step)
+            end if
         end if
 
         do i = 1, 3

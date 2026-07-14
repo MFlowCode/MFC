@@ -682,6 +682,7 @@ def _load():
         "qm_wrt",
         "liutex_wrt",
         "cf_wrt",
+        "jwl_wrt",
         "sim_data",
         "output_partial_domain",
     ]:
@@ -1455,6 +1456,7 @@ _nv(
     "E_wrt",
     "pres_wrt",
     "c_wrt",
+    "jwl_wrt",
     "gamma_wrt",
     "heat_ratio_wrt",
     "pi_inf_wrt",
