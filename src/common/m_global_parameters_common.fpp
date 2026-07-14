@@ -415,6 +415,13 @@ contains
         cont_damage = .false.
         hyper_cleaning = .false.
 
+        ! Condensed-phase reactive burn
+        reactive_burn = .false.
+        rburn_k = dflt_real
+        rburn_pign = dflt_real
+        rburn_pref = dflt_real
+        rburn_n = dflt_real
+
         ! Case-optimization params: under case-opt these are compile-time constants in sim (skip assignment); in pre/post
         ! MFC_CASE_OPTIMIZATION is always False so the block always executes there.
         #:if not MFC_CASE_OPTIMIZATION

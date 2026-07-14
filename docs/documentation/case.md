@@ -1129,8 +1129,15 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | `tau_star`        | Real    | Threshold stress for continuum damage model         |
 | `cont_damage_s`   | Real    | Power `s` for continuum damage model                |
 | `alpha_bar`       | Real    | Damage factor (rate) for continuum damage model     |
+| `reactive_burn`   | Logical | Enable condensed-phase reactive burn                |
+| `rburn_k`         | Real    | Reactive-burn rate coefficient [1/s]                |
+| `rburn_pign`      | Real    | Reactive-burn ignition pressure threshold [Pa]      |
+| `rburn_pref`      | Real    | Reactive-burn reference pressure for the drive [Pa] |
+| `rburn_n`         | Real    | Reactive-burn pressure-drive exponent               |
 
 - `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) (\cite Cao19).
+
+- `reactive_burn` converts a "reactant" fluid into a "product" fluid (`num_fluids >= 2`, ``chemistry = 'F'``) via a programmed pressure burn `dlambda/dt = rburn_k (1 - lambda) ((p - rburn_pign)/rburn_pref)^rburn_n`. The two fluids share the same `gamma`/`pi_inf` and differ only in `qv`, so the conversion releases `qv` through the mixture EOS — a reactive-Euler/ZND detonation model on the diffuse-interface framework.
 
 ### 16. Cylindrical Coordinates
 

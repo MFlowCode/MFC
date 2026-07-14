@@ -22,6 +22,7 @@
             "m_viscous",
             "m_hb_function",
             "m_surface_tension",
+            "m_reactive_burn",
             "m_bubbles",
             "m_bubbles_EE",
             "m_bubbles_EL",
