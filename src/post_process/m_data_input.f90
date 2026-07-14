@@ -565,27 +565,27 @@ contains
 
     end subroutine s_finalize_data_input_module
 
-    !> Reconstruct level-1 fine cell boundaries fcb(-1:nfine) by bisecting the coarse cells of pcb, starting at this rank's LOCAL
-    !! coarse index lo_local. Mirrors s_build_level_coords (m_amr) but keeps only the boundaries needed by the mesh.
-    pure subroutine s_amr_reconstruct_fine_cb(pcb, pcb_lb, lo_local, nfine, fcb)
+    !> Reconstruct fine cell boundaries fcb(-1:nfine) by rr-way subdivision of the coarse cells of pcb, starting at this rank's
+    !! LOCAL coarse index lo_local. Mirrors s_build_level_coords (m_amr) but keeps only the boundaries needed by the mesh. At rr=2
+    !! the result is bit-identical to the original bisection (kk=0 gives the old midpoint; kk=1 gives xr; fcb(-1)=xl).
+    pure subroutine s_amr_reconstruct_fine_cb(pcb, pcb_lb, lo_local, nfine, rr, fcb)
 
         real(wp), intent(in)                 :: pcb(:)
-        integer, intent(in)                  :: pcb_lb, lo_local, nfine
+        integer, intent(in)                  :: pcb_lb, lo_local, nfine, rr
         real(wp), allocatable, intent(inout) :: fcb(:)
-        integer                              :: fi, c, off
-        real(wp)                             :: xl, xr, xm
+        integer                              :: fi, c, off, kk
+        real(wp)                             :: xl, xr
 
         off = 1 - pcb_lb  ! pcb(j) = coarse_cb(j + pcb_lb - 1); coarse_cb(c) = pcb(c + off)
+        fcb(-1) = pcb(lo_local - 1 + off)  ! left boundary of the fine region
         do fi = 0, nfine
-            c = lo_local + fi/2
-            xl = pcb(c - 1 + off)
-            xr = pcb(c + off)
-            xm = 0.5_wp*(xl + xr)
-            if (mod(fi, 2) == 0) then
-                fcb(fi - 1) = xl
-                fcb(fi) = xm
+            c = lo_local + fi/rr
+            xl = pcb(c - 1 + off); xr = pcb(c + off)
+            kk = mod(fi, rr)
+            if (kk == rr - 1) then
+                fcb(fi) = xr  ! coarse-cell right edge (exact)
             else
-                fcb(fi) = xr
+                fcb(fi) = (real(rr - 1 - kk, wp)*xl + real(kk + 1, wp)*xr)/real(rr, wp)
             end if
         end do
 
@@ -593,10 +593,10 @@ contains
 
     !> Populate block slot `k` metadata, allocate its conservative fields, and reconstruct its fine coordinates from the coarse cell
     !! boundaries (x_cb/y_cb/z_cb, already read for this t_step). isect_lo is the block's global coarse origin; sidx is this rank's
-    !! global coarse origin (0 for a single-rank/no-MPI run).
-    impure subroutine s_setup_amr_block(k, reg, isect_lo, sidx, fm, fn, fp)
+    !! global coarse origin (0 for a single-rank/no-MPI run). rr is the refinement factor for this block (ref_ratio**level).
+    impure subroutine s_setup_amr_block(k, reg, isect_lo, sidx, fm, fn, fp, rr)
 
-        integer, intent(in) :: k, reg(6), isect_lo(3), sidx(3), fm, fn, fp
+        integer, intent(in) :: k, reg(6), isect_lo(3), sidx(3), fm, fn, fp, rr
         integer             :: i
 
         amr_fine(k)%lo = reg(1:3)
@@ -609,16 +609,16 @@ contains
         end do
 
         ! isect_lo is GLOBAL; sidx is this rank's global origin (0 for a single-rank/no-MPI run), so
-        ! isect_lo - sidx is the LOCAL coarse index whose x_cb slice the bisection reads.
+        ! isect_lo - sidx is the LOCAL coarse index whose x_cb slice the rr-way subdivision reads.
         allocate (amr_fine(k)%x_cb(-1:fm))
-        call s_amr_reconstruct_fine_cb(x_cb, lbound(x_cb, 1), isect_lo(1) - sidx(1), fm, amr_fine(k)%x_cb)
+        call s_amr_reconstruct_fine_cb(x_cb, lbound(x_cb, 1), isect_lo(1) - sidx(1), fm, rr, amr_fine(k)%x_cb)
         if (n > 0) then
             allocate (amr_fine(k)%y_cb(-1:fn))
-            call s_amr_reconstruct_fine_cb(y_cb, lbound(y_cb, 1), isect_lo(2) - sidx(2), fn, amr_fine(k)%y_cb)
+            call s_amr_reconstruct_fine_cb(y_cb, lbound(y_cb, 1), isect_lo(2) - sidx(2), fn, rr, amr_fine(k)%y_cb)
         end if
         if (p > 0) then
             allocate (amr_fine(k)%z_cb(-1:fp))
-            call s_amr_reconstruct_fine_cb(z_cb, lbound(z_cb, 1), isect_lo(3) - sidx(3), fp, amr_fine(k)%z_cb)
+            call s_amr_reconstruct_fine_cb(z_cb, lbound(z_cb, 1), isect_lo(3) - sidx(3), fp, rr, amr_fine(k)%z_cb)
         end if
 
     end subroutine s_setup_amr_block
@@ -631,7 +631,7 @@ contains
         character(LEN=path_len + 3*name_len) :: file_loc
         logical                              :: file_exist
         integer                              :: k, i, nblk, ghdr(3), reg(6), rm, rn, rp
-        integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d
+        integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d, rr
         integer                              :: have_loc, have_glb
         logical                              :: owns
 
@@ -705,14 +705,12 @@ contains
                 if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
                 if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
                 if (.not. owns) cycle  ! writer emitted no data record for a block this rank does not own
-                fm = 2*(isect_hi(1) - isect_lo(1) + 1) - 1
-                fn = 0; fp = 0
-                if (n > 0) fn = 2*(isect_hi(2) - isect_lo(2) + 1) - 1
-                if (p > 0) fp = 2*(isect_hi(3) - isect_lo(3) + 1) - 1
-                if (fm /= rm .or. fn /= rn .or. fp /= rp) call s_mpi_abort('amr post: fine-extent mismatch vs the ' &
-                    & // 'AMR restart file (identical rank count and decomposition required). Exiting.')
+                ! Use the file's authoritative per-block fine extent (rm/rn/rp); derive rr = ref_ratio**level
+                ! from the ratio of fine cells to coarse cells (2 for L1, 4 for L2, etc.).
+                fm = rm; fn = rn; fp = rp
+                rr = (rm + 1)/max(isect_hi(1) - isect_lo(1) + 1, 1)
                 amr_num_fine = amr_num_fine + 1
-                call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp)
+                call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp, rr)
                 do i = 1, sys_size
                     read (2) amr_fine(amr_num_fine)%q_cons(i)%sf(0:fm,0:fn,0:fp)
                 end do
@@ -749,10 +747,14 @@ contains
                 owns = isect_lo(1) <= isect_hi(1)
                 if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
                 if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
-                fm = 2*max(isect_hi(1) - isect_lo(1) + 1, 0) - 1
-                fn = 0; fp = 0
-                if (n > 0) fn = 2*max(isect_hi(2) - isect_lo(2) + 1, 0) - 1
-                if (p > 0) fp = 2*max(isect_hi(3) - isect_lo(3) + 1, 0) - 1
+                ! Use the file's authoritative per-rank fine extents from wext; derive rr per block.
+                fm = 0; fn = 0; fp = 0; rr = 1
+                if (owns) then
+                    fm = wext(3*proc_rank + 1)
+                    if (n > 0) fn = wext(3*proc_rank + 2)
+                    if (p > 0) fp = wext(3*proc_rank + 3)
+                    rr = (fm + 1)/max(isect_hi(1) - isect_lo(1) + 1, 1)
+                end if
                 ! validate the writer's per-rank layout against this run's decomposition (catches a
                 ! load_balance simulation, whose weighted splits post never reproduces)
                 myext = 0
@@ -776,7 +778,7 @@ contains
                                           & status, ierr)
                 if (owns) then
                     amr_num_fine = amr_num_fine + 1
-                    call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp)
+                    call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp, rr)
                     idx = 0
                     do i = 1, sys_size
                         do fk = 0, fp
