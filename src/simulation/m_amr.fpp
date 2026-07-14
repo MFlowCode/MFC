@@ -4095,1568 +4095,1752 @@ contains
 
     end subroutine s_amr_tile_box
 
-    !> Cluster the local per-cell tag field into a LIST of separated block boxes (global level-0 cell indices), identically on every
-    !! rank. Gathers the tags into a global field (allreduce MAX), runs Berger-Rigoutsos recursive bisection until each box's tag
-    !! efficiency reaches amr_cluster_eff (or it is atomic / the amr_max_blocks cap is reached), then merges any two boxes whose
-    !! amr_buf-padded extents come within buff_size (guaranteeing no fine-fine adjacency: separated boxes stay >= buff_size apart,
-    !! nearby ones collapse to a single box == the legacy bounding box). Boxes are the raw tagged extents; the caller pads, clamps
-    !! and size-caps each one.
-    impure subroutine s_amr_cluster(tag_grid, boxes, nboxes)
+    !> Rank-invariant SPARSE union of the level-clustering tag field (SP7a): all-gathers each rank's tagged-cell global linear
+    !! indices and ORs them into gtag, replacing an O(global-grid) MPI_ALLREDUCE(MPI_MAX). Tags are 0/1 so the result is
+    !! byte-identical to the dense MAX; comm scales with the number of tagged cells, not the whole grid.
+    impure subroutine s_amr_union_gtag(gtag, tag_grid, mg, ng, pg, sidx)
 
-        logical, intent(in)                   :: tag_grid(0:,0:,0:)
-        type(t_box), allocatable, intent(out) :: boxes(:)
-        integer, intent(out)                  :: nboxes
-        integer, allocatable                  :: gtag(:,:,:), slo(:,:), shi(:,:), alo(:,:), ahi(:,:)
-        integer                               :: mg, ng, pg, sidx(3), ci, cj, ck, gi, gj, gk
-        integer                               :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag, vol
-        integer                               :: blo(3), bhi(3)
-        logical                               :: ok, force, capped, changed, tooclose
-        real(wp)                              :: eff
+        integer, intent(inout) :: gtag(0:,0:,0:)
+        logical, intent(in)    :: tag_grid(0:,0:,0:)
+        integer, intent(in)    :: mg, ng, pg, sidx(3)
 
 #ifdef MFC_MPI
-        integer :: ierr
-#endif
+        integer              :: ci, cj, ck, gi, gj, gk, i, jrem, nloc, ntot, ierr
+        integer, allocatable :: locidx(:), allidx(:), rcnt(:), rdsp(:)
 
-        nboxes = 0
-        mg = m_glb; ng = 0; pg = 0
-        if (n_glb > 0) ng = n_glb
-        if (p_glb > 0) pg = p_glb
-        allocate (gtag(0:mg,0:ng,0:pg)); gtag = 0
-        sidx = 0; sidx(1) = start_idx(1)
-        if (n_glb > 0) sidx(2) = start_idx(2)
-        if (p_glb > 0) sidx(3) = start_idx(3)
-        do ck = 0, p
-            do cj = 0, n
-                do ci = 0, m
-                    if (tag_grid(ci, cj, ck)) then
-                        gi = ci + sidx(1); gj = 0; gk = 0
-                        if (n_glb > 0) gj = cj + sidx(2)
-                        if (p_glb > 0) gk = ck + sidx(3)
-                        gtag(gi, gj, gk) = 1
-                    end if
-                end do
-            end do
-        end do
-#ifdef MFC_MPI
-        ! every rank ORs in its local tags => an identical global tag field, so the bisection below is rank-invariant (SP7a)
-        if (num_procs > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, gtag, (mg + 1)*(ng + 1)*(pg + 1), MPI_INTEGER, MPI_MAX, &
-            & MPI_COMM_WORLD, ierr)
-#endif
-        if (sum(gtag) == 0) then; deallocate (gtag); return; end if
-
-        cap = amr_max_blocks
-        allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
-        nwork = 1; slo(:,1) = [0, 0, 0]; shi(:,1) = [mg, ng, pg]  ! first pop trims to the global tagged bbox
-        nacc = 0; capped = .false.
-        do while (nwork > 0)
-            blo = slo(:,nwork); bhi = shi(:,nwork); nwork = nwork - 1
-            call s_amr_trim_box(gtag, blo, bhi, ok)
-            if (.not. ok) cycle
-            ntag = 0
-            do ck = blo(3), bhi(3); do cj = blo(2), bhi(2); do ci = blo(1), bhi(1)
-                ntag = ntag + gtag(ci, cj, ck)
-            end do; end do; end do
-            vol = 1
-            do d = 1, num_dims; vol = vol*(bhi(d) - blo(d) + 1); end do
-                eff = real(ntag, wp)/real(max(vol, 1), wp)
-                call s_amr_find_split(gtag, blo, bhi, sax, spos, ok)
-                force = (nacc + nwork + 1 >= cap)  ! splitting now could overflow the amr_max_blocks cap
-                if (eff >= amr_cluster_eff .or. .not. ok .or. force) then
-                    if (nacc < cap) then; nacc = nacc + 1; alo(:,nacc) = blo; ahi(:,nacc) = bhi; end if
-                    if (force .and. ok .and. eff < amr_cluster_eff) capped = .true.
-                else
-                    slo(:,nwork + 1) = blo; shi(:,nwork + 1) = bhi; shi(sax, nwork + 1) = spos - 1
-                    slo(:,nwork + 2) = blo; shi(:,nwork + 2) = bhi; slo(sax, nwork + 2) = spos
-                    nwork = nwork + 2
-                end if
-            end do
-            deallocate (gtag)
-
-            ! min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their bounding
-            ! box
-            thr = buff_size + 2*amr_buf
-            changed = .true.
-            do while (changed)
-                changed = .false.
-                outer: do i = 1, nacc - 1
-                    do j = i + 1, nacc
-                        tooclose = .true.
-                        do d = 1, num_dims
-                            if (max(alo(d, i), alo(d, j)) - min(ahi(d, i), ahi(d, j)) - 1 >= thr) tooclose = .false.
-                        end do
-                        if (tooclose) then
-                            alo(:,i) = min(alo(:,i), alo(:,j)); ahi(:,i) = max(ahi(:,i), ahi(:,j))
-                            alo(:,j) = alo(:,nacc); ahi(:,j) = ahi(:,nacc)
-                            nacc = nacc - 1; changed = .true.
-                            exit outer
-                        end if
-                    end do
-                end do outer
-            end do
-            if (capped .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tag clustering capped at amr_max_blocks = ', cap
-
-            nboxes = nacc
-            allocate (boxes(nboxes))
-            do i = 1, nboxes
-                boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
-            end do
-            deallocate (slo, shi, alo, ahi)
-
-        end subroutine s_amr_cluster
-
-        !> Regrid: tag by relative density gradient into a per-cell field, cluster (Berger-Rigoutsos + min-separation merge) into a
-        !! list of separated boxes, pad/clamp/size-cap each, and rebuild every active slot. Each new box's slot prolongs from coarse
-        !! then overwrites its overlap with whichever OLD slot(s) covered it (rank-local by construction; a split copies from one
-        !! old slot, a merge from both). Called between steps only. No-op if nothing is tagged or the box set is unchanged.
-        impure subroutine s_amr_regrid(q_cons_base)
-
-            type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-            logical, allocatable                                   :: tag_grid(:,:,:)
-            type(t_box), allocatable                               :: boxes(:)
-            integer                                                :: lo(3), hi(3), sh(3), old_np, k, kk
-            integer                                                :: old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks)
-            integer                                                :: old_chi(3, amr_max_blocks)
-            integer                                                :: old_owner(amr_max_blocks), old_level(amr_max_blocks)
-            logical                                                :: old_owns(amr_max_blocks), any_xchg, same, merged
-            integer                                                :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, i
-            integer                                                :: sidx(3), tg_lo(3), tg_hi(3), nboxes, box_level(amr_max_blocks)
-            real(wp)                                               :: r0, g
-
-            ! valid coarse CONS ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the rebuild
-            ! prolongation
-            ! reads past the new intersection (ALL ranks call: pairwise per-direction exchange; complete no-op at np=1).
-
-            call s_amr_exchange_coarse_cons_halo(q_cons_base)
-            do i = 1, sys_size
-                $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
-            end do
-
-            ! Lagrangian-cloud exclusion bbox for this regrid (collective): smearing (mapCells) +
-            ! stencil headroom (2) + drift margin until the next regrid (amr_buf)
-            if (bubbles_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
-
-            ! 1) per-cell tag field (density-gradient criterion, unchanged), skipping the two global boundary cells per active dim
-            sidx = 0
-            sidx(1) = start_idx(1)
-            if (n_glb > 0) sidx(2) = start_idx(2)
-            if (p_glb > 0) sidx(3) = start_idx(3)
-            tg_lo = 0; tg_hi = 0
-            tg_lo(1) = merge(1, 0, sidx(1) == 0); tg_hi(1) = merge(m - 1, m, sidx(1) + m == m_glb)
-            if (n_glb > 0) then; tg_lo(2) = merge(1, 0, sidx(2) == 0); tg_hi(2) = merge(n - 1, n, sidx(2) + n == n_glb); end if
-            if (p_glb > 0) then; tg_lo(3) = merge(1, 0, sidx(3) == 0); tg_hi(3) = merge(p - 1, p, sidx(3) + p == p_glb); end if
-            allocate (tag_grid(0:m,0:n,0:p)); tag_grid = .false.
-            do ck = tg_lo(3), tg_hi(3)
-                do cj = tg_lo(2), tg_hi(2)
-                    do ci = tg_lo(1), tg_hi(1)
-                        ! total density gradient (sum of the continuity variables): degenerates to the single-fluid tagger and is
-                        ! immune to trace-fluid noise. Matched-density composition-only interfaces are invisible (documented limit).
-                        r0 = max(abs(f_amr_rho_tot(q_cons_base, ci, cj, ck)), 1.e-30_wp)
-                        g = abs(f_amr_rho_tot(q_cons_base, ci + 1, cj, ck) - f_amr_rho_tot(q_cons_base, ci - 1, cj, ck))
-                        if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj + 1, ck) - f_amr_rho_tot(q_cons_base, ci, &
-                            & cj - 1, ck)))
-                        if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj, ck + 1) - f_amr_rho_tot(q_cons_base, ci, &
-                            & cj, ck - 1)))
-                        if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
-                        ! the acoustic source support stays coarse (its spatials are coarse cell
-                        ! indices): suppress tags there so the clusterer splits around the source
-                        if (acoustic_source .and. tag_grid(ci, cj, ck)) then
-                            if (f_in_acoustic_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
-                        end if
-                        ! the Lagrangian bubble cloud stays coarse (two-way coupling lives on the
-                        ! coarse grid): suppress tags over its padded bbox
-                        if (bubbles_lagrange .and. tag_grid(ci, cj, ck)) then
-                            if (f_in_lag_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
-                        end if
-                    end do
-                end do
-            end do
-
-            ! 2) cluster into a list of separated boxes (deterministic on all ranks)
-            call s_amr_cluster(tag_grid, boxes, nboxes)
-            deallocate (tag_grid)
-            if (nboxes == 0) return  ! nothing tagged on any rank; keep the current blocks
-
-            ! 3) pad + clamp + size-cap each box (amr_maxc_fit lets each box move freely across rank boundaries); drop margin-only
-            ! boxes
-            k = 0
-            do kk = 1, nboxes
-                lo = boxes(kk)%lo; hi = boxes(kk)%hi
-                lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
-                ! IB keeps the size-cap CLAMP (a body needs one contiguous block; splitting a body across tiles is untested); the
-                ! general path leaves boxes full-size and TILES them (below) into <= amr_maxc_fit sub-blocks with a fine-fine halo
-                if (ib .and. hi(1) - lo(1) + 1 > amr_maxc_fit(1)) hi(1) = lo(1) + amr_maxc_fit(1) - 1
-                if (n_glb > 0) then
-                    lo(2) = max(lo(2) - amr_buf, buff_size); hi(2) = min(hi(2) + amr_buf, n_glb - buff_size)
-                    if (ib .and. hi(2) - lo(2) + 1 > amr_maxc_fit(2)) hi(2) = lo(2) + amr_maxc_fit(2) - 1
-                else
-                    lo(2) = 0; hi(2) = 0
-                end if
-                if (p_glb > 0) then
-                    lo(3) = max(lo(3) - amr_buf, buff_size); hi(3) = min(hi(3) + amr_buf, p_glb - buff_size)
-                    if (ib .and. hi(3) - lo(3) + 1 > amr_maxc_fit(3)) hi(3) = lo(3) + amr_maxc_fit(3) - 1
-                else
-                    lo(3) = 0; hi(3) = 0
-                end if
-                ! keep candidate boxes clear of every acoustic source support (the source acts on the
-                ! coarse grid only); clipping only shrinks, so boxes stay disjoint - empties drop below
-                if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
-                if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
-                ! active_box: boxes stay strictly inside the active window (the windowed coarse
-                ! update would drop reflux corrections at faces outside it). Tags cannot arise
-                ! outside (frozen-ambient exterior), so only the amr_buf padding is ever cut -
-                ! and the cut cells are ambient. np=1 only (ab_active is false under MPI).
-                if (ab_active) then
-                    lo(1) = max(lo(1), ab_x%beg + 1); hi(1) = min(hi(1), ab_x%end - 1)
-                    if (n_glb > 0) then; lo(2) = max(lo(2), ab_y%beg + 1); hi(2) = min(hi(2), ab_y%end - 1); end if
-                    if (p_glb > 0) then; lo(3) = max(lo(3), ab_z%beg + 1); hi(3) = min(hi(3), ab_z%end - 1); end if
-                end if
-                ! a fine block that PARTIALLY covers an immersed body is an untested regime (ghost
-                ! prolongation through body-interior cells, refluxing across the body): any box that
-                ! overlaps a body's bounding box is expanded to contain the whole body plus margin
-                if (ib) call s_amr_expand_box_over_bodies(lo, hi)
-                if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) cycle  ! confined to the domain margin
-                k = k + 1; boxes(k)%lo = lo; boxes(k)%hi = hi
-            end do
-            nboxes = k
-            if (nboxes == 0) return
-
-            ! max_grid_size tiling (non-IB): split any box larger than amr_maxc_fit into contiguous <= amr_maxc_fit sub-blocks so a
-            ! whole block fits a rank's local solver scratch. Tiles are adjacent; the block-to-block fine-fine halo (s_amr_fine_
-            ! fine_halo) makes the seams conservative and the reflux skips fine-fine faces. (IB keeps the clamp - see above.)
-            if (.not. ib) then
-                block
-                    type(t_box), allocatable :: tiled(:)
-                    integer                  :: kk2, ntl, capt
-                    allocate (tiled(amr_max_blocks))
-                    ntl = 0; capt = 0
-                    do kk2 = 1, nboxes
-                        call s_amr_tile_box(boxes(kk2)%lo, boxes(kk2)%hi, tiled, ntl, amr_max_blocks, capt)
-                    end do
-                    if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', &
-                        & amr_max_blocks
-                    deallocate (boxes); call move_alloc(tiled, boxes)
-                    nboxes = ntl
-                end block
+        allocate (locidx((m + 1)*(n + 1)*(p + 1)), rcnt(num_procs), rdsp(num_procs))
+        nloc = 0
+        do ck = 0, p; do cj = 0, n; do ci = 0, m
+            if (tag_grid(ci, cj, ck)) then
+                gi = ci + sidx(1); gj = 0; gk = 0
+                if (n_glb > 0) gj = cj + sidx(2)
+                if (p_glb > 0) gk = ck + sidx(3)
+                nloc = nloc + 1
+                locidx(nloc) = gi + (mg + 1)*(gj + (ng + 1)*gk)
             end if
+        end do; end do; end do
+        call MPI_ALLGATHER(nloc, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+        rdsp(1) = 0
+        do i = 2, num_procs; rdsp(i) = rdsp(i - 1) + rcnt(i - 1); end do
+            ntot = rdsp(num_procs) + rcnt(num_procs)
+            allocate (allidx(max(ntot, 1)))
+            call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER, allidx, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            do i = 1, ntot
+                gk = allidx(i)/((mg + 1)*(ng + 1))
+                jrem = allidx(i) - gk*(mg + 1)*(ng + 1)
+                gj = jrem/(mg + 1)
+                gi = jrem - gj*(mg + 1)
+                gtag(gi, gj, gk) = 1
+            end do
+            deallocate (locidx, rcnt, rdsp, allidx)
+#endif
 
-            if (ib) then
-                ! body-containment expansion can make boxes overlap (bisection guaranteed disjoint
-                ! boxes; two boxes near one body both grow over it): merge overlapping pairs to a
-                ! bounding box until none remain - overlapping blocks would double-restrict/reflux
-                merged = .true.
-                do while (merged)
-                    merged = .false.
-                    outer: do k = 1, nboxes - 1
-                        do kk = k + 1, nboxes
-                            if (boxes(k)%lo(1) <= boxes(kk)%hi(1) .and. boxes(k)%hi(1) >= boxes(kk)%lo(1) .and. (n_glb == 0 &
-                                & .or. (boxes(k)%lo(2) <= boxes(kk)%hi(2) .and. boxes(k)%hi(2) >= boxes(kk)%lo(2))) &
-                                & .and. (p_glb == 0 .or. (boxes(k)%lo(3) <= boxes(kk)%hi(3) .and. boxes(k)%hi(3) &
-                                & >= boxes(kk)%lo(3)))) then
-                                boxes(k)%lo = min(boxes(k)%lo, boxes(kk)%lo)
-                                boxes(k)%hi = max(boxes(k)%hi, boxes(kk)%hi)
-                                boxes(kk) = boxes(nboxes); nboxes = nboxes - 1
-                                if (boxes(k)%hi(1) - boxes(k)%lo(1) + 1 > amr_maxc_fit(1) .or. (n_glb > 0 .and. boxes(k)%hi(2) &
-                                    & - boxes(k)%lo(2) + 1 > amr_maxc_fit(2)) .or. (p_glb > 0 .and. boxes(k)%hi(3) &
-                                    & - boxes(k)%lo(3) + 1 > amr_maxc_fit(3))) then
-                                    call s_mpi_abort('amr regrid: merging body-containing blocks exceeds ' &
-                                                     & // 'the per-rank block size cap')
-                                end if
-                                merged = .true.
-                                exit outer
+        end subroutine s_amr_union_gtag
+
+        !> Sparse-union sibling of s_amr_union_gtag for the multi-level child-nesting tag field: unions only the child window
+        !! [mlo:mhi] (where the fine-sensor / IB tags live), replacing the O(global-grid) MPI_ALLREDUCE(MPI_LOR). Byte-identical.
+        impure subroutine s_amr_union_gctag(gctag, mg, ng, pg, mlo, mhi)
+
+            logical, intent(inout) :: gctag(0:,0:,0:)
+            integer, intent(in)    :: mg, ng, pg, mlo(3), mhi(3)
+
+#ifdef MFC_MPI
+            integer              :: gi, gj, gk, i, jrem, nloc, ntot, ierr, wv
+            integer, allocatable :: locidx(:), allidx(:), rcnt(:), rdsp(:)
+
+            wv = mhi(1) - mlo(1) + 1
+            if (n_glb > 0) wv = wv*(mhi(2) - mlo(2) + 1)
+            if (p_glb > 0) wv = wv*(mhi(3) - mlo(3) + 1)
+            allocate (locidx(max(wv, 1)), rcnt(num_procs), rdsp(num_procs))
+            nloc = 0
+            do gk = merge(mlo(3), 0, p_glb > 0), merge(mhi(3), 0, p_glb > 0)
+                do gj = merge(mlo(2), 0, n_glb > 0), merge(mhi(2), 0, n_glb > 0)
+                    do gi = mlo(1), mhi(1)
+                        if (gctag(gi, gj, gk)) then
+                            nloc = nloc + 1
+                            locidx(nloc) = gi + (mg + 1)*(gj + (ng + 1)*gk)
+                        end if
+                    end do
+                end do
+            end do
+            call MPI_ALLGATHER(nloc, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            rdsp(1) = 0
+            do i = 2, num_procs; rdsp(i) = rdsp(i - 1) + rcnt(i - 1); end do
+                ntot = rdsp(num_procs) + rcnt(num_procs)
+                allocate (allidx(max(ntot, 1)))
+                call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER, allidx, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                do i = 1, ntot
+                    gk = allidx(i)/((mg + 1)*(ng + 1))
+                    jrem = allidx(i) - gk*(mg + 1)*(ng + 1)
+                    gj = jrem/(mg + 1)
+                    gi = jrem - gj*(mg + 1)
+                    gctag(gi, gj, gk) = .true.
+                end do
+                deallocate (locidx, rcnt, rdsp, allidx)
+#endif
+
+            end subroutine s_amr_union_gctag
+
+            !> Cluster the local per-cell tag field into a LIST of separated block boxes (global level-0 cell indices), identically
+            !! on every rank. Gathers the tags into a global field (allreduce MAX), runs Berger-Rigoutsos recursive bisection until
+            !! each box's tag efficiency reaches amr_cluster_eff (or it is atomic / the amr_max_blocks cap is reached), then merges
+            !! any two boxes whose amr_buf-padded extents come within buff_size (guaranteeing no fine-fine adjacency: separated
+            !! boxes stay >= buff_size apart, nearby ones collapse to a single box == the legacy bounding box). Boxes are the raw
+            !! tagged extents; the caller pads, clamps and size-caps each one.
+            impure subroutine s_amr_cluster(tag_grid, boxes, nboxes)
+
+                logical, intent(in)                   :: tag_grid(0:,0:,0:)
+                type(t_box), allocatable, intent(out) :: boxes(:)
+                integer, intent(out)                  :: nboxes
+                integer, allocatable                  :: gtag(:,:,:), slo(:,:), shi(:,:), alo(:,:), ahi(:,:)
+                integer                               :: mg, ng, pg, sidx(3), ci, cj, ck, gi, gj, gk
+                integer                               :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag, vol
+                integer                               :: blo(3), bhi(3)
+                logical                               :: ok, force, capped, changed, tooclose
+                real(wp)                              :: eff
+
+#ifdef MFC_MPI
+                integer :: ierr
+#endif
+
+                nboxes = 0
+                mg = m_glb; ng = 0; pg = 0
+                if (n_glb > 0) ng = n_glb
+                if (p_glb > 0) pg = p_glb
+                allocate (gtag(0:mg,0:ng,0:pg)); gtag = 0
+                sidx = 0; sidx(1) = start_idx(1)
+                if (n_glb > 0) sidx(2) = start_idx(2)
+                if (p_glb > 0) sidx(3) = start_idx(3)
+                do ck = 0, p
+                    do cj = 0, n
+                        do ci = 0, m
+                            if (tag_grid(ci, cj, ck)) then
+                                gi = ci + sidx(1); gj = 0; gk = 0
+                                if (n_glb > 0) gj = cj + sidx(2)
+                                if (p_glb > 0) gk = ck + sidx(3)
+                                gtag(gi, gj, gk) = 1
                             end if
                         end do
-                    end do outer
+                    end do
                 end do
-                ! the expansion may also have grown a box onto an acoustic source support or the
-                ! Lagrangian cloud: the constraints (contain the body, exclude the source/cloud)
-                ! cannot both hold - fail closed
-                if (acoustic_source .or. (bubbles_lagrange .and. lag_supp_on)) then
-                    do k = 1, nboxes
-                        lo = boxes(k)%lo; hi = boxes(k)%hi
+#ifdef MFC_MPI
+                ! every rank ORs in its local tags => an identical global tag field, so the bisection below is rank-invariant (SP7a)
+                if (num_procs > 1) call s_amr_union_gtag(gtag, tag_grid, mg, ng, pg, sidx)
+#endif
+                if (sum(gtag) == 0) then; deallocate (gtag); return; end if
+
+                cap = amr_max_blocks
+                allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
+                nwork = 1; slo(:,1) = [0, 0, 0]; shi(:,1) = [mg, ng, pg]  ! first pop trims to the global tagged bbox
+                nacc = 0; capped = .false.
+                do while (nwork > 0)
+                    blo = slo(:,nwork); bhi = shi(:,nwork); nwork = nwork - 1
+                    call s_amr_trim_box(gtag, blo, bhi, ok)
+                    if (.not. ok) cycle
+                    ntag = 0
+                    do ck = blo(3), bhi(3); do cj = blo(2), bhi(2); do ci = blo(1), bhi(1)
+                        ntag = ntag + gtag(ci, cj, ck)
+                    end do; end do; end do
+                    vol = 1
+                    do d = 1, num_dims; vol = vol*(bhi(d) - blo(d) + 1); end do
+                        eff = real(ntag, wp)/real(max(vol, 1), wp)
+                        call s_amr_find_split(gtag, blo, bhi, sax, spos, ok)
+                        force = (nacc + nwork + 1 >= cap)  ! splitting now could overflow the amr_max_blocks cap
+                        if (eff >= amr_cluster_eff .or. .not. ok .or. force) then
+                            if (nacc < cap) then; nacc = nacc + 1; alo(:,nacc) = blo; ahi(:,nacc) = bhi; end if
+                            if (force .and. ok .and. eff < amr_cluster_eff) capped = .true.
+                        else
+                            slo(:,nwork + 1) = blo; shi(:,nwork + 1) = bhi; shi(sax, nwork + 1) = spos - 1
+                            slo(:,nwork + 2) = blo; shi(:,nwork + 2) = bhi; slo(sax, nwork + 2) = spos
+                            nwork = nwork + 2
+                        end if
+                    end do
+                    deallocate (gtag)
+
+                    ! min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their
+                    ! bounding
+                    ! box
+                    thr = buff_size + 2*amr_buf
+                    changed = .true.
+                    do while (changed)
+                        changed = .false.
+                        outer: do i = 1, nacc - 1
+                            do j = i + 1, nacc
+                                tooclose = .true.
+                                do d = 1, num_dims
+                                    if (max(alo(d, i), alo(d, j)) - min(ahi(d, i), ahi(d, j)) - 1 >= thr) tooclose = .false.
+                                end do
+                                if (tooclose) then
+                                    alo(:,i) = min(alo(:,i), alo(:,j)); ahi(:,i) = max(ahi(:,i), ahi(:,j))
+                                    alo(:,j) = alo(:,nacc); ahi(:,j) = ahi(:,nacc)
+                                    nacc = nacc - 1; changed = .true.
+                                    exit outer
+                                end if
+                            end do
+                        end do outer
+                    end do
+                    if (capped .and. proc_rank == 0) print '(A,I0)', &
+                        & ' [amr] WARNING: tag clustering capped at amr_max_blocks = ', cap
+
+                    nboxes = nacc
+                    allocate (boxes(nboxes))
+                    do i = 1, nboxes
+                        boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
+                    end do
+                    deallocate (slo, shi, alo, ahi)
+
+                end subroutine s_amr_cluster
+
+                !> Regrid: tag by relative density gradient into a per-cell field, cluster (Berger-Rigoutsos + min-separation merge)
+                !! into a list of separated boxes, pad/clamp/size-cap each, and rebuild every active slot. Each new box's slot
+                !! prolongs from coarse then overwrites its overlap with whichever OLD slot(s) covered it (rank-local by
+                !! construction; a split copies from one old slot, a merge from both). Called between steps only. No-op if nothing
+                !! is tagged or the box set is unchanged.
+                impure subroutine s_amr_regrid(q_cons_base)
+
+                    type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
+                    logical, allocatable :: tag_grid(:,:,:)
+                    type(t_box), allocatable :: boxes(:)
+                    integer :: lo(3), hi(3), sh(3), old_np, k, kk
+                    integer :: old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks)
+                    integer :: old_chi(3, amr_max_blocks)
+                    integer :: old_owner(amr_max_blocks), old_level(amr_max_blocks)
+                    logical :: old_owns(amr_max_blocks), any_xchg, same, merged
+                    integer :: ci, cj, ck, fi, fj, fk, ofi, ofj, ofk, i
+                    integer :: sidx(3), tg_lo(3), tg_hi(3), nboxes, box_level(amr_max_blocks)
+                    real(wp) :: r0, g
+
+                    ! valid coarse CONS ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the rebuild
+                    ! prolongation
+                    ! reads past the new intersection (ALL ranks call: pairwise per-direction exchange; complete no-op at np=1).
+
+                    call s_amr_exchange_coarse_cons_halo(q_cons_base)
+                    do i = 1, sys_size
+                        $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
+                    end do
+
+                    ! Lagrangian-cloud exclusion bbox for this regrid (collective): smearing (mapCells) +
+                    ! stencil headroom (2) + drift margin until the next regrid (amr_buf)
+                    if (bubbles_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
+
+                    ! 1) per-cell tag field (density-gradient criterion, unchanged), skipping the two global boundary cells per
+                    ! active dim
+                    sidx = 0
+                    sidx(1) = start_idx(1)
+                    if (n_glb > 0) sidx(2) = start_idx(2)
+                    if (p_glb > 0) sidx(3) = start_idx(3)
+                    tg_lo = 0; tg_hi = 0
+                    tg_lo(1) = merge(1, 0, sidx(1) == 0); tg_hi(1) = merge(m - 1, m, sidx(1) + m == m_glb)
+                    if (n_glb > 0) then; tg_lo(2) = merge(1, 0, sidx(2) == 0); tg_hi(2) = merge(n - 1, n, &
+                        & sidx(2) + n == n_glb); end if
+                    if (p_glb > 0) then; tg_lo(3) = merge(1, 0, sidx(3) == 0); tg_hi(3) = merge(p - 1, p, &
+                        & sidx(3) + p == p_glb); end if
+                    allocate (tag_grid(0:m,0:n,0:p)); tag_grid = .false.
+                    do ck = tg_lo(3), tg_hi(3)
+                        do cj = tg_lo(2), tg_hi(2)
+                            do ci = tg_lo(1), tg_hi(1)
+                                ! total density gradient (sum of the continuity variables): degenerates to the single-fluid tagger
+                                ! and is
+                                ! immune to trace-fluid noise. Matched-density composition-only interfaces are invisible (documented
+                                ! limit).
+                                r0 = max(abs(f_amr_rho_tot(q_cons_base, ci, cj, ck)), 1.e-30_wp)
+                                g = abs(f_amr_rho_tot(q_cons_base, ci + 1, cj, ck) - f_amr_rho_tot(q_cons_base, ci - 1, cj, ck))
+                                if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj + 1, &
+                                    & ck) - f_amr_rho_tot(q_cons_base, ci, cj - 1, ck)))
+                                if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj, &
+                                    & ck + 1) - f_amr_rho_tot(q_cons_base, ci, cj, ck - 1)))
+                                if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
+                                ! the acoustic source support stays coarse (its spatials are coarse cell
+                                ! indices): suppress tags there so the clusterer splits around the source
+                                if (acoustic_source .and. tag_grid(ci, cj, ck)) then
+                                    if (f_in_acoustic_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, &
+                                        & ck) = .false.
+                                end if
+                                ! the Lagrangian bubble cloud stays coarse (two-way coupling lives on the
+                                ! coarse grid): suppress tags over its padded bbox
+                                if (bubbles_lagrange .and. tag_grid(ci, cj, ck)) then
+                                    if (f_in_lag_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
+                                end if
+                            end do
+                        end do
+                    end do
+
+                    ! 2) cluster into a list of separated boxes (deterministic on all ranks)
+                    call s_amr_cluster(tag_grid, boxes, nboxes)
+                    deallocate (tag_grid)
+                    if (nboxes == 0) return  ! nothing tagged on any rank; keep the current blocks
+
+                    ! 3) pad + clamp + size-cap each box (amr_maxc_fit lets each box move freely across rank boundaries); drop
+                    ! margin-only
+                    ! boxes
+                    k = 0
+                    do kk = 1, nboxes
+                        lo = boxes(kk)%lo; hi = boxes(kk)%hi
+                        lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
+                        ! IB keeps the size-cap CLAMP (a body needs one contiguous block; splitting a body across tiles is
+                        ! untested); the
+                        ! general path leaves boxes full-size and TILES them (below) into <= amr_maxc_fit sub-blocks with a
+                        ! fine-fine halo
+                        if (ib .and. hi(1) - lo(1) + 1 > amr_maxc_fit(1)) hi(1) = lo(1) + amr_maxc_fit(1) - 1
+                        if (n_glb > 0) then
+                            lo(2) = max(lo(2) - amr_buf, buff_size); hi(2) = min(hi(2) + amr_buf, n_glb - buff_size)
+                            if (ib .and. hi(2) - lo(2) + 1 > amr_maxc_fit(2)) hi(2) = lo(2) + amr_maxc_fit(2) - 1
+                        else
+                            lo(2) = 0; hi(2) = 0
+                        end if
+                        if (p_glb > 0) then
+                            lo(3) = max(lo(3) - amr_buf, buff_size); hi(3) = min(hi(3) + amr_buf, p_glb - buff_size)
+                            if (ib .and. hi(3) - lo(3) + 1 > amr_maxc_fit(3)) hi(3) = lo(3) + amr_maxc_fit(3) - 1
+                        else
+                            lo(3) = 0; hi(3) = 0
+                        end if
+                        ! keep candidate boxes clear of every acoustic source support (the source acts on the
+                        ! coarse grid only); clipping only shrinks, so boxes stay disjoint - empties drop below
                         if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
                         if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
+                        ! active_box: boxes stay strictly inside the active window (the windowed coarse
+                        ! update would drop reflux corrections at faces outside it). Tags cannot arise
+                        ! outside (frozen-ambient exterior), so only the amr_buf padding is ever cut -
+                        ! and the cut cells are ambient. np=1 only (ab_active is false under MPI).
                         if (ab_active) then
                             lo(1) = max(lo(1), ab_x%beg + 1); hi(1) = min(hi(1), ab_x%end - 1)
                             if (n_glb > 0) then; lo(2) = max(lo(2), ab_y%beg + 1); hi(2) = min(hi(2), ab_y%end - 1); end if
                             if (p_glb > 0) then; lo(3) = max(lo(3), ab_z%beg + 1); hi(3) = min(hi(3), ab_z%end - 1); end if
                         end if
-                        if (any(lo /= boxes(k)%lo) .or. any(hi /= boxes(k)%hi)) then
-                            call s_mpi_abort('amr regrid: a block must contain an immersed body AND stay ' &
-                                             & // 'clear of an acoustic source support / Lagrangian bubble cloud - the ' &
-                                             & // 'constraints conflict; move the body, source, or cloud apart')
-                        end if
+                        ! a fine block that PARTIALLY covers an immersed body is an untested regime (ghost
+                        ! prolongation through body-interior cells, refluxing across the body): any box that
+                        ! overlaps a body's bounding box is expanded to contain the whole body plus margin
+                        if (ib) call s_amr_expand_box_over_bodies(lo, hi)
+                        if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) cycle  ! confined to the domain margin
+                        k = k + 1; boxes(k)%lo = lo; boxes(k)%hi = hi
                     end do
-                end if
-            end if
+                    nboxes = k
+                    if (nboxes == 0) return
 
-            ! 3b) multi-level nesting: hierarchically append a box at level l nested inside each level-(l-1) box, for l =
-            ! 2..amr_max_
-            ! level. Parents-first ordering (every level-(l-1) box precedes its level-l children) so the build loop fills a parent
-            ! before its child's gather-from-parent reads it. SENSOR-ON-FINE: each child's extent is the density-gradient sensor run
-            ! on the parent-level FINE solution (the still-live OLD level-(l-1) blocks, read here BEFORE the step-5 stash),
-            ! coarsened
-            ! to L0-cell granularity and clustered - so children track features inside the parent instead of a fixed centre. A
-            ! brand-new region with no old fine data falls back to a centred inset (the sensor takes over next regrid); a parent
-            ! whose
-            ! fine solution is smooth gets no child. Tagging only places boxes - conservation (restrict/reflux) is independent of
-            ! where they sit. np=1 + non-IB (multi-level distribution / IB nesting are future work). Regions stay in L0 cell
-            ! indices.
-            box_level(1:nboxes) = 1
-            if (amr_max_level >= 2) then
-                ! the nesting loop below APPENDS level-l child boxes into `boxes` (up to amr_max_blocks total). The non-IB
-                ! path already grew `boxes` to amr_max_blocks via the tiling move_alloc; the IB path (which only merges, never
-                ! grows) leaves `boxes` at the cluster count, so grow it here or the child appends overrun the allocation.
-                if (size(boxes) < amr_max_blocks) then
-                    block
-                        type(t_box), allocatable :: grown(:)
-                        allocate (grown(amr_max_blocks))
-                        grown(1:nboxes) = boxes(1:nboxes)
-                        call move_alloc(grown, boxes)
-                    end block
-                end if
-                block
-                    integer                  :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
-                    integer                  :: mg, ng, pg, ci, cj, ck, sidx(3)
-                    logical, allocatable     :: ctag(:,:,:), gctag(:,:,:)
-                    logical                  :: covered, any_tag
-                    type(t_box), allocatable :: cboxes(:)
-#ifdef MFC_MPI
-                    integer :: ierr
-#endif
-
-                    ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads amr_slots(ob)%q_cons on the
-                    ! host, but the GPU_UPDATE host that the step-5 stash does runs AFTER this nesting - so the host copy is stale
-                    ! here
-                    do ob = 1, amr_num_blocks
-                        if (.not. amr_owns_all(ob)) cycle  ! np>1: only the owner holds this old block's fine q_cons
-                        do obi = eqn_idx%cont%beg, eqn_idx%cont%end
-                            $:GPU_UPDATE(host='[amr_slots(ob)%q_cons(obi)%sf]')
-                        end do
-                    end do
-                    ! Fine-sensor tags accumulate in a GLOBAL L0 frame: at np>1 an old block is read only by its owner, but its
-                    ! tag footprint can fall in ANOTHER rank's subdomain, so the local (0:m) frame the clusterer uses cannot hold
-                    ! it. Each owner ORs its tags into gctag; an ALLREDUCE unions them; the clusterer then consumes the local slice.
-                    mg = m_glb; ng = 0; pg = 0
-                    if (n_glb > 0) ng = n_glb
-                    if (p_glb > 0) pg = p_glb
-                    sidx = 0; sidx(1) = start_idx(1)
-                    if (n_glb > 0) sidx(2) = start_idx(2)
-                    if (p_glb > 0) sidx(3) = start_idx(3)
-                    allocate (ctag(0:m,0:n,0:p), gctag(0:mg,0:ng,0:pg))
-
-                    plo = 1; phi = nboxes  ! [plo:phi] = the boxes at the previous level (lev-1) to nest inside
-                    do lev = 2, amr_max_level
-                        newlo = nboxes + 1
-                        do kb = plo, phi
-                            if (nboxes + 1 > amr_max_blocks) exit  ! pool full - stop nesting
-                            ! nesting window: children keep an amr_cpat_mar margin from the parent boundary so their ghost
-                            ! prolongation reads valid parent interior cells
-                            mlo = boxes(kb)%lo; mhi = boxes(kb)%hi
-                            mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
-                            if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
-                            if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
-                            if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
-                            if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
-                            if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
-
-                            ! sensor-on-fine: tag from every OLD level-(lev-1) block overlapping this parent window (amr_block_level
-                            ! still holds the old levels here - it is reset to box_level at step 5b, below)
-                            gctag = .false.; covered = .false.; any_tag = .false.
-                            do ob = 1, amr_num_blocks
-                                if (amr_block_level(ob) /= lev - 1) cycle
-                                if (boxes(kb)%lo(1) > amr_region_hi_all(1, ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, &
-                                    & ob)) cycle
-                                if (n_glb > 0) then
-                                    if (boxes(kb)%lo(2) > amr_region_hi_all(2, ob) .or. boxes(kb)%hi(2) < amr_region_lo_all(2, &
-                                        & ob)) cycle
-                                end if
-                                if (p_glb > 0) then
-                                    if (boxes(kb)%lo(3) > amr_region_hi_all(3, ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, &
-                                        & ob)) cycle
-                                end if
-                                covered = .true.  ! replicated (metadata) - identical on every rank regardless of ownership
-                                if (amr_owns_all(ob)) call s_amr_tag_child_from_fine(ob, mlo, mhi, gctag, any_tag)
+                    ! max_grid_size tiling (non-IB): split any box larger than amr_maxc_fit into contiguous <= amr_maxc_fit
+                    ! sub-blocks so a
+                    ! whole block fits a rank's local solver scratch. Tiles are adjacent; the block-to-block fine-fine halo
+                    ! (s_amr_fine_
+                    ! fine_halo) makes the seams conservative and the reflux skips fine-fine faces. (IB keeps the clamp - see
+                    ! above.)
+                    if (.not. ib) then
+                        block
+                            type(t_box), allocatable :: tiled(:)
+                            integer                  :: kk2, ntl, capt
+                            allocate (tiled(amr_max_blocks))
+                            ntl = 0; capt = 0
+                            do kk2 = 1, nboxes
+                                call s_amr_tile_box(boxes(kk2)%lo, boxes(kk2)%hi, tiled, ntl, amr_max_blocks, capt)
                             end do
-                            ! IB: always refine the body region at this level, even where the density sensor is quiet - mark the
-                            ! body's L0-frame bbox into gctag so it is clustered into a child (mirrors the L1 expand at :3836).
-                            ! Containment margin = max(amr_buf, 4) + amr_cpat_mar: the child window (mlo:mhi) is the parent inset by
-                            ! amr_cpat_mar, and clamping the tag to that window can eat up to amr_cpat_mar of the body's stencil
-                            ! margin at the parent-adjacent side. The parent (widened in s_amr_expand_box_over_bodies by
-                            ! (amr_max_level-1)*amr_cpat_mar) now clears the body by enough that this window contains the body plus
-                            ! max(amr_buf, 4), so the tag survives the inset with a full image-point stencil of fluid on every side:
-                            ! the body SURFACE is refined at every level and the C/F boundary sits a full stencil off it, in fluid.
-                            if (ib) then
-                                block
-                                    integer :: ib_i, bb_lo(3), bb_hi(3), gi, gj, gk
-                                    do ib_i = 1, num_ibs
-                                        call s_amr_body_bbox(ib_i, max(amr_buf, 4) + amr_cpat_mar, bb_lo, bb_hi)
-                                        ! clamp the body bbox to this parent's nesting window (global L0 frame - s_amr_body_bbox
-                                        ! returns GLOBAL L0 cell indices, same frame as mlo/mhi)
-                                        bb_lo = max(bb_lo, mlo); bb_hi = min(bb_hi, mhi)
-                                        if (bb_hi(1) < bb_lo(1)) cycle
-                                        if (n_glb > 0 .and. bb_hi(2) < bb_lo(2)) cycle
-                                        if (p_glb > 0 .and. bb_hi(3) < bb_lo(3)) cycle
-                                        covered = .true.
-                                        do gk = bb_lo(3), bb_hi(3)
-                                            do gj = bb_lo(2), bb_hi(2)
-                                                do gi = bb_lo(1), bb_hi(1)
-                                                    gctag(gi, gj, gk) = .true.
-                                                end do
-                                            end do
-                                        end do
-                                    end do
-                                end block
-                            end if
-#ifdef MFC_MPI
-                            ! union the distributed owners' fine tags so every rank clusters the SAME child boxes (regrid must be
-                            ! deterministic); no-op at np=1 (the single owner already holds the whole global tag field)
-                            if (num_procs > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, gctag, (mg + 1)*(ng + 1)*(pg + 1), MPI_LOGICAL, &
-                                & MPI_LOR, MPI_COMM_WORLD, ierr)
-#endif
-                            any_tag = any(gctag)  ! recompute from the reduced field (a rank's local any_tag saw only its own obs)
+                            if (capt == 1 .and. proc_rank == 0) print '(A,I0)', &
+                                & ' [amr] WARNING: tiling capped at amr_max_blocks = ', amr_max_blocks
+                            deallocate (boxes); call move_alloc(tiled, boxes)
+                            nboxes = ntl
+                        end block
+                    end if
 
-                            if (covered .and. .not. any_tag) cycle  ! parent's fine solution is smooth here - no child
-
-                            if (covered) then
-                                ! slice the reduced global tag field into this rank's local (0:m) frame for the clusterer
-                                do ck = 0, p
-                                    do cj = 0, n
-                                        do ci = 0, m
-                                            ctag(ci, cj, ck) = gctag(ci + sidx(1), cj + sidx(2), ck + sidx(3))
-                                        end do
-                                    end do
+                    if (ib) then
+                        ! body-containment expansion can make boxes overlap (bisection guaranteed disjoint
+                        ! boxes; two boxes near one body both grow over it): merge overlapping pairs to a
+                        ! bounding box until none remain - overlapping blocks would double-restrict/reflux
+                        merged = .true.
+                        do while (merged)
+                            merged = .false.
+                            outer: do k = 1, nboxes - 1
+                                do kk = k + 1, nboxes
+                                    if (boxes(k)%lo(1) <= boxes(kk)%hi(1) .and. boxes(k)%hi(1) >= boxes(kk)%lo(1) &
+                                        & .and. (n_glb == 0 .or. (boxes(k)%lo(2) <= boxes(kk)%hi(2) .and. boxes(k)%hi(2) &
+                                        & >= boxes(kk)%lo(2))) .and. (p_glb == 0 .or. (boxes(k)%lo(3) <= boxes(kk)%hi(3) &
+                                        & .and. boxes(k)%hi(3) >= boxes(kk)%lo(3)))) then
+                                        boxes(k)%lo = min(boxes(k)%lo, boxes(kk)%lo)
+                                        boxes(k)%hi = max(boxes(k)%hi, boxes(kk)%hi)
+                                        boxes(kk) = boxes(nboxes); nboxes = nboxes - 1
+                                        if (boxes(k)%hi(1) - boxes(k)%lo(1) + 1 > amr_maxc_fit(1) .or. (n_glb > 0 &
+                                            & .and. boxes(k)%hi(2) - boxes(k)%lo(2) + 1 > amr_maxc_fit(2)) .or. (p_glb > 0 &
+                                            & .and. boxes(k)%hi(3) - boxes(k)%lo(3) + 1 > amr_maxc_fit(3))) then
+                                            call s_mpi_abort('amr regrid: merging body-containing blocks exceeds ' &
+                                                             & // 'the per-rank block size cap')
+                                        end if
+                                        merged = .true.
+                                        exit outer
+                                    end if
                                 end do
-                                ! cluster the fine-tagged L0 cells into child boxes, pad by amr_buf, clamp into the nesting window
-                                call s_amr_cluster(ctag, cboxes, ncb)
-                                do kc = 1, ncb
-                                    if (nboxes + 1 > amr_max_blocks) exit
-                                    clo = cboxes(kc)%lo; chi = cboxes(kc)%hi
-                                    clo(1) = max(clo(1) - amr_buf, mlo(1)); chi(1) = min(chi(1) + amr_buf, mhi(1))
-                                    if (n_glb > 0) then
-                                        clo(2) = max(clo(2) - amr_buf, mlo(2)); chi(2) = min(chi(2) + amr_buf, mhi(2))
-                                    else
-                                        clo(2) = 0; chi(2) = 0
-                                    end if
-                                    if (p_glb > 0) then
-                                        clo(3) = max(clo(3) - amr_buf, mlo(3)); chi(3) = min(chi(3) + amr_buf, mhi(3))
-                                    else
-                                        clo(3) = 0; chi(3) = 0
-                                    end if
-                                    ! IB: a child clustered from the (widened) body tag must fully contain every overlapping body -
-                                    ! expand over bodies (mirrors the L1 expand at :3836), then re-clamp to the nesting window so
+                            end do outer
+                        end do
+                        ! the expansion may also have grown a box onto an acoustic source support or the
+                        ! Lagrangian cloud: the constraints (contain the body, exclude the source/cloud)
+                        ! cannot both hold - fail closed
+                        if (acoustic_source .or. (bubbles_lagrange .and. lag_supp_on)) then
+                            do k = 1, nboxes
+                                lo = boxes(k)%lo; hi = boxes(k)%hi
+                                if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
+                                if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, &
+                                    & lag_supp_hi)
+                                if (ab_active) then
+                                    lo(1) = max(lo(1), ab_x%beg + 1); hi(1) = min(hi(1), ab_x%end - 1)
+                                    if (n_glb > 0) then; lo(2) = max(lo(2), ab_y%beg + 1); hi(2) = min(hi(2), ab_y%end - 1); end if
+                                    if (p_glb > 0) then; lo(3) = max(lo(3), ab_z%beg + 1); hi(3) = min(hi(3), ab_z%end - 1); end if
+                                end if
+                                if (any(lo /= boxes(k)%lo) .or. any(hi /= boxes(k)%hi)) then
+                                    call s_mpi_abort('amr regrid: a block must contain an immersed body AND stay ' &
+                                                     & // 'clear of an acoustic source support / Lagrangian bubble cloud - the ' &
+                                                     & // 'constraints conflict; move the body, source, or cloud apart')
+                                end if
+                            end do
+                        end if
+                    end if
+
+                    ! 3b) multi-level nesting: hierarchically append a box at level l nested inside each level-(l-1) box, for l =
+                    ! 2..amr_max_
+                    ! level. Parents-first ordering (every level-(l-1) box precedes its level-l children) so the build loop fills a
+                    ! parent
+                    ! before its child's gather-from-parent reads it. SENSOR-ON-FINE: each child's extent is the density-gradient
+                    ! sensor run
+                    ! on the parent-level FINE solution (the still-live OLD level-(l-1) blocks, read here BEFORE the step-5 stash),
+                    ! coarsened
+                    ! to L0-cell granularity and clustered - so children track features inside the parent instead of a fixed centre.
+                    ! A
+                    ! brand-new region with no old fine data falls back to a centred inset (the sensor takes over next regrid); a
+                    ! parent
+                    ! whose
+                    ! fine solution is smooth gets no child. Tagging only places boxes - conservation (restrict/reflux) is
+                    ! independent of
+                    ! where they sit. np=1 + non-IB (multi-level distribution / IB nesting are future work). Regions stay in L0 cell
+                    ! indices.
+                    box_level(1:nboxes) = 1
+                    if (amr_max_level >= 2) then
+                        ! the nesting loop below APPENDS level-l child boxes into `boxes` (up to amr_max_blocks total). The non-IB
+                        ! path already grew `boxes` to amr_max_blocks via the tiling move_alloc; the IB path (which only merges,
+                        ! never
+                        ! grows) leaves `boxes` at the cluster count, so grow it here or the child appends overrun the allocation.
+                        if (size(boxes) < amr_max_blocks) then
+                            block
+                                type(t_box), allocatable :: grown(:)
+                                allocate (grown(amr_max_blocks))
+                                grown(1:nboxes) = boxes(1:nboxes)
+                                call move_alloc(grown, boxes)
+                            end block
+                        end if
+                        block
+                            integer :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
+                            integer :: mg, ng, pg, ci, cj, ck, sidx(3)
+                            logical, allocatable :: ctag(:,:,:), gctag(:,:,:)
+                            logical :: covered, any_tag
+                            type(t_box), allocatable :: cboxes(:)
+#ifdef MFC_MPI
+                            integer :: ierr
+#endif
+
+                            ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads
+                            ! amr_slots(ob)%q_cons on the
+                            ! host, but the GPU_UPDATE host that the step-5 stash does runs AFTER this nesting - so the host copy is
+                            ! stale
+                            ! here
+                            do ob = 1, amr_num_blocks
+                                if (.not. amr_owns_all(ob)) cycle  ! np>1: only the owner holds this old block's fine q_cons
+                                do obi = eqn_idx%cont%beg, eqn_idx%cont%end
+                                    $:GPU_UPDATE(host='[amr_slots(ob)%q_cons(obi)%sf]')
+                                end do
+                            end do
+                            ! Fine-sensor tags accumulate in a GLOBAL L0 frame: at np>1 an old block is read only by its owner, but
+                            ! its
+                            ! tag footprint can fall in ANOTHER rank's subdomain, so the local (0:m) frame the clusterer uses cannot
+                            ! hold
+                            ! it. Each owner ORs its tags into gctag; an ALLREDUCE unions them; the clusterer then consumes the
+                            ! local slice.
+                            mg = m_glb; ng = 0; pg = 0
+                            if (n_glb > 0) ng = n_glb
+                            if (p_glb > 0) pg = p_glb
+                            sidx = 0; sidx(1) = start_idx(1)
+                            if (n_glb > 0) sidx(2) = start_idx(2)
+                            if (p_glb > 0) sidx(3) = start_idx(3)
+                            allocate (ctag(0:m,0:n,0:p), gctag(0:mg,0:ng,0:pg))
+
+                            plo = 1; phi = nboxes  ! [plo:phi] = the boxes at the previous level (lev-1) to nest inside
+                            do lev = 2, amr_max_level
+                                newlo = nboxes + 1
+                                do kb = plo, phi
+                                    if (nboxes + 1 > amr_max_blocks) exit  ! pool full - stop nesting
+                                    ! nesting window: children keep an amr_cpat_mar margin from the parent boundary so their ghost
+                                    ! prolongation reads valid parent interior cells
+                                    mlo = boxes(kb)%lo; mhi = boxes(kb)%hi
+                                    mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
+                                    if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
+                                    if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
+                                    if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
+                                    if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
+                                    if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
+
+                                    ! sensor-on-fine: tag from every OLD level-(lev-1) block overlapping this parent window
+                                    ! (amr_block_level
+                                    ! still holds the old levels here - it is reset to box_level at step 5b, below)
+                                    gctag = .false.; covered = .false.; any_tag = .false.
+                                    do ob = 1, amr_num_blocks
+                                        if (amr_block_level(ob) /= lev - 1) cycle
+                                        if (boxes(kb)%lo(1) > amr_region_hi_all(1, &
+                                            & ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, ob)) cycle
+                                        if (n_glb > 0) then
+                                            if (boxes(kb)%lo(2) > amr_region_hi_all(2, &
+                                                & ob) .or. boxes(kb)%hi(2) < amr_region_lo_all(2, ob)) cycle
+                                        end if
+                                        if (p_glb > 0) then
+                                            if (boxes(kb)%lo(3) > amr_region_hi_all(3, &
+                                                & ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, ob)) cycle
+                                        end if
+                                        covered = .true.  ! replicated (metadata) - identical on every rank regardless of ownership
+                                        if (amr_owns_all(ob)) call s_amr_tag_child_from_fine(ob, mlo, mhi, gctag, any_tag)
+                                    end do
+                                    ! IB: always refine the body region at this level, even where the density sensor is quiet - mark
                                     ! the
-                                    ! child stays nested. Because the parent was widened by (amr_max_level-1)*amr_cpat_mar, its
-                                    ! nesting window (mlo:mhi) already contains the body plus max(amr_buf, 4), so the re-clamp does
-                                    ! NOT cut the body's stencil: the child CONTAINS the body bbox and the C/F boundary lands a full
-                                    ! image-point stencil off the surface, in fluid (surface refined, not just the interior).
+                                    ! body's L0-frame bbox into gctag so it is clustered into a child (mirrors the L1 expand at
+                                    ! :3836).
+                                    ! Containment margin = max(amr_buf, 4) + amr_cpat_mar: the child window (mlo:mhi) is the parent
+                                    ! inset by
+                                    ! amr_cpat_mar, and clamping the tag to that window can eat up to amr_cpat_mar of the body's
+                                    ! stencil
+                                    ! margin at the parent-adjacent side. The parent (widened in s_amr_expand_box_over_bodies by
+                                    ! (amr_max_level-1)*amr_cpat_mar) now clears the body by enough that this window contains the
+                                    ! body plus
+                                    ! max(amr_buf, 4), so the tag survives the inset with a full image-point stencil of fluid on
+                                    ! every side:
+                                    ! the body SURFACE is refined at every level and the C/F boundary sits a full stencil off it, in
+                                    ! fluid.
                                     if (ib) then
-                                        call s_amr_expand_box_over_bodies(clo, chi)
-                                        clo(1) = max(clo(1), mlo(1)); chi(1) = min(chi(1), mhi(1))
-                                        if (n_glb > 0) then; clo(2) = max(clo(2), mlo(2)); chi(2) = min(chi(2), mhi(2)); end if
-                                        if (p_glb > 0) then; clo(3) = max(clo(3), mlo(3)); chi(3) = min(chi(3), mhi(3)); end if
-                                    end if
-                                    ! slot cap: a level->=2 block's fine grid spans 4*(its L0 extent) cells while the slot holds
-                                    ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. In LOCK-STEP a
-                                    ! feature wider than that TILES into adjacent <= amr_maxc_fit/2 sub-blocks (like the L1 tiling):
-                                    ! the per-stage fine-fine halo (s_amr_fine_fine_halo, level-aware) matches the shared seam flux
-                                    ! and the L2->L1 reflux skips those fine-fine faces. SUBCYCLE advances level-2 children
-                                    ! per-block
-                                    ! (s_amr_advance_children) with no L2-L2 halo, so it keeps ONE capped child (adjacent tiles
-                                    ! would
-                                    ! leak at their seam there - transposing that path is future work); a wide feature is under-
-                                    ! refined rather than non-conservative.
-                                    if (amr_subcycle) then
-                                        chi(1) = min(chi(1), clo(1) + amr_maxc_fit(1)/2 - 1)
-                                        if (n_glb > 0) chi(2) = min(chi(2), clo(2) + amr_maxc_fit(2)/2 - 1)
-                                        if (p_glb > 0) chi(3) = min(chi(3), clo(3) + amr_maxc_fit(3)/2 - 1)
-                                        nboxes = nboxes + 1
-                                        boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
-                                    else
                                         block
-                                            type(t_box) :: l2t(amr_max_blocks)
-                                            integer     :: nl2, cpd, it
-                                            nl2 = 0; cpd = 0
-                                            call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, amr_maxc_fit/2)
-                                            do it = 1, nl2
-                                                if (nboxes + 1 > amr_max_blocks) exit
-                                                nboxes = nboxes + 1
-                                                boxes(nboxes)%lo = l2t(it)%lo; boxes(nboxes)%hi = l2t(it)%hi
-                                                box_level(nboxes) = lev
+                                            integer :: ib_i, bb_lo(3), bb_hi(3), gi, gj, gk
+                                            do ib_i = 1, num_ibs
+                                                call s_amr_body_bbox(ib_i, max(amr_buf, 4) + amr_cpat_mar, bb_lo, bb_hi)
+                                                ! clamp the body bbox to this parent's nesting window (global L0 frame -
+                                                ! s_amr_body_bbox
+                                                ! returns GLOBAL L0 cell indices, same frame as mlo/mhi)
+                                                bb_lo = max(bb_lo, mlo); bb_hi = min(bb_hi, mhi)
+                                                if (bb_hi(1) < bb_lo(1)) cycle
+                                                if (n_glb > 0 .and. bb_hi(2) < bb_lo(2)) cycle
+                                                if (p_glb > 0 .and. bb_hi(3) < bb_lo(3)) cycle
+                                                covered = .true.
+                                                do gk = bb_lo(3), bb_hi(3)
+                                                    do gj = bb_lo(2), bb_hi(2)
+                                                        do gi = bb_lo(1), bb_hi(1)
+                                                            gctag(gi, gj, gk) = .true.
+                                                        end do
+                                                    end do
+                                                end do
                                             end do
                                         end block
                                     end if
+#ifdef MFC_MPI
+                                    ! union the distributed owners' fine tags so every rank clusters the SAME child boxes (regrid
+                                    ! must be
+                                    ! deterministic); no-op at np=1 (the single owner already holds the whole global tag field)
+                                    if (num_procs > 1) call s_amr_union_gctag(gctag, mg, ng, pg, mlo, mhi)
+#endif
+                                    ! recompute from the reduced field (a rank's local any_tag saw only its own obs)
+                                    any_tag = any(gctag)
+
+                                    if (covered .and. .not. any_tag) cycle  ! parent's fine solution is smooth here - no child
+
+                                    if (covered) then
+                                        ! slice the reduced global tag field into this rank's local (0:m) frame for the clusterer
+                                        do ck = 0, p
+                                            do cj = 0, n
+                                                do ci = 0, m
+                                                    ctag(ci, cj, ck) = gctag(ci + sidx(1), cj + sidx(2), ck + sidx(3))
+                                                end do
+                                            end do
+                                        end do
+                                        ! cluster the fine-tagged L0 cells into child boxes, pad by amr_buf, clamp into the nesting
+                                        ! window
+                                        call s_amr_cluster(ctag, cboxes, ncb)
+                                        do kc = 1, ncb
+                                            if (nboxes + 1 > amr_max_blocks) exit
+                                            clo = cboxes(kc)%lo; chi = cboxes(kc)%hi
+                                            clo(1) = max(clo(1) - amr_buf, mlo(1)); chi(1) = min(chi(1) + amr_buf, mhi(1))
+                                            if (n_glb > 0) then
+                                                clo(2) = max(clo(2) - amr_buf, mlo(2)); chi(2) = min(chi(2) + amr_buf, mhi(2))
+                                            else
+                                                clo(2) = 0; chi(2) = 0
+                                            end if
+                                            if (p_glb > 0) then
+                                                clo(3) = max(clo(3) - amr_buf, mlo(3)); chi(3) = min(chi(3) + amr_buf, mhi(3))
+                                            else
+                                                clo(3) = 0; chi(3) = 0
+                                            end if
+                                            ! IB: a child clustered from the (widened) body tag must fully contain every overlapping
+                                            ! body -
+                                            ! expand over bodies (mirrors the L1 expand at :3836), then re-clamp to the nesting
+                                            ! window so
+                                            ! the
+                                            ! child stays nested. Because the parent was widened by (amr_max_level-1)*amr_cpat_mar,
+                                            ! its
+                                            ! nesting window (mlo:mhi) already contains the body plus max(amr_buf, 4), so the
+                                            ! re-clamp does
+                                            ! NOT cut the body's stencil: the child CONTAINS the body bbox and the C/F boundary
+                                            ! lands a full
+                                            ! image-point stencil off the surface, in fluid (surface refined, not just the
+                                            ! interior).
+                                            if (ib) then
+                                                call s_amr_expand_box_over_bodies(clo, chi)
+                                                clo(1) = max(clo(1), mlo(1)); chi(1) = min(chi(1), mhi(1))
+                                                if (n_glb > 0) then; clo(2) = max(clo(2), mlo(2)); chi(2) = min(chi(2), &
+                                                    & mhi(2)); end if
+                                                if (p_glb > 0) then; clo(3) = max(clo(3), mlo(3)); chi(3) = min(chi(3), &
+                                                    & mhi(3)); end if
+                                            end if
+                                            ! slot cap: a level->=2 block's fine grid spans 4*(its L0 extent) cells while the slot
+                                            ! holds
+                                            ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. In
+                                            ! LOCK-STEP a
+                                            ! feature wider than that TILES into adjacent <= amr_maxc_fit/2 sub-blocks (like the L1
+                                            ! tiling):
+                                            ! the per-stage fine-fine halo (s_amr_fine_fine_halo, level-aware) matches the shared
+                                            ! seam flux
+                                            ! and the L2->L1 reflux skips those fine-fine faces. SUBCYCLE advances level-2 children
+                                            ! per-block
+                                            ! (s_amr_advance_children) with no L2-L2 halo, so it keeps ONE capped child (adjacent
+                                            ! tiles
+                                            ! would
+                                            ! leak at their seam there - transposing that path is future work); a wide feature is
+                                            ! under-
+                                            ! refined rather than non-conservative.
+                                            if (amr_subcycle) then
+                                                chi(1) = min(chi(1), clo(1) + amr_maxc_fit(1)/2 - 1)
+                                                if (n_glb > 0) chi(2) = min(chi(2), clo(2) + amr_maxc_fit(2)/2 - 1)
+                                                if (p_glb > 0) chi(3) = min(chi(3), clo(3) + amr_maxc_fit(3)/2 - 1)
+                                                nboxes = nboxes + 1
+                                                boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                                            else
+                                                block
+                                                    type(t_box) :: l2t(amr_max_blocks)
+                                                    integer     :: nl2, cpd, it
+                                                    nl2 = 0; cpd = 0
+                                                    call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, amr_maxc_fit/2)
+                                                    do it = 1, nl2
+                                                        if (nboxes + 1 > amr_max_blocks) exit
+                                                        nboxes = nboxes + 1
+                                                        boxes(nboxes)%lo = l2t(it)%lo; boxes(nboxes)%hi = l2t(it)%hi
+                                                        box_level(nboxes) = lev
+                                                    end do
+                                                end block
+                                            end if
+                                        end do
+                                        if (allocated(cboxes)) deallocate (cboxes)
+                                    else
+                                        ! brand-new region (no old fine data yet): centred inset so the child still appears this
+                                        ! regrid
+                                        ins = 0
+                                        ins(1) = max((boxes(kb)%hi(1) - boxes(kb)%lo(1) + 1)/4, amr_cpat_mar)
+                                        if (n_glb > 0) ins(2) = max((boxes(kb)%hi(2) - boxes(kb)%lo(2) + 1)/4, amr_cpat_mar)
+                                        if (p_glb > 0) ins(3) = max((boxes(kb)%hi(3) - boxes(kb)%lo(3) + 1)/4, amr_cpat_mar)
+                                        clo = boxes(kb)%lo + ins; chi = boxes(kb)%hi - ins
+                                        if (chi(1) < clo(1)) cycle  ! inset left no interior in x
+                                        if (n_glb > 0 .and. chi(2) < clo(2)) cycle
+                                        if (p_glb > 0 .and. chi(3) < clo(3)) cycle
+                                        nboxes = nboxes + 1
+                                        boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                                    end if
                                 end do
-                                if (allocated(cboxes)) deallocate (cboxes)
-                            else
-                                ! brand-new region (no old fine data yet): centred inset so the child still appears this regrid
-                                ins = 0
-                                ins(1) = max((boxes(kb)%hi(1) - boxes(kb)%lo(1) + 1)/4, amr_cpat_mar)
-                                if (n_glb > 0) ins(2) = max((boxes(kb)%hi(2) - boxes(kb)%lo(2) + 1)/4, amr_cpat_mar)
-                                if (p_glb > 0) ins(3) = max((boxes(kb)%hi(3) - boxes(kb)%lo(3) + 1)/4, amr_cpat_mar)
-                                clo = boxes(kb)%lo + ins; chi = boxes(kb)%hi - ins
-                                if (chi(1) < clo(1)) cycle  ! inset left no interior in x
-                                if (n_glb > 0 .and. chi(2) < clo(2)) cycle
-                                if (p_glb > 0 .and. chi(3) < clo(3)) cycle
-                                nboxes = nboxes + 1
-                                boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
-                            end if
-                        end do
-                        plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
-                        if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
-                    end do
-                    deallocate (ctag, gctag)
-                    if (nboxes >= amr_max_blocks .and. proc_rank == 0) print '(A)', &
-                        & ' [amr] NOTE: block pool full during multi-level nesting; some boxes were not refined further'
-                end block
-            end if
-
-            ! 4) unchanged? (same count, boxes AND levels as the live slots -> keep them; a rebuild would reproduce them exactly
-            ! anyway). The level must be compared too: a box that keeps its coordinates but changes refinement level would
-            ! otherwise slip through with a stale amr_block_level, corrupting the level-aware coupling.
-            if (nboxes == amr_num_blocks) then
-                same = .true.
-                do k = 1, nboxes
-                    if (any(boxes(k)%lo /= amr_slots(k)%region%lo) .or. any(boxes(k)%hi /= amr_slots(k)%region%hi) &
-                        & .or. box_level(k) /= amr_block_level(k)) same = .false.
-                end do
-                if (same) return
-            end if
-
-            ! 5) stash every live slot's fine interior (dead-between-steps q_cons_stor bounce), keeping its old intersection origin
-            old_np = amr_num_blocks
-            do k = 1, old_np
-                ! GLOBAL block origin + extents (replicated, valid on every rank - not the owner-only isect), so the cross-rank
-                ! migration below and the overlap-copy's index shift are correct even where this rank did not own the old block
-                old_ilo(:,k) = amr_region_lo_all(:,k)
-                old_chi(:,k) = amr_region_hi_all(:,k)  ! old COARSE hi (for the P2P migration overlap test below)
-                ! fine extent = (2**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating it with the
-                ! level-1 factor (2x) truncates half its fine cells. Level-1 blocks (2**1 = 2) are byte-identical to before.
-                old_ext(1, k) = (ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
-                old_ext(2, k) = merge((ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, &
-                        & k) + 1) - 1, 0, n_glb > 0)
-                old_ext(3, k) = merge((ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, &
-                        & k) + 1) - 1, 0, p_glb > 0)
-                old_owner(k) = amr_block_owner(k)
-                old_level(k) = amr_block_level(k)  ! overlap-copy must match levels: an old L2's stash is in the 4x parent-fine frame
-                old_owns(k) = amr_owns_all(k)
-                if (old_owns(k)) then
-                    do i = 1, sys_size
-                        $:GPU_UPDATE(host='[amr_slots(k)%q_cons(i)%sf]')
-                    end do
-                    do i = 1, sys_size
-                        amr_slots(k)%q_cons_stor(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, &
-                                  & k)) = amr_slots(k)%q_cons(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k))
-                    end do
-                    ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like
-                    ! q_cons (both stors are dead between steps)
-                    if (qbmm .and. .not. polytropic) then
-                        $:GPU_UPDATE(host='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f%sf]')
-                        amr_slots(k)%pb_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
-                                  & :) = amr_slots(k)%pb_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
-                        amr_slots(k)%mv_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
-                                  & :) = amr_slots(k)%mv_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
+                                plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
+                                if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
+                            end do
+                            deallocate (ctag, gctag)
+                            if (nboxes >= amr_max_blocks .and. proc_rank == 0) print '(A)', &
+                                & ' [amr] NOTE: block pool full during multi-level nesting; some boxes were not refined further'
+                        end block
                     end if
-                end if
-            end do
-            ! coarse pb/mv host-current for the per-block re-prolongation below
-            if (qbmm .and. .not. polytropic) then
-                $:GPU_UPDATE(host='[pb_ts(1)%sf, mv_ts(1)%sf]')
-            end if
 
-            ! set the regions + assign owners BEFORE the migration (P2P needs the new owners) and before the owner-dependent
-            ! geometry (else s_set_amr_fine_geometry sizes the whole-block owner from a stale amr_block_owner)
-            amr_num_blocks = nboxes
-            do k = 1, nboxes
-                amr_region_lo_all(:,k) = boxes(k)%lo; amr_region_hi_all(:,k) = boxes(k)%hi
-                ! box_level(k) is the refinement level assigned during the hierarchical nesting above (1 for the L0->L1 boxes, l for
-                ! a box nested at level l). Setting it every regrid resets a stale level when a slot is reused across levels.
-                amr_block_level(k) = box_level(k)
-            end do
-            ! Proper-nesting guard: each level>=2 block must be covered by EXACTLY ONE parent-level block. f_amr_parent_block (and
-            ! the gather/reflux that key off it) take the FIRST overlap, so a fine tile straddling two parent tiles - an internal
-            ! parent-level tile seam crossed by a nested feature - would silently couple to only one parent (wrong coarse BC + a
-            ! conservation leak on the other). Abort fail-closed instead. Replicated boxes -> every rank aborts together.
-            block
-                integer :: bk, bkk, npar
-                do bk = 1, nboxes
-                    if (box_level(bk) < 2) cycle
-                    npar = 0
-                    do bkk = 1, nboxes
-                        if (box_level(bkk) == box_level(bk) - 1 .and. f_amr_boxes_overlap(boxes(bk)%lo, boxes(bk)%hi, &
-                            & boxes(bkk)%lo, boxes(bkk)%hi)) npar = npar + 1
+                    ! 4) unchanged? (same count, boxes AND levels as the live slots -> keep them; a rebuild would reproduce them
+                    ! exactly
+                    ! anyway). The level must be compared too: a box that keeps its coordinates but changes refinement level would
+                    ! otherwise slip through with a stale amr_block_level, corrupting the level-aware coupling.
+                    if (nboxes == amr_num_blocks) then
+                        same = .true.
+                        do k = 1, nboxes
+                            if (any(boxes(k)%lo /= amr_slots(k)%region%lo) .or. any(boxes(k)%hi /= amr_slots(k)%region%hi) &
+                                & .or. box_level(k) /= amr_block_level(k)) same = .false.
+                        end do
+                        if (same) return
+                    end if
+
+                    ! 5) stash every live slot's fine interior (dead-between-steps q_cons_stor bounce), keeping its old intersection
+                    ! origin
+                    old_np = amr_num_blocks
+                    do k = 1, old_np
+                        ! GLOBAL block origin + extents (replicated, valid on every rank - not the owner-only isect), so the
+                        ! cross-rank
+                        ! migration below and the overlap-copy's index shift are correct even where this rank did not own the old
+                        ! block
+                        old_ilo(:,k) = amr_region_lo_all(:,k)
+                        old_chi(:,k) = amr_region_hi_all(:,k)  ! old COARSE hi (for the P2P migration overlap test below)
+                        ! fine extent = (2**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating it
+                        ! with the
+                        ! level-1 factor (2x) truncates half its fine cells. Level-1 blocks (2**1 = 2) are byte-identical to before.
+                        old_ext(1, k) = (ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
+                        old_ext(2, k) = merge((ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, &
+                                & k) + 1) - 1, 0, n_glb > 0)
+                        old_ext(3, k) = merge((ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, &
+                                & k) + 1) - 1, 0, p_glb > 0)
+                        old_owner(k) = amr_block_owner(k)
+                        ! overlap-copy must match levels: an old L2's stash is in the 4x parent-fine frame
+                        old_level(k) = amr_block_level(k)
+                        old_owns(k) = amr_owns_all(k)
+                        if (old_owns(k)) then
+                            do i = 1, sys_size
+                                $:GPU_UPDATE(host='[amr_slots(k)%q_cons(i)%sf]')
+                            end do
+                            do i = 1, sys_size
+                                amr_slots(k)%q_cons_stor(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, &
+                                          & k)) = amr_slots(k)%q_cons(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k))
+                            end do
+                            ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like
+                            ! q_cons (both stors are dead between steps)
+                            if (qbmm .and. .not. polytropic) then
+                                $:GPU_UPDATE(host='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f%sf]')
+                                amr_slots(k)%pb_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
+                                          & :) = amr_slots(k)%pb_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
+                                amr_slots(k)%mv_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
+                                          & :) = amr_slots(k)%mv_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
+                            end if
+                        end if
                     end do
-                    if (npar /= 1) call s_mpi_abort('amr multi-level: a level>=2 block overlaps more than one (or no) ' &
-                        & // 'parent-level block - a fine tile straddling a parent-tile seam is unsupported (gather/reflux ' &
-                        & // 'couple to a single parent); reduce max_grid_size or the refined feature extent')
-                end do
-            end block
-            amr_num_levels = maxval(box_level(1:nboxes))
-            call s_amr_assign_block_owners()
+                    ! coarse pb/mv host-current for the per-block re-prolongation below
+                    if (qbmm .and. .not. polytropic) then
+                        $:GPU_UPDATE(host='[pb_ts(1)%sf, mv_ts(1)%sf]')
+                    end if
+
+                    ! set the regions + assign owners BEFORE the migration (P2P needs the new owners) and before the owner-dependent
+                    ! geometry (else s_set_amr_fine_geometry sizes the whole-block owner from a stale amr_block_owner)
+                    amr_num_blocks = nboxes
+                    do k = 1, nboxes
+                        amr_region_lo_all(:,k) = boxes(k)%lo; amr_region_hi_all(:,k) = boxes(k)%hi
+                        ! box_level(k) is the refinement level assigned during the hierarchical nesting above (1 for the L0->L1
+                        ! boxes, l for
+                        ! a box nested at level l). Setting it every regrid resets a stale level when a slot is reused across
+                        ! levels.
+                        amr_block_level(k) = box_level(k)
+                    end do
+                    ! Proper-nesting guard: each level>=2 block must be covered by EXACTLY ONE parent-level block.
+                    ! f_amr_parent_block (and
+                    ! the gather/reflux that key off it) take the FIRST overlap, so a fine tile straddling two parent tiles - an
+                    ! internal
+                    ! parent-level tile seam crossed by a nested feature - would silently couple to only one parent (wrong coarse BC
+                    ! + a
+                    ! conservation leak on the other). Abort fail-closed instead. Replicated boxes -> every rank aborts together.
+                    block
+                        integer :: bk, bkk, npar
+                        do bk = 1, nboxes
+                            if (box_level(bk) < 2) cycle
+                            npar = 0
+                            do bkk = 1, nboxes
+                                if (box_level(bkk) == box_level(bk) - 1 .and. f_amr_boxes_overlap(boxes(bk)%lo, boxes(bk)%hi, &
+                                    & boxes(bkk)%lo, boxes(bkk)%hi)) npar = npar + 1
+                            end do
+                            if (npar /= 1) call s_mpi_abort('amr multi-level: a level>=2 block overlaps more than one (or no) ' &
+                                & // 'parent-level block - a fine tile straddling a parent-tile seam is unsupported (gather/reflux ' // 'couple to a single parent); reduce max_grid_size or the refined feature extent')
+                        end do
+                    end block
+                    amr_num_levels = maxval(box_level(1:nboxes))
+                    call s_amr_assign_block_owners()
 
 #ifdef MFC_MPI
-            ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by reading
-            ! amr_slots(kk)%q_cons_stor, but an old block may be owned by a rank OTHER than the one now owning a covering new block.
-            ! POINT-TO-POINT (mirrors s_amr_gather_coarse_patch): each old owner sends its stashed fine state ONLY to the distinct
-            ! new-block owners whose region overlaps that old block. A rank that did not receive old block kk never reads it - the
-            ! overlap-copy's per-(k,kk) index guard skips every cell of a non-overlapping pair. No-op at np=1 (single owner, local).
-            if (num_procs > 1) then
-                block
-                    integer               :: kk, k2, ii, gi, gj, gk, idx2, ierr2, rr, maxcnt, nrq
-                    integer               :: cnt(old_np)
-                    logical               :: getk(old_np), isdest(0:num_procs - 1)
-                    real(wp), allocatable :: spack(:,:), rpack(:,:)
-                    integer, allocatable  :: rq(:)
-                    maxcnt = 0
-                    do kk = 1, old_np
-                        cnt(kk) = sys_size*(old_ext(1, kk) + 1)*(old_ext(2, kk) + 1)*(old_ext(3, kk) + 1)
-                        maxcnt = max(maxcnt, cnt(kk))
-                        ! I need old block kk iff I own a NEW block overlapping it (and do not already hold kk locally)
-                        getk(kk) = .false.
-                        if (.not. old_owns(kk)) then
-                            do k2 = 1, nboxes
-                                if (amr_block_owner(k2) == proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, &
-                                    & old_ilo(:,kk), old_chi(:,kk))) then
-                                    getk(kk) = .true.; exit
+                    ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by
+                    ! reading
+                    ! amr_slots(kk)%q_cons_stor, but an old block may be owned by a rank OTHER than the one now owning a covering
+                    ! new block.
+                    ! POINT-TO-POINT (mirrors s_amr_gather_coarse_patch): each old owner sends its stashed fine state ONLY to the
+                    ! distinct
+                    ! new-block owners whose region overlaps that old block. A rank that did not receive old block kk never reads it
+                    ! - the
+                    ! overlap-copy's per-(k,kk) index guard skips every cell of a non-overlapping pair. No-op at np=1 (single owner,
+                    ! local).
+                    if (num_procs > 1) then
+                        block
+                            integer               :: kk, k2, ii, gi, gj, gk, idx2, ierr2, rr, maxcnt, nrq
+                            integer               :: cnt(old_np)
+                            logical               :: getk(old_np), isdest(0:num_procs - 1)
+                            real(wp), allocatable :: spack(:,:), rpack(:,:)
+                            integer, allocatable  :: rq(:)
+                            maxcnt = 0
+                            do kk = 1, old_np
+                                cnt(kk) = sys_size*(old_ext(1, kk) + 1)*(old_ext(2, kk) + 1)*(old_ext(3, kk) + 1)
+                                maxcnt = max(maxcnt, cnt(kk))
+                                ! I need old block kk iff I own a NEW block overlapping it (and do not already hold kk locally)
+                                getk(kk) = .false.
+                                if (.not. old_owns(kk)) then
+                                    do k2 = 1, nboxes
+                                        if (amr_block_owner(k2) == proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, &
+                                            & boxes(k2)%hi, old_ilo(:,kk), old_chi(:,kk))) then
+                                            getk(kk) = .true.; exit
+                                        end if
+                                    end do
                                 end if
                             end do
-                        end if
-                    end do
-                    ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the reconcile below)
-                    do kk = 1, old_np
-                        if (getk(kk)) call s_amr_alloc_slot(kk)
-                    end do
-                    allocate (rq(old_np*num_procs), spack(max(maxcnt, 1), old_np), rpack(max(maxcnt, 1), old_np))
-                    nrq = 0
-                    do kk = 1, old_np  ! post receives for the old blocks I need
-                        if (.not. getk(kk)) cycle
-                        nrq = nrq + 1
-                        call MPI_IRECV(rpack(1, kk), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
-                    end do
-                    do kk = 1, old_np  ! pack + send each old block I own to every distinct new-owner (/= me) overlapping it
-                        if (.not. old_owns(kk)) cycle
-                        isdest = .false.
-                        do k2 = 1, nboxes
-                            rr = amr_block_owner(k2)
-                            if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:, &
-                                & kk))) isdest(rr) = .true.
-                        end do
-                        if (.not. any(isdest)) cycle
-                        idx2 = 0
-                        do ii = 1, sys_size
-                            do gk = 0, old_ext(3, kk)
-                                do gj = 0, old_ext(2, kk)
-                                    do gi = 0, old_ext(1, kk)
-                                        idx2 = idx2 + 1
-                                        spack(idx2, kk) = real(amr_slots(kk)%q_cons_stor(ii)%sf(gi, gj, gk), wp)
+                            ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the reconcile below)
+                            do kk = 1, old_np
+                                if (getk(kk)) call s_amr_alloc_slot(kk)
+                            end do
+                            allocate (rq(old_np*num_procs), spack(max(maxcnt, 1), old_np), rpack(max(maxcnt, 1), old_np))
+                            nrq = 0
+                            do kk = 1, old_np  ! post receives for the old blocks I need
+                                if (.not. getk(kk)) cycle
+                                nrq = nrq + 1
+                                call MPI_IRECV(rpack(1, kk), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
+                            end do
+                            do kk = 1, old_np  ! pack + send each old block I own to every distinct new-owner (/= me) overlapping it
+                                if (.not. old_owns(kk)) cycle
+                                isdest = .false.
+                                do k2 = 1, nboxes
+                                    rr = amr_block_owner(k2)
+                                    if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), &
+                                        & old_chi(:,kk))) isdest(rr) = .true.
+                                end do
+                                if (.not. any(isdest)) cycle
+                                idx2 = 0
+                                do ii = 1, sys_size
+                                    do gk = 0, old_ext(3, kk)
+                                        do gj = 0, old_ext(2, kk)
+                                            do gi = 0, old_ext(1, kk)
+                                                idx2 = idx2 + 1
+                                                spack(idx2, kk) = real(amr_slots(kk)%q_cons_stor(ii)%sf(gi, gj, gk), wp)
+                                            end do
+                                        end do
+                                    end do
+                                end do
+                                do rr = 0, num_procs - 1
+                                    if (.not. isdest(rr)) cycle
+                                    nrq = nrq + 1
+                                    call MPI_ISEND(spack(1, kk), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
+                                end do
+                            end do
+                            if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
+                            do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots
+                                if (.not. getk(kk)) cycle
+                                idx2 = 0
+                                do ii = 1, sys_size
+                                    do gk = 0, old_ext(3, kk)
+                                        do gj = 0, old_ext(2, kk)
+                                            do gi = 0, old_ext(1, kk)
+                                                idx2 = idx2 + 1
+                                                amr_slots(kk)%q_cons_stor(ii)%sf(gi, gj, gk) = real(rpack(idx2, kk), stp)
+                                            end do
+                                        end do
                                     end do
                                 end do
                             end do
-                        end do
-                        do rr = 0, num_procs - 1
-                            if (.not. isdest(rr)) cycle
-                            nrq = nrq + 1
-                            call MPI_ISEND(spack(1, kk), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
-                        end do
-                    end do
-                    if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
-                    do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots
-                        if (.not. getk(kk)) cycle
-                        idx2 = 0
-                        do ii = 1, sys_size
-                            do gk = 0, old_ext(3, kk)
-                                do gj = 0, old_ext(2, kk)
-                                    do gi = 0, old_ext(1, kk)
-                                        idx2 = idx2 + 1
-                                        amr_slots(kk)%q_cons_stor(ii)%sf(gi, gj, gk) = real(rpack(idx2, kk), stp)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end do
-                    deallocate (rq, spack, rpack)
-                end block
-            end if
+                            deallocate (rq, spack, rpack)
+                        end block
+                    end if
 #endif
 
-            ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
-            any_xchg = .false.
-            if (proc_rank == 0) print '(A,I0,A)', ' [amr] regrid: ', nboxes, ' block(s)'
-            do k = 1, nboxes
-                amr_cur = k
-                if (amr_block_owner(k) == proc_rank) call s_amr_alloc_slot(k)  ! owned slot needs its arrays before geometry/prolong
-                call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
-                any_xchg = any_xchg .or. amr_xchg_coarse_ghosts
-                if (proc_rank == 0) print '(A,I0,A,I0,A,I0,A,I0,A)', ' [amr]   block ', k, ': box x ', boxes(k)%lo(1), ':', &
-                    & boxes(k)%hi(1), ' (', (boxes(k)%hi(1) - boxes(k)%lo(1) + 1), ' coarse cells)'
-                ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
-                ! q_cons_base is host-current with valid ghosts from the exchange at the top of s_amr_regrid)
-                call s_amr_gather_coarse_patch(q_cons_base, .false.)
-                ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners re-prolong from it below)
-                if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
-                if (.not. amr_rank_owns_block) cycle
-                call s_interpolate_coarse_to_fine()
-                ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy
-                ! the overlap from EVERY covering old block regardless of who owned it - sh is the old->new LOCAL fine index shift.
-                ! A level>=2 block SKIPS this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its PARENT-fine
-                ! frame,
-                ! so the shift is wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid instead; the
-                ! coupling
-                ! keeps conservation. Detail-preserving same-level L2 migration (parent-fine overlap) is a later increment.
-                if (amr_block_level(amr_cur) < 2) then
-                    do kk = 1, old_np
-                        ! same-level overlap only (a child's stash is 4x-framed)
-                        if (old_level(kk) /= amr_block_level(amr_cur)) cycle
-                        ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
-                        sh = ref_ratio*(amr_isect_lo - old_ilo(:,kk))
-                        do i = 1, sys_size
-                            do fk = 0, amr_slots(k)%p
-                                ofk = fk + sh(3)
-                                if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
-                                do fj = 0, amr_slots(k)%n
-                                    ofj = fj + sh(2)
-                                    if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
-                                    do fi = 0, amr_slots(k)%m
-                                        ofi = fi + sh(1)
-                                        if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                        amr_slots(k)%q_cons(i)%sf(fi, fj, fk) = amr_slots(kk)%q_cons_stor(i)%sf(ofi, ofj, ofk)
+                    ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old
+                    ! slot
+                    any_xchg = .false.
+                    if (proc_rank == 0) print '(A,I0,A)', ' [amr] regrid: ', nboxes, ' block(s)'
+                    do k = 1, nboxes
+                        amr_cur = k
+                        ! owned slot needs its arrays before geometry/prolong
+                        if (amr_block_owner(k) == proc_rank) call s_amr_alloc_slot(k)
+                        call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
+                        any_xchg = any_xchg .or. amr_xchg_coarse_ghosts
+                        if (proc_rank == 0) print '(A,I0,A,I0,A,I0,A,I0,A)', ' [amr]   block ', k, ': box x ', boxes(k)%lo(1), &
+                            & ':', boxes(k)%hi(1), ' (', (boxes(k)%hi(1) - boxes(k)%lo(1) + 1), ' coarse cells)'
+                        ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
+                        ! q_cons_base is host-current with valid ghosts from the exchange at the top of s_amr_regrid)
+                        call s_amr_gather_coarse_patch(q_cons_base, .false.)
+                        ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners re-prolong from it below)
+                        if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
+                        if (.not. amr_rank_owns_block) cycle
+                        call s_interpolate_coarse_to_fine()
+                        ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so
+                        ! copy
+                        ! the overlap from EVERY covering old block regardless of who owned it - sh is the old->new LOCAL fine index
+                        ! shift.
+                        ! A level>=2 block SKIPS this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its
+                        ! PARENT-fine
+                        ! frame,
+                        ! so the shift is wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid instead;
+                        ! the
+                        ! coupling
+                        ! keeps conservation. Detail-preserving same-level L2 migration (parent-fine overlap) is a later increment.
+                        if (amr_block_level(amr_cur) < 2) then
+                            do kk = 1, old_np
+                                ! same-level overlap only (a child's stash is 4x-framed)
+                                if (old_level(kk) /= amr_block_level(amr_cur)) cycle
+                                ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
+                                sh = ref_ratio*(amr_isect_lo - old_ilo(:,kk))
+                                do i = 1, sys_size
+                                    do fk = 0, amr_slots(k)%p
+                                        ofk = fk + sh(3)
+                                        if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
+                                        do fj = 0, amr_slots(k)%n
+                                            ofj = fj + sh(2)
+                                            if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
+                                            do fi = 0, amr_slots(k)%m
+                                                ofi = fi + sh(1)
+                                                if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
+                                                amr_slots(k)%q_cons(i)%sf(fi, fj, fk) = amr_slots(kk)%q_cons_stor(i)%sf(ofi, ofj, &
+                                                          & ofk)
+                                            end do
+                                        end do
                                     end do
                                 end do
                             end do
-                        end do
-                    end do
-                end if
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[amr_slots(k)%q_cons(i)%sf]')
-                end do
-                ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant),
-                ! then overwrite the overlap with the old blocks' fine data (same index shift)
-                if (qbmm .and. .not. polytropic) then
-                    call s_amr_prolong_pbmv()
-                    ! level>=2 re-prolongs only (the L0-frame overlap shift is wrong for a child)
-                    if (amr_block_level(amr_cur) < 2) then
-                        do kk = 1, old_np
-                            if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
-                            if (.not. old_owns(kk)) cycle
-                            sh = ref_ratio*(amr_isect_lo - old_ilo(:,kk))
-                            do fk = 0, amr_slots(k)%p
-                                ofk = fk + sh(3)
-                                if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
-                                do fj = 0, amr_slots(k)%n
-                                    ofj = fj + sh(2)
-                                    if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
-                                    do fi = 0, amr_slots(k)%m
-                                        ofi = fi + sh(1)
-                                        if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                        amr_slots(k)%pb_f%sf(fi, fj, fk,:,:) = amr_slots(kk)%pb_stor%sf(ofi, ofj, ofk,:,:)
-                                        amr_slots(k)%mv_f%sf(fi, fj, fk,:,:) = amr_slots(kk)%mv_stor%sf(ofi, ofj, ofk,:,:)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end if
-                    $:GPU_UPDATE(device='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f%sf]')
-                end if
-                ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
-            end do
-            amr_xchg_coarse_ghosts = any_xchg  ! coarse halo exchanged once per step if ANY block needs it
-            ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
-            ! new-owned slots were allocated in the build loop, so this only frees - a rank keeps just its owned blocks' fine arrays
-            call s_amr_reconcile_slots()
-            ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/
-            ! image points recomputed from the body definitions; no state carries across regrids)
-            if (ib) call s_amr_setup_ib()
-            call s_amr_select_slot(1)
-
-        end subroutine s_amr_regrid
-
-        !> Sensor-on-fine child tagging: OR-accumulate density-gradient tags from an OLD fine block's solution into an L0-cell tag
-        !! grid, restricted to a parent nesting window. Reads amr_slots(ob)%q_cons on the HOST (the caller host-refreshes the cont
-        !! range first; the step-5 stash's GPU_UPDATE runs later). Fine cell (fi,fj,fk) covers L0 cell (ci,cj,ck) with fi =
-        !! rr*(ci-olo(1))+d etc.; the gradient uses one-sided differences at the fine-interior edges so no stale fine ghost is read.
-        !! Only decides placement - conservation is enforced downstream by restrict/reflux regardless of the box extent.
-        impure subroutine s_amr_tag_child_from_fine(ob, win_lo, win_hi, ctag, any_tag)
-
-            integer, intent(in)    :: ob, win_lo(3), win_hi(3)
-            logical, intent(inout) :: ctag(0:,0:,0:)
-            logical, intent(inout) :: any_tag
-            integer                :: rr, ci, cj, ck, fi, fj, fk, d1, d2, d3, fm1, fm2, fm3, olo(3), lo(3), hi(3)
-            real(wp)               :: r0, g
-            logical                :: tagged
-
-            rr = amr_slots(ob)%ref_ratio
-            olo = amr_region_lo_all(:,ob)
-            fm1 = amr_slots(ob)%m; fm2 = amr_slots(ob)%n; fm3 = amr_slots(ob)%p
-            ! overlap of this old block with the parent window, in L0 cells
-            lo(1) = max(win_lo(1), amr_region_lo_all(1, ob)); hi(1) = min(win_hi(1), amr_region_hi_all(1, ob))
-            lo(2) = merge(max(win_lo(2), amr_region_lo_all(2, ob)), 0, n_glb > 0)
-            hi(2) = merge(min(win_hi(2), amr_region_hi_all(2, ob)), 0, n_glb > 0)
-            lo(3) = merge(max(win_lo(3), amr_region_lo_all(3, ob)), 0, p_glb > 0)
-            hi(3) = merge(min(win_hi(3), amr_region_hi_all(3, ob)), 0, p_glb > 0)
-            do ck = lo(3), hi(3)
-                do cj = lo(2), hi(2)
-                    do ci = lo(1), hi(1)
-                        tagged = .false.
-                        do d3 = 0, merge(rr - 1, 0, p_glb > 0)
-                            fk = (ck - olo(3))*rr + d3
-                            do d2 = 0, merge(rr - 1, 0, n_glb > 0)
-                                fj = (cj - olo(2))*rr + d2
-                                do d1 = 0, rr - 1
-                                    fi = (ci - olo(1))*rr + d1
-                                    r0 = max(abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, fk)), 1.e-30_wp)
-                                    g = abs(f_amr_rho_tot(amr_slots(ob)%q_cons, min(fi + 1, fm1), fj, &
-                                            & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, max(fi - 1, 0), fj, fk))
-                                    if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, min(fj + 1, fm2), &
-                                        & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, max(fj - 1, 0), fk)))
-                                    if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, min(fk + 1, &
-                                        & fm3)) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, max(fk - 1, 0))))
-                                    if (g/(2._wp*r0) > amr_tag_eps) tagged = .true.
-                                end do
-                            end do
-                        end do
-                        if (tagged) then
-                            ctag(ci, cj, ck) = .true.
-                            any_tag = .true.
                         end if
+                        do i = 1, sys_size
+                            $:GPU_UPDATE(device='[amr_slots(k)%q_cons(i)%sf]')
+                        end do
+                        ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant),
+                        ! then overwrite the overlap with the old blocks' fine data (same index shift)
+                        if (qbmm .and. .not. polytropic) then
+                            call s_amr_prolong_pbmv()
+                            ! level>=2 re-prolongs only (the L0-frame overlap shift is wrong for a child)
+                            if (amr_block_level(amr_cur) < 2) then
+                                do kk = 1, old_np
+                                    if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
+                                    if (.not. old_owns(kk)) cycle
+                                    sh = ref_ratio*(amr_isect_lo - old_ilo(:,kk))
+                                    do fk = 0, amr_slots(k)%p
+                                        ofk = fk + sh(3)
+                                        if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
+                                        do fj = 0, amr_slots(k)%n
+                                            ofj = fj + sh(2)
+                                            if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
+                                            do fi = 0, amr_slots(k)%m
+                                                ofi = fi + sh(1)
+                                                if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
+                                                amr_slots(k)%pb_f%sf(fi, fj, fk,:,:) = amr_slots(kk)%pb_stor%sf(ofi, ofj, ofk,:,:)
+                                                amr_slots(k)%mv_f%sf(fi, fj, fk,:,:) = amr_slots(kk)%mv_stor%sf(ofi, ofj, ofk,:,:)
+                                            end do
+                                        end do
+                                    end do
+                                end do
+                            end if
+                            $:GPU_UPDATE(device='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f%sf]')
+                        end if
+                        ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine
+                        ! advance
                     end do
-                end do
-            end do
+                    amr_xchg_coarse_ghosts = any_xchg  ! coarse halo exchanged once per step if ANY block needs it
+                    ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
+                    ! new-owned slots were allocated in the build loop, so this only frees - a rank keeps just its owned blocks'
+                    ! fine arrays
+                    call s_amr_reconcile_slots()
+                    ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/
+                    ! image points recomputed from the body definitions; no state carries across regrids)
+                    if (ib) call s_amr_setup_ib()
+                    call s_amr_select_slot(1)
 
-        end subroutine s_amr_tag_child_from_fine
+                end subroutine s_amr_regrid
 
-        !> Write the fine-level restart file for save step t_step alongside the level-0 restart (whose format stays untouched): the
-        !! writing rank count, the active-block count, and for EACH block its box + each rank's intersection-local fine conservative
-        !! state. Serial mode: one unformatted file per rank inside its level-0 step directory. Parallel mode: one shared MPI-IO
-        !! file (3-int global header [np, nboxes, sys_size], then per block a 6-int box header, a 3*np-int per-rank fine-extents
-        !! record [m,n,p per rank, 0s for non-owners; validated on read], followed by the ranks' fine blocks concatenated in rank
-        !! order). Same rank count + decomposition required to restart (enforced by the extents record).
-        impure subroutine s_write_amr_restart(t_step)
+                !> Sensor-on-fine child tagging: OR-accumulate density-gradient tags from an OLD fine block's solution into an
+                !! L0-cell tag grid, restricted to a parent nesting window. Reads amr_slots(ob)%q_cons on the HOST (the caller
+                !! host-refreshes the cont range first; the step-5 stash's GPU_UPDATE runs later). Fine cell (fi,fj,fk) covers L0
+                !! cell (ci,cj,ck) with fi = rr*(ci-olo(1))+d etc.; the gradient uses one-sided differences at the fine-interior
+                !! edges so no stale fine ghost is read. Only decides placement - conservation is enforced downstream by
+                !! restrict/reflux regardless of the box extent.
+                impure subroutine s_amr_tag_child_from_fine(ob, win_lo, win_hi, ctag, any_tag)
 
-            integer, intent(in)                  :: t_step
-            character(LEN=path_len + 3*name_len) :: file_loc
-            integer                              :: i, k
+                    integer, intent(in)    :: ob, win_lo(3), win_hi(3)
+                    logical, intent(inout) :: ctag(0:,0:,0:)
+                    logical, intent(inout) :: any_tag
+                    integer                :: rr, ci, cj, ck, fi, fj, fk, d1, d2, d3, fm1, fm2, fm3, olo(3), lo(3), hi(3)
+                    real(wp)               :: r0, g
+                    logical                :: tagged
+
+                    rr = amr_slots(ob)%ref_ratio
+                    olo = amr_region_lo_all(:,ob)
+                    fm1 = amr_slots(ob)%m; fm2 = amr_slots(ob)%n; fm3 = amr_slots(ob)%p
+                    ! overlap of this old block with the parent window, in L0 cells
+                    lo(1) = max(win_lo(1), amr_region_lo_all(1, ob)); hi(1) = min(win_hi(1), amr_region_hi_all(1, ob))
+                    lo(2) = merge(max(win_lo(2), amr_region_lo_all(2, ob)), 0, n_glb > 0)
+                    hi(2) = merge(min(win_hi(2), amr_region_hi_all(2, ob)), 0, n_glb > 0)
+                    lo(3) = merge(max(win_lo(3), amr_region_lo_all(3, ob)), 0, p_glb > 0)
+                    hi(3) = merge(min(win_hi(3), amr_region_hi_all(3, ob)), 0, p_glb > 0)
+                    do ck = lo(3), hi(3)
+                        do cj = lo(2), hi(2)
+                            do ci = lo(1), hi(1)
+                                tagged = .false.
+                                do d3 = 0, merge(rr - 1, 0, p_glb > 0)
+                                    fk = (ck - olo(3))*rr + d3
+                                    do d2 = 0, merge(rr - 1, 0, n_glb > 0)
+                                        fj = (cj - olo(2))*rr + d2
+                                        do d1 = 0, rr - 1
+                                            fi = (ci - olo(1))*rr + d1
+                                            r0 = max(abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, fk)), 1.e-30_wp)
+                                            g = abs(f_amr_rho_tot(amr_slots(ob)%q_cons, min(fi + 1, fm1), fj, &
+                                                    & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, max(fi - 1, 0), fj, fk))
+                                            if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, min(fj + 1, &
+                                                & fm2), fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, max(fj - 1, 0), fk)))
+                                            if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, min(fk + 1, &
+                                                & fm3)) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, max(fk - 1, 0))))
+                                            if (g/(2._wp*r0) > amr_tag_eps) tagged = .true.
+                                        end do
+                                    end do
+                                end do
+                                if (tagged) then
+                                    ctag(ci, cj, ck) = .true.
+                                    any_tag = .true.
+                                end if
+                            end do
+                        end do
+                    end do
+
+                end subroutine s_amr_tag_child_from_fine
+
+                !> Write the fine-level restart file for save step t_step alongside the level-0 restart (whose format stays
+                !! untouched): the writing rank count, the active-block count, and for EACH block its box + each rank's
+                !! intersection-local fine conservative state. Serial mode: one unformatted file per rank inside its level-0 step
+                !! directory. Parallel mode: one shared MPI-IO file (3-int global header [np, nboxes, sys_size], then per block a
+                !! 6-int box header, a 3*np-int per-rank fine-extents record [m,n,p per rank, 0s for non-owners; validated on read],
+                !! followed by the ranks' fine blocks concatenated in rank order). Same rank count + decomposition required to
+                !! restart (enforced by the extents record).
+                impure subroutine s_write_amr_restart(t_step)
+
+                    integer, intent(in)                  :: t_step
+                    character(LEN=path_len + 3*name_len) :: file_loc
+                    integer                              :: i, k
 
 #ifdef MFC_MPI
-            integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, reg(6), ibytes, sbytes
-            integer                                    :: myext(3)
-            integer, allocatable                       :: wext(:), myext_all(:), wext_all(:)
-            integer, dimension(MPI_STATUS_SIZE)        :: status
-            integer(kind=MPI_OFFSET_KIND)              :: my_cnt, my_off, disp0, ddisp
-            integer(kind=MPI_OFFSET_KIND), allocatable :: my_cnt_vec(:), my_off_vec(:), tot_cnt_vec(:)
-            logical                                    :: file_exist
-            real(stp), allocatable                     :: buf(:)
+                    integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, reg(6), ibytes, sbytes
+                    integer                                    :: myext(3)
+                    integer, allocatable                       :: wext(:), myext_all(:), wext_all(:)
+                    integer, dimension(MPI_STATUS_SIZE)        :: status
+                    integer(kind=MPI_OFFSET_KIND)              :: my_cnt, my_off, disp0, ddisp
+                    integer(kind=MPI_OFFSET_KIND), allocatable :: my_cnt_vec(:), my_off_vec(:), tot_cnt_vec(:)
+                    logical                                    :: file_exist
+                    real(stp), allocatable                     :: buf(:)
 #endif
 
-            if (.not. amr) return
-            ! host consumer: the fine state is device-current during stepping (pull every owned slot)
-            do k = 1, amr_num_blocks
-                if (amr_owns_all(k)) then
-                    do i = 1, sys_size
-                        $:GPU_UPDATE(host='[amr_slots(k)%q_cons(i)%sf]')
+                    if (.not. amr) return
+                    ! host consumer: the fine state is device-current during stepping (pull every owned slot)
+                    do k = 1, amr_num_blocks
+                        if (amr_owns_all(k)) then
+                            do i = 1, sys_size
+                                $:GPU_UPDATE(host='[amr_slots(k)%q_cons(i)%sf]')
+                            end do
+                        end if
                     end do
-                end if
-            end do
 
-            if (.not. parallel_io) then
-                ! per-rank file in the step directory freshly created by the level-0 serial write
-                write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step, '/amr_fine.dat'
-                open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
-                write (2) num_procs, amr_num_blocks, sys_size
-                do k = 1, amr_num_blocks
-                    write (2) amr_slots(k)%region%lo, amr_slots(k)%region%hi, amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p
-                    if (amr_owns_all(k)) then
-                        do i = 1, sys_size
-                            write (2) amr_slots(k)%q_cons(i)%sf(0:amr_slots(k)%m,0:amr_slots(k)%n,0:amr_slots(k)%p)
+                    if (.not. parallel_io) then
+                        ! per-rank file in the step directory freshly created by the level-0 serial write
+                        write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step, '/amr_fine.dat'
+                        open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
+                        write (2) num_procs, amr_num_blocks, sys_size
+                        do k = 1, amr_num_blocks
+                            write (2) amr_slots(k)%region%lo, amr_slots(k)%region%hi, amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p
+                            if (amr_owns_all(k)) then
+                                do i = 1, sys_size
+                                    write (2) amr_slots(k)%q_cons(i)%sf(0:amr_slots(k)%m,0:amr_slots(k)%n,0:amr_slots(k)%p)
+                                end do
+                            end if
+                        end do
+                        close (2)
+                    else
+#ifdef MFC_MPI
+                        ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
+                        write (file_loc, '(A,I0,A)') 'amr_', t_step, '.dat'
+                        file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+                        inquire (FILE=trim(file_loc), EXIST=file_exist)
+                        if (file_exist .and. proc_rank == 0) then
+                            call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+                        end if
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, &
+                                           & ierr)
+                        ! MPI-IO file handles default to MPI_ERRORS_RETURN: failures are silent unless checked
+                        if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart write: MPI_FILE_OPEN failed for ' // trim(file_loc))
+                        if (proc_rank == 0) call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), [num_procs, amr_num_blocks, &
+                            & sys_size], 3, MPI_INTEGER, status, ierr)
+                        disp0 = int(3*ibytes, MPI_OFFSET_KIND)  ! running byte offset past the 3-int global header
+                        ! hoist per-block metadata collectives: one EXSCAN/ALLREDUCE/ALLGATHER over ALL blocks
+                        allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks), tot_cnt_vec(amr_num_blocks))
+                        allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
+                        do k = 1, amr_num_blocks
+                            cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
+                            if (.not. amr_owns_all(k)) cnt = 0
+                            my_cnt_vec(k) = int(cnt, MPI_OFFSET_KIND)
+                            myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = 0
+                            if (amr_owns_all(k)) myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = [amr_slots(k)%m, amr_slots(k)%n, &
+                                & amr_slots(k)%p]
+                        end do
+                        my_off_vec = int(0, MPI_OFFSET_KIND)
+                        call MPI_EXSCAN(my_cnt_vec, my_off_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
+                        if (proc_rank == 0) my_off_vec = int(0, MPI_OFFSET_KIND)
+                        call MPI_ALLREDUCE(my_cnt_vec, tot_cnt_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
+                        ! per-rank fine extents (0s for non-owning ranks): readers rebuild this vector
+                        ! from their own decomposition and abort on mismatch - a different rank count,
+                        ! ownership pattern, or load_balance split would otherwise silently misalign
+                        ! the concatenated per-rank data slices below
+                        call MPI_ALLGATHER(myext_all, 3*amr_num_blocks, MPI_INTEGER, wext_all, 3*amr_num_blocks, MPI_INTEGER, &
+                                           & MPI_COMM_WORLD, ierr)
+                        if (.not. allocated(wext)) allocate (wext(3*num_procs))
+                        do k = 1, amr_num_blocks
+                            cnt = int(my_cnt_vec(k), kind(cnt))
+                            my_off = my_off_vec(k)
+                            if (proc_rank == 0) then
+                                reg(1:3) = amr_slots(k)%region%lo; reg(4:6) = amr_slots(k)%region%hi
+                                call MPI_FILE_WRITE_AT(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                            end if
+                            ! wext_all layout: rank r's extents for block k at wext_all(3*amr_num_blocks*r + 3*(k-1) + 1 : +3)
+                            do i = 0, num_procs - 1
+                                wext(3*i + 1:3*i + 3) = wext_all(3*amr_num_blocks*i + 3*(k - 1) + 1:3*amr_num_blocks*i + 3*(k - 1) &
+                                     & + 3)
+                            end do
+                            if (proc_rank == 0) then
+                                call MPI_FILE_WRITE_AT(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, &
+                                                       & MPI_INTEGER, status, ierr)
+                            end if
+                            ddisp = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
+                            allocate (buf(max(cnt, 1)))
+                            idx = 0
+                            do i = 1, sys_size
+                                do fk = 0, amr_slots(k)%p
+                                    do fj = 0, amr_slots(k)%n
+                                        do fi = 0, amr_slots(k)%m
+                                            idx = idx + 1
+                                            buf(idx) = amr_slots(k)%q_cons(i)%sf(fi, fj, fk)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            call MPI_FILE_WRITE_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, &
+                                                       & mpi_io_p, status, ierr)
+                            if (ierr /= MPI_SUCCESS) &
+                                & call s_mpi_abort('amr restart write: data write failed (disk full/quota?); the file is unusable')
+                            deallocate (buf)
+                            disp0 = ddisp + tot_cnt_vec(k)*int(sbytes, MPI_OFFSET_KIND)
+                        end do
+                        deallocate (my_cnt_vec, my_off_vec, tot_cnt_vec, myext_all, wext_all)
+                        ! the close is where buffered MPI-IO data flushes on many stacks - a failure here truncates the file
+                        call MPI_FILE_CLOSE(ifile, ierr)
+                        if (ierr /= MPI_SUCCESS) &
+                            & call s_mpi_abort('amr restart write: MPI_FILE_CLOSE failed; the file may be truncated')
+#endif
+                    end if
+
+                end subroutine s_write_amr_restart
+
+                !> Restore the fine level from the AMR restart file at t_step_start (n_start under cfl_dt), if one exists: for each
+                !! saved block rebuild the box via s_set_amr_fine_geometry, then read each rank's intersection-local fine state
+                !! (exact stp round-trip). parallel_io REPARTITIONS across rank counts (each block is one contiguous region-sized
+                !! chunk under whole-block ownership, re-assigned to this run's owners); serial (per-rank files) still needs the
+                !! writing rank count. restored = false on a fresh start, or - with a one-line warning - on a legacy restart without
+                !! the file; the caller then re-prolongs from coarse. Collective: ALL ranks call together.
+                impure subroutine s_read_amr_restart(restored)
+
+                    logical, intent(out)                 :: restored
+                    character(LEN=path_len + 3*name_len) :: file_loc
+                    character(LEN=300)                   :: msg
+                    logical                              :: file_exist
+                    integer                              :: i, k, ts, have_loc, have_glb, ghdr(3), reg(6), rm, rn, rp
+                    logical, allocatable                 :: had_data(:)
+
+#ifdef MFC_MPI
+                    integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes, np_old
+                    integer                                    :: myext(3)
+                    integer, allocatable                       :: wext(:), rext(:), myext_all(:), wext_all(:)
+                    integer, dimension(MPI_STATUS_SIZE)        :: status
+                    integer(kind=MPI_OFFSET_KIND)              :: my_cnt, my_off, disp0, ddisp, fsz
+                    integer(kind=MPI_OFFSET_KIND), allocatable :: blk_base(:), my_cnt_vec(:), my_off_vec(:)
+                    real(stp), allocatable                     :: buf(:)
+#endif
+
+                    restored = .false.
+                    if (.not. amr) return
+                    if (cfl_dt) then
+                        ts = n_start
+                    else
+                        ts = t_step_start
+                    end if
+                    if (ts == 0) return  ! fresh start: the fine level is prolonged from the pre_process ICs
+
+                    if (.not. parallel_io) then
+                        write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', ts, '/amr_fine.dat'
+                    else
+                        write (file_loc, '(A,I0,A)') 'amr_', ts, '.dat'
+                        file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+                    end if
+                    inquire (FILE=trim(file_loc), EXIST=file_exist)
+                    have_loc = merge(1, 0, file_exist)
+                    call s_mpi_allreduce_integer_min(have_loc, have_glb)
+                    if (have_glb == 0) then
+                        if (proc_rank == 0) then
+                            print '(A)', &
+                                & ' [amr] WARNING: no AMR restart file at this step; the fine level is re-initialized by ' &
+                                & // 'prolongation from coarse (fine-level accuracy is lost across this restart)'
+                        end if
+                        return
+                    end if
+
+                    if (.not. parallel_io) then
+                        open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
+                        read (2) ghdr
+                        if (ghdr(1) /= num_procs) then
+                            write (msg, &
+                                   & '(A,I0,A,I0,A)') &
+                                   & 'amr restart rank-count mismatch: the serial (non-parallel_io) AMR restart ' &
+                                   & // 'file was written with ', ghdr(1), ' ranks but this run has ', num_procs, &
+                                   & '; restart with the same rank count, or use parallel_io (which repartitions across rank counts)'
+                            call s_mpi_abort(trim(msg))
+                        end if
+                        if (ghdr(3) /= sys_size) then
+                            write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
+                                   & ' conserved variables but this run has ', sys_size, &
+                                   & '; the physics configuration ' &
+                                   & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
+                            call s_mpi_abort(trim(msg))
+                        end if
+                        if (ghdr(2) < 1 .or. ghdr(2) > amr_max_blocks) then
+                            call s_mpi_abort('amr restart: the file holds more fine blocks than amr_max_blocks ' &
+                                             & // 'in this run; restart with amr_max_blocks at least the written block count')
+                        end if
+                        amr_num_blocks = ghdr(2)
+                        allocate (had_data(amr_num_blocks))
+                        ! PASS 1: read every block's region + (present iff rm>=0, i.e. this rank owned it at write) the
+                        ! owner's fine state. Whole-block ownership is decomposition-deterministic, so the file's
+                        ! data-presence flag drives the read here; the owner map is rebuilt from the regions in pass 2.
+                        do k = 1, amr_num_blocks
+                            read (2) reg, rm, rn, rp
+                            ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
+                            ! build and coordinate reads out of bounds silently in release builds
+                            if (reg(1) < 0 .or. reg(4) > m_glb .or. reg(1) > reg(4) .or. (n_glb > 0 .and. (reg(2) < 0 .or. reg(5) &
+                                & > n_glb .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) &
+                                & > reg(6)))) then
+                                call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
+                            end if
+                            amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
+                            had_data(k) = rm >= 0
+                            if (had_data(k)) then
+                                ! whole-block owner extents are region-derived (decomposition-independent); a file whose
+                                ! stored extent disagrees is corrupt/foreign - reject before the direct read
+                                if (rm /= ref_ratio*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge(ref_ratio*(reg(5) - reg(2) + 1) &
+                                    & - 1, 0, n_glb > 0) .or. rp /= merge(ref_ratio*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
+                                    call s_mpi_abort('amr restart: block fine extents disagree with the region (corrupt file)')
+                                end if
+                                ! serial (same rank count): had_data == this run's ownership, so this is the owned slot
+                                call s_amr_alloc_slot(k)
+                                do i = 1, sys_size
+                                    read (2) amr_slots(k)%q_cons(i)%sf(0:rm,0:rn,0:rp)
+                                end do
+                            end if
+                        end do
+                        close (2)
+                        ! PASS 2: rebuild whole-block owners from the regions, then each block's geometry under the
+                        ! correct owner; verify the data read (write-owner) matches who owns the block in this run
+                        call s_amr_assign_block_owners()
+                        ! free any init slots not in the restart set (had_data slots stay: they are owned)
+                        call s_amr_reconcile_slots()
+                        do k = 1, amr_num_blocks
+                            amr_cur = k
+                            call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
+                            if (had_data(k) .neqv. amr_owns_all(k)) then
+                                call s_mpi_abort('amr restart decomposition mismatch: the file''s block ownership differs from this' // ' run''s (identical decomposition - rank count and load_balance settings - required)')
+                            end if
+                        end do
+                        deallocate (had_data)
+                    else
+#ifdef MFC_MPI
+                        ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
+                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                        ! MPI-IO errors are silent by default (MPI_ERRORS_RETURN on file handles) and a read past EOF
+                        ! is not even an error - it returns short with an uninitialized tail. Grab the size up front;
+                        ! the exact expected byte count is compared after the layout records are consumed below.
+                        if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart read: MPI_FILE_OPEN failed for ' // trim(file_loc))
+                        call MPI_FILE_GET_SIZE(ifile, fsz, ierr)
+                        call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
+                        ! Repartition-on-restart: the writer's rank count sets only the file layout (the 3*np_old per-block
+                        ! extents record). Whole-block ownership makes each block's fine data one contiguous region-sized chunk,
+                        ! so ANY new rank count can read it - pass 2 re-assigns owners for THIS run and each new owner reads its
+                        ! whole blocks. np_old == num_procs is byte-identical to the same-rank path (and keeps the layout check).
+                        np_old = ghdr(1)
+                        if (np_old /= num_procs .and. proc_rank == 0) then
+                            print '(A,I0,A,I0,A)', ' [amr] restart: repartitioning a ', np_old, '-rank checkpoint onto ', &
+                                & num_procs, ' ranks (fine blocks re-assigned by this run''s SFC map)'
+                        end if
+                        if (ghdr(3) /= sys_size) then
+                            write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
+                                   & ' conserved variables but this run has ', sys_size, &
+                                   & '; the physics configuration ' &
+                                   & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
+                            call s_mpi_abort(trim(msg))
+                        end if
+                        if (ghdr(2) < 1 .or. ghdr(2) > amr_max_blocks) then
+                            call s_mpi_abort('amr restart: the file holds more fine blocks than amr_max_blocks ' &
+                                             & // 'in this run; restart with amr_max_blocks at least the written block count')
+                        end if
+                        amr_num_blocks = ghdr(2)
+                        allocate (wext(3*np_old), rext(3*num_procs), blk_base(amr_num_blocks))
+                        ! PASS 1: read every block's region (collective) and lay out the file offsets. Under whole-block
+                        ! ownership the per-block data size is fixed by the region (one owner holds all sys_size*cells),
+                        ! so all offsets are known before the owner map is rebuilt in pass 2.
+                        disp0 = int(3*ibytes, MPI_OFFSET_KIND)
+                        do k = 1, amr_num_blocks
+                            call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                            ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
+                            ! build and coordinate reads out of bounds silently in release builds
+                            if (reg(1) < 0 .or. reg(4) > m_glb .or. reg(1) > reg(4) .or. (n_glb > 0 .and. (reg(2) < 0 .or. reg(5) &
+                                & > n_glb .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) &
+                                & > reg(6)))) then
+                                call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
+                            end if
+                            amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
+                            blk_base(k) = disp0
+                            cnt = sys_size*(ref_ratio*(reg(4) - reg(1) + 1))*merge(ref_ratio*(reg(5) - reg(2) + 1), 1, &
+                                            & n_glb > 0)*merge(ref_ratio*(reg(6) - reg(3) + 1), 1, p_glb > 0)
+                            disp0 = disp0 + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND) + int(cnt, MPI_OFFSET_KIND)*int(sbytes, &
+                                                & MPI_OFFSET_KIND)
+                        end do
+                        ! PASS 2: rebuild whole-block owners from the regions, then per block build geometry under the
+                        ! correct owner, validate the writer's layout, and read this rank's owned slice at its offset.
+                        call s_amr_assign_block_owners()
+                        ! allocate this run's owned blocks (frees any stale init slots) before the read below
+                        call s_amr_reconcile_slots()
+                        do k = 1, amr_num_blocks
+                            amr_cur = k
+                            call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
+                        end do
+                        ! hoist per-block metadata collectives: one ALLGATHER/EXSCAN over ALL blocks
+                        allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks))
+                        allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
+                        do k = 1, amr_num_blocks
+                            cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
+                            if (.not. amr_owns_all(k)) cnt = 0
+                            my_cnt_vec(k) = int(cnt, MPI_OFFSET_KIND)
+                            myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = 0
+                            if (amr_owns_all(k)) myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = [amr_slots(k)%m, amr_slots(k)%n, &
+                                & amr_slots(k)%p]
+                        end do
+                        my_off_vec = int(0, MPI_OFFSET_KIND)
+                        call MPI_EXSCAN(my_cnt_vec, my_off_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
+                        if (proc_rank == 0) my_off_vec = int(0, MPI_OFFSET_KIND)
+                        ! same rank count: validate the writer's per-rank layout against this run's decomposition (a
+                        ! re-derived load_balance split would silently misalign every rank's slice). Repartitioning
+                        ! (np_old /= num_procs) intentionally uses a DIFFERENT decomposition, so the layout cannot match -
+                        ! skip the check; whole-block ownership makes each block one contiguous chunk the new owner reads
+                        ! wholly, and the file-size check below still fails closed on a truncated/corrupt file.
+                        if (np_old == num_procs) then
+                            call MPI_ALLGATHER(myext_all, 3*amr_num_blocks, MPI_INTEGER, wext_all, 3*amr_num_blocks, MPI_INTEGER, &
+                                               & MPI_COMM_WORLD, ierr)
+                        end if
+                        if (.not. allocated(wext)) allocate (wext(3*np_old))
+                        if (.not. allocated(rext)) allocate (rext(3*num_procs))
+                        do k = 1, amr_num_blocks
+                            cnt = int(my_cnt_vec(k), kind(cnt))
+                            my_off = my_off_vec(k)
+                            if (np_old == num_procs) then
+                                call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*np_old, &
+                                                          & MPI_INTEGER, status, ierr)
+                                do i = 0, num_procs - 1
+                                    rext(3*i + 1:3*i + 3) = wext_all(3*amr_num_blocks*i + 3*(k - 1) + 1:3*amr_num_blocks*i + 3*(k &
+                                         & - 1) + 3)
+                                end do
+                                if (any(rext /= wext)) then
+                                    call s_mpi_abort('amr restart: the per-rank fine-block layout in the file does not match ' &
+                                                     & // 'this run''s decomposition; with the same rank count the ownership and ' // '(with load_balance) the weighted splits must match the run that wrote the restart')
+                                end if
+                            end if
+                            ddisp = blk_base(k) + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND)
+                            allocate (buf(max(cnt, 1)))
+                            call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, &
+                                                      & mpi_io_p, status, ierr)
+                            idx = 0
+                            do i = 1, sys_size
+                                do fk = 0, amr_slots(k)%p
+                                    do fj = 0, amr_slots(k)%n
+                                        do fi = 0, amr_slots(k)%m
+                                            idx = idx + 1
+                                            amr_slots(k)%q_cons(i)%sf(fi, fj, fk) = buf(idx)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            deallocate (buf)
+                        end do
+                        deallocate (blk_base, my_cnt_vec, my_off_vec, myext_all, wext_all)
+                        ! disp0 now equals the exact byte count a complete file must have: a truncated file (crashed
+                        ! writer, filesystem hiccup) passes every layout check above but returns short reads with
+                        ! garbage tails - fail closed instead of restoring uninitialized data as the fine level
+                        if (disp0 /= fsz) then
+                            call s_mpi_abort('amr restart read: file size does not match the expected layout ' &
+                                             & // '(truncated or corrupt amr restart file)')
+                        end if
+                        call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+                    end if
+
+                    ! restored fine state to the device (mirrors s_populate_amr_fine's push; host reads above)
+                    do k = 1, amr_num_blocks
+                        if (amr_owns_all(k)) then
+                            do i = 1, sys_size
+                                $:GPU_UPDATE(device='[amr_slots(k)%q_cons(i)%sf]')
+                            end do
+                        end if
+                    end do
+                    ! non-polytropic QBMM: the restart file carries q_cons only; re-prolong each block's
+                    ! side-state from the restored coarse pb/mv (one-time piecewise-constant smoothing)
+                    if (qbmm .and. .not. polytropic) then
+                        do k = 1, amr_num_blocks
+                            call s_amr_select_slot(k)
+                            ! gather the coarse pb/mv patch on ALL ranks (P2P), then owners re-prolong from it
+                            call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
+                            if (amr_owns_all(k)) call s_amr_prolong_pbmv()
                         end do
                     end if
-                end do
-                close (2)
-            else
-#ifdef MFC_MPI
-                ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
-                write (file_loc, '(A,I0,A)') 'amr_', t_step, '.dat'
-                file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
-                inquire (FILE=trim(file_loc), EXIST=file_exist)
-                if (file_exist .and. proc_rank == 0) then
-                    call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
-                end if
-                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
-                ! MPI-IO file handles default to MPI_ERRORS_RETURN: failures are silent unless checked
-                if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart write: MPI_FILE_OPEN failed for ' // trim(file_loc))
-                if (proc_rank == 0) call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), [num_procs, amr_num_blocks, sys_size], &
-                    & 3, MPI_INTEGER, status, ierr)
-                disp0 = int(3*ibytes, MPI_OFFSET_KIND)  ! running byte offset past the 3-int global header
-                ! hoist per-block metadata collectives: one EXSCAN/ALLREDUCE/ALLGATHER over ALL blocks
-                allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks), tot_cnt_vec(amr_num_blocks))
-                allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
-                do k = 1, amr_num_blocks
-                    cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
-                    if (.not. amr_owns_all(k)) cnt = 0
-                    my_cnt_vec(k) = int(cnt, MPI_OFFSET_KIND)
-                    myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = 0
-                    if (amr_owns_all(k)) myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
-                end do
-                my_off_vec = int(0, MPI_OFFSET_KIND)
-                call MPI_EXSCAN(my_cnt_vec, my_off_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
-                if (proc_rank == 0) my_off_vec = int(0, MPI_OFFSET_KIND)
-                call MPI_ALLREDUCE(my_cnt_vec, tot_cnt_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
-                ! per-rank fine extents (0s for non-owning ranks): readers rebuild this vector
-                ! from their own decomposition and abort on mismatch - a different rank count,
-                ! ownership pattern, or load_balance split would otherwise silently misalign
-                ! the concatenated per-rank data slices below
-                call MPI_ALLGATHER(myext_all, 3*amr_num_blocks, MPI_INTEGER, wext_all, 3*amr_num_blocks, MPI_INTEGER, &
-                                   & MPI_COMM_WORLD, ierr)
-                if (.not. allocated(wext)) allocate (wext(3*num_procs))
-                do k = 1, amr_num_blocks
-                    cnt = int(my_cnt_vec(k), kind(cnt))
-                    my_off = my_off_vec(k)
+                    call s_amr_select_slot(1)
+                    restored = .true.
                     if (proc_rank == 0) then
-                        reg(1:3) = amr_slots(k)%region%lo; reg(4:6) = amr_slots(k)%region%hi
-                        call MPI_FILE_WRITE_AT(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                        print '(A,I0,A)', ' [amr] restart: restored fine level, ', amr_num_blocks, ' block(s)'
                     end if
-                    ! wext_all layout: rank r's extents for block k at wext_all(3*amr_num_blocks*r + 3*(k-1) + 1 : +3)
-                    do i = 0, num_procs - 1
-                        wext(3*i + 1:3*i + 3) = wext_all(3*amr_num_blocks*i + 3*(k - 1) + 1:3*amr_num_blocks*i + 3*(k - 1) + 3)
-                    end do
-                    if (proc_rank == 0) then
-                        call MPI_FILE_WRITE_AT(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, &
-                                               & status, ierr)
-                    end if
-                    ddisp = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
-                    allocate (buf(max(cnt, 1)))
-                    idx = 0
-                    do i = 1, sys_size
-                        do fk = 0, amr_slots(k)%p
-                            do fj = 0, amr_slots(k)%n
-                                do fi = 0, amr_slots(k)%m
-                                    idx = idx + 1
-                                    buf(idx) = amr_slots(k)%q_cons(i)%sf(fi, fj, fk)
-                                end do
-                            end do
-                        end do
-                    end do
-                    call MPI_FILE_WRITE_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, &
-                                               & mpi_io_p, status, ierr)
-                    if (ierr /= MPI_SUCCESS) &
-                        & call s_mpi_abort('amr restart write: data write failed (disk full/quota?); the file is unusable')
-                    deallocate (buf)
-                    disp0 = ddisp + tot_cnt_vec(k)*int(sbytes, MPI_OFFSET_KIND)
-                end do
-                deallocate (my_cnt_vec, my_off_vec, tot_cnt_vec, myext_all, wext_all)
-                ! the close is where buffered MPI-IO data flushes on many stacks - a failure here truncates the file
-                call MPI_FILE_CLOSE(ifile, ierr)
-                if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart write: MPI_FILE_CLOSE failed; the file may be truncated')
-#endif
-            end if
 
-        end subroutine s_write_amr_restart
+                end subroutine s_read_amr_restart
 
-        !> Restore the fine level from the AMR restart file at t_step_start (n_start under cfl_dt), if one exists: for each saved
-        !! block rebuild the box via s_set_amr_fine_geometry, then read each rank's intersection-local fine state (exact stp
-        !! round-trip). parallel_io REPARTITIONS across rank counts (each block is one contiguous region-sized chunk under
-        !! whole-block ownership, re-assigned to this run's owners); serial (per-rank files) still needs the writing rank count.
-        !! restored = false on a fresh start, or - with a one-line warning - on a legacy restart without the file; the caller then
-        !! re-prolongs from coarse. Collective: ALL ranks call together.
-        impure subroutine s_read_amr_restart(restored)
+                !> Global Sum(dV*U) for the per-fluid masses (continuity variables) and energy (eqn_idx%E) over the level-0
+                !! interior. First call (finalize_report=F) stores the baselines; the finalize call prints the relative drifts
+                !! (~roundoff with refluxing).
+                impure subroutine s_amr_conservation_defect(q_cons_base, finalize_report)
 
-            logical, intent(out)                 :: restored
-            character(LEN=path_len + 3*name_len) :: file_loc
-            character(LEN=300)                   :: msg
-            logical                              :: file_exist
-            integer                              :: i, k, ts, have_loc, have_glb, ghdr(3), reg(6), rm, rn, rp
-            logical, allocatable                 :: had_data(:)
+                    type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
+                    logical, intent(in)                                 :: finalize_report
+                    real(wp)                                            :: sm(num_fluids_max), se, dv, s_glb
+                    integer                                             :: ci, cj, ck, f
 
-#ifdef MFC_MPI
-            integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes, np_old
-            integer                                    :: myext(3)
-            integer, allocatable                       :: wext(:), rext(:), myext_all(:), wext_all(:)
-            integer, dimension(MPI_STATUS_SIZE)        :: status
-            integer(kind=MPI_OFFSET_KIND)              :: my_cnt, my_off, disp0, ddisp, fsz
-            integer(kind=MPI_OFFSET_KIND), allocatable :: blk_base(:), my_cnt_vec(:), my_off_vec(:)
-            real(stp), allocatable                     :: buf(:)
-#endif
-
-            restored = .false.
-            if (.not. amr) return
-            if (cfl_dt) then
-                ts = n_start
-            else
-                ts = t_step_start
-            end if
-            if (ts == 0) return  ! fresh start: the fine level is prolonged from the pre_process ICs
-
-            if (.not. parallel_io) then
-                write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', ts, '/amr_fine.dat'
-            else
-                write (file_loc, '(A,I0,A)') 'amr_', ts, '.dat'
-                file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
-            end if
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            have_loc = merge(1, 0, file_exist)
-            call s_mpi_allreduce_integer_min(have_loc, have_glb)
-            if (have_glb == 0) then
-                if (proc_rank == 0) then
-                    print '(A)', &
-                        & ' [amr] WARNING: no AMR restart file at this step; the fine level is re-initialized by ' &
-                        & // 'prolongation from coarse (fine-level accuracy is lost across this restart)'
-                end if
-                return
-            end if
-
-            if (.not. parallel_io) then
-                open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
-                read (2) ghdr
-                if (ghdr(1) /= num_procs) then
-                    write (msg, &
-                           & '(A,I0,A,I0,A)') 'amr restart rank-count mismatch: the serial (non-parallel_io) AMR restart ' &
-                           & // 'file was written with ', ghdr(1), ' ranks but this run has ', num_procs, &
-                           & '; restart with the same rank count, or use parallel_io (which repartitions across rank counts)'
-                    call s_mpi_abort(trim(msg))
-                end if
-                if (ghdr(3) /= sys_size) then
-                    write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
-                           & ' conserved variables but this run has ', sys_size, &
-                           & '; the physics configuration ' &
-                           & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
-                    call s_mpi_abort(trim(msg))
-                end if
-                if (ghdr(2) < 1 .or. ghdr(2) > amr_max_blocks) then
-                    call s_mpi_abort('amr restart: the file holds more fine blocks than amr_max_blocks ' &
-                                     & // 'in this run; restart with amr_max_blocks at least the written block count')
-                end if
-                amr_num_blocks = ghdr(2)
-                allocate (had_data(amr_num_blocks))
-                ! PASS 1: read every block's region + (present iff rm>=0, i.e. this rank owned it at write) the
-                ! owner's fine state. Whole-block ownership is decomposition-deterministic, so the file's
-                ! data-presence flag drives the read here; the owner map is rebuilt from the regions in pass 2.
-                do k = 1, amr_num_blocks
-                    read (2) reg, rm, rn, rp
-                    ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
-                    ! build and coordinate reads out of bounds silently in release builds
-                    if (reg(1) < 0 .or. reg(4) > m_glb .or. reg(1) > reg(4) .or. (n_glb > 0 .and. (reg(2) < 0 .or. reg(5) > n_glb &
-                        & .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) > reg(6)))) then
-                        call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
-                    end if
-                    amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
-                    had_data(k) = rm >= 0
-                    if (had_data(k)) then
-                        ! whole-block owner extents are region-derived (decomposition-independent); a file whose
-                        ! stored extent disagrees is corrupt/foreign - reject before the direct read
-                        if (rm /= ref_ratio*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge(ref_ratio*(reg(5) - reg(2) + 1) - 1, 0, &
-                            & n_glb > 0) .or. rp /= merge(ref_ratio*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
-                            call s_mpi_abort('amr restart: block fine extents disagree with the region (corrupt file)')
-                        end if
-                        ! serial (same rank count): had_data == this run's ownership, so this is the owned slot
-                        call s_amr_alloc_slot(k)
-                        do i = 1, sys_size
-                            read (2) amr_slots(k)%q_cons(i)%sf(0:rm,0:rn,0:rp)
-                        end do
-                    end if
-                end do
-                close (2)
-                ! PASS 2: rebuild whole-block owners from the regions, then each block's geometry under the
-                ! correct owner; verify the data read (write-owner) matches who owns the block in this run
-                call s_amr_assign_block_owners()
-                call s_amr_reconcile_slots()  ! free any init slots not in the restart set (had_data slots stay: they are owned)
-                do k = 1, amr_num_blocks
-                    amr_cur = k
-                    call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
-                    if (had_data(k) .neqv. amr_owns_all(k)) then
-                        call s_mpi_abort('amr restart decomposition mismatch: the file''s block ownership differs from this' &
-                                         & // ' run''s (identical decomposition - rank count and load_balance settings - required)')
-                    end if
-                end do
-                deallocate (had_data)
-            else
-#ifdef MFC_MPI
-                ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
-                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-                ! MPI-IO errors are silent by default (MPI_ERRORS_RETURN on file handles) and a read past EOF
-                ! is not even an error - it returns short with an uninitialized tail. Grab the size up front;
-                ! the exact expected byte count is compared after the layout records are consumed below.
-                if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart read: MPI_FILE_OPEN failed for ' // trim(file_loc))
-                call MPI_FILE_GET_SIZE(ifile, fsz, ierr)
-                call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
-                ! Repartition-on-restart: the writer's rank count sets only the file layout (the 3*np_old per-block
-                ! extents record). Whole-block ownership makes each block's fine data one contiguous region-sized chunk,
-                ! so ANY new rank count can read it - pass 2 re-assigns owners for THIS run and each new owner reads its
-                ! whole blocks. np_old == num_procs is byte-identical to the same-rank path (and keeps the layout check).
-                np_old = ghdr(1)
-                if (np_old /= num_procs .and. proc_rank == 0) then
-                    print '(A,I0,A,I0,A)', ' [amr] restart: repartitioning a ', np_old, '-rank checkpoint onto ', num_procs, &
-                        & ' ranks (fine blocks re-assigned by this run''s SFC map)'
-                end if
-                if (ghdr(3) /= sys_size) then
-                    write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
-                           & ' conserved variables but this run has ', sys_size, &
-                           & '; the physics configuration ' &
-                           & // '(num_fluids/model_eqns/bubbles/chemistry) must match the run that wrote the restart'
-                    call s_mpi_abort(trim(msg))
-                end if
-                if (ghdr(2) < 1 .or. ghdr(2) > amr_max_blocks) then
-                    call s_mpi_abort('amr restart: the file holds more fine blocks than amr_max_blocks ' &
-                                     & // 'in this run; restart with amr_max_blocks at least the written block count')
-                end if
-                amr_num_blocks = ghdr(2)
-                allocate (wext(3*np_old), rext(3*num_procs), blk_base(amr_num_blocks))
-                ! PASS 1: read every block's region (collective) and lay out the file offsets. Under whole-block
-                ! ownership the per-block data size is fixed by the region (one owner holds all sys_size*cells),
-                ! so all offsets are known before the owner map is rebuilt in pass 2.
-                disp0 = int(3*ibytes, MPI_OFFSET_KIND)
-                do k = 1, amr_num_blocks
-                    call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
-                    ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
-                    ! build and coordinate reads out of bounds silently in release builds
-                    if (reg(1) < 0 .or. reg(4) > m_glb .or. reg(1) > reg(4) .or. (n_glb > 0 .and. (reg(2) < 0 .or. reg(5) > n_glb &
-                        & .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) > reg(6)))) then
-                        call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
-                    end if
-                    amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
-                    blk_base(k) = disp0
-                    cnt = sys_size*(ref_ratio*(reg(4) - reg(1) + 1))*merge(ref_ratio*(reg(5) - reg(2) + 1), 1, &
-                                    & n_glb > 0)*merge(ref_ratio*(reg(6) - reg(3) + 1), 1, p_glb > 0)
-                    disp0 = disp0 + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND) + int(cnt, MPI_OFFSET_KIND)*int(sbytes, &
-                                        & MPI_OFFSET_KIND)
-                end do
-                ! PASS 2: rebuild whole-block owners from the regions, then per block build geometry under the
-                ! correct owner, validate the writer's layout, and read this rank's owned slice at its offset.
-                call s_amr_assign_block_owners()
-                call s_amr_reconcile_slots()  ! allocate this run's owned blocks (frees any stale init slots) before the read below
-                do k = 1, amr_num_blocks
-                    amr_cur = k
-                    call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
-                end do
-                ! hoist per-block metadata collectives: one ALLGATHER/EXSCAN over ALL blocks
-                allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks))
-                allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
-                do k = 1, amr_num_blocks
-                    cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
-                    if (.not. amr_owns_all(k)) cnt = 0
-                    my_cnt_vec(k) = int(cnt, MPI_OFFSET_KIND)
-                    myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = 0
-                    if (amr_owns_all(k)) myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
-                end do
-                my_off_vec = int(0, MPI_OFFSET_KIND)
-                call MPI_EXSCAN(my_cnt_vec, my_off_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
-                if (proc_rank == 0) my_off_vec = int(0, MPI_OFFSET_KIND)
-                ! same rank count: validate the writer's per-rank layout against this run's decomposition (a
-                ! re-derived load_balance split would silently misalign every rank's slice). Repartitioning
-                ! (np_old /= num_procs) intentionally uses a DIFFERENT decomposition, so the layout cannot match -
-                ! skip the check; whole-block ownership makes each block one contiguous chunk the new owner reads
-                ! wholly, and the file-size check below still fails closed on a truncated/corrupt file.
-                if (np_old == num_procs) then
-                    call MPI_ALLGATHER(myext_all, 3*amr_num_blocks, MPI_INTEGER, wext_all, 3*amr_num_blocks, MPI_INTEGER, &
-                                       & MPI_COMM_WORLD, ierr)
-                end if
-                if (.not. allocated(wext)) allocate (wext(3*np_old))
-                if (.not. allocated(rext)) allocate (rext(3*num_procs))
-                do k = 1, amr_num_blocks
-                    cnt = int(my_cnt_vec(k), kind(cnt))
-                    my_off = my_off_vec(k)
-                    if (np_old == num_procs) then
-                        call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*np_old, &
-                                                  & MPI_INTEGER, status, ierr)
-                        do i = 0, num_procs - 1
-                            rext(3*i + 1:3*i + 3) = wext_all(3*amr_num_blocks*i + 3*(k - 1) + 1:3*amr_num_blocks*i + 3*(k - 1) + 3)
-                        end do
-                        if (any(rext /= wext)) then
-                            call s_mpi_abort('amr restart: the per-rank fine-block layout in the file does not match ' &
-                                             & // 'this run''s decomposition; with the same rank count the ownership and ' &
-                                             & // '(with load_balance) the weighted splits must match the run that wrote the restart')
-                        end if
-                    end if
-                    ddisp = blk_base(k) + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND)
-                    allocate (buf(max(cnt, 1)))
-                    call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
-                                              & status, ierr)
-                    idx = 0
-                    do i = 1, sys_size
-                        do fk = 0, amr_slots(k)%p
-                            do fj = 0, amr_slots(k)%n
-                                do fi = 0, amr_slots(k)%m
-                                    idx = idx + 1
-                                    amr_slots(k)%q_cons(i)%sf(fi, fj, fk) = buf(idx)
-                                end do
-                            end do
-                        end do
-                    end do
-                    deallocate (buf)
-                end do
-                deallocate (blk_base, my_cnt_vec, my_off_vec, myext_all, wext_all)
-                ! disp0 now equals the exact byte count a complete file must have: a truncated file (crashed
-                ! writer, filesystem hiccup) passes every layout check above but returns short reads with
-                ! garbage tails - fail closed instead of restoring uninitialized data as the fine level
-                if (disp0 /= fsz) then
-                    call s_mpi_abort('amr restart read: file size does not match the expected layout ' &
-                                     & // '(truncated or corrupt amr restart file)')
-                end if
-                call MPI_FILE_CLOSE(ifile, ierr)
-#endif
-            end if
-
-            ! restored fine state to the device (mirrors s_populate_amr_fine's push; host reads above)
-            do k = 1, amr_num_blocks
-                if (amr_owns_all(k)) then
-                    do i = 1, sys_size
-                        $:GPU_UPDATE(device='[amr_slots(k)%q_cons(i)%sf]')
-                    end do
-                end if
-            end do
-            ! non-polytropic QBMM: the restart file carries q_cons only; re-prolong each block's
-            ! side-state from the restored coarse pb/mv (one-time piecewise-constant smoothing)
-            if (qbmm .and. .not. polytropic) then
-                do k = 1, amr_num_blocks
-                    call s_amr_select_slot(k)
-                    ! gather the coarse pb/mv patch on ALL ranks (P2P), then owners re-prolong from it
-                    call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
-                    if (amr_owns_all(k)) call s_amr_prolong_pbmv()
-                end do
-            end if
-            call s_amr_select_slot(1)
-            restored = .true.
-            if (proc_rank == 0) then
-                print '(A,I0,A)', ' [amr] restart: restored fine level, ', amr_num_blocks, ' block(s)'
-            end if
-
-        end subroutine s_read_amr_restart
-
-        !> Global Sum(dV*U) for the per-fluid masses (continuity variables) and energy (eqn_idx%E) over the level-0 interior. First
-        !! call (finalize_report=F) stores the baselines; the finalize call prints the relative drifts (~roundoff with refluxing).
-        impure subroutine s_amr_conservation_defect(q_cons_base, finalize_report)
-
-            type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
-            logical, intent(in)                                 :: finalize_report
-            real(wp)                                            :: sm(num_fluids_max), se, dv, s_glb
-            integer                                             :: ci, cj, ck, f
-
-            if (.not. amr) return
-            ! host consumer: diagnostics (host sum over exactly the summed fields). The init baseline call
-            ! runs BEFORE s_initialize_gpu_vars pushes the ICs to the device, so it must NOT pull the
-            ! (uninitialized) device copies.
-            if (finalize_report) then
-                do f = 1, num_fluids
-                    $:GPU_UPDATE(host='[q_cons_base(f)%sf]')
-                end do
-                $:GPU_UPDATE(host='[q_cons_base(eqn_idx%E)%sf]')
-            end if
-            sm = 0._wp; se = 0._wp
-            do ck = 0, p
-                do cj = 0, n
-                    do ci = 0, m
-                        dv = dx(ci)
-                        if (n_glb > 0) dv = dv*dy(cj)
-                        if (p_glb > 0) dv = dv*dz(ck)
+                    if (.not. amr) return
+                    ! host consumer: diagnostics (host sum over exactly the summed fields). The init baseline call
+                    ! runs BEFORE s_initialize_gpu_vars pushes the ICs to the device, so it must NOT pull the
+                    ! (uninitialized) device copies.
+                    if (finalize_report) then
                         do f = 1, num_fluids
-                            sm(f) = sm(f) + dv*real(q_cons_base(f)%sf(ci, cj, ck), wp)
+                            $:GPU_UPDATE(host='[q_cons_base(f)%sf]')
                         end do
-                        se = se + dv*real(q_cons_base(eqn_idx%E)%sf(ci, cj, ck), wp)
+                        $:GPU_UPDATE(host='[q_cons_base(eqn_idx%E)%sf]')
+                    end if
+                    sm = 0._wp; se = 0._wp
+                    do ck = 0, p
+                        do cj = 0, n
+                            do ci = 0, m
+                                dv = dx(ci)
+                                if (n_glb > 0) dv = dv*dy(cj)
+                                if (p_glb > 0) dv = dv*dz(ck)
+                                do f = 1, num_fluids
+                                    sm(f) = sm(f) + dv*real(q_cons_base(f)%sf(ci, cj, ck), wp)
+                                end do
+                                se = se + dv*real(q_cons_base(eqn_idx%E)%sf(ci, cj, ck), wp)
+                            end do
+                        end do
                     end do
-                end do
-            end do
-            if (num_procs > 1) then
-                do f = 1, num_fluids
-                    call s_mpi_allreduce_sum(sm(f), s_glb); sm(f) = s_glb
-                end do
-                call s_mpi_allreduce_sum(se, s_glb); se = s_glb
-            end if
-            if (.not. finalize_report) then
-                amr_mass0(1:num_fluids) = sm(1:num_fluids); amr_energy0 = se
-            else if (proc_rank == 0) then
-                do f = 1, num_fluids
-                    print '(A,I0,A,ES12.4)', ' [amr] conservation defect: mass(', f, ') drift = ', &
-                        & abs(sm(f) - amr_mass0(f))/max(abs(amr_mass0(f)), 1.e-30_wp)
-                end do
-                print '(A,ES12.4)', ' [amr] conservation defect: energy drift = ', abs(se - amr_energy0)/max(abs(amr_energy0), &
-                    & 1.e-30_wp)
-            end if
+                    if (num_procs > 1) then
+                        do f = 1, num_fluids
+                            call s_mpi_allreduce_sum(sm(f), s_glb); sm(f) = s_glb
+                        end do
+                        call s_mpi_allreduce_sum(se, s_glb); se = s_glb
+                    end if
+                    if (.not. finalize_report) then
+                        amr_mass0(1:num_fluids) = sm(1:num_fluids); amr_energy0 = se
+                    else if (proc_rank == 0) then
+                        do f = 1, num_fluids
+                            print '(A,I0,A,ES12.4)', ' [amr] conservation defect: mass(', f, ') drift = ', &
+                                & abs(sm(f) - amr_mass0(f))/max(abs(amr_mass0(f)), 1.e-30_wp)
+                        end do
+                        print '(A,ES12.4)', ' [amr] conservation defect: energy drift = ', &
+                            & abs(se - amr_energy0)/max(abs(amr_energy0), 1.e-30_wp)
+                    end if
 
-        end subroutine s_amr_conservation_defect
+                end subroutine s_amr_conservation_defect
 
-        !> Init-time operator verification: (b) linear reproduction, (c) restriction of an independent field. Uses
-        !! amr_slots(amr_cur)%q_cons(1) as scratch; called before s_populate_amr_fine overwrites it.
-        impure subroutine s_amr_operator_checks()
+                !> Init-time operator verification: (b) linear reproduction, (c) restriction of an independent field. Uses
+                !! amr_slots(amr_cur)%q_cons(1) as scratch; called before s_populate_amr_fine overwrites it.
+                impure subroutine s_amr_operator_checks()
 
-            type(scalar_field), allocatable :: cscr(:)
-            integer                         :: fi, fj, fk, ci, cj, ck, l1, l2, l3, g1, g2, g3
-            real(wp)                        :: e, errb, errc, si_f, si_c, dvf, dvc, want, xc, yc, zc
+                    type(scalar_field), allocatable :: cscr(:)
+                    integer                         :: fi, fj, fk, ci, cj, ck, l1, l2, l3, g1, g2, g3
+                    real(wp)                        :: e, errb, errc, si_f, si_c, dvf, dvc, want, xc, yc, zc
 
-            if (.not. amr) return
-            if (.not. amr_rank_owns_block) return
-            ! fine-level distribution: the owner's block need not lie in its coarse subdomain, so operate in the block-local patch
-            ! frame (the amr_cg frame: cell 0 == region_lo - nmar) and take coarse cell centres/spacings from the GLOBAL boundaries.
-            amr_cpat_off = 0
-            amr_cpat_off(1) = amr_isect_lo(1) - amr_cpat_mar
-            if (n_glb > 0) amr_cpat_off(2) = amr_isect_lo(2) - amr_cpat_mar
-            if (p_glb > 0) amr_cpat_off(3) = amr_isect_lo(3) - amr_cpat_mar
+                    if (.not. amr) return
+                    if (.not. amr_rank_owns_block) return
+                    ! fine-level distribution: the owner's block need not lie in its coarse subdomain, so operate in the block-local
+                    ! patch
+                    ! frame (the amr_cg frame: cell 0 == region_lo - nmar) and take coarse cell centres/spacings from the GLOBAL
+                    ! boundaries.
+                    amr_cpat_off = 0
+                    amr_cpat_off(1) = amr_isect_lo(1) - amr_cpat_mar
+                    if (n_glb > 0) amr_cpat_off(2) = amr_isect_lo(2) - amr_cpat_mar
+                    if (p_glb > 0) amr_cpat_off(3) = amr_isect_lo(3) - amr_cpat_mar
 
-            ! (b) fill a coarse-patch scratch with an exactly-linear field (global coords), prolong, compare pointwise
-            allocate (cscr(1:1))
-            allocate (cscr(1)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
-            do l3 = 0, amr_cpat_hi(3)
-                g3 = l3 + amr_cpat_off(3); zc = 0._wp; if (p_glb > 0) zc = 0.5_wp*(amr_gzcb(g3 - 1) + amr_gzcb(g3))
-                do l2 = 0, amr_cpat_hi(2)
-                    g2 = l2 + amr_cpat_off(2); yc = 0._wp; if (n_glb > 0) yc = 0.5_wp*(amr_gycb(g2 - 1) + amr_gycb(g2))
-                    do l1 = 0, amr_cpat_hi(1)
-                        g1 = l1 + amr_cpat_off(1); xc = 0.5_wp*(amr_gxcb(g1 - 1) + amr_gxcb(g1))
-                        cscr(1)%sf(l1, l2, l3) = 1._wp + 2._wp*xc
-                        if (n_glb > 0) cscr(1)%sf(l1, l2, l3) = cscr(1)%sf(l1, l2, l3) + 3._wp*yc
-                        if (p_glb > 0) cscr(1)%sf(l1, l2, l3) = cscr(1)%sf(l1, l2, l3) + 4._wp*zc
+                    ! (b) fill a coarse-patch scratch with an exactly-linear field (global coords), prolong, compare pointwise
+                    allocate (cscr(1:1))
+                    allocate (cscr(1)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
+                    do l3 = 0, amr_cpat_hi(3)
+                        g3 = l3 + amr_cpat_off(3); zc = 0._wp; if (p_glb > 0) zc = 0.5_wp*(amr_gzcb(g3 - 1) + amr_gzcb(g3))
+                        do l2 = 0, amr_cpat_hi(2)
+                            g2 = l2 + amr_cpat_off(2); yc = 0._wp; if (n_glb > 0) yc = 0.5_wp*(amr_gycb(g2 - 1) + amr_gycb(g2))
+                            do l1 = 0, amr_cpat_hi(1)
+                                g1 = l1 + amr_cpat_off(1); xc = 0.5_wp*(amr_gxcb(g1 - 1) + amr_gxcb(g1))
+                                cscr(1)%sf(l1, l2, l3) = 1._wp + 2._wp*xc
+                                if (n_glb > 0) cscr(1)%sf(l1, l2, l3) = cscr(1)%sf(l1, l2, l3) + 3._wp*yc
+                                if (p_glb > 0) cscr(1)%sf(l1, l2, l3) = cscr(1)%sf(l1, l2, l3) + 4._wp*zc
+                            end do
+                        end do
                     end do
-                end do
-            end do
-            call s_prolong_one_var(cscr(1), amr_slots(amr_cur)%q_cons(1))
-            errb = 0._wp
-            do fk = 0, amr_slots(amr_cur)%p
-                do fj = 0, amr_slots(amr_cur)%n
-                    do fi = 0, amr_slots(amr_cur)%m
-                        want = 1._wp + 2._wp*amr_slots(amr_cur)%x_cc(fi)
-                        if (n_glb > 0) want = want + 3._wp*amr_slots(amr_cur)%y_cc(fj)
-                        if (p_glb > 0) want = want + 4._wp*amr_slots(amr_cur)%z_cc(fk)
-                        e = abs(real(amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk), wp) - want)
-                        if (e > errb) errb = e
+                    call s_prolong_one_var(cscr(1), amr_slots(amr_cur)%q_cons(1))
+                    errb = 0._wp
+                    do fk = 0, amr_slots(amr_cur)%p
+                        do fj = 0, amr_slots(amr_cur)%n
+                            do fi = 0, amr_slots(amr_cur)%m
+                                want = 1._wp + 2._wp*amr_slots(amr_cur)%x_cc(fi)
+                                if (n_glb > 0) want = want + 3._wp*amr_slots(amr_cur)%y_cc(fj)
+                                if (p_glb > 0) want = want + 4._wp*amr_slots(amr_cur)%z_cc(fk)
+                                e = abs(real(amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk), wp) - want)
+                                if (e > errb) errb = e
+                            end do
+                        end do
                     end do
-                end do
-            end do
 
-            ! (c) fill the fine block with a quadratic (NOT from prolongation), restrict, compare integrals
-            do fk = 0, amr_slots(amr_cur)%p
-                do fj = 0, amr_slots(amr_cur)%n
-                    do fi = 0, amr_slots(amr_cur)%m
-                        amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%x_cc(fi)**2
-                        if (n_glb > 0) amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, &
-                            & fk) + amr_slots(amr_cur)%y_cc(fj)**2
-                        if (p_glb > 0) amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, &
-                            & fk) + amr_slots(amr_cur)%z_cc(fk)**2
+                    ! (c) fill the fine block with a quadratic (NOT from prolongation), restrict, compare integrals
+                    do fk = 0, amr_slots(amr_cur)%p
+                        do fj = 0, amr_slots(amr_cur)%n
+                            do fi = 0, amr_slots(amr_cur)%m
+                                amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%x_cc(fi)**2
+                                if (n_glb > 0) amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons(1)%sf(fi, &
+                                    & fj, fk) + amr_slots(amr_cur)%y_cc(fj)**2
+                                if (p_glb > 0) amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons(1)%sf(fi, &
+                                    & fj, fk) + amr_slots(amr_cur)%z_cc(fk)**2
+                            end do
+                        end do
                     end do
-                end do
-            end do
-            call s_restrict_one_var(amr_slots(amr_cur)%q_cons(1), cscr(1))
-            si_f = 0._wp; si_c = 0._wp
-            do fk = 0, amr_slots(amr_cur)%p
-                do fj = 0, amr_slots(amr_cur)%n
-                    do fi = 0, amr_slots(amr_cur)%m
-                        dvf = amr_slots(amr_cur)%dx(fi)
-                        if (n_glb > 0) dvf = dvf*amr_slots(amr_cur)%dy(fj)
-                        if (p_glb > 0) dvf = dvf*amr_slots(amr_cur)%dz(fk)
-                        si_f = si_f + dvf*real(amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk), wp)
+                    call s_restrict_one_var(amr_slots(amr_cur)%q_cons(1), cscr(1))
+                    si_f = 0._wp; si_c = 0._wp
+                    do fk = 0, amr_slots(amr_cur)%p
+                        do fj = 0, amr_slots(amr_cur)%n
+                            do fi = 0, amr_slots(amr_cur)%m
+                                dvf = amr_slots(amr_cur)%dx(fi)
+                                if (n_glb > 0) dvf = dvf*amr_slots(amr_cur)%dy(fj)
+                                if (p_glb > 0) dvf = dvf*amr_slots(amr_cur)%dz(fk)
+                                si_f = si_f + dvf*real(amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk), wp)
+                            end do
+                        end do
                     end do
-                end do
-            end do
-            do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
-                do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
-                    do ci = amr_isect_lo(1), amr_isect_hi(1)
-                        dvc = amr_gxcb(ci) - amr_gxcb(ci - 1)  ! GLOBAL coarse spacing (owner may not hold local dx here)
-                        if (n_glb > 0) dvc = dvc*(amr_gycb(cj) - amr_gycb(cj - 1))
-                        if (p_glb > 0) dvc = dvc*(amr_gzcb(ck) - amr_gzcb(ck - 1))
-                        si_c = si_c + dvc*real(cscr(1)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), wp)
+                    do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
+                        do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
+                            do ci = amr_isect_lo(1), amr_isect_hi(1)
+                                dvc = amr_gxcb(ci) - amr_gxcb(ci - 1)  ! GLOBAL coarse spacing (owner may not hold local dx here)
+                                if (n_glb > 0) dvc = dvc*(amr_gycb(cj) - amr_gycb(cj - 1))
+                                if (p_glb > 0) dvc = dvc*(amr_gzcb(ck) - amr_gzcb(ck - 1))
+                                si_c = si_c + dvc*real(cscr(1)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), &
+                                                       & ck - amr_cpat_off(3)), wp)
+                            end do
+                        end do
                     end do
-                end do
-            end do
-            errc = abs(si_f - si_c)/max(abs(si_f), 1.e-30_wp)
-            ! every rank with fine cells prints
-            print '(A,ES12.4)', ' [amr] prolong linear-reproduction err = ', errb
-            print '(A,ES12.4)', ' [amr] restrict independent-integral err = ', errc
-            deallocate (cscr(1)%sf); deallocate (cscr)
+                    errc = abs(si_f - si_c)/max(abs(si_f), 1.e-30_wp)
+                    ! every rank with fine cells prints
+                    print '(A,ES12.4)', ' [amr] prolong linear-reproduction err = ', errb
+                    print '(A,ES12.4)', ' [amr] restrict independent-integral err = ', errc
+                    deallocate (cscr(1)%sf); deallocate (cscr)
 
-        end subroutine s_amr_operator_checks
+                end subroutine s_amr_operator_checks
 
-        !> Total density (sum of the continuity variables) at one cell: the regrid tag field. Reduces to variable 1 for one fluid.
-        pure function f_amr_rho_tot(q, ci, cj, ck) result(r)
+                !> Total density (sum of the continuity variables) at one cell: the regrid tag field. Reduces to variable 1 for one
+                !! fluid.
+                pure function f_amr_rho_tot(q, ci, cj, ck) result(r)
 
-            type(scalar_field), dimension(:), intent(in) :: q
-            integer, intent(in)                          :: ci, cj, ck
-            real(wp)                                     :: r
-            integer                                      :: f
+                    type(scalar_field), dimension(:), intent(in) :: q
+                    integer, intent(in)                          :: ci, cj, ck
+                    real(wp)                                     :: r
+                    integer                                      :: f
 
-            r = 0._wp
-            do f = eqn_idx%cont%beg, eqn_idx%cont%end
-                r = r + real(q(f)%sf(ci, cj, ck), wp)
-            end do
+                    r = 0._wp
+                    do f = eqn_idx%cont%beg, eqn_idx%cont%end
+                        r = r + real(q(f)%sf(ci, cj, ck), wp)
+                    end do
 
-        end function f_amr_rho_tot
+                end function f_amr_rho_tot
 
-        !> minmod slope limiter: 0 if a,b differ in sign, else the smaller-magnitude argument.
-        pure elemental function minmod(a, b) result(m)
+                !> minmod slope limiter: 0 if a,b differ in sign, else the smaller-magnitude argument.
+                pure elemental function minmod(a, b) result(m)
 
-            $:GPU_ROUTINE(parallelism='[seq]')
-            real(wp), intent(in) :: a, b
-            real(wp)             :: m
+                    $:GPU_ROUTINE(parallelism='[seq]')
+                    real(wp), intent(in) :: a, b
+                    real(wp)             :: m
 
-            if (a*b <= 0._wp) then
-                m = 0._wp
-            else if (abs(a) < abs(b)) then
-                m = a
-            else
-                m = b
-            end if
+                    if (a*b <= 0._wp) then
+                        m = 0._wp
+                    else if (abs(a) < abs(b)) then
+                        m = a
+                    else
+                        m = b
+                    end if
 
-        end function minmod
+                end function minmod
 
-        !> Allocate slot islot's per-block field arrays (coords + the 6 device-resident field vectors + non-poly QBMM side-state),
-        !! sized to the max buffered block - mirrors the old init inline loop. Idempotent (no-op if already live). The single QBMM
-        !! RHS scratch amr_rhs_pb_f/mv_f and the global amr_cg/amr_decomp are NOT per-slot and stay in init/finalize.
-        impure subroutine s_amr_alloc_slot(islot)
+                !> Allocate slot islot's per-block field arrays (coords + the 6 device-resident field vectors + non-poly QBMM
+                !! side-state), sized to the max buffered block - mirrors the old init inline loop. Idempotent (no-op if already
+                !! live). The single QBMM RHS scratch amr_rhs_pb_f/mv_f and the global amr_cg/amr_decomp are NOT per-slot and stay
+                !! in init/finalize.
+                impure subroutine s_amr_alloc_slot(islot)
 
-            integer, intent(in) :: islot
-            integer             :: i
+                    integer, intent(in) :: islot
+                    integer             :: i
 
-            if (amr_slot_live(islot)) return
-            amr_slots(islot)%ref_ratio = ref_ratio
-            amr_slots(islot)%buff_size = buff_size
-            allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
-            if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), &
-                & amr_slots(islot)%dy(0:max_f2))
-            if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), &
-                & amr_slots(islot)%dz(0:max_f3))
-            @:ALLOCATE(amr_slots(islot)%q_cons(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%q_cons_stor(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%q_ghost_a(1:sys_size))
-            @:ALLOCATE(amr_slots(islot)%q_ghost_b(1:sys_size))
-            do i = 1, sys_size
-                @:ALLOCATE(amr_slots(islot)%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                ! rhs is ghost-inclusive (mbuf); igr widens to -1:+1 per dim including collapsed ones (coarse rhs_vf is -1:m+1 etc.)
-                if (igr) then
-                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
-                               & -1):max(mbuf3_hi, 1)))
-                else
-                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                end if
-                @:ALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_cons_stor(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_a(i))
-                @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_b(i))
-            end do
-            if (qbmm .and. .not. polytropic) then
-                #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
-                    @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                    @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
-                #:endfor
-                if (amr_subcycle) then
-                    #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
-                        @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, &
-                                   & 1:nb))
-                        @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
-                    #:endfor
-                end if
-            end if
-            amr_slot_live(islot) = .true.
+                    if (amr_slot_live(islot)) return
+                    amr_slots(islot)%ref_ratio = ref_ratio
+                    amr_slots(islot)%buff_size = buff_size
+                    allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
+                    if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), &
+                        & amr_slots(islot)%dy(0:max_f2))
+                    if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), &
+                        & amr_slots(islot)%dz(0:max_f3))
+                    @:ALLOCATE(amr_slots(islot)%q_cons(1:sys_size))
+                    @:ALLOCATE(amr_slots(islot)%q_cons_stor(1:sys_size))
+                    @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
+                    @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
+                    @:ALLOCATE(amr_slots(islot)%q_ghost_a(1:sys_size))
+                    @:ALLOCATE(amr_slots(islot)%q_ghost_b(1:sys_size))
+                    do i = 1, sys_size
+                        @:ALLOCATE(amr_slots(islot)%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                        @:ALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                        @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                        ! rhs is ghost-inclusive (mbuf); igr widens to -1:+1 per dim including collapsed ones (coarse rhs_vf is
+                        ! -1:m+1 etc.)
+                        if (igr) then
+                            @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), &
+                                       & min(mbuf3_lo, -1):max(mbuf3_hi, 1)))
+                        else
+                            @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                        end if
+                        @:ALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                        @:ALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                        @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
+                        @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
+                        @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
+                        @:ACC_SETUP_SFs(amr_slots(islot)%q_cons_stor(i))
+                        @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_a(i))
+                        @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_b(i))
+                    end do
+                    if (qbmm .and. .not. polytropic) then
+                        #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
+                            @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, &
+                                       & 1:nnode, 1:nb))
+                            @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
+                        #:endfor
+                        if (amr_subcycle) then
+                            #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
+                                @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, &
+                                           & 1:nnode, 1:nb))
+                                @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
+                            #:endfor
+                        end if
+                    end if
+                    amr_slot_live(islot) = .true.
 
-        end subroutine s_amr_alloc_slot
+                end subroutine s_amr_alloc_slot
 
-        !> Free slot islot's per-block field arrays (inverse of s_amr_alloc_slot). Idempotent (no-op if not live).
-        impure subroutine s_amr_free_slot(islot)
+                !> Free slot islot's per-block field arrays (inverse of s_amr_alloc_slot). Idempotent (no-op if not live).
+                impure subroutine s_amr_free_slot(islot)
 
-            integer, intent(in) :: islot
-            integer             :: i
+                    integer, intent(in) :: islot
+                    integer             :: i
 
-            if (.not. amr_slot_live(islot)) return
-            ! Undo each field's ACC_SETUP_SFs (Cray descriptor + %sf copyin) BEFORE the @:DEALLOCATE - Cray
-            ! 'exit data delete' decrements the ref count, so the lone @:DEALLOCATE would leave the descriptor
-            ! and the ACC_SETUP %sf ref dangling; the leaked host address is later reused (e.g. by Gs_rs at
-            ! restart), tripping a Cray "Error placing / already present" present-table crash (gpu-acc).
-            do i = 1, sys_size
-                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_cons(i))
-                @:DEALLOCATE(amr_slots(islot)%q_cons(i)%sf)
-                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_cons_stor(i))
-                @:DEALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf)
-                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_prim(i))
-                @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
-                @:ACC_TEARDOWN_SFs(amr_slots(islot)%rhs(i))
-                @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
-                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_ghost_a(i))
-                @:DEALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf)
-                @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_ghost_b(i))
-                @:DEALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf)
-            end do
-            @:DEALLOCATE(amr_slots(islot)%q_cons)
-            @:DEALLOCATE(amr_slots(islot)%q_cons_stor)
-            @:DEALLOCATE(amr_slots(islot)%q_prim)
-            @:DEALLOCATE(amr_slots(islot)%rhs)
-            @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
-            @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
-            if (qbmm .and. .not. polytropic) then
-                #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
-                    @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
-                    @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
-                #:endfor
-                if (amr_subcycle) then
-                    #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
-                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
-                        @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
-                    #:endfor
-                end if
-            end if
-            if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
-            if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)
-            if (allocated(amr_slots(islot)%z_cb)) deallocate (amr_slots(islot)%z_cb, amr_slots(islot)%z_cc, amr_slots(islot)%dz)
-            amr_slot_live(islot) = .false.
+                    if (.not. amr_slot_live(islot)) return
+                    ! Undo each field's ACC_SETUP_SFs (Cray descriptor + %sf copyin) BEFORE the @:DEALLOCATE - Cray
+                    ! 'exit data delete' decrements the ref count, so the lone @:DEALLOCATE would leave the descriptor
+                    ! and the ACC_SETUP %sf ref dangling; the leaked host address is later reused (e.g. by Gs_rs at
+                    ! restart), tripping a Cray "Error placing / already present" present-table crash (gpu-acc).
+                    do i = 1, sys_size
+                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_cons(i))
+                        @:DEALLOCATE(amr_slots(islot)%q_cons(i)%sf)
+                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_cons_stor(i))
+                        @:DEALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf)
+                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_prim(i))
+                        @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
+                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%rhs(i))
+                        @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
+                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_ghost_a(i))
+                        @:DEALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf)
+                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_ghost_b(i))
+                        @:DEALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf)
+                    end do
+                    @:DEALLOCATE(amr_slots(islot)%q_cons)
+                    @:DEALLOCATE(amr_slots(islot)%q_cons_stor)
+                    @:DEALLOCATE(amr_slots(islot)%q_prim)
+                    @:DEALLOCATE(amr_slots(islot)%rhs)
+                    @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
+                    @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
+                    if (qbmm .and. .not. polytropic) then
+                        #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
+                            @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
+                            @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
+                        #:endfor
+                        if (amr_subcycle) then
+                            #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
+                                @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
+                                @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
+                            #:endfor
+                        end if
+                    end if
+                    if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, &
+                        & amr_slots(islot)%dx)
+                    if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, &
+                        & amr_slots(islot)%dy)
+                    if (allocated(amr_slots(islot)%z_cb)) deallocate (amr_slots(islot)%z_cb, amr_slots(islot)%z_cc, &
+                        & amr_slots(islot)%dz)
+                    amr_slot_live(islot) = .false.
 
-        end subroutine s_amr_free_slot
+                end subroutine s_amr_free_slot
 
-        !> Reconcile the allocated per-slot field arrays to the CURRENT ownership: allocate every active block this rank owns, free
-        !! everything else. Call after ownership is set (init/regrid/restart). A rank ends holding only its owned blocks' fine
-        !! arrays (~amr_num_blocks/num_procs of the pool), not all amr_max_blocks. Regrid must alloc its transient (received/old)
-        !! slots BEFORE calling this, since it frees anything not currently owned.
-        impure subroutine s_amr_reconcile_slots()
+                !> Reconcile the allocated per-slot field arrays to the CURRENT ownership: allocate every active block this rank
+                !! owns, free everything else. Call after ownership is set (init/regrid/restart). A rank ends holding only its owned
+                !! blocks' fine arrays (~amr_num_blocks/num_procs of the pool), not all amr_max_blocks. Regrid must alloc its
+                !! transient (received/old) slots BEFORE calling this, since it frees anything not currently owned.
+                impure subroutine s_amr_reconcile_slots()
 
-            integer :: k
-            logical :: needed
+                    integer :: k
+                    logical :: needed
 
-            do k = 1, amr_max_blocks
-                needed = k <= amr_num_blocks
-                if (needed) needed = amr_block_owner(k) == proc_rank
-                if (needed) then
-                    call s_amr_alloc_slot(k)
-                else
-                    call s_amr_free_slot(k)
-                end if
-            end do
+                    do k = 1, amr_max_blocks
+                        needed = k <= amr_num_blocks
+                        if (needed) needed = amr_block_owner(k) == proc_rank
+                        if (needed) then
+                            call s_amr_alloc_slot(k)
+                        else
+                            call s_amr_free_slot(k)
+                        end if
+                    end do
 
-        end subroutine s_amr_reconcile_slots
+                end subroutine s_amr_reconcile_slots
 
-        impure subroutine s_finalize_amr_module()
+                impure subroutine s_finalize_amr_module()
 
-            integer :: i, islot
+                    integer :: i, islot
 
-            if (.not. amr) return
-            do islot = 1, amr_max_blocks
-                call s_amr_free_slot(islot)
-            end do
-            if (qbmm .and. .not. polytropic) then
-                @:DEALLOCATE(amr_rhs_pb_f)
-                @:DEALLOCATE(amr_rhs_mv_f)
-                @:DEALLOCATE(amr_cg_pb)
-                @:DEALLOCATE(amr_cg_mv)
-            end if
-            deallocate (amr_slot_live)
-            if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
-            do i = 1, sys_size
-                @:DEALLOCATE(amr_cg(i)%sf)
-            end do
-            @:DEALLOCATE(amr_cg)
-            deallocate (amr_decomp)
-            deallocate (amr_slots)
-            deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
-            if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
-            if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
-            if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
-            if (allocated(amr_block_owner)) deallocate (amr_block_owner)
-            if (allocated(amr_block_level)) deallocate (amr_block_level)
-            if (allocated(amr_gxcb)) deallocate (amr_gxcb)
-            if (allocated(amr_gycb)) deallocate (amr_gycb)
-            if (allocated(amr_gzcb)) deallocate (amr_gzcb)
-            if (igr) then
-                @:DEALLOCATE(sw_jac)
-                @:DEALLOCATE(sw_jac_old)
-            end if
+                    if (.not. amr) return
+                    do islot = 1, amr_max_blocks
+                        call s_amr_free_slot(islot)
+                    end do
+                    if (qbmm .and. .not. polytropic) then
+                        @:DEALLOCATE(amr_rhs_pb_f)
+                        @:DEALLOCATE(amr_rhs_mv_f)
+                        @:DEALLOCATE(amr_cg_pb)
+                        @:DEALLOCATE(amr_cg_mv)
+                    end if
+                    deallocate (amr_slot_live)
+                    if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
+                    do i = 1, sys_size
+                        @:DEALLOCATE(amr_cg(i)%sf)
+                    end do
+                    @:DEALLOCATE(amr_cg)
+                    deallocate (amr_decomp)
+                    deallocate (amr_slots)
+                    deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
+                    if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
+                    if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
+                    if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
+                    if (allocated(amr_block_owner)) deallocate (amr_block_owner)
+                    if (allocated(amr_block_level)) deallocate (amr_block_level)
+                    if (allocated(amr_gxcb)) deallocate (amr_gxcb)
+                    if (allocated(amr_gycb)) deallocate (amr_gycb)
+                    if (allocated(amr_gzcb)) deallocate (amr_gzcb)
+                    if (igr) then
+                        @:DEALLOCATE(sw_jac)
+                        @:DEALLOCATE(sw_jac_old)
+                    end if
 
-        end subroutine s_finalize_amr_module
+                end subroutine s_finalize_amr_module
 
-    end module m_amr
+            end module m_amr
