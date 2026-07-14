@@ -203,6 +203,19 @@ contains
                 & '): the fine level can occupy at most amr_max_blocks ranks - raise amr_max_blocks for better fine-level balance'
         end if
 
+        ! Lock-step advances every fine block at the coarse dt, but a level-l cell is ref_ratio**l smaller, so its
+        ! CFL limit is ref_ratio**amr_max_level tighter than the coarse grid's. The dt (fixed, or the coarse-only
+        ! cfl_dt estimate) is NOT scaled down for that, so a coarse-CFL dt silently runs the finest block unstable
+        ! (subcycling instead advances each level at dt/ref_ratio and is stable by construction). We cannot know the
+        ! true CFL at init, so warn rather than abort - a small enough dt is valid.
+        if (proc_rank == 0 .and. .not. amr_subcycle .and. (ref_ratio > 2 .or. amr_max_level > 1)) then
+            print '(A,I0,A)', &
+                & ' [amr] WARNING: lock-step (amr_subcycle = F) advances fine blocks at the coarse dt, but the ' &
+                & // 'finest cell is ref_ratio**amr_max_level = ', ref_ratio**amr_max_level, &
+                & 'x smaller - ensure dt satisfies the FINEST cell CFL (roughly the coarse-stable dt divided by that ' &
+                & // 'factor), or enable amr_subcycle, else the fine block may go unstable'
+        end if
+
         ! Mirror decomposition: each rank holds the fine cells covering block /\ its own subdomain
         ! (np=1: the intersection is the whole block). buff_size is not available at checker time,
         ! so the geometric aborts below must live here.
