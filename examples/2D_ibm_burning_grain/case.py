@@ -9,9 +9,20 @@
 # Both default off, so non-burning IBM is unchanged. Builds on the IBM+chemistry
 # ghost-state fix (m_ibm.fpp): the injecting surface sets a thermodynamically
 # consistent reacting ghost state.
+#
+# --burn_exp n makes the injection pressure-coupled (Vieille's law: v_blow scales
+# with the local surface pressure as (p/p0)^n). In this closed chamber that gives
+# internal-ballistics feedback -- combustion raises the pressure, which raises the
+# burn rate, which raises the pressure -- an accelerating self-pressurization.
+import argparse
 import json
 
 import cantera as ct
+
+parser = argparse.ArgumentParser(prog="2D_ibm_burning_grain")
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC toolchain state.")
+parser.add_argument("--burn_exp", type=float, default=0.0, help="Pressure exponent n in Vieille's law v_blow*(p/p0)^n; 0 = constant injection.")
+args = parser.parse_args()
 
 ctfile = "h2o2.yaml"
 # Hot oxidizer chamber (no fuel): injected H2 meets hot O2 and ignites.
@@ -119,6 +130,11 @@ case = {
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": 1.0 / mu0,
 }
+
+# Pressure-coupled burn rate (internal-ballistics demo): v_blow -> v_blow*(p/P0)^n.
+if args.burn_exp > 0.0:
+    case["patch_ib(1)%burn_rate_pref"] = P0
+    case["patch_ib(1)%burn_rate_exp"] = args.burn_exp
 
 for i in range(len(ox.Y)):
     case[f"patch_icpp(1)%Y({i + 1})"] = float(ox.Y[i])

@@ -346,6 +346,8 @@ contains
             patch_ib(i)%slip = .false.
             patch_ib(i)%v_blow = 0._wp
             patch_ib(i)%inj_species = 0
+            patch_ib(i)%burn_rate_exp = 0._wp
+            patch_ib(i)%burn_rate_pref = 0._wp
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0

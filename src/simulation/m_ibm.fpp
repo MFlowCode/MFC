@@ -171,6 +171,7 @@ contains
             real(wp), dimension(num_species) :: Ys_IP
         #:endif
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
+        real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
@@ -221,7 +222,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, mw_IP, e_IP]')
+                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -346,9 +347,16 @@ contains
                 ! Burning/injecting surface: superimpose wall-normal (outward) blowing on the
                 ! ghost velocity so the immersed surface transpires/injects gas into the flow.
                 if (patch_ib(patch_id)%v_blow > 0._wp) then
+                    v_blow_eff = patch_ib(patch_id)%v_blow
+                    ! Pressure-coupled burn rate (Vieille's law r_dot ~ p^n): the local surface
+                    ! pressure scales the blowing speed, giving chamber-pressure feedback (internal
+                    ! ballistics) in a closed chamber. Off (constant) when burn_rate_pref <= 0.
+                    if (patch_ib(patch_id)%burn_rate_pref > 0._wp) then
+                        v_blow_eff = v_blow_eff*(pres_IP/patch_ib(patch_id)%burn_rate_pref)**patch_ib(patch_id)%burn_rate_exp
+                    end if
                     norm(1:3) = gp%levelset_norm
                     buf = sqrt(sum(norm**2))
-                    if (buf > 0._wp) vel_g = vel_g + patch_ib(patch_id)%v_blow*norm/buf
+                    if (buf > 0._wp) vel_g = vel_g + v_blow_eff*norm/buf
                 end if
 
                 ! Set momentum

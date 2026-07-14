@@ -358,6 +358,8 @@ module m_derived_types
         integer :: moving_ibm  !< 0 for no moving, 1 for moving, 2 for moving on forced path
         real(wp) :: v_blow  !< Wall-normal surface blowing speed (burning/transpiring IB surface); 0 = impermeable
         integer :: inj_species  !< Injected species index at a blowing surface (chemistry); 0 = mirror ambient
+        real(wp) :: burn_rate_exp  !< Pressure exponent n in v_blow*(p/p_ref)^n (Vieille's law); 0 = constant blowing
+        real(wp) :: burn_rate_pref  !< Reference pressure p_ref for the pressure-coupled burn rate; 0 = coupling off
         real(wp) :: mass, moment  !< mass and moment of inertia of object used to compute forces in 2-way coupling
         real(wp), dimension(1:3) :: force, torque  !< vectors for the computed force and torque values applied to an IB
         real(wp), dimension(1:3) :: vel
