@@ -1,3 +1,5 @@
+@page amr_multilevel Multi-level AMR nesting
+
 # Multi-level AMR nesting — design and implementation plan
 
 Status: **multi-level nesting implemented.** The block-structured AMR core supports arbitrary
