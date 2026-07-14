@@ -2300,6 +2300,64 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     chemistry_cases()
 
+    def reactive_burn_cases():
+        # Condensed-phase programmed burn (m_reactive_burn): a uniform two-fluid stiffened-gas
+        # reactant above the ignition pressure, so the burn source converts reactant (fluid 1)
+        # to product (fluid 2) and releases energy through the qv difference. Uniform IC isolates
+        # the source term (no shock/gradient) for a stable, reproducible golden; it also exercises
+        # the reactive_burn precondition checks (num_fluids=2, shared EOS, qv(1) > qv(2)).
+        stack.push(
+            "1D -> Reactive Burn -> Condensed Programmed Detonation",
+            {
+                "m": 99,
+                "n": 0,
+                "p": 0,
+                "dt": 1.0e-9,
+                "num_patches": 1,
+                "num_fluids": 2,
+                "model_eqns": 2,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 0.005,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "weno_order": 5,
+                "weno_eps": 1e-16,
+                "mapped_weno": "F",
+                "mp_weno": "F",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "time_stepper": 3,
+                "reactive_burn": "T",
+                "rburn_k": 1.0e7,
+                "rburn_pign": 1.0e9,
+                "rburn_pref": 2.0e9,
+                "rburn_n": 1.0,
+                "fluid_pp(1)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
+                "fluid_pp(1)%pi_inf": 9.0e8,
+                "fluid_pp(1)%qv": 4.0e6,
+                "fluid_pp(2)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
+                "fluid_pp(2)%pi_inf": 9.0e8,
+                "fluid_pp(2)%qv": 0.0,
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.0025,
+                "patch_icpp(1)%length_x": 0.005,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%pres": 2.0e9,
+                "patch_icpp(1)%alpha_rho(1)": 1900.0 * 0.95,
+                "patch_icpp(1)%alpha_rho(2)": 1900.0 * 0.05,
+                "patch_icpp(1)%alpha(1)": 0.95,
+                "patch_icpp(1)%alpha(2)": 0.05,
+                "t_step_start": 0,
+                "t_step_stop": 40,
+                "t_step_save": 40,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+    reactive_burn_cases()
+
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
 
