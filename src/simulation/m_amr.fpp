@@ -91,6 +91,8 @@ module m_amr
     integer              :: max_f1, max_f2, max_f3
     integer              :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
     logical, allocatable :: amr_slot_live(:)
+    !! fine-fine seam pack buffers, hoisted out of the per-seam s_amr_fine_fine_halo loop (allocated once at max seam extent)
+    real(wp), allocatable :: amr_seambuf_x(:), amr_seambuf_y(:)
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min over ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
@@ -172,7 +174,7 @@ contains
     !! (sys_size/buff_size set). Per-slot fine arrays are allocated lazily (s_amr_reconcile_slots) - only the blocks a rank owns.
     impure subroutine s_initialize_amr_module()
 
-        integer                         :: i, d, islot
+        integer                         :: i, d, islot, tcap
         integer                         :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
         integer                         :: blk_lo(3), blk_hi(3)
         type(scalar_field), allocatable :: tmp_cg(:)
@@ -282,6 +284,17 @@ contains
 
         ! MPI exchange buffers for the fine halo (all ranks; no-op without MFC_MPI)
         call s_initialize_amr_mpi_buffers(max_f1, max_f2, max_f3)
+
+        ! fine-fine seam pack buffers: sized ONCE to the largest possible seam (sys_size*buff_size * max transverse fine
+        ! face), so s_amr_fine_fine_halo reuses them instead of allocating per seam per stage. Transverse cap = the largest
+        ! fine face over the choice of seam dimension: 3D -> max pairwise product, 2D -> the larger single dim, 1D -> 1.
+        tcap = 1
+        if (n_glb > 0 .and. p_glb > 0) then
+            tcap = max((max_f1 + 1)*(max_f2 + 1), (max_f2 + 1)*(max_f3 + 1), (max_f1 + 1)*(max_f3 + 1))
+        else if (n_glb > 0) then
+            tcap = max(max_f1, max_f2) + 1
+        end if
+        allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
         mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
@@ -3221,8 +3234,7 @@ contains
     !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (incl. every np=1 case, untiled).
     impure subroutine s_amr_fine_fine_halo()
 
-        integer               :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul
-        real(wp), allocatable :: xbuf(:), ybuf(:)
+        integer :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul
 
         if (.not. amr) return
         if (amr_num_blocks < 2) return
@@ -3258,31 +3270,32 @@ contains
                 if (d /= 2 .and. n_glb > 0) tsz = tsz*(xm(2) + 1)
                 if (d /= 3 .and. p_glb > 0) tsz = tsz*(xm(3) + 1)
                 cnt = sys_size*buff_size*tsz
-                allocate (xbuf(cnt), ybuf(cnt))
                 if (rX == rY) then  ! same rank owns both: pack each near-seam interior, unpack into the other's seam ghost
-                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), xbuf, 1)  ! xb high interior
-                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, ybuf, 1)  ! yb low interior
-                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, xbuf, -1)  ! -> yb low ghost
-                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, ybuf, -1)  ! -> xb high ghost
+                    ! xb high interior
+                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
+                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)  ! yb low interior
+                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)  ! -> yb low ghost
+                    ! -> xb high ghost
+                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, amr_seambuf_y(1:cnt), -1)
                 else if (proc_rank == rX) then
                     ! send xb high interior
-                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), xbuf, 1)
+                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
 #ifdef MFC_MPI
-                    call MPI_SENDRECV(xbuf, cnt, mpi_p, rY, 4200, ybuf, cnt, mpi_p, rY, 4201, MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
-                                      & ierr)
+                    call MPI_SENDRECV(amr_seambuf_x(1:cnt), cnt, mpi_p, rY, 4200, amr_seambuf_y(1:cnt), cnt, mpi_p, rY, 4201, &
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
                     ! recv yb low interior -> xb high ghost
-                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, ybuf, -1)
+                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, amr_seambuf_y(1:cnt), -1)
                 else  ! proc_rank == rY
-                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, ybuf, 1)  ! send yb low interior
+                    ! send yb low interior
+                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)
 #ifdef MFC_MPI
-                    call MPI_SENDRECV(ybuf, cnt, mpi_p, rX, 4201, xbuf, cnt, mpi_p, rX, 4200, MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
-                                      & ierr)
+                    call MPI_SENDRECV(amr_seambuf_y(1:cnt), cnt, mpi_p, rX, 4201, amr_seambuf_x(1:cnt), cnt, mpi_p, rX, 4200, &
+                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
                     ! recv xb high interior -> yb low ghost
-                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, xbuf, -1)
+                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)
                 end if
-                deallocate (xbuf, ybuf)
             end do
         end do
         call s_amr_select_slot(1)
@@ -5592,6 +5605,7 @@ contains
                 @:DEALLOCATE(amr_cg_mv)
             end if
             deallocate (amr_slot_live)
+            if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
             do i = 1, sys_size
                 @:DEALLOCATE(amr_cg(i)%sf)
             end do
