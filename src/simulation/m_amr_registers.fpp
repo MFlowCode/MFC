@@ -55,6 +55,14 @@ module m_amr_registers
     type(t_face_reg) :: freg(3)  !< fine flux at the covering fine faces (0-based fine transverse)
     $:GPU_DECLARE(create='[creg, freg]')
 
+    !> Per-slot geometry scratch for the batched creg capture kernels (1:amr_max_blocks): host-filled from the per-slot
+    !! flags/overlap, then GPU_UPDATE'd so ONE kernel iterates the slot dimension instead of O(blocks) tiny launches. bactive gates
+    !! the slot; bt1lo/bt1hi/bt2lo/bt2hi are the per-slot transverse window (a slot outside the rectangular max caps is cycled);
+    !! bjlo/bjhi are the normal-face flux indices; bo1/bo2 the transverse origins; bclo/bchi the per-face capture gates.
+    integer, allocatable :: bjlo(:), bjhi(:), bo1(:), bo2(:), bt1lo(:), bt1hi(:), bt2lo(:), bt2hi(:)
+    logical, allocatable :: bclo(:), bchi(:), bactive(:)
+    $:GPU_DECLARE(create='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
+
 contains
 
     !> Reflux-face participation for THIS rank: own_lo(d)/own_hi(d) = it owns the coarse cell layer just OUTSIDE the block's
@@ -166,109 +174,124 @@ contains
             @:ALLOCATE(freg(3)%lo(1:sys_size,0:max_f1,0:max_f2,1:amr_max_blocks), freg(3)%hi(1:sys_size,0:max_f1,0:max_f2, &
                        & 1:amr_max_blocks))
         end if
+        ! per-slot geometry scratch for the batched capture kernels (device-resident: filled on host, GPU_UPDATE'd before each call)
+        @:ALLOCATE(bjlo(1:amr_max_blocks), bjhi(1:amr_max_blocks), bo1(1:amr_max_blocks), bo2(1:amr_max_blocks))
+        @:ALLOCATE(bt1lo(1:amr_max_blocks), bt1hi(1:amr_max_blocks), bt2lo(1:amr_max_blocks), bt2hi(1:amr_max_blocks))
+        @:ALLOCATE(bclo(1:amr_max_blocks), bchi(1:amr_max_blocks), bactive(1:amr_max_blocks))
 
     end subroutine s_initialize_amr_registers
 
-    !> Shared creg boundary-flux capture (dense eq range): creg(id)%lo/hi(eq, t1, t2, slot) [+=/=] cf * flux(face, o1+t1, o2+t2) for
-    !! eq in [eqb:eqe], over transverse [t1lo:t1hi] x [t2lo:t2hi]. acc=.true. accumulates, .false. overwrites (the merge picks the
-    !! old value or 0 with no arithmetic, so a stage-1 overwrite reads no uninitialized creg). clo/chi gate the low/high face
-    !! (unowned coarse faces off; child faces always on). Used for the advective (flux_dir, eqb=1..sys_size) and viscous (flux_src,
-    !! eqb=mom..E) captures on BOTH the coarse-self (islot) and child (kc) sides - see s_amr_capture_boundary_flux.
-    impure subroutine s_amr_capture_creg_dense(slot, id, flux, cf, acc, clo, chi, jlo, jhi, o1, o2, t1lo, t1hi, t2lo, t2hi, eqb, &
-        & eqe)
+    !> Shared creg boundary-flux capture (dense eq range), BATCHED over the slot dimension: for each active slot in [1:nb],
+    !! creg(id)%lo/hi(eq, t1, t2, slot) [+=/=] cf * flux(face, bo1(slot)+t1, bo2(slot)+t2) for eq in [eqb:eqe], over the per-slot
+    !! transverse window [bt1lo:bt1hi] x [bt2lo:bt2hi]. acc=.true. accumulates, .false. overwrites (the merge picks the old value or
+    !! 0 with no arithmetic, so a stage-1 overwrite reads no uninitialized creg). bclo/bchi gate the low/high face (unowned coarse
+    !! faces off; child faces always on). The device kernel collapses (slot, t2, t1, eq) over the rectangular caps
+    !! [0:maxt2]x[0:maxt1] (max over slots) and cycles inactive slots / out-of-window cells - one launch replaces the O(blocks)
+    !! per-slot launches. The per-slot geometry (bjlo etc.) is filled on host and GPU_UPDATE'd by the caller. Used for the advective
+    !! (flux_dir, eqb=1..sys_size) and viscous (flux_src, eqb=mom..E) captures on BOTH the coarse-self and child sides.
+    impure subroutine s_amr_capture_creg_dense_batch(nb, id, flux, cf, acc, maxt1, maxt2, eqb, eqe)
 
-        integer, intent(in)            :: slot, id, jlo, jhi, o1, o2, t1lo, t1hi, t2lo, t2hi, eqb, eqe
+        integer, intent(in)            :: nb, id, maxt1, maxt2, eqb, eqe
         type(vector_field), intent(in) :: flux
         real(wp), intent(in)           :: cf
-        logical, intent(in)            :: acc, clo, chi
-        integer                        :: eq, t1, t2
+        logical, intent(in)            :: acc
+        integer                        :: eq, t1, t2, slot
+
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do slot = 1, nb
+            do t2 = 0, maxt2
+                do t1 = 0, maxt1
+                    do eq = eqb, eqe
+                        if (.not. bactive(slot)) cycle
+                        if (t1 < bt1lo(slot) .or. t1 > bt1hi(slot) .or. t2 < bt2lo(slot) .or. t2 > bt2hi(slot)) cycle
+                        select case (id)
+                        case (1)
+                            if (bclo(slot)) creg(1)%lo(eq, t1, t2, slot) = merge(creg(1)%lo(eq, t1, t2, slot), 0._wp, &
+                                & acc) + cf*real(flux%vf(eq)%sf(bjlo(slot), bo1(slot) + t1, bo2(slot) + t2), wp)
+                            if (bchi(slot)) creg(1)%hi(eq, t1, t2, slot) = merge(creg(1)%hi(eq, t1, t2, slot), 0._wp, &
+                                & acc) + cf*real(flux%vf(eq)%sf(bjhi(slot), bo1(slot) + t1, bo2(slot) + t2), wp)
+                        case (2)
+                            if (bclo(slot)) creg(2)%lo(eq, t1, t2, slot) = merge(creg(2)%lo(eq, t1, t2, slot), 0._wp, &
+                                & acc) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bjlo(slot), bo2(slot) + t2), wp)
+                            if (bchi(slot)) creg(2)%hi(eq, t1, t2, slot) = merge(creg(2)%hi(eq, t1, t2, slot), 0._wp, &
+                                & acc) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bjhi(slot), bo2(slot) + t2), wp)
+                        case (3)
+                            if (bclo(slot)) creg(3)%lo(eq, t1, t2, slot) = merge(creg(3)%lo(eq, t1, t2, slot), 0._wp, &
+                                & acc) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bo2(slot) + t2, bjlo(slot)), wp)
+                            if (bchi(slot)) creg(3)%hi(eq, t1, t2, slot) = merge(creg(3)%hi(eq, t1, t2, slot), 0._wp, &
+                                & acc) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bo2(slot) + t2, bjhi(slot)), wp)
+                        end select
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_capture_creg_dense_batch
+
+    !> Shared creg boundary-flux capture (chemistry species diffusion), BATCHED over the slot dimension: always-accumulate the
+    !! species mass fluxes, plus the energy flux only when NOT viscous (the viscous pass already captured flux_src(E)). Species use
+    !! a seq inner loop (a runtime range). The device kernel collapses (slot, t2, t1) over the rectangular caps [0:maxt2]x[0:maxt1]
+    !! (max over slots) and cycles inactive slots / out-of-window cells. Per-slot geometry is host-filled + GPU_UPDATE'd by the
+    !! caller. Used for the chem capture on BOTH the coarse-self and child sides.
+    impure subroutine s_amr_capture_creg_chem_batch(nb, id, flux, cf, maxt1, maxt2)
+
+        integer, intent(in)            :: nb, id, maxt1, maxt2
+        type(vector_field), intent(in) :: flux
+        real(wp), intent(in)           :: cf
+        integer                        :: eq, t1, t2, slot
 
         $:GPU_PARALLEL_LOOP(collapse=3)
-        do t2 = t2lo, t2hi
-            do t1 = t1lo, t1hi
-                do eq = eqb, eqe
-                    select case (id)
-                    case (1)
-                        if (clo) creg(1)%lo(eq, t1, t2, slot) = merge(creg(1)%lo(eq, t1, t2, slot), 0._wp, &
-                            & acc) + cf*real(flux%vf(eq)%sf(jlo, o1 + t1, o2 + t2), wp)
-                        if (chi) creg(1)%hi(eq, t1, t2, slot) = merge(creg(1)%hi(eq, t1, t2, slot), 0._wp, &
-                            & acc) + cf*real(flux%vf(eq)%sf(jhi, o1 + t1, o2 + t2), wp)
-                    case (2)
-                        if (clo) creg(2)%lo(eq, t1, t2, slot) = merge(creg(2)%lo(eq, t1, t2, slot), 0._wp, &
-                            & acc) + cf*real(flux%vf(eq)%sf(o1 + t1, jlo, o2 + t2), wp)
-                        if (chi) creg(2)%hi(eq, t1, t2, slot) = merge(creg(2)%hi(eq, t1, t2, slot), 0._wp, &
-                            & acc) + cf*real(flux%vf(eq)%sf(o1 + t1, jhi, o2 + t2), wp)
-                    case (3)
-                        if (clo) creg(3)%lo(eq, t1, t2, slot) = merge(creg(3)%lo(eq, t1, t2, slot), 0._wp, &
-                            & acc) + cf*real(flux%vf(eq)%sf(o1 + t1, o2 + t2, jlo), wp)
-                        if (chi) creg(3)%hi(eq, t1, t2, slot) = merge(creg(3)%hi(eq, t1, t2, slot), 0._wp, &
-                            & acc) + cf*real(flux%vf(eq)%sf(o1 + t1, o2 + t2, jhi), wp)
-                    end select
+        do slot = 1, nb
+            do t2 = 0, maxt2
+                do t1 = 0, maxt1
+                    if (.not. bactive(slot)) cycle
+                    if (t1 < bt1lo(slot) .or. t1 > bt1hi(slot) .or. t2 < bt2lo(slot) .or. t2 > bt2hi(slot)) cycle
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do eq = eqn_idx%species%beg, eqn_idx%species%end
+                        select case (id)
+                        case (1)
+                            if (bclo(slot)) creg(1)%lo(eq, t1, t2, slot) = creg(1)%lo(eq, t1, t2, &
+                                & slot) + cf*real(flux%vf(eq)%sf(bjlo(slot), bo1(slot) + t1, bo2(slot) + t2), wp)
+                            if (bchi(slot)) creg(1)%hi(eq, t1, t2, slot) = creg(1)%hi(eq, t1, t2, &
+                                & slot) + cf*real(flux%vf(eq)%sf(bjhi(slot), bo1(slot) + t1, bo2(slot) + t2), wp)
+                        case (2)
+                            if (bclo(slot)) creg(2)%lo(eq, t1, t2, slot) = creg(2)%lo(eq, t1, t2, &
+                                & slot) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bjlo(slot), bo2(slot) + t2), wp)
+                            if (bchi(slot)) creg(2)%hi(eq, t1, t2, slot) = creg(2)%hi(eq, t1, t2, &
+                                & slot) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bjhi(slot), bo2(slot) + t2), wp)
+                        case (3)
+                            if (bclo(slot)) creg(3)%lo(eq, t1, t2, slot) = creg(3)%lo(eq, t1, t2, &
+                                & slot) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bo2(slot) + t2, bjlo(slot)), wp)
+                            if (bchi(slot)) creg(3)%hi(eq, t1, t2, slot) = creg(3)%hi(eq, t1, t2, &
+                                & slot) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bo2(slot) + t2, bjhi(slot)), wp)
+                        end select
+                    end do
+                    if (.not. viscous) then
+                        select case (id)
+                        case (1)
+                            if (bclo(slot)) creg(1)%lo(eqn_idx%E, t1, t2, slot) = creg(1)%lo(eqn_idx%E, t1, t2, &
+                                & slot) + cf*real(flux%vf(eqn_idx%E)%sf(bjlo(slot), bo1(slot) + t1, bo2(slot) + t2), wp)
+                            if (bchi(slot)) creg(1)%hi(eqn_idx%E, t1, t2, slot) = creg(1)%hi(eqn_idx%E, t1, t2, &
+                                & slot) + cf*real(flux%vf(eqn_idx%E)%sf(bjhi(slot), bo1(slot) + t1, bo2(slot) + t2), wp)
+                        case (2)
+                            if (bclo(slot)) creg(2)%lo(eqn_idx%E, t1, t2, slot) = creg(2)%lo(eqn_idx%E, t1, t2, &
+                                & slot) + cf*real(flux%vf(eqn_idx%E)%sf(bo1(slot) + t1, bjlo(slot), bo2(slot) + t2), wp)
+                            if (bchi(slot)) creg(2)%hi(eqn_idx%E, t1, t2, slot) = creg(2)%hi(eqn_idx%E, t1, t2, &
+                                & slot) + cf*real(flux%vf(eqn_idx%E)%sf(bo1(slot) + t1, bjhi(slot), bo2(slot) + t2), wp)
+                        case (3)
+                            if (bclo(slot)) creg(3)%lo(eqn_idx%E, t1, t2, slot) = creg(3)%lo(eqn_idx%E, t1, t2, &
+                                & slot) + cf*real(flux%vf(eqn_idx%E)%sf(bo1(slot) + t1, bo2(slot) + t2, bjlo(slot)), wp)
+                            if (bchi(slot)) creg(3)%hi(eqn_idx%E, t1, t2, slot) = creg(3)%hi(eqn_idx%E, t1, t2, &
+                                & slot) + cf*real(flux%vf(eqn_idx%E)%sf(bo1(slot) + t1, bo2(slot) + t2, bjhi(slot)), wp)
+                        end select
+                    end if
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_capture_creg_dense
-
-    !> Shared creg boundary-flux capture (chemistry species diffusion): always-accumulate the species mass fluxes, plus the energy
-    !! flux only when NOT viscous (the viscous pass already captured flux_src(E)). Species use a seq inner loop (a runtime range).
-    !! Used for the chem capture on BOTH the coarse-self and child sides.
-    impure subroutine s_amr_capture_creg_chem(slot, id, flux, cf, clo, chi, jlo, jhi, o1, o2, t1lo, t1hi, t2lo, t2hi)
-
-        integer, intent(in)            :: slot, id, jlo, jhi, o1, o2, t1lo, t1hi, t2lo, t2hi
-        type(vector_field), intent(in) :: flux
-        real(wp), intent(in)           :: cf
-        logical, intent(in)            :: clo, chi
-        integer                        :: eq, t1, t2
-
-        $:GPU_PARALLEL_LOOP(collapse=2)
-        do t2 = t2lo, t2hi
-            do t1 = t1lo, t1hi
-                $:GPU_LOOP(parallelism='[seq]')
-                do eq = eqn_idx%species%beg, eqn_idx%species%end
-                    select case (id)
-                    case (1)
-                        if (clo) creg(1)%lo(eq, t1, t2, slot) = creg(1)%lo(eq, t1, t2, slot) + cf*real(flux%vf(eq)%sf(jlo, &
-                            & o1 + t1, o2 + t2), wp)
-                        if (chi) creg(1)%hi(eq, t1, t2, slot) = creg(1)%hi(eq, t1, t2, slot) + cf*real(flux%vf(eq)%sf(jhi, &
-                            & o1 + t1, o2 + t2), wp)
-                    case (2)
-                        if (clo) creg(2)%lo(eq, t1, t2, slot) = creg(2)%lo(eq, t1, t2, slot) + cf*real(flux%vf(eq)%sf(o1 + t1, &
-                            & jlo, o2 + t2), wp)
-                        if (chi) creg(2)%hi(eq, t1, t2, slot) = creg(2)%hi(eq, t1, t2, slot) + cf*real(flux%vf(eq)%sf(o1 + t1, &
-                            & jhi, o2 + t2), wp)
-                    case (3)
-                        if (clo) creg(3)%lo(eq, t1, t2, slot) = creg(3)%lo(eq, t1, t2, slot) + cf*real(flux%vf(eq)%sf(o1 + t1, &
-                            & o2 + t2, jlo), wp)
-                        if (chi) creg(3)%hi(eq, t1, t2, slot) = creg(3)%hi(eq, t1, t2, slot) + cf*real(flux%vf(eq)%sf(o1 + t1, &
-                            & o2 + t2, jhi), wp)
-                    end select
-                end do
-                if (.not. viscous) then
-                    select case (id)
-                    case (1)
-                        if (clo) creg(1)%lo(eqn_idx%E, t1, t2, slot) = creg(1)%lo(eqn_idx%E, t1, t2, &
-                            & slot) + cf*real(flux%vf(eqn_idx%E)%sf(jlo, o1 + t1, o2 + t2), wp)
-                        if (chi) creg(1)%hi(eqn_idx%E, t1, t2, slot) = creg(1)%hi(eqn_idx%E, t1, t2, &
-                            & slot) + cf*real(flux%vf(eqn_idx%E)%sf(jhi, o1 + t1, o2 + t2), wp)
-                    case (2)
-                        if (clo) creg(2)%lo(eqn_idx%E, t1, t2, slot) = creg(2)%lo(eqn_idx%E, t1, t2, &
-                            & slot) + cf*real(flux%vf(eqn_idx%E)%sf(o1 + t1, jlo, o2 + t2), wp)
-                        if (chi) creg(2)%hi(eqn_idx%E, t1, t2, slot) = creg(2)%hi(eqn_idx%E, t1, t2, &
-                            & slot) + cf*real(flux%vf(eqn_idx%E)%sf(o1 + t1, jhi, o2 + t2), wp)
-                    case (3)
-                        if (clo) creg(3)%lo(eqn_idx%E, t1, t2, slot) = creg(3)%lo(eqn_idx%E, t1, t2, &
-                            & slot) + cf*real(flux%vf(eqn_idx%E)%sf(o1 + t1, o2 + t2, jlo), wp)
-                        if (chi) creg(3)%hi(eqn_idx%E, t1, t2, slot) = creg(3)%hi(eqn_idx%E, t1, t2, &
-                            & slot) + cf*real(flux%vf(eqn_idx%E)%sf(o1 + t1, o2 + t2, jhi), wp)
-                    end select
-                end if
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_capture_creg_chem
+    end subroutine s_amr_capture_creg_chem_batch
 
     !> Capture the c/f boundary-face fluxes for direction id from the just-finalized flux array. Runs INSIDE s_compute_rhs: coarse
     !! call (amr_in_fine_advance false, coarse globals) fills creg at the block boundary faces; fine call (flag true, globals
@@ -281,7 +304,7 @@ contains
         type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
         integer                        :: eq, t1, t2, jlo, jhi, t1_lo, t1_hi, t2_lo, t2_hi, o1, o2, islot, save_cur
-        integer                        :: sidx(3), ext(3), tlo(3), thi(3), kc, dch
+        integer                        :: sidx(3), ext(3), tlo(3), thi(3), kc, dch, maxt1, maxt2
         logical                        :: own_lo(3), own_hi(3), cap_lo, cap_hi
         real(wp)                       :: coef, ccoef
         logical                        :: accum, cacc, is_child
@@ -439,7 +462,11 @@ contains
             ! (s_amr_reflux_to_parent). Captures the TOTAL flux - advective (flux_dir), then viscous (flux_src, mom..E), then
             ! chemistry species+energy - mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves (no
             ! checker gate). np=1 (children co-owned with the parent); np>=2 P2P delivery is future work.
+            ! fill the per-slot (per-child) geometry, then issue ONE batched kernel per capture category. Each child is its OWN creg
+            ! slot (slot=kc); both faces always owned (child co-located), t1lo=t2lo=0.
             ccoef = rk3_w(stage); cacc = (stage > 1)
+            bactive = .false.
+            maxt1 = 0; maxt2 = 0
             do kc = 1, amr_num_blocks
                 if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1 .or. .not. amr_owns_all(kc)) cycle
                 is_child = .true.
@@ -459,15 +486,20 @@ contains
                     o1 = amr_isect_lo_all(1, kc); t1_hi = amr_isect_hi_all(1, kc) - amr_isect_lo_all(1, kc)
                     o2 = amr_isect_lo_all(2, kc); t2_hi = amr_isect_hi_all(2, kc) - amr_isect_lo_all(2, kc)
                 end select
-                ! shared capture into this CHILD's creg (parent-fine frame, both faces always owned since child is co-located):
-                ! advective, then total-flux viscous, then chemistry species+energy.
-                call s_amr_capture_creg_dense(kc, id, flux_dir, ccoef, cacc, .true., .true., jlo, jhi, o1, o2, 0, t1_hi, 0, &
-                                              & t2_hi, 1, sys_size)
-                if (viscous) call s_amr_capture_creg_dense(kc, id, flux_src, ccoef, .true., .true., .true., jlo, jhi, o1, o2, 0, &
-                    & t1_hi, 0, t2_hi, eqn_idx%mom%beg, eqn_idx%E)
-                if (chemistry .and. chem_params%diffusion) call s_amr_capture_creg_chem(kc, id, flux_src, ccoef, .true., .true., &
-                    & jlo, jhi, o1, o2, 0, t1_hi, 0, t2_hi)
+                bactive(kc) = .true.; bclo(kc) = .true.; bchi(kc) = .true.
+                bjlo(kc) = jlo; bjhi(kc) = jhi; bo1(kc) = o1; bo2(kc) = o2
+                bt1lo(kc) = 0; bt1hi(kc) = t1_hi; bt2lo(kc) = 0; bt2hi(kc) = t2_hi
+                maxt1 = max(maxt1, t1_hi); maxt2 = max(maxt2, t2_hi)
             end do
+            if (any(bactive(1:amr_num_blocks))) then
+                $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
+                ! shared capture into each CHILD's creg (parent-fine frame): advective, then total-flux viscous, then chemistry.
+                call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_dir, ccoef, cacc, maxt1, maxt2, 1, sys_size)
+                if (viscous) call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, ccoef, .true., maxt1, maxt2, &
+                    & eqn_idx%mom%beg, eqn_idx%E)
+                if (chemistry .and. chem_params%diffusion) call s_amr_capture_creg_chem_batch(amr_num_blocks, id, flux_src, &
+                    & ccoef, maxt1, maxt2)
+            end if
         else
             ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its
             ! flux_n covers that face; at a rank-interior face the same rank also holds the inside cells).
@@ -477,6 +509,8 @@ contains
             ! intersection is the block and both flags hold, recovering the single-rank behavior exactly.
             ! ONE coarse s_compute_rhs pass fills EVERY active block's registers: revisit each slot's region+intersection in turn.
             save_cur = amr_cur
+            bactive = .false.
+            maxt1 = 0; maxt2 = 0
             do islot = 1, amr_num_blocks
                 ! a level>=2 block's coarse side is its PARENT (creg captured in the fine branch), not L0
                 if (amr_block_level(islot) >= 2) cycle
@@ -497,17 +531,23 @@ contains
                         t1_lo = tlo(1) - amr_region_lo(1); t1_hi = thi(1) - amr_region_lo(1); o1 = amr_region_lo(1) - sidx(1)
                         t2_lo = tlo(2) - amr_region_lo(2); t2_hi = thi(2) - amr_region_lo(2); o2 = amr_region_lo(2) - sidx(2)
                     end select
-                    ! shared capture into this coarse block's creg (region/sidx frame, per-face ownership gating): advective, then
-                    ! total-flux viscous, then chemistry species+energy.
-                    call s_amr_capture_creg_dense(islot, id, flux_dir, coef, accum, cap_lo, cap_hi, jlo, jhi, o1, o2, t1_lo, &
-                                                  & t1_hi, t2_lo, t2_hi, 1, sys_size)
-                    if (viscous) call s_amr_capture_creg_dense(islot, id, flux_src, coef, .true., cap_lo, cap_hi, jlo, jhi, o1, &
-                        & o2, t1_lo, t1_hi, t2_lo, t2_hi, eqn_idx%mom%beg, eqn_idx%E)
-                    if (chemistry .and. chem_params%diffusion) call s_amr_capture_creg_chem(islot, id, flux_src, coef, cap_lo, &
-                        & cap_hi, jlo, jhi, o1, o2, t1_lo, t1_hi, t2_lo, t2_hi)
+                    bactive(islot) = .true.; bclo(islot) = cap_lo; bchi(islot) = cap_hi
+                    bjlo(islot) = jlo; bjhi(islot) = jhi; bo1(islot) = o1; bo2(islot) = o2
+                    bt1lo(islot) = t1_lo; bt1hi(islot) = t1_hi; bt2lo(islot) = t2_lo; bt2hi(islot) = t2_hi
+                    maxt1 = max(maxt1, t1_hi); maxt2 = max(maxt2, t2_hi)
                 end if  ! cap_lo .or. cap_hi
             end do
             call s_amr_select_slot(save_cur)
+            if (any(bactive(1:amr_num_blocks))) then
+                $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
+                ! shared capture into each coarse block's creg (region/sidx frame, per-face ownership gating): advective, then
+                ! total-flux viscous, then chemistry species+energy.
+                call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_dir, coef, accum, maxt1, maxt2, 1, sys_size)
+                if (viscous) call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, coef, .true., maxt1, maxt2, &
+                    & eqn_idx%mom%beg, eqn_idx%E)
+                if (chemistry .and. chem_params%diffusion) call s_amr_capture_creg_chem_batch(amr_num_blocks, id, flux_src, coef, &
+                    & maxt1, maxt2)
+            end if
         end if
 
     end subroutine s_amr_capture_boundary_flux
@@ -831,6 +871,7 @@ contains
                 @:DEALLOCATE(freg(d)%lo, freg(d)%hi)
             end if
         end do
+        @:DEALLOCATE(bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive)
 
     end subroutine s_finalize_amr_registers
 
