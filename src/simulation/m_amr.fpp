@@ -3183,13 +3183,14 @@ contains
         #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
             #:set IDX = {1: '(c, a, b)', 2: '(a, c, b)', 3: '(a, b, c)'}[D]
             if (d == ${D}$) then
-                na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1
+                na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1  ! scalars; the kernel loop bounds MUST use na-1/nb-1, not fm(..),
+                !                     so no host array is referenced in the device region (nvfortran/Cray demand it PRESENT)
                 if (dir == 1) then  ! host <- device: pack on the device, copyout moves the contiguous buffer to host
                     $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
                     do i = 1, sys_size
                         do c = dlo, dhi
-                            do b = 0, fm(${TB}$)
-                                do a = 0, fm(${TA}$)
+                            do b = 0, nb - 1
+                                do a = 0, na - 1
                                     buf(1 + a + na*(b + nb*(c - dlo + nc*(i - 1)))) = real(q_cons(i)%sf${IDX}$, wp)
                                 end do
                             end do
@@ -3200,8 +3201,8 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
                     do i = 1, sys_size
                         do c = dlo, dhi
-                            do b = 0, fm(${TB}$)
-                                do a = 0, fm(${TA}$)
+                            do b = 0, nb - 1
+                                do a = 0, na - 1
                                     q_cons(i)%sf${IDX}$ = real(buf(1 + a + na*(b + nb*(c - dlo + nc*(i - 1)))), stp)
                                 end do
                             end do
