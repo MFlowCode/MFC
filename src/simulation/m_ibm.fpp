@@ -1746,10 +1746,17 @@ contains
         ! (all ghost_points consumers run on-device). This also removes the whole-array ghost_points GPU_UPDATE
         ! that amdflang lowered to a per-element custom mapper (ROCm HSA OUT_OF_RESOURCES abort). On the setup
         ! path the fine list does not exist yet - s_ibm_setup_fine fills ghost_points in place next.
+        ! These swap/restore kernels carry an AMD-only defaultmap(present:allocatable): AMD's default='present'
+        ! emits no defaultmap, so flang otherwise generates a map ENTRY for these device-resident allocatable
+        ! derived-type arrays (ghost_points/gp_park) that it lowers to a per-element custom mapper - the offload
+        ! runtime then busy-loops for minutes recursing through targetDataBegin/targetDataEnd (same amdflang
+        ! per-element-mapper failure as the removed whole-array GPU_UPDATE above). defaultmap(present:allocatable)
+        ! asserts them present with NO map entry, so no mapper is generated. CCE gets this via its default='present'.
         n_c = num_gps
         @:PROHIBIT(int(n_c, 8) > size(gp_park, dim=1, kind=8), "AMR fine IB: coarse ghost-point count exceeds the gp_park capacity")
         csl = ib_coarse_slot
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c, csl]')
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c, csl]', &
+                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
         do a = 1, n_c
             gp_park(a, csl) = ghost_points(a)
         end do
@@ -1759,7 +1766,8 @@ contains
         if (gps_on_device) then
             n_f = num_gps
             fsl = islot
-            $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, fsl]')
+            $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, fsl]', &
+                                & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
             do a = 1, n_f
                 ghost_points(a) = gp_park(a, fsl)
             end do
@@ -1787,7 +1795,8 @@ contains
 
         n_f = num_gps
         fsl = islot
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, fsl]')
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, fsl]', &
+                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
         do a = 1, n_f
             gp_park(a, fsl) = ghost_points(a)
         end do
@@ -1796,7 +1805,8 @@ contains
         num_gps = num_gps_save
         n_c = num_gps
         csl = ib_coarse_slot
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c, csl]')
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c, csl]', &
+                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
         do a = 1, n_c
             ghost_points(a) = gp_park(a, csl)
         end do

@@ -59,6 +59,34 @@ on all backends; only the transfer mechanism differs.
 All four previously-failing cases pass, no regression on the passing cases:
 `244B1E42`, `ADA042A2`, `660FFBFE`, `B7704247` (fixed); `21C71558`, `5EFB3277` (still pass).
 
+## Second, separate bug: AMR+IB fine-marker swap/restore hangs the offload runtime
+
+Found while sweeping the suite. **Symptom:** AMR+IB tests hang (99% host CPU, GPU idle, no timestep
+output) inside `s_ibm_swap_to_fine` / `s_ibm_restore_from_fine` (`m_ibm.fpp`), the AMR-fine IB
+ghost-point park/pull kernels. `rocgdb` on the live hang shows the AMD offload runtime busy-looping in
+a recursive `targetDataBegin → targetDataMapper → targetDataBegin` (cycling through `free`,
+`SourceInfo::getSubstring`, `std::string::find`).
+
+**Root cause:** those kernels access the device-resident `allocatable` derived-type arrays
+`ghost_points` / `gp_park` with only `default='present'` — which on AMD emits **no** defaultmap, so
+flang generates a map *entry* for them and lowers it to a per-element custom mapper (the same amdflang
+failure the code already dodged for the whole-array `ghost_points` `GPU_UPDATE`). The runtime then
+busy-loops processing that entry. Both an implicit `tofrom` map and an explicit `map(present,alloc:…)`
+still create the entry and still hang; only **no entry at all** avoids it.
+
+**Fix:** add an AMD-only `defaultmap(present:allocatable)` (via `extraOmpArgs`, gated on
+`MFC_COMPILER == "LLVMFlang"`) to the four swap/restore kernels — asserts them present with no map
+entry, so no mapper is generated. CCE already gets this via its `default='present'`; NVHPC/CPU
+unchanged. `05A8C23C` is the only *multi-level* AMR+IB test (largest `gp_park`), which is why it
+surfaced first; the fix is on the shared kernels so it covers all AMR+IB cases.
+
+**Not minimally reproducible:** a standalone kernel implicitly mapping the same flat derived-type array
+completes instantly even at MFC's element count and present-table size — the per-element-mapper path
+only triggers in MFC's full offload context. Worth a flang/ROCm report with the `rocgdb` backtraces.
+
+**Verification:** all AMR+IB tests pass on the MI250X: `05A8C23C` (multi-level, was hanging),
+`2854A102`, `F980C769`, `7FC2F9F8`, `13945217`, `43AF9F25`.
+
 ## Reproduce / debug env
 ```
 source ./mfc.sh load -c amdfund -m g   # must be chained (&&) with the command below in ONE shell
@@ -66,4 +94,8 @@ export OMP_TARGET_OFFLOAD=MANDATORY     # abort if offload cannot reach a GPU
 export OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES=8   # name the faulting kernel on a GPU memory fault
 export LIBOMPTARGET_INFO=-1             # full host<->device mapping trace (very verbose)
 ./mfc.sh test --only 244B1E42 -- -b mpirun -n 2
+```
+For a *hang* (no error text), attach to the spinning rank to see where the runtime is stuck:
+```
+rocgdb -p $(pgrep -n simulation) -batch -ex 'bt 12'
 ```
