@@ -4114,8 +4114,9 @@ contains
         integer                           :: ci, cj, ck, gi, gj, gk
 
 #ifdef MFC_MPI
-        integer              :: i, jrem, nloc, ierr
-        integer, allocatable :: locidx(:), allidx(:), rcnt(:), rdsp(:)
+        integer                 :: i, jrem, nloc, ierr
+        integer, allocatable    :: rcnt(:), rdsp(:)
+        integer(8), allocatable :: locidx(:), allidx(:)
 
         if (num_procs > 1) then
             allocate (locidx((m + 1)*(n + 1)*(p + 1)), rcnt(num_procs), rdsp(num_procs))
@@ -4126,7 +4127,7 @@ contains
                     if (n_glb > 0) gj = cj + sidx(2)
                     if (p_glb > 0) gk = ck + sidx(3)
                     nloc = nloc + 1
-                    locidx(nloc) = gi + (mg + 1)*(gj + (ng + 1)*gk)
+                    locidx(nloc) = int(gi, 8) + int(mg + 1, 8)*(int(gj, 8) + int(ng + 1, 8)*int(gk, 8))
                 end if
             end do; end do; end do
             call MPI_ALLGATHER(nloc, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -4134,10 +4135,10 @@ contains
             do i = 2, num_procs; rdsp(i) = rdsp(i - 1) + rcnt(i - 1); end do
                 ntag = rdsp(num_procs) + rcnt(num_procs)
                 allocate (allidx(max(ntag, 1)), tags(3, max(ntag, 1)))
-                call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER, allidx, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER8, allidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
                 do i = 1, ntag
-                    gk = allidx(i)/((mg + 1)*(ng + 1))
-                    jrem = allidx(i) - gk*(mg + 1)*(ng + 1)
+                    gk = int(allidx(i)/(int(mg + 1, 8)*int(ng + 1, 8)))
+                    jrem = int(allidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8))
                     gj = jrem/(mg + 1)
                     gi = jrem - gj*(mg + 1)
                     tags(1, i) = gi; tags(2, i) = gj; tags(3, i) = gk
@@ -4180,8 +4181,9 @@ contains
             integer                           :: gi, gj, gk
 
 #ifdef MFC_MPI
-            integer              :: i, jrem, nloc, ntot, ierr
-            integer, allocatable :: locidx(:), allidx(:), rcnt(:), rdsp(:)
+            integer                 :: i, jrem, nloc, ntot, ierr
+            integer, allocatable    :: rcnt(:), rdsp(:)
+            integer(8), allocatable :: locidx(:), allidx(:)
 
             if (num_procs > 1) then
                 nloc = 0
@@ -4193,7 +4195,7 @@ contains
                 do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
                     if (gwin(gi, gj, gk)) then
                         nloc = nloc + 1
-                        locidx(nloc) = gi + (mg + 1)*(gj + (ng + 1)*gk)
+                        locidx(nloc) = int(gi, 8) + int(mg + 1, 8)*(int(gj, 8) + int(ng + 1, 8)*int(gk, 8))
                     end if
                 end do; end do; end do
                 call MPI_ALLGATHER(nloc, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -4201,10 +4203,10 @@ contains
                 do i = 2, num_procs; rdsp(i) = rdsp(i - 1) + rcnt(i - 1); end do
                     ntot = rdsp(num_procs) + rcnt(num_procs)
                     allocate (allidx(max(ntot, 1)))
-                    call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER, allidx, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                    call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER8, allidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
                     do i = 1, ntot
-                        gk = allidx(i)/((mg + 1)*(ng + 1))
-                        jrem = allidx(i) - gk*(mg + 1)*(ng + 1)
+                        gk = int(allidx(i)/(int(mg + 1, 8)*int(ng + 1, 8)))
+                        jrem = int(allidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8))
                         gj = jrem/(mg + 1)
                         gi = jrem - gj*(mg + 1)
                         gwin(gi, gj, gk) = .true.  ! dedups replicated tags back into the window field
