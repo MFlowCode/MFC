@@ -56,6 +56,16 @@ contains
         @:PROHIBIT(bf_spatial_support .and. (n == 0 .or. p /= 0), &
                    & "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
 
+        ! Condensed-phase reactive burn assumes exactly two fluids (reactant=1, product=2) that share the
+        ! stiffened-gas EOS and differ only in qv; violating these silently corrupts the mass/energy balance.
+        @:PROHIBIT(reactive_burn .and. num_fluids /= 2, "reactive_burn requires num_fluids = 2 (reactant then product)")
+        @:PROHIBIT(reactive_burn .and. .not. f_approx_equal(fluid_pp(1)%gamma, fluid_pp(2)%gamma), &
+                   & "reactive_burn requires fluid_pp(1)%gamma == fluid_pp(2)%gamma (reactant and product share the EOS)")
+        @:PROHIBIT(reactive_burn .and. .not. f_approx_equal(fluid_pp(1)%pi_inf, fluid_pp(2)%pi_inf), &
+                   & "reactive_burn requires fluid_pp(1)%pi_inf == fluid_pp(2)%pi_inf (reactant and product share the EOS)")
+        @:PROHIBIT(reactive_burn .and. fluid_pp(1)%qv <= fluid_pp(2)%qv, &
+                   & "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)")
+
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
         end if

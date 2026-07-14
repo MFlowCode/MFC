@@ -352,7 +352,10 @@ contains
                     ! pressure scales the blowing speed, giving chamber-pressure feedback (internal
                     ! ballistics) in a closed chamber. Off (constant) when burn_rate_pref <= 0.
                     if (patch_ib(patch_id)%burn_rate_pref > 0._wp) then
-                        v_blow_eff = v_blow_eff*(pres_IP/patch_ib(patch_id)%burn_rate_pref)**patch_ib(patch_id)%burn_rate_exp
+                        ! max(pres_IP, 0) guards the fractional power against a transient negative
+                        ! interpolated pressure, which would otherwise return NaN and poison the field.
+                        v_blow_eff = v_blow_eff*(max(pres_IP, &
+                                                 & 0._wp)/patch_ib(patch_id)%burn_rate_pref)**patch_ib(patch_id)%burn_rate_exp
                     end if
                     norm(1:3) = gp%levelset_norm
                     buf = sqrt(sum(norm**2))
