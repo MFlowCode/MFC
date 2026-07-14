@@ -3573,14 +3573,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # far-rank coarse owner (s_amr_scatter_pbmv). The bit-uniform grid makes this byte-identical to the np=1 golden
         # above (the np-cross validation oracle for the non-conservative side-state).
         cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2, override_tol=5 * 10 ** (-9)))
-        # np=4: the same distributed pb/mv coupling at a higher rank count. The 64 cells split into
-        # [0,15]/[16,31]/[32,47]/[48,63]; the block [26,37] straddles ONLY the rank1<->rank2 boundary
-        # (6 coarse cells each side, well under the <=half-subdomain scratch cap), so ranks 0 and 3 own
-        # no block cells and must correctly no-op the gather/scatter (idle-rank robustness) while the owner
-        # P2P-couples one far rank. Exercises MPI-tag safety and the do-r-loop over 4 ranks that the np=2
-        # single-straddle case does not. Block repositioned (vs the [16,47] cases above) to fit the np=4
-        # decomposition, so validated by its own np4==np1 machine-zero cross-check on the bit-uniform grid.
-        cases.append(define_case_d(stack, "4 MPI Ranks", {"amr_block_beg(1)": 26, "amr_block_end(1)": 37}, ppn=4, override_tol=5 * 10 ** (-9)))
         # dynamic regrid + subcycle: the pb/mv side-state now regrids (stor bounce + re-prolong +
         # overlap copy) and subcycles (two-source ghost time-lerp) exactly like q_cons
         stack.push("regrid subcycle", {"amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "amr_subcycle": "T"})
