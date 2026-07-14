@@ -22,6 +22,7 @@ import cantera as ct
 parser = argparse.ArgumentParser(prog="2D_ibm_burning_grain")
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC toolchain state.")
 parser.add_argument("--burn_exp", type=float, default=0.0, help="Pressure exponent n in Vieille's law v_blow*(p/p0)^n; 0 = constant injection.")
+parser.add_argument("--tend", type=float, default=1.5e-4, help="Physical end time [s].")
 args = parser.parse_args()
 
 ctfile = "h2o2.yaml"
@@ -49,7 +50,7 @@ v_blow = 20.0  # surface fuel-injection (blowing) speed [m/s]
 # dt from the acoustic CFL; small for explicit chemistry stability.
 cfl = 0.05
 dt = cfl * dx / (v_blow + c0)
-tend = 1.5e-4
+tend = args.tend
 NT = int(tend / dt)
 NS = max(1, NT // 60)
 
