@@ -29,6 +29,6 @@ exclude = [
     "https://sc22\\.supercomputing\\.org",              # Returns 415 to automated requests
     "https://strawberryperl\\.com",                    # Frequently times out
     "https://www\\.olcf\\.ornl\\.gov/summit",            # Returns 503 to automated requests
-    "https://apps\\.microsoft\\.com",                 # Microsoft Store returns 403 to automated requests
-    "https://code\\.visualstudio\\.com",              # Returns 403 to automated requests
+    "https://apps\\.microsoft\\.com/store/detail/",  # Microsoft Store detail pages return 403 to automated requests
+    "https://code\\.visualstudio\\.com/?$",           # Root page returns 403 to automated requests
 ]
