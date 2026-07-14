@@ -12,7 +12,7 @@ import cantera as ct
 
 parser = argparse.ArgumentParser(prog="2D_hybrid_slab")
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC toolchain state.")
-parser.add_argument("--tend", type=float, default=1.0e-4, help="Physical end time [s].")
+parser.add_argument("--tend", type=float, default=1.2e-3, help="Physical end time [s] (~1 crossflow flow-through Lx/u_ox so the wall-injected flame anchors, not just the startup transient).")
 parser.add_argument("--res", type=float, default=1.0, help="Resolution multiplier: m=200*res, n=50*res.")
 parser.add_argument("--frames", type=int, default=5, help="Number of saved output frames.")
 args = parser.parse_args()
@@ -137,7 +137,7 @@ case = {
     # Fluid EOS (ideal-gas closure is bypassed by chemistry, but gamma/Re must be set)
     "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
     "fluid_pp(1)%pi_inf": 0.0,
-    "fluid_pp(1)%Re(1)": 200000,
+    "fluid_pp(1)%Re(1)": 1.0 / oxidizer.viscosity,  # mu = 1/Re; use the physical O2/Ar viscosity at T0
 }
 
 # Species mass fractions per patch + per-species output
