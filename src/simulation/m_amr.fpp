@@ -3149,55 +3149,55 @@ contains
     !! buff_size-deep near-seam slab is moved device<->host (host<-device before a pack, device<-host after an unpack), interior
     !! transverse (0:fm) only - exactly the cells touched below, so the round-trip is byte-identical to a full-field update at a
     !! tiny fraction of the volume (the halo runs per stage, 6x per fine step).
-    impure subroutine s_amr_fine_slice(slot, d, dlo, dhi, buf, dir)
+    impure subroutine s_amr_fine_slice(slot, q_cons, d, dlo, dhi, buf, dir)
 
-        integer, intent(in)     :: slot, d, dlo, dhi, dir
-        real(wp), intent(inout) :: buf(:)
-        integer                 :: i, a, b, c, idx, fm(3)
+        integer, intent(in)                                    :: slot, d, dlo, dhi, dir
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons  ! amr_slots(slot)%q_cons: pass the
+        !                                    scalar_field array in so the device kernel reads the mapped %sf via a
+        !                                    dummy - amr_slots itself is not GPU_DECLARE'd, so indexing the module
+        !                                    array amr_slots(slot)%q_cons inside a kernel dereferences a null descriptor
+        real(wp), intent(inout), contiguous :: buf(:)
+        integer                             :: i, a, b, c, fm(3), na, nb, nc
 
         fm(1) = amr_slots(slot)%m; fm(2) = amr_slots(slot)%n; fm(3) = amr_slots(slot)%p
-        if (dir == 1) then  ! host <- device: make the slab current before the pack reads it
-            do i = 1, sys_size
-                #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
-                    #:set SEC = {1: '(dlo:dhi, 0:fm(2), 0:fm(3))', 2: '(0:fm(1), dlo:dhi, 0:fm(3))', &
-                        & 3: '(0:fm(1), 0:fm(2), dlo:dhi)'}[D]
-                    if (d == ${D}$) then
-                        $:GPU_UPDATE(host='[amr_slots(slot)%q_cons(i)%sf' + SEC + ']')
-                    end if
-                #:endfor
-            end do
-        end if
-        idx = 0
-        do i = 1, sys_size
-            do c = dlo, dhi
-                #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
-                    if (d == ${D}$) then
-                        do b = 0, fm(${TB}$)
-                            do a = 0, fm(${TA}$)
-                                idx = idx + 1
-                                #:set IDX = {1: '(c, a, b)', 2: '(a, c, b)', 3: '(a, b, c)'}[D]
-                                if (dir == 1) then
-                                    buf(idx) = real(amr_slots(slot)%q_cons(i)%sf${IDX}$, wp)
-                                else
-                                    amr_slots(slot)%q_cons(i)%sf${IDX}$ = real(buf(idx), stp)
-                                end if
+        nc = dhi - dlo + 1
+        ! Pack (dir=1) / unpack (dir=-1) the near-seam slab ON THE DEVICE straight into the contiguous buffer buf,
+        ! then move ONLY buf host<->device. flang miscomputes a STRIDED section (seam dim d < num_dims) of the
+        ! doubly-nested amr_slots%q_cons%sf in a target-update map clause, corrupting the 2D+ np>1 seam ghosts; the
+        ! base-grid halo (s_mpi_sendrecv_variables_buffers) device-packs into a contiguous buffer for the same reason.
+        ! buf index runs a fastest, then b, then c, then i, so a pack and an unpack with matching extents align cell-
+        ! for-cell (na/nb are the transverse fine sizes, nc the slab depth).
+        #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+            #:set IDX = {1: '(c, a, b)', 2: '(a, c, b)', 3: '(a, b, c)'}[D]
+            if (d == ${D}$) then
+                na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1
+                if (dir == 1) then  ! host <- device: pack on the device, copyout moves the contiguous buffer to host
+                    $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
+                    do i = 1, sys_size
+                        do c = dlo, dhi
+                            do b = 0, fm(${TB}$)
+                                do a = 0, fm(${TA}$)
+                                    buf(1 + a + na*(b + nb*(c - dlo + nc*(i - 1)))) = real(q_cons(i)%sf${IDX}$, wp)
+                                end do
                             end do
                         end do
-                    end if
-                #:endfor
-            end do
-        end do
-        if (dir == -1) then  ! device <- host: push the freshly unpacked seam ghosts back to the device
-            do i = 1, sys_size
-                #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
-                    #:set SEC = {1: '(dlo:dhi, 0:fm(2), 0:fm(3))', 2: '(0:fm(1), dlo:dhi, 0:fm(3))', &
-                        & 3: '(0:fm(1), 0:fm(2), dlo:dhi)'}[D]
-                    if (d == ${D}$) then
-                        $:GPU_UPDATE(device='[amr_slots(slot)%q_cons(i)%sf' + SEC + ']')
-                    end if
-                #:endfor
-            end do
-        end if
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                else  ! device <- host: copyin moves the contiguous buffer to device, then unpack on the device
+                    $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
+                    do i = 1, sys_size
+                        do c = dlo, dhi
+                            do b = 0, fm(${TB}$)
+                                do a = 0, fm(${TA}$)
+                                    q_cons(i)%sf${IDX}$ = real(buf(1 + a + na*(b + nb*(c - dlo + nc*(i - 1)))), stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+            end if
+        #:endfor
 
     end subroutine s_amr_fine_slice
 
@@ -3247,24 +3247,27 @@ contains
                 cnt = sys_size*buff_size*tsz
                 allocate (xbuf(cnt), ybuf(cnt))
                 if (rX == rY) then  ! same rank owns both: pack each near-seam interior, unpack into the other's seam ghost
-                    call s_amr_fine_slice(xb, d, xm(d) - buff_size + 1, xm(d), xbuf, 1)  ! xb high interior
-                    call s_amr_fine_slice(yb, d, 0, buff_size - 1, ybuf, 1)  ! yb low interior
-                    call s_amr_fine_slice(yb, d, -buff_size, -1, xbuf, -1)  ! -> yb low ghost
-                    call s_amr_fine_slice(xb, d, xm(d) + 1, xm(d) + buff_size, ybuf, -1)  ! -> xb high ghost
+                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), xbuf, 1)  ! xb high interior
+                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, ybuf, 1)  ! yb low interior
+                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, xbuf, -1)  ! -> yb low ghost
+                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, ybuf, -1)  ! -> xb high ghost
                 else if (proc_rank == rX) then
-                    call s_amr_fine_slice(xb, d, xm(d) - buff_size + 1, xm(d), xbuf, 1)  ! send xb high interior
+                    ! send xb high interior
+                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), xbuf, 1)
 #ifdef MFC_MPI
                     call MPI_SENDRECV(xbuf, cnt, mpi_p, rY, 4200, ybuf, cnt, mpi_p, rY, 4201, MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
                                       & ierr)
 #endif
-                    call s_amr_fine_slice(xb, d, xm(d) + 1, xm(d) + buff_size, ybuf, -1)  ! recv yb low interior -> xb high ghost
+                    ! recv yb low interior -> xb high ghost
+                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, ybuf, -1)
                 else  ! proc_rank == rY
-                    call s_amr_fine_slice(yb, d, 0, buff_size - 1, ybuf, 1)  ! send yb low interior
+                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, ybuf, 1)  ! send yb low interior
 #ifdef MFC_MPI
                     call MPI_SENDRECV(ybuf, cnt, mpi_p, rX, 4201, xbuf, cnt, mpi_p, rX, 4200, MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
                                       & ierr)
 #endif
-                    call s_amr_fine_slice(yb, d, -buff_size, -1, xbuf, -1)  ! recv xb high interior -> yb low ghost
+                    ! recv xb high interior -> yb low ghost
+                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, xbuf, -1)
                 end if
                 deallocate (xbuf, ybuf)
             end do
