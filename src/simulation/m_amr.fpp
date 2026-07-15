@@ -5214,7 +5214,10 @@ contains
             open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
             write (2) num_procs, amr_num_blocks, sys_size
             do k = 1, amr_num_blocks
-                write (2) amr_slots(k)%region%lo, amr_slots(k)%region%hi, amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p
+                ! per-block header: region box, refinement LEVEL (a level-l block's fine extent is ref_ratio**l,
+                ! not ref_ratio, of the region - the reader needs the level to rebuild multi-level geometry), extents
+                write (2) amr_slots(k)%region%lo, amr_slots(k)%region%hi, amr_block_level(k), amr_slots(k)%m, amr_slots(k)%n, &
+                       & amr_slots(k)%p
                 if (amr_owns_all(k)) then
                     do i = 1, sys_size
                         write (2) amr_slots(k)%q_cons(i)%sf(0:amr_slots(k)%m,0:amr_slots(k)%n,0:amr_slots(k)%p)
@@ -5314,7 +5317,7 @@ contains
         character(LEN=path_len + 3*name_len) :: file_loc
         character(LEN=300)                   :: msg
         logical                              :: file_exist
-        integer                              :: i, k, ts, have_loc, have_glb, ghdr(3), reg(6), rm, rn, rp
+        integer                              :: i, k, ts, have_loc, have_glb, ghdr(3), reg(6), lvl, rm, rn, rp
         logical, allocatable                 :: had_data(:)
 
 #ifdef MFC_MPI
@@ -5381,20 +5384,26 @@ contains
             ! owner's fine state. Whole-block ownership is decomposition-deterministic, so the file's
             ! data-presence flag drives the read here; the owner map is rebuilt from the regions in pass 2.
             do k = 1, amr_num_blocks
-                read (2) reg, rm, rn, rp
+                read (2) reg, lvl, rm, rn, rp
                 ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
                 ! build and coordinate reads out of bounds silently in release builds
                 if (reg(1) < 0 .or. reg(4) > m_glb .or. reg(1) > reg(4) .or. (n_glb > 0 .and. (reg(2) < 0 .or. reg(5) > n_glb &
                     & .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) > reg(6)))) then
                     call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
                 end if
+                if (lvl < 1 .or. lvl > amr_max_level) then
+                    call s_mpi_abort('amr restart: corrupt block record (block level outside 1..amr_max_level)')
+                end if
                 amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
+                ! set the level BEFORE the owner/geometry rebuild below: s_amr_assign_block_owners and
+                ! s_set_amr_fine_geometry key off amr_block_level to place L>=2 blocks under their parent
+                amr_block_level(k) = lvl
                 had_data(k) = rm >= 0
                 if (had_data(k)) then
-                    ! whole-block owner extents are region-derived (decomposition-independent); a file whose
-                    ! stored extent disagrees is corrupt/foreign - reject before the direct read
-                    if (rm /= ref_ratio*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge(ref_ratio*(reg(5) - reg(2) + 1) - 1, 0, &
-                        & n_glb > 0) .or. rp /= merge(ref_ratio*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
+                    ! whole-block owner extents are region-derived per level (a level-l block covers ref_ratio**l
+                    ! fine cells per L0 cell of its region, not ref_ratio); a stored extent that disagrees is corrupt
+                    if (rm /= (ref_ratio**lvl)*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge((ref_ratio**lvl)*(reg(5) - reg(2) + 1) &
+                        & - 1, 0, n_glb > 0) .or. rp /= merge((ref_ratio**lvl)*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
                         call s_mpi_abort('amr restart: block fine extents disagree with the region (corrupt file)')
                     end if
                     ! serial (same rank count): had_data == this run's ownership, so this is the owned slot

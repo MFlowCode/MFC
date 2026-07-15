@@ -3961,6 +3961,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (h2) multi-level restart roundtrip: same static L2 hierarchy as (h), but restart_check proves the
+        # AMR restart file round-trips a MULTI-LEVEL block set. A level-2 block's fine extent is ref_ratio**2
+        # (not ref_ratio) times its coarse region, so the single-level restart reader rejected every L2 block
+        # as "corrupt"; the per-block level stored in the file lets the reader rebuild the multi-level geometry.
+        stack.push(
+            "AMR -> 1D -> multi-level restart",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
+        stack.pop()
+
         # (i) multi-level + dynamic regrid: (h) is a static hierarchy; this arms amr_regrid_int so the
         # level-2 child is placed by SENSOR-ON-FINE (the density-gradient sensor run on the level-1 fine
         # solution, coarsened + clustered into a nested child box), not a fixed inset. This is the ONLY
