@@ -17,7 +17,7 @@ module m_amr
     use m_global_parameters
     use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
-    use m_mpi_proxy, only: s_mpi_abort, s_initialize_amr_mpi_buffers
+    use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, s_mpi_allreduce_min, &
         & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
     use m_rhs, only: s_compute_rhs
@@ -281,9 +281,6 @@ contains
         max_f2 = 0; max_f3 = 0
         if (n_glb > 0) max_f2 = ref_ratio*maxc_loc(2) - 1
         if (p_glb > 0) max_f3 = ref_ratio*maxc_loc(3) - 1
-
-        ! MPI exchange buffers for the fine halo (all ranks; no-op without MFC_MPI)
-        call s_initialize_amr_mpi_buffers(max_f1, max_f2, max_f3)
 
         ! fine-fine seam pack buffers: sized ONCE to the largest possible seam (sys_size*buff_size * max transverse fine
         ! face), so s_amr_fine_fine_halo reuses them instead of allocating per seam per stage. Transverse cap = the largest
@@ -5178,7 +5175,7 @@ contains
     !> Write the fine-level restart file for save step t_step alongside the level-0 restart (whose format stays untouched): the
     !! writing rank count, the active-block count, and for EACH block its box + each rank's intersection-local fine conservative
     !! state. Serial mode: one unformatted file per rank inside its level-0 step directory. Parallel mode: one shared MPI-IO file
-    !! (3-int global header [np, nboxes, sys_size], then per block a 6-int box header, a 3*np-int per-rank fine-extents record
+    !! (3-int global header [np, nboxes, sys_size], then per block a 7-int box+level header, a 3*np-int per-rank fine-extents record
     !! [m,n,p per rank, 0s for non-owners; validated on read], followed by the ranks' fine blocks concatenated in rank order). Same
     !! rank count + decomposition required to restart (enforced by the extents record).
     impure subroutine s_write_amr_restart(t_step)
@@ -5188,7 +5185,7 @@ contains
         integer                              :: i, k
 
 #ifdef MFC_MPI
-        integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, reg(6), ibytes, sbytes
+        integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, reg(6), bhdr(7), ibytes, sbytes
         integer                                    :: myext(3)
         integer, allocatable                       :: wext(:), myext_all(:), wext_all(:)
         integer, dimension(MPI_STATUS_SIZE)        :: status
@@ -5265,18 +5262,20 @@ contains
                 cnt = int(my_cnt_vec(k), kind(cnt))
                 my_off = my_off_vec(k)
                 if (proc_rank == 0) then
-                    reg(1:3) = amr_slots(k)%region%lo; reg(4:6) = amr_slots(k)%region%hi
-                    call MPI_FILE_WRITE_AT(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                    ! 7-int per-block header: region box (6) + refinement LEVEL (a level-l block's fine extent is
+                    ! ref_ratio**l, not ref_ratio, of the region - the reader needs the level to rebuild multi-level geometry)
+                    bhdr(1:3) = amr_slots(k)%region%lo; bhdr(4:6) = amr_slots(k)%region%hi; bhdr(7) = amr_block_level(k)
+                    call MPI_FILE_WRITE_AT(ifile, disp0, bhdr, 7, MPI_INTEGER, status, ierr)
                 end if
                 ! wext_all layout: rank r's extents for block k at wext_all(3*amr_num_blocks*r + 3*(k-1) + 1 : +3)
                 do i = 0, num_procs - 1
                     wext(3*i + 1:3*i + 3) = wext_all(3*amr_num_blocks*i + 3*(k - 1) + 1:3*amr_num_blocks*i + 3*(k - 1) + 3)
                 end do
                 if (proc_rank == 0) then
-                    call MPI_FILE_WRITE_AT(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, status, &
+                    call MPI_FILE_WRITE_AT(ifile, disp0 + int(7*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, status, &
                                            & ierr)
                 end if
-                ddisp = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
+                ddisp = disp0 + int((7 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
                 allocate (buf(max(cnt, 1)))
                 idx = 0
                 do i = 1, sys_size
@@ -5321,7 +5320,7 @@ contains
         logical, allocatable                 :: had_data(:)
 
 #ifdef MFC_MPI
-        integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes, np_old
+        integer                                    :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes, np_old, bhdr(7)
         integer                                    :: myext(3)
         integer, allocatable                       :: wext(:), rext(:), myext_all(:), wext_all(:)
         integer, dimension(MPI_STATUS_SIZE)        :: status
@@ -5465,18 +5464,26 @@ contains
             ! so all offsets are known before the owner map is rebuilt in pass 2.
             disp0 = int(3*ibytes, MPI_OFFSET_KIND)
             do k = 1, amr_num_blocks
-                call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
+                call MPI_FILE_READ_AT_ALL(ifile, disp0, bhdr, 7, MPI_INTEGER, status, ierr)
+                reg = bhdr(1:6); lvl = bhdr(7)
                 ! corrupt/foreign-file guard: a box outside the global domain would drive the geometry
                 ! build and coordinate reads out of bounds silently in release builds
                 if (reg(1) < 0 .or. reg(4) > m_glb .or. reg(1) > reg(4) .or. (n_glb > 0 .and. (reg(2) < 0 .or. reg(5) > n_glb &
                     & .or. reg(2) > reg(5))) .or. (p_glb > 0 .and. (reg(3) < 0 .or. reg(6) > p_glb .or. reg(3) > reg(6)))) then
                     call s_mpi_abort('amr restart: corrupt block record (box outside the global domain)')
                 end if
+                if (lvl < 1 .or. lvl > amr_max_level) then
+                    call s_mpi_abort('amr restart: corrupt block record (block level outside 1..amr_max_level)')
+                end if
                 amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
+                ! set the level before the owner/geometry rebuild: s_amr_assign_block_owners and
+                ! s_set_amr_fine_geometry key off amr_block_level to place L>=2 blocks under their parent
+                amr_block_level(k) = lvl
                 blk_base(k) = disp0
-                cnt = sys_size*(ref_ratio*(reg(4) - reg(1) + 1))*merge(ref_ratio*(reg(5) - reg(2) + 1), 1, &
-                                & n_glb > 0)*merge(ref_ratio*(reg(6) - reg(3) + 1), 1, p_glb > 0)
-                disp0 = disp0 + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND) + int(cnt, MPI_OFFSET_KIND)*int(sbytes, MPI_OFFSET_KIND)
+                ! data size is region-derived per level: a level-l block covers ref_ratio**l fine cells per L0 cell
+                cnt = sys_size*((ref_ratio**lvl)*(reg(4) - reg(1) + 1))*merge((ref_ratio**lvl)*(reg(5) - reg(2) + 1), 1, &
+                                & n_glb > 0)*merge((ref_ratio**lvl)*(reg(6) - reg(3) + 1), 1, p_glb > 0)
+                disp0 = disp0 + int((7 + 3*np_old)*ibytes, MPI_OFFSET_KIND) + int(cnt, MPI_OFFSET_KIND)*int(sbytes, MPI_OFFSET_KIND)
             end do
             ! PASS 2: rebuild whole-block owners from the regions, then per block build geometry under the
             ! correct owner, validate the writer's layout, and read this rank's owned slice at its offset.
@@ -5515,7 +5522,7 @@ contains
                 cnt = int(my_cnt_vec(k), kind(cnt))
                 my_off = my_off_vec(k)
                 if (np_old == num_procs) then
-                    call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*np_old, MPI_INTEGER, &
+                    call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(7*ibytes, MPI_OFFSET_KIND), wext, 3*np_old, MPI_INTEGER, &
                                               & status, ierr)
                     do i = 0, num_procs - 1
                         rext(3*i + 1:3*i + 3) = wext_all(3*amr_num_blocks*i + 3*(k - 1) + 1:3*amr_num_blocks*i + 3*(k - 1) + 3)
@@ -5526,7 +5533,7 @@ contains
                                          & // '(with load_balance) the weighted splits must match the run that wrote the restart')
                     end if
                 end if
-                ddisp = blk_base(k) + int((6 + 3*np_old)*ibytes, MPI_OFFSET_KIND)
+                ddisp = blk_base(k) + int((7 + 3*np_old)*ibytes, MPI_OFFSET_KIND)
                 allocate (buf(max(cnt, 1)))
                 call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                           & status, ierr)

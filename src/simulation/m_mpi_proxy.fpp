@@ -27,9 +27,6 @@ module m_mpi_proxy
     integer                                     :: i_halo_size
     $:GPU_DECLARE(create='[i_halo_size]')
 
-    real(wp), private, allocatable, dimension(:) :: amr_buff_send  !< AMR fine-halo send buffer (device-resident)
-    real(wp), private, allocatable, dimension(:) :: amr_buff_recv  !< AMR fine-halo receive buffer (device-resident)
-
 contains
 
     !> Initialize the MPI proxy module
@@ -54,184 +51,6 @@ contains
 #endif
 
     end subroutine s_initialize_mpi_proxy_module
-
-    !> Preallocate the AMR fine-halo pack buffers at this rank's max fine extents (m_amr's preallocation cap). Called from
-    !! s_initialize_amr_module on all ranks; no-op without MPI or at np=1.
-    impure subroutine s_initialize_amr_mpi_buffers(max_f1, max_f2, max_f3)
-
-        integer, intent(in) :: max_f1, max_f2, max_f3
-
-#ifdef MFC_MPI
-        integer :: sz
-
-        if (num_procs == 1) return
-        sz = sys_size*buff_size*(max_f2 + 1)*(max_f3 + 1)
-        if (n_glb > 0) sz = max(sz, sys_size*buff_size*(max_f1 + 2*buff_size + 1)*(max_f3 + 1))
-        if (p_glb > 0) sz = max(sz, sys_size*buff_size*(max_f1 + 2*buff_size + 1)*(max_f2 + 2*buff_size + 1))
-        @:ALLOCATE(amr_buff_send(0:sz - 1), amr_buff_recv(0:sz - 1))
-#endif
-
-    end subroutine s_initialize_amr_mpi_buffers
-
-    !> AMR fine-level halo exchange: overwrite the buff_size fine ghost layers of q_fine at CONTINUATION faces (where the block
-    !! extends past this rank's intersection) with the neighbor rank's true fine data - the coarse-topology neighbor (bc_x/y/z rank
-    !! encoding) holds matching fine cells by construction (mirror decomposition, lockstep in time). Sequential per direction with
-    !! the coarse halo's transverse ranges, so corners propagate. Pack/unpack run as device kernels; only the buffers move through
-    !! the host (no-op macros on CPU builds). Reads the COARSE grid state for participation - call BEFORE s_amr_swap_to_fine. No
-    !! exchange fires at np=1 or for fully-contained blocks; fm/fn/fp are the LOCAL fine extents.
-    impure subroutine s_mpi_sendrecv_amr_fine_halo(q_fine, fm, fn, fp)
-
-        type(scalar_field), dimension(1:), intent(inout) :: q_fine
-        integer, intent(in)                              :: fm, fn, fp
-
-#ifdef MFC_MPI
-        integer :: i, j, k, l, r, cnt, nbr, stag, rtag, pack_off, unpack_off, d, loc, ierr
-        logical :: go
-
-        if (num_procs == 1) return
-        if (.not. amr_rank_owns_block) return
-        do d = 1, num_dims
-            do loc = -1, 1, 2
-                ! a face participates iff the block CONTINUES past this rank's intersection there; the
-                ! neighbor then participates on its matching face by construction (blocking pairwise
-                ! sendrecvs in a fixed (d, loc) order cannot deadlock)
-                select case (d)
-                case (1)
-                    cnt = sys_size*buff_size*(fn + 1)*(fp + 1)
-                    if (loc == -1) then
-                        go = amr_isect_lo(1) > amr_region_lo(1); nbr = bc_x%beg
-                        pack_off = 0; unpack_off = -buff_size
-                    else
-                        go = amr_isect_hi(1) < amr_region_hi(1); nbr = bc_x%end
-                        pack_off = fm - buff_size + 1; unpack_off = fm + 1
-                    end if
-                case (2)
-                    cnt = sys_size*buff_size*(fm + 2*buff_size + 1)*(fp + 1)
-                    if (loc == -1) then
-                        go = amr_isect_lo(2) > amr_region_lo(2); nbr = bc_y%beg
-                        pack_off = 0; unpack_off = -buff_size
-                    else
-                        go = amr_isect_hi(2) < amr_region_hi(2); nbr = bc_y%end
-                        pack_off = fn - buff_size + 1; unpack_off = fn + 1
-                    end if
-                case (3)
-                    cnt = sys_size*buff_size*(fm + 2*buff_size + 1)*(fn + 2*buff_size + 1)
-                    if (loc == -1) then
-                        go = amr_isect_lo(3) > amr_region_lo(3); nbr = bc_z%beg
-                        pack_off = 0; unpack_off = -buff_size
-                    else
-                        go = amr_isect_hi(3) < amr_region_hi(3); nbr = bc_z%end
-                        pack_off = fp - buff_size + 1; unpack_off = fp + 1
-                    end if
-                end select
-                if (.not. go) cycle
-                ! tags by data direction: 2*d = moving to the lower rank, 2*d+1 = moving to the upper rank
-                if (loc == -1) then
-                    stag = 2*d; rtag = 2*d + 1
-                else
-                    stag = 2*d + 1; rtag = 2*d
-                end if
-                ! pack the near-face INTERIOR layers (device kernel)
-                #:for DIR in [1, 2, 3]
-                    if (d == ${DIR}$) then
-                        #:if DIR == 1
-                            $:GPU_PARALLEL_LOOP(collapse=4, private='[r]')
-                            do l = 0, fp
-                                do k = 0, fn
-                                    do j = 0, buff_size - 1
-                                        do i = 1, sys_size
-                                            r = (i - 1) + sys_size*(j + buff_size*(k + (fn + 1)*l))
-                                            amr_buff_send(r) = real(q_fine(i)%sf(j + pack_off, k, l), wp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        #:elif DIR == 2
-                            $:GPU_PARALLEL_LOOP(collapse=4, private='[r]')
-                            do l = 0, fp
-                                do k = 0, buff_size - 1
-                                    do j = -buff_size, fm + buff_size
-                                        do i = 1, sys_size
-                                            r = (i - 1) + sys_size*((j + buff_size) + (fm + 2*buff_size + 1)*(k + buff_size*l))
-                                            amr_buff_send(r) = real(q_fine(i)%sf(j, k + pack_off, l), wp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        #:else
-                            $:GPU_PARALLEL_LOOP(collapse=4, private='[r]')
-                            do l = 0, buff_size - 1
-                                do k = -buff_size, fn + buff_size
-                                    do j = -buff_size, fm + buff_size
-                                        do i = 1, sys_size
-                                            r = (i - 1) + sys_size*((j + buff_size) + (fm + 2*buff_size + 1)*((k + buff_size) &
-                                                 & + (fn + 2*buff_size + 1)*l))
-                                            amr_buff_send(r) = real(q_fine(i)%sf(j, k, l + pack_off), wp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        #:endif
-                    end if
-                #:endfor
-                $:GPU_UPDATE(host='[amr_buff_send]')
-                call MPI_SENDRECV(amr_buff_send, cnt, mpi_p, nbr, stag, amr_buff_recv, cnt, mpi_p, nbr, rtag, MPI_COMM_WORLD, &
-                                  & MPI_STATUS_IGNORE, ierr)
-                $:GPU_UPDATE(device='[amr_buff_recv]')
-                ! unpack into the near-face GHOST layers (device kernel)
-                #:for DIR in [1, 2, 3]
-                    if (d == ${DIR}$) then
-                        #:if DIR == 1
-                            $:GPU_PARALLEL_LOOP(collapse=4, private='[r]')
-                            do l = 0, fp
-                                do k = 0, fn
-                                    do j = 0, buff_size - 1
-                                        do i = 1, sys_size
-                                            r = (i - 1) + sys_size*(j + buff_size*(k + (fn + 1)*l))
-                                            q_fine(i)%sf(j + unpack_off, k, l) = real(amr_buff_recv(r), stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        #:elif DIR == 2
-                            $:GPU_PARALLEL_LOOP(collapse=4, private='[r]')
-                            do l = 0, fp
-                                do k = 0, buff_size - 1
-                                    do j = -buff_size, fm + buff_size
-                                        do i = 1, sys_size
-                                            r = (i - 1) + sys_size*((j + buff_size) + (fm + 2*buff_size + 1)*(k + buff_size*l))
-                                            q_fine(i)%sf(j, k + unpack_off, l) = real(amr_buff_recv(r), stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        #:else
-                            $:GPU_PARALLEL_LOOP(collapse=4, private='[r]')
-                            do l = 0, buff_size - 1
-                                do k = -buff_size, fn + buff_size
-                                    do j = -buff_size, fm + buff_size
-                                        do i = 1, sys_size
-                                            r = (i - 1) + sys_size*((j + buff_size) + (fm + 2*buff_size + 1)*((k + buff_size) &
-                                                 & + (fn + 2*buff_size + 1)*l))
-                                            q_fine(i)%sf(j, k, l + unpack_off) = real(amr_buff_recv(r), stp)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        #:endif
-                    end if
-                #:endfor
-            end do
-        end do
-#endif
-
-    end subroutine s_mpi_sendrecv_amr_fine_halo
 
     !> Since only the processor with rank 0 reads and verifies the consistency of user inputs, these are initially not available to
     !! the other processors. Then, the purpose of this subroutine is to distribute the user inputs to the remaining processors in
@@ -403,9 +222,6 @@ contains
 #ifdef MFC_MPI
         if (ib) then
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
-        end if
-        if (allocated(amr_buff_send)) then
-            @:DEALLOCATE(amr_buff_send, amr_buff_recv)
         end if
 #endif
 
