@@ -569,8 +569,8 @@ contains
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         rr = ref_ratio
-        ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer (all faces at np=1);
-        ! the owner's freg is broadcast to every participant by s_mpi_bcast_amr_reflux_faces before this is called
+        ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer (all faces at np=1).
+        ! Under whole-block ownership the block's freg is already resident on its owner, so no broadcast is needed here.
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
         if (.not. (any(own_lo) .or. any(own_hi))) return
         ! device kernels: the coarse rhs stays device-resident for the coarse RK update kernel

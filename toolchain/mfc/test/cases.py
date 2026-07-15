@@ -4064,6 +4064,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (l') multi-level restart via parallel_io (MPI-IO): (l)'s static 2-level hierarchy at np=2, but the restart
+        # roundtrip goes through the MPI-IO path. Proves the shared restart file round-trips a MULTI-LEVEL block set:
+        # a level-2 block's fine data is ref_ratio**2 (not ref_ratio) of its region, so the per-block MPI-IO header
+        # must carry the refinement level. Without it the reader sized L2 blocks at level-1 extents and mislaid every
+        # downstream block offset (caught only by the total-size tripwire). This is the ONLY multi-level MPI-IO restart.
+        stack.push(
+            "AMR -> 1D -> multi-level restart parallel_io np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+                "parallel_io": "T",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True, honor_io_keys=True))
+        stack.pop()
+
         # (m) multi-level + dynamic regrid at np=2: (l) is a STATIC 2-level hierarchy on two ranks; this arms
         # amr_regrid_int so the level-2 children are placed by DISTRIBUTED sensor-on-fine nesting. Each rank tags
         # children only for the level-1 parents it owns (its local fine data), the tags are OR-reduced across ranks
