@@ -3684,15 +3684,15 @@ contains
 
     !> Shrink box [blo:bhi] to the tight bounding box of the tagged cells inside it. ok=.false. if no tagged cell. Collapsed dims
     !! (lo=hi=0) survive unchanged. Deterministic (integer scan of the identical sparse tag list).
-    impure subroutine s_amr_trim_box(tags, ntag, blo, bhi, ok)
+    impure subroutine s_amr_trim_box(tags, ts, te, blo, bhi, ok)
 
-        integer, intent(in)    :: tags(:,:), ntag
+        integer, intent(in)    :: tags(:,:), ts, te
         integer, intent(inout) :: blo(3), bhi(3)
         logical, intent(out)   :: ok
         integer                :: tlo(3), thi(3), t, i, j, k
 
         tlo = huge(1); thi = -huge(1)
-        do t = 1, ntag
+        do t = ts, te
             i = tags(1, t); j = tags(2, t); k = tags(3, t)
             if (i < blo(1) .or. i > bhi(1)) cycle
             if (j < blo(2) .or. j > bhi(2)) cycle
@@ -3709,9 +3709,9 @@ contains
     !> Berger-Rigoutsos bisection of one (already tagged-trimmed) candidate box on the global tag field: pick the longest splittable
     !! axis, prefer a zero-signature hole (widest interior run), else the strongest signature inflection (Laplacian sign change).
     !! ok=.false. if no axis admits a split leaving both children >= 2 cells. Integer-only => identical on all ranks.
-    impure subroutine s_amr_find_split(tags, ntag, blo, bhi, sax, spos, ok)
+    impure subroutine s_amr_find_split(tags, ts, te, blo, bhi, sax, spos, ok)
 
-        integer, intent(in)  :: tags(:,:), ntag
+        integer, intent(in)  :: tags(:,:), ts, te
         integer, intent(in)  :: blo(3), bhi(3)
         integer, intent(out) :: sax, spos
         logical, intent(out) :: ok
@@ -3739,7 +3739,7 @@ contains
             do t = blo(ax), bhi(ax)
                 sig(t) = 0
             end do
-            do t = 1, ntag
+            do t = ts, te
                 i = tags(1, t); j = tags(2, t); k = tags(3, t)
                 if (i < blo(1) .or. i > bhi(1)) cycle
                 if (j < blo(2) .or. j > bhi(2)) cycle
@@ -4244,9 +4244,10 @@ contains
                 type(t_box), allocatable, intent(out) :: boxes(:)
                 integer, intent(out)                  :: nboxes
                 integer, allocatable                  :: slo(:,:), shi(:,:), alo(:,:), ahi(:,:)
-                integer                               :: mg, ng, pg, ci, cj, ck, t
+                integer, allocatable                  :: sts(:), ste(:), wt(:,:)
+                integer                               :: mg, ng, pg, t
                 integer                               :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag, vol
-                integer                               :: blo(3), bhi(3)
+                integer                               :: blo(3), bhi(3), ts, te, lo, hi, tmp(3)
                 logical                               :: ok, force, capped, changed, tooclose
                 real(wp)                              :: eff
 
@@ -4258,31 +4259,47 @@ contains
 
                 cap = amr_max_blocks
                 allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
+                allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in))
+                ! working copy of the tag list, partitioned in place as the tree descends so each node scans only its tags
+                do t = 1, ntag_in
+                    wt(:,t) = tags(:,t)
+                end do
                 nwork = 1; slo(:,1) = [0, 0, 0]; shi(:,1) = [mg, ng, pg]  ! first pop trims to the global tagged bbox
+                sts(1) = 1; ste(1) = ntag_in
                 nacc = 0; capped = .false.
                 do while (nwork > 0)
-                    blo = slo(:,nwork); bhi = shi(:,nwork); nwork = nwork - 1
-                    call s_amr_trim_box(tags, ntag_in, blo, bhi, ok)
+                    blo = slo(:,nwork); bhi = shi(:,nwork); ts = sts(nwork); te = ste(nwork); nwork = nwork - 1
+                    call s_amr_trim_box(wt, ts, te, blo, bhi, ok)
                     if (.not. ok) cycle
-                    ntag = 0
-                    do t = 1, ntag_in
-                        ci = tags(1, t); cj = tags(2, t); ck = tags(3, t)
-                        if (ci < blo(1) .or. ci > bhi(1)) cycle
-                        if (cj < blo(2) .or. cj > bhi(2)) cycle
-                        if (ck < blo(3) .or. ck > bhi(3)) cycle
-                        ntag = ntag + 1
-                    end do
+                    ! invariant: [ts:te] holds exactly the tags in this box, and trim only shrinks to their bbox => count is the
+                    ! range size
+                    ntag = te - ts + 1
                     vol = 1
                     do d = 1, num_dims; vol = vol*(bhi(d) - blo(d) + 1); end do
                         eff = real(ntag, wp)/real(max(vol, 1), wp)
-                        call s_amr_find_split(tags, ntag_in, blo, bhi, sax, spos, ok)
+                        call s_amr_find_split(wt, ts, te, blo, bhi, sax, spos, ok)
                         force = (nacc + nwork + 1 >= cap)  ! splitting now could overflow the amr_max_blocks cap
                         if (eff >= amr_cluster_eff .or. .not. ok .or. force) then
                             if (nacc < cap) then; nacc = nacc + 1; alo(:,nacc) = blo; ahi(:,nacc) = bhi; end if
                             if (force .and. ok .and. eff < amr_cluster_eff) capped = .true.
                         else
+                            ! partition wt(:, ts:te) in place: coord(sax) < spos to the front (low child), >= spos to the back
+                            ! (high)
+                            lo = ts; hi = te
+                            do while (lo <= hi)
+                                if (wt(sax, lo) < spos) then
+                                    lo = lo + 1
+                                else
+                                    tmp = wt(:,lo); wt(:,lo) = wt(:,hi); wt(:,hi) = tmp
+                                    hi = hi - 1
+                                end if
+                            end do
+                            ! low child = [ts:lo-1], high child = [lo:te]; every parent tag lands in exactly one (box just
+                            ! trimmed+split)
                             slo(:,nwork + 1) = blo; shi(:,nwork + 1) = bhi; shi(sax, nwork + 1) = spos - 1
+                            sts(nwork + 1) = ts; ste(nwork + 1) = lo - 1
                             slo(:,nwork + 2) = blo; shi(:,nwork + 2) = bhi; slo(sax, nwork + 2) = spos
+                            sts(nwork + 2) = lo; ste(nwork + 2) = te
                             nwork = nwork + 2
                         end if
                     end do
@@ -4317,7 +4334,7 @@ contains
                     do i = 1, nboxes
                         boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
                     end do
-                    deallocate (slo, shi, alo, ahi)
+                    deallocate (slo, shi, alo, ahi, sts, ste, wt)
 
                 end subroutine s_amr_cluster
 
