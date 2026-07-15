@@ -736,14 +736,14 @@ contains
                         if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(eqn_idx%damage)%sf(j, k, l)), 0._wp)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                            ! subtracting elastic contribution for pressure calculation
+                            ! Elastic energy subtraction (guard skips when G near zero from alpha undershoot)
                             if (G_K > verysmall) then
                                 qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, l) - ((qK_prim_vf(i)%sf(j, k, &
-                                           & l)**2._wp)/(4._wp*G_K))/gamma_K
+                                           & l)**2._wp)/max(4._wp*G_K, verysmall))/gamma_K
                                 ! Double for shear stresses
                                 if (any(i == shear_indices)) then
                                     qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, l) - ((qK_prim_vf(i)%sf(j, &
-                                               & k, l)**2._wp)/(4._wp*G_K))/gamma_K
+                                               & k, l)**2._wp)/max(4._wp*G_K, verysmall))/gamma_K
                                 end if
                             end if
                         end do
@@ -988,14 +988,14 @@ contains
                     if (hypoelasticity) then
                         if (cont_damage) G = G*max((1._wp - q_prim_vf(eqn_idx%damage)%sf(j, k, l)), 0._wp)
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                            ! adding elastic contribution
+                            ! Elastic energy addition (guard skips when G near zero from alpha undershoot)
                             if (G > verysmall) then
                                 q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
-                                          & l)**2._wp)/(4._wp*G)
+                                          & l)**2._wp)/max(4._wp*G, verysmall)
                                 ! Double for shear stresses
                                 if (any(i == shear_indices)) then
                                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
-                                              & l)**2._wp)/(4._wp*G)
+                                              & l)**2._wp)/max(4._wp*G, verysmall)
                                 end if
                             end if
                         end do

@@ -300,6 +300,8 @@ contains
                             end if
 
                             ! elastic energy update
+                            ! HLL handles hypoelasticity as inline branches like this one - one of three code
+                            ! shapes (cf. HLLC inline, and the separate HLLD dual-pass module). See s_riemann_solver.
                             if (hypoelasticity) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
@@ -310,7 +312,7 @@ contains
                                 damage_L = 0._wp; damage_R = 0._wp
                                 if (cont_damage) then
                                     damage_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
-                                    damage_R = qR_prim_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                    damage_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%damage)
                                 end if
 
                                 call s_compute_hypoelastic_interface_energy(num_fluids, alpha_L, alpha_R, damage_L, damage_R, &
@@ -354,14 +356,7 @@ contains
                                     s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 else if (hypoelasticity) then
                                     ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1))) &
-                                              & /rho_L), &
-                                              & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1))) &
-                                              & /rho_R))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1))) &
-                                              & /rho_R), &
-                                              & vel_L(dir_idx(1)) + sqrt(c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1))) &
-                                              & /rho_L))
+                                    @:compute_elastic_wave_speeds_lr()
                                 else if (hyperelasticity) then
                                     s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L), &
                                               & vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
@@ -536,14 +531,63 @@ contains
                                 end do
                             end if
 
-                            ! Advection flux and source: interface velocity for volume fraction transport
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                flux_rsx_vf(${SF('')}$, i) = (qL_prim_rsx_vf(${SF('')}$, i) - qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                            & i))*s_M*s_P/(s_M - s_P)
-                                flux_src_rsx_vf(${SF('')}$, i) = (s_M*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                & i) - s_P*qL_prim_rsx_vf(${SF('')}$, i))/(s_M - s_P)
-                            end do
+                            ! Export interface velocity for NC RHS
+                            if (hypo_nc_mode == hypo_nc_mode_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_dims
+                                    if (0._wp <= s_L) then
+                                        nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_L(dir_idx(i))
+                                    else if (s_R <= 0._wp) then
+                                        nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_R(dir_idx(i))
+                                    else
+                                        nc_iface_vel_rsx_vf(${SF('')}$, &
+                                                            & dir_idx(i)) = (s_R*vel_L(dir_idx(i)) - s_L*vel_R(dir_idx(i)))/(s_R &
+                                                            & - s_L)
+                                    end if
+                                end do
+                            end if
+
+                            if (.not. hll_u_interface) then  ! HLL Method 1: per-fluid alpha interface flux
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                    if (0._wp <= s_L .or. s_R <= 0._wp) then
+                                        flux_rsx_vf(${SF('')}$, i) = 0._wp
+                                    else
+                                        flux_rsx_vf(${SF('')}$, i) = s_M*s_P*(qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                    & i) - qL_prim_rsx_vf(${SF('')}$, i))/(s_R - s_L)
+                                    end if
+                                    if (0._wp <= s_L) then
+                                        flux_src_rsx_vf(${SF('')}$, i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                    else if (s_R <= 0._wp) then
+                                        flux_src_rsx_vf(${SF('')}$, i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                    else
+                                        flux_src_rsx_vf(${SF('')}$, i) = (s_R*qL_prim_rsx_vf(${SF('')}$, &
+                                                        & i) - s_L*qR_prim_rsx_vf(${SF(' + 1')}$, i))/(s_R - s_L)
+                                    end if
+                                end do
+                            else  ! HLL Method 2: shared velocity interface flux
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                    if (0._wp <= s_L) then
+                                        flux_rsx_vf(${SF('')}$, i) = qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
+                                    else if (s_R <= 0._wp) then
+                                        flux_rsx_vf(${SF('')}$, i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)*vel_R(dir_idx(1))
+                                    else
+                                        flux_rsx_vf(${SF('')}$, i) = (s_R*qL_prim_rsx_vf(${SF('')}$, &
+                                                    & i)*vel_L(dir_idx(1)) - s_L*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                    & i)*vel_R(dir_idx(1)) + s_L*s_R*(qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                    & i) - qL_prim_rsx_vf(${SF('')}$, i)))/(s_R - s_L)
+                                    end if
+                                end do
+                                if (0._wp <= s_L) then
+                                    flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_L(dir_idx(1))
+                                else if (s_R <= 0._wp) then
+                                    flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_R(dir_idx(1))
+                                else
+                                    flux_src_rsx_vf(${SF('')}$, &
+                                                    & eqn_idx%adv%beg) = (s_R*vel_L(dir_idx(1)) - s_L*vel_R(dir_idx(1)))/(s_R - s_L)
+                                end if
+                            end if
 
                             if (bubbles_euler) then
                                 ! From HLLC: Kills mass transport @ bubble gas density
@@ -619,7 +663,11 @@ contains
                                     ! Geometrical source of the void fraction(s) is zero
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        if (.not. hll_u_interface) then
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        else
+                                            flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                        end if
                                     end do
                                 end if
 

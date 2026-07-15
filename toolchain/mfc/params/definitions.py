@@ -495,6 +495,29 @@ DEPENDENCIES = {
             "requires": ["mhd"],
         }
     },
+    "riemann_hypo_ADC": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [2, 4],
+            },
+        }
+    },
+    "hypo_hll_interface_rhs": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
+    "hll_u_interface": {
+        "when_true": {
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
     "schlieren_wrt": {
         "when_true": {
             "requires": ["fd_order"],
@@ -620,6 +643,10 @@ def _load():
     # Elasticity
     for n in ["hypoelasticity", "hyperelasticity"]:
         _r(n, LOG, {"elasticity"})
+    _r("riemann_hypo_ADC", LOG, {"elasticity"})
+    _r("ADC_kappa", REAL, {"elasticity"})
+    _r("hypo_hll_interface_rhs", LOG, {"elasticity"})
+    _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
@@ -1293,6 +1320,10 @@ _nv(
     "ic_eps",
     "ic_beta",
     "riemann_solver",
+    "riemann_hypo_ADC",
+    "ADC_kappa",
+    "hll_u_interface",
+    "hypo_hll_interface_rhs",
     "wave_speeds",
     "low_Mach",
     "hyper_cleaning_speed",

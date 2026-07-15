@@ -14,8 +14,9 @@ module m_hypoelastic
 
     implicit none
 
-    private; public :: s_initialize_hypoelastic_module, s_finalize_hypoelastic_module, s_compute_hypoelastic_rhs, &
-        & s_compute_damage_state
+    private; public :: s_initialize_hypoelastic_module, s_finalize_hypoelastic_module, &
+        & s_compute_hypoelastic_rhs_finite_diff_per_sweep, s_compute_hypoelastic_rhs_iface, &
+        & s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_damage_state
 
     real(wp), allocatable, dimension(:) :: Gs_hypo
     $:GPU_DECLARE(create='[Gs_hypo]')
@@ -78,8 +79,13 @@ contains
 
     end subroutine s_initialize_hypoelastic_module
 
-    !> Compute the hypoelastic stress source terms
-    subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf)
+    !> Legacy FD-based hypoelastic RHS (Mode 1: HLL). Uses finite-difference velocity gradients computed from cell-centered
+    !! primitive variables. Called once per direction inside the dim-split loop. Supports 1D/2D/3D Cartesian and cylindrical
+    !! geometry.
+    !! @param idir Dimension splitting index
+    !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf rhs variables
+    subroutine s_compute_hypoelastic_rhs_finite_diff_per_sweep(idir, q_prim_vf, rhs_vf)
 
         integer, intent(in)                                    :: idir
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
@@ -199,9 +205,8 @@ contains
                         rho_K_field(k, l, q) = rho_K
                         G_K_field(k, l, q) = G_K
 
-                        ! TODO: take this out if not needed
                         if (G_K < verysmall) then
-                            G_K_field(k, l, q) = 0
+                            G_K_field(k, l, q) = 0._wp
                         end if
                     end do
                 end do
@@ -326,7 +331,261 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-    end subroutine s_compute_hypoelastic_rhs
+    end subroutine s_compute_hypoelastic_rhs_finite_diff_per_sweep
+
+    !> Interface-consistent hypoelastic RHS (Mode 2: HLL/HLLC). Uses interface velocities from the Riemann solver to compute
+    !! velocity gradients. Called once after all dimensional sweeps. Supports 1D, 2D Cartesian, 2D axisymmetric, and 3D Cartesian.
+    !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf rhs variables
+    !! @param nc_iface_vel_n Interface velocities per direction
+    subroutine s_compute_hypoelastic_rhs_iface(q_prim_vf, rhs_vf, nc_iface_vel_n)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(vector_field), dimension(:), intent(in)           :: nc_iface_vel_n
+        real(wp)                                               :: rho_K, G_K
+        real(wp)                                               :: trace, shear, shear2, diag, diag_z, offdiag, cross1, cross2
+        real(wp)                                               :: txx, txy, tyy, txz, tyz, tzz
+        integer                                                :: i, k, l, q
+        integer                                                :: ndirs
+
+        ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
+
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    du_dx_hypo(k, l, q) = (nc_iface_vel_n(1)%vf(1)%sf(k, l, q) - nc_iface_vel_n(1)%vf(1)%sf(k - 1, l, q))/dx(k)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (ndirs > 1) then
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        du_dy_hypo(k, l, q) = (nc_iface_vel_n(2)%vf(1)%sf(k, l, q) - nc_iface_vel_n(2)%vf(1)%sf(k, l - 1, q))/dy(l)
+                        dv_dx_hypo(k, l, q) = (nc_iface_vel_n(1)%vf(2)%sf(k, l, q) - nc_iface_vel_n(1)%vf(2)%sf(k - 1, l, q))/dx(k)
+                        dv_dy_hypo(k, l, q) = (nc_iface_vel_n(2)%vf(2)%sf(k, l, q) - nc_iface_vel_n(2)%vf(2)%sf(k, l - 1, q))/dy(l)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        if (ndirs == 3) then
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        du_dz_hypo(k, l, q) = (nc_iface_vel_n(3)%vf(1)%sf(k, l, q) - nc_iface_vel_n(3)%vf(1)%sf(k, l, q - 1))/dz(q)
+                        dv_dz_hypo(k, l, q) = (nc_iface_vel_n(3)%vf(2)%sf(k, l, q) - nc_iface_vel_n(3)%vf(2)%sf(k, l, q - 1))/dz(q)
+                        dw_dx_hypo(k, l, q) = (nc_iface_vel_n(1)%vf(3)%sf(k, l, q) - nc_iface_vel_n(1)%vf(3)%sf(k - 1, l, q))/dx(k)
+                        dw_dy_hypo(k, l, q) = (nc_iface_vel_n(2)%vf(3)%sf(k, l, q) - nc_iface_vel_n(2)%vf(3)%sf(k, l - 1, q))/dy(l)
+                        dw_dz_hypo(k, l, q) = (nc_iface_vel_n(3)%vf(3)%sf(k, l, q) - nc_iface_vel_n(3)%vf(3)%sf(k, l, q - 1))/dz(q)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        $:GPU_PARALLEL_LOOP(collapse=3,private='[rho_K, G_K]')
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    rho_K = 0._wp; G_K = 0._wp
+                    do i = 1, num_fluids
+                        rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)
+                        G_K = G_K + q_prim_vf(eqn_idx%adv%beg - 1 + i)%sf(k, l, q)*Gs_hypo(i)
+                    end do
+
+                    if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(eqn_idx%damage)%sf(k, l, q)), 0._wp)
+
+                    rho_K_field(k, l, q) = rho_K
+                    G_K_field(k, l, q) = G_K
+
+                    if (G_K < verysmall) then
+                        G_K_field(k, l, q) = 0._wp
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) + rho_K_field(k, l, &
+                           & q)*((4._wp*G_K_field(k, l, q)/3._wp) + q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q))*du_dx_hypo(k, l, q)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (ndirs > 1) then
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) + rho_K_field(k, l, &
+                               & q)*(2._wp*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*du_dy_hypo(k, l, &
+                               & q) - q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dv_dy_hypo(k, l, q) - (2._wp/3._wp)*G_K_field(k, &
+                               & l, q)*dv_dy_hypo(k, l, q))
+
+                        rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) + rho_K_field(k, &
+                               & l, q)*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)*dv_dx_hypo(k, l, &
+                               & q) + q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*du_dy_hypo(k, l, q) + G_K_field(k, l, &
+                               & q)*(du_dy_hypo(k, l, q) + dv_dx_hypo(k, l, q)))
+
+                        rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + rho_K_field(k, &
+                               & l, q)*(2._wp*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*dv_dx_hypo(k, l, &
+                               & q) - q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*du_dx_hypo(k, l, &
+                               & q) + q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) + 2._wp*G_K_field(k, l, &
+                               & q)*(dv_dy_hypo(k, l, q) - (1._wp/3._wp)*(du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q))))
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        if (ndirs == 3 .and. .not. cyl_coord) then
+            $:GPU_PARALLEL_LOOP(collapse=3,private='[txx, txy, tyy, txz, tyz, tzz, trace, shear, shear2, diag, diag_z, offdiag, &
+                                & cross1, cross2]')
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        txx = q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)
+                        txy = q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)
+                        tyy = q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)
+                        txz = q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)
+                        tyz = q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)
+                        tzz = q_prim_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)
+
+                        ! z-direction contributions to tau_xx
+                        trace = -(2._wp/3._wp*G_K_field(k, l, q) + txx)
+                        shear = 2._wp*txz
+                        rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) + rho_K_field(k, l, &
+                               & q)*(trace*dw_dz_hypo(k, l, q) + shear*du_dz_hypo(k, l, q))
+
+                        ! z-direction contributions to tau_xy
+                        offdiag = -txy
+                        cross1 = tyz
+                        cross2 = txz
+                        rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) + rho_K_field(k, &
+                               & l, q)*(offdiag*dw_dz_hypo(k, l, q) + cross1*du_dz_hypo(k, l, q) + cross2*dv_dz_hypo(k, l, q))
+
+                        ! z-direction contributions to tau_yy
+                        trace = -(2._wp/3._wp*G_K_field(k, l, q) + tyy)
+                        shear = 2._wp*tyz
+                        rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + rho_K_field(k, &
+                               & l, q)*(trace*dw_dz_hypo(k, l, q) + shear*dv_dz_hypo(k, l, q))
+
+                        ! tau_xz (stress%beg+3)
+                        diag = G_K_field(k, l, q) + txx
+                        offdiag = -txz
+                        cross1 = tyz
+                        cross2 = txy
+                        diag_z = G_K_field(k, l, q) + tzz
+                        rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + rho_K_field(k, &
+                               & l, q)*(diag*dw_dx_hypo(k, l, q) + offdiag*dv_dy_hypo(k, l, q) + cross1*du_dy_hypo(k, l, &
+                               & q) + cross2*dw_dy_hypo(k, l, q) + diag_z*du_dz_hypo(k, l, q))
+
+                        ! tau_yz (stress%beg+4)
+                        offdiag = -tyz
+                        cross1 = txz
+                        cross2 = txy
+                        diag = G_K_field(k, l, q) + tyy
+                        rhs_vf(eqn_idx%stress%beg + 4)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 4)%sf(k, l, q) + rho_K_field(k, &
+                               & l, q)*(offdiag*du_dx_hypo(k, l, q) + cross1*dv_dx_hypo(k, l, q) + cross2*dw_dx_hypo(k, l, &
+                               & q) + diag*dw_dy_hypo(k, l, q) + diag_z*dv_dz_hypo(k, l, q))
+
+                        ! tau_zz (stress%beg+5)
+                        trace = -(2._wp/3._wp*G_K_field(k, l, q) + tzz)
+                        shear = 2._wp*txz
+                        shear2 = 2._wp*tyz
+                        diag = 4._wp/3._wp*G_K_field(k, l, q) + tzz
+                        rhs_vf(eqn_idx%stress%beg + 5)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 5)%sf(k, l, q) + rho_K_field(k, &
+                               & l, q)*(trace*du_dx_hypo(k, l, q) + shear*dw_dx_hypo(k, l, q) + trace*dv_dy_hypo(k, l, &
+                               & q) + shear2*dw_dy_hypo(k, l, q) + diag*dw_dz_hypo(k, l, q))
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        if (grid_geometry == 2) then
+            call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, nc_iface_vel_n(1)%vf, nc_iface_vel_n(2)%vf, 1.0_wp)
+        end if
+
+    end subroutine s_compute_hypoelastic_rhs_iface
+
+    !> Axisymmetric geometric source terms for the hypoelastic stress evolution, using interface velocities. Adds the v/r and div(u)
+    !! contributions that arise in cylindrical (r-z) coordinates: tau_xx, tau_xr, tau_rr get a -rho*(v/r) source; tau_thetatheta
+    !! gets a combined divergence and hoop-stress source. Called from s_compute_hypoelastic_rhs_iface when grid_geometry == 2.
+    !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf rhs variables
+    !! @param nc_iface_vel_x_vf Interface velocities in x-direction
+    !! @param nc_iface_vel_y_vf Interface velocities in y-direction
+    !! @param weight Sub-step weighting factor
+    subroutine s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, nc_iface_vel_x_vf, nc_iface_vel_y_vf, weight)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_x_vf
+        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_y_vf
+        real(wp), intent(in)                                   :: weight
+        integer                                                :: i, k, l, q
+        real(wp)                                               :: rho_K, G_K, v_over_r, divU_axi
+
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    du_dx_hypo(k, l, q) = (nc_iface_vel_x_vf(1)%sf(k, l, q) - nc_iface_vel_x_vf(1)%sf(k - 1, l, q))/dx(k)
+
+                    dv_dy_hypo(k, l, q) = (nc_iface_vel_y_vf(2)%sf(k, l, q) - nc_iface_vel_y_vf(2)%sf(k, l - 1, q))/dy(l)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(collapse=3,private='[rho_K, G_K, v_over_r, divU_axi]')
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    rho_K = 0._wp
+                    G_K = 0._wp
+                    do i = 1, num_fluids
+                        rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)
+                        G_K = G_K + q_prim_vf(eqn_idx%adv%beg - 1 + i)%sf(k, l, q)*Gs_hypo(i)
+                    end do
+
+                    if (cont_damage) G_K = G_K*max(1._wp - q_prim_vf(eqn_idx%damage)%sf(k, l, q), 0._wp)
+
+                    v_over_r = q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, l, q)/y_cc(l)
+                    divU_axi = du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q) + v_over_r
+
+                    rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, &
+                           & q) - weight*rho_K*v_over_r*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q) + 2._wp*G_K/3._wp)
+
+                    rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, &
+                           & q) - weight*rho_K*v_over_r*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)
+
+                    rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, &
+                           & q) - weight*rho_K*v_over_r*(q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)
+
+                    rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, &
+                           & q) + weight*rho_K*(-(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, &
+                           & q) + 2._wp*G_K/3._wp)*divU_axi + 2._wp*(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + G_K)*v_over_r)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_hypoelastic_rhs_axisym_geom_iface
 
     !> Finalize the hypoelastic module
     impure subroutine s_finalize_hypoelastic_module()
