@@ -642,7 +642,7 @@ contains
         end if
 
         dt_local = huge(1.0_wp)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt]', &
                             & reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
