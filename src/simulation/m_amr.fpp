@@ -4166,72 +4166,62 @@ contains
 
     end subroutine s_amr_union_gtag
 
-    !> Sparse union of the multi-level child-nesting tag field over the child window [mlo:mhi]. The window (a subset of one parent
-    !! box) is small vs the global grid, so a WINDOW-LOCAL dense logical field gwin (NOT global-grid-sized) both deduplicates tags
-    !! exactly like the old dense field and holds the MPI-unioned result. Returns the tagged cells of the window as a sparse
-    !! coordinate list tags(1:3, 1:ntag). Byte-identical to the old dense LOR union: replicated IB tags and same-rank overlaps
-    !! collapse in gwin before/after the all-gather. At np=1 no all-gather runs (single owner holds all tags).
-    impure subroutine s_amr_union_gctag(gwin, mlo, mhi, mg, ng, tags, ntag)
+    !> Grow the per-level pack buffers sidx(:) (int8 linear index) / skb(:) (parent box id) geometrically so at least nloc+extra
+    !! slots fit; preserves the first nloc entries. Amortized O(1) append for s_amr_pack_gwin_pairs.
+    impure subroutine s_amr_grow_pack(sidx, skb, nloc, extra)
 
-        integer, intent(in)               :: mlo(3), mhi(3), mg, ng
-        logical, intent(inout)            :: gwin(mlo(1):,mlo(2):,mlo(3):)
-        integer, allocatable, intent(out) :: tags(:,:)
-        integer, intent(out)              :: ntag
-        integer                           :: gi, gj, gk
+        integer(8), allocatable, intent(inout) :: sidx(:)
+        integer, allocatable, intent(inout)    :: skb(:)
+        integer, intent(in)                    :: nloc, extra
+        integer                                :: cap, newcap
+        integer(8), allocatable                :: t8(:)
+        integer, allocatable                   :: ti(:)
 
-#ifdef MFC_MPI
-        integer                 :: i, jrem, nloc, ntot, ierr
-        integer, allocatable    :: rcnt(:), rdsp(:)
-        integer(8), allocatable :: locidx(:), allidx(:)
-
-        if (num_procs > 1) then
-            nloc = 0
-            do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
-                if (gwin(gi, gj, gk)) nloc = nloc + 1
-            end do; end do; end do
-            allocate (locidx(max(nloc, 1)), rcnt(num_procs), rdsp(num_procs))
-            nloc = 0
-            do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
-                if (gwin(gi, gj, gk)) then
-                    nloc = nloc + 1
-                    locidx(nloc) = int(gi, 8) + int(mg + 1, 8)*(int(gj, 8) + int(ng + 1, 8)*int(gk, 8))
-                end if
-            end do; end do; end do
-            call MPI_ALLGATHER(nloc, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-            rdsp(1) = 0
-            do i = 2, num_procs; rdsp(i) = rdsp(i - 1) + rcnt(i - 1); end do
-            ntot = rdsp(num_procs) + rcnt(num_procs)
-            allocate (allidx(max(ntot, 1)))
-            call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER8, allidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
-            do i = 1, ntot
-                gk = int(allidx(i)/(int(mg + 1, 8)*int(ng + 1, 8)))
-                jrem = int(allidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8))
-                gj = jrem/(mg + 1)
-                gi = jrem - gj*(mg + 1)
-                gwin(gi, gj, gk) = .true.  ! dedups replicated tags back into the window field
-            end do
-            deallocate (locidx, rcnt, rdsp, allidx)
+        cap = 0
+        if (allocated(sidx)) cap = size(sidx)
+        if (nloc + extra <= cap) return
+        newcap = max(2*cap, max(nloc + extra, 1024))
+        allocate (t8(newcap), ti(newcap))
+        if (nloc > 0) then
+            t8(1:nloc) = sidx(1:nloc)
+            ti(1:nloc) = skb(1:nloc)
         end if
-#endif
-        ! extract the (deduplicated) window tags as a sparse coordinate list, in the SAME (k,j,i) scan order the old dense
-        ! slice used, so the resulting box list is byte-identical
-        ntag = 0
-        do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
-            if (gwin(gi, gj, gk)) ntag = ntag + 1
-        end do; end do; end do
-        allocate (tags(3, max(ntag, 1)))
-        ntag = 0
-        do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
-            if (gwin(gi, gj, gk)) then
-                ntag = ntag + 1
-                tags(1, ntag) = gi; tags(2, ntag) = gj; tags(3, ntag) = gk
-            end if
-        end do; end do; end do
+        call move_alloc(t8, sidx)
+        call move_alloc(ti, skb)
 
-    end subroutine s_amr_union_gctag
+    end subroutine s_amr_grow_pack
+
+    !> Pack this rank's OWNED tagged cells of the child window [mlo:mhi] as (linear-index, kb) pairs, appended to the per-level send
+    !! arrays sidx(:) (int8 linear index) / skb(:) (parent box id). The int8 encode matches the decode in s_amr_regrid's pass 2, so
+    !! gathering these pairs across ranks and setting them into a per-parent dense window reproduces the old per-parent dense-window
+    !! dedup (replicated/overlapping tags collapse) and the (k,j,i) extraction order exactly -> byte-identical child boxes. Batching
+    !! all parents of a level into one allgatherv (in the caller) drops the collective count from O(#parent-boxes) to O(#levels).
+    !! gwin is read here (not modified).
+    impure subroutine s_amr_pack_gwin_pairs(gwin, mlo, mhi, mg, ng, kb, sidx, skb, nloc)
+
+        integer, intent(in)                    :: mlo(3), mhi(3), mg, ng, kb
+        logical, intent(in)                    :: gwin(mlo(1):,mlo(2):,mlo(3):)
+        integer(8), allocatable, intent(inout) :: sidx(:)
+        integer, allocatable, intent(inout)    :: skb(:)
+        integer, intent(inout)                 :: nloc
+        integer                                :: gi, gj, gk
+
+        do gk = mlo(3), mhi(3)
+            do gj = mlo(2), mhi(2)
+                do gi = mlo(1), mhi(1)
+                    if (.not. gwin(gi, gj, gk)) cycle
+                    call s_amr_grow_pack(sidx, skb, nloc, 1)
+                    nloc = nloc + 1
+                    sidx(nloc) = int(gi, 8) + int(mg + 1, 8)*(int(gj, 8) + int(ng + 1, 8)*int(gk, 8))
+                    skb(nloc) = kb
+                end do
+            end do
+        end do
+
+    end subroutine s_amr_pack_gwin_pairs
 
     !> Cluster a rank-invariant SPARSE tag list (global level-0 cell coords, tags(1:3, 1:ntag_in)) into a LIST of separated block
-    !! boxes, identically on every rank. The caller builds the list (s_amr_union_gtag / s_amr_union_gctag). Per-rank memory is
+    !! boxes, identically on every rank. The caller builds the list (s_amr_union_gtag / s_amr_pack_gwin_pairs). Per-rank memory is
     !! O(#tagged), not O(global grid). Runs Berger-Rigoutsos recursive bisection until each box's tag efficiency reaches
     !! amr_cluster_eff (or it is atomic / the amr_max_blocks cap is reached), then merges any two boxes whose amr_buf-padded extents
     !! come within buff_size (guaranteeing no fine-fine adjacency: separated boxes stay >= buff_size apart, nearby ones collapse to
@@ -4560,13 +4550,16 @@ contains
             end if
             block
                 integer                  :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
-                integer                  :: mg, ng, pg, nct
-                integer, allocatable     :: ctags(:,:)
-                logical, allocatable     :: gwin(:,:,:)
-                logical                  :: covered, any_tag
+                integer                  :: mg, ng, pg, nct, np_lev, nloc_send, gi, gj, gk, jrem, ntot_g
+                integer, allocatable     :: ctags(:,:), skb(:), gkb(:)
+                integer(8), allocatable  :: sidx(:), gidx(:)
+                logical, allocatable     :: gwin(:,:,:), covered(:)
+                integer, allocatable     :: mlo_all(:,:), mhi_all(:,:)
+                logical                  :: any_tag
                 type(t_box), allocatable :: cboxes(:)
 #ifdef MFC_MPI
-                integer :: ierr
+                integer              :: ierr, ip
+                integer, allocatable :: rcnt(:), rdsp(:)
 #endif
 
                 ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads
@@ -4584,8 +4577,9 @@ contains
                 ! its
                 ! tag footprint can fall in ANOTHER rank's subdomain. Each parent's nesting window [mlo:mhi] is small vs
                 ! the global grid, so a WINDOW-LOCAL dense field gwin (allocated per parent below) holds each owner's
-                ! tags; s_amr_union_gctag unions them across ranks and returns the tagged cells as a sparse global-coord
-                ! list that the clusterer consumes directly (no O(global-grid) tag field, no local slice).
+                ! tags; s_amr_pack_gwin_pairs extracts them as (linear-index, kb) pairs, one per-level allgatherv unions all
+                ! parents' pairs across ranks, and pass 2 rebuilds each parent's window from them (no O(global-grid) tag
+                ! field, no local slice; the clusterer consumes the sparse per-parent list directly).
                 mg = m_glb; ng = 0; pg = 0
                 if (n_glb > 0) ng = n_glb
                 if (p_glb > 0) pg = p_glb
@@ -4593,14 +4587,26 @@ contains
                 plo = 1; phi = nboxes  ! [plo:phi] = the boxes at the previous level (lev-1) to nest inside
                 do lev = 2, amr_max_level
                     newlo = nboxes + 1
+                    ! COLLECT -> ONE COMMUNICATE -> PROCESS, per level: the per-parent cross-rank union (the old per-(lev,kb)
+                    ! allgather) is batched into a SINGLE allgatherv per level, so the collective count is O(#levels) not
+                    ! O(#parent-boxes). Pass 1 tags each parent's window from OWNED obs and appends this rank's tagged cells as
+                    ! (linear-index, parent-kb) pairs; one allgatherv unions them; Pass 2 rebuilds each parent's dense window from
+                    ! the gathered pairs whose gkb==kb, which reproduces the old per-parent dense-window dedup and the (k,j,i)
+                    ! extraction order exactly -> each parent's ctags set (and thus its child boxes) is byte-identical.
+                    np_lev = phi - plo + 1
+                    if (np_lev < 1) exit  ! nothing nested at the previous level -> no deeper levels possible
+                    allocate (covered(plo:phi), mlo_all(3,plo:phi), mhi_all(3,plo:phi))
+                    covered = .false.
+                    nloc_send = 0
+                    ! Pass 1: collect (no comm)
                     do kb = plo, phi
-                        if (nboxes + 1 > amr_max_blocks) exit  ! pool full - stop nesting
                         ! nesting window: children keep an amr_cpat_mar margin from the parent boundary so their ghost
                         ! prolongation reads valid parent interior cells
                         mlo = boxes(kb)%lo; mhi = boxes(kb)%hi
                         mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
                         if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
                         if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
+                        mlo_all(:,kb) = mlo; mhi_all(:,kb) = mhi
                         if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
                         if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
                         if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
@@ -4609,7 +4615,7 @@ contains
                         ! (amr_block_level
                         ! still holds the old levels here - it is reset to box_level at step 5b, below)
                         allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
-                        gwin = .false.; covered = .false.; any_tag = .false.
+                        gwin = .false.; any_tag = .false.
                         do ob = 1, amr_num_blocks
                             if (amr_block_level(ob) /= lev - 1) cycle
                             if (boxes(kb)%lo(1) > amr_region_hi_all(1, ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, ob)) cycle
@@ -4621,7 +4627,7 @@ contains
                                 if (boxes(kb)%lo(3) > amr_region_hi_all(3, ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, &
                                     & ob)) cycle
                             end if
-                            covered = .true.  ! replicated (metadata) - identical on every rank regardless of ownership
+                            covered(kb) = .true.  ! replicated (metadata) - identical on every rank regardless of ownership
                             if (amr_owns_all(ob)) call s_amr_tag_child_from_fine(ob, mlo, mhi, gwin, any_tag)
                         end do
                         ! IB: always refine the body region at this level, even where the density sensor is quiet - mark
@@ -4641,7 +4647,7 @@ contains
                         ! fluid.
                         if (ib) then
                             block
-                                integer :: ib_i, bb_lo(3), bb_hi(3), gi, gj, gk
+                                integer :: ib_i, bb_lo(3), bb_hi(3), gii, gjj, gkk
                                 do ib_i = 1, num_ibs
                                     call s_amr_body_bbox(ib_i, max(amr_buf, 4) + amr_cpat_mar, bb_lo, bb_hi)
                                     ! clamp the body bbox to this parent's nesting window (global L0 frame -
@@ -4651,31 +4657,92 @@ contains
                                     if (bb_hi(1) < bb_lo(1)) cycle
                                     if (n_glb > 0 .and. bb_hi(2) < bb_lo(2)) cycle
                                     if (p_glb > 0 .and. bb_hi(3) < bb_lo(3)) cycle
-                                    covered = .true.
-                                    do gk = bb_lo(3), bb_hi(3)
-                                        do gj = bb_lo(2), bb_hi(2)
-                                            do gi = bb_lo(1), bb_hi(1)
-                                                gwin(gi, gj, gk) = .true.
+                                    covered(kb) = .true.
+                                    do gkk = bb_lo(3), bb_hi(3)
+                                        do gjj = bb_lo(2), bb_hi(2)
+                                            do gii = bb_lo(1), bb_hi(1)
+                                                gwin(gii, gjj, gkk) = .true.
                                             end do
                                         end do
                                     end do
                                 end do
                             end block
                         end if
-                        ! union the distributed owners' fine tags (deduped in gwin) so every rank clusters the SAME
-                        ! child
-                        ! boxes (regrid must be deterministic), returning them as a sparse global-coord list; at np=1
-                        ! the
-                        ! single owner already holds all tags, so this just extracts them. gwin is consumed here.
-                        call s_amr_union_gctag(gwin, mlo, mhi, mg, ng, ctags, nct)
+                        ! extract THIS rank's OWNED tagged cells as (linear-index, kb) pairs into the per-level send
+                        ! arrays. The int8 linear index matches the decode in pass 2, so the gathered pairs reproduce the
+                        ! same window coords. gwin is read here, then freed.
+                        call s_amr_pack_gwin_pairs(gwin, mlo, mhi, mg, ng, kb, sidx, skb, nloc_send)
                         deallocate (gwin)
-                        ! recompute from the reduced list (a rank's local any_tag saw only its own obs)
+                    end do
+
+                    ! COMMUNICATE: one allgatherv per level (np>1)
+                    if (.not. allocated(sidx)) then
+                        allocate (sidx(0), skb(0))  ! this rank owned no tags at this level
+                    end if
+#ifdef MFC_MPI
+                    if (num_procs > 1) then
+                        allocate (rcnt(num_procs), rdsp(num_procs))
+                        call MPI_ALLGATHER(nloc_send, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        rdsp(1) = 0
+                        do ip = 2, num_procs
+                            rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
+                        end do
+                        ntot_g = rdsp(num_procs) + rcnt(num_procs)
+                        allocate (gidx(max(ntot_g, 1)), gkb(max(ntot_g, 1)))
+                        call MPI_ALLGATHERV(sidx, nloc_send, MPI_INTEGER8, gidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
+                        call MPI_ALLGATHERV(skb, nloc_send, MPI_INTEGER, gkb, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        deallocate (rcnt, rdsp)
+                    else
+                        call move_alloc(sidx, gidx); call move_alloc(skb, gkb)
+                        ntot_g = nloc_send
+                    end if
+#else
+                    call move_alloc(sidx, gidx); call move_alloc(skb, gkb)
+                    ntot_g = nloc_send
+#endif
+                    if (allocated(sidx)) deallocate (sidx)
+                    if (allocated(skb)) deallocate (skb)
+
+                    ! Pass 2: process (no comm)
+                    do kb = plo, phi
+                        if (nboxes + 1 > amr_max_blocks) exit  ! pool full - stop nesting
+                        mlo = mlo_all(:,kb); mhi = mhi_all(:,kb)
+                        if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
+                        if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
+                        if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
+
+                        ! rebuild this parent's dense window from the gathered pairs whose gkb==kb: setting .true. once per
+                        ! gathered cell reproduces the old per-parent dedup (replicated/overlapping tags collapse), and the
+                        ! (k,j,i) sparse extract below matches the old scan order -> byte-identical ctags.
+                        allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
+                        gwin = .false.
+                        do i = 1, ntot_g
+                            if (gkb(i) /= kb) cycle
+                            gk = int(gidx(i)/(int(mg + 1, 8)*int(ng + 1, 8)))
+                            jrem = int(gidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8))
+                            gj = jrem/(mg + 1)
+                            gi = jrem - gj*(mg + 1)
+                            gwin(gi, gj, gk) = .true.
+                        end do
+                        nct = 0
+                        do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
+                            if (gwin(gi, gj, gk)) nct = nct + 1
+                        end do; end do; end do
+                        allocate (ctags(3, max(nct, 1)))
+                        nct = 0
+                        do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
+                            if (gwin(gi, gj, gk)) then
+                                nct = nct + 1
+                                ctags(1, nct) = gi; ctags(2, nct) = gj; ctags(3, nct) = gk
+                            end if
+                        end do; end do; end do
+                        deallocate (gwin)
                         any_tag = nct > 0
 
                         ! smooth here - no child
-                        if (covered .and. .not. any_tag) then; deallocate (ctags); cycle; end if
+                        if (covered(kb) .and. .not. any_tag) then; deallocate (ctags); cycle; end if
 
-                        if (covered) then
+                        if (covered(kb)) then
                             ! cluster the fine-tagged L0 cells into child boxes, pad by amr_buf, clamp into the nesting window
                             call s_amr_cluster(ctags, nct, cboxes, ncb)
                             deallocate (ctags)
@@ -4765,6 +4832,7 @@ contains
                             boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
                         end if
                     end do
+                    deallocate (gidx, gkb, covered, mlo_all, mhi_all)  ! per-level scratch - freed every level (no leak)
                     plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
                     if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
                 end do
