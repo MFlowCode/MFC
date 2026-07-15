@@ -442,6 +442,21 @@
             end do
             q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
         end if
+    case (275)  ! reactive shock-flame: sinusoidal (burned | fresh) flame interface
+        ! Applied on the burned patch; cells AHEAD of the wavy interface are reset to the fresh
+        ! reactant state (patch 1), giving a finite-amplitude flame front for a shock to wrinkle
+        ! (Richtmyer-Meshkov). a(2) = mean interface x, a(3) = amplitude, a(4) = transverse wavenumber.
+        d = patch_icpp(patch_id)%a(2) + patch_icpp(patch_id)%a(3)*sin(2._wp*pi*patch_icpp(patch_id)%a(4)*y_cc(j)/(y_domain%end &
+                       & - y_domain%beg))
+        if (x_cc(i) > d) then
+            q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(1)%pres
+            q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = patch_icpp(1)%vel(1)
+            q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, 0) = patch_icpp(1)%vel(2)
+            do v = eqn_idx%species%beg, eqn_idx%species%end
+                q_prim_vf(v)%sf(i, j, 0) = patch_icpp(1)%Y(v - eqn_idx%species%beg + 1)
+            end do
+        end if
     case (280)  ! Isentropic vortex
         ! This is patch is hard-coded for test suite optimization used in the 2D_isentropicvortex case: This analytic patch uses
         ! geometry 2
