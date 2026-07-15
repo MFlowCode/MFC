@@ -93,6 +93,12 @@ module m_amr
     logical, allocatable :: amr_slot_live(:)
     !! fine-fine seam pack buffers, hoisted out of the per-seam s_amr_fine_fine_halo loop (allocated once at max seam extent)
     real(wp), allocatable :: amr_seambuf_x(:), amr_seambuf_y(:)
+    !! cached same-level adjacent-seam list (3, npairs) = (xb, yb, seam-dim), so s_amr_fine_fine_halo iterates O(#seams)
+    !! instead of rescanning all O(nblocks^2) pairs every RK stage. Block topology (regions/levels/count) changes only at
+    !! regrid/restart, so the list is rebuilt only when amr_seam_pairs_dirty is set (or the block count changes - a tripwire).
+    integer, allocatable :: amr_seam_pairs(:,:)
+    integer              :: amr_num_seam_pairs, amr_seam_pairs_nblk
+    logical              :: amr_seam_pairs_dirty
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min over ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
@@ -292,6 +298,7 @@ contains
             tcap = max(max_f1, max_f2) + 1
         end if
         allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
+        amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1  ! force a seam-list build on the first fine-fine halo
         mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
@@ -3225,6 +3232,53 @@ contains
 
     end subroutine s_amr_fine_slice
 
+    !> Seam dimension of the ordered pair (xb, yb): the dim d in which yb is the immediate high-face neighbour of xb at matched
+    !! resolution (same level), or 0 if they are not a same-level fine-fine seam. Face adjacency requires transverse overlap, so a
+    !! pair is adjacent in at most one dim; the last-true assignment reproduces the original inline scan in s_amr_fine_fine_halo.
+    pure integer function f_amr_seam_dim(xb, yb) result(d)
+
+        integer, intent(in) :: xb, yb
+
+        d = 0
+        if (xb == yb) return
+        if (amr_block_level(xb) /= amr_block_level(yb)) return
+        if (f_amr_seam(xb, yb, 1)) d = 1
+        if (n_glb > 0) then; if (f_amr_seam(xb, yb, 2)) d = 2; end if
+        if (p_glb > 0) then; if (f_amr_seam(xb, yb, 3)) d = 3; end if
+
+    end function f_amr_seam_dim
+
+    !> Rebuild the cached same-level seam-pair list (amr_seam_pairs): one O(nblocks^2) scan per regrid/restart in place of the same
+    !! scan every RK stage (6x per fine step). Same (xb, yb) nested-loop order on all ranks (replicated region metadata) so the
+    !! paired MPI_SENDRECVs in s_amr_fine_fine_halo stay matched. Count then fill for an exact-size list (no cap, no overflow).
+    impure subroutine s_amr_build_seam_pairs()
+
+        integer :: xb, yb, d, np
+
+        if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
+        np = 0
+        do xb = 1, amr_num_blocks
+            do yb = 1, amr_num_blocks
+                if (f_amr_seam_dim(xb, yb) > 0) np = np + 1
+            end do
+        end do
+        amr_num_seam_pairs = np
+        allocate (amr_seam_pairs(3, max(np, 1)))
+        np = 0
+        do xb = 1, amr_num_blocks
+            do yb = 1, amr_num_blocks
+                d = f_amr_seam_dim(xb, yb)
+                if (d > 0) then
+                    np = np + 1
+                    amr_seam_pairs(1, np) = xb; amr_seam_pairs(2, np) = yb; amr_seam_pairs(3, np) = d
+                end if
+            end do
+        end do
+        amr_seam_pairs_nblk = amr_num_blocks
+        amr_seam_pairs_dirty = .false.
+
+    end subroutine s_amr_build_seam_pairs
+
     !> Block-to-block fine-fine halo (max_grid_size tiling): overwrite each sub-block's seam ghost cells (faces shared with an
     !! ADJACENT sub-block) with the neighbour's stage-entry fine interior, so the shared fine flux matches on both sides
     !! (coarse-prolonged seam ghosts would be non-conservative). For each seam pair (xb below, yb above, dim d) the two owners
@@ -3232,69 +3286,64 @@ contains
     !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (incl. every np=1 case, untiled).
     impure subroutine s_amr_fine_fine_halo()
 
-        integer :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul
+        integer :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul, idx
 
         if (.not. amr) return
         if (amr_num_blocks < 2) return
 
+        ! iterate the cached same-level seam list (rebuilt only when the topology changes) instead of the old O(nblocks^2)
+        ! f_amr_seam rescan every stage; the list preserves the original (xb, yb) order so paired MPI_SENDRECVs still match.
+        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
         ! device<->host of the fine state is done per-seam inside s_amr_fine_slice, moving only the buff_size-deep near-seam
         ! slab each pack/unpack touches (not the whole block) - a large PCIe saving since this runs per stage (6x per fine step)
-        do xb = 1, amr_num_blocks
-            do yb = 1, amr_num_blocks
-                if (xb == yb) cycle
-                if (amr_block_level(xb) /= amr_block_level(yb)) cycle  ! fine-fine halo is same-level only (matched resolution)
-                d = 0
-                if (f_amr_seam(xb, yb, 1)) d = 1
-                if (n_glb > 0) then; if (f_amr_seam(xb, yb, 2)) d = 2; end if
-                if (p_glb > 0) then; if (f_amr_seam(xb, yb, 3)) d = 3; end if
-                if (d == 0) cycle
-                rX = amr_block_owner(xb); rY = amr_block_owner(yb)
-                if (proc_rank /= rX .and. proc_rank /= rY) cycle
-                ! fine extents from the REPLICATED region metadata (not amr_slots%m/n/p: at np>1 this rank may own only one of the
-                ! pair, and the transverse size (used for the buffer count) must be valid for both). A level-L block's region is in
-                ! L0-coarse cells but its own grid is 2**L finer (each level halves dx), so fine = 2**L*(coarse extent)-1; xb, yb
-                ! share the level (same-level seam). 2**1 keeps L1 byte-identical; L2 tiles need 2**2 (an L1-frame 2* mislocates the
-                ! seam slice to half the block, filling the seam ghost from the wrong cells - the source of the L2-L2 leak).
-                fmul = ref_ratio**amr_block_level(xb)
-                xm(1) = fmul*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
-                xm(2) = merge(fmul*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
-                xm(3) = merge(fmul*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
-                ym(1) = fmul*(amr_region_hi_all(1, yb) - amr_region_lo_all(1, yb) + 1) - 1
-                ym(2) = merge(fmul*(amr_region_hi_all(2, yb) - amr_region_lo_all(2, yb) + 1) - 1, 0, n_glb > 0)
-                ym(3) = merge(fmul*(amr_region_hi_all(3, yb) - amr_region_lo_all(3, yb) + 1) - 1, 0, p_glb > 0)
-                ! transverse fine size (dims /= d); xb and yb share it (exact-match seam)
-                tsz = 1
-                if (d /= 1) tsz = tsz*(xm(1) + 1)
-                if (d /= 2 .and. n_glb > 0) tsz = tsz*(xm(2) + 1)
-                if (d /= 3 .and. p_glb > 0) tsz = tsz*(xm(3) + 1)
-                cnt = sys_size*buff_size*tsz
-                if (rX == rY) then  ! same rank owns both: pack each near-seam interior, unpack into the other's seam ghost
-                    ! xb high interior
-                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
-                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)  ! yb low interior
-                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)  ! -> yb low ghost
-                    ! -> xb high ghost
-                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, amr_seambuf_y(1:cnt), -1)
-                else if (proc_rank == rX) then
-                    ! send xb high interior
-                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
+        do idx = 1, amr_num_seam_pairs
+            xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
+            rX = amr_block_owner(xb); rY = amr_block_owner(yb)
+            if (proc_rank /= rX .and. proc_rank /= rY) cycle
+            ! fine extents from the REPLICATED region metadata (not amr_slots%m/n/p: at np>1 this rank may own only one of the
+            ! pair, and the transverse size (used for the buffer count) must be valid for both). A level-L block's region is in
+            ! L0-coarse cells but its own grid is 2**L finer (each level halves dx), so fine = 2**L*(coarse extent)-1; xb, yb
+            ! share the level (same-level seam). 2**1 keeps L1 byte-identical; L2 tiles need 2**2 (an L1-frame 2* mislocates the
+            ! seam slice to half the block, filling the seam ghost from the wrong cells - the source of the L2-L2 leak).
+            fmul = ref_ratio**amr_block_level(xb)
+            xm(1) = fmul*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
+            xm(2) = merge(fmul*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
+            xm(3) = merge(fmul*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
+            ym(1) = fmul*(amr_region_hi_all(1, yb) - amr_region_lo_all(1, yb) + 1) - 1
+            ym(2) = merge(fmul*(amr_region_hi_all(2, yb) - amr_region_lo_all(2, yb) + 1) - 1, 0, n_glb > 0)
+            ym(3) = merge(fmul*(amr_region_hi_all(3, yb) - amr_region_lo_all(3, yb) + 1) - 1, 0, p_glb > 0)
+            ! transverse fine size (dims /= d); xb and yb share it (exact-match seam)
+            tsz = 1
+            if (d /= 1) tsz = tsz*(xm(1) + 1)
+            if (d /= 2 .and. n_glb > 0) tsz = tsz*(xm(2) + 1)
+            if (d /= 3 .and. p_glb > 0) tsz = tsz*(xm(3) + 1)
+            cnt = sys_size*buff_size*tsz
+            if (rX == rY) then  ! same rank owns both: pack each near-seam interior, unpack into the other's seam ghost
+                ! xb high interior
+                call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
+                call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)  ! yb low interior
+                call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)  ! -> yb low ghost
+                ! -> xb high ghost
+                call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, amr_seambuf_y(1:cnt), -1)
+            else if (proc_rank == rX) then
+                ! send xb high interior
+                call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
 #ifdef MFC_MPI
-                    call MPI_SENDRECV(amr_seambuf_x(1:cnt), cnt, mpi_p, rY, 4200, amr_seambuf_y(1:cnt), cnt, mpi_p, rY, 4201, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call MPI_SENDRECV(amr_seambuf_x(1:cnt), cnt, mpi_p, rY, 4200, amr_seambuf_y(1:cnt), cnt, mpi_p, rY, 4201, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
-                    ! recv yb low interior -> xb high ghost
-                    call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, amr_seambuf_y(1:cnt), -1)
-                else  ! proc_rank == rY
-                    ! send yb low interior
-                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)
+                ! recv yb low interior -> xb high ghost
+                call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, amr_seambuf_y(1:cnt), -1)
+            else  ! proc_rank == rY
+                ! send yb low interior
+                call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)
 #ifdef MFC_MPI
-                    call MPI_SENDRECV(amr_seambuf_y(1:cnt), cnt, mpi_p, rX, 4201, amr_seambuf_x(1:cnt), cnt, mpi_p, rX, 4200, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call MPI_SENDRECV(amr_seambuf_y(1:cnt), cnt, mpi_p, rX, 4201, amr_seambuf_x(1:cnt), cnt, mpi_p, rX, 4200, &
+                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
-                    ! recv xb high interior -> yb low ghost
-                    call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)
-                end if
-            end do
+                ! recv xb high interior -> yb low ghost
+                call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)
+            end if
         end do
         call s_amr_select_slot(1)
 
@@ -5115,6 +5164,7 @@ contains
         ! image points recomputed from the body definitions; no state carries across regrids)
         if (ib) call s_amr_setup_ib()
         call s_amr_select_slot(1)
+        amr_seam_pairs_dirty = .true.  ! block set changed: the cached seam-pair list must be rebuilt
 
     end subroutine s_amr_regrid
 
@@ -5581,6 +5631,7 @@ contains
             end do
         end if
         call s_amr_select_slot(1)
+        amr_seam_pairs_dirty = .true.  ! restored a new block set: the cached seam-pair list must be rebuilt
         restored = .true.
         if (proc_rank == 0) then
             print '(A,I0,A)', ' [amr] restart: restored fine level, ', amr_num_blocks, ' block(s)'
@@ -5905,6 +5956,7 @@ contains
         end if
         deallocate (amr_slot_live)
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
+        if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         do i = 1, sys_size
             @:DEALLOCATE(amr_cg(i)%sf)
         end do
