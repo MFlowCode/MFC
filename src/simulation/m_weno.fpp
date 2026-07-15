@@ -1018,7 +1018,8 @@ contains
                                     use_central = .false.
                                     if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                     if (use_central) then
-                                        omega(0:weno_num_stencils) = d_cbL_${XYZ}$ (:,${SV}$)
+                                        vL_rs_vf_x(j, k, l, i) = d_cbL_${XYZ}$ (0, ${SV}$)*poly(0) + d_cbL_${XYZ}$ (1, &
+                                                   & ${SV}$)*poly(1)
                                     else
                                         if (wenojs) then
                                             do q = 0, weno_num_stencils
@@ -1042,9 +1043,8 @@ contains
                                             end do
                                         end if
                                         omega = alpha/sum(alpha)
+                                        vL_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
                                     end if
-
-                                    vL_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
                                     ! reconstruct from right side
 
@@ -1054,7 +1054,8 @@ contains
                                     use_central = .false.
                                     if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                     if (use_central) then
-                                        omega(0:weno_num_stencils) = d_cbR_${XYZ}$ (:,${SV}$)
+                                        vR_rs_vf_x(j, k, l, i) = d_cbR_${XYZ}$ (0, ${SV}$)*poly(0) + d_cbR_${XYZ}$ (1, &
+                                                   & ${SV}$)*poly(1)
                                     else
                                         if (wenojs) then
                                             do q = 0, weno_num_stencils
@@ -1076,9 +1077,8 @@ contains
                                             end do
                                         end if
                                         omega = alpha/sum(alpha)
+                                        vR_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
                                     end if
-
-                                    vR_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
                                 end do
                             end do
                         end do
@@ -1145,7 +1145,8 @@ contains
                                         use_central = .false.
                                         if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                         if (use_central) then
-                                            omega(0:weno_num_stencils) = d_cbL_${XYZ}$ (:,${SV}$)
+                                            vL_rs_vf_x(j, k, l, i) = d_cbL_${XYZ}$ (0, ${SV}$)*poly(0) + d_cbL_${XYZ}$ (1, &
+                                                       & ${SV}$)*poly(1) + d_cbL_${XYZ}$ (2, ${SV}$)*poly(2)
                                         else
                                             if (wenojs) then
                                                 do q = 0, weno_num_stencils
@@ -1197,9 +1198,8 @@ contains
                                             omega(0) = alpha(0)/(alpha(0) + alpha(1) + alpha(2))
                                             omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
                                             omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
+                                            vL_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
                                         end if
-
-                                        vL_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
 
                                         ! reconstruct from right side
 
@@ -1213,7 +1213,8 @@ contains
                                         use_central = .false.
                                         if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                         if (use_central) then
-                                            omega(0:weno_num_stencils) = d_cbR_${XYZ}$ (:,${SV}$)
+                                            vR_rs_vf_x(j, k, l, i) = d_cbR_${XYZ}$ (0, ${SV}$)*poly(0) + d_cbR_${XYZ}$ (1, &
+                                                       & ${SV}$)*poly(1) + d_cbR_${XYZ}$ (2, ${SV}$)*poly(2)
                                         else
                                             if (wenojs) then
                                                 do q = 0, weno_num_stencils
@@ -1245,9 +1246,8 @@ contains
                                             omega(0) = alpha(0)/(alpha(0) + alpha(1) + alpha(2))
                                             omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
                                             omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
+                                            vR_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
                                         end if
-
-                                        vR_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
                                     end do
                                 end do
                             end do
@@ -1380,7 +1380,9 @@ contains
                                         use_central = .false.
                                         if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                         if (use_central) then
-                                            omega(0:weno_num_stencils) = d_cbL_${XYZ}$ (:,${SV}$)
+                                            do q = 0, weno_num_stencils
+                                                omega(q) = d_cbL_${XYZ}$ (q, ${SV}$)
+                                            end do
                                         else
                                             if (wenojs) then
                                                 do q = 0, weno_num_stencils
@@ -1462,7 +1464,9 @@ contains
                                         use_central = .false.
                                         if (hybrid_weno) use_central = .not. weno_full(${SF('')}$)
                                         if (use_central) then
-                                            omega(0:weno_num_stencils) = d_cbR_${XYZ}$ (:,${SV}$)
+                                            do q = 0, weno_num_stencils
+                                                omega(q) = d_cbR_${XYZ}$ (q, ${SV}$)
+                                            end do
                                         else
                                             if (wenojs) then
                                                 do q = 0, weno_num_stencils
