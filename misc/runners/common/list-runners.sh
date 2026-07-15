@@ -21,13 +21,16 @@ trap 'rm -rf "$tmpdir"' EXIT
 sweep_all_nodes "$tmpdir"
 
 # Parse sweep results into associative arrays
-declare -A runner_node runner_rss runner_slurm
+declare -A runner_node runner_rss runner_slurm runner_dupcount
 for node in "${NODES[@]}"; do
     while IFS= read -r line; do
         read -r _s sweep_node dir rss slurm_ok <<< "$line"
         runner_node["$dir"]="$sweep_node"
         runner_rss["$dir"]="$rss"
         runner_slurm["$dir"]="$slurm_ok"
+        # Count how many nodes report this runner. >1 means a duplicate
+        # listener, which the last-wins assignment above would otherwise hide.
+        runner_dupcount["$dir"]=$(( ${runner_dupcount["$dir"]:-0} + 1 ))
     done < <(grep '^RUNNER ' "$tmpdir/$node.out" 2>/dev/null || true)
 done
 
@@ -63,6 +66,10 @@ while IFS= read -r dir; do
         recorded=$(cat "$dir/runner.node")
         [ "$actual_node" != "$recorded" ] && node_col="${actual_node} *(stale: ${recorded})"
     fi
+
+    # Flag duplicate listeners (same runner on more than one node)
+    [ "${runner_dupcount[$dir]:-1}" -gt 1 ] && \
+        node_col="${actual_node} !!DUPLICATE on ${runner_dupcount[$dir]} nodes — run dedupe-runners!!"
 
     printf "%-25s %-8s %-20s %-8s %sMB\n" "$name" "$gh_col" "$node_col" "$slurm" "$rss"
 done < <(find_runner_dirs)

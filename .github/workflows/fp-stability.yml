@@ -43,10 +43,10 @@ jobs:
       checkall: ${{ steps.changes.outputs.checkall }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: ".github/file-filter.yml"
@@ -62,11 +62,11 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Cache Verrou
         id: cache-verrou
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/verrou
           # Key off the installer's content so any version bump (or other edit) in
@@ -99,7 +99,7 @@ jobs:
 
       - name: Upload FP stability logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: fp-stability-logs
           path: fp-stability-logs/
