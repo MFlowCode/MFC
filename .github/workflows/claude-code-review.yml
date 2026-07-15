@@ -64,7 +64,7 @@ jobs:
           echo "pr_head_ref=$PR_HEAD_REF" >> "$GITHUB_OUTPUT"
 
       - name: Checkout base repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 

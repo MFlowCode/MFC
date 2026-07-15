@@ -61,24 +61,48 @@ print(d.get('agentName', ''))
 # Output is filtered to numeric lines only to strip SSH MOTD noise.
 # Args: $1 = node, $2 = runner directory
 # Prints: space-separated PIDs, or empty.
+# Returns: 0 normally; 2 if the SSH connection itself failed (so callers can
+#          fail safe rather than mistake an unreachable node for "no runner").
 find_pids() {
-    ssh $SSH_OPTS "$1" '
+    local out rc
+    out=$(ssh $SSH_OPTS "$1" '
         for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
             exe=$(readlink -f /proc/$p/exe 2>/dev/null || true)
             exe=${exe% (deleted)}
             [ "$exe" = "'"$2"'/bin/Runner.Listener" ] && echo "$p"
         done
-    ' 2>/dev/null | grep -E '^[0-9]+$' | tr '\n' ' ' || true
+    ' 2>/dev/null)
+    rc=$?
+    # ssh exits 255 when the connection itself fails (timeout, refused, or
+    # throttled during a connection storm). Distinguish that from a clean
+    # "no matching process": treating an unreachable node as empty is what
+    # lets a busy runner be declared offline and restarted elsewhere,
+    # producing a duplicate listener.
+    [ "$rc" -eq 255 ] && return 2
+    printf '%s\n' "$out" | grep -E '^[0-9]+$' | tr '\n' ' '
+    return 0
 }
 
 # Find which login node a runner is on.
 # Args: $1 = runner directory
-# Prints: node hostname, or "offline".
+# Prints: node hostname if found; "offline" if confirmed nowhere; "unknown"
+#         if one or more nodes could not be reached (so the location cannot be
+#         confirmed and the caller should not act on it).
 find_node() {
+    local node pids rc unreachable=0
     for node in "${NODES[@]}"; do
-        [ -n "$(find_pids "$node" "$1")" ] && echo "$node" && return
+        pids=$(find_pids "$node" "$1")
+        rc=$?
+        if [ "$rc" -eq 2 ]; then
+            unreachable=1
+            continue
+        fi
+        if [ -n "$pids" ]; then
+            echo "$node"
+            return 0
+        fi
     done
-    echo "offline"
+    [ "$unreachable" -eq 1 ] && echo "unknown" || echo "offline"
 }
 
 # Check if a runner process has a slurm directory in its PATH.
@@ -144,10 +168,18 @@ start_runner() {
 # still alive (e.g. SSH kill failed, wrong UID, kernel stuck), emits a warning
 # to stderr and returns 1 so callers can react. Returns 0 if the runner is
 # confirmed stopped or was never running.
+# If the node is unreachable at any check, returns 1 (state unknown) rather
+# than 0: a caller that then starts the runner elsewhere would create a
+# duplicate listener, so "could not confirm stopped" must not read as stopped.
 # Args: $1 = node, $2 = runner directory
 stop_runner() {
-    local node="$1" dir="$2" pids
+    local node="$1" dir="$2" pids rc
     pids=$(find_pids "$node" "$dir")
+    rc=$?
+    if [ "$rc" -eq 2 ]; then
+        echo "WARNING: could not reach $node to stop runner; assuming it is still running" >&2
+        return 1
+    fi
     [ -z "$pids" ] && return 0
     for pid in $pids; do
         ssh $SSH_OPTS "$node" "kill $pid" 2>/dev/null || true
@@ -159,8 +191,43 @@ stop_runner() {
     done
     sleep 1
     pids=$(find_pids "$node" "$dir")
+    rc=$?
+    if [ "$rc" -eq 2 ]; then
+        echo "WARNING: lost contact with $node while stopping runner; state unknown" >&2
+        return 1
+    fi
     if [ -n "$pids" ]; then
         echo "WARNING: process(es) $pids on $node survived SIGKILL; runner may still be running" >&2
         return 1
     fi
+}
+
+# Sweep all nodes in parallel for Runner.Listener processes, emitting one line
+# per live listener with its PID, directory, and busy state. Unlike
+# sweep_all_nodes (which keys results by directory and so collapses a runner
+# that is wrongly listening on two nodes down to one), this preserves every
+# (node, pid) pair so callers can detect duplicates.
+# Each output line: LISTENER <node> <pid> <dir> <busy>
+#   busy = "busy" if a Runner.Worker child is present for that dir, else "idle"
+# Args: $1 = tmpdir (caller creates and cleans up)
+sweep_all_listeners() {
+    local tmpdir="$1" node
+    for node in "${NODES[@]}"; do
+        ssh $SSH_OPTS "$node" '
+            for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
+                exe=$(readlink -f /proc/$p/exe 2>/dev/null || true)
+                exe=${exe% (deleted)}
+                [ -z "$exe" ] && continue
+                dir=$(dirname "$(dirname "$exe")")
+                if ps aux | grep Runner.Worker | grep -v grep | grep -q "$dir/"; then
+                    busy=busy
+                else
+                    busy=idle
+                fi
+                echo "LISTENER '"$node"' $p $dir $busy"
+            done
+        ' 2>/dev/null > "$tmpdir/$node.dup" &
+    done
+    wait
+    cat "$tmpdir"/*.dup 2>/dev/null | grep '^LISTENER ' || true
 }
