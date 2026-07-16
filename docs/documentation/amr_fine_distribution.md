@@ -1,6 +1,9 @@
+@page amr_fine_distribution AMR fine-level distribution
+
 # AMR fine-level distribution (design note)
 
-**Status:** in progress on `up/mega` (part of the AMR effort). Phase 1 landed (map computed, not applied); Phase 2 is the apply + gather/scatter checkpoint.
+> **Design record / implementation note.** This documents the internal design and development of AMR
+> fine-block distribution across MPI ranks. For user-facing behavior and parameters, see @ref amr.
 
 ## Problem
 

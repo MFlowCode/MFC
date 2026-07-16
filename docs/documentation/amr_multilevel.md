@@ -2,6 +2,9 @@
 
 # Multi-level AMR nesting — design and implementation plan
 
+> **Design record / implementation note.** This documents the internal design and development of
+> multi-level AMR nesting. For user-facing behavior and parameters, see @ref amr.
+
 Status: **multi-level nesting implemented.** The block-structured AMR core supports arbitrary
 refinement depth (L0, L1, …, L`amr_max_level`, 2:1 per level): static AMR (`amr_regrid_int = 0`)
 nests one level-2 block, dynamic regrid (`amr_regrid_int > 0`) nests deeper and per-level. This

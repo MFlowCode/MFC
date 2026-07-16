@@ -919,6 +919,14 @@ separated features independently, and memory efficiency (compact per-block pools
 follow-up. Dynamic regrid clusters the tagged cells into up to `amr_max_blocks` separated
 boxes (`amr_cluster_eff` sets the min tag efficiency each box reaches before splitting stops).
 
+**Multi-level nesting.**
+`amr_max_level` (default 1) sets the maximum refinement depth. With `amr_max_level > 1`,
+blocks nest recursively: a level-`l` block refines a region of its parent level-(`l-1`)
+block by a further `ref_ratio`, so refinement tracks a moving feature to arbitrary depth.
+Multi-level nesting requires `ref_ratio = 2` (the default) and `amr_max_blocks >= 2`; static
+AMR (`amr_regrid_int = 0`) nests up to level 2, dynamic regrid (`amr_regrid_int > 0`) nests
+deeper. See @ref amr_multilevel for the nesting and reflux details.
+
 **Restart.**
 Each save step writes a fine-level AMR restart file alongside the level-0 restart data
 (whose format is unchanged): the current — possibly regridded — block box and the fine

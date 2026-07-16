@@ -322,3 +322,10 @@ For multi-fluid (5-equation), additionally set:
   are enforced by the checker and reflect the validation state at the time of writing.
 
 <div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-07-04</div>
+
+## Design notes {#amr-design-notes}
+
+Internal design / implementation records (how the code works, not how to configure it):
+
+- @subpage amr_multilevel — multi-level nesting design and reflux
+- @subpage amr_fine_distribution — fine-block distribution across MPI ranks
