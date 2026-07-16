@@ -283,8 +283,14 @@ The following parameters support hardcoded initial conditions that read interfac
 | `interface_file` | String  | Path to interface geometry data file                      |
 | `normFac`        | Real    | Interface normalization factor                            |
 | `normMag`        | Real    | Interface normal magnitude                                |
-| `g0_ic`          | Real    | Initial gas volume fraction for interfacial IC            |
-| `p0_ic`          | Real    | Initial pressure for interfacial IC                       |
+| `g0_ic`          | Real    | Gravitational acceleration for the interfacial IC pressure field |
+| `p0_ic`          | Real    | Reference pressure at the interface                       |
+
+These parameters are only read by the file-based hardcoded-IC patches (`hcid = 304` and `305` in `src/common/include/3dHardcodedIC.fpp`); they are ignored otherwise.
+
+- `interface_file` gives the path to a text file that supplies the interface-position field \f$h(i,j)\f$ used to place the material interface. The run aborts if the file is not found.
+- `normMag` and `normFac` rescale and offset the raw interface data, \f$h \leftarrow \texttt{normMag}\,h + \texttt{normFac}\f$. Each is applied only when set (defaults leave the data unchanged).
+- `p0_ic` and `g0_ic` set the initial (hydrostatic) pressure field about the interface, \f$p = p_{0} + \rho\, g_{0}\,\big(h - x\big)\f$, where \f$x\f$ is the coordinate normal to the interface.
 
 #### Parameter Descriptions
 
@@ -962,6 +968,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `gravity_force`       | Logical | Enable gravity force (default false)                           |
 | `pressure_force`      | Logical | Enable pressure force (default true)                           |
 | `input_path`          | String  | Path to bubble input file (default: `./input/lag_bubbles.dat`) |
+| `kahan_summation`     | Logical | Use Kahan compensated summation when accumulating the void fraction |
 
 - `nBubs_glb` Total number of bubbles.
 
@@ -975,10 +982,13 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `massTransfer_model` Activates the mass transfer model at the bubble's interface based on (\cite Preston07).
 
-- `vel_model` Activates translational motion of bubbles: [1] enables tracer bubbles and [2] enables Newton's second law.
-    - `drag_model` defines the drag model: [0] No drag (default), [1] Stoke's slip drag, [2] Stoke's no-slip drag, [3] Levich drag
-    - `gravity_force` enables gravitation acceleration of the bubbles.
-    - `pressure_force` enables the acceleration of the bubbles by pressure gradient.
+- `vel_model` activates translational motion of the bubbles (\cite Wilfong26): [1] tracer bubbles, which are advected with the local carrier velocity \f$\underline{u}\f$ so that \f$\dot{\underline{x}}_b = \underline{u}(\underline{x}_b)\f$; [2] Newton's second law, which integrates \f$m_b \ddot{\underline{x}}_b = \underline{F}_D + \underline{F}_p + \underline{F}_g\f$, where \f$m_b\f$ is the bubble mass and the right-hand side collects the drag, pressure, and gravity forces below. The carrier velocity at the bubble is interpolated with a Lagrange polynomial of order set by `fd_order`, which must be specified when `vel_model > 0`.
+
+    - `drag_model` selects the drag force \f$\underline{F}_D\f$ acting on the slip velocity \f$\underline{u}_{\rm rel} = \underline{u}_b - \underline{u}\f$, with bubble radius \f$a\f$ and Reynolds number \f$Re\f$: [0] no drag (default); [1] free-slip Stokes drag, \f$\underline{F}_D = -4\pi a\,\underline{u}_{\rm rel}/Re\f$; [2] no-slip Stokes drag, \f$\underline{F}_D = -6\pi a\,\underline{u}_{\rm rel}/Re\f$; [3] Levich drag, \f$\underline{F}_D = -12\pi a\,\underline{u}_{\rm rel}/Re\f$.
+    - `pressure_force` (default true) enables the pressure-gradient force \f$\underline{F}_p = -V_b\,\nabla p\f$, where \f$V_b = \tfrac{4}{3}\pi a^3\f$ is the bubble volume.
+    - `gravity_force` (default false) enables the body force \f$\underline{F}_g = m_b\,\underline{g}\f$, with \f$\underline{g}\f$ the acceleration set by the body-force parameters.
+
+- `kahan_summation` uses Kahan compensated summation when smearing the bubble contributions onto the Eulerian void fraction, reducing the round-off sensitivity of the accumulation to the summation order. It is not compatible with `--mixed` precision builds.
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 

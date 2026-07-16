@@ -265,10 +265,10 @@ DESCRIPTIONS = {
     "lag_betaC_wrt": "Write bubble mass transfer coefficient",
     # Interfacial flow parameters
     "interface_file": "Path to interface geometry data file",
-    "normFac": "Interface normalization factor",
-    "normMag": "Interface normal magnitude",
-    "g0_ic": "Initial gas volume fraction for interfacial IC",
-    "p0_ic": "Initial pressure for interfacial IC",
+    "normFac": "Offset added to the interface data (hcid 304/305)",
+    "normMag": "Scale factor applied to the interface data (hcid 304/305)",
+    "g0_ic": "Gravitational acceleration for the interfacial IC pressure field (hcid 304/305)",
+    "p0_ic": "Reference pressure at the interface (hcid 304/305)",
     # IB collision parameters
     "coefficient_of_restitution": "Real number describing the elasticity of collisions from 0 (perfectly ineleastic) to 1 (perfectly elastic)",
     "collision_model": "Integer selecting the collision model being used. 0 for no collision. 1 for soft-sphere collisions",
@@ -514,6 +514,7 @@ PATTERNS = [
     (r"lag_params%pressure_force", "Enable pressure force for Newton's 2nd law force model"),
     (r"lag_params%gravity_force", "Enable gravity force for Newton's 2nd law force model"),
     (r"lag_params%input_path", "Path to input file for Lagrangian bubbles"),
+    (r"lag_params%kahan_summation", "Use Kahan summation for void fraction accumulation"),
     (r"lag_params%(\w+)", "Lagrangian tracking parameter: {0}"),
     # chem_params patterns - specific fields first
     (r"chem_params%diffusion", "Enable species diffusion for chemistry"),

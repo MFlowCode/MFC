@@ -326,7 +326,7 @@ contains
                                                       & **(3._wp*(strength_idx + 1._wp))
                 end do
             else
-                !> 2D cartesian function: Equation (48) from Madea and Colonius 2018
+                !> 2D cartesian function: Equation (48) from Maeda and Colonius 2018
                 ! We smear particles considering a virtual depth (lag_params%charwidth) with lag_params%charNz cells
                 dzp = (lag_params%charwidth/(lag_params%charNz + 1._wp))
 
