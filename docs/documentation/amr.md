@@ -10,9 +10,9 @@
 
 Block-structured adaptive mesh refinement (AMR) concentrates resolution where the flow
 demands it — around shocks, interfaces, and bubble clouds — while leaving the rest of the
-domain at the coarser base-grid resolution. MFC implements a two-level hierarchy: the
-unmodified base (level-0) solve runs as usual, and one or more 2:1 refined rectangular
-blocks advance alongside it on a finer grid.
+domain at the coarser base-grid resolution. MFC implements a multi-level block hierarchy: the
+unmodified base (level-0) solve runs as usual, and one or more refined rectangular blocks advance
+alongside it on a finer grid — nested recursively to `amr_max_level` levels when enabled.
 
 The fine blocks are dynamically repositioned every `amr_regrid_int` coarse steps using a
 gradient-based cell tagger and Berger–Rigoutsos block clustering, so they follow moving
