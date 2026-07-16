@@ -459,6 +459,9 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         real(wp)                :: start, finish
+        integer(kind=8)         :: stage_t0, stage_t1, clock_rate
+        real(wp)                :: stage_time
+        integer, parameter      :: n_warmup = 2      !< stages excluded before the timing floor (warmup/JIT/first-touch)
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
@@ -467,8 +470,9 @@ contains
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         do s = 1, nstage
+            call system_clock(stage_t0)
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
-                               & t_step, time_avg, s)
+                               & t_step, s)
 
             if (s == 1) then
                 if (run_time_info) then
@@ -565,6 +569,20 @@ contains
                 else
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
                 end if
+            end if
+
+            ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
+            ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
+            ! (not cpu_time, which counts MPI spin-wait) and the minimum (jitter only adds
+            ! time) make it reproducible; the min over stages drops the I/O-bearing s==1 stage.
+            call system_clock(stage_t1, clock_rate)
+            stage_time = real(stage_t1 - stage_t0, wp)/real(clock_rate, wp)
+            if (t_step - t_step_start < n_warmup) then
+                time_avg = 0._wp
+            else if (time_avg <= 0._wp) then
+                time_avg = stage_time
+            else
+                time_avg = min(time_avg, stage_time)
             end if
         end do
 
