@@ -216,7 +216,9 @@ PHYSICS_DOCS = {
         "title": "Adaptive Mesh Refinement (AMR)",
         "category": "Adaptive Mesh Refinement",
         "explanation": (
-            "Block-structured AMR (Experimental) adds up to amr_max_blocks 2:1 refined level-1 blocks. "
+            "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at ref_ratio:1 "
+            "refinement (ref_ratio = 2 or 4); with amr_max_level > 1 the blocks nest recursively to that "
+            "depth (multi-level nesting requires ref_ratio = 2). "
             "Requires WENO reconstruction (recon_type = 1), SSP-RK3 (time_stepper = 3), "
             "and the 5- or 6-equation model (model_eqns = 2 or 3; for 6-eq the per-stage pressure "
             "relaxation also runs on each fine block); num_fluids > 1 additionally requires "
@@ -269,6 +271,8 @@ PHYSICS_DOCS = {
             "sit strictly inside the growing active window (init abort + regrid clamp), and the "
             "fine advance treats its whole block as active. "
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
+            "ref_ratio must be 2 or 4 (ref_ratio = 4 is single-level without subcycling); amr_max_level >= 1, "
+            "and multi-level (amr_max_level > 1) needs amr_max_blocks >= 2. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
             "incompatible with cfl_dt. "
             "Under MPI the patch may span ranks (each rank holds the fine cells covering its "
@@ -1417,8 +1421,20 @@ class CaseValidator:
         amr_buf = self.get("amr_buf")
         amr_max_blocks = self.get("amr_max_blocks")
         amr_cluster_eff = self.get("amr_cluster_eff")
+        amr_max_level = self.get("amr_max_level")
+        ref_ratio = self.get("ref_ratio")
 
         self.prohibit(amr_max_blocks is not None and amr_max_blocks < 1, "amr_max_blocks must be >= 1")
+        self.prohibit(amr_max_level is not None and amr_max_level < 1, "amr_max_level must be >= 1")
+        self.prohibit(
+            amr_max_level is not None and amr_max_level > 1 and amr_max_blocks is not None and amr_max_blocks < 2,
+            "multi-level AMR (amr_max_level > 1) needs amr_max_blocks >= 2 " "(at least one level-1 block plus one nested level-2 block)",
+        )
+        self.prohibit(ref_ratio is not None and ref_ratio not in (2, 4), "ref_ratio must be 2 or 4")
+        self.prohibit(
+            ref_ratio is not None and ref_ratio != 2 and ((amr_max_level is not None and amr_max_level > 1) or amr_subcycle),
+            "ref_ratio /= 2 is only supported at amr_max_level = 1 without subcycling (v1)",
+        )
         self.prohibit(
             amr_cluster_eff is not None and (amr_cluster_eff <= 0 or amr_cluster_eff > 1),
             "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1",
