@@ -540,10 +540,13 @@ contains
     !! region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full reach of every prolongation/ghost-fill stencil) for all sys_size
     !! variables, stored in amr_cg in a block-LOCAL frame (cell 0 == global amr_cpat_off). POINT-TO-POINT: the owner receives the
     !! patch cells it does not hold from exactly the (SFC-local) coarse-owners that hold them - each rank's contribution is the
-    !! intersection of the patch with its contiguous owned coarse range (f_amr_rank_coarse_range, = the f_amr_own_coarse set), read
+    !! intersection of the patch with its contiguous owned coarse range (s_amr_rank_coarse_range, = the f_amr_own_coarse set), read
     !! from the replicated amr_decomp table. Non-participants send/recv nothing (no global collective). At np=1 the owner is the
     !! sole rank and just copies its own coarse over the patch, bit-for-bit. Host fill (q_coarse must be host-current with valid
-    !! ghosts); the packed data is wp, cast to stp into amr_cg (identity for stp coarse), then pushed to the device.
+    !! ghosts); the packed data is wp, cast to stp into amr_cg (identity for stp coarse), then pushed to the device. INVARIANT:
+    !! "coarse" here means the block's PARENT level (level l-1), NOT the base grid (level 0). For a level-1 block the parent IS L0,
+    !! but a level>=2 block folds to/from its parent block's fine array; the C<->F prolong/restrict/gather routines all operate in
+    !! the parent-fine frame, not the L0 frame.
     impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -588,7 +591,7 @@ contains
         if (num_procs == 1 .and. pull_host) then
             block
                 integer :: bl1, bh1, bl2, bh2, bl3, bh3, coff1, coff2, coff3
-                call f_amr_rank_coarse_range(owner, crlo, crhi)
+                call s_amr_rank_coarse_range(owner, crlo, crhi)
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                 bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
                 coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
@@ -616,14 +619,14 @@ contains
 
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
-            call f_amr_rank_coarse_range(proc_rank, crlo, crhi)
+            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
             ! count + post recvs from every OTHER rank whose owned range overlaps the patch
             nsrc = 0
             do r = 0, num_procs - 1
                 if (r == owner) cycle
-                call f_amr_rank_coarse_range(r, crlo, crhi)
+                call s_amr_rank_coarse_range(r, crlo, crhi)
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                 if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
             end do
@@ -632,7 +635,7 @@ contains
                 nsrc = 0
                 do r = 0, num_procs - 1
                     if (r == owner) cycle
-                    call f_amr_rank_coarse_range(r, crlo, crhi)
+                    call s_amr_rank_coarse_range(r, crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                     if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -645,7 +648,7 @@ contains
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
 #endif
                 do idx = 1, nsrc
-                    call f_amr_rank_coarse_range(srank(idx), crlo, crhi)
+                    call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                     ! unpack in the SAME (i, g3, g2, g1) order the sender packed; place at amr_cg patch-local index
                     r = 0
@@ -668,7 +671,7 @@ contains
             end do
         else
             ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
-            call f_amr_rank_coarse_range(proc_rank, crlo, crhi)
+            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -737,7 +740,7 @@ contains
         if (num_procs == 1 .and. pull_host) then
             block
                 integer :: bl1, bh1, bl2, bh2, bl3, bh3, coff1, coff2, coff3
-                call f_amr_rank_coarse_range(owner, crlo, crhi)
+                call s_amr_rank_coarse_range(owner, crlo, crhi)
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                 bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
                 coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
@@ -768,7 +771,7 @@ contains
 
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
-            call f_amr_rank_coarse_range(proc_rank, crlo, crhi)
+            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             do ib_ = 1, nb
                 do q = 1, nnode
@@ -788,7 +791,7 @@ contains
             nsrc = 0
             do r = 0, num_procs - 1
                 if (r == owner) cycle
-                call f_amr_rank_coarse_range(r, crlo, crhi)
+                call s_amr_rank_coarse_range(r, crlo, crhi)
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                 if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
             end do
@@ -797,7 +800,7 @@ contains
                 nsrc = 0
                 do r = 0, num_procs - 1
                     if (r == owner) cycle
-                    call f_amr_rank_coarse_range(r, crlo, crhi)
+                    call s_amr_rank_coarse_range(r, crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                     if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -810,7 +813,7 @@ contains
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
 #endif
                 do idx = 1, nsrc
-                    call f_amr_rank_coarse_range(srank(idx), crlo, crhi)
+                    call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                     ! unpack in the SAME (ib_, q, g3, g2, g1) order the sender packed - pb block then mv block
                     r = 0
@@ -846,7 +849,7 @@ contains
             $:GPU_UPDATE(device='[amr_cg_pb, amr_cg_mv]')
         else
             ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
-            call f_amr_rank_coarse_range(proc_rank, crlo, crhi)
+            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -970,7 +973,7 @@ contains
     !> This rank's (r's) contiguous owned coarse-cell range per dim from the replicated amr_decomp table: interior [start:start+ext]
     !! plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal to the set where
     !! f_amr_own_coarse is true, but as one contiguous span so box intersections identify contributors without a per-cell scan.
-    pure subroutine f_amr_rank_coarse_range(r, crlo, crhi)
+    pure subroutine s_amr_rank_coarse_range(r, crlo, crhi)
 
         integer, intent(in)  :: r
         integer, intent(out) :: crlo(3), crhi(3)
@@ -987,7 +990,7 @@ contains
             crhi(3) = amr_decomp(3, r) + amr_decomp(6, r); if (crhi(3) == p_glb) crhi(3) = crhi(3) + buff_size
         end if
 
-    end subroutine f_amr_rank_coarse_range
+    end subroutine s_amr_rank_coarse_range
 
     !> Per-dim intersection of two global boxes [alo:ahi] and [blo:bhi] -> [olo:ohi] (empty when olo > ohi in some dim).
     pure subroutine s_amr_box_isect(alo, ahi, blo, bhi, olo, ohi)
@@ -1267,7 +1270,11 @@ contains
 
     !> Set the fine level's geometry (region, intersection, extents, bounds, coordinates) for the box lo:hi. Arrays are preallocated
     !! at max size; this only updates metadata and refills coords. Collective: ALL ranks must call together (init and regrid do) -
-    !! it also refreshes the allreduced amr_xchg_coarse_ghosts flag for the new box.
+    !! it also refreshes the allreduced amr_xchg_coarse_ghosts flag for the new box. INVARIANT: a level-l block's fine extent is
+    !! ref_ratio**l * (coarse-region width) - 1, NOT ref_ratio*width. (ref_ratio*width holds only for the level-1 initial block;
+    !! nested boxes compound by ref_ratio per level.) Every fine-extent computation - here, the restart-reader check, the
+    !! load-weight, the fmul - uses ref_ratio**level; assuming ref_ratio*width rejects level>=2 blocks as corrupt (the exact bug
+    !! that bit the multi-level restart reader).
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
@@ -1740,7 +1747,7 @@ contains
 
         if (proc_rank == owner) then
             ! overwrite the covered cells this rank owns, then send each other coarse-owner its covered slice
-            call f_amr_rank_interior(proc_rank, ilo, ihi)
+            call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
             if (num_procs == 1) then
                 ! np=1 device-native fold-back: restrict the fine block (device) into the coarse (device) over the COVERED
@@ -1766,7 +1773,7 @@ contains
             nsrc = 0
             do r = 0, num_procs - 1
                 if (r == owner) cycle
-                call f_amr_rank_interior(r, ilo, ihi)
+                call s_amr_rank_interior(r, ilo, ihi)
                 call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
                 if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
             end do
@@ -1775,7 +1782,7 @@ contains
                 nsrc = 0
                 do r = 0, num_procs - 1
                     if (r == owner) cycle
-                    call f_amr_rank_interior(r, ilo, ihi)
+                    call s_amr_rank_interior(r, ilo, ihi)
                     call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
                     if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     nsrc = nsrc + 1; drank(nsrc) = r
@@ -1802,7 +1809,7 @@ contains
             end if
         else
             ! coarse-owner: if I hold covered cells, receive my slice from the owner and overwrite my local coarse
-            call f_amr_rank_interior(proc_rank, ilo, ihi)
+            call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -1902,7 +1909,7 @@ contains
 
     !> Rank r's coarse INTERIOR box (global) from the replicated amr_decomp table (no ghosts). Covered coarse cells are in-domain,
     !! so restriction targets are identified by interior overlap alone.
-    pure subroutine f_amr_rank_interior(r, ilo, ihi)
+    pure subroutine s_amr_rank_interior(r, ilo, ihi)
 
         integer, intent(in)  :: r
         integer, intent(out) :: ilo(3), ihi(3)
@@ -1912,7 +1919,7 @@ contains
         if (n_glb > 0) then; ilo(2) = amr_decomp(2, r); ihi(2) = amr_decomp(2, r) + amr_decomp(5, r); end if
         if (p_glb > 0) then; ilo(3) = amr_decomp(3, r); ihi(3) = amr_decomp(3, r) + amr_decomp(6, r); end if
 
-    end subroutine f_amr_rank_interior
+    end subroutine s_amr_rank_interior
 
     !> Volume-weighted restriction of one covered coarse cell (ci,cj,ck) for variable i: average of its ref_ratio^d fine children
     !! from the owner's fine block, block-relative (fine origin (ci-rlo)*rr). Same child-sum order as the old device kernel.
@@ -2429,7 +2436,7 @@ contains
 
         if (proc_rank == owner) then
             ! overwrite the covered cells this rank owns (device, owned box), then send each other coarse-owner its covered slice
-            call f_amr_rank_interior(proc_rank, ilo, ihi)
+            call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
             $:GPU_UPDATE(host='[amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf]')
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_pbmv_box_device(pb_ts(1)%sf, &
@@ -2437,7 +2444,7 @@ contains
             nsrc = 0
             do r = 0, num_procs - 1
                 if (r == owner) cycle
-                call f_amr_rank_interior(r, ilo, ihi)
+                call s_amr_rank_interior(r, ilo, ihi)
                 call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
                 if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
             end do
@@ -2446,7 +2453,7 @@ contains
                 nsrc = 0
                 do r = 0, num_procs - 1
                     if (r == owner) cycle
-                    call f_amr_rank_interior(r, ilo, ihi)
+                    call s_amr_rank_interior(r, ilo, ihi)
                     call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
                     if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     nsrc = nsrc + 1; drank(nsrc) = r
@@ -2489,7 +2496,7 @@ contains
             end if
         else
             ! coarse-owner: if I hold covered cells, receive my pb/mv slice from the owner and overwrite my local coarse
-            call f_amr_rank_interior(proc_rank, ilo, ihi)
+            call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -4367,6 +4374,7 @@ contains
                         & cj - 1, ck)))
                     if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj, ck + 1) - f_amr_rho_tot(q_cons_base, ci, cj, &
                         & ck - 1)))
+                    ! 2*r0 normalizes the 2-cell central difference (rho at i+1..i-1); the 2 is the stencil span, NOT ref_ratio
                     if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
                     ! the acoustic source support stays coarse (its spatials are coarse cell
                     ! indices): suppress tags there so the clusterer splits around the source
@@ -5150,6 +5158,7 @@ contains
                                     & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, max(fj - 1, 0), fk)))
                                 if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, min(fk + 1, &
                                     & fm3)) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, max(fk - 1, 0))))
+                                ! 2*r0 normalizes the 2-cell central difference; the 2 is the stencil span, NOT ref_ratio
                                 if (g/(2._wp*r0) > amr_tag_eps) tagged = .true.
                             end do
                         end do

@@ -19,6 +19,21 @@ covered in `docs/documentation/contributing.md`.
   `contxb`/`momxb` shorthands are gone. Index positions depend on `model_eqns` and
   enabled features — changing either moves ALL indices; never hard-code one.
 
+## AMR levels (silent-index traps)
+
+- **A level-`l` block's fine extent is `ref_ratio**l * (coarse-region width) - 1`, NOT
+  `ref_ratio*width`.** The `ref_ratio*width` form is correct only for the level-1 initial
+  block; nested boxes compound by `ref_ratio` per level (`ref_ratio**level`). Every
+  fine-extent computation uses `ref_ratio**amr_block_level` — geometry
+  (`s_set_amr_fine_geometry`), the restart-reader extent check, load-weight, `fmul`.
+  Assuming `ref_ratio*width` rejects level≥2 blocks as corrupt (the exact bug that bit the
+  multi-level restart reader).
+- **"coarse" in the AMR coupling routines means the block's PARENT level (`l-1`), not the
+  base grid (level 0).** For a level-1 block the parent IS L0; for level≥2 the block folds
+  to/from its parent block's fine array. `s_amr_gather_coarse_patch`,
+  `s_interpolate_coarse_to_fine`, and the restrict/reflux path all operate in the
+  parent-fine frame — assuming L0 silently corrupts level≥2 coupling.
+
 ## GPU
 
 - WARNING: do NOT wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops — `GPU_LOOP` emits
