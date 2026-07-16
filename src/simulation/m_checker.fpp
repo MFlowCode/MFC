@@ -40,6 +40,9 @@ contains
         @:PROHIBIT(chemistry .and. chem_params%reaction_substeps < 0, &
                    & "chem_params%reaction_substeps must be >= 0 (0 = reaction source in the flow RHS; > 0 = operator-split sub-stepping)")
 
+        @:PROHIBIT(chemistry .and. igr .and. chem_params%reaction_substeps > 0, &
+                   & "operator-split reaction sub-stepping (reaction_substeps > 0) is not supported with igr: the reactor reads the post-flow (rho, e, T) state, which the IGR update path does not guarantee")
+
         @:PROHIBIT(chemistry .and. chem_params%adap_substeps .and. chem_params%reaction_substeps < 1, &
                    & "chem_params%adap_substeps requires reaction_substeps >= 1 (the operator-split floor)")
 

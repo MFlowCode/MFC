@@ -189,6 +189,11 @@ contains
                             Ys(eqn - eqn_idx%species%beg + 1) = q_cons_vf(eqn)%sf(x, y, z)/rho
                         end do
                         T = q_T_sf%sf(x, y, z)
+                        ! Net rate (creation - destruction) on purpose: nsub sizes the accuracy of the
+                        ! composition trajectory, which is set by how fast Ys actually moves, not by the
+                        ! raw forward/reverse magnitudes. In fast partial equilibrium the net is ~0 and the
+                        ! composition is static, so the floor is adequate; the alpha-QSS update is itself
+                        ! unconditionally stable, so an under-sized nsub loses accuracy, never stability.
                         call get_net_production_rates(rho, T, Ys, cdot)  ! net omega in cdot
                         cell_stiff = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
@@ -224,7 +229,7 @@ contains
                     energy = q_cons_vf(eqn_idx%E)%sf(x, y, z)/rho
                     $:GPU_LOOP(parallelism='[seq]')
                     do eqn = eqn_idx%mom%beg, eqn_idx%mom%end
-                        energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/rho)**2._wp
+                        energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/rho)**2
                     end do
 
                     T = q_T_sf%sf(x, y, z)
@@ -244,8 +249,7 @@ contains
                             Ys(eqn) = y0(eqn) + dt_sub*(prod0(eqn) - loss_i)/(1._wp + alp(eqn)*dt_sub*Lloss(eqn))
                             if (Ys(eqn) < 0._wp) Ys(eqn) = 0._wp
                         end do
-                        ! corrector: re-evaluate rates at the predicted state
-                        T_new = T
+                        ! corrector: re-evaluate rates at the predicted state (T is the Newton guess; T_new is intent(out))
                         call get_temperature(energy, T, Ys, .true., T_new)
                         call get_creation_destruction_rates(rho, T_new, Ys, cdot, ddot)
                         Ysum = 0._wp
@@ -273,7 +277,6 @@ contains
                                 Ys(eqn) = y0(eqn)
                             end do
                         end if
-                        T_new = T
                         call get_temperature(energy, T, Ys, .true., T_new)
                         T = T_new
                     end do
