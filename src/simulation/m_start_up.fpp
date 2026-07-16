@@ -120,6 +120,10 @@ contains
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. num_bc_patches > 0) then
                 bc_io = .true.
             end if
+
+            if (bc_x%beg == BC_PERIODIC .and. bc_x%end == BC_PERIODIC) periodic_bc(1) = .true.
+            if (bc_y%beg == BC_PERIODIC .and. bc_y%end == BC_PERIODIC) periodic_bc(2) = .true.
+            if (bc_z%beg == BC_PERIODIC .and. bc_z%end == BC_PERIODIC) periodic_bc(3) = .true.
         else
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
@@ -311,9 +315,8 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
 
-        x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
+        call s_apply_grid_from_global_dim(x_cb_glb, m_glb, m, start_idx(1), bc_x%beg, bc_x%end, buff_size, buff_size, buff_size, &
+                                          & buff_size, x_cb, x_cc, dx)
 
         if (n > 0) then
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
@@ -328,9 +331,8 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
 
-            y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
+            call s_apply_grid_from_global_dim(y_cb_glb, n_glb, n, start_idx(2), bc_y%beg, bc_y%end, buff_size, buff_size, &
+                                              & buff_size, buff_size, y_cb, y_cc, dy)
 
             if (p > 0) then
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
@@ -345,9 +347,8 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // 'is missing. Exiting.')
                 end if
 
-                z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
+                call s_apply_grid_from_global_dim(z_cb_glb, p_glb, p, start_idx(3), bc_z%beg, bc_z%end, buff_size, buff_size, &
+                                                  & buff_size, buff_size, z_cb, z_cc, dz)
             end if
         end if
 
@@ -759,7 +760,7 @@ contains
         if (bubbles_lagrange) then
             $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
                          & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC]')
-            do i = 1, nBubs
+            do i = 1, n_el_bubs_loc
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
                 end if
@@ -918,7 +919,7 @@ contains
         end if
         if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
+        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
@@ -998,6 +999,8 @@ contains
 
         call s_mpi_decompose_computational_domain()
 
+        bc = bc_xyz_info(bc_x, bc_y, bc_z)
+
     end subroutine s_initialize_mpi_domain
 
     !> Transfer initial conservative variable and model parameter data to the GPU device
@@ -1053,6 +1056,8 @@ contains
         $:GPU_UPDATE(device='[bc_y%isothermal_in, bc_y%isothermal_out]')
         $:GPU_UPDATE(device='[bc_z%isothermal_in, bc_z%isothermal_out]')
         $:GPU_UPDATE(device='[bc_x%Twall_in, bc_x%Twall_out, bc_y%Twall_in, bc_y%Twall_out, bc_z%Twall_in, bc_z%Twall_out]')
+
+        $:GPU_UPDATE(device='[bc]')
 
         $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then

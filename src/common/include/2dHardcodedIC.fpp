@@ -40,7 +40,6 @@
     select case (patch_icpp(patch_id)%hcid)  ! 2D_hardcoded_ic example case
     case (200)  ! Two-fluid cubic interface
         if (y_cc(j) <= (-x_cc(i)**3 + 1)**(1._wp/3._wp)) then
-            ! Volume Fractions
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, 0) = eps
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - eps
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = eps*1000._wp
