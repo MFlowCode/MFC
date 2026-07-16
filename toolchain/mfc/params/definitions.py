@@ -61,8 +61,6 @@ CASE_OPT_PARAMS = {
     "recon_type",
     "muscl_order",
     "muscl_lim",
-    "hybrid_riemann",
-    "hybrid_weno",
 }
 
 
@@ -668,8 +666,6 @@ def _load():
         "sfc_partition_wrt",
         "load_balance",
         "rank_time_wrt",
-        "hybrid_weno",
-        "hybrid_riemann",
         "amr",
     ]:
         _r(n, LOG, {"output"})
@@ -684,8 +680,6 @@ def _load():
     _r("amr_max_level", INT)
     _r("amr_cluster_eff", REAL)
     _r("ref_ratio", INT)
-    _r("hybrid_weno_eps", REAL, {"output"})
-    _r("hybrid_smooth_flux", INT, {"output"})
     _r("partition_tile_size", INT, {"output"})
     for n in [
         "schlieren_wrt",
@@ -1286,10 +1280,6 @@ _nv(
     "sfc_partition_wrt",
     "load_balance",
     "rank_time_wrt",
-    "hybrid_weno",
-    "hybrid_weno_eps",
-    "hybrid_riemann",
-    "hybrid_smooth_flux",
     "partition_tile_size",
     "alt_soundspeed",
     "mixture_err",

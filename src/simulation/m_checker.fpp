@@ -43,8 +43,6 @@ contains
         if (active_box) then
             @:PROHIBIT(recon_type /= recon_type_weno, "active_box requires WENO reconstruction")
             @:PROHIBIT(ib, "active_box is incompatible with immersed boundaries")
-            @:PROHIBIT(hybrid_weno .or. hybrid_riemann, &
-                       & "active_box is incompatible with hybrid_weno/hybrid_riemann: the smoothness sensor sweeps the full domain but the cons-to-prim conversion is narrowed to the active-box footprint, so the sensor would read unconverted primitives outside it")
             @:PROHIBIT(acoustic_source, "active_box is incompatible with acoustic sources")
             @:PROHIBIT(bodyForces, "active_box is incompatible with body forces")
             @:PROHIBIT(bubbles_lagrange, "active_box is incompatible with Lagrangian bubbles")
@@ -69,27 +67,6 @@ contains
         @:PROHIBIT(sfc_partition_wrt .and. partition_tile_size < 1, "partition_tile_size must be >= 1")
         @:PROHIBIT(load_balance .and. .not. parallel_io, "load_balance requires parallel_io = T")
         @:PROHIBIT(load_balance .and. num_procs == 1, "load_balance requires more than one MPI rank")
-        @:PROHIBIT(hybrid_weno .and. recon_type /= recon_type_weno, "hybrid_weno requires WENO reconstruction")
-        @:PROHIBIT(hybrid_weno .and. weno_order == 1, "hybrid_weno requires weno_order > 1")
-        @:PROHIBIT(hybrid_weno .and. hybrid_weno_eps <= 0._wp, "hybrid_weno_eps must be > 0")
-        @:PROHIBIT(hybrid_weno .and. igr, "hybrid_weno is incompatible with the IGR solver")
-        @:PROHIBIT(hybrid_riemann .and. recon_type /= recon_type_weno, &
-                   & "hybrid_riemann requires WENO reconstruction (the shared sensor lives in the WENO module)")
-        @:PROHIBIT(hybrid_riemann .and. weno_order == 1, "hybrid_riemann requires weno_order > 1")
-        @:PROHIBIT(hybrid_riemann .and. .not. (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq), &
-                   & "hybrid_riemann supports only the 5- and 6-equation models")
-        @:PROHIBIT(hybrid_riemann .and. (hybrid_smooth_flux < 1 .or. hybrid_smooth_flux > 2), &
-                   & "hybrid_smooth_flux must be 1 (central) or 2 (Rusanov)")
-        @:PROHIBIT(hybrid_riemann .and. igr, "hybrid_riemann is incompatible with the IGR solver")
-        @:PROHIBIT(hybrid_riemann .and. (viscous .or. surface_tension .or. hypoelasticity .or. hyperelasticity .or. elasticity), &
-                   & "hybrid_riemann does not support viscous/elastic/surface-tension physics")
-        @:PROHIBIT(hybrid_riemann .and. (bubbles_euler .or. bubbles_lagrange .or. qbmm), &
-                   & "hybrid_riemann does not support bubble models")
-        @:PROHIBIT(hybrid_riemann .and. chemistry, "hybrid_riemann does not support chemistry")
-        @:PROHIBIT(hybrid_riemann .and. cyl_coord, &
-                   & "hybrid_riemann does not support cylindrical/axisymmetric (no smooth-flux geometric source)")
-        @:PROHIBIT(hybrid_riemann .and. low_Mach /= 0, &
-                   & "hybrid_riemann (cheap central/Rusanov flux) is incompatible with the low_Mach correction")
 
         if (amr) then
             @:PROHIBIT((.not. igr) .and. recon_type /= recon_type_weno, "amr requires WENO reconstruction (or the IGR solver)")
@@ -168,10 +145,6 @@ contains
             ! inside the monotonically-growing active window (init check + regrid clamp; the
             ! windowed coarse update would drop reflux corrections at faces outside it), and
             ! the fine advance disables the coarse-indexed windowing on the swapped block grid
-            ! no hybrid_weno/hybrid_riemann gate: the sensor arrays are sized to the coarse
-            ! idwbuff (the fine extent guard keeps fine bounds inside them) and the sensor is
-            ! recomputed from the live (swapped) idwbuff every RHS call, so each level evaluates
-            ! its own sensor with conservative full-WENO defaults at its buffer edges.
             ! no acoustic_source gate here: acoustic sources act on the coarse grid only (their spatial support is precomputed as
             ! coarse cell indices). A startup check aborts if the support overlaps the user-placed
             ! initial block; the dynamic regrid keeps its own boxes clear of the support (tags are

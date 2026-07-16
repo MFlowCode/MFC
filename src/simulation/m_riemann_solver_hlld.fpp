@@ -12,7 +12,6 @@ module m_riemann_solver_hlld
     use m_global_parameters
     use m_variables_conversion
     use m_riemann_state
-    use m_weno, only: weno_full
 
     implicit none
 
@@ -61,7 +60,6 @@ contains
         real(wp) :: vL_star, vR_star, wL_star, wR_star
         real(wp) :: v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR, E_double
         integer  :: i, j, k, l
-        logical  :: face_smooth  !< hybrid Riemann: use central/Rusanov flux at a WENO-smooth face
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
             & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
@@ -75,10 +73,10 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[face_smooth, alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, &
-                                    & pres, E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, &
-                                    & U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, s_L, s_R, s_M, s_starL, &
-                                    & s_starR, pTot_L, pTot_R, p_star, rhoL_star, rhoR_star, E_starL, E_starR, sqrt_rhoL_star, &
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, pres, E, &
+                                    & H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, U_starR, &
+                                    & U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, s_L, s_R, s_M, s_starL, s_starR, &
+                                    & pTot_L, pTot_R, p_star, rhoL_star, rhoR_star, E_starL, E_starR, sqrt_rhoL_star, &
                                     & sqrt_rhoR_star, denom_ds, sign_Bx, vL_star, vR_star, wL_star, wR_star, v_double, w_double, &
                                     & By_double, Bz_double, E_doubleL, E_doubleR, E_double]', copyin='[norm_dir]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
@@ -239,11 +237,6 @@ contains
                             end if
 
                             ! Hybrid Riemann: overwrite HLLD with a central/Rusanov flux at a WENO-smooth face
-                            if (hybrid_riemann) then
-                                face_smooth = .not. (weno_full(${SF('')}$) .or. weno_full(${SF(' + 1')}$))
-                                if (face_smooth) F_hlld = 0.5_wp*(F_L + F_R) - real(hybrid_smooth_flux - 1, &
-                                    & wp)*0.5_wp*max(abs(vel%L(1)) + c_fast%L, abs(vel%R(1)) + c_fast%R)*(U_R - U_L)
-                            end if
 
                             ! (12) Write HLLD flux to output arrays
                             flux_rsx_vf(${SF('')}$, 1) = F_hlld(1)  ! TODO multi-component

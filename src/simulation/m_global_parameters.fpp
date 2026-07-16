@@ -498,7 +498,6 @@ contains
         sfc_partition_wrt = .false.
         load_balance = .false.
         rank_time_wrt = .false.
-        hybrid_weno_eps = 1.0e-2_wp
         amr = .false.
         amr_block_beg(:) = 0
         amr_block_end(:) = 0
@@ -510,7 +509,6 @@ contains
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
         ref_ratio = 2
-        hybrid_smooth_flux = 2
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.
 
@@ -522,8 +520,6 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             nb = 1
             muscl_lim = dflt_int
-            hybrid_weno = .false.
-            hybrid_riemann = .false.
         #:endif
 
         adv_n = .false.
@@ -966,7 +962,6 @@ contains
             $:GPU_UPDATE(device='[muscl_order, muscl_lim]')
             $:GPU_UPDATE(device='[igr, igr_order]')
             $:GPU_UPDATE(device='[num_fluids, num_dims, viscous, num_vels, nb, muscl_lim]')
-            $:GPU_UPDATE(device='[hybrid_weno, hybrid_riemann, hybrid_weno_eps, hybrid_smooth_flux]')
         #:endif
 
         $:GPU_UPDATE(device='[int_comp, ic_eps, ic_beta]')

@@ -22,7 +22,6 @@ module m_riemann_solver_hllc
         & get_mixture_energy_mass, get_species_specific_heats_r, get_species_enthalpies_rt, get_mixture_specific_heat_cp_mass, &
         & molecular_weights
     use m_riemann_state
-    use m_weno, only: weno_full
 
     implicit none
 
@@ -123,7 +122,6 @@ contains
         real(wp) :: zcoef, pcorr                !< low Mach number correction
         integer  :: i, j, k, l, q               !< Generic loop iterators
         integer  :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
-        logical  :: face_smooth                 !< hybrid Riemann: use central/Rusanov flux at a WENO-smooth face
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -145,9 +143,9 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC HLLC star-state flux with contact wave speed s_S
                 if (model_eqns == model_eqns_6eq) then
                     ! 6-equation model (model_eqns=3): separate phasic internal energies
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[face_smooth, i, j, k, l, vel_L, vel_R, Re_L, Re_R, alpha_L, &
-                                        & alpha_R, alpha_rho_L, alpha_rho_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, &
-                                        & Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, &
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, &
+                                        & alpha_rho_L, alpha_rho_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, &
+                                        & Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, &
                                         & xi_field_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, &
                                         & Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, &
                                         & Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, &
@@ -500,12 +498,6 @@ contains
                                         flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
                                     end if
                                 #:endif
-                                if (hybrid_riemann) then
-                                    face_smooth = .not. (weno_full(${SF('')}$) .or. weno_full(${SF(' + 1')}$))
-                                    if (face_smooth) call s_compute_hybrid_smooth_flux(${SF('')}$, alpha_rho_L, alpha_L, &
-                                        & alpha_rho_R, alpha_R, vel_L, vel_R, c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, &
-                                        & hybrid_smooth_flux)
-                                end if
                             end do
                         end do
                     end do
@@ -1101,16 +1093,15 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 else
                     ! 5-equation model (model_eqns=2): mixture total energy, volume fraction advection
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[face_smooth, i, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, &
-                                        & rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, &
-                                        & alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, &
-                                        & Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, &
-                                        & s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, &
-                                        & vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, &
-                                        & alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, &
-                                        & Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, &
-                                        & xi_field_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]', &
-                                        & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, &
+                                        & pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, &
+                                        & MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, &
+                                        & H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, &
+                                        & xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, &
+                                        & alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, &
+                                        & vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, &
+                                        & Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg, Phi_avg, &
+                                        & h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -1490,12 +1481,6 @@ contains
                                         flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
                                     end if
                                 #:endif
-                                if (hybrid_riemann) then
-                                    face_smooth = .not. (weno_full(${SF('')}$) .or. weno_full(${SF(' + 1')}$))
-                                    if (face_smooth) call s_compute_hybrid_smooth_flux(${SF('')}$, alpha_rho_L, alpha_L, &
-                                        & alpha_rho_R, alpha_R, vel_L, vel_R, c_L, c_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, &
-                                        & hybrid_smooth_flux)
-                                end if
                             end do
                         end do
                     end do

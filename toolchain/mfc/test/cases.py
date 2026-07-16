@@ -2824,17 +2824,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # restart_check on the REGRIDDED layout: unlike the static block, a regridded block set
         # cannot be reconstructed from the ICs, so the roundtrip proves the restart file itself
         cases.append(define_case_d(stack, "", {}, restart_check=True))
-        # hybrid sensors on the fine level. eps must be chosen so no cell's Jameson phi lands
-        # NEAR it on any timestep, or a compiler's FP-reordering flips a cell between central and
-        # WENO -> a percent-level local golden diff (the failure mode that killed eps=0.5, which
-        # sat right where a shock cell's phi crosses). An eps-sweep of this exact case shows a
-        # clean phi GAP over [0.20, 0.40] (bit-identical output across the whole range -> no cell
-        # sits there on any step): eps 0.30 is centred in it with a +/-0.10 margin (~1000x the
-        # ~1e-4 cross-compiler phi drift), so no compiler can flip a cell, while still moving the
-        # answer ~4e-4 vs a dead sensor (all-WENO). override_tol 5e-5 sits an order below that
-        # ~4e-4 dead-sensor signal and ~8x above the ~6e-6 flip-free FP drift.
-        cases.append(define_case_d(stack, "hybrid_weno sensor", {"hybrid_weno": "T", "hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
-        cases.append(define_case_d(stack, "hybrid_riemann sensor", {"hybrid_riemann": "T", "hybrid_weno_eps": 0.3, "hybrid_smooth_flux": 2}, override_tol=5.0e-5))
         # 2 MPI ranks + parallel_io: the ONLY test that executes the MPI-IO AMR restart write/read
         # (EXSCAN offset arithmetic, per-rank-extents validation) and multi-rank dynamic regrid
         # (coarse-halo exchange before tagging, fine seam halo) - a rank-seam or restart-offset bug
@@ -2957,10 +2946,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("AMR -> 1D -> MHD -> HLLD", {**mhd_1d_base, "amr_regrid_int": 0})
         cases.append(define_case_d(stack, "", {}))
         cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 0.05, "amr_buf": 3}))
-        # hlld hybrid: the smooth-flux override reuses HLLD's own F_L/F_R physical fluxes (Rusanov at a
-        # WENO-smooth face). Liveness eps (1e-2, bit-identical to plain by design) confirms the MHD override is
-        # wired without the consequential-eps threshold-flip fragility (see the HLL/LF note in hybrid_sensor_tests)
-        cases.append(define_case_d(stack, "hybrid_riemann", {"hybrid_riemann": "T", "hybrid_weno_eps": 1.0e-2, "hybrid_smooth_flux": 2}))
         stack.pop()
         stack.push(
             "AMR -> 1D -> RMHD",
@@ -4209,65 +4194,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     amr_golden_tests()
-
-    def hybrid_sensor_tests():
-        """Golden tests for the hybrid WENO/Riemann smoothness sensors: a 1D Sod-type shock so the
-        sensor genuinely partitions the domain (full nonlinear WENO/upwind flux at the
-        discontinuities, central weights/flux in the smooth regions). These protect the sensor
-        plumbing and the shared nonlinear-weight block in m_weno against silent divergence."""
-        hybrid_1d_base = {
-            "m": 63,
-            "n": 0,
-            "p": 0,
-            "dt": 5.0e-4,
-            "t_step_stop": 6,
-            "t_step_save": 6,
-            "x_domain%beg": 0.0,
-            "x_domain%end": 1.0,
-            "bc_x%beg": -3,
-            "bc_x%end": -3,
-            "patch_icpp(1)%geometry": 1,
-            "patch_icpp(1)%x_centroid": 0.05,
-            "patch_icpp(1)%length_x": 0.1,
-            "patch_icpp(1)%vel(1)": 0.0,
-            "patch_icpp(2)%geometry": 1,
-            "patch_icpp(2)%x_centroid": 0.45,
-            "patch_icpp(2)%length_x": 0.7,
-            "patch_icpp(2)%vel(1)": 0.0,
-            "patch_icpp(3)%geometry": 1,
-            "patch_icpp(3)%x_centroid": 0.9,
-            "patch_icpp(3)%length_x": 0.2,
-            "patch_icpp(3)%vel(1)": 0.0,
-        }
-        stack.push("Hybrid -> 1D -> WENO sensor", {**hybrid_1d_base, "hybrid_weno": "T", "hybrid_weno_eps": 1.0e-2})
-        cases.append(define_case_d(stack, "", {}))
-        # liveness golden: the eps=1e-2 case above is bitwise-identical to plain by design (only
-        # constant/eps-dominated cells go central) so it protects no-corruption but cannot detect
-        # a dead sensor. eps=0.3 puts consequential cells under the sensor (answer moves ~4e-4 vs
-        # plain WENO). eps is centred in the [0.20,0.40] phi GAP measured by an eps-sweep of this
-        # case (output bit-identical across that range -> no cell's Jameson phi sits there on any
-        # timestep), giving a +/-0.10 margin so no compiler's FP reordering can flip a cell across
-        # the threshold - the fragility that failed eps=0.5 (which sat where a shock cell flips).
-        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
-        stack.pop()
-        stack.push(
-            "Hybrid -> 1D -> Riemann sensor",
-            {**hybrid_1d_base, "hybrid_riemann": "T", "hybrid_weno_eps": 1.0e-2, "hybrid_smooth_flux": 2},
-        )
-        cases.append(define_case_d(stack, "", {}))
-        cases.append(define_case_d(stack, "consequential eps", {"hybrid_weno_eps": 0.3}, override_tol=5.0e-5))
-        # the central smooth-flux (enum 1) is a distinct flux path from Rusanov (2) - cover both
-        cases.append(define_case_d(stack, "central flux", {"hybrid_smooth_flux": 1}))
-        # Cover HLL and Lax-Friedrichs at the liveness eps (inherited 1e-2). HLL shares the smooth-flux helper
-        # (s_compute_hybrid_smooth_flux). LF instead just switches to the local (normal-velocity) wave speed
-        # under hybrid_riemann - i.e. LF becomes local-LF everywhere - because LF's own flux carries pcorr and a
-        # distinct advection form the generic helper lacks; overwriting only smooth faces injected a sensor-flip
-        # discontinuity that made LF diverge ~2% across compilers. Local-LF is a single consistent scheme.
-        cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
-        cases.append(define_case_d(stack, "Lax-Friedrichs", {"riemann_solver": 5}))
-        stack.pop()
-
-    hybrid_sensor_tests()
 
     def load_balance_tests():
         """Golden for the weighted init-time decomposition (load_balance): a two-fluid material

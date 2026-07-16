@@ -376,8 +376,6 @@ gbl_id = patch_ib(i)%gbl_patch_id
             viscous = 1 if self.params.get("viscous", "F") == "T" else 0
             igr = 1 if self.params.get("igr", "F") == "T" else 0
             igr_pres_lim = 1 if self.params.get("igr_pres_lim", "F") == "T" else 0
-            hybrid_riemann = 1 if self.params.get("hybrid_riemann", "F") == "T" else 0
-            hybrid_weno = 1 if self.params.get("hybrid_weno", "F") == "T" else 0
 
             # Throw error if wenoz_q is required but not set
             out = f"""\
@@ -406,8 +404,6 @@ gbl_id = patch_ib(i)%gbl_patch_id
 #:set igr_pres_lim          = {igr_pres_lim}
 #:set igr_order             = {self.params.get("igr_order", 3)}
 #:set viscous               = {viscous}
-#:set hybrid_riemann        = {hybrid_riemann}
-#:set hybrid_weno           = {hybrid_weno}
 """
 
         else:
