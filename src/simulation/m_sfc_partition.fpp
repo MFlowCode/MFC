@@ -12,6 +12,7 @@ module m_sfc_partition
     use m_mpi_proxy
     use m_mpi_common
     use m_load_weight, only: load_weight, s_compute_load_weight
+    use m_box, only: f_morton
 
     implicit none
 
@@ -142,22 +143,6 @@ contains
         end do
 
     end function f_segments_needed
-
-    !> Returns the 63-bit Morton code for tile coordinates (tx, ty, tz).
-    pure function f_morton(tx, ty, tz) result(code)
-
-        integer, intent(in) :: tx, ty, tz
-        integer(kind=8)     :: code, x, y, z
-        integer             :: b
-
-        x = int(tx, 8); y = int(ty, 8); z = int(tz, 8); code = 0_8
-        do b = 0, 20
-            code = ior(code, ishft(iand(ishft(x, -b), 1_8), 3*b))
-            code = ior(code, ishft(iand(ishft(y, -b), 1_8), 3*b + 1))
-            code = ior(code, ishft(iand(ishft(z, -b), 1_8), 3*b + 2))
-        end do
-
-    end function f_morton
 
     !> Fills order(1:n_tiles) with tile linear indices sorted by Morton code.
     impure subroutine s_build_sfc_order(order)

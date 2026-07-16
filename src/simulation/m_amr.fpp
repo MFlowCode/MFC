@@ -14,6 +14,7 @@ module m_amr
 #endif
 
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
+    use m_box, only: f_morton  ! shared 3D Morton key (single-sourced with m_sfc_partition)
     use m_global_parameters
     use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
@@ -1179,7 +1180,7 @@ contains
                 & k) + 1) - 1, 8)
             if (p_glb > 0) wt(k) = wt(k)*int((ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, &
                 & k) + 1) - 1, 8)
-            key(k) = f_amr_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
+            key(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
             ord(k) = k
         end do
 
@@ -1231,23 +1232,6 @@ contains
         end do
 
     end subroutine s_amr_assign_block_owners
-
-    !> 3D Morton (Z-order) key from global coarse indices; collapsed dims contribute 0. 21 bits/dim (fits a 64-bit key for grids up
-    !! to 2^21 cells/dim, far beyond any block-index range).
-    pure integer(kind=8) function f_amr_morton(ix, iy, iz) result(key)
-        integer, intent(in) :: ix, iy, iz
-        integer             :: b
-        integer(kind=8)     :: xx, yy, zz
-
-        xx = int(max(ix, 0), 8); yy = int(max(iy, 0), 8); zz = int(max(iz, 0), 8)
-        key = 0_8
-        do b = 0, 20
-            key = ior(key, ishft(iand(ishft(xx, -b), 1_8), 3*b))
-            key = ior(key, ishft(iand(ishft(yy, -b), 1_8), 3*b + 1))
-            key = ior(key, ishft(iand(ishft(zz, -b), 1_8), 3*b + 2))
-        end do
-
-    end function f_amr_morton
 
     impure subroutine s_amr_compute_isect(lo, hi)
 
