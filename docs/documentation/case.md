@@ -970,7 +970,9 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `input_path`          | String  | Path to bubble input file (default: `./input/lag_bubbles.dat`) |
 | `kahan_summation`     | Logical | Use Kahan compensated summation when accumulating the void fraction |
 
-- `nBubs_glb` Total number of bubbles.
+- `nBubs_glb` Total number of bubbles. Their initial conditions are read from the file given by `input_path`.
+
+- `input_path` Path to the bubble input file (default `./input/lag_bubbles.dat`). Each row specifies the initial state of one bubble, with columns `xPosition/x0  yPosition/x0  zPosition/x0  xVel/c0  yVel/c0  zVel/c0  radius/x0  interfaceVelocity/c0`. See `examples/3D_lagrange_shbubcollapse/input/lag_bubbles.dat` for a checked-in example, or the other Lagrange example cases (e.g. `examples/2D_lagrange_bubblescreen/case.py`), which generate this file programmatically.
 
 - `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on \cite Maeda18, where the effect of the bubbles is added in the Eulerian field as source terms.
 
