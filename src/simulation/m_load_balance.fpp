@@ -91,7 +91,9 @@ contains
 
         inquire (FILE=trim(file_loc), EXIST=file_exist)
         if (.not. file_exist) then
+#ifdef MFC_DEBUG
             if (proc_rank == 0) print *, '[load_balance] probe: restart file missing, using equal decomposition: ' // trim(file_loc)
+#endif
             return
         end if
 
@@ -226,18 +228,14 @@ contains
                 & amr_block_beg(3), amr_block_end(3)))) exit
             scale = 0.5_wp*scale
         end do
+#ifdef MFC_DEBUG
         if (amr .and. scale < 1._wp .and. proc_rank == 0) then
             print *, '[load_balance] amr weight softened to fit the fine block per rank; scale =', scale
         end if
+#endif
 
         changed = f_offsets_differ_from_equal(ox, m_glb + 1, num_procs_x) .or. f_offsets_differ_from_equal(oy, n_glb + 1, &
                                               & num_procs_y) .or. f_offsets_differ_from_equal(oz, p_glb + 1, num_procs_z)
-
-        if (proc_rank == 0) then
-            print *, '[load_balance] x-offsets:', ox
-            if (num_dims >= 2) print *, '[load_balance] y-offsets:', oy
-            if (num_dims >= 3) print *, '[load_balance] z-offsets:', oz
-        end if
 
         if (changed) call s_apply_weighted_offsets(ox, oy, oz)
 

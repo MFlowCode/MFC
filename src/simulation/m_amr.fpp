@@ -37,11 +37,10 @@ module m_amr
 
     private
     public :: t_level, amr_maxc, amr_maxc_fit, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
-        & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_amr_conservation_check, s_finalize_amr_module, &
-        & s_amr_swap_to_fine, s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_operator_checks, s_amr_fine_stage_fill, &
-        & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_amr_conservation_defect, &
-        & s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, s_amr_relax_fine, s_amr_setup_ib, &
-        & s_amr_check_active_box_containment, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
+        & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_swap_to_fine, &
+        & s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, &
+        & s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_regrid, s_write_amr_restart, s_read_amr_restart, &
+        & s_amr_relax_fine, s_amr_setup_ib, s_amr_check_active_box_containment, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -144,7 +143,6 @@ module m_amr
     real(wp), allocatable :: sw_z_cb(:), sw_z_cc(:), sw_dz(:)
 
     !> Conservation-defect baselines (level-0 interior integrals at init; per-fluid masses + energy)
-    real(wp) :: amr_mass0(num_fluids_max) = 0._wp, amr_energy0 = 0._wp
 
     !> True (identically on all ranks) iff some rank's fine ghost-fill stencil reads its coarse GHOST cells - the solver populates
     !! only PRIM ghosts, so the CONS ghosts the fill prolongs from must be halo-exchanged first. Never true at np=1 (block faces sit
@@ -1166,7 +1164,6 @@ contains
         integer         :: k, kk, r, a, lev, maxlev, ord(amr_num_blocks)
         integer(kind=8) :: wt(amr_num_blocks), twt(amr_num_blocks), key(amr_num_blocks), tmpk, cum, tgt, total
         integer         :: tmpo
-        real(wp)        :: rank_load(0:num_procs - 1), imbal
 
         if (amr_num_blocks < 1) return
 
@@ -1213,14 +1210,12 @@ contains
         do k = 1, amr_num_blocks
             if (amr_block_level(k) == 1) total = total + twt(k)
         end do
-        rank_load = 0._wp
         r = 0; cum = 0_8
         do k = 1, amr_num_blocks
             if (amr_block_level(ord(k)) /= 1) cycle
             tgt = (int(r + 1, 8)*total)/int(num_procs, 8)
             if (cum >= tgt .and. r < num_procs - 1) r = r + 1
             amr_block_owner(ord(k)) = r
-            rank_load(r) = rank_load(r) + real(twt(ord(k)), wp)
             cum = cum + twt(ord(k))
         end do
 
@@ -1231,12 +1226,6 @@ contains
                 if (amr_block_level(k) == lev) amr_block_owner(k) = amr_block_owner(f_amr_parent_block(k))
             end do
         end do
-
-        if (proc_rank == 0) then
-            imbal = maxval(rank_load)/max(real(total, wp)/real(num_procs, wp), 1._wp)
-            print '(A,I0,A,F6.2,A)', ' [amr] fine-dist map: ', amr_num_blocks, ' block(s), predicted fine-work imbalance ', &
-                & imbal, 'x (1.00 = perfect; map computed, not yet applied)'
-        end if
 
     end subroutine s_amr_assign_block_owners
 
@@ -1723,8 +1712,8 @@ contains
         if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_tic()
 
         ! multi-level: a level>=2 block folds back into its PARENT block's fine array (the coarse side of level l is level l-1),
-        ! not the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. np=1 local; np>=2 P2P
-        ! TODO.
+        ! not the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. Co-located towers
+        ! keep a level>=2 block and its parent on the same rank, so the restrict is always local (no cross-rank P2P needed).
         if (amr_block_level(amr_cur) >= 2) then
             if (amr_rank_owns_block) call s_amr_restrict_to_parent()
             if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
@@ -2541,50 +2530,6 @@ contains
         end if
 
     end subroutine s_amr_scatter_pbmv
-
-    !> SP2 gate: restrict(prolong(coarse)) must reproduce coarse over the block interior (conservation). Init-only diagnostic;
-    !! allocates a scratch coarse target, never touches level-0 or the solve.
-    impure subroutine s_amr_conservation_check(q_cons_base)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
-        type(scalar_field), dimension(:), allocatable       :: scratch
-        integer                                             :: i, ci, cj, ck
-        real(wp)                                            :: err, e
-
-        if (.not. amr) return
-        ! this self-test compares restrict(fine) to the gathered patch amr_cg for the CURRENT block; amr_cg holds only the LAST
-        ! block s_populate_amr_fine gathered, so it is meaningful only when there is a single block (the untiled np=1 case)
-        if (amr_num_blocks > 1) return
-        if (.not. amr_rank_owns_block) return
-        ! fine-level distribution: the block's coarse cells live in the gathered patch amr_cg (set by s_populate_amr_fine just
-        ! before this), not the owner's local q_cons_base. Compare restrict(fine) to amr_cg in the block-local patch frame.
-        allocate (scratch(1:sys_size))
-        do i = 1, sys_size
-            allocate (scratch(i)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
-        end do
-        ! host restriction path: the scratch target is host-only and the fine state is host-current at init
-        do i = 1, sys_size
-            call s_restrict_one_var(amr_slots(amr_cur)%q_cons(i), scratch(i))
-        end do
-        err = 0._wp
-        do i = 1, sys_size
-            do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
-                do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
-                    do ci = amr_isect_lo(1), amr_isect_hi(1)
-                        e = abs(real(scratch(i)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), &
-                                & wp) - real(amr_cg(i)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), wp))
-                        if (e > err) err = e
-                    end do
-                end do
-            end do
-        end do
-        print '(A,ES12.4)', ' [amr] restrict-prolong conservation err = ', err  ! every rank with fine cells prints
-        do i = 1, sys_size
-            deallocate (scratch(i)%sf)
-        end do
-        deallocate (scratch)
-
-    end subroutine s_amr_conservation_check
 
     !> Swap the global grid state to the fine block. MUST be paired with s_amr_restore_coarse.
     impure subroutine s_amr_swap_to_fine()
@@ -5072,15 +5017,12 @@ contains
 
         ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
         any_xchg = .false.
-        if (proc_rank == 0) print '(A,I0,A)', ' [amr] regrid: ', nboxes, ' block(s)'
         do k = 1, nboxes
             amr_cur = k
             ! owned slot needs its arrays before geometry/prolong
             if (amr_block_owner(k) == proc_rank) call s_amr_alloc_slot(k)
             call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
             any_xchg = any_xchg .or. amr_xchg_coarse_ghosts
-            if (proc_rank == 0) print '(A,I0,A,I0,A,I0,A,I0,A)', ' [amr]   block ', k, ': box x ', boxes(k)%lo(1), ':', &
-                & boxes(k)%hi(1), ' (', (boxes(k)%hi(1) - boxes(k)%lo(1) + 1), ' coarse cells)'
             ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
             ! q_cons_base is host-current with valid ghosts from the exchange at the top of s_amr_regrid)
             call s_amr_gather_coarse_patch(q_cons_base, .false.)
@@ -5492,10 +5434,6 @@ contains
             ! so ANY new rank count can read it - pass 2 re-assigns owners for THIS run and each new owner reads its
             ! whole blocks. np_old == num_procs is byte-identical to the same-rank path (and keeps the layout check).
             np_old = ghdr(1)
-            if (np_old /= num_procs .and. proc_rank == 0) then
-                print '(A,I0,A,I0,A)', ' [amr] restart: repartitioning a ', np_old, '-rank checkpoint onto ', num_procs, &
-                    & ' ranks (fine blocks re-assigned by this run''s SFC map)'
-            end if
             if (ghdr(3) /= sys_size) then
                 write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
                        & ' conserved variables but this run has ', sys_size, &
@@ -5633,153 +5571,8 @@ contains
         call s_amr_select_slot(1)
         amr_seam_pairs_dirty = .true.  ! restored a new block set: the cached seam-pair list must be rebuilt
         restored = .true.
-        if (proc_rank == 0) then
-            print '(A,I0,A)', ' [amr] restart: restored fine level, ', amr_num_blocks, ' block(s)'
-        end if
 
     end subroutine s_read_amr_restart
-
-    !> Global Sum(dV*U) for the per-fluid masses (continuity variables) and energy (eqn_idx%E) over the level-0 interior. First call
-    !! (finalize_report=F) stores the baselines; the finalize call prints the relative drifts (~roundoff with refluxing).
-    impure subroutine s_amr_conservation_defect(q_cons_base, finalize_report)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
-        logical, intent(in)                                 :: finalize_report
-        real(wp)                                            :: sm(num_fluids_max), se, dv, s_glb
-        integer                                             :: ci, cj, ck, f
-
-        if (.not. amr) return
-        ! host consumer: diagnostics (host sum over exactly the summed fields). The init baseline call
-        ! runs BEFORE s_initialize_gpu_vars pushes the ICs to the device, so it must NOT pull the
-        ! (uninitialized) device copies.
-        if (finalize_report) then
-            do f = 1, num_fluids
-                $:GPU_UPDATE(host='[q_cons_base(f)%sf]')
-            end do
-            $:GPU_UPDATE(host='[q_cons_base(eqn_idx%E)%sf]')
-        end if
-        sm = 0._wp; se = 0._wp
-        do ck = 0, p
-            do cj = 0, n
-                do ci = 0, m
-                    dv = dx(ci)
-                    if (n_glb > 0) dv = dv*dy(cj)
-                    if (p_glb > 0) dv = dv*dz(ck)
-                    do f = 1, num_fluids
-                        sm(f) = sm(f) + dv*real(q_cons_base(f)%sf(ci, cj, ck), wp)
-                    end do
-                    se = se + dv*real(q_cons_base(eqn_idx%E)%sf(ci, cj, ck), wp)
-                end do
-            end do
-        end do
-        if (num_procs > 1) then
-            do f = 1, num_fluids
-                call s_mpi_allreduce_sum(sm(f), s_glb); sm(f) = s_glb
-            end do
-            call s_mpi_allreduce_sum(se, s_glb); se = s_glb
-        end if
-        if (.not. finalize_report) then
-            amr_mass0(1:num_fluids) = sm(1:num_fluids); amr_energy0 = se
-        else if (proc_rank == 0) then
-            do f = 1, num_fluids
-                print '(A,I0,A,ES12.4)', ' [amr] conservation defect: mass(', f, ') drift = ', &
-                    & abs(sm(f) - amr_mass0(f))/max(abs(amr_mass0(f)), 1.e-30_wp)
-            end do
-            print '(A,ES12.4)', ' [amr] conservation defect: energy drift = ', abs(se - amr_energy0)/max(abs(amr_energy0), &
-                & 1.e-30_wp)
-        end if
-
-    end subroutine s_amr_conservation_defect
-
-    !> Init-time operator verification: (b) linear reproduction, (c) restriction of an independent field. Uses
-    !! amr_slots(amr_cur)%q_cons(1) as scratch; called before s_populate_amr_fine overwrites it.
-    impure subroutine s_amr_operator_checks()
-
-        type(scalar_field), allocatable :: cscr(:)
-        integer                         :: fi, fj, fk, ci, cj, ck, l1, l2, l3, g1, g2, g3
-        real(wp)                        :: e, errb, errc, si_f, si_c, dvf, dvc, want, xc, yc, zc
-
-        if (.not. amr) return
-        if (.not. amr_rank_owns_block) return
-        ! fine-level distribution: the owner's block need not lie in its coarse subdomain, so operate in the block-local
-        ! patch
-        ! frame (the amr_cg frame: cell 0 == region_lo - nmar) and take coarse cell centres/spacings from the GLOBAL
-        ! boundaries.
-        amr_cpat_off = 0
-        amr_cpat_off(1) = amr_isect_lo(1) - amr_cpat_mar
-        if (n_glb > 0) amr_cpat_off(2) = amr_isect_lo(2) - amr_cpat_mar
-        if (p_glb > 0) amr_cpat_off(3) = amr_isect_lo(3) - amr_cpat_mar
-
-        ! (b) fill a coarse-patch scratch with an exactly-linear field (global coords), prolong, compare pointwise
-        allocate (cscr(1:1))
-        allocate (cscr(1)%sf(0:amr_cpat_hi(1),0:amr_cpat_hi(2),0:amr_cpat_hi(3)))
-        do l3 = 0, amr_cpat_hi(3)
-            g3 = l3 + amr_cpat_off(3); zc = 0._wp; if (p_glb > 0) zc = 0.5_wp*(amr_gzcb(g3 - 1) + amr_gzcb(g3))
-            do l2 = 0, amr_cpat_hi(2)
-                g2 = l2 + amr_cpat_off(2); yc = 0._wp; if (n_glb > 0) yc = 0.5_wp*(amr_gycb(g2 - 1) + amr_gycb(g2))
-                do l1 = 0, amr_cpat_hi(1)
-                    g1 = l1 + amr_cpat_off(1); xc = 0.5_wp*(amr_gxcb(g1 - 1) + amr_gxcb(g1))
-                    cscr(1)%sf(l1, l2, l3) = 1._wp + 2._wp*xc
-                    if (n_glb > 0) cscr(1)%sf(l1, l2, l3) = cscr(1)%sf(l1, l2, l3) + 3._wp*yc
-                    if (p_glb > 0) cscr(1)%sf(l1, l2, l3) = cscr(1)%sf(l1, l2, l3) + 4._wp*zc
-                end do
-            end do
-        end do
-        call s_prolong_one_var(cscr(1), amr_slots(amr_cur)%q_cons(1))
-        errb = 0._wp
-        do fk = 0, amr_slots(amr_cur)%p
-            do fj = 0, amr_slots(amr_cur)%n
-                do fi = 0, amr_slots(amr_cur)%m
-                    want = 1._wp + 2._wp*amr_slots(amr_cur)%x_cc(fi)
-                    if (n_glb > 0) want = want + 3._wp*amr_slots(amr_cur)%y_cc(fj)
-                    if (p_glb > 0) want = want + 4._wp*amr_slots(amr_cur)%z_cc(fk)
-                    e = abs(real(amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk), wp) - want)
-                    if (e > errb) errb = e
-                end do
-            end do
-        end do
-
-        ! (c) fill the fine block with a quadratic (NOT from prolongation), restrict, compare integrals
-        do fk = 0, amr_slots(amr_cur)%p
-            do fj = 0, amr_slots(amr_cur)%n
-                do fi = 0, amr_slots(amr_cur)%m
-                    amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%x_cc(fi)**2
-                    if (n_glb > 0) amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, &
-                        & fk) + amr_slots(amr_cur)%y_cc(fj)**2
-                    if (p_glb > 0) amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk) = amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, &
-                        & fk) + amr_slots(amr_cur)%z_cc(fk)**2
-                end do
-            end do
-        end do
-        call s_restrict_one_var(amr_slots(amr_cur)%q_cons(1), cscr(1))
-        si_f = 0._wp; si_c = 0._wp
-        do fk = 0, amr_slots(amr_cur)%p
-            do fj = 0, amr_slots(amr_cur)%n
-                do fi = 0, amr_slots(amr_cur)%m
-                    dvf = amr_slots(amr_cur)%dx(fi)
-                    if (n_glb > 0) dvf = dvf*amr_slots(amr_cur)%dy(fj)
-                    if (p_glb > 0) dvf = dvf*amr_slots(amr_cur)%dz(fk)
-                    si_f = si_f + dvf*real(amr_slots(amr_cur)%q_cons(1)%sf(fi, fj, fk), wp)
-                end do
-            end do
-        end do
-        do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
-            do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
-                do ci = amr_isect_lo(1), amr_isect_hi(1)
-                    dvc = amr_gxcb(ci) - amr_gxcb(ci - 1)  ! GLOBAL coarse spacing (owner may not hold local dx here)
-                    if (n_glb > 0) dvc = dvc*(amr_gycb(cj) - amr_gycb(cj - 1))
-                    if (p_glb > 0) dvc = dvc*(amr_gzcb(ck) - amr_gzcb(ck - 1))
-                    si_c = si_c + dvc*real(cscr(1)%sf(ci - amr_cpat_off(1), cj - amr_cpat_off(2), ck - amr_cpat_off(3)), wp)
-                end do
-            end do
-        end do
-        errc = abs(si_f - si_c)/max(abs(si_f), 1.e-30_wp)
-        ! every rank with fine cells prints
-        print '(A,ES12.4)', ' [amr] prolong linear-reproduction err = ', errb
-        print '(A,ES12.4)', ' [amr] restrict independent-integral err = ', errc
-        deallocate (cscr(1)%sf); deallocate (cscr)
-
-    end subroutine s_amr_operator_checks
 
     !> Total density (sum of the continuity variables) at one cell: the regrid tag field. Reduces to variable 1 for one fluid.
     pure function f_amr_rho_tot(q, ci, cj, ck) result(r)
