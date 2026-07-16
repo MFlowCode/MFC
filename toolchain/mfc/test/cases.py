@@ -2011,6 +2011,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ndim in range(1, 4):
             cases.append(define_case_f(f"{ndim}D -> Chemistry -> Perfect Reactor", "examples/nD_perfect_reactor/case.py", ["--ndim", str(ndim)], mods=common_mods))
 
+        # Operator-split, sub-stepped reaction integration (chem_params%reaction_substeps > 0): the
+        # autoigniting reactor exercises the split path that keeps stiff mechanisms stable.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "chem_params%reaction_substeps": 10},
+            )
+        )
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
