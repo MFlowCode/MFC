@@ -687,10 +687,6 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `amr_max_level`        | Integer | Maximum AMR refinement depth (number of refined levels above L0); must be >= 1 (default 1). Multi-level nesting (>= 2) is supported: static AMR (`amr_regrid_int = 0`) nests up to level 2, dynamic regrid (`amr_regrid_int > 0`) nests deeper (see @ref amr_multilevel) |
 | `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered block box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
 | `ref_ratio`             | Integer | AMR refinement ratio between coarse and fine levels; must be 2 or 4 (default 2). Only ref_ratio = 2 is supported with multi-level AMR or subcycling (v1). |
-| `hybrid_weno`           | Logical | Use linear-optimal reconstruction in smooth cells, full WENO only at flagged discontinuities (requires WENO reconstruction) |
-| `hybrid_weno_eps`       | Real    | Smoothness threshold for hybrid WENO shock flagging; must be > 0 (default 1e-2) |
-| `hybrid_riemann`        | Logical | Use a cheap central/Rusanov flux in smooth cells, full HLLC only at flagged discontinuities (requires HLLC, 5eq/6eq) |
-| `hybrid_smooth_flux`    | Integer | Smooth-region flux for hybrid Riemann: 1 = central, 2 = Rusanov (default 2) |
 | `partition_tile_size`   | Integer | Tile side for the SFC partitioner (default 8) |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
@@ -865,9 +861,7 @@ AMR is incompatible with surface tension, 3D cylindrical
 coordinates (2D axisymmetric IS supported), 2D/3D MHD (measured: the coarse/fine seam is a
 continuous div(B) source that GLM cleaning cannot remove; 1D MHD/RMHD IS supported since
 div(B) = 0 by construction there), hyperelasticity, and Riemann-extrapolation
-boundaries (bc = -4). `active_box` is supported (single-rank): blocks must sit strictly inside the growing active window (init abort + regrid clamp), and the fine advance treats its whole block as active. `hybrid_weno`/`hybrid_riemann` are supported: each
-level recomputes the smoothness sensor over its own (swapped) bounds every RHS call.
-Nonuniform grids ARE supported (grid stretching and the axisymmetric axis half-cell): the fine
+boundaries (bc = -4). `active_box` is supported (single-rank): blocks must sit strictly inside the growing active window (init abort + regrid clamp), and the fine advance treats its whole block as active.Nonuniform grids ARE supported (grid stretching and the axisymmetric axis half-cell): the fine
 ghost-shell coordinates extend by exact parent-cell bisection and the spacing-dependent WENO
 coefficients are recomputed for the active grid on every block swap/restore, armed automatically
 when the grid is detected nonuniform at startup.

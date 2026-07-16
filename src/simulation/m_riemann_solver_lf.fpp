@@ -313,17 +313,7 @@ contains
                             s_L = sqrt(s_L)
                             s_R = sqrt(s_R)
 
-                            if (hybrid_riemann) then
-                                ! For LF, hybrid_riemann simply switches the dissipation to the local (normal-
-                                ! velocity) wave speed, turning LF into local Lax-Friedrichs everywhere. LF does
-                                ! NOT call the shared smooth-flux helper: LF's flux carries extra terms (pcorr,
-                                ! its own advection form) the generic Rusanov helper lacks, so overwriting only
-                                ! smooth faces would inject a sensor-flip discontinuity. Using LF's own flux with
-                                ! the local wave speed keeps it a single consistent, backend-stable scheme.
-                                s_P = max(abs(vel_L(dir_idx(1))) + c_L, abs(vel_R(dir_idx(1))) + c_R)
-                            else
-                                s_P = max(s_L, s_R) + max(c_L, c_R)
-                            end if
+                            s_P = max(s_L, s_R) + max(c_L, c_R)
                             s_M = -s_P
 
                             s_L = s_M
