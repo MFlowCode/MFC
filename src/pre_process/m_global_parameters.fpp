@@ -53,10 +53,21 @@ module m_global_parameters
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
     type(int_bounds_info) :: bc_x, bc_y, bc_z  !< Boundary conditions in the x-, y- and z-coordinate directions
+    type(bc_xyz_info)     :: bc                !< Combined BC storage (used by the shared beta-buffer routines; pre-process-local)
     ! simplex_params: auto-generated in generated_decls.fpp
+    ! shear_num/shear_indices/shear_BC_flip_*, bc: in m_global_parameters_common
+    integer                           :: fd_order    !< Finite-difference order for CoM/probe derivative approximations
+    integer                           :: fd_number   !< FD half-stencil size: MAX(1, fd_order/2)
+    type(bubbles_lagrange_parameters) :: lag_params  !< Lagrange bubbles' parameters (pre_process-local; not in generated_decls)
 
     ! fluid_rho (perturbs surrounding-air density to break grid symmetry): auto-generated in generated_decls.fpp
     ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
+
+    !> @name MPI domain-decomposition neighbor info (Lagrangian-bubble decomposition, #1290)
+    !> @{
+    type(int_bounds_info), dimension(3)    :: nidx
+    integer, allocatable, dimension(:,:,:) :: neighbor_ranks  !< Neighbor ranks
+    !> @}
 #ifdef MFC_MPI
     type(mpi_io_var), public :: MPI_IO_DATA
 #endif
@@ -93,6 +104,10 @@ module m_global_parameters
     type(pres_field)                       :: pb
     type(pres_field)                       :: mv
     integer                                :: buff_size  !< Number of ghost cells for boundary condition storage
+
+    ! Variables for hardcoded initial conditions that are read from input files
+    character(LEN=2*path_len) :: interface_file
+    real(wp)                  :: normFac, normMag, g0_ic, p0_ic
 
 contains
 
@@ -196,6 +211,25 @@ contains
 
         ! Initial condition parameters
         num_patches = dflt_int
+
+        fd_order = dflt_int
+        lag_params%cluster_type = dflt_int
+        lag_params%pressure_corrector = .false.
+        lag_params%smooth_type = dflt_int
+        lag_params%heatTransfer_model = .false.
+        lag_params%massTransfer_model = .false.
+        lag_params%write_bubbles = .false.
+        lag_params%write_bubbles_stats = .false.
+        lag_params%write_void_evol = .false.
+        lag_params%pressure_force = .false.
+        lag_params%gravity_force = .false.
+        lag_params%nBubs_glb = dflt_int
+        lag_params%vel_model = dflt_int
+        lag_params%drag_model = dflt_int
+        lag_params%epsilonb = 1._wp
+        lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
+        lag_params%valmaxvoid = dflt_real
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
@@ -484,8 +518,10 @@ contains
             end if
         end if
 
+        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
         if (qbmm .and. .not. polytropic) then
@@ -574,6 +610,8 @@ contains
             deallocate (MPI_IO_DATA%view)
         end if
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

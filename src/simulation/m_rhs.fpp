@@ -880,14 +880,15 @@ contains
         ! blocks): during the fine advance the EL hooks are skipped - a bubble's position would
         ! map to wrong cell indices on the swapped block grid
         if (bubbles_lagrange .and. .not. amr_in_fine_advance) then
-            ! RHS additions for sub-grid bubbles_lagrange
-            call nvtxStartRange("RHS-EL-BUBBLES-SRC")
-            call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
-            call nvtxEndRange
-            ! Compute bubble dynamics
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
-                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), stage)
+                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+                call nvtxEndRange
+            end if
+
+            if (lag_params%solver_approach == 2) then
+                call nvtxStartRange("RHS-EL-BUBBLES-SRC")
+                call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
                 call nvtxEndRange
             end if
         end if

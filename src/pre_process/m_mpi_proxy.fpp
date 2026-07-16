@@ -149,6 +149,13 @@ contains
             #:endfor
         end do
 
+        ! Hardcoded-patch variables (#1290; not namelist-bound, set on rank 0)
+        call MPI_BCAST(interface_file, len(interface_file), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(normFac, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(normMag, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(g0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(p0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
         ! manual: simplex_params density perturbation (nested i-j loops; irregular structure)
         do i = 1, num_fluids_max
             call MPI_BCAST(simplex_params%perturb_dens(i), 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

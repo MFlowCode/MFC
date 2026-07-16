@@ -630,6 +630,8 @@ contains
 
         call s_mpi_decompose_computational_domain()
 
+        bc = bc_xyz_info(bc_x, bc_y, bc_z)
+
     end subroutine s_initialize_mpi_domain
 
     !> Finalize all pre-process modules, deallocate resources, and shut down MPI.

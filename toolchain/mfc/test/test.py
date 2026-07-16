@@ -168,7 +168,6 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 cases.remove(case)
 
     # Skip tests that fail under nvfortran in Docker (pass natively/Apptainer):
-    #  - Lagrange Bubbles: NaN on 24.1/24.3 (other versions not verified in Docker)
     #  - 3D_rayleigh_taylor_muscl: segfaults with nvfortran+MPI (seccomp/mprotect)
     if os.environ.get("FC") == "nvfortran" and os.path.exists("/.dockerenv"):
         nvhpc_skip_uuids = {"B9553426", "4A1BD9B8", "0D1FA5C5", "2122A4F6", "4B08E9B7", "BCE1BBAE"}

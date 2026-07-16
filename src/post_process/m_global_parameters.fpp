@@ -93,10 +93,13 @@ module m_global_parameters
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
+    type(bc_xyz_info)     :: bc
     !> @}
 
     ! shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices: in m_global_parameters_common
     ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
+    type(int_bounds_info), dimension(3)                    :: nidx  !< Neighbor index offsets per direction (#1290 decomposition)
+    integer, allocatable, dimension(:,:,:)                 :: neighbor_ranks  !< MPI ranks of neighbors (#1290 decomposition)
     type(ib_airfoil_parameters), allocatable, dimension(:) :: ib_airfoil  !< Per-airfoil NACA parameters (unused in post_process)
     !> Per-airfoil computed surface grids (unused in post_process)
     type(ib_airfoil_grid), allocatable, dimension(:) :: ib_airfoil_grids
@@ -588,6 +591,8 @@ contains
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

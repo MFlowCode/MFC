@@ -47,19 +47,22 @@ module m_global_parameters
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
+    type(bounds_info), dimension(3)             :: glb_bounds
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-    ! type(bounds_info) :: x_domain, y_domain, z_domain !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
     $:GPU_DECLARE(create='[x_cb, y_cb, z_cb, x_cc, y_cc, z_cc, dx, dy, dz]')
+
+    ! dt, m, n, p, cfl_target: GPU-declared via generated_decls.fpp (registered params)
+    $:GPU_DECLARE(create='[glb_bounds]')
 
     logical :: cfl_dt
     ! Simulation Algorithm Parameters generated_case_opt_decls.fpp: now in m_global_parameters_common
@@ -86,10 +89,12 @@ module m_global_parameters
     $:GPU_DECLARE(create='[hyper_model]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress]')
 
-    logical :: bc_io
+    logical               :: bc_io
+    logical, dimension(3) :: periodic_bc
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
+    type(bc_xyz_info)     :: bc
     !> @}
     !> @name Original boundary conditions preserved for immersed boundary code
     !> (bc_x/y/z get overwritten with MPI neighbor ranks during decomposition)
@@ -105,12 +110,21 @@ module m_global_parameters
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
     $:GPU_DECLARE(create='[ib_bc_x, ib_bc_y, ib_bc_z]')
 #endif
-    type(bounds_info) :: x_domain, y_domain, z_domain
+    $:GPU_DECLARE(create='[bc]')
     type(bounds_info) :: neighbor_domain_x, neighbor_domain_y, neighbor_domain_z
     integer           :: num_gbl_ibs, num_local_ibs
-    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain, neighbor_domain_x, neighbor_domain_y, neighbor_domain_z, num_gbl_ibs]')
+    $:GPU_DECLARE(create='[neighbor_domain_x, neighbor_domain_y, neighbor_domain_z, num_gbl_ibs]')
 
     ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
+    ! down_sample: GPU-declared via generated_decls.fpp (registered param)
+
+    !> @name MPI domain-decomposition state for Lagrangian-bubble exchange (#1290)
+    !> @{
+    type(bounds_info), allocatable, dimension(:) :: pcomm_coords    !< Local rank physical domain bounds
+    type(int_bounds_info), dimension(3)          :: nidx            !< Neighbor index offsets per direction
+    integer, allocatable, dimension(:,:,:)       :: neighbor_ranks  !< MPI ranks of neighbors
+    $:GPU_DECLARE(create='[pcomm_coords]')
+    !> @}
     type(mpi_io_var), public                      :: MPI_IO_DATA
     type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
     type(mpi_io_airfoil_ib_var), public           :: MPI_IO_airfoil_IB_DATA
@@ -273,6 +287,16 @@ module m_global_parameters
     !> @name lagrangian subgrid bubble parameters
     !> lag_params: auto-generated in generated_decls.fpp
     !> @{!
+    ! lag_params (decl + GPU_DECLARE) auto-generated in generated_decls.fpp; bubbles_lagrange GPU-declared in
+    ! m_global_parameters_common
+    integer :: n_el_bubs_loc, n_el_bubs_glb  !< Number of Lagrangian bubbles (local and global)
+    logical :: moving_lag_bubbles
+    logical :: lag_pressure_force
+    logical :: lag_gravity_force
+    integer :: lag_vel_model, lag_drag_model
+    $:GPU_DECLARE(create='[n_el_bubs_loc, n_el_bubs_glb]')
+    $:GPU_DECLARE(create='[moving_lag_bubbles, lag_vel_model, lag_drag_model]')
+    $:GPU_DECLARE(create='[lag_pressure_force, lag_gravity_force]')
     !> @}
 
     !> @name Continuum damage model parameters
@@ -440,10 +464,12 @@ contains
 
         num_bc_patches = 0
         bc_io = .false.
+        periodic_bc = .false.
 
-        x_domain%beg = dflt_real; x_domain%end = dflt_real
-        y_domain%beg = dflt_real; y_domain%end = dflt_real
-        z_domain%beg = dflt_real; z_domain%end = dflt_real
+        ! bc_x/y/z (incl. vb/ve loop) already defaulted above; glb_bounds is #1290's grid-derived global extent
+        glb_bounds(1)%beg = dflt_real; glb_bounds(1)%end = dflt_real
+        glb_bounds(2)%beg = dflt_real; glb_bounds(2)%end = dflt_real
+        glb_bounds(3)%beg = dflt_real; glb_bounds(3)%end = dflt_real
 
         ! Fluids physical parameters (sim-specific; Re(:) and G=0._wp differ from post)
         do i = 1, num_fluids_max
@@ -625,10 +651,20 @@ contains
         lag_params%massTransfer_model = .false.
         lag_params%write_bubbles = .false.
         lag_params%write_bubbles_stats = .false.
+        lag_params%write_void_evol = .false.
         lag_params%nBubs_glb = dflt_int
+        lag_params%vel_model = dflt_int
+        lag_params%drag_model = dflt_int
+        lag_params%pressure_force = .true.
+        lag_params%gravity_force = .false.
+        lag_params%kahan_summation = .true.
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
         lag_params%valmaxvoid = dflt_real
+        lag_params%input_path = 'input/lag_bubbles.dat'
+        moving_lag_bubbles = .false.
+        lag_vel_model = dflt_int
 
         ! Continuum damage model
         tau_star = dflt_real
@@ -914,12 +950,12 @@ contains
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 
-        if (elasticity .or. mhd .or. probe_wrt .or. ib) then
+        if (elasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             fd_number = max(1, fd_order/2)
         end if
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1005,7 +1041,11 @@ contains
     !> Initializes parallel infrastructure
     impure subroutine s_initialize_parallel_io
 
+        ! proc_coords/start_idx/mpiiofs/mpi_info_int setup moved into the shared routine
         call s_initialize_parallel_io_common
+
+        ! #1290: per-rank physical comm-domain bounds for Lagrangian-bubble exchange
+        @:ALLOCATE(pcomm_coords(1:num_dims))
 
     end subroutine s_initialize_parallel_io
 
@@ -1035,6 +1075,8 @@ contains
             end if
         end if
 
+        @:DEALLOCATE(pcomm_coords)
+
         ! Shared: deallocate proc_coords and start_idx
         call s_finalize_global_parameters_common
 
@@ -1063,6 +1105,10 @@ contains
 
         if (p == 0) return
         @:DEALLOCATE(z_cb, z_cc, dz)
+
+        if (allocated(neighbor_ranks)) then
+            @:DEALLOCATE(neighbor_ranks)
+        end if
 
     end subroutine s_finalize_global_parameters_module
 
