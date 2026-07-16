@@ -2765,15 +2765,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def amr_golden_tests():
         """Golden tests for the block-structured AMR module.
 
-        Three minimal 1D cases built on the BASE_CFG Sod IC:
-        (a) static block  – amr_regrid_int=0, no regrid, cheapest sanity check
-        (b) dynamic regrid – amr_regrid_int=2, exercises the tag/rebuild path
-        (c) subcycling    – amr_subcycle=T, exercises the dt/2 two-substep path
-        (d) two-fluid     – num_fluids=2 + mpp_lim, regrid + subcycle: exercises the
-            sum-preserving alpha prolongation and per-fluid reflux (SP9a)
+        Grows from minimal 1D single-level sanity checks (static block, dynamic regrid,
+        subcycling, multi-fluid reflux) to the full matrix: multi-level nesting, np=1/2/4
+        distributed regrid + seam-halo + reflux, restart round-trips (serial and parallel_io),
+        and per-physics coverage (viscous, Euler-Euler and QBMM bubbles, chemistry,
+        hypoelastic, immersed boundaries, active_box). Each case carries an inline comment
+        stating exactly what code path it guards and why its parameters are chosen.
 
-        Grid: m=63 (indices 0..63); fine block beg=16, end=47 so that
-        2*(47-16+1)-1 = 63 <= 63 satisfies the extent guard.
+        Extent guard (per axis): ref_ratio**level * (amr_block_end - amr_block_beg + 1) - 1
+        must not exceed the base grid; the 1D base uses m=63, block 16..47 (ref_ratio=2 ->
+        2*32 - 1 = 63).
         """
         # Common 1D domain + Sod IC setup shared by all three AMR cases
         amr_1d_base = {
