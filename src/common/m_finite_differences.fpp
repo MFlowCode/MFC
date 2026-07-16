@@ -16,6 +16,7 @@ contains
     !> Compute the centered finite-difference coefficients for first-order spatial derivatives in the s-coordinate direction (x, y,
     !! or z). Supports up to 4th order accuracy.
     !! @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
+    !! @param local_buff_size Size of the local buffer
     !! @param fd_number_in Finite-difference number
     !! @param fd_order_in Finite-difference order of accuracy
     !! @param offset_s Optional offset bounds in the s-coordinate direction

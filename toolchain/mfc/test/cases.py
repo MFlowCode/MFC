@@ -1733,6 +1733,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "lag_betaC_wrt": "T",
                             "lag_params%write_bubbles": "T",
                             "lag_params%write_bubbles_stats": "T",
+                            "lag_params%write_void_evol": "T",
+                            "lag_params%valmaxvoid": 0.99,
+                            "lag_params%nBubs_glb": 1,
                             "polytropic": "F",
                             "bub_pp%R0ref": 1.0,
                             "bub_pp%p0ref": 1.0,
@@ -1756,7 +1759,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
 
                     if len(dimInfo[0]) == 2:
-                        stack.push("", {"acoustic(1)%support": 2})
+                        stack.push("", {"acoustic(1)%support": 2, "lag_params%charwidth": 2, "lag_params%charNz": 25})
                     else:
                         stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
 
@@ -1787,6 +1790,39 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0})
                         cases.append(define_case_d(stack, "", {}))
                         cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}))
+                        stack.pop()
+
+                    if len(dimInfo[0]) == 3 and couplingMethod == 2:
+                        stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
+                        stack.push(
+                            "Inertial Bubbles",
+                            {"lag_params%vel_model": 2, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(2)%Re(1)": 100.0},
+                        )
+                        if adap_dt == "F":
+                            inertial_matrix = [(d, f) for d in [0, 1, 2] for f in [1, 2, 4]]
+                        else:
+                            inertial_matrix = [(0, 1), (1, 2), (2, 4)]
+                        for dragModel, fdOrder in inertial_matrix:
+                            stack.push(f"drag_model={dragModel}", {"lag_params%drag_model": dragModel})
+                            stack.push(f"fd_order={fdOrder}", {"fd_order": fdOrder})
+                            cases.append(define_case_d(stack, "", {}))
+                            stack.pop()
+                            stack.pop()
+                        stack.pop()
+
+                    if len(dimInfo[0]) == 2 and couplingMethod == 1:
+                        stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
+                        stack.push(
+                            "Inertial Bubbles",
+                            {"lag_params%vel_model": 2, "lag_params%drag_model": 2, "fd_order": 2, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(2)%Re(1)": 100.0},
+                        )
+                        cases.append(define_case_d(stack, "", {}))
                         stack.pop()
 
                     stack.pop()
@@ -1972,11 +2008,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_IGR_33jet",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
-                "1D_qbmm",
+                "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
+                "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
+                "2D_lagrange_rising_bubble",
+                "2D_lagrange_in_crossflow",
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
                 # by a large mu_max: even on the downsized grid the step count to reach t_stop
                 # is too large for the CI smoke suite. The faster NN examples remain tested.

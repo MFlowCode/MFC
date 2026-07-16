@@ -3832,16 +3832,16 @@ contains
         integer, intent(in)                :: pad_cells
         integer, intent(out)               :: blo(3), bhi(3)
 
-        blo(1) = int((pmin(1) - x_domain%beg)/dx(0)) - pad_cells
-        bhi(1) = int((pmax(1) - x_domain%beg)/dx(0)) + pad_cells
+        blo(1) = int((pmin(1) - glb_bounds(1)%beg)/dx(0)) - pad_cells
+        bhi(1) = int((pmax(1) - glb_bounds(1)%beg)/dx(0)) + pad_cells
         blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
         if (n_glb > 0) then
-            blo(2) = int((pmin(2) - y_domain%beg)/dy(min(1, n))) - pad_cells
-            bhi(2) = int((pmax(2) - y_domain%beg)/dy(min(1, n))) + pad_cells
+            blo(2) = int((pmin(2) - glb_bounds(2)%beg)/dy(min(1, n))) - pad_cells
+            bhi(2) = int((pmax(2) - glb_bounds(2)%beg)/dy(min(1, n))) + pad_cells
         end if
         if (p_glb > 0) then
-            blo(3) = int((pmin(3) - z_domain%beg)/dz(0)) - pad_cells
-            bhi(3) = int((pmax(3) - z_domain%beg)/dz(0)) + pad_cells
+            blo(3) = int((pmin(3) - glb_bounds(3)%beg)/dz(0)) - pad_cells
+            bhi(3) = int((pmax(3) - glb_bounds(3)%beg)/dz(0)) + pad_cells
         end if
 
     end subroutine s_lag_phys_to_cells
@@ -3989,16 +3989,16 @@ contains
         ! physical bbox -> global coarse indices: valid for uniform spacing only (stretched
         ! grids with ib-dynamic-regrid/Lagrangian are aborted at init; the axisymmetric half
         ! axis cell only shrinks dy(0), so the floor is still conservative)
-        blo(1) = int((c(1) - half(1) - x_domain%beg)/dx(0)) - mrg
-        bhi(1) = int((c(1) + half(1) - x_domain%beg)/dx(0)) + mrg
+        blo(1) = int((c(1) - half(1) - glb_bounds(1)%beg)/dx(0)) - mrg
+        bhi(1) = int((c(1) + half(1) - glb_bounds(1)%beg)/dx(0)) + mrg
         blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
         if (n_glb > 0) then
-            blo(2) = int((c(2) - half(2) - y_domain%beg)/dy(min(1, n))) - mrg
-            bhi(2) = int((c(2) + half(2) - y_domain%beg)/dy(min(1, n))) + mrg
+            blo(2) = int((c(2) - half(2) - glb_bounds(2)%beg)/dy(min(1, n))) - mrg
+            bhi(2) = int((c(2) + half(2) - glb_bounds(2)%beg)/dy(min(1, n))) + mrg
         end if
         if (p_glb > 0) then
-            blo(3) = int((c(3) - half(3) - z_domain%beg)/dz(0)) - mrg
-            bhi(3) = int((c(3) + half(3) - z_domain%beg)/dz(0)) + mrg
+            blo(3) = int((c(3) - half(3) - glb_bounds(3)%beg)/dz(0)) - mrg
+            bhi(3) = int((c(3) + half(3) - glb_bounds(3)%beg)/dz(0)) + mrg
         end if
 
     end subroutine s_amr_body_bbox
