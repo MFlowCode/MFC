@@ -1913,6 +1913,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
                 "1D_reactive_shocktube",
+                "1D_reactive_shocktube_adaptive",
                 "2D_ibm_steady_shock",
                 "3D_performance_test",
                 "3D_ibm_stl_ellipsoid",
