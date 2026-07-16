@@ -459,9 +459,9 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         real(wp)                :: start, finish
-        integer(kind=8)         :: stage_t0, stage_t1, clock_rate
+        integer(kind=8)         :: stage_t0, stage_t1, clock_rate, clock_max
         real(wp)                :: stage_time
-        integer, parameter      :: n_warmup = 2      !< stages excluded before the timing floor (warmup/JIT/first-touch)
+        integer, parameter      :: n_warmup = 2      !< time steps excluded before the timing floor (warmup/JIT/first-touch)
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
@@ -575,8 +575,13 @@ contains
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
             ! (not cpu_time, which counts MPI spin-wait) and the minimum (jitter only adds
             ! time) make it reproducible; the min over stages drops the I/O-bearing s==1 stage.
-            call system_clock(stage_t1, clock_rate)
-            stage_time = real(stage_t1 - stage_t0, wp)/real(clock_rate, wp)
+            call system_clock(stage_t1, clock_rate, clock_max)
+            ! Correct the delta for the rare case of the clock counter wrapping past clock_max.
+            if (stage_t1 >= stage_t0) then
+                stage_time = real(stage_t1 - stage_t0, wp)/real(clock_rate, wp)
+            else
+                stage_time = real(stage_t1 - stage_t0 + clock_max + 1_8, wp)/real(clock_rate, wp)
+            end if
             if (t_step - t_step_start < n_warmup) then
                 time_avg = 0._wp
             else if (time_avg <= 0._wp) then
