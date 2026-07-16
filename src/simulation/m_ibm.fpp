@@ -725,6 +725,9 @@ contains
         ! Sorting on the device is deliberate: a host round-trip here needs a GPU_UPDATE of the declare-target
         ! ghost_points, which fails Cray OpenACC's present-table lookup and aborts CCE OpenMP-offload with
         ! lib-4425 in the AMR fine path (this routine runs mid-swap, see s_ibm_swap_to_fine).
+        ! Non-AMR runs keep the original (unsorted) ghost order - only moving AMR-IB rebuilds the
+        ! list on-device per substep, so only it needs the deterministic ordering.
+        if (.not. amr) return
         $:GPU_PARALLEL_LOOP(private='[a, b, tmp, less]')
         do local_idx = 1, 1
             do a = 2, num_gps
@@ -1838,8 +1841,6 @@ contains
         call s_apply_levelset(ghost_points, num_gps)
         call s_compute_image_points(ghost_points)
         call s_compute_interpolation_coeffs(ghost_points)
-
-        if (num_gps > 0) print '(A,I0,A,I0)', ' [amr] block ', amr_cur, ': fine IB ghost points = ', num_gps
 
     end subroutine s_ibm_setup_fine
 
