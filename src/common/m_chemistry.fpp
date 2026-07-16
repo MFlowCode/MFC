@@ -9,10 +9,11 @@
 !> @brief Multi-species chemistry interface for thermodynamic properties, reaction rates, and transport coefficients
 module m_chemistry
 
-    use m_thermochem, only: num_species, molecular_weights, get_temperature, get_net_production_rates, get_mole_fractions, &
-        & get_species_binary_mass_diffusivities, get_species_mass_diffusivities_mixavg, gas_constant, &
-        & get_mixture_molecular_weight, get_mixture_energy_mass, get_mixture_thermal_conductivity_mixavg, &
-        & get_species_enthalpies_rt, get_mixture_viscosity_mixavg, get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass
+    use m_thermochem, only: num_species, molecular_weights, get_temperature, get_net_production_rates, &
+        & get_creation_destruction_rates, get_mole_fractions, get_species_binary_mass_diffusivities, &
+        & get_species_mass_diffusivities_mixavg, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass, &
+        & get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt, get_mixture_viscosity_mixavg, &
+        & get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass
 
     use m_global_parameters
 
@@ -147,6 +148,138 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_chemistry_reaction_flux
+
+    !> Operator-split integration of the reaction source with an alpha-QSS (Mott quasi-steady-state) reactor. Called after the flow
+    !! update: each cell's constant-(rho, e) reactor is advanced over dtime with chem_params%reaction_substeps predictor-corrector
+    !! sub-steps, updating the species partial densities and temperature in place. Mixture density, momentum, and total energy are
+    !! unchanged (reactions convert chemical to thermal energy at fixed internal energy). The alpha-QSS update treats each species'
+    !! destruction as a pseudo-first-order loss, so it is stable for stiff ignition where an explicit source would overshoot and
+    !! diverge, and relaxes to the correct chemical equilibrium rather than over-heating.
+    subroutine s_chemistry_reaction_substep(q_cons_vf, q_T_sf, dtime, bounds)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), intent(inout)                      :: q_T_sf
+        real(wp), intent(in)                                   :: dtime
+        type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
+        integer                                                :: x, y, z, eqn, s, nsub
+        real(wp)                                               :: rho, energy, T, T_new, dt_sub, Ysum
+        real(wp)                                               :: r, r2, wr, loss_i, prod_p, loss_p, Lbar, pbar
+        real(wp)                                               :: stiff_max, cell_stiff
+        real(wp), parameter                                    :: y_floor = 1.e-16_wp
+        real(wp), parameter                                    :: stiff_target = 0.5_wp
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
+        #:else
+            real(wp), dimension(num_species) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
+        #:endif
+
+        if (chem_params%adap_substeps) then
+            ! Pass 1: per-rank local stiffness probe -> adapt nsub for this step, no MPI. Each rank
+            ! sizes its own work from the largest fractional net species change any of its cells sees.
+            stiff_max = 0._wp
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, cdot, eqn, rho, T, wr, cell_stiff]', reduction='[[stiff_max]]', &
+                                & reductionOp='[MAX]', copyin='[bounds, dtime]')
+            do z = bounds(3)%beg, bounds(3)%end
+                do y = bounds(2)%beg, bounds(2)%end
+                    do x = bounds(1)%beg, bounds(1)%end
+                        rho = q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = eqn_idx%species%beg, eqn_idx%species%end
+                            Ys(eqn - eqn_idx%species%beg + 1) = q_cons_vf(eqn)%sf(x, y, z)/rho
+                        end do
+                        T = q_T_sf%sf(x, y, z)
+                        call get_net_production_rates(rho, T, Ys, cdot)  ! net omega in cdot
+                        cell_stiff = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = 1, num_species
+                            wr = molecular_weights(eqn)/rho
+                            cell_stiff = max(cell_stiff, dtime*abs(wr*cdot(eqn))/max(Ys(eqn), y_floor))
+                        end do
+                        stiff_max = max(stiff_max, cell_stiff)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            nsub = ceiling(max(real(chem_params%reaction_substeps, wp), min(real(chem_params%reaction_substeps_max, wp), &
+                           & stiff_max/stiff_target)))
+        else
+            nsub = chem_params%reaction_substeps
+        end if
+        dt_sub = dtime/real(nsub, wp)
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, cdot, ddot, y0, prod0, Lloss, alp, eqn, s, rho, energy, T, T_new, Ysum, r, &
+                            & r2, wr, loss_i, prod_p, loss_p, Lbar, pbar]', copyin='[bounds, dt_sub, nsub]')
+        do z = bounds(3)%beg, bounds(3)%end
+            do y = bounds(2)%beg, bounds(2)%end
+                do x = bounds(1)%beg, bounds(1)%end
+                    rho = q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z)
+
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do eqn = eqn_idx%species%beg, eqn_idx%species%end
+                        Ys(eqn - eqn_idx%species%beg + 1) = q_cons_vf(eqn)%sf(x, y, z)/rho
+                    end do
+
+                    ! internal energy per mass, held fixed through the reactor sub-steps
+                    energy = q_cons_vf(eqn_idx%E)%sf(x, y, z)/rho
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do eqn = eqn_idx%mom%beg, eqn_idx%mom%end
+                        energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/rho)**2._wp
+                    end do
+
+                    T = q_T_sf%sf(x, y, z)
+
+                    do s = 1, nsub
+                        ! predictor: rates at the start of the sub-step (one fused pass fills both)
+                        call get_creation_destruction_rates(rho, T, Ys, cdot, ddot)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = 1, num_species
+                            y0(eqn) = Ys(eqn)
+                            wr = molecular_weights(eqn)/rho
+                            prod0(eqn) = wr*cdot(eqn)  ! mass-fraction production
+                            loss_i = wr*ddot(eqn)  ! mass-fraction loss
+                            Lloss(eqn) = loss_i/max(Ys(eqn), y_floor)  ! pseudo-first-order loss rate
+                            r = dt_sub*Lloss(eqn); r2 = r*r
+                            alp(eqn) = (180._wp + 60._wp*r + 11._wp*r2 + r2*r)/(360._wp + 60._wp*r + 12._wp*r2 + r2*r)
+                            Ys(eqn) = y0(eqn) + dt_sub*(prod0(eqn) - loss_i)/(1._wp + alp(eqn)*dt_sub*Lloss(eqn))
+                            if (Ys(eqn) < 0._wp) Ys(eqn) = 0._wp
+                        end do
+                        ! corrector: re-evaluate rates at the predicted state
+                        T_new = T
+                        call get_temperature(energy, T, Ys, .true., T_new)
+                        call get_creation_destruction_rates(rho, T_new, Ys, cdot, ddot)
+                        Ysum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = 1, num_species
+                            wr = molecular_weights(eqn)/rho
+                            prod_p = wr*cdot(eqn)
+                            loss_p = wr*ddot(eqn)
+                            Lbar = 0.5_wp*(Lloss(eqn) + loss_p/max(Ys(eqn), y_floor))
+                            pbar = alp(eqn)*prod_p + (1._wp - alp(eqn))*prod0(eqn)
+                            Ys(eqn) = y0(eqn) + dt_sub*(pbar - Lbar*y0(eqn))/(1._wp + alp(eqn)*dt_sub*Lbar)
+                            if (Ys(eqn) < 0._wp) Ys(eqn) = 0._wp
+                            Ysum = Ysum + Ys(eqn)
+                        end do
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = 1, num_species
+                            Ys(eqn) = Ys(eqn)/Ysum
+                        end do
+                        T_new = T
+                        call get_temperature(energy, T, Ys, .true., T_new)
+                        T = T_new
+                    end do
+
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do eqn = eqn_idx%species%beg, eqn_idx%species%end
+                        q_cons_vf(eqn)%sf(x, y, z) = rho*Ys(eqn - eqn_idx%species%beg + 1)
+                    end do
+                    q_T_sf%sf(x, y, z) = T
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_chemistry_reaction_substep
 
     !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
     subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz, q_T_sf)

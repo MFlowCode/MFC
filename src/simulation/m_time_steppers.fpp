@@ -11,6 +11,7 @@ module m_time_steppers
     use m_derived_types
     use m_global_parameters
     use m_rhs
+    use m_chemistry
     use m_pressure_relaxation
     use m_data_output
     use m_bubbles_EE
@@ -567,6 +568,14 @@ contains
                 end if
             end if
         end do
+
+        ! Operator-split reaction: integrate the stiff chemistry ODE per cell after the flow update,
+        ! with sub-stepping, instead of adding the reaction source to the flow RHS (chem_params%reaction_substeps > 0).
+        if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0) then
+            call nvtxStartRange("CHEM-REACTION-SUBSTEP")
+            call s_chemistry_reaction_substep(q_cons_ts(1)%vf, q_T_sf, dt, idwint)
+            call nvtxEndRange
+        end if
 
         if (ib) then
             if (moving_immersed_boundary_flag) then

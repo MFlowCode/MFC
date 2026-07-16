@@ -37,6 +37,16 @@ contains
 
         call s_check_inputs_time_stepping
 
+        @:PROHIBIT(chemistry .and. chem_params%reaction_substeps < 0, &
+                   & "chem_params%reaction_substeps must be >= 0 (0 = reaction source in the flow RHS; > 0 = operator-split sub-stepping)")
+
+        @:PROHIBIT(chemistry .and. chem_params%adap_substeps .and. chem_params%reaction_substeps < 1, &
+                   & "chem_params%adap_substeps requires reaction_substeps >= 1 (the operator-split floor)")
+
+        @:PROHIBIT(chemistry .and. chem_params%adap_substeps &
+                   & .and. chem_params%reaction_substeps_max < chem_params%reaction_substeps, &
+                   & "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T")
+
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
