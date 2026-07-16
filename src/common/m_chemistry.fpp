@@ -260,10 +260,19 @@ contains
                             if (Ys(eqn) < 0._wp) Ys(eqn) = 0._wp
                             Ysum = Ysum + Ys(eqn)
                         end do
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do eqn = 1, num_species
-                            Ys(eqn) = Ys(eqn)/Ysum
-                        end do
+                        if (Ysum > y_floor) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do eqn = 1, num_species
+                                Ys(eqn) = Ys(eqn)/Ysum
+                            end do
+                        else
+                            ! Degenerate corrector (every species clipped to zero): fall back to the
+                            ! sub-step's starting composition rather than dividing by a vanishing sum.
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do eqn = 1, num_species
+                                Ys(eqn) = y0(eqn)
+                            end do
+                        end if
                         T_new = T
                         call get_temperature(energy, T, Ys, .true., T_new)
                         T = T_new
