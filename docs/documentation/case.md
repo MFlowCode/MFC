@@ -1320,14 +1320,14 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
 
-| #    | Name               | Dim.   |
-| ---: | :----:             | :---   |
-| 2    | 2D Circle          | 2      |
-| 3    | 2D Rectangle       | 2      |
-| 4    | 2D Airfoil         | 2      |
-| 8    | 3D Sphere          | 3      |
+| #    | Name               | Dim.   | Notes                                             |
+| ---: | :----:             | :---:  | :---                                              |
+| 2    | 2D Circle          | 2      |                                                   |
+| 3    | 2D Rectangle       | 2      |                                                   |
+| 4    | 2D Airfoil         | 2      |                                                   |
+| 8    | 3D Sphere          | 3      |                                                   |
 | 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder. |
-| 11   | 3D Airfoil         | 3      |
+| 11   | 3D Airfoil         | 3      |                                                   |
 
 ### Acoustic Supports {#acoustic-supports}
 
