@@ -151,10 +151,13 @@ contains
 
     !> Operator-split integration of the reaction source with an alpha-QSS (Mott quasi-steady-state) reactor. Called after the flow
     !! update: each cell's constant-(rho, e) reactor is advanced over dtime with chem_params%reaction_substeps predictor-corrector
-    !! sub-steps, updating the species partial densities and temperature in place. Mixture density, momentum, and total energy are
-    !! unchanged (reactions convert chemical to thermal energy at fixed internal energy). The alpha-QSS update treats each species'
-    !! destruction as a pseudo-first-order loss, so it is stable for stiff ignition where an explicit source would overshoot and
-    !! diverge, and relaxes to the correct chemical equilibrium rather than over-heating.
+    !! sub-steps -- or, when adap_substeps = T, an adaptive count nsub clamped to [reaction_substeps, reaction_substeps_max] and
+    !! sized once per rank from the rank's stiffest cell -- updating the species partial densities and temperature in place. Mixture
+    !! density, momentum, and total energy are unchanged (reactions convert chemical to thermal energy at fixed internal energy).
+    !! The alpha-QSS update treats each species' destruction as a pseudo-first-order loss, so it is stable for stiff ignition where
+    !! an explicit source would overshoot and diverge, and relaxes to the correct chemical equilibrium rather than over-heating.
+    !! Reaction is split from the flow update at first order (Lie-Trotter), and each sub-step renormalizes the mass fractions to sum
+    !! to one (which does not strictly conserve elemental composition).
     subroutine s_chemistry_reaction_substep(q_cons_vf, q_T_sf, dtime, bounds)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -166,7 +169,10 @@ contains
         real(wp)                                               :: r, r2, wr, loss_i, prod_p, loss_p, Lbar, pbar
         real(wp)                                               :: stiff_max, cell_stiff
         real(wp), parameter                                    :: y_floor = 1.e-16_wp
-        real(wp), parameter                                    :: stiff_target = 0.5_wp
+        ! stiff_target: fractional net composition change per sub-step targeted when sizing the adaptive
+        ! nsub. An uncalibrated engineering default -- alpha-QSS is unconditionally stable, so it trades
+        ! accuracy for cost (never stability), and the cost is bounded by reaction_substeps_max.
+        real(wp), parameter :: stiff_target = 0.5_wp
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(10) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
@@ -274,6 +280,9 @@ contains
                             prod_p = wr*cdot(eqn)
                             loss_p = wr*ddot(eqn)
                             Lbar = 0.5_wp*(Lloss(eqn) + loss_p/max(Ys(eqn), y_floor))
+                            ! reuse the predictor's alp(eqn) here (and in the denominator) rather than
+                            ! recomputing alpha from the averaged loss Lbar -- a deliberate CHEMEQ2
+                            ! simplification, stability-neutral (alpha in [0.5, 1]) and mitigated by sub-stepping.
                             pbar = alp(eqn)*prod_p + (1._wp - alp(eqn))*prod0(eqn)
                             Ys(eqn) = y0(eqn) + dt_sub*(pbar - Lbar*y0(eqn))/(1._wp + alp(eqn)*dt_sub*Lbar)
                             if (Ys(eqn) < 0._wp) Ys(eqn) = 0._wp

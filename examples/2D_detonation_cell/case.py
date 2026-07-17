@@ -7,10 +7,11 @@
 #                      Because the reaction source is operator-split out of the flow
 #                      RHS (alpha-QSS, below), the CFL sees a clean sound speed and
 #                      takes the full *hydro*-stable step.
-#   * adap_substeps -- the operator-split alpha-QSS reaction integrator chooses its
-#                      sub-step count per flow step, per rank, from the local chemical
-#                      stiffness: floor (reaction_substeps) in the burned/unburned gas,
-#                      ceiling (reaction_substeps_max) only across the detonation front.
+#   * adap_substeps -- the operator-split alpha-QSS reaction integrator chooses one
+#                      sub-step count per flow step, per rank, sized from the stiffest
+#                      cell that rank owns: a rank of only burned/unburned gas sits at
+#                      the floor (reaction_substeps), and any rank spanning the
+#                      detonation front ramps to the ceiling (reaction_substeps_max).
 #
 # Integrating the reaction source explicitly in the RK3 RHS (reaction_substeps=0)
 # caps this detonation near CFL ~0.06; alpha-QSS runs the *same* physics at CFL ~0.5
@@ -29,7 +30,7 @@ parser.add_argument("--scale", type=float, default=1.0, help="Grid multiplier (c
 parser.add_argument("--ndim", type=int, default=2, choices=(2, 3), help="Spatial dimensions (2 or 3).")
 parser.add_argument("--tend", type=float, default=200e-6, help="Physical end time [s].")
 parser.add_argument("--cfl-target", type=float, default=0.5, help="Target hydrodynamic CFL; sets the (constant) flow timestep.")
-parser.add_argument("--substeps", type=int, default=2, help="alpha-QSS sub-step floor (used where the chemistry is not stiff).")
+parser.add_argument("--substeps", type=int, default=2, help="alpha-QSS sub-step floor -- the count a rank uses when none of its cells are stiff.")
 parser.add_argument("--substeps-max", type=int, default=16, help="alpha-QSS sub-step ceiling (used across the detonation front).")
 parser.add_argument(
     "--overdrive",

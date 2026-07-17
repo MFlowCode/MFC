@@ -8,14 +8,16 @@
 #                      of the flow RHS (see below), the CFL sees a clean sound
 #                      speed and picks the largest *hydro*-stable step.
 #   * adap_substeps -- the reaction integrator (operator-split alpha-QSS) chooses
-#                      its sub-step count per flow step, per rank, from the local
-#                      chemical stiffness: it sits at reaction_substeps (floor) in
-#                      inert/burned gas and ramps toward reaction_substeps_max
-#                      (ceiling) only across the ignition front.
+#                      one sub-step count per flow step, per rank, sized from the
+#                      stiffest cell that rank owns: a rank holding only inert/burned
+#                      gas sits at reaction_substeps (floor), while any rank that
+#                      contains the ignition front ramps toward reaction_substeps_max
+#                      (ceiling). On a single rank (as here) the whole domain uses the
+#                      ceiling count whenever the front is present anywhere.
 #
 # The net effect on this case: the flow takes the large hydro-limited step while
-# the (cheap) chemistry is sub-cycled only where it is actually stiff -- reaching
-# the same detonation structure as a fine-dt reference at a fraction of the cost,
+# the (cheap) chemistry is sub-cycled as hard as the rank's stiffest cell demands --
+# reaching the same detonation structure as a fine-dt reference at a fraction of the cost,
 # with no manual dt or sub-step tuning. Without operator splitting, that large a
 # step integrated with the reaction in the RK3 RHS goes unstable (NaN).
 #
@@ -33,7 +35,7 @@ parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help
 parser.add_argument("--no-chem", dest="chemistry", default=True, action="store_false", help="Disable chemistry.")
 parser.add_argument("--scale", type=float, default=1, help="Grid scale (multiplies the 400-cell base mesh).")
 parser.add_argument("--cfl-target", type=float, default=0.5, help="Target hydrodynamic CFL; sets the (constant) flow timestep.")
-parser.add_argument("--substeps", type=int, default=2, help="alpha-QSS sub-step floor (used where the chemistry is not stiff).")
+parser.add_argument("--substeps", type=int, default=2, help="alpha-QSS sub-step floor -- the count a rank uses when none of its cells are stiff.")
 parser.add_argument("--substeps-max", type=int, default=16, help="alpha-QSS sub-step ceiling (used across the ignition front).")
 args = parser.parse_args()
 
