@@ -27,20 +27,11 @@ module m_phase_change
     integer, parameter  :: max_iter = 100000            !< max Newton iterations before accepting the last iterate
     real(wp), parameter :: pCr = 4.94e7_wp              !< Critical pressure of water [Pa]
     real(wp), parameter :: TCr = 385.05_wp + 273.15_wp  !< Critical temperature of water [K]
-    real(wp), parameter :: Tsat_min = 1.0_wp            !< lower bracket for the saturation-temperature root [K]
-    real(wp), parameter :: tsat_tol = 1.0e-12_wp        !< relative convergence tolerance for the s_TSat root find
     integer, parameter  :: ptg_ls_max = 30              !< max backtracking-line-search halvings in the pTg solver
     real(wp), parameter :: mixM = 1.0e-8_wp             !< Mixture mass fraction threshold for triggering phase change
     integer, parameter  :: lp = 1                       !< index for the liquid phase of the reacting fluid
     integer, parameter  :: vp = 2                       !< index for the vapor phase of the reacting fluid
     !> @}
-
-    !> @name Gibbs free energy phase change parameters
-    !> @{
-    real(wp) :: A, B, C, D
-    !> @}
-
-    $:GPU_DECLARE(create='[A, B, C, D]')
 
 contains
 
@@ -54,17 +45,8 @@ contains
 
     end subroutine s_relaxation_solver
 
-    !> Initialize the phase change module by setting saturation curve coefficients for pT- or pTg-equilibrium
+    !> Initialize the phase change module (no module-level state to set up; the pT/pTg relaxation solvers are self-contained)
     impure subroutine s_initialize_phasechange_module
-
-        ! Saturation curve coefficients via stiffened gas EOS. Saurel et al. JCP (2008), Le Metayer et al. JFE (2004)
-        A = (gs_min(lp)*cvs(lp) - gs_min(vp)*cvs(vp) + qvps(vp) - qvps(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
-
-        B = (qvs(lp) - qvs(vp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
-
-        C = (gs_min(vp)*cvs(vp) - gs_min(lp)*cvs(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
-
-        D = ((gs_min(lp) - 1.0_wp)*cvs(lp))/((gs_min(vp) - 1.0_wp)*cvs(vp))
 
     end subroutine s_initialize_phasechange_module
 
@@ -72,20 +54,19 @@ contains
     subroutine s_infinite_relaxation_k(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(wp) :: pS, pSOV, pSSL                  !< equilibrium pressure for mixture, overheated vapor, and subcooled liquid
-        real(wp) :: TS, TSOV, TSSL, TSatOV, TSatSL  !< Equilibrium and saturation temperatures
-        real(wp) :: rhoe, dynE, rhos                !< total internal energy, kinetic energy, and total entropy
-        real(wp) :: rho, rM, m1, m2, MCT            !< total density, total reacting mass, individual reacting masses
-        real(wp) :: TvF                             !< total volume fraction
-        ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
-        ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
+        real(wp) :: pS                    !< equilibrium pressure
+        real(wp) :: TS                    !< equilibrium temperature
+        real(wp) :: rhoe, dynE, rhos      !< total internal energy, kinetic energy, and total entropy
+        real(wp) :: rho, rM, m1, m2, MCT  !< total density, total reacting mass, individual reacting masses
+        real(wp) :: TvF                   !< total volume fraction
+        ! $:GPU_DECLARE(create='[pS,TS,rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+            real(wp), dimension(3) :: p_infpT, sk, hk, gk, ek, rhok
         #:else
-            real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+            real(wp), dimension(num_fluids) :: p_infpT, sk, hk, gk, ek, rhok
         #:endif
-        ! $:GPU_DECLARE(create='[p_infOV,p_infpT,p_infSL,sk,hk,gk,ek,rhok]')
+        ! $:GPU_DECLARE(create='[p_infpT,sk,hk,gk,ek,rhok]')
 
         !> Generic loop iterators
         integer :: i, j, k, l
@@ -93,14 +74,14 @@ contains
 #ifdef _CRAYFTN
 #ifdef MFC_OpenACC
         ! CCE 19 IPA workaround: prevent bring_routine_resident SIGSEGV DIR$ NOINLINE s_infinite_pt_relaxation_k DIR$ NOINLINE
-        ! s_infinite_ptg_relaxation_k DIR$ NOINLINE s_correct_partial_densities DIR$ NOINLINE s_TSat
+        ! s_infinite_ptg_relaxation_k DIR$ NOINLINE s_correct_partial_densities
 #endif
 #endif
 
         ! starting equilibrium solver
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok, pS, pSOV, pSSL, &
-                            & TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infpT, sk, hk, gk, ek, rhok, pS, TS, rhoe, dynE, rhos, rho, rM, &
+                            & m1, m2, MCT, TvF]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -147,68 +128,16 @@ contains
                     if ((relax_model == 6) .and. ((q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, &
                         & l) > mixM*rM) .and. (q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, &
                         & l) > mixM*rM)) .and. (pS < pCr) .and. (TS < TCr)) then
-                        ! Checking if phase change is needed, by checking whether the final solution is either subcoooled liquid or
-                        ! overheated vapor.
+                        ! Solve pTg-equilibrium directly on the actual reacting masses. The Newton solver projects
+                        ! the liquid mass onto [0, mT], so it recovers the single-phase limits itself (ml -> 0 for
+                        ! all-vapor, ml -> mT for all-liquid). The former overheated-vapor / subcooled-liquid pT
+                        ! shortcuts were removed: their pT states differ O(1) from the pTg equilibrium, so the
+                        ! sub-ULP shortcut/pTg branch decision flipped across backends (CPU vs GPU) near a phase
+                        ! boundary and destroyed cross-backend reproducibility.
+                        q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m1
+                        q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m2
 
-                        ! overheated vapor case depleting the mass of liquid
-                        q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = mixM*rM
-
-                        ! transferring the total mass to vapor
-                        q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
-
-                        ! calling pT-equilibrium for overheated vapor, which is MFL = 0
-                        call s_infinite_pt_relaxation_k(j, k, l, 0, pSOV, p_infOV, q_cons_vf, rhoe, TSOV)
-
-                        ! calculating Saturation temperature
-                        call s_TSat(pSOV, TSatOV, TSOV)
-
-                        ! subcooled liquid case transferring the total mass to liquid
-                        q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
-
-                        ! depleting the mass of vapor
-                        q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = mixM*rM
-
-                        ! calling pT-equilibrium for subcooled liquid, which is MFL = 1
-                        call s_infinite_pt_relaxation_k(j, k, l, 1, pSSL, p_infSL, q_cons_vf, rhoe, TSSL)
-
-                        ! calculating Saturation temperature
-                        call s_TSat(pSSL, TSatSL, TSSL)
-
-                        ! checking the conditions for overheated vapor and subcooled liquide
-                        if (TSOV > TSatOV) then
-                            ! Assigning pressure
-                            pS = pSOV
-
-                            ! Assigning Temperature
-                            TS = TSOV
-
-                            ! correcting the liquid partial density
-                            q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = mixM*rM
-
-                            ! correcting the vapor partial density
-                            q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
-                        else if (TSSL < TSatSL) then
-                            ! Assigning pressure
-                            pS = pSSL
-
-                            ! Assigning Temperature
-                            TS = TSSL
-
-                            ! correcting the liquid partial density
-                            q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
-
-                            ! correcting the vapor partial density
-                            q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = mixM*rM
-                        else
-                            ! returning partial pressures to what they were from the homogeneous solver liquid
-                            q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m1
-
-                            ! vapor
-                            q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m2
-
-                            ! calling the pTg-equilibrium solver
-                            call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
-                        end if
+                        call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
                     end if
 
                     ! Calculations AFTER equilibrium
@@ -536,84 +465,6 @@ contains
         end if
 
     end subroutine s_correct_partial_densities
-
-    !> Find the saturation temperature T_sat(p_sat) from Gibbs equality g_l = g_v. For stiffened gases this reduces to the
-    !! dimensionless, monotone saturation relation G(T) = A + B/T + C*ln(T) + D*ln(p_sat + p_inf,l) - ln(p_sat + p_inf,v) = 0 with
-    !! A, B, C, D the saturation-curve coefficients from s_initialize_phasechange_module. G is strictly increasing over the physical
-    !! window [Tsat_min, TCr] for a liquid-vapor pair, so the root is unique. Solved with a safeguarded Newton (rtsafe): a Newton
-    !! step when it stays in the bracket and makes progress, bisection otherwise. Converges in a few iterations, cannot diverge,
-    !! needs no accurate guess (uniform, bounded iteration count -> no GPU warp divergence).
-    elemental subroutine s_TSat(pSat, TSat, TSIn)
-
-        $:GPU_ROUTINE(function_name='s_TSat',parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: pSat
-        real(wp), intent(out) :: TSat
-        real(wp), intent(in)  :: TSIn
-        real(wp)              :: pterm          !< pressure-only part of the residual (constant in T)
-        real(wp)              :: G, dG          !< residual and its T-derivative
-        real(wp)              :: T, T_lo, T_hi  !< current iterate and bracket
-        real(wp)              :: dT, dT_old     !< current and previous step size
-        integer               :: ns
-
-        ! No saturation state to solve for (mass-depleted cell): mirror the incoming zero state.
-        if ((f_approx_equal(pSat, 0.0_wp)) .and. (f_approx_equal(TSIn, 0.0_wp))) then
-            TSat = 0.0_wp
-            return
-        end if
-
-        ! log(p_sat + p_inf,v) is undefined for p_sat + p_inf,v <= 0; no valid saturation temperature
-        ! exists there, so leave the incoming temperature untouched.
-        if (pSat + ps_inf(vp) <= 0.0_wp) then
-            TSat = TSIn
-            return
-        end if
-
-        ! Pressure-dependent part of G(T), constant across the iteration.
-        pterm = D*log(pSat + ps_inf(lp)) - log(pSat + ps_inf(vp))
-
-        ! Bracket the root in [Tsat_min, TCr] and clamp gracefully if it falls outside the physical window.
-        T_lo = Tsat_min
-        T_hi = TCr
-        if (A + B/T_lo + C*log(T_lo) + pterm > 0.0_wp) then  ! root below Tsat_min (p_sat -> 0)
-            TSat = Tsat_min
-            return
-        else if (A + B/T_hi + C*log(T_hi) + pterm < 0.0_wp) then  ! root above TCr (p_sat -> pCr)
-            TSat = TCr
-            return
-        end if
-
-        ! Safeguarded Newton, G(T_lo) < 0 < G(T_hi) by monotonicity.
-        T = TSIn
-        if (T <= T_lo .or. T >= T_hi) T = 0.5_wp*(T_lo + T_hi)
-        dT_old = T_hi - T_lo
-        dT = dT_old
-        G = A + B/T + C*log(T) + pterm
-        dG = -B/T**2 + C/T
-        do ns = 1, max_iter
-            ! bisect if the Newton step leaves the bracket or is not reducing the interval fast enough
-            if ((((T - T_hi)*dG - G)*((T - T_lo)*dG - G) > 0.0_wp) .or. (abs(2.0_wp*G) > abs(dT_old*dG))) then
-                dT_old = dT
-                dT = 0.5_wp*(T_hi - T_lo)
-                T = T_lo + dT
-            else
-                dT_old = dT
-                dT = G/dG
-                T = T - dT
-            end if
-            if (abs(dT) < tsat_tol*T) exit
-            G = A + B/T + C*log(T) + pterm
-            dG = -B/T**2 + C/T
-            if (G < 0.0_wp) then
-                T_lo = T
-            else
-                T_hi = T
-            end if
-        end do
-
-        TSat = T
-
-    end subroutine s_TSat
 
     !> Finalize the phase change module
     impure subroutine s_finalize_relaxation_solver_module
