@@ -11,7 +11,7 @@ Produces two figures from the D/ output:
 
 Field layout (num_fluids=2, model_eqns=2, jwl_reactive):
   prim.5 = pressure, prim.3/4 = velocity, prim.8 = reaction progress lambda,
-  cons.1/2 = alpha_rho of TNT products / air, so Y = cons.1 / (cons.1+cons.2).
+  cons.1/2 = alpha_rho of PETN products / air, so Y = cons.1 / (cons.1+cons.2).
 
 Usage: ./visualize.py [case_dir]
 """
@@ -36,9 +36,13 @@ CHARGE_R = 0.05
 
 
 def load(pre, i, t):
-    a = np.loadtxt(f"{D}/{pre}.{i}.00.{t:06d}.dat")
+    # parallel_io=F: each MPI rank writes its own domain-decomposed chunk
+    # (pre.i.<rank>.<step>.dat) -- concatenate all ranks, not just rank 0.
+    files = sorted(glob.glob(f"{D}/{pre}.{i}.*.{t:06d}.dat"))
+    a = np.vstack([np.loadtxt(f) for f in files])
     xs, ys = np.unique(a[:, 0]), np.unique(a[:, 1])
-    return xs, ys, a[:, 2].reshape(len(xs), len(ys))
+    order = np.lexsort((a[:, 0], a[:, 1]))
+    return xs, ys, a[order, 2].reshape(len(ys), len(xs)).T
 
 
 def fields(t):
@@ -72,7 +76,7 @@ dx = xs[1] - xs[0]
 ext = [xs[0], xs[-1], ys[0], ys[-1]]
 
 fig, ax = plt.subplots(2, 2, figsize=(11.5, 10.4), constrained_layout=True)
-fig.suptitle(f"2D TNT reactive detonation into air  •  400×400  •  t = {t*DT*1e6:.0f} µs", fontsize=13, color="#222222")
+fig.suptitle(f"2D PETN (Kuhl) reactive detonation into air  •  400×400  •  t = {t*DT*1e6:.0f} µs", fontsize=13, color="#222222")
 
 im = ax[0, 0].imshow(p.T, origin="lower", extent=ext, cmap="magma", norm=LogNorm(vmin=1.0e5, vmax=max(p.max(), 2.0e6)))
 ax[0, 0].set_title("pressure  p [Pa]  (log)")

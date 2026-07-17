@@ -1,11 +1,19 @@
-# 2D JWL Reactive Detonation with Full Products–Air Mixing (TNT)
+# 2D JWL Reactive Detonation with Full Products–Air Mixing (PETN)
 
-A real-world 2D free-air burst: a full-density cylindrical TNT charge
-(`rho0 = 1630 kg/m^3`, 5 cm radius) at rest at ambient pressure in air at STP.
-A small central hot spot (8 mm, 25 GPa) ignites a self-propagating JWL++
-(`jwl_reactive`, Souers 2000) detonation, `dλ/dt = G p^b (1-λ)`, that sweeps
-outward through the charge, then the products expand violently into the
-surrounding air.
+A real-world 2D free-air burst: a cylindrical PETN charge (`rho0 = 1000 kg/m^3`,
+5 cm radius, Kuhl et al.'s own pressed-charge reference density — see
+`examples/3D_jwl_znd_spherical_octant/VALIDATION.md` for the full parameter
+provenance) at rest at ambient pressure in air at STP. An 8 mm booster patch,
+seeded already-reacted (`rxn_val = 1`, not just pressurized — see below),
+ignites a self-propagating JWL++ (`jwl_reactive`, Souers 2000) detonation,
+`dλ/dt = G p^b (1-λ)`, that sweeps outward through the charge, then the
+products expand violently into the surrounding air.
+
+Direct initiation with a pressure-only hot spot (no `rxn_val`) was tried first
+and fizzles for this material: PETN_KUHL's CJ pressure (measured, see below)
+is low enough that a pressure spike alone decays without reaching a
+self-sustained reaction wave. Seeding the booster patch as already-reacted
+gives robust initiation instead.
 
 This case exercises two things the shipped program-burn example
 (`examples/2D_jwl_detonation`) does not:
@@ -26,9 +34,13 @@ This case exercises two things the shipped program-burn example
    Richtmyer–Meshkov-unstable contact — the mixture EOS's real workload, not
    just the pure endpoints.
 
-The TNT JWL fit (`A`, `B`, `R1`, `R2`, `ω`, `E0`) matches
-`examples/2D_jwl_detonation`; `jwl_delta_e ≈ -1.29e7 J/kg` is computed in
-`case.py` so unreacted TNT at `(rho0, e=0)` sits exactly at ambient pressure.
+The PETN JWL fit (`A`, `B`, `R1`, `R2`, `ω`, `E0`) is `PETN_KUHL` from
+`toolchain/mfc/jwl_products.py`, extracted from Kuhl et al. (UCRL-PROC-225822,
+2006, Appendix); `jwl_delta_e ≈ -7.98e6 J/kg` is computed in `case.py` (Garno
+et al. 2020, Eq. 17, closed-form, not fit) so unreacted PETN at `(rho0, e=0)`
+sits exactly at ambient pressure. `jwl_G = 1.0e-13` was calibrated on the 1D
+companion case via a CJ-eigenvalue (G-invariance) test — see
+`examples/3D_jwl_znd_spherical_octant/VALIDATION.md`.
 
 ## Run
 
@@ -47,17 +59,36 @@ The TNT JWL fit (`A`, `B`, `R1`, `R2`, `ω`, `E0`) matches
 
 ## What the run shows
 
-- **t ≈ 4 µs** — detonation propagating outward, `Pmax ≈ 18 GPa` (near TNT's
-  ~21 GPa CJ pressure), front at ~29 mm; the diverging cylindrical front runs
-  slightly below the planar CJ speed as expected from front curvature.
-- **t ≈ 34 µs** — the whole charge has burnt (`λ→1`), the detonation has broken
-  out of the charge, and the blast has decayed to ~0.7 GPa while a partially
-  mixed `0.05 < Y < 0.95` layer develops at the products/air contact.
-- **t ≈ 60 µs** — far-field air blast (~0.1 GPa) with a developed,
-  Richtmyer–Meshkov-fingered mixing layer.
+Measured directly from the `D/` output of the shipped run (400×400, 1 mm cells):
+
+- **t ≈ 4 µs** — detonation propagating outward, `Pmax ≈ 9.1 GPa` near the
+  booster/charge center, front (`p > 2 atm`) at ~33 mm; the diverging
+  cylindrical front runs below the measured planar `D_CJ = 6245 m/s`,
+  `P_CJ = 16.7 GPa` as expected from front curvature at this early radius.
+- **t ≈ 22–37 µs** — the charge has burnt through, the detonation has broken
+  out of the charge, and the front (`p > 2 atm`) has advanced to ~116–185 mm
+  while `Pmax` decays through ~1.8 GPa → 0.4 GPa as the blast disperses into
+  air.
+- **t ≈ 60 µs** — the front (`p > 2 atm`) reaches ~283 mm, i.e. the domain
+  corner — the blast has essentially exited through the non-reflecting
+  boundaries by the final save, `Pmax ≈ 0.075 GPa`.
+- **Products mass fraction `Y`** is close to 1 over nearly the whole swept
+  region by the final save. This is a genuine consequence of the density
+  contrast, not a diffusion artifact: PETN products at Kuhl's reference
+  density (`rho0 = 1000 kg/m^3`) outmass the swept air (`~1.2 kg/m^3`) by
+  ~3 orders of magnitude, so even after the products expand and dilute by
+  1-2 orders of magnitude within the domain, `Y = c1/(c1+c2)` stays near 1
+  almost everywhere the front has passed. A visibly partial `0 < Y < 1`
+  mixing layer is confined to a thin band at the products/air contact
+  (see the schlieren panel).
 
 The domain (40 cm square) is sized so the blast reaches the non-reflecting
 outer boundaries near the final time; shorten `t_step_stop` or enlarge the
 domain to keep the front interior for longer. A uniform 400×400 mesh is used
 deliberately — grid stretching is known to go NaN with strong JWL reactive
 sources (see the note in `examples/2D_jwl_detonation`).
+
+`visualize.py`'s `load()` concatenates every rank's `.dat` chunk
+(`parallel_io=F` writes one file per MPI rank) before reshaping onto the
+grid — reading only rank 0 silently returns a small corner sliver of the
+domain rather than an error, so always run with the fixed loader.
