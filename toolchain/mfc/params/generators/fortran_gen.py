@@ -234,6 +234,13 @@ def generate_case_opt_decls_fpp() -> str:
 # These are kept in the manual residue of m_mpi_proxy.fpp.
 _STRUCT_ROOTS = frozenset({"bc_x", "bc_y", "bc_z", "x_domain", "y_domain", "z_domain", "x_output", "y_output", "z_output"})
 
+# Plain (non-struct) namelist arrays registered only as indexed variants (e.g.
+# synth_L(i,d)). The generator's array path (FORTRAN_ARRAY_DIMS) emits a 1D
+# broadcast only, so these — including the 2D turb_pos/synth_L — are declared and
+# broadcast by hand in m_mpi_proxy.fpp. Skipped here so the scalar classifier does
+# not treat the base name as a missing-registry scalar.
+_MANUAL_ARRAY_RESIDUE = frozenset({"synth_n_waves_per_shell", "synth_k_shell", "synth_amp_shell", "turb_pos", "synth_L"})
+
 # Variables excluded from broadcast generation (derived post-broadcast or non-namelist).
 # muscl_eps was previously excluded here on the assumption that it was derived
 # post-broadcast, but the derivation only fires under f_is_default(muscl_eps),
@@ -294,6 +301,8 @@ def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str],
         if target == "post" and name in _POST_BCAST_EXCLUDE:
             continue
         if name in _STRUCT_ROOTS:
+            continue
+        if name in _MANUAL_ARRAY_RESIDUE:
             continue
         if name in TYPED_DECLS:
             continue
@@ -375,9 +384,14 @@ def _emit_lag_params(lines: List[str]) -> None:
     from the Fortran type by upstream #1085/#1093 and are no longer in the registry.
     """
     # Walk the registry for lag_params members, split by type.
-    lag_log = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type == ParamType.LOG)
-    lag_int = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
-    lag_real = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in _REAL_TYPES)
+    lag_all = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%"))
+    lag_log = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type == ParamType.LOG)
+    lag_int = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
+    lag_real = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type in _REAL_TYPES)
+    lag_str = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type == ParamType.STR)
+    unhandled = set(lag_all) - set(lag_log) - set(lag_int) - set(lag_real) - set(lag_str)
+    if unhandled:
+        raise ValueError(f"lag_params members with unhandled ParamType (would be silently missing from the broadcast): {sorted(unhandled)}")
     lines.append("        if (bubbles_lagrange) then")
     for mem in sorted(lag_log):
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
@@ -385,6 +399,8 @@ def _emit_lag_params(lines: List[str]) -> None:
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)")
     for mem in sorted(lag_real):
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    for mem in sorted(lag_str):
+        lines.append(f"            call MPI_BCAST(lag_params%{mem}, len(lag_params%{mem}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end if")
 
 

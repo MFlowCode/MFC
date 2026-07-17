@@ -607,6 +607,66 @@ Does not do anything for OpenMP currently
 
 ------------------------------------------------------------------------------------------
 
+## Writing GPU_ROUTINE Device Helpers
+
+`GPU_ROUTINE` marks a subroutine or function as callable from within a GPU kernel
+(an OpenACC `routine` or OpenMP `declare target` directive). The standard idiom for
+pure, sequential per-thread helpers is:
+
+```fortran
+subroutine s_accumulate_mixture_properties(nf, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
+
+    $:GPU_ROUTINE(function_name='s_accumulate_mixture_properties', parallelism='[seq]', cray_inline=True)
+
+    integer, intent(in)                 :: nf
+    real(wp), dimension(nf), intent(in) :: alpha_rho_K, alpha_K
+    real(wp), intent(out)               :: rho_K, gamma_K, pi_inf_K, qv_K
+    ...
+end subroutine s_accumulate_mixture_properties
+```
+
+**When to use it.** Extract a block into a `GPU_ROUTINE` helper when:
+
+- It does roughly 50–100 or more FLOPs of work per call, enough to amortize the
+  call overhead on device. Below that threshold, the helper is justified only when
+  the same block appears verbatim in three or more callers (duplication removal).
+- It is called from inside a `GPU_PARALLEL_LOOP` region — ``parallelism='[seq]'`` is
+  correct for sequential per-thread work; the surrounding loop keeps the parallelism.
+
+**Key idioms.**
+
+- Always ``parallelism='[seq]'`` for these helpers. `cray_inline=True` is required
+  when the helper is called from other modules — the Cray compiler does not inline
+  cross-file `routine` calls without it, and performance collapses silently on that
+  backend. Helpers called only from their own module (e.g., the shear/bulk stress
+  tensor pair in `m_riemann_state.fpp`) do not need it.
+- `function_name=` is required when `cray_inline=True` (the Cray inline directive
+  needs the explicit name).
+- The `GPU_ROUTINE` directive lives in the *definition*, not the call site. The
+  caller needs no annotation beyond being inside a `GPU_PARALLEL_LOOP`.
+
+**Caller-loads, helper-computes.** Callers do all coordinate-indexed array loads
+from the global state arrays (`qL_rs_vf`, `qR_rs_vf`, etc.) before the call; the
+helper receives only scalars or small arrays with explicit-shape dimensioning. This
+is required because the `SF` indexing lambda used in solver loops is defined locally
+inside each solver's `#:for NORM_DIR` block and cannot be referenced from a helper.
+
+**AMD case-opt compatibility.** Under `--case-optimization` with the AMD backend,
+arrays that are sized by runtime parameters at compile time must be declared with an
+explicit constant bound. Use an explicit `n` argument (e.g., `integer, intent(in) ::
+nf`) and dimension helpers as `dimension(nf)` rather than `dimension(num_fluids)`.
+See `s_compute_interface_reynolds` in `src/simulation/m_riemann_state.fpp` for the
+`#:if not MFC_CASE_OPTIMIZATION and USING_AMD` guard pattern: the guard sits on the
+dummy-argument declaration in the helper's definition, with matching guards on the
+callers' own local declarations so the actual and dummy bounds agree.
+
+**Declare scoping.** The `GPU_ROUTINE` directive must appear in the source file
+that defines the routine. Helpers added to `m_riemann_state.fpp` are automatically
+in scope for every solver module that `use`s it — no additional declare-target
+annotations are needed at call sites.
+
+------------------------------------------------------------------------------------------
+
 # Debugging Tools and Tips for GPUs
 
 ## Compiler agnostic tools

@@ -18,10 +18,10 @@ jobs:
       checkall: ${{ steps.changes.outputs.checkall }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: ".github/file-filter.yml"
@@ -37,7 +37,7 @@ jobs:
     timeout-minutes: 240
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Ubuntu
         run: |
@@ -46,7 +46,7 @@ jobs:
                    openmpi-bin libopenmpi-dev
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
