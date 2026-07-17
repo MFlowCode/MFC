@@ -820,12 +820,10 @@ contains
                     ! Obtaining the density, specific heat ratio function and the liquid stiffness function, respectively
                     call s_convert_to_mixture_variables(q_prim_vf, j, k, l, rho, gamma, pi_inf, qv, Re_K, G, fluid_pp(:)%G)
 
-                    if (.not. igr .or. num_fluids > 1) then
-                        ! Transferring the advection equation(s) variable(s)
-                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                        end do
-                    end if
+                    ! Transferring the advection equation(s) variable(s)
+                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                        q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                    end do
 
                     if (relativity) then
                         if (n == 0) then

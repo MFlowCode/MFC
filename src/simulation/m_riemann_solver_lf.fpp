@@ -179,7 +179,10 @@ contains
                             pres_mag%L = 0._wp
                             pres_mag%R = 0._wp
 
-                            if (mpp_lim) then
+                            ! Legacy IGR does not apply the normal LF MPP
+                            ! limiter to reconstructed face alphas. Keep the
+                            ! refactored IGR path numerically equivalent.
+                            if (mpp_lim .and. (.not. igr)) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     alpha_rho_L(i) = max(0._wp, alpha_rho_L(i))

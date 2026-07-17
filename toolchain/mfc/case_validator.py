@@ -1077,6 +1077,7 @@ class CaseValidator:
         cyl_coord = self.get("cyl_coord", "F") == "T"
         probe_wrt = self.get("probe_wrt", "F") == "T"
         int_comp = self.get("int_comp", 0)
+        riemann_solver = self.get("riemann_solver")
 
         self.prohibit(num_igr_iters is not None and num_igr_iters < 0, "num_igr_iters must be greater than or equal to 0")
         self.prohibit(num_igr_warm_start_iters is not None and num_igr_warm_start_iters < 0, "num_igr_warm_start_iters must be greater than or equal to 0")
@@ -1096,6 +1097,7 @@ class CaseValidator:
         self.prohibit(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt, "IGR does not support probe writes")
         self.prohibit(int_comp > 0, "IGR does not support int_comp > 0")
+        self.prohibit(riemann_solver != 5, "IGR currently requires riemann_solver = 5 (Lax-Friedrichs)")
 
         # Check BCs - IGR does not support characteristic BCs
         # Characteristic BCs are BC_CHAR_SLIP_WALL (-5) through BC_CHAR_SUP_OUTFLOW (-12)

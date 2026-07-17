@@ -907,6 +907,7 @@ contains
         ! needed to properly configure the modules. The preparations below DO DEPEND on the grid being complete.
         if (igr) then
             call s_initialize_igr_module()
+            call s_initialize_riemann_solvers_module()
         end if
         if (.not. igr) then
             if (recon_type == recon_type_weno) then
@@ -1084,6 +1085,7 @@ contains
         call s_finalize_rhs_module()
         if (igr) then
             call s_finalize_igr_module()
+            call s_finalize_riemann_solvers_module()
         else
             call s_finalize_cbc_module()
             call s_finalize_riemann_solvers_module()

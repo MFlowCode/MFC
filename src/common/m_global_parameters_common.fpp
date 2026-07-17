@@ -168,15 +168,10 @@ contains
             eqn_idx%mom%end = eqn_idx%cont%end + num_vels
             eqn_idx%E = eqn_idx%mom%end + 1
 
-            if (igr) then
-                ! IGR: volume fractions after energy (N-1 for N fluids; skipped when num_fluids=1)
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids - 1
-            else
-                ! WENO/MUSCL + Riemann tracks a total of (N) volume fractions for N fluids
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids
-            end if
+            ! Store all N volume fractions for N fluids. IGR originally used a compact N-1 layout,
+            ! but the shared Riemann path expects the final volume fraction to be available.
+            eqn_idx%adv%beg = eqn_idx%E + 1
+            eqn_idx%adv%end = eqn_idx%E + num_fluids
 
             sys_size = eqn_idx%adv%end
 

@@ -483,7 +483,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def alter_igr():
-        stack.push("IGR", {"igr": "T", "alf_factor": 10, "num_igr_iters": 10, "elliptic_smoothing": "T", "elliptic_smoothing_iters": 10, "num_igr_warm_start_iters": 10})
+        stack.push(
+            "IGR",
+            {
+                "igr": "T",
+                "riemann_solver": 5,
+                "wave_speeds": None,
+                "avg_state": None,
+                "alf_factor": 10,
+                "num_igr_iters": 10,
+                "elliptic_smoothing": "T",
+                "elliptic_smoothing_iters": 10,
+                "num_igr_warm_start_iters": 10,
+            },
+        )
 
         for order in [3, 5]:
             stack.push(f"igr_order={order}", {"igr_order": order})

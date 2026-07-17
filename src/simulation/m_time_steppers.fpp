@@ -221,87 +221,85 @@ contains
         ! Allocating the cell-average primitive variables
         @:ALLOCATE(q_prim_vf(1:sys_size))
 
-        if (.not. igr) then
-            do i = 1, eqn_idx%adv%end
+        do i = 1, eqn_idx%adv%end
+            @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_prim_vf(i))
+        end do
+
+        if (bubbles_euler) then
+            do i = eqn_idx%bub%beg, eqn_idx%bub%end
+                @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+            if (adv_n) then
+                @:ALLOCATE(q_prim_vf(eqn_idx%n)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%n))
+            end if
+        end if
+
+        if (mhd) then
+            do i = eqn_idx%B%beg, eqn_idx%B%end
+                @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
+        if (elasticity) then
+            do i = eqn_idx%stress%beg, eqn_idx%stress%end
+                @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
+        if (hyperelasticity) then
+            do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
+                @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
+        if (cont_damage) then
+            @:ALLOCATE(q_prim_vf(eqn_idx%damage)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%damage))
+        end if
+
+        if (hyper_cleaning) then
+            @:ALLOCATE(q_prim_vf(eqn_idx%psi)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%psi))
+        end if
+
+        if (model_eqns == model_eqns_6eq) then
+            do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
+                @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
+        if (surface_tension) then
+            @:ALLOCATE(q_prim_vf(eqn_idx%c)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%c))
+        end if
+
+        if (chemistry) then
+            do i = eqn_idx%species%beg, eqn_idx%species%end
                 @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
 
-            if (bubbles_euler) then
-                do i = eqn_idx%bub%beg, eqn_idx%bub%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(i))
-                end do
-                if (adv_n) then
-                    @:ALLOCATE(q_prim_vf(eqn_idx%n)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%n))
-                end if
-            end if
-
-            if (mhd) then
-                do i = eqn_idx%B%beg, eqn_idx%B%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(i))
-                end do
-            end if
-
-            if (elasticity) then
-                do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(i))
-                end do
-            end if
-
-            if (hyperelasticity) then
-                do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(i))
-                end do
-            end if
-
-            if (cont_damage) then
-                @:ALLOCATE(q_prim_vf(eqn_idx%damage)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%damage))
-            end if
-
-            if (hyper_cleaning) then
-                @:ALLOCATE(q_prim_vf(eqn_idx%psi)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%psi))
-            end if
-
-            if (model_eqns == model_eqns_6eq) then
-                do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(i))
-                end do
-            end if
-
-            if (surface_tension) then
-                @:ALLOCATE(q_prim_vf(eqn_idx%c)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%c))
-            end if
-
-            if (chemistry) then
-                do i = eqn_idx%species%beg, eqn_idx%species%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
-                    @:ACC_SETUP_SFs(q_prim_vf(i))
-                end do
-
-                @:ALLOCATE(q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-                @:ACC_SETUP_SFs(q_T_sf)
-            end if
+            @:ALLOCATE(q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(q_T_sf)
         end if
+        ! end if
 
         @:ALLOCATE(pb_ts(1:2))
         ! Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
@@ -375,18 +373,10 @@ contains
         @:ALLOCATE(rhs_vf(1:sys_size))
         @:PREFER_GPU(rhs_vf)
 
-        if (igr) then
-            do i = 1, sys_size
-                @:ALLOCATE(rhs_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
-                @:ACC_SETUP_SFs(rhs_vf(i))
-                @:PREFER_GPU(rhs_vf(i)%sf)
-            end do
-        else
-            do i = 1, sys_size
-                @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
-                @:ACC_SETUP_SFs(rhs_vf(i))
-            end do
-        end if
+        do i = 1, sys_size
+            @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(rhs_vf(i))
+        end do
 
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
@@ -466,6 +456,7 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
+                    ! IGR runtime information still uses conservative variables until primitive workspaces are fully integrated
                     if (igr) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
                     end if
@@ -495,20 +486,14 @@ contains
                             if (s == 1 .and. nstage > 1) then
                                 q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
                             end if
-                            if (igr) then
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
-                                          & l))/rk_coef(s, 4)
-                            else
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, &
-                                          & l))/rk_coef(s, 4)
-                            end if
+                            q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
+                                      & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
                         end do
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
             ! Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
                 $:GPU_PARALLEL_LOOP(collapse=5)
@@ -637,6 +622,7 @@ contains
         integer                :: j, k, l  !< Generic loop iterators
         integer                :: fl       !< Fluid loop iterator
 
+        ! IGR dt calculation still uses its custom conservative-variable path.
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
@@ -942,50 +928,49 @@ contains
             @:DEALLOCATE(q_prim_ts1, q_prim_ts2)
         end if
 
-        if (.not. igr) then
-            ! Deallocating the cell-average primitive variables
-            do i = 1, eqn_idx%adv%end
+        ! Deallocating the cell-average primitive variables
+        do i = 1, eqn_idx%adv%end
+            @:DEALLOCATE(q_prim_vf(i)%sf)
+        end do
+
+        if (mhd) then
+            do i = eqn_idx%B%beg, eqn_idx%B%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
-
-            if (mhd) then
-                do i = eqn_idx%B%beg, eqn_idx%B%end
-                    @:DEALLOCATE(q_prim_vf(i)%sf)
-                end do
-            end if
-
-            if (elasticity) then
-                do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                    @:DEALLOCATE(q_prim_vf(i)%sf)
-                end do
-            end if
-
-            if (hyperelasticity) then
-                do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
-                    @:DEALLOCATE(q_prim_vf(i)%sf)
-                end do
-            end if
-
-            if (cont_damage) then
-                @:DEALLOCATE(q_prim_vf(eqn_idx%damage)%sf)
-            end if
-
-            if (hyper_cleaning) then
-                @:DEALLOCATE(q_prim_vf(eqn_idx%psi)%sf)
-            end if
-
-            if (bubbles_euler) then
-                do i = eqn_idx%bub%beg, eqn_idx%bub%end
-                    @:DEALLOCATE(q_prim_vf(i)%sf)
-                end do
-            end if
-
-            if (model_eqns == model_eqns_6eq) then
-                do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
-                    @:DEALLOCATE(q_prim_vf(i)%sf)
-                end do
-            end if
         end if
+
+        if (elasticity) then
+            do i = eqn_idx%stress%beg, eqn_idx%stress%end
+                @:DEALLOCATE(q_prim_vf(i)%sf)
+            end do
+        end if
+
+        if (hyperelasticity) then
+            do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
+                @:DEALLOCATE(q_prim_vf(i)%sf)
+            end do
+        end if
+
+        if (cont_damage) then
+            @:DEALLOCATE(q_prim_vf(eqn_idx%damage)%sf)
+        end if
+
+        if (hyper_cleaning) then
+            @:DEALLOCATE(q_prim_vf(eqn_idx%psi)%sf)
+        end if
+
+        if (bubbles_euler) then
+            do i = eqn_idx%bub%beg, eqn_idx%bub%end
+                @:DEALLOCATE(q_prim_vf(i)%sf)
+            end do
+        end if
+
+        if (model_eqns == model_eqns_6eq) then
+            do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
+                @:DEALLOCATE(q_prim_vf(i)%sf)
+            end do
+        end if
+        ! end if
 
         @:DEALLOCATE(q_prim_vf)
 
