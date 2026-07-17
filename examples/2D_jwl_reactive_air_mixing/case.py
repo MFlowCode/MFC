@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # Real-world 2D JWL detonation with full products-air mixing.
 #
-# A full-density cylindrical TNT charge (rho0 = 1630 kg/m^3, radius 5 cm) sits at
-# rest at ambient pressure in free air at STP. A small central hot spot ignites a
+# A PETN charge (Kuhl et al., UCRL-PROC-225822 (2006) Appendix JWL fit, rho0 = 1000
+# kg/m^3 -- Kuhl's own pressed-booster reference density, radius 5 cm) sits at rest at
+# ambient pressure in free air at STP. A small central hot spot ignites a
 # self-propagating JWL++ (jwl_reactive, Souers 2000) detonation: dl/dt = G p^b (1-l)
 # releases the detonation energy E0/rho0 as the reaction front sweeps outward at the
-# TNT CJ speed (~6.9 km/s). The reaction is gated by Y*(1-lambda), so ONLY the
+# PETN CJ speed. The reaction is gated by Y*(1-lambda), so ONLY the
 # unreacted explosive burns -- the surrounding air never reacts.
 #
 # Two features distinguish this from the shipped program-burn examples/2D_jwl_detonation:
@@ -14,7 +15,7 @@
 #      Garno et al. (2020) Eq. 17 energy offset e_eff = e + Y*(1-lambda)*delta_e, so the
 #      UNREACTED charge sits on a stiffer Hugoniot than the products (the Y factor keeps the
 #      offset on the explosive, leaving the surrounding air untouched). delta_e is chosen
-#      (below) so the unreacted TNT at (rho0, e=0) sits exactly at ambient pressure. The
+#      (below) so the unreacted PETN at (rho0, e=0) sits exactly at ambient pressure. The
 #      detonation therefore carries a von Neumann pressure spike decaying to the CJ state
 #      -- not the monotonic energy-source profile of a program burn. (The sub-mm reaction
 #      zone is only partially resolved at this engineering resolution; the fully resolved
@@ -29,35 +30,33 @@
 # Uniform 400x400 mesh (grid stretching is known to go NaN with strong JWL reactive
 # sources -- see the note in examples/2D_jwl_detonation).
 import json
-import math
 
-# --- TNT JWL products (same fit as examples/2D_jwl_detonation) ---
-jwl_A = 3.712e11
-jwl_B = 3.231e9
-jwl_R1 = 4.15
-jwl_R2 = 0.95
-jwl_omega = 0.30
-jwl_rho0 = 1630.0
-jwl_E0 = 1.0089e10  # E0 = rho0 * Q_detonation
-jwl_Cv = 613.5
+from mfc.jwl_products import AIR, PETN_KUHL, ambient_fluid, jwl_fluid, znd_delta_e
+
+# --- PETN JWL products (Kuhl et al. 2006 fit; see toolchain/mfc/jwl_products.py) ---
+jwl_rho0 = PETN_KUHL["rho0"]
 
 # --- Reactant/product energy offset (Garno Eq. 17) ---
-# Placed so unreacted TNT (lambda=0) at (rho0, e=0) sits at ambient pressure, i.e.
+# Placed so unreacted PETN (lambda=0) at (rho0, e=0) sits at ambient pressure, i.e.
 # on a stiffer Hugoniot than the products -> resolvable ZND (von Neumann) structure.
 p_amb = 101325.0
-F1 = jwl_A * (1.0 - jwl_omega / jwl_R1) * math.exp(-jwl_R1) + jwl_B * (1.0 - jwl_omega / jwl_R2) * math.exp(-jwl_R2)
-jwl_delta_e = (p_amb - F1) / (jwl_omega * jwl_rho0)  # ~ -1.29e7 J/kg
+jwl_delta_e = znd_delta_e(PETN_KUHL, p_amb)
 
 # --- JWL++ rate: dl/dt = jwl_G * p^jwl_b_exp * (1 - lambda) ---
-# G set so the reaction zone spans a few 1 mm cells at TNT's ~21 GPa CJ pressure
-# (e-fold time ~0.4 us -> zone ~3 mm), giving a sharp but resolved detonation front.
-jwl_G = 5.0e-15
+# Calibrated in 1D (examples/1D_jwl_znd_detonation-style planar runs, see that
+# README) against PETN_KUHL's measured, G-invariant CJ eigenvalue: D_CJ = 6245
+# m/s, P_CJ = 16.7 GPa (front speed and post-reaction plateau pressure held
+# fixed across a 3.3x change in G -- the operational definition of the CJ
+# state). This G gives a ~1.25 mm reaction zone at 1D resolution (dx=10 um);
+# at this case's 1 mm mesh the zone is sub-cell, same engineering-resolution
+# caveat as the original TNT case (P10 Souers: recalibrate per grid).
+jwl_G = 1.0e-13
 jwl_b_exp = 2.0
 
 # --- Air (ideal gas, STP) ---
-air_rho = 1.225
-air_gamma_mfc = 2.5  # 1/(1.4 - 1)
-air_Cv = 717.5
+air_rho = AIR["rho0"]
+air_gamma_mfc = AIR["gamma"]
+air_Cv = AIR["cv"]
 
 print(
     json.dumps(
@@ -123,7 +122,7 @@ print(
             "patch_icpp(1)%alpha_rho(2)": air_rho * (1.0 - 1.0e-8),
             "patch_icpp(1)%alpha(1)": 1.0e-8,
             "patch_icpp(1)%alpha(2)": 0.99999999,
-            # Patch 2: full-density TNT charge, radius 5 cm, unreacted (ambient pressure).
+            # Patch 2: PETN charge, radius 5 cm, unreacted (ambient pressure).
             "patch_icpp(2)%geometry": 2,
             "patch_icpp(2)%alter_patch(1)": "T",
             "patch_icpp(2)%x_centroid": 0.0,
@@ -136,7 +135,7 @@ print(
             "patch_icpp(2)%alpha_rho(2)": air_rho * 1.0e-8,
             "patch_icpp(2)%alpha(1)": 0.99999999,
             "patch_icpp(2)%alpha(2)": 1.0e-8,
-            # Patch 3: central hot spot (still TNT material) igniting the burn.
+            # Patch 3: central hot spot (still PETN material) igniting the burn.
             "patch_icpp(3)%geometry": 2,
             "patch_icpp(3)%alter_patch(1)": "T",
             "patch_icpp(3)%alter_patch(2)": "T",
@@ -150,26 +149,14 @@ print(
             "patch_icpp(3)%alpha_rho(2)": air_rho * 1.0e-8,
             "patch_icpp(3)%alpha(1)": 0.99999999,
             "patch_icpp(3)%alpha(2)": 1.0e-8,
-            # Fluid 1: TNT JWL products.
-            "fluid_pp(1)%eos": 2,
-            "fluid_pp(1)%gamma": 2.5,
-            "fluid_pp(1)%pi_inf": 0.0,
-            "fluid_pp(1)%cv": jwl_Cv,
-            "fluid_pp(1)%jwl_A": jwl_A,
-            "fluid_pp(1)%jwl_B": jwl_B,
-            "fluid_pp(1)%jwl_R1": jwl_R1,
-            "fluid_pp(1)%jwl_R2": jwl_R2,
-            "fluid_pp(1)%jwl_omega": jwl_omega,
-            "fluid_pp(1)%jwl_rho0": jwl_rho0,
-            "fluid_pp(1)%jwl_E0": jwl_E0,
-            "fluid_pp(1)%jwl_air_e0": 2.5575e5,
-            "fluid_pp(1)%jwl_air_rho0": air_rho,
-            "fluid_pp(1)%jwl_delta_e": jwl_delta_e,
-            # Fluid 2: air.
-            "fluid_pp(2)%eos": 1,
-            "fluid_pp(2)%gamma": air_gamma_mfc,
-            "fluid_pp(2)%pi_inf": 0.0,
-            "fluid_pp(2)%cv": air_Cv,
+            # Direct initiation: a pressure-only hot spot was found (in 1D trials)
+            # to be sub-critical for PETN_KUHL's lower CJ pressure -- it fizzles
+            # rather than transitioning to a self-sustained detonation. Seeding the
+            # booster as already-reacted (rxn_val = 1) gives robust direct initiation.
+            "patch_icpp(3)%rxn_val": 1.0,
+            # Fluid 1: PETN JWL products (+ ambient references); Fluid 2: air.
+            **jwl_fluid(1, PETN_KUHL, AIR, delta_e=jwl_delta_e),
+            **ambient_fluid(2, AIR),
         }
     )
 )

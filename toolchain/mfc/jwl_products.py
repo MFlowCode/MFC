@@ -70,6 +70,21 @@ PETN = {  # Dobratz & Crawford, UCRL-52997; P_CJ ~ 33.5 GPa, D ~ 8300 m/s
     "Q": 1.01e10 / 1770.0,
     "cv": 1000.0,
 }
+PETN_KUHL = {  # Kuhl, Bell, Beckner, Khasainov, UCRL-PROC-225822 (2006) Appendix;
+    # rho0 is KUHL'S OWN reference/charge density (1.0 g/cc pressed booster, not
+    # full PETN TMD 1.77 g/cc) -- A/B are fit to that isochor, so use them together.
+    # cv derived from R_DP = 28.76 g/mol via cv = R/omega; Q from the reported heat
+    # of detonation 1423 cal/g; T_CJ ~ 4600 K (no separate D_CJ/P_CJ reported).
+    "name": "PETN (Kuhl)",
+    "A": 5.8e11,
+    "B": 9.3e9,
+    "R1": 7.0,
+    "R2": 1.7,
+    "omega": 0.246,
+    "rho0": 1000.0,
+    "Q": 5.9538e6,
+    "cv": 1174.9,
+}
 COMP_B = {  # Dobratz & Crawford, UCRL-52997 (Composition B-3); P_CJ ~ 29.5 GPa, D ~ 7980 m/s
     "name": "Composition B",
     "A": 5.242e11,
@@ -104,7 +119,7 @@ PBX9404 = {  # Dobratz & Crawford, UCRL-52997; P_CJ ~ 37 GPa, D ~ 8800 m/s
     "cv": 1000.0,
 }
 
-PRODUCTS = {p["name"]: p for p in (TNT, LX10, PETN, COMP_B, HMX, PBX9404)}
+PRODUCTS = {p["name"]: p for p in (TNT, LX10, PETN, PETN_KUHL, COMP_B, HMX, PBX9404)}
 
 # --- ambient gas (the co-existing non-JWL fluid) ---
 # gamma is MFC's convention (1/(gamma_phys - 1)); e0 [J/kg] is the energy at p0, rho0.
