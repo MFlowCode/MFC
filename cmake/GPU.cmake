@@ -143,6 +143,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Mfprelaxed>
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")

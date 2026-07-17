@@ -25,7 +25,7 @@ module m_phase_change
 
     !> @name Parameters for the first order transition phase change
     !> @{
-    integer, parameter  :: max_iter = 1e8_wp            !< max # of iterations
+    integer, parameter  :: max_iter = 100000            !< max Newton iterations before accepting the last iterate
     real(wp), parameter :: pCr = 4.94e7_wp              !< Critical pressure of water [Pa]
     real(wp), parameter :: TCr = 385.05_wp + 273.15_wp  !< Critical temperature of water [K]
     real(wp), parameter :: mixM = 1.0e-8_wp             !< Mixture mass fraction threshold for triggering phase change
@@ -353,6 +353,8 @@ contains
         do while ((abs(pS - pO) > palpha_eps) .and. (abs((pS - pO)/pO) > palpha_eps/1.e4_wp) .or. (ns == 0))
             ! increasing counter
             ns = ns + 1
+            ! guard against non-convergence: accept the last iterate rather than looping forever
+            if (ns >= max_iter) exit
 
             ! updating old pressure
             pO = pS
@@ -430,6 +432,8 @@ contains
 
             ! Updating counter for the iterative procedure
             ns = ns + 1
+            ! guard against non-convergence: accept the last iterate rather than looping forever
+            if (ns >= max_iter) exit
 
             ! Auxiliary variables to help in the calculation of the residue
             mCP = 0.0_wp; mCPD = 0.0_wp; mCVGP = 0.0_wp; mCVGP2 = 0.0_wp; mQ = 0.0_wp; mQD = 0.0_wp
@@ -627,6 +631,8 @@ contains
             do while ((abs(FT) > ptgalpha_eps) .or. (ns == 0))
                 ! increasing counter
                 ns = ns + 1
+                ! guard against non-convergence: accept the last iterate rather than looping forever
+                if (ns >= max_iter) exit
 
                 ! calculating residual
                 FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*(1 - log(TSat)) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) &
