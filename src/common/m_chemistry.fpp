@@ -178,8 +178,8 @@ contains
             ! Pass 1: per-rank local stiffness probe -> adapt nsub for this step, no MPI. Each rank
             ! sizes its own work from the largest fractional net species change any of its cells sees.
             stiff_max = 0._wp
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, cdot, eqn, rho, T, wr, cell_stiff]', reduction='[[stiff_max]]', &
-                                & reductionOp='[MAX]', copyin='[bounds, dtime]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, cdot, eqn, rho, T, T_new, energy, wr, cell_stiff]', &
+                                & reduction='[[stiff_max]]', reductionOp='[MAX]', copyin='[bounds, dtime]')
             do z = bounds(3)%beg, bounds(3)%end
                 do y = bounds(2)%beg, bounds(2)%end
                     do x = bounds(1)%beg, bounds(1)%end
@@ -188,7 +188,18 @@ contains
                         do eqn = eqn_idx%species%beg, eqn_idx%species%end
                             Ys(eqn - eqn_idx%species%beg + 1) = q_cons_vf(eqn)%sf(x, y, z)/rho
                         end do
+                        ! q_T_sf still holds the pre-update RK-stage temperature; re-solve T from the fresh
+                        ! post-advection internal energy so a just-shock-heated cell is probed at its true
+                        ! (hot) temperature. Otherwise the stiffness is under-read and nsub under-sizes
+                        ! exactly at an ignition front.
+                        energy = q_cons_vf(eqn_idx%E)%sf(x, y, z)/rho
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = eqn_idx%mom%beg, eqn_idx%mom%end
+                            energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/rho)**2
+                        end do
                         T = q_T_sf%sf(x, y, z)
+                        call get_temperature(energy, T, Ys, .true., T_new)
+                        T = T_new
                         ! Net rate (creation - destruction) on purpose: nsub sizes the accuracy of the
                         ! composition trajectory, which is set by how fast Ys actually moves, not by the
                         ! raw forward/reverse magnitudes. In fast partial equilibrium the net is ~0 and the
@@ -232,7 +243,11 @@ contains
                         energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/rho)**2
                     end do
 
+                    ! re-solve T from the fresh internal energy so the first predictor sub-step starts
+                    ! from the post-advection state (q_T_sf holds the pre-update RK-stage temperature).
                     T = q_T_sf%sf(x, y, z)
+                    call get_temperature(energy, T, Ys, .true., T_new)
+                    T = T_new
 
                     do s = 1, nsub
                         ! predictor: rates at the start of the sub-step (one fused pass fills both)
