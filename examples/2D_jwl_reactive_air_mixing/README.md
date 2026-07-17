@@ -57,6 +57,23 @@ companion case via a CJ-eigenvalue (G-invariance) test — see
 - `contours_evolution.png` — pressure at four times: initiation → outward
   detonation → products-air expansion.
 
+`analyze_checklist.py` runs the four quantitative checks of the Blast-Afterburn
+validation note (`numerical_checks_reactive_jwl.tex`) by binning the field onto
+radius `r = hypot(x, y)`:
+
+- `checklist_1_propagation.png` — radial profiles `p, ρ, u_r, λ, Y` at six times
+  (initiation and propagation: a coupled shock-reaction front, not a decaying
+  blast; `λ` steps 0→1 across the front).
+- `checklist_2_energy.png` — explosive mass (flat to machine precision until the
+  blast reaches the open boundary), unreacted mass `∫ρY(1-λ)dV → 0`, and total
+  energy (rises ×2.01 from the EOS-embedded chemical release, then flat until
+  efflux — a conservative release, no external source).
+- `checklist_3_breakout.png` — shock trajectory `R_s(t)` with charge breakout,
+  the peak-pressure envelope `p_shock(r)` fitted over the uncontaminated window,
+  and the radial specific impulse `I(r)`.
+- `checklist_4_closure.png` — the mixing cells `1e-6 < Y < 1-1e-6` and the
+  `(ρ, p, e)` state there, i.e. where the weighted-composition closure is active.
+
 ## What the run shows
 
 Measured directly from the `D/` output of the shipped run (400×400, 1 mm cells):

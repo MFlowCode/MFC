@@ -67,6 +67,18 @@ at Kuhl's reference density (1000 kg/m^3) outmass the swept air
 (~1.2 kg/m^3) by ~3 orders of magnitude, so `Y` stays near 1 almost
 everywhere the front has passed even after significant dilution.
 
+The full Blast-Afterburn checklist (`numerical_checks_reactive_jwl.tex`,
+all four sections) is run on this case by
+`examples/2D_jwl_reactive_air_mixing/analyze_checklist.py`, which writes
+`checklist_1_propagation.png` ... `checklist_4_closure.png`. Results:
+(1) a coupled shock-reaction front with `λ` stepping 0→1 across it, not a
+decaying blast; (2) explosive mass conserved to machine precision and total
+energy rising x2.01 from the EOS-embedded chemical release (conservative,
+no external source), both until the blast vents through the open boundary;
+(3) charge breakout at ~7.5 us with the diverging front running below the
+planar D_CJ ray (curvature velocity deficit); (4) the weighted-composition
+closure active in a thin `0 < Y < 1` shell at the products/air contact.
+
 ## Open items
 
 1. Fix or replace the hand-rolled analytic Hugoniot/Rayleigh-tangency CJ
