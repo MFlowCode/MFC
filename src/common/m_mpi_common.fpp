@@ -571,7 +571,14 @@ contains
             v_size = nVar + 2*nb*nnode
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
+#ifdef MFC_SIMULATION
         else if (present(q_T_sf) .and. chemistry .and. chem_params%diffusion) then
+#else
+        else if (present(q_T_sf) .and. chemistry) then
+            ! post_process converts cons->prim over the ghost-inclusive bounds, so the temperature
+            ! Newton guess must be valid at rank seams for EVERY chemistry run (not only diffusion):
+            ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output
+#endif
             chem_diff_comm = .true.
             v_size = nVar + 1
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
