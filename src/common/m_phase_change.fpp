@@ -27,6 +27,9 @@ module m_phase_change
     integer, parameter  :: max_iter = 100000            !< max Newton iterations before accepting the last iterate
     real(wp), parameter :: pCr = 4.94e7_wp              !< Critical pressure of water [Pa]
     real(wp), parameter :: TCr = 385.05_wp + 273.15_wp  !< Critical temperature of water [K]
+    real(wp), parameter :: Tsat_min = 1.0_wp            !< lower bracket for the saturation-temperature root [K]
+    real(wp), parameter :: tsat_tol = 1.0e-12_wp        !< relative convergence tolerance for the s_TSat root find
+    integer, parameter  :: ptg_ls_max = 30              !< max backtracking-line-search halvings in the pTg solver
     real(wp), parameter :: mixM = 1.0e-8_wp             !< Mixture mass fraction threshold for triggering phase change
     integer, parameter  :: lp = 1                       !< index for the liquid phase of the reacting fluid
     integer, parameter  :: vp = 2                       !< index for the vapor phase of the reacting fluid
@@ -204,7 +207,7 @@ contains
                             q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m2
 
                             ! calling the pTg-equilibrium solver
-                            call s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
+                            call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
                         end if
                     end if
 
@@ -317,7 +320,8 @@ contains
         ! Newton Solver for the pT-equilibrium
         ns = 0
         ! change this relative error metric. 1.e4_wp is just arbitrary
-        do while ((abs(pS - pO) > palpha_eps) .and. (abs((pS - pO)/pO) > palpha_eps/1.e4_wp) .or. (ns == 0))
+        ! Relative criterion written in multiply form to avoid dividing by pO (pO = 0 on the first pass).
+        do while ((abs(pS - pO) > palpha_eps) .and. (abs(pS - pO) > (palpha_eps/1.e4_wp)*abs(pO)) .or. (ns == 0))
             ! increasing counter
             ns = ns + 1
             ! guard against non-convergence: accept the last iterate rather than looping forever
@@ -348,176 +352,147 @@ contains
 
     end subroutine s_infinite_pt_relaxation_k
 
-    !> Apply pTg-equilibrium relaxation for N fluids under pT and 2 fluids under pTg-equilibrium. There is a final common p and T
-    !! during relaxation
-    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
+    !> Evaluate the pTg-equilibrium residual R2D and temperature TS at a trial state (ml, pS) WITHOUT mutating q_cons_vf, so the
+    !! Newton driver can line-search. The total reacting mass mT is conserved, so the reacting masses are (ml, mT - ml) and only the
+    !! inert fluids are read from q_cons_vf. Also returns the mixture sums the Jacobian and the final temperature need.
+    subroutine s_compute_ptg_residual(ml, mT, pS, j, k, l, q_cons_vf, rhoe, R2D, TS, mCP, mQ, mCVGP, mCVGP2, mCPD)
+
+        $:GPU_ROUTINE(function_name='s_compute_ptg_residual', parallelism='[seq]')
+
+        real(wp), intent(in)                                :: ml, mT, pS, rhoe
+        integer, intent(in)                                 :: j, k, l
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(wp), dimension(2), intent(out)                 :: R2D
+        real(wp), intent(out)                               :: TS, mCP, mQ, mCVGP, mCVGP2, mCPD
+        real(wp)                                            :: mQD
+        integer                                             :: i
+
+        ! reacting fluids contribute via (ml, mT - ml); inert fluids are summed from q_cons_vf
+        mCP = ml*cvs(lp)*gs_min(lp) + (mT - ml)*cvs(vp)*gs_min(vp)
+        mQ = ml*qvs(lp) + (mT - ml)*qvs(vp)
+        mCVGP = 0.0_wp; mCVGP2 = 0.0_wp; mCPD = 0.0_wp; mQD = 0.0_wp
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            if ((i /= lp) .and. (i /= vp)) then
+                mCP = mCP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*gs_min(i)
+                mQ = mQ + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
+                mCVGP = mCVGP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*(gs_min(i) - 1)/(pS + ps_inf(i))
+                mCVGP2 = mCVGP2 + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*(gs_min(i) - 1)/((pS + ps_inf(i))**2)
+                mQD = mQD + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
+                mCPD = mCPD + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*gs_min(i)
+            end if
+        end do
+
+        TS = 1.0_wp/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp) &
+                     & *(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mCVGP)
+
+        ! (i) Gibbs free-energy equality
+        R2D(1) = TS*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*(1 - log(TS)) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) - 1) &
+            & *log(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))) + qvs(lp) - qvs(vp)
+
+        ! (ii) constant-energy condition
+        R2D(2) = rhoe + pS + ml*(qvs(vp) - qvs(lp)) - mT*qvs(vp) - mQD + (ml*(gs_min(vp)*cvs(vp) - gs_min(lp)*cvs(lp)) &
+            & - mT*gs_min(vp)*cvs(vp) - mCPD)/(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS &
+            & + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)
+
+    end subroutine s_compute_ptg_residual
+
+    !> Apply pTg-equilibrium relaxation: a damped (backtracking line search) Newton solve for the reacting liquid mass ml and
+    !! pressure pS enforcing Gibbs equality and energy conservation, converging on the residual norm (absolute ptgalpha_eps, or the
+    !! rhoe-relative branch). Every step is projected onto the physical bounds 0 <= ml <= mT, pS > pmin. This converges in a handful
+    !! of iterations with a bounded, uniform count (no GPU warp divergence), unlike the former fixed 1e-3 underrelaxation that
+    !! stalled far from the root.
+    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
 
         $:GPU_ROUTINE(function_name='s_infinite_ptg_relaxation_k', parallelism='[seq]', cray_noinline=True)
 
         integer, intent(in)                                    :: j, k, l
         real(wp), intent(inout)                                :: pS
-        real(wp), dimension(1:), intent(in)                    :: p_infpT
         real(wp), intent(in)                                   :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout)                                :: TS
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: p_infpTg  !< stiffness for the participating fluids for pTg-equilibrium
-        #:else
-            real(wp), dimension(num_fluids) :: p_infpTg  !< stiffness for the participating fluids for pTg-equilibrium
-        #:endif
-        real(wp), dimension(2, 2) :: Jac, InvJac, TJac                  !< matrices for the Newton Solver
-        real(wp), dimension(2)    :: R2D, DeltamP                       !< residual and correction array
-        real(wp)                  :: Om                                 !< underrelaxation factor
-        real(wp)                  :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD  !< auxiliary variables for the pTg-solver
-        real(wp)                  :: ml, mT, dFdT, dTdm, dTdp
+        real(wp), dimension(2, 2)                              :: Jac, InvJac
+        real(wp), dimension(2)                                 :: R2D, R2D_try, DeltamP
+        real(wp)                                               :: mCP, mCPD, mCVGP, mCVGP2, mQ
+        real(wp)                                               :: ml, ml_try, mT, pS_try, pmin, lambda, resnorm, resnorm_try
+        real(wp)                                               :: dFdT, dTdm, dTdp, detJ
+        integer                                                :: ns, ls
 
-        !> Generic loop iterators
-        integer :: i, ns
-        ! pTg-equilibrium solution procedure Newton Solver parameters counter
-        ns = 0
+        ! total reacting mass is conserved; the liquid mass ml is the primary unknown, vapor mass = mT - ml
+        mT = q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) + q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l)
+        ml = q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l)
 
-        ! Relaxation factor
-        Om = 1.0e-3_wp
-
-        p_infpTg = p_infpT
-
+        ! recover a physical pressure guess when the incoming pS is non-physical
         if (((pS < 0.0_wp) .and. ((q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) + q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, &
             & k, &
             & l)) > ((rhoe - gs_min(lp)*ps_inf(lp)/(gs_min(lp) - 1))/qvs(lp)))) .or. ((pS >= 0.0_wp) .and. (pS < 1.0e-1_wp))) then
-            ! improve this initial condition
             pS = 1.0e4_wp
         end if
 
-        ! Loop until the solution for F(X) is satisfied Check whether I need to use both absolute and relative values for the
-        ! residual, and how to do it adequately. Dummy guess to start the pTg-equilibrium problem. improve this initial condition
-        R2D(1) = 0.0_wp; R2D(2) = 0.0_wp
-        DeltamP(1) = 0.0_wp; DeltamP(2) = 0.0_wp
-        do while (((sqrt(R2D(1)**2 + R2D(2)**2) > ptgalpha_eps) .and. ((sqrt(R2D(1)**2 + R2D(2)**2)/rhoe) > (ptgalpha_eps/1.e6_wp) &
-                  & )) .or. (ns == 0))
+        ! pressure floor (stiffened gas requires pS + ps_inf > 0 for both phases)
+        pmin = -min(ps_inf(lp), ps_inf(vp)) + 1.0_wp
 
-            ! Updating counter for the iterative procedure
-            ns = ns + 1
-            ! guard against non-convergence: accept the last iterate rather than looping forever
-            if (ns >= max_iter) exit
+        call s_compute_ptg_residual(ml, mT, pS, j, k, l, q_cons_vf, rhoe, R2D, TS, mCP, mQ, mCVGP, mCVGP2, mCPD)
+        resnorm = sqrt(R2D(1)**2 + R2D(2)**2)
 
-            ! Auxiliary variables to help in the calculation of the residue
-            mCP = 0.0_wp; mCPD = 0.0_wp; mCVGP = 0.0_wp; mCVGP2 = 0.0_wp; mQ = 0.0_wp; mQD = 0.0_wp
-            ! Those must be updated through the iterations, as they either depend on the partial masses for all fluids, or on the
-            ! equilibrium pressure
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                ! sum of the total alpha*rho*cp of the system
-                mCP = mCP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*gs_min(i)
+        do ns = 1, max_iter
+            ! converged on the absolute residual, or on the rhoe-relative residual (multiply form, rhoe > 0)
+            if ((resnorm <= ptgalpha_eps) .or. (resnorm <= (ptgalpha_eps/1.e6_wp)*rhoe)) exit
 
-                ! sum of the total alpha*rho*q of the system
-                mQ = mQ + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
-
-                ! These auxiliary variables now need to be updated, as the partial densities now vary at every iteration
-                if ((i /= lp) .and. (i /= vp)) then
-                    mCVGP = mCVGP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*(gs_min(i) - 1)/(pS + ps_inf(i))
-
-                    mCVGP2 = mCVGP2 + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*(gs_min(i) - 1)/((pS + ps_inf(i))**2)
-
-                    mQD = mQD + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
-
-                    ! sum of the total alpha*rho*cp of the system
-                    mCPD = mCPD + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*gs_min(i)
-                end if
-            end do
-
-            ! calculating the (2D) Jacobian Matrix used in the solution of the pTg-quilibrium model
-
-            ! mass of the reacting liquid
-            ml = q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l)
-
-            ! mass of the two participating fluids
-            mT = q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) + q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l)
-
-            TS = 1/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp) &
-                    & *(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mCVGP)
-
+            ! 2x2 Jacobian of (Gibbs equality, energy) with respect to (ml, pS) at the current state
             dFdT = -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TS) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) - 1)*log(pS &
                      & + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))
-
             dTdm = -(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))*TS**2
-
             dTdp = (mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2 + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp))**2 - cvs(vp) &
                     & *(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) + mCVGP2)*TS**2
 
-            ! F = (F1,F2) is the function whose roots we are looking for x = (m1, p) are the independent variables. m1 = mass of the
-            ! first participant fluid, p = pressure F1 = 0 is the Gibbs free energy quality F2 = 0 is the enforcement of the
-            ! thermodynamic (total - kinectic) energy dF1dm
             Jac(1, 1) = dFdT*dTdm
-
-            ! dF1dp
             Jac(1, 2) = dFdT*dTdp + TS*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))
-
-            ! dF2dm
             Jac(2, &
-                & 1) = (qvs(vp) - qvs(lp) + (cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp))/(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS &
+                & 1) = qvs(vp) - qvs(lp) + (cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp))/(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS &
                 & + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) &
                 & + mCVGP) - (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) - mT*cvs(vp)*gs_min(vp) - mCPD)*(cvs(lp)*(gs_min(lp) &
                 & - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))/((ml*(cvs(lp)*(gs_min(lp) - 1)/(pS &
                 & + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) &
-                & + mCVGP)**2))/1
-            ! dF2dp
+                & + mCVGP)**2)
             Jac(2, &
-                & 2) = (1 + (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) - mT*cvs(vp)*gs_min(vp) - mCPD)*(ml*(cvs(lp)*(gs_min(lp) &
+                & 2) = 1 + (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) - mT*cvs(vp)*gs_min(vp) - mCPD)*(ml*(cvs(lp)*(gs_min(lp) &
                 & - 1)/(pS + ps_inf(lp))**2 - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS &
                 & + ps_inf(vp))**2 + mCVGP2)/(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS &
-                & + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)**2)/1
+                & + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)**2
 
-            ! intermediate elements of J^{-1}
-            InvJac(1, 1) = Jac(2, 2)
-            InvJac(1, 2) = -1.0_wp*Jac(1, 2)
-            InvJac(2, 1) = -1.0_wp*Jac(2, 1)
-            InvJac(2, 2) = Jac(1, 1)
+            detJ = Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1)
+            ! singular Jacobian: no usable Newton direction, accept the current (best) state
+            if (detJ == 0.0_wp) exit
 
-            ! elements of J^{T}
-            TJac(1, 1) = Jac(1, 1)
-            TJac(1, 2) = Jac(2, 1)
-            TJac(2, 1) = Jac(1, 2)
-            TJac(2, 2) = Jac(2, 2)
+            InvJac(1, 1) = Jac(2, 2)/detJ
+            InvJac(1, 2) = -Jac(1, 2)/detJ
+            InvJac(2, 1) = -Jac(2, 1)/detJ
+            InvJac(2, 2) = Jac(1, 1)/detJ
 
-            ! dividing by det(J)
-            InvJac = InvJac/(Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1))
+            DeltamP(1) = -(InvJac(1, 1)*R2D(1) + InvJac(1, 2)*R2D(2))
+            DeltamP(2) = -(InvJac(2, 1)*R2D(1) + InvJac(2, 2)*R2D(2))
 
-            ! calculating correction array for Newton's method
-            DeltamP(1) = -1.0_wp*(InvJac(1, 1)*R2D(1) + InvJac(1, 2)*R2D(2))
-            DeltamP(2) = -1.0_wp*(InvJac(2, 1)*R2D(1) + InvJac(2, 2)*R2D(2))
+            ! backtracking line search: halve the step until the residual decreases, keeping the state
+            ! physical (0 <= ml <= mT, pS above the stiffened-gas floor)
+            lambda = 1.0_wp
+            do ls = 1, ptg_ls_max
+                ml_try = min(max(ml + lambda*DeltamP(1), 0.0_wp), mT)
+                pS_try = max(pS + lambda*DeltamP(2), pmin)
+                call s_compute_ptg_residual(ml_try, mT, pS_try, j, k, l, q_cons_vf, rhoe, R2D_try, TS, mCP, mQ, mCVGP, mCVGP2, mCPD)
+                resnorm_try = sqrt(R2D_try(1)**2 + R2D_try(2)**2)
+                if ((resnorm_try < resnorm) .or. (ls == ptg_ls_max)) exit
+                lambda = 0.5_wp*lambda
+            end do
 
-            ! updating two reacting 'masses'. Recall that inert 'masses' do not change during the phase change liquid
-            q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) + Om*DeltamP(1)
-
-            ! gas
-            q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) - Om*DeltamP(1)
-
-            ! updating pressure
-            pS = pS + Om*DeltamP(2)
-
-            ! calculating residuals, which are (i) the difference between the Gibbs Free energy of the gas and the liquid and (ii)
-            ! the energy before and after the phase-change process.
-
-            ! mass of the reacting liquid
-            ml = q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l)
-
-            ! mass of the two participating fluids
-            mT = q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) + q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l)
-
-            TS = 1/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp) &
-                    & *(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mCVGP)
-
-            ! Gibbs Free Energy Equality condition (DG)
-            R2D(1) = TS*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*(1 - log(TS)) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) &
-                & - 1)*log(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))) + qvs(lp) - qvs(vp)
-
-            ! Constant Energy Process condition (DE)
-            R2D(2) = (rhoe + pS + ml*(qvs(vp) - qvs(lp)) - mT*qvs(vp) - mQD + (ml*(gs_min(vp)*cvs(vp) - gs_min(lp)*cvs(lp)) &
-                & - mT*gs_min(vp)*cvs(vp) - mCPD)/(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS &
-                & + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP))/1
+            ! accept the trial state (TS, mCP, mQ, mCVGP, mCVGP2, mCPD already set to it by the last call)
+            ml = ml_try; pS = pS_try; R2D = R2D_try; resnorm = resnorm_try
         end do
 
-        ! common temperature
+        ! commit the reacting masses (mT conserved) and set the common temperature
+        q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = ml
+        q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = mT - ml
+
         TS = (rhoe + pS - mQ)/mCP
 
     end subroutine s_infinite_ptg_relaxation_k
@@ -562,7 +537,12 @@ contains
 
     end subroutine s_correct_partial_densities
 
-    !> Find the saturation temperature for a given saturation pressure using a Newton solver
+    !> Find the saturation temperature T_sat(p_sat) from Gibbs equality g_l = g_v. For stiffened gases this reduces to the
+    !! dimensionless, monotone saturation relation G(T) = A + B/T + C*ln(T) + D*ln(p_sat + p_inf,l) - ln(p_sat + p_inf,v) = 0 with
+    !! A, B, C, D the saturation-curve coefficients from s_initialize_phasechange_module. G is strictly increasing over the physical
+    !! window [Tsat_min, TCr] for a liquid-vapor pair, so the root is unique. Solved with a safeguarded Newton (rtsafe): a Newton
+    !! step when it stays in the bracket and makes progress, bisection otherwise. Converges in a few iterations, cannot diverge,
+    !! needs no accurate guess (uniform, bounded iteration count -> no GPU warp divergence).
     elemental subroutine s_TSat(pSat, TSat, TSIn)
 
         $:GPU_ROUTINE(function_name='s_TSat',parallelism='[seq]', cray_noinline=True)
@@ -570,48 +550,68 @@ contains
         real(wp), intent(in)  :: pSat
         real(wp), intent(out) :: TSat
         real(wp), intent(in)  :: TSIn
-        real(wp)              :: dFdT, FT, Om  !< auxiliary variables
-        ! Generic loop iterators
-        integer :: ns
+        real(wp)              :: pterm          !< pressure-only part of the residual (constant in T)
+        real(wp)              :: G, dG          !< residual and its T-derivative
+        real(wp)              :: T, T_lo, T_hi  !< current iterate and bracket
+        real(wp)              :: dT, dT_old     !< current and previous step size
+        integer               :: ns
 
+        ! No saturation state to solve for (mass-depleted cell): mirror the incoming zero state.
         if ((f_approx_equal(pSat, 0.0_wp)) .and. (f_approx_equal(TSIn, 0.0_wp))) then
-            ! assigning Saturation temperature
             TSat = 0.0_wp
-        else
-            ! calculating initial estimate for temperature in the TSat procedure. I will also use this variable to iterate over the
-            ! Newton's solver
-            TSat = TSIn
-
-            ! iteration counter
-            ns = 0
-
-            ! underrelaxation factor
-            Om = 1.0e-3_wp
-
-            ! FT must be initialized before the do while condition is evaluated. Fortran .or. is not short-circuit: abs(FT) is
-            ! always evaluated even when ns == 0, so FT must have a defined value here.
-            FT = huge(1.0_wp)
-
-            do while ((abs(FT) > ptgalpha_eps) .or. (ns == 0))
-                ! increasing counter
-                ns = ns + 1
-                ! guard against non-convergence: accept the last iterate rather than looping forever
-                if (ns >= max_iter) exit
-
-                ! calculating residual
-                FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*(1 - log(TSat)) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) &
-                           & - 1)*log(pSat + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))) + qvs(lp) - qvs(vp)
-
-                ! calculating the jacobian
-                dFdT = -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TSat) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) - 1) &
-                         & *log(pSat + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))
-
-                ! updating saturation temperature
-                TSat = TSat - Om*FT/dFdT
-
-                if (abs(FT) <= ptgalpha_eps) exit
-            end do
+            return
         end if
+
+        ! log(p_sat + p_inf,v) is undefined for p_sat + p_inf,v <= 0; no valid saturation temperature
+        ! exists there, so leave the incoming temperature untouched.
+        if (pSat + ps_inf(vp) <= 0.0_wp) then
+            TSat = TSIn
+            return
+        end if
+
+        ! Pressure-dependent part of G(T), constant across the iteration.
+        pterm = D*log(pSat + ps_inf(lp)) - log(pSat + ps_inf(vp))
+
+        ! Bracket the root in [Tsat_min, TCr] and clamp gracefully if it falls outside the physical window.
+        T_lo = Tsat_min
+        T_hi = TCr
+        if (A + B/T_lo + C*log(T_lo) + pterm > 0.0_wp) then  ! root below Tsat_min (p_sat -> 0)
+            TSat = Tsat_min
+            return
+        else if (A + B/T_hi + C*log(T_hi) + pterm < 0.0_wp) then  ! root above TCr (p_sat -> pCr)
+            TSat = TCr
+            return
+        end if
+
+        ! Safeguarded Newton, G(T_lo) < 0 < G(T_hi) by monotonicity.
+        T = TSIn
+        if (T <= T_lo .or. T >= T_hi) T = 0.5_wp*(T_lo + T_hi)
+        dT_old = T_hi - T_lo
+        dT = dT_old
+        G = A + B/T + C*log(T) + pterm
+        dG = -B/T**2 + C/T
+        do ns = 1, max_iter
+            ! bisect if the Newton step leaves the bracket or is not reducing the interval fast enough
+            if ((((T - T_hi)*dG - G)*((T - T_lo)*dG - G) > 0.0_wp) .or. (abs(2.0_wp*G) > abs(dT_old*dG))) then
+                dT_old = dT
+                dT = 0.5_wp*(T_hi - T_lo)
+                T = T_lo + dT
+            else
+                dT_old = dT
+                dT = G/dG
+                T = T - dT
+            end if
+            if (abs(dT) < tsat_tol*T) exit
+            G = A + B/T + C*log(T) + pterm
+            dG = -B/T**2 + C/T
+            if (G < 0.0_wp) then
+                T_lo = T
+            else
+                T_hi = T
+            end if
+        end do
+
+        TSat = T
 
     end subroutine s_TSat
 
