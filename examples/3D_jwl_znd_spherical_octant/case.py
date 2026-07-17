@@ -22,12 +22,13 @@ spherical-divergence quenching risk (senior-cfd-physics.md P4/P6). The
 booster patch is therefore seeded already-reacted (rxn_val = 1) for robust
 direct initiation.
 
-jwl_G was calibrated in 1D planar trials (see examples/1D_jwl_znd_detonation
-for the analogous LX-10 methodology) against PETN_KUHL's measured CJ
-eigenvalue: front speed and post-reaction plateau pressure held fixed
-(D_CJ = 6245 m/s, P_CJ = 16.7 GPa) across a > 3x change in G -- the
-operational definition of a converged CJ state (G sets reaction-zone width
-only, never the propagation speed, for a genuinely self-sustained detonation).
+The self-sustained CJ state of this material (Hugoniot/Rayleigh tangency,
+EOS only) is D_CJ ~ 5384 m/s, P_CJ ~ 7.35 GPa; Kuhl reports only T_CJ ~ 4600
+K, not P_CJ/D_CJ. The 1D calibration run is overdriven by its 30 GPa booster
+plus closed rear boundary (it propagates at ~6245 m/s / ~16.7 GPa, exactly
+the overdriven lambda=1 Hugoniot state at that speed), so jwl_G here sets the
+reaction-zone width but the front speed is piston-set, not CJ. See
+examples/3D_jwl_znd_spherical_octant/VALIDATION.md.
 
 Grid convergence (P8 protocol: 3 grids x factor 2 in dx):
     ./mfc.sh run examples/3D_jwl_znd_spherical_octant/case.py -n 8 -- --grid 39   # dx = 1.00 mm

@@ -43,12 +43,12 @@ p_amb = 101325.0
 jwl_delta_e = znd_delta_e(PETN_KUHL, p_amb)
 
 # --- JWL++ rate: dl/dt = jwl_G * p^jwl_b_exp * (1 - lambda) ---
-# Calibrated in 1D (examples/1D_jwl_znd_detonation-style planar runs, see that
-# README) against PETN_KUHL's measured, G-invariant CJ eigenvalue: D_CJ = 6245
-# m/s, P_CJ = 16.7 GPa (front speed and post-reaction plateau pressure held
-# fixed across a 3.3x change in G -- the operational definition of the CJ
-# state). This G gives a ~1.25 mm reaction zone at 1D resolution (dx=10 um);
-# at this case's 1 mm mesh the zone is sub-cell, same engineering-resolution
+# The self-sustained CJ state of this material (Hugoniot/Rayleigh tangency,
+# EOS only) is D_CJ ~ 5384 m/s, P_CJ ~ 7.35 GPa; Kuhl reports only T_CJ ~ 4600
+# K. jwl_G was set in 1D planar trials, but note the 1D run is overdriven by
+# its booster (see 3D_jwl_znd_spherical_octant/VALIDATION.md); in this 2D case
+# the diverging front vents and relaxes below the planar CJ ray. This G gives
+# a sub-cell reaction zone at the 1 mm mesh -- same engineering-resolution
 # caveat as the original TNT case (P10 Souers: recalibrate per grid).
 jwl_G = 1.0e-13
 jwl_b_exp = 2.0

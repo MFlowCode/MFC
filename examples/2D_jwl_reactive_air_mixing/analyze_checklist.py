@@ -42,8 +42,12 @@ RHO0 = 1000.0  # kg/m^3, PETN_KUHL reference density
 CHARGE_R = 0.05  # m
 DX = 0.4 / 400.0  # m, uniform cell size
 CELL_A = DX * DX  # m^2 (per unit depth)
-D_CJ = 6245.0  # m/s, measured planar CJ speed (see VALIDATION.md)
-P_CJ = 16.7e9  # Pa, measured planar CJ pressure
+# Self-sustained CJ state of the standard-form JWL with Kuhl's PETN constants,
+# from the Hugoniot/Rayleigh tangency (rate-independent, EOS only). The same
+# construction reproduces literature CJ for TNT/PETN/Comp-B to a few percent.
+# Kuhl reports only T_CJ ~ 4600 K, no P_CJ/D_CJ; these are computed, not his.
+D_CJ = 5384.0  # m/s
+P_CJ = 7.35e9  # Pa
 
 
 def load(pre, i, t):
@@ -120,7 +124,7 @@ def checklist_1():
         ax[row].set_ylabel(ylabel)
         if logy:
             ax[row].set_yscale("log")
-    ax[0].axhline(P_CJ, color="crimson", ls="--", lw=0.8, label="measured P_CJ = 16.7 GPa")
+    ax[0].axhline(P_CJ, color="crimson", ls="--", lw=0.8, label="EOS CJ pressure ≈ 7.4 GPa")
     ax[0].text(CHARGE_R * 1000 + 2, P_CJ * 1.3, "charge edge", color=MUTED, fontsize=7)
     ax[0].legend(fontsize=7, ncol=2, loc="upper right")
     ax[-1].set_xlabel("radius  r [mm]")
@@ -178,12 +182,13 @@ def checklist_3():
 
     ax[0].plot(times * 1e6, Rs * 1000, "o", mfc="none", color="#154c79", ms=6, label="MFC shock front (p > 2 atm)")
     tt = np.linspace(times.min(), times.max(), 100)
-    # reference slope: charge-edge breakout ray at planar D_CJ (upper bound on speed)
+    # reference slope: charge-edge breakout ray at the self-sustained planar CJ
+    # speed; a diverging front runs below it (curvature velocity deficit)
     ib = np.argmax(Rs > CHARGE_R)
     t_bo = times[ib]
     ax[0].axhline(CHARGE_R * 1000, color=MUTED, ls=":", lw=0.8)
     ax[0].axvline(t_bo * 1e6, color="crimson", ls="--", lw=0.8, label=f"breakout t ≈ {t_bo * 1e6:.0f} µs")
-    ax[0].plot(tt * 1e6, (CHARGE_R + D_CJ * (tt - t_bo)) * 1000, color="crimson", lw=1.0, alpha=0.6, label="planar D_CJ ray (upper bound)")
+    ax[0].plot(tt * 1e6, (CHARGE_R + D_CJ * (tt - t_bo)) * 1000, color="crimson", lw=1.0, alpha=0.6, label="planar CJ ray (D ≈ 5.4 km/s)")
     ax[0].set_xlabel("time  t [µs]")
     ax[0].set_ylabel("shock radius  R_s [mm]")
     ax[0].legend(fontsize=7, loc="lower right")

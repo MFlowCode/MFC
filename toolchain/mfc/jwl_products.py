@@ -70,11 +70,15 @@ PETN = {  # Dobratz & Crawford, UCRL-52997; P_CJ ~ 33.5 GPa, D ~ 8300 m/s
     "Q": 1.01e10 / 1770.0,
     "cv": 1000.0,
 }
-PETN_KUHL = {  # Kuhl, Bell, Beckner, Khasainov, UCRL-PROC-225822 (2006) Appendix;
-    # rho0 is KUHL'S OWN reference/charge density (1.0 g/cc pressed booster, not
-    # full PETN TMD 1.77 g/cc) -- A/B are fit to that isochor, so use them together.
-    # cv derived from R_DP = 28.76 g/mol via cv = R/omega; Q from the reported heat
-    # of detonation 1423 cal/g; T_CJ ~ 4600 K (no separate D_CJ/P_CJ reported).
+PETN_KUHL = {  # Kuhl et al., UCRL-PROC-225822 (2006), p. 6 (A,B,R1,R2,omega,rho0);
+    # Kuhl & Khasainov, 38th ICT (2007) for Q and T_CJ. rho0 is Kuhl's own pressed
+    # booster loading density (1.0 g/cc, NOT full PETN TMD 1.77 g/cc); the constants
+    # are only self-consistent at 1 g/cc. cv from R_DP = 28.76 g/mol via cv = R/omega;
+    # Q from the 1423 cal/g heat of detonation; T_CJ ~ 4600 K. Kuhl reports NO
+    # P_CJ/D_CJ -- these are a products-isentrope (CJ-adiabat) fit he uses for
+    # ALREADY-detonated products expanding/afterburning, not a detonation model.
+    # The EOS-tangency CJ of the standard-form JWL with these constants is
+    # D_CJ ~ 5384 m/s, P_CJ ~ 7.35 GPa (matches empirical low-density PETN).
     "name": "PETN (Kuhl)",
     "A": 5.8e11,
     "B": 9.3e9,

@@ -18,25 +18,32 @@ Souers 2000 JWL++) with the Garno et al. (2020) Eq. 17 reactant energy
 offset, so it carries real ZND structure rather than an instantaneous or
 kinematic release.
 
-## Calibration (1D, before spending 3D compute)
+## The CJ state and the overdriven 1D calibration
 
-`jwl_G` was calibrated in 1D planar trials, not guessed: increasing `jwl_G`
-by more than 3x left the front speed and the post-reaction plateau pressure
-unchanged (< 0.02%), which is the operational definition of a converged CJ
-eigenvalue (G sets reaction-zone width only; the CJ speed is a property of
-the EOS and heat release alone). Measured:
+The self-sustained Chapman-Jouguet state of this material, from the
+Hugoniot/Rayleigh tangency (rate-independent, EOS only; the same
+construction reproduces literature CJ for full-density PETN, TNT and Comp B
+to a few percent, and is corroborated by empirical low-density PETN at
+1 g/cc, D ~ 5.5 km/s):
 
-    D_CJ = 6245 m/s
-    P_CJ = 16.7 GPa   (post-reaction plateau)
-    P_vN ~ 19-20 GPa  (leading spike, partially resolved at 1D calibration resolution)
+    D_CJ ~ 5384 m/s
+    P_CJ ~ 7.35 GPa
+    P_vN ~ 13.6 GPa (single-fluid offset model; uncalibrated vs experiment)
     jwl_delta_e = -7.98e6 J/kg  (Garno Eq. 17 offset, closed-form -- not fit)
 
-These differ substantially from a hand-rolled Hugoniot/Rayleigh-tangency
-estimate for this material (D ~ 5450 m/s, P_CJ ~ 6.3 GPa); the G-invariance
-check above is trusted as the ground truth (it interrogates MFC's actual
-closure directly) and the analytic script's tangency search is flagged as
-unreliable for this material's unusually steep JWL coefficients (R1 = 7.0,
-R2 = 1.7) -- fixing that script is follow-up work, not blocking.
+Kuhl reports only T_CJ ~ 4600 K for this PETN; P_CJ and D_CJ are not in his
+papers, so the pair above is computed, not quoted.
+
+The shipped 1D calibration run is **overdriven**, not at CJ: it propagates at
+D ~ 6245 m/s with a ~16.8 GPa state behind a ~19.8 GPa spike. That pair is
+exactly the overdriven lambda = 1 Hugoniot/Rayleigh strong branch at
+D = 6245 m/s (16.7 GPa) -- the front is supported by the oversized 30 GPa
+`rxn_val = 1` booster and the closed rear boundary acting as a piston, so a
+planar wave with no rear rarefaction never relaxes to CJ. A `jwl_G`
+invariance check does **not** prove this front is at CJ: a piston-supported
+overdriven front is equally G-independent (its speed is set by the piston,
+not the reaction rate). Re-calibrating to the true CJ (softer booster,
+rarefiable rear boundary) is follow-up work.
 
 A pressure-only hot spot fizzles for this material (P4/P6: sub-critical
 initiation) rather than transitioning to a self-sustained detonation, so the
@@ -74,10 +81,9 @@ passes.
 The naive `analyze_convergence.py` front-arrival fit (pressure crossing
 2x ambient) does NOT yet give a trustworthy speed: it reports ~5.0 km/s at
 dx = 1.00 mm and ~2.3 km/s at dx = 0.50 mm -- moving the WRONG way under
-refinement (a genuine converging quantity should approach `D_CJ` = 6245 m/s
-from either side monotonically, not roughly halve). Two compounding
-diagnostic weaknesses are the likely cause, not necessarily a physics
-failure:
+refinement (a genuine converging quantity should approach a fixed value
+monotonically, not roughly halve). Two compounding diagnostic weaknesses
+are the likely cause, not necessarily a physics failure:
 
 1. **MFC's ASCII probe output prints only 6 decimal digits of time**
    (microsecond resolution) -- coarse relative to the ~1-2 us transit time

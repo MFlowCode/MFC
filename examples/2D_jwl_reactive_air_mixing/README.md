@@ -10,8 +10,8 @@ ignites a self-propagating JWL++ (`jwl_reactive`, Souers 2000) detonation,
 products expand violently into the surrounding air.
 
 Direct initiation with a pressure-only hot spot (no `rxn_val`) was tried first
-and fizzles for this material: PETN_KUHL's CJ pressure (measured, see below)
-is low enough that a pressure spike alone decays without reaching a
+and fizzles for this material: PETN_KUHL's CJ pressure (≈ 7.35 GPa, see
+below) is low enough that a pressure spike alone decays without reaching a
 self-sustained reaction wave. Seeding the booster patch as already-reacted
 gives robust initiation instead.
 
@@ -79,8 +79,9 @@ Measured directly from the `D/` output of the shipped run (400×400, 1 mm cells)
 
 - **t ≈ 4 µs** — detonation propagating outward, `Pmax ≈ 9.1 GPa` near the
   booster/charge center, front (`p > 2 atm`) at ~33 mm; the diverging
-  cylindrical front runs below the measured planar `D_CJ = 6245 m/s`,
-  `P_CJ = 16.7 GPa` as expected from front curvature at this early radius.
+  cylindrical front runs below the self-sustained planar CJ state
+  (`D_CJ ≈ 5384 m/s`, `P_CJ ≈ 7.35 GPa`, computed from the JWL EOS; Kuhl
+  reports only `T_CJ ≈ 4600 K`) as expected from front curvature.
 - **t ≈ 22–37 µs** — the charge has burnt through, the detonation has broken
   out of the charge, and the front (`p > 2 atm`) has advanced to ~116–185 mm
   while `Pmax` decays through ~1.8 GPa → 0.4 GPa as the blast disperses into
