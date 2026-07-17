@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Reactive-JWL validation checklist for the 2D PETN products-air mixing run.
 
-Implements the four checks of the Blast-Afterburn note
-(`numerical_checks_reactive_jwl.tex`) directly from the D/ field output, by
-binning the (nearly axisymmetric) 2D field onto radius r = hypot(x, y):
+Runs four quantitative checks directly from the D/ field output, by binning the
+(nearly axisymmetric) 2D field onto radius r = hypot(x, y):
 
   checklist_1_propagation.png -- radial profiles p, rho, u_r, lambda, Y at
-                                 successive times (initiation & propagation).
+                                 successive times (initiation and propagation).
   checklist_2_energy.png      -- volume-integrated explosive mass (conserved),
                                  unreacted mass rho Y (1-lambda) (must fall to
                                  zero), and total energy (energy-release check).
@@ -16,9 +15,8 @@ binning the (nearly axisymmetric) 2D field onto radius r = hypot(x, y):
   checklist_4_closure.png     -- the mixing/closure region 1e-6 < Y < 1-1e-6
                                  and the (p, rho, e) thermodynamic state there.
 
-House style follows the detonation-physics skill's plotting-validation grammar:
-Agg backend, perceptually-uniform colormaps, sim as markers where a reference
-line exists, explicit units, constrained_layout.
+House style: Agg backend, perceptually-uniform colormaps, sim as markers where a
+reference line exists, explicit units, constrained_layout.
 
 Usage: ./analyze_checklist.py [case_dir]
 """
@@ -110,7 +108,7 @@ t_edge = times[i_edge]
 
 def checklist_1():
     fig, ax = plt.subplots(5, 1, figsize=(7.2, 12.0), sharex=True, constrained_layout=True)
-    fig.suptitle("Check 1 — Initiation & Propagation: radial profiles (2D PETN, 400×400, dx = 1 mm)", fontsize=11, color="#222222")
+    fig.suptitle("Radial profiles of the diverging PETN detonation (2D, 400×400, dx = 1 mm)", fontsize=11, color="#222222")
     keys = [("p", "p [Pa]  (log)", True), ("rho", "ρ [kg/m³]  (log)", True), ("ur", "u_r [m/s]", False), ("lam", "λ  (reaction progress)", False), ("Y", "Y  (products mass fraction)", False)]
     for row, (k, ylabel, logy) in enumerate(keys):
         for j in sel:
@@ -139,24 +137,24 @@ def checklist_2():
     pre = slice(0, i_edge + 1)
     m_dev = 100 * (m_expl[pre].max() - m_expl[pre].min()) / m_expl[0]
     fig, ax = plt.subplots(1, 2, figsize=(11.0, 4.2), constrained_layout=True)
-    fig.suptitle("Check 2 — Energy Release", fontsize=11, color="#222222")
+    fig.suptitle("Explosive consumption and energy release", fontsize=11, color="#222222")
     for a in ax:
         a.axvspan(t_edge * 1e6, times[-1] * 1e6, color=MUTED, alpha=0.12)
         a.axvline(t_edge * 1e6, color=MUTED, ls="--", lw=0.8)
-    ax[0].text(t_edge * 1e6 + 0.5, 0.45, "blast at open\nboundary → efflux", color=MUTED, fontsize=7)
+    ax[0].text(t_edge * 1e6 + 0.5, 0.45, "blast reaches open\nboundary (efflux)", color=MUTED, fontsize=7)
     ax[0].plot(times * 1e6, m_expl / m_expl[0], "o-", color="#2E6B69", ms=4, label="explosive mass  ∫ρ_expl dV  (flat until efflux)")
-    ax[0].plot(times * 1e6, m_unrx / m_unrx[0], "s-", color="#B8420F", ms=4, label="unreacted mass  ∫ρY(1-λ) dV  (should → 0)")
+    ax[0].plot(times * 1e6, m_unrx / m_unrx[0], "s-", color="#B8420F", ms=4, label="unreacted mass  ∫ρY(1-λ) dV  (falls to zero)")
     ax[0].set_xlabel("time  t [µs]")
     ax[0].set_ylabel("fraction of initial")
     ax[0].axhline(0, color=MUTED, ls=":", lw=0.6)
     ax[0].legend(fontsize=7)
-    ax[0].set_title(f"explosive mass conserved to {m_dev:.3f}% before efflux; " f"unreacted → {100 * m_unrx[i_edge] / m_unrx[0]:.1f}%")
+    ax[0].set_title(f"explosive mass conserved to {m_dev:.3f}% before efflux; " f"unreacted fraction {100 * m_unrx[i_edge] / m_unrx[0]:.1f}%")
     ax[1].plot(times * 1e6, e_tot / e_tot[0], "^-", color="#154c79", ms=4, label="total energy  ∫ρE dV")
     ax[1].set_xlabel("time  t [µs]")
     ax[1].set_ylabel("∫ρE dV / initial")
     ax[1].legend(fontsize=7)
     e_plateau = 100 * (e_tot[3 : i_edge + 1].max() - e_tot[3 : i_edge + 1].min()) / e_tot[3]
-    ax[1].set_title(f"chemical release ×{e_tot[i_edge] / e_tot[0]:.2f} (embedded in EOS), " f"then flat to {e_plateau:.2f}%")
+    ax[1].set_title(f"chemical release ×{e_tot[i_edge] / e_tot[0]:.2f} embedded in EOS, " f"then flat to {e_plateau:.2f}%")
     out = os.path.join(HERE, "checklist_2_energy.png")
     fig.savefig(out, dpi=140)
     print(f"wrote {out}")
@@ -176,7 +174,7 @@ def checklist_3():
     I_r = np.trapz(over, times, axis=0) if hasattr(np, "trapz") else np.trapezoid(over, times, axis=0)
 
     fig, ax = plt.subplots(1, 3, figsize=(15.5, 4.3), constrained_layout=True)
-    fig.suptitle("Check 3 — Breakout", fontsize=11, color="#222222")
+    fig.suptitle("Blast breakout and near-field decay", fontsize=11, color="#222222")
 
     ax[0].plot(times * 1e6, Rs * 1000, "o", mfc="none", color="#154c79", ms=6, label="MFC shock front (p > 2 atm)")
     tt = np.linspace(times.min(), times.max(), 100)
@@ -189,7 +187,7 @@ def checklist_3():
     ax[0].set_xlabel("time  t [µs]")
     ax[0].set_ylabel("shock radius  R_s [mm]")
     ax[0].legend(fontsize=7, loc="lower right")
-    ax[0].set_title("front trajectory & breakout")
+    ax[0].set_title("front trajectory and breakout")
 
     # fit window: beyond the charge edge, inside the boundary-contaminated far
     # field (skill plotting-validation §1.2 -- fit only where the law holds)
@@ -205,7 +203,7 @@ def checklist_3():
     ax[1].set_xlabel("radius  r [mm]")
     ax[1].set_ylabel("peak pressure  p_shock [Pa]")
     ax[1].legend(fontsize=7)
-    ax[1].set_title("peak-pressure decay (fit charge edge → 180 mm)")
+    ax[1].set_title("peak-pressure decay (fit charge edge to 180 mm)")
 
     ax[2].plot(rc * 1000, I_r, "-", color="#2E6B69", lw=1.4)
     ax[2].axvline(CHARGE_R * 1000, color=MUTED, ls=":", lw=0.8)
@@ -223,7 +221,7 @@ def checklist_4():
     f = frames[len(frames) * 3 // 4]
     mix = (f["Y"] > 1e-6) & (f["Y"] < 1 - 1e-6)
     fig, ax = plt.subplots(1, 3, figsize=(15.0, 4.4), constrained_layout=True)
-    fig.suptitle(f"Check 4 — Closure region  1e-6 < Y < 1-1e-6  " f"(t = {f['t'] * DT_STEP * 1e6:.0f} µs, {mix.sum()} cells active)", fontsize=11, color="#222222")
+    fig.suptitle(f"Products-air mixing region: cells with 1e-6 < Y < 1-1e-6  " f"(t = {f['t'] * DT_STEP * 1e6:.0f} µs, {mix.sum()} cells)", fontsize=11, color="#222222")
     # spatial location of the closure cells, colored by Y
     x, y, _ = load("prim", 5, f["t"])
     sc = ax[0].scatter(x[mix], y[mix], c=f["Y"][mix], cmap="viridis", s=2, vmin=0, vmax=1)

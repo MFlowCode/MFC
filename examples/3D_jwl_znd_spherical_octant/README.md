@@ -54,9 +54,8 @@ Each resolution should be run from its own subdirectory copy of `case.py`
 collide -- MFC writes output relative to the case file's own directory.
 Five radial probes (`probe_wrt`) sit at r = 0.3, 0.6, 1.0, 1.5, 2.0 times the
 charge radius (4.5, 9.0, 15.0, 22.5, 30.0 mm), spanning the charge interior,
-edge, and breakout region, per the numerical-checks methodology
-(`docs/research/` / the Blast-Afterburn validation checklist: front velocity,
-lambda 0->1 behind the front, breakout).
+edge, and breakout region, so the front velocity, the lambda 0->1 rise behind
+the front, and breakout can each be read off the probe histories.
 
     ./analyze_convergence.py grid_39 grid_79 grid_159
 

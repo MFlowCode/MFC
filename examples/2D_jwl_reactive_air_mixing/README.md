@@ -57,9 +57,8 @@ companion case via a CJ-eigenvalue (G-invariance) test — see
 - `contours_evolution.png` — pressure at four times: initiation → outward
   detonation → products-air expansion.
 
-`analyze_checklist.py` runs the four quantitative checks of the Blast-Afterburn
-validation note (`numerical_checks_reactive_jwl.tex`) by binning the field onto
-radius `r = hypot(x, y)`:
+`analyze_checklist.py` runs four quantitative validation checks by binning the
+field onto radius `r = hypot(x, y)`:
 
 - `checklist_1_propagation.png` — radial profiles `p, ρ, u_r, λ, Y` at six times
   (initiation and propagation: a coupled shock-reaction front, not a decaying

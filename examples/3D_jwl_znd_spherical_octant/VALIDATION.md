@@ -1,8 +1,6 @@
 # PETN (Kuhl) JWL validation summary
 
-Methodology follows the Blast-Afterburn validation checklist
-(`numerical_checks_reactive_jwl.tex`, sections "Initiation and Propagation"
-and "Breakout"): plot p(r,t), confirm a coupled shock-reaction structure
+Methodology: plot p(r,t), confirm a coupled shock-reaction structure
 (not a decaying blast), confirm the front approaches the intended
 detonation velocity, and characterize breakout.
 
@@ -67,8 +65,7 @@ at Kuhl's reference density (1000 kg/m^3) outmass the swept air
 (~1.2 kg/m^3) by ~3 orders of magnitude, so `Y` stays near 1 almost
 everywhere the front has passed even after significant dilution.
 
-The full Blast-Afterburn checklist (`numerical_checks_reactive_jwl.tex`,
-all four sections) is run on this case by
+The full four-part validation checklist is run on the 2D companion case by
 `examples/2D_jwl_reactive_air_mixing/analyze_checklist.py`, which writes
 `checklist_1_propagation.png` ... `checklist_4_closure.png`. Results:
 (1) a coupled shock-reaction front with `λ` stepping 0→1 across it, not a
