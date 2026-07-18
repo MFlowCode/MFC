@@ -132,31 +132,35 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 
 * 1-3D
 * Compressible
-	* Low Mach number treatment available
+	* Low Mach accuracy treatment available
 * Multi- and single-component
 	* 4, 5, and 6 equation models for multi-component/phase features
-   	* Kapila and Allaire models 5-equation models
-* Multi- and single-phase
+   	* Kapila and Allaire 5-equation models
+* Multi-phase support
 	* Phase change via p, pT, and pTg schemes
 * Grids
 	* 1-3D Cartesian, cylindrical, axisymmetric.
 	* Arbitrary grid stretching for multiple domain regions.
 	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
-* Surface tension for multiphase cases
-* Sub-grid bubble dynamics
-	* Euler-Euler volume-averaged bubble models
+* Surface tension (multi-material)
+* Sub-grid particle dynamics
+	* Euler-Euler volume-averaged models
 	* Euler-Lagrange particle tracking
 	* Quadrature-based moment methods (QBMM)
+ 	* Support for bubbles. Nascent support for particles.
 * Viscous effects (high-order accurate representations)
 	* Newtonian and non-Newtonian rheology (Herschel-Bulkley: power-law, Bingham, and yield-stress fluids)
-* Hypoelastic and hyperelastic material models
+* Solid-like material models
+	* Hypoelastic
+ 	* Hyperelastic
 * Ideal and stiffened gas equations of state
 * Body forces
-* Acoustic wave generation (one- and two-way sound sources)
+* Sound wave generation (one- and two-way sources)
 * Chemistry and multi-species transport via [Pyrometheus](https://github.com/pyrometheus/pyrometheus)
+	* Stiff time-integration support 
 * Magnetohydrodynamics (MHD)
-* Relativistic Magnetohydrodynamics (RMHD)
+	* Includes non- and standard-relativistic (RMHD)
 
 ### Numerics
 
@@ -164,7 +168,7 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 	* First-order upwinding
  	* MUSCL (order 2)
   		* Slope limiters: minmod, monotonized central, Van Albada, Van Leer, superbee
- 	* WENO reconstructions (orders 3, 5, and 7)
+ 	* WENO reconstructions (orders 3, 5, 7)
   	* WENO variants: WENO-JS, WENO-M, WENO-Z, TENO
    	* Monotonicity-preserving reconstructions
 	* Reliable handling of large density ratios
@@ -174,8 +178,10 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 	* Slip and no-slip
  	* Thompson-based characteristic BCs: non-reflecting sub/supersonic buffers, inflows, outflows
 	* Generalized characteristic relaxation boundary conditions
-* Runge-Kutta orders 1-3 (SSP TVD), adaptive time stepping
-* RK4-5 operator splitting for Euler-Lagrange modeling
+* Time stepping
+	* Base: Runge-Kutta orders 1-3 (SSP TVD)
+	* Opt-in: RK4-5 operator splitting for Euler-Lagrange modeling
+ 	* Opt-in: Alpha-QSS stiff thermochemistry/reacting flow substepper 
 * Interface sharpening (THINC-like)
 * Information geometric regularization (IGR)
     * Shock capturing without WENO and Riemann solvers
@@ -198,7 +204,7 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* \>500 Regression tests with each PR.
+	* \>600 Regression tests with each PR.
  		* Performed with GNU (GCC), Intel (oneAPI), Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
