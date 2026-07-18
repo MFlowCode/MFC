@@ -274,7 +274,7 @@ The code provides three pre-built patches for dimensional extrusion of initial c
 - `case(273)`: Extrude 1D data to 2D domain, with the mom%%beg data column carrying the
   extruded-axis (mom%%end) velocity profile instead of its own (zeroed) component. Used by
   `examples/2D_reacting_mixing_layer` to give a temporally-evolving mixing layer a nonzero
-  mean streamwise velocity along the extruded axis, which `case(270)` cannot represent since
+  streamwise velocity profile along the extruded axis, which `case(270)` cannot represent since
   it always zeros that component.
 - `case(274)`: Load a full 2D `(x, y)` field with no extrusion -- one data file per variable,
   `(m_glb+1)*(n_glb+1)` lines each in x-major order, covering all primitive variables
@@ -1069,7 +1069,7 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models whe
 | Parameter            | Type    | Description                                                              |
 | ---:                 | :---:   | :---                                                                     |
 | `bf_x[y,z]`          | Logical | Enable body forces in the x[y,z] direction                               |
-| `k_x[y,y]`           | Real    | Magnitude of oscillating acceleration                                    |
+| `k_x[y,z]`           | Real    | Magnitude of oscillating acceleration                                    |
 | `w_x[y,z]`           | Real    | Frequency of oscillating acceleration                                    |
 | `p_x[y,z]`           | Real    | Phase shift of oscillating acceleration                                  |
 | `g_x[y,z]`           | Real    | Magnitude of background acceleration                                     |

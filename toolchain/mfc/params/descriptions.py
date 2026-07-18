@@ -236,6 +236,13 @@ DESCRIPTIONS = {
     "p_y": "Body force phase in y-direction",
     "p_z": "Body force phase in z-direction",
     "bf_spatial_support": "Enable spatially supported body force (Wei & Freund, JFM 2005)",
+    "spatial_bf%amp": "Spatially supported body force amplitude",
+    "spatial_bf%x_centroid": "Streamwise center of the spatial forcing envelope",
+    "spatial_bf%y_centroid": "Cross-stream center of the spatial forcing envelope",
+    "spatial_bf%conv_vel": "Convective velocity advecting the streamwise forcing (conv_vel*t)",
+    "spatial_bf%sigma": "Gaussian envelope width parameter of the spatial forcing",
+    "spatial_bf%freq": "Spatial forcing frequency ladder (per mode, 1:8)",
+    "spatial_bf%phase": "Spatial forcing phase offsets (per mode, 1:8)",
     # Synthetic turbulence
     "synthetic_turbulence": "Enable synthetic turbulence forcing",
     "synth_seed": "Random seed for wave vector generation",

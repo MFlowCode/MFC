@@ -88,7 +88,21 @@ bf_freq = 2 * np.pi * 0.25 * freq_nom * (np.arange(8) + rng.uniform(-0.5, 0.5, s
 bf_phase = rng.uniform(0, 2 * np.pi, size=8)
 
 ic_dir = os.path.join(current_dir, "IC")
-if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(stream_coord) * len(cross_coord)):
+# Key the cache on grid size + mode + physics so a cached IC isn't silently reused across
+# a --hot/cold switch or a physical-parameter change that leaves the line count unchanged.
+cache_key = {
+    "cold": not args.hot,
+    "lines": len(stream_coord) * len(cross_coord),
+    "vort_thickness": vort_thickness,
+    "temperature_ox": temperature_ox,
+    "temperature_fu": temperature_fu,
+    "mach_ox": mach_ox,
+    "mach_fu": mach_fu,
+    "mole_fraction_ox": mole_fraction_ox,
+    "mole_fraction_fu": mole_fraction_fu,
+    "num_iter": num_iter,
+}
+if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(stream_coord) * len(cross_coord), cache_key):
     import jax.numpy as jnp
     from pyrometheus.codegen.python import PythonCodeGenerator
     from pyrometheus.flamelets.make_pyro import make_pyro_object

@@ -20,6 +20,7 @@ written into the mom%beg (index 2) file slot -- the slot that would otherwise ho
 """
 
 import contextlib
+import json
 import os
 import sys
 import time
@@ -306,20 +307,42 @@ def reference_fluid_properties(sol, temperature_ox, pressure, mole_fraction_ox):
     return {"gamma": float(sol.cp_mass / sol.cv_mass), "viscosity": float(sol.viscosity)}
 
 
-def ic_cache_valid(ic_dir, file_extension, expected_lines):
+def ic_cache_valid(ic_dir, file_extension, expected_lines, cache_key=None):
     """True only if IC/ has prim.1.<ext>.dat with exactly the current grid's expected
-    line count. A bare "IC/ is non-empty" check isn't enough: this same case.py is
-    invoked with different --scale values by different toolchain paths (e.g.
-    `./mfc.sh validate` during precheck uses no args/default scale, while a registered
-    test passes its own --scale) that can share this directory, so a cache populated by
-    one grid size must not be silently reused by a run expecting a different one --
-    reading it would desync the Fortran reader (hcid=273 expects exactly len(cross_coord)
-    lines) from the actual grid."""
+    line count AND (if `cache_key` is given) a matching .cache_key.json. A bare "IC/ is
+    non-empty" check isn't enough: this same case.py is invoked with different --scale
+    values by different toolchain paths (e.g. `./mfc.sh validate` during precheck uses no
+    args/default scale, while a registered test passes its own --scale) that can share
+    this directory, so a cache populated by one grid size must not be silently reused by a
+    run expecting a different one -- reading it would desync the Fortran reader (hcid=273
+    expects exactly len(cross_coord) lines) from the actual grid. The `cache_key` further
+    guards against silently reusing an IC generated with a different mode (--hot vs cold)
+    or different physical parameters that leave the line count unchanged."""
     path = os.path.join(ic_dir, f"prim.1.00.{file_extension}.dat")
     if not os.path.isfile(path):
         return False
     with open(path) as fh:
-        return sum(1 for _ in fh) == expected_lines
+        if sum(1 for _ in fh) != expected_lines:
+            return False
+    if cache_key is not None:
+        key_path = os.path.join(ic_dir, ".cache_key.json")
+        if not os.path.isfile(key_path):
+            return False
+        try:
+            with open(key_path) as fh:
+                stored = json.load(fh)
+        except (OSError, ValueError):
+            return False
+        if stored != cache_key:
+            return False
+    return True
+
+
+def write_cache_key(ic_dir, cache_key):
+    """Record the parameters an IC/ was generated with, so ic_cache_valid can detect a
+    stale cache (different --hot/cold mode or physical parameters at the same grid size)."""
+    with open(os.path.join(ic_dir, ".cache_key.json"), "w") as fh:
+        json.dump(cache_key, fh, sort_keys=True)
 
 
 def create_simulation_fields(pyro_gas, sol, pres, temp_ox, temp_fu, cross_coord, vort_thickness, stream_ox, stream_fu, z_st, num_iter, cold):
@@ -452,6 +475,11 @@ def generate_ic_files(
         velocity_1d = np.array(sim_fields.velocity)
         mass_fractions_1d = np.array(sim_fields.mass_fractions)
         density_1d = np.array(pyro_gas.get_density(pressure_1d, temperature_1d, mass_fractions_1d))
+
+        # Fail at generation time rather than writing a non-finite IC that would only
+        # surface downstream as a cryptic VCFL=Inf crash (e.g. a diverged --hot solve).
+        if not all(np.all(np.isfinite(a)) for a in (temperature_1d, pressure_1d, velocity_1d, mass_fractions_1d, density_1d)):
+            raise ValueError("flamelet IC solve produced non-finite values; refusing to write IC")
 
         write_hcid_ic(output_dir, cross_coord, density_1d, velocity_1d, pressure_1d, mass_fractions_1d, file_extension=file_extension)
 

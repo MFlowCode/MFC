@@ -51,7 +51,20 @@ cross_coord, grid = flamelet_ic.compute_grid(vort_thickness, cross_min, cross_ma
 fluid = flamelet_ic.reference_fluid_properties(sol, temperature_ox, pressure, mole_fraction_ox)
 
 ic_dir = os.path.join(current_dir, "IC")
-if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(cross_coord)):
+# Key the cache on grid size + mode + physics so a cached IC isn't silently reused across
+# a --hot/cold switch or a physical-parameter change that leaves the line count unchanged.
+cache_key = {
+    "cold": not args.hot,
+    "lines": len(cross_coord),
+    "vort_thickness": vort_thickness,
+    "temperature_ox": temperature_ox,
+    "temperature_fu": temperature_fu,
+    "mach_c": mach_c,
+    "mole_fraction_ox": mole_fraction_ox,
+    "mole_fraction_fu": mole_fraction_fu,
+    "num_iter": num_iter,
+}
+if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(cross_coord), cache_key):
     import jax.numpy as jnp
     from pyrometheus.codegen.python import PythonCodeGenerator
     from pyrometheus.flamelets.make_pyro import make_pyro_object
@@ -75,6 +88,7 @@ if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(cross_coord)):
         num_iter=num_iter,
         cold=not args.hot,
     )
+    flamelet_ic.write_cache_key(ic_dir, cache_key)
 
 case = {
     "run_time_info": "T",
