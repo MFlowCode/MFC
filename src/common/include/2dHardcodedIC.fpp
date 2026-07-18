@@ -285,6 +285,58 @@
     case (270)  ! 2D extrusion of 1D profile from external data
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
         @: HardcodedReadValues()
+    case (273)  ! Temporal reacting mixing layer: 2D extrusion + streamwise velocity
+        ! @:HardcodedReadValues() always zeros mom%end (the extruded-axis velocity).
+        ! The mom%beg file slot is repurposed to carry the streamwise-velocity-vs-
+        ! cross-stream-position profile (real cross-stream velocity is legitimately
+        ! zero everywhere in the unperturbed base state), so swap it into mom%end and
+        ! zero out mom%beg's true physical value.
+        @: HardcodedReadValues()
+        q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0)
+        q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = 0.0_wp
+    case (274)  ! Full 2D field from external data (no extrusion)
+        ! Unlike case(270-273), this reads a genuinely 2D (x,y) field per variable, with no
+        ! extrusion direction and no zeroed component -- all sys_size variables are read and
+        ! assigned directly. Data files must have exactly (m_glb+1)*(n_glb+1) lines per
+        ! variable, in x-major order (outer loop x, inner loop y), matching this rank's
+        ! global grid exactly -- by construction, since the IC generator derives both the
+        ! grid and the file contents from the same computation.
+        !
+        ! A local cell's global (x, y) index is derived from x_cc(i)/y_cc(j) against the
+        ! file's own first coordinate and this rank's uniform grid spacing -- following the
+        ! same pattern as case(270)'s global_offset_x/y above -- rather than from start_idx:
+        ! start_idx is only allocated when parallel_io=T (s_initialize_parallel_io_common
+        ! returns before allocating it otherwise), so a serial-IO run (the default for
+        ! golden-file tests) would index into an unallocated array.
+        if (.not. files_loaded274) then
+            @:ALLOCATE(stored_values274(0:m_glb, 0:n_glb, sys_size))
+            do f274 = 1, sys_size
+                write (file_num_str274, '(I0)') f274
+                fname274 = trim(files_dir) // "/prim." // trim(file_num_str274) // ".00." // trim(file_extension) // ".dat"
+                open (newunit=unit274, file=trim(fname274), status='old', action='read', iostat=ios274)
+                if (ios274 /= 0) call s_mpi_abort("Error opening file: " // trim(fname274))
+                do ix274 = 0, m_glb
+                    do iy274 = 0, n_glb
+                        read (unit274, *, iostat=ios274) dummy_x274, dummy_y274, stored_values274(ix274, iy274, f274)
+                        if (ios274 /= 0) call s_mpi_abort("Error reading file: " // trim(fname274))
+                        if (f274 == 1 .and. ix274 == 0 .and. iy274 == 0) then
+                            x0_274 = dummy_x274
+                            y0_274 = dummy_y274
+                        end if
+                    end do
+                end do
+                close (unit274)
+            end do
+            files_loaded274 = .true.
+        end if
+
+        x_step274 = x_cc(1) - x_cc(0)
+        y_step274 = y_cc(1) - y_cc(0)
+        ix_idx274 = max(0, min(nint((x_cc(i) - x0_274)/x_step274), m_glb))
+        iy_idx274 = max(0, min(nint((y_cc(j) - y0_274)/y_step274), n_glb))
+        do f274 = 1, sys_size
+            q_prim_vf(f274)%sf(i, j, 0) = stored_values274(ix_idx274, iy_idx274, f274)
+        end do
     case (271)  ! Premixed Flame Vortices Interaction
         @: HardcodedReadValues()
         x1c = 0.0027_wp

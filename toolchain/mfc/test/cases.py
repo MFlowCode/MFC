@@ -2069,6 +2069,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # once goldens are regenerated per-backend or the tolerance model gains backend awareness.
         # cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={"t_step_stop": 1, "t_step_save": 1}, override_tol=10 ** (-10)))
 
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Reacting Mixing Layer",
+                "examples/2D_reacting_mixing_layer/case.py",
+                ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+            )
+        )
+
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Spatial Reacting Mixing Layer",
+                "examples/2D_spatial_reacting_mixing_layer/case.py",
+                ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+            )
+        )
+
         stack.push(
             "1D -> Chemistry -> Dual Isothermal Wall Gradient",
             {

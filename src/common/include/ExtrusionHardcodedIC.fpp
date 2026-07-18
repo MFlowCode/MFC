@@ -50,6 +50,17 @@
     character(len=20)                       :: file_num_str                      !< For storing the file number as a string
     integer                                 :: ios
     integer                                 :: ios2
+
+    ! hcid=274 (2dHardcodedIC.fpp): full 2D field from external data, no extrusion.
+    ! Declared here (not in Hardcoded2DVariables()) so it's visible wherever
+    ! HardcodedDeallocation() is called, matching the pattern of stored_values/x_coords/
+    ! y_coords/files_loaded above.
+    real(wp), allocatable, dimension(:,:,:) :: stored_values274
+    logical                                 :: files_loaded274 = .false.
+    integer                                 :: f274, ix274, iy274, unit274, ios274, ix_idx274, iy_idx274
+    character(len=300)                      :: fname274
+    character(len=20)                       :: file_num_str274
+    real(wp)                                :: dummy_x274, dummy_y274, x0_274, y0_274, x_step274, y_step274
 #:enddef
 
 #:def HardcodedReadValues()
@@ -169,11 +180,15 @@
     select case (num_dims)
     case (1)
         idx = i + 1 + global_offset_x
+        ! Clamp to valid range to handle boundary/ghost cells
+        idx = max(1, min(idx, xRows))
         do f = 1, sys_size
             q_prim_vf(f)%sf(i, 0, 0) = stored_values(idx, 1, f)
         end do
     case (2)
         idx = i + 1 + global_offset_x - index_x
+        ! Clamp to valid range to handle boundary/ghost cells
+        idx = max(1, min(idx, xRows))
         do f = 1, sys_size - 1
             jump = merge(1, 0, f >= eqn_idx%mom%end)
             q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, 1, f)
@@ -182,6 +197,9 @@
     case (3)
         idx = i + 1 + global_offset_x - index_x
         idy = j + 1 + global_offset_y - index_y
+        ! Clamp to valid range to handle boundary/ghost cells
+        idx = max(1, min(idx, xRows))
+        idy = max(1, min(idy, yRows))
         do f = 1, sys_size - 1
             jump = merge(1, 0, f >= eqn_idx%mom%end)
             q_prim_vf(f + jump)%sf(i, j, k) = stored_values(idx, idy, f)
@@ -201,4 +219,10 @@
     end if
 
     files_loaded = .false.
+
+    if (allocated(stored_values274)) then
+        @:DEALLOCATE(stored_values274)
+    end if
+
+    files_loaded274 = .false.
 #:enddef
