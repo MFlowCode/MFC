@@ -1978,6 +1978,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
                 "1D_reactive_shocktube",
+                "1D_reactive_shocktube_adaptive",
+                "2D_detonation_cell",
                 "2D_ibm_steady_shock",
                 "3D_performance_test",
                 "3D_ibm_stl_ellipsoid",
@@ -2115,6 +2117,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 ppn=1,
                 mods={**amr_chem_mods, "chem_params%diffusion": "T"},
                 override_tol=10 ** (-8),
+            )
+        )
+
+        # Operator-split, sub-stepped reaction integration (chem_params%reaction_substeps > 0): the
+        # autoigniting reactor exercises the split path that keeps stiff mechanisms stable.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "chem_params%reaction_substeps": 10},
             )
         )
 
