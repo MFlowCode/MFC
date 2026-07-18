@@ -57,7 +57,7 @@
 - **Compact code** - ~40K lines of Fortran with [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming. Small enough to read and modify; powerful enough for [Gordon Bell](https://awards.acm.org/bell).
 - **Native multi-phase** - 4, 5, and 6-equation models, phase change, surface tension, bubble dynamics, and Euler-Lagrange particle tracking, all built in.
 - **Portable** - NVIDIA and AMD GPUs, CPUs, laptops to exascale. Docker, Codespaces, Homebrew, and [16+ HPC system templates](https://mflowcode.github.io/documentation/running.html).
-- **Tested** - 500+ regression tests per PR with line-level [coverage](https://app.codecov.io/gh/MFlowCode/MFC) across GNU, Intel, Cray, and NVIDIA compilers.
+- **Tested** - 600+ regression tests per PR with line-level [coverage](https://app.codecov.io/gh/MFlowCode/MFC) on GNU, Intel, Cray, NVIDIA, and AMD compilers.
 - **Easy to shape** - If MFC is missing something you need, do not get stuck maintaining an old private copy. Open a PR and make your feature, fix, machine support, or workflow part of the maintained codebase.
 - **Open** - MIT license, active [Slack](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw), and a responsive development team.
 
