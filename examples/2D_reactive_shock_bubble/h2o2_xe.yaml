@@ -1,0 +1,318 @@
+generator: YamlWriter
+cantera-version: 3.2.0
+git-commit: 4a8358e
+date: Wed Jul 15 19:30:59 2026
+phases:
+  - name: h2o2_xe
+    thermo: ideal-gas
+    elements: [H, O, Ar, N, Xe]
+    species: [H2, H, O, O2, OH, H2O, HO2, H2O2, AR, N2, XE]
+    kinetics: bulk
+    transport: mixture-averaged
+    state:
+      T: 1.0e-03
+      density: 1.0e-03
+      Y: {H2: 1.0}
+species:
+  - name: H2
+    composition: {H: 2.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [2.34433112, 7.98052075e-03, -1.9478151e-05, 2.01572094e-08,
+        -7.37611761e-12, -917.935173, 0.683010238]
+        - [3.3372792, -4.94024731e-05, 4.99456778e-07, -1.79566394e-10,
+        2.00255376e-14, -950.158922, -3.20502331]
+      note: TPIS78
+    transport:
+      model: gas
+      geometry: linear
+      diameter: 2.92
+      well-depth: 38.0
+      polarizability: 0.79
+      rotational-relaxation: 280.0
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 1.43319e+11
+      b: 18.42802577
+  - name: H
+    composition: {H: 1.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [2.5, 7.05332819e-13, -1.99591964e-15, 2.30081632e-18, -9.27732332e-22,
+        2.54736599e+04, -0.446682853]
+        - [2.50000001, -2.30842973e-11, 1.61561948e-14, -4.73515235e-18,
+        4.98197357e-22, 2.54736599e+04, -0.446682914]
+      note: L7/88
+    transport:
+      model: gas
+      geometry: atom
+      diameter: 2.05
+      well-depth: 145.0
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 1.32125e+11
+      b: 17.63395812
+  - name: O
+    composition: {O: 1.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [3.1682671, -3.27931884e-03, 6.64306396e-06, -6.12806624e-09,
+        2.11265971e-12, 2.91222592e+04, 2.05193346]
+        - [2.56942078, -8.59741137e-05, 4.19484589e-08, -1.00177799e-11,
+        1.22833691e-15, 2.92175791e+04, 4.78433864]
+      note: L1/90
+    transport:
+      model: gas
+      geometry: atom
+      diameter: 2.75
+      well-depth: 80.0
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 4.74173e+11
+      b: 10.69952492
+  - name: O2
+    composition: {O: 2.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [3.78245636, -2.99673416e-03, 9.84730201e-06, -9.68129509e-09,
+        3.24372837e-12, -1063.94356, 3.65767573]
+        - [3.28253784, 1.48308754e-03, -7.57966669e-07, 2.09470555e-10,
+        -2.16717794e-14, -1088.45772, 5.45323129]
+      note: TPIS89
+    transport:
+      model: gas
+      geometry: linear
+      diameter: 3.458
+      well-depth: 107.4
+      polarizability: 1.6
+      rotational-relaxation: 3.8
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 1.74102e+12
+      b: 22.08100907
+  - name: OH
+    composition: {H: 1.0, O: 1.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [3.99201543, -2.40131752e-03, 4.61793841e-06, -3.88113333e-09,
+        1.3641147e-12, 3615.08056, -0.103925458]
+        - [3.09288767, 5.48429716e-04, 1.26505228e-07, -8.79461556e-11,
+        1.17412376e-14, 3858.657, 4.4766961]
+      note: RUS78
+    transport:
+      model: gas
+      geometry: linear
+      diameter: 2.75
+      well-depth: 80.0
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 4.77552e+11
+      b: 10.72986231
+  - name: H2O
+    composition: {H: 2.0, O: 1.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [4.19864056, -2.0364341e-03, 6.52040211e-06, -5.48797062e-09,
+        1.77197817e-12, -3.02937267e+04, -0.849032208]
+        - [3.03399249, 2.17691804e-03, -1.64072518e-07, -9.7041987e-11,
+        1.68200992e-14, -3.00042971e+04, 4.9667701]
+      note: L8/89
+    transport:
+      model: gas
+      geometry: nonlinear
+      diameter: 2.605
+      well-depth: 572.4
+      dipole: 1.844
+      rotational-relaxation: 4.0
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 1.42674e+13
+      b: 21.12705912
+  - name: HO2
+    composition: {H: 1.0, O: 2.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [4.30179801, -4.74912051e-03, 2.11582891e-05, -2.42763894e-08,
+        9.29225124e-12, 294.80804, 3.71666245]
+        - [4.0172109, 2.23982013e-03, -6.3365815e-07, 1.1424637e-10,
+        -1.07908535e-14, 111.856713, 3.78510215]
+      note: L5/89
+    transport:
+      model: gas
+      geometry: nonlinear
+      diameter: 3.458
+      well-depth: 107.4
+      rotational-relaxation: 1.0
+      note: "*"
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 1.46652e+12
+      b: 21.27344867
+  - name: H2O2
+    composition: {H: 2.0, O: 2.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [4.27611269, -5.42822417e-04, 1.67335701e-05, -2.15770813e-08,
+        8.62454363e-12, -1.77025821e+04, 3.43505074]
+        - [4.16500285, 4.90831694e-03, -1.90139225e-06, 3.71185986e-10,
+        -2.87908305e-14, -1.78617877e+04, 2.91615662]
+      note: L7/88
+    transport:
+      model: gas
+      geometry: nonlinear
+      diameter: 3.458
+      well-depth: 107.4
+      rotational-relaxation: 3.8
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 1.46652e+12
+      b: 21.27344867
+  - name: AR
+    composition: {Ar: 1.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [300.0, 1000.0, 5000.0]
+      data:
+        - [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 4.366]
+        - [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 4.366]
+      note: '120186'
+    transport:
+      model: gas
+      geometry: atom
+      diameter: 3.33
+      well-depth: 136.5
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 1.69466e+12
+      b: 22.30627035
+  - name: N2
+    composition: {N: 2.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [300.0, 1000.0, 5000.0]
+      data:
+        - [3.298677, 1.4082404e-03, -3.963222e-06, 5.641515e-09, -2.444854e-12,
+        -1020.8999, 3.950372]
+        - [2.92664, 1.4879768e-03, -5.68476e-07, 1.0097038e-10, -6.753351e-15,
+        -922.7977, 5.980528]
+      note: '121286'
+    transport:
+      model: gas
+      geometry: linear
+      diameter: 3.621
+      well-depth: 97.53
+      polarizability: 1.76
+      rotational-relaxation: 4.0
+    equation-of-state:
+      model: Redlich-Kwong
+      a: 1.55976e+12
+      b: 26.81724983
+  - name: XE
+    composition: {Xe: 1.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [300.0, 1000.0, 5000.0]
+      data:
+        - [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 4.366]
+        - [2.5, 0.0, 0.0, 0.0, 0.0, -745.375, 4.366]
+      note: '120186'
+    transport:
+      model: gas
+      geometry: atom
+      diameter: 3.33
+      well-depth: 136.5
+reactions:
+  - equation: 2 O + M <=> O2 + M
+    type: three-body
+    rate-constant: {A: 1.2e+11, b: -1.0, Ea: 0.0}
+    efficiencies: {AR: 0.83, H2: 2.4, H2O: 15.4}
+  - equation: H + O + M <=> OH + M
+    type: three-body
+    rate-constant: {A: 5.0e+11, b: -1.0, Ea: 0.0}
+    efficiencies: {AR: 0.7, H2: 2.0, H2O: 6.0}
+  - equation: H2 + O <=> H + OH
+    rate-constant: {A: 38.7, b: 2.7, Ea: 2.619184e+07}
+  - equation: HO2 + O <=> O2 + OH
+    rate-constant: {A: 2.0e+10, b: 0.0, Ea: 0.0}
+  - equation: H2O2 + O <=> HO2 + OH
+    rate-constant: {A: 9630.0, b: 2.0, Ea: 1.6736e+07}
+  - equation: H + O2 + M <=> HO2 + M
+    type: three-body
+    rate-constant: {A: 2.8e+12, b: -0.86, Ea: 0.0}
+    efficiencies: {AR: 0.0, H2O: 0.0, N2: 0.0, O2: 0.0}
+  - equation: H + O2 + O2 <=> HO2 + O2
+    rate-constant: {A: 2.08e+13, b: -1.24, Ea: 0.0}
+  - equation: H + O2 + H2O <=> HO2 + H2O
+    rate-constant: {A: 1.126e+13, b: -0.76, Ea: 0.0}
+  - equation: H + O2 + N2 <=> HO2 + N2
+    rate-constant: {A: 2.6e+13, b: -1.24, Ea: 0.0}
+  - equation: H + O2 + AR <=> HO2 + AR
+    rate-constant: {A: 7.0e+11, b: -0.8, Ea: 0.0}
+  - equation: H + O2 <=> O + OH
+    rate-constant: {A: 2.65e+13, b: -0.6707, Ea: 7.1299544e+07}
+  - equation: 2 H + M <=> H2 + M
+    type: three-body
+    rate-constant: {A: 1.0e+12, b: -1.0, Ea: 0.0}
+    efficiencies: {AR: 0.63, H2: 0.0, H2O: 0.0}
+  - equation: 2 H + H2 <=> H2 + H2
+    rate-constant: {A: 9.0e+10, b: -0.6, Ea: 0.0}
+  - equation: 2 H + H2O <=> H2 + H2O
+    rate-constant: {A: 6.0e+13, b: -1.25, Ea: 0.0}
+  - equation: H + OH + M <=> H2O + M
+    type: three-body
+    rate-constant: {A: 2.2e+16, b: -2.0, Ea: 0.0}
+    efficiencies: {AR: 0.38, H2: 0.73, H2O: 3.65}
+  - equation: H + HO2 <=> H2O + O
+    rate-constant: {A: 3.97e+09, b: 0.0, Ea: 2.807464e+06}
+  - equation: H + HO2 <=> H2 + O2
+    rate-constant: {A: 4.48e+10, b: 0.0, Ea: 4.468512e+06}
+  - equation: H + HO2 <=> 2 OH
+    rate-constant: {A: 8.4e+10, b: 0.0, Ea: 2.65684e+06}
+  - equation: H + H2O2 <=> H2 + HO2
+    rate-constant: {A: 1.21e+04, b: 2.0, Ea: 2.17568e+07}
+  - equation: H + H2O2 <=> H2O + OH
+    rate-constant: {A: 1.0e+10, b: 0.0, Ea: 1.50624e+07}
+  - equation: H2 + OH <=> H + H2O
+    rate-constant: {A: 2.16e+05, b: 1.51, Ea: 1.435112e+07}
+  - equation: 2 OH (+M) <=> H2O2 (+M)
+    type: falloff
+    low-P-rate-constant: {A: 2.3e+12, b: -0.9, Ea: -7.1128e+06}
+    high-P-rate-constant: {A: 7.4e+10, b: -0.37, Ea: 0.0}
+    Troe: {A: 0.7346, T3: 94.0, T1: 1756.0, T2: 5182.0}
+    efficiencies: {AR: 0.7, H2: 2.0, H2O: 6.0}
+  - equation: 2 OH <=> H2O + O
+    rate-constant: {A: 35.7, b: 2.4, Ea: -8.82824e+06}
+  - equation: HO2 + OH <=> H2O + O2
+    rate-constant: {A: 1.45e+10, b: 0.0, Ea: -2.092e+06}
+    duplicate: true
+  - equation: H2O2 + OH <=> H2O + HO2
+    rate-constant: {A: 2.0e+09, b: 0.0, Ea: 1.786568e+06}
+    duplicate: true
+  - equation: H2O2 + OH <=> H2O + HO2
+    rate-constant: {A: 1.7e+15, b: 0.0, Ea: 1.2305144e+08}
+    duplicate: true
+  - equation: 2 HO2 <=> H2O2 + O2
+    rate-constant: {A: 1.3e+08, b: 0.0, Ea: -6.81992e+06}
+    duplicate: true
+  - equation: 2 HO2 <=> H2O2 + O2
+    rate-constant: {A: 4.2e+11, b: 0.0, Ea: 5.0208e+07}
+    duplicate: true
+  - equation: HO2 + OH <=> H2O + O2
+    rate-constant: {A: 5.0e+12, b: 0.0, Ea: 7.250872e+07}
+    duplicate: true

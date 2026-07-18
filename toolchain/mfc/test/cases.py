@@ -1953,6 +1953,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
                 "1D_reactive_shocktube",
+                "1D_reactive_shocktube_adaptive",
+                "2D_detonation_cell",
                 "2D_ibm_steady_shock",
                 "3D_performance_test",
                 "3D_ibm_stl_ellipsoid",
@@ -2054,6 +2056,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         common_mods = {"t_step_stop": Nt, "t_step_save": Nt}
         for ndim in range(1, 4):
             cases.append(define_case_f(f"{ndim}D -> Chemistry -> Perfect Reactor", "examples/nD_perfect_reactor/case.py", ["--ndim", str(ndim)], mods=common_mods))
+
+        # Operator-split, sub-stepped reaction integration (chem_params%reaction_substeps > 0): the
+        # autoigniting reactor exercises the split path that keeps stiff mechanisms stable.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "chem_params%reaction_substeps": 10},
+            )
+        )
 
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(

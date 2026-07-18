@@ -513,6 +513,16 @@ module m_derived_types
         !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
         integer :: gamma_method
         integer :: transport_model
+        !> reaction_substeps > 0 integrates the reaction source with operator splitting: after the
+        !> flow update, each cell's constant-(rho,e) reactor ODE is advanced with this many alpha-QSS
+        !> sub-steps. Stabilizes stiff mechanisms (e.g. methane). 0 = off (reaction source is added to
+        !> the RHS and integrated by the flow time stepper, the default behavior).
+        integer :: reaction_substeps
+        !> adap_substeps = T: adapt the alpha-QSS sub-step count per rank each step from a local
+        !> stiffness estimate, ranging in [reaction_substeps (floor), reaction_substeps_max (ceiling)].
+        !> Zero MPI: each rank sizes its own work from its own cells. Default F = fixed reaction_substeps.
+        logical :: adap_substeps
+        integer :: reaction_substeps_max
     end type chemistry_parameters
 
     !> Lagrangian bubble parameters

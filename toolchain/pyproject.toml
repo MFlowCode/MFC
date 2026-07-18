@@ -34,7 +34,7 @@ dependencies = [
 
     # Chemistry
     "cantera>=3.1.0",
-    "pyrometheus>=1.1.0",  # 1.1.0 adds pyrometheus.flamelets, used by 2D_reacting_mixing_layer
+    "pyrometheus == 1.1.1",  # ==1.1.1 for get_creation_destruction_rates; also provides pyrometheus.flamelets (mixing-layer examples)
 
     # Frontier Profiling
     "astunparse==1.6.2",
