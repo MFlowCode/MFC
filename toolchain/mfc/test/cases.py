@@ -1945,6 +1945,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
+                # File-based IC (hcid=273/274) sized to the full grid; the Example
+                # suite's m/n cap breaks it. Covered by the Chemistry golden tests.
+                "2D_reacting_mixing_layer",
+                "2D_spatial_reacting_mixing_layer",
                 "2D_ibm_multiphase",
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
