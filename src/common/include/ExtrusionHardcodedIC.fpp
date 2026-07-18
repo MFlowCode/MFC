@@ -61,6 +61,7 @@
     character(len=300)                      :: fname274
     character(len=20)                       :: file_num_str274
     real(wp)                                :: dummy_x274, dummy_y274, x0_274, y0_274, x_step274, y_step274
+    real(wp)                                :: file_dx274, file_dy274
 #:enddef
 
 #:def HardcodedReadValues()

@@ -255,10 +255,10 @@ contains
                         theta_x = pre_fac*(x_cc(j) - spbf_xc - spbf_conv_vel*t) + phase(f)
                         theta_y = pre_fac*(y_cc(k) - spbf_yc) + phase(f)
                         spbf_source_x(j, k, l) = spbf_source_x(j, k, &
-                                      & l) + spbf_amp*support*(pre_fac*sin(theta_x)*cos(theta_y) - 2*spbf_sigma*(y_cc(k) &
+                                      & l) + spbf_amp*support*(pre_fac*sin(theta_x)*cos(theta_y) - 2._wp*spbf_sigma*(y_cc(k) &
                                       & - spbf_yc)*sin(theta_x)*sin(theta_y))
                         spbf_source_y(j, k, l) = spbf_source_y(j, k, &
-                                      & l) - spbf_amp*support*(pre_fac*cos(theta_x)*sin(theta_y) - 2*spbf_sigma*(x_cc(j) &
+                                      & l) - spbf_amp*support*(pre_fac*cos(theta_x)*sin(theta_y) - 2._wp*spbf_sigma*(x_cc(j) &
                                       & - spbf_xc)*sin(theta_x)*sin(theta_y))
                     end do
                 end do
@@ -328,6 +328,11 @@ contains
                     do j = bounds(1)%beg, bounds(1)%end
                         rhs_vf(eqn_idx%mom%beg)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg)%sf(j, k, l) + spbf_source_x(j, k, l)
                         rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) + spbf_source_y(j, k, l)
+                        ! Energy work term u*f: velocity (mom/rho) dotted with the momentum source,
+                        ! matching the bf_x/y/z convention below so the forcing is energy-consistent.
+                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + (q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
+                               & l)/rhoM(j, k, l))*spbf_source_x(j, k, l) + (q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/rhoM(j, &
+                               & k, l))*spbf_source_y(j, k, l)
                     end do
                 end do
             end do

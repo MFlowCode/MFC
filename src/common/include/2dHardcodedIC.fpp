@@ -308,6 +308,9 @@
         ! start_idx is only allocated when parallel_io=T (s_initialize_parallel_io_common
         ! returns before allocating it otherwise), so a serial-IO run (the default for
         ! golden-file tests) would index into an unallocated array.
+        x_step274 = x_cc(1) - x_cc(0)
+        y_step274 = y_cc(1) - y_cc(0)
+
         if (.not. files_loaded274) then
             @:ALLOCATE(stored_values274(0:m_glb, 0:n_glb, sys_size))
             do f274 = 1, sys_size
@@ -318,20 +321,43 @@
                 do ix274 = 0, m_glb
                     do iy274 = 0, n_glb
                         read (unit274, *, iostat=ios274) dummy_x274, dummy_y274, stored_values274(ix274, iy274, f274)
-                        if (ios274 /= 0) call s_mpi_abort("Error reading file: " // trim(fname274))
-                        if (f274 == 1 .and. ix274 == 0 .and. iy274 == 0) then
-                            x0_274 = dummy_x274
-                            y0_274 = dummy_y274
+                        if (ios274 /= 0) call s_mpi_abort("Error reading file (fewer lines than grid?): " // trim(fname274))
+                        ! Capture the file's own origin and spacing from its first records so we can
+                        ! confirm it was sampled on this run's grid (a silent mismatch would otherwise
+                        ! read a wrong partial slice -> nonphysical field -> VCFL=Inf downstream).
+                        if (f274 == 1) then
+                            if (ix274 == 0 .and. iy274 == 0) then
+                                x0_274 = dummy_x274
+                                y0_274 = dummy_y274
+                            end if
+                            if (ix274 == 1 .and. iy274 == 0) file_dx274 = dummy_x274 - x0_274
+                            if (ix274 == 0 .and. iy274 == 1) file_dy274 = dummy_y274 - y0_274
                         end if
                     end do
                 end do
+                ! The file must contain exactly (m_glb+1)*(n_glb+1) records: a successful extra
+                ! read means it was generated for a larger grid and would be silently misread.
+                read (unit274, *, iostat=ios274) dummy_x274, dummy_y274
+                if (ios274 == 0) call s_mpi_abort("hcid=274 file has more lines than the grid: " // trim(fname274))
                 close (unit274)
             end do
+
+            ! Origin and spacing must match this run's grid (uniform grid assumed, as in case 270).
+            if (abs(x0_274 - x_cc(0)) > 0.5_wp*abs(x_step274)) &
+                & call s_mpi_abort("hcid=274 file x-origin does not match the grid; regenerate the IC for this grid.")
+            if (m_glb >= 1) then
+                if (abs(file_dx274 - x_step274) > 1.e-6_wp*abs(x_step274)) &
+                    & call s_mpi_abort("hcid=274 file x-spacing does not match the grid; regenerate the IC for this grid.")
+            end if
+            if (n_glb >= 1) then
+                if (abs(y0_274 - y_cc(0)) > 0.5_wp*abs(y_step274)) &
+                    & call s_mpi_abort("hcid=274 file y-origin does not match the grid; regenerate the IC for this grid.")
+                if (abs(file_dy274 - y_step274) > 1.e-6_wp*abs(y_step274)) &
+                    & call s_mpi_abort("hcid=274 file y-spacing does not match the grid; regenerate the IC for this grid.")
+            end if
+
             files_loaded274 = .true.
         end if
-
-        x_step274 = x_cc(1) - x_cc(0)
-        y_step274 = y_cc(1) - y_cc(0)
         ix_idx274 = max(0, min(nint((x_cc(i) - x0_274)/x_step274), m_glb))
         iy_idx274 = max(0, min(nint((y_cc(j) - y0_274)/y_step274), n_glb))
         do f274 = 1, sys_size
