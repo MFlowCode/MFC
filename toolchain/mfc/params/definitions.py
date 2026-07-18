@@ -797,6 +797,14 @@ def _load():
     _r("normFac", REAL)
     _r("interface_file", STR)
 
+    # Body force with spatial support (Wei & Freund, JFM 2005)
+    _r("bf_spatial_support", LOG)
+    for a in ["amp", "x_centroid", "y_centroid", "conv_vel", "sigma"]:
+        _r(f"spatial_bf%{a}", REAL)
+    for j in range(1, 9):
+        _r(f"spatial_bf%freq({j})", REAL)
+        _r(f"spatial_bf%phase({j})", REAL)
+
     # Synthetic turbulence forcing
     _r("synthetic_turbulence", LOG, {"synthetic_turbulence"})
     _r("synth_seed", INT, {"synthetic_turbulence"})
@@ -1183,6 +1191,7 @@ TYPED_DECLS: dict[str, tuple] = {
     "lag_params": ("type(bubbles_lagrange_parameters)", None, True, "Lagrange bubbles' parameters"),
     "particle_cloud": ("type(particle_cloud_parameters)", "num_particle_clouds_max", False, "Particle bed specifications"),
     "simplex_params": ("type(simplex_noise_params)", None, False, None),
+    "spatial_bf": ("type(spbf_parameters)", None, True, "Parameters for spatially supported body force (Wei & Freund, JFM 2005)"),
 }
 
 
@@ -1313,6 +1322,8 @@ _nv(
     "bf_x",
     "bf_y",
     "bf_z",
+    "bf_spatial_support",
+    "spatial_bf",
     "k_x",
     "k_y",
     "k_z",

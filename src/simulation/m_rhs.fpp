@@ -460,6 +460,28 @@ contains
 
         call s_initialize_pressure_relaxation_module
 
+        ! Spatial body force source arrays - sized to include ghost cells so the
+        ! same indexing as q_*_vf is valid; iteration is restricted to interior
+        ! cells via the `bounds` argument in m_body_forces.
+        if (n > 0) then
+            if (p > 0) then
+                @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
+                @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
+            else
+                @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
+                @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
+            end if
+        else
+            @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, 0:0, 0:0))
+            @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, 0:0, 0:0))
+        end if
+        @:PREFER_GPU(spbf_source_x)
+        @:PREFER_GPU(spbf_source_y)
+
+        spbf_source_x = 0._wp
+        spbf_source_y = 0._wp
+        $:GPU_UPDATE(device='[spbf_source_x, spbf_source_y]')
+
     end subroutine s_initialize_rhs_module
 
     !> Compute the right-hand side of the semi-discrete governing equations for a single time stage
@@ -1853,6 +1875,8 @@ contains
             end do
             @:DEALLOCATE(mom_sp, mom_3d)
         end if
+
+        @:DEALLOCATE(spbf_source_x, spbf_source_y)
 
     end subroutine s_finalize_rhs_module
 

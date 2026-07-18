@@ -235,6 +235,7 @@ DESCRIPTIONS = {
     "p_x": "Body force phase in x-direction",
     "p_y": "Body force phase in y-direction",
     "p_z": "Body force phase in z-direction",
+    "bf_spatial_support": "Enable spatially supported body force (Wei & Freund, JFM 2005)",
     # Synthetic turbulence
     "synthetic_turbulence": "Enable synthetic turbulence forcing",
     "synth_seed": "Random seed for wave vector generation",

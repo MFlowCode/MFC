@@ -719,7 +719,7 @@ contains
         integer                                                  :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")
-        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
+        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = eqn_idx%mom%beg, eqn_idx%E

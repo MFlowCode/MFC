@@ -236,6 +236,13 @@ contains
             #:endfor
         end do
 
+        ! manual: spatial-support body-force derived-type members (scalars are broadcast by generated_bcast.fpp)
+        #:for VAR in ['amp','x_centroid','y_centroid','sigma','conv_vel']
+            call MPI_BCAST(spatial_bf%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        #:endfor
+        call MPI_BCAST(spatial_bf%freq, 8, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(spatial_bf%phase, 8, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
         ! manual: synthetic turbulence namelist arrays (registered as indexed
         ! variants only; scalars are broadcast by generated_bcast.fpp)
         call MPI_BCAST(synth_n_waves_per_shell, num_synth_shells_max, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
