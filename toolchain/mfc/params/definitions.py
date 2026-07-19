@@ -1116,9 +1116,9 @@ def _load():
     _r("lag_params%input_path", STR, {"bubbles"})
 
     # chem_params
-    for a in ["diffusion", "reactions"]:
+    for a in ["diffusion", "reactions", "adap_substeps"]:
         _r(f"chem_params%{a}", LOG, {"chemistry"})
-    for a in ["gamma_method", "transport_model"]:
+    for a in ["gamma_method", "transport_model", "reaction_substeps", "reaction_substeps_max"]:
         _r(f"chem_params%{a}", INT, {"chemistry"})
 
     # Per-fluid output arrays

@@ -1344,9 +1344,14 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `chem_params%%reactions`       | Logical | Enable chemical reactions                                |
 | `chem_params%%gamma_method`    | Integer | Methodology for calculating the heat capacity ratio      |
 | `chem_params%%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
+| `chem_params%%reaction_substeps` | Integer | Sub-steps for operator-split reaction integration (0 = off) |
+| `chem_params%%adap_substeps`   | Logical | Per-rank adaptive sub-step count driven by local stiffness  |
+| `chem_params%%reaction_substeps_max` | Integer | Sub-step ceiling when `adap_substeps` is enabled       |
 | `cantera_file`                | String  | Cantera-format mechanism file (e.g., .yaml)              |
 
 - `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
+- `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
+- `chem_params%%adap_substeps` (default `F`) makes each rank choose its α-QSS sub-step count per flow step from the largest chemical stiffness among its own cells: the count sits at `reaction_substeps` (the floor) in inert or burned gas and rises toward `reaction_substeps_max` (the ceiling) only across the reaction front. It uses no MPI collectives. When enabled, `reaction_substeps >= 1` and `reaction_substeps_max >= reaction_substeps` are required
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
