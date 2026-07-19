@@ -3930,9 +3930,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # geometric sources) with the static fine block's lower-r edge at the MINIMUM legal axis
         # distance (amr_block_beg(2) = buff_size) - the stiffest 1/r a block can see. The axis
         # half-width cell makes the coarse y-WENO coefficients per-cell, so this also exercises
-        # the per-swap coefficient recompute (amr_weno_coef_recompute). Validated against a
-        # no-AMR reference (diffs match the Cartesian control's resolution effects; r-weighted
-        # mass drift 1.09e-6 vs the reference's 1.07e-6).
+        # the per-swap coefficient recompute (amr_weno_coef_recompute). Cyl cell volume ~ radius,
+        # so the fold-back is RADIUS-weighted (fine y_cc) and the c/f reflux area-weights the
+        # radial outside-cell (r_face/r_cell) and the axial fine-flux average (fine-face radius);
+        # on a closed axisymmetric box this conserves r-weighted mass to machine zero (~4e-16),
+        # matching the no-AMR base scheme (the prior equal-weight fold-back drifted ~1e-5).
         stack.push(
             "AMR -> 2D -> axisymmetric",
             {

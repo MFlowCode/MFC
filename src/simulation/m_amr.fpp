@@ -117,6 +117,13 @@ module m_amr
     real(wp), allocatable :: sw_jac(:,:,:), sw_jac_old(:,:,:)
     $:GPU_DECLARE(create='[sw_jac, sw_jac_old]')
 
+    !> Per-fine-cell radial volume weight for cyl_coord restriction (axisymmetric): the fold-back must be volume-weighted and cell
+    !! volume is proportional to radius, so a fine child is weighted by its own cell-center radius y_cc. Filled from the active
+    !! block's fine y_cc each restriction and read IDENTICALLY by the device kernel and the host scatter path so np=1 == np>=2 stays
+    !! element-exact. Allocated only for cyl_coord (Cartesian restriction is untouched).
+    real(wp), allocatable :: amr_rvw(:)
+    $:GPU_DECLARE(create='[amr_rvw]')
+
     !> Non-polytropic QBMM fine rhs scratch, shared across slots (slots advance sequentially). Module-level raw arrays mirror the
     !! coarse rhs_pb/rhs_mv pattern: derived-type component actuals for these tripped nvfortran's component-section data clauses on
     !! device.
@@ -320,6 +327,9 @@ contains
         if (igr) then
             @:ALLOCATE(sw_jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ALLOCATE(sw_jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        end if
+        if (cyl_coord .and. n_glb > 0) then
+            @:ALLOCATE(amr_rvw(0:max_f2))
         end if
 
         ! Grid uniformity policy. The two spacing-uniformity consumers are both handled exactly:
@@ -1688,10 +1698,12 @@ contains
 
     end subroutine s_restrict_one_var
 
-    !> Volume-weighted restriction: each covered coarse cell = average of its ref_ratio^d fine children. Writes the caller's coarse
-    !! target - in production the level-0 state q_cons_ts(1)%vf (the deliberate fold-back of fine data each step, plus coarse pb/mv
-    !! for non-polytropic QBMM); the init-time diagnostics pass a scratch buffer instead. Device kernel (per-cell arithmetic
-    !! identical to s_restrict_one_var, which remains the host path for the diagnostics).
+    !> Volume-weighted restriction: each covered coarse cell = volume-weighted average of its ref_ratio^d fine children (equal
+    !! weight on Cartesian grids where the children share a volume; radius-weighted by fine y_cc on cyl_coord, where cell volume ~
+    !! radius - amr_rvw, single-sourced so the device and host paths agree bit-for-bit). Writes the caller's coarse target - in
+    !! production the level-0 state q_cons_ts(1)%vf (the deliberate fold-back of fine data each step, plus coarse pb/mv for
+    !! non-polytropic QBMM); the init-time diagnostics pass a scratch buffer instead. Device kernel (per-cell arithmetic identical
+    !! to s_restrict_one_var, which remains the host path for the diagnostics).
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -1728,6 +1740,14 @@ contains
         if (n_glb > 0) o2 = start_idx(2)
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = sys_size*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
+
+        ! cyl_coord: fine radial volume weights = this block's fine cell-center radii, pushed to device for the restriction kernel.
+        ! Only the owner restricts (device overwrite + host scatter), so only the owner needs them; single-sourced from y_cc so the
+        ! device (owner-local) and host (scatter) child-averages are bit-identical.
+        if (cyl_coord .and. proc_rank == owner) then
+            amr_rvw(0:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%y_cc(0:amr_slots(amr_cur)%n)
+            $:GPU_UPDATE(device='[amr_rvw]')
+        end if
 
         if (proc_rank == owner) then
             ! overwrite the covered cells this rank owns, then send each other coarse-owner its covered slice
@@ -1910,9 +1930,24 @@ contains
     impure real(wp) function f_amr_restrict_cell(i, ci, cj, ck, rlo, rr, dj_hi, dk_hi, nchild) result(v)
         integer, intent(in) :: i, ci, cj, ck, rlo(3), rr, dj_hi, dk_hi, nchild
         integer             :: fi0, fj0, fk0, ddi, ddj, ddk
-        real(wp)            :: acc
+        real(wp)            :: acc, wacc, w
         fi0 = (ci - rlo(1))*rr; fj0 = (cj - rlo(2))*rr; fk0 = (ck - rlo(3))*rr
         acc = 0._wp
+        if (cyl_coord) then
+            ! axisymmetric: cell volume ~ radius, so weight each fine child by its cell-center radius (amr_rvw = fine y_cc)
+            wacc = 0._wp
+            do ddk = 0, dk_hi
+                do ddj = 0, dj_hi
+                    w = amr_rvw(fj0 + ddj)
+                    do ddi = 0, rr - 1
+                        acc = acc + real(amr_slots(amr_cur)%q_cons(i)%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)*w
+                        wacc = wacc + w
+                    end do
+                end do
+            end do
+            v = acc/wacc
+            return
+        end if
         do ddk = 0, dk_hi
             do ddj = 0, dj_hi
                 do ddi = 0, rr - 1
@@ -1956,10 +1991,37 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_fine
         integer, intent(in) :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
         integer :: i, ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
-        real(wp) :: acc
+        real(wp) :: acc, wacc, w
 
         bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
         rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
+        if (cyl_coord) then
+            ! axisymmetric volume-weighted fold-back: weight each fine child by its cell-center radius (amr_rvw = fine y_cc, on
+            ! device). Same child order as the Cartesian path and as the host f_amr_restrict_cell, so CPU==GPU and np=1==np>=2.
+            $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc, wacc, w]')
+            do i = 1, sys_size
+                do ck = bl3, bh3
+                    do cj = bl2, bh2
+                        do ci = bl1, bh1
+                            fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
+                            acc = 0._wp; wacc = 0._wp
+                            do ddk = 0, dk_hi
+                                do ddj = 0, dj_hi
+                                    w = amr_rvw(fj0 + ddj)
+                                    do ddi = 0, rr - 1
+                                        acc = acc + real(q_fine(i)%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)*w
+                                        wacc = wacc + w
+                                    end do
+                                end do
+                            end do
+                            coarse_tgt(i)%sf(ci - o1, cj - o2, ck - o3) = real(acc/wacc, stp)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            return
+        end if
         $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]')
         do i = 1, sys_size
             do ck = bl3, bh3
@@ -5753,6 +5815,9 @@ contains
         if (igr) then
             @:DEALLOCATE(sw_jac)
             @:DEALLOCATE(sw_jac_old)
+        end if
+        if (cyl_coord .and. n_glb > 0) then
+            @:DEALLOCATE(amr_rvw)
         end if
 
     end subroutine s_finalize_amr_module

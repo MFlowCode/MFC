@@ -563,7 +563,7 @@ contains
         integer                                                :: bl1, bh1, bl2, bh2, bl3, bh3, ol1, ol2, ol3, oh1, oh2, oh3
         integer                                                :: tl1, tl2, tl3, dd1_hi, dd2_hi, sidx(3), ext(3), tlo(3), thi(3)
         logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
-        real(wp)                                               :: fblo, fbhi, mlo, mhi
+        real(wp)                                               :: fblo, fbhi, mlo, mhi, wsum, rf
 
         if (.not. amr) return
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
@@ -594,28 +594,58 @@ contains
             mlo = 1._wp; mhi = 1._wp
             if (has_lo) mlo = dx(ol1)
             if (has_hi) mhi = dx(oh1)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do c2 = bl3, bh3
-                    do c1 = bl2, bh2
-                        f20 = 0; if (d3) f20 = rr*c2
-                        f10 = 0; if (d2) f10 = rr*c1
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, dd2_hi
+            if (cyl_coord) then
+                ! axisymmetric x-face (axial): the rr covering fine faces are stacked in the RADIAL (transverse) direction at
+                ! DIFFERENT radii, so Fbar_fine must be area-weighted by fine-face radius (fine y_cc rebuilt from the coarse y_cb of
+                ! transverse cell tl2+c1). Outside-cell axial divergence has no radial factor (axial face area ~ cell volume ~ y_cc,
+                ! cancels), so the width stays dx.
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi, wsum, rf]')
+                do eq = 1, sys_size
+                    do c2 = bl3, bh3
+                        do c1 = bl2, bh2
+                            f20 = 0
+                            f10 = rr*c1
+                            fblo = 0._wp; fbhi = 0._wp; wsum = 0._wp
                             do dd1 = 0, dd1_hi
-                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                                rf = y_cb(tl2 + c1 - 1) + (real(dd1, wp) + 0.5_wp)*(y_cb(tl2 + c1) - y_cb(tl2 + c1 - 1))/real(rr, &
+                                          & wp)
+                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20, islot)*rf
+                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20, islot)*rf
+                                wsum = wsum + rf
                             end do
+                            fblo = fblo/wsum; fbhi = fbhi/wsum
+                            if (has_lo) rhs_vf(eq)%sf(ol1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(ol1, tl2 + c1, &
+                                & tl3 + c2) + (creg(1)%lo(eq, c1, c2, islot) - fblo)/mlo
+                            if (has_hi) rhs_vf(eq)%sf(oh1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(oh1, tl2 + c1, &
+                                & tl3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2, islot))/mhi
                         end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (has_lo) rhs_vf(eq)%sf(ol1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(ol1, tl2 + c1, &
-                            & tl3 + c2) + (creg(1)%lo(eq, c1, c2, islot) - fblo)/mlo
-                        if (has_hi) rhs_vf(eq)%sf(oh1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(oh1, tl2 + c1, &
-                            & tl3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2, islot))/mhi
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            else
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+                do eq = 1, sys_size
+                    do c2 = bl3, bh3
+                        do c1 = bl2, bh2
+                            f20 = 0; if (d3) f20 = rr*c2
+                            f10 = 0; if (d2) f10 = rr*c1
+                            fblo = 0._wp; fbhi = 0._wp
+                            do dd2 = 0, dd2_hi
+                                do dd1 = 0, dd1_hi
+                                    fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                    fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                                end do
+                            end do
+                            fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                            if (has_lo) rhs_vf(eq)%sf(ol1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(ol1, tl2 + c1, &
+                                & tl3 + c2) + (creg(1)%lo(eq, c1, c2, islot) - fblo)/mlo
+                            if (has_hi) rhs_vf(eq)%sf(oh1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(oh1, tl2 + c1, &
+                                & tl3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2, islot))/mhi
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
         ! y-faces (n_glb > 0): transverse dims (x, z); x is always active (2 children)
         has_lo = own_lo(2); has_hi = own_hi(2)
@@ -626,6 +656,13 @@ contains
             mlo = 1._wp; mhi = 1._wp
             if (has_lo) mlo = dy(ol2)
             if (has_hi) mhi = dy(oh2)
+            ! cyl_coord (axisymmetric): the radial c/f flux correction is area-weighted - the low/high face carries radius y_cb, the
+            ! outside cell volume carries y_cc, so fold r_face/r_cell into the width (kernel divides by it). r_+ = y_cb(ol2) at the
+            ! block's low face; r_- = y_cb(oh2-1) at the high face. Byte-identical to the previous form on Cartesian grids.
+            if (cyl_coord) then
+                if (has_lo) mlo = mlo*y_cc(ol2)/y_cb(ol2)
+                if (has_hi) mhi = mhi*y_cc(oh2)/y_cb(oh2 - 1)
+            end if
             $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
             do eq = 1, sys_size
                 do c2 = bl3, bh3
@@ -739,6 +776,12 @@ contains
         if (n_glb > 0) then
             if (own_lo(2)) mlo(2) = dy(olo(2))
             if (own_hi(2)) mhi(2) = dy(ohi(2))
+            ! cyl_coord (axisymmetric): area-weight the radial c/f correction by r_face/r_cell (mirror of s_amr_apply_reflux). L0/L1
+            ! coarse frame -> global y_cb/y_cc for the owned outside cell. r_+ = y_cb(olo(2)) low face; r_- = y_cb(ohi(2)-1) high.
+            if (cyl_coord) then
+                if (own_lo(2)) mlo(2) = mlo(2)*y_cc(olo(2))/y_cb(olo(2))
+                if (own_hi(2)) mhi(2) = mhi(2)*y_cc(ohi(2))/y_cb(ohi(2) - 1)
+            end if
         end if
         if (p_glb > 0) then
             if (own_lo(3)) mlo(3) = dz(olo(3))
@@ -765,7 +808,7 @@ contains
         integer, intent(in) :: islot, rr, olo(3), ohi(3), glo(3), ghi(3), woff(3)
         real(wp), intent(in) :: dtl, w_lo(3), w_hi(3), mlo(3), mhi(3)
         integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, w2, w3, w1, gl1, gh1, gl2, gh2, gl3, gh3
-        real(wp) :: fblo, fbhi, wl, wh, ml, mh
+        real(wp) :: fblo, fbhi, wl, wh, ml, mh, wsum, rf
 
         ! loop bounds hoisted to scalars: array-element bounds (glo(d)/ghi(d)) drive the collapsed inner loop and would force the
         ! host arrays present on the device (an ACC present error)
@@ -777,28 +820,56 @@ contains
             nch = 1; if (n_glb > 0) nch = nch*rr; if (p_glb > 0) nch = nch*rr
             dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
             ol = olo(1); oh = ohi(1); w2 = woff(2); w3 = woff(3); wl = w_lo(1); wh = w_hi(1); ml = mlo(1); mh = mhi(1)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do g2 = gl3, gh3
-                    do g1 = gl2, gh2
-                        f20 = 0; if (p_glb > 0) f20 = rr*g2
-                        f10 = 0; if (n_glb > 0) f10 = rr*g1
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, dd2_hi
+            if (cyl_coord) then
+                ! axisymmetric x-face: area-weight Fbar_fine by fine-face radius (rebuilt from the coarse y_cb of transverse cell
+                ! w2+g1) - the rr covering fine faces sit at different radii. cyl reaches here only single-level (L0 frame), so the
+                ! global y_cb is the correct coarse grid.
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi, wsum, rf]')
+                do eq = 1, sys_size
+                    do g2 = gl3, gh3
+                        do g1 = gl2, gh2
+                            f20 = 0
+                            f10 = rr*g1
+                            fblo = 0._wp; fbhi = 0._wp; wsum = 0._wp
                             do dd1 = 0, dd1_hi
-                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                                rf = y_cb(w2 + g1 - 1) + (real(dd1, wp) + 0.5_wp)*(y_cb(w2 + g1) - y_cb(w2 + g1 - 1))/real(rr, wp)
+                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20, islot)*rf
+                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20, islot)*rf
+                                wsum = wsum + rf
                             end do
+                            fblo = fblo/wsum; fbhi = fbhi/wsum
+                            if (wl /= 0._wp) q(eq)%sf(ol, w2 + g1, w3 + g2) = q(eq)%sf(ol, w2 + g1, &
+                                & w3 + g2) + wl*dtl*(creg(1)%lo(eq, g1, g2, islot) - fblo)/ml
+                            if (wh /= 0._wp) q(eq)%sf(oh, w2 + g1, w3 + g2) = q(eq)%sf(oh, w2 + g1, &
+                                & w3 + g2) + wh*dtl*(fbhi - creg(1)%hi(eq, g1, g2, islot))/mh
                         end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (wl /= 0._wp) q(eq)%sf(ol, w2 + g1, w3 + g2) = q(eq)%sf(ol, w2 + g1, w3 + g2) + wl*dtl*(creg(1)%lo(eq, &
-                            & g1, g2, islot) - fblo)/ml
-                        if (wh /= 0._wp) q(eq)%sf(oh, w2 + g1, w3 + g2) = q(eq)%sf(oh, w2 + g1, &
-                            & w3 + g2) + wh*dtl*(fbhi - creg(1)%hi(eq, g1, g2, islot))/mh
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            else
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+                do eq = 1, sys_size
+                    do g2 = gl3, gh3
+                        do g1 = gl2, gh2
+                            f20 = 0; if (p_glb > 0) f20 = rr*g2
+                            f10 = 0; if (n_glb > 0) f10 = rr*g1
+                            fblo = 0._wp; fbhi = 0._wp
+                            do dd2 = 0, dd2_hi
+                                do dd1 = 0, dd1_hi
+                                    fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                    fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                                end do
+                            end do
+                            fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                            if (wl /= 0._wp) q(eq)%sf(ol, w2 + g1, w3 + g2) = q(eq)%sf(ol, w2 + g1, &
+                                & w3 + g2) + wl*dtl*(creg(1)%lo(eq, g1, g2, islot) - fblo)/ml
+                            if (wh /= 0._wp) q(eq)%sf(oh, w2 + g1, w3 + g2) = q(eq)%sf(oh, w2 + g1, &
+                                & w3 + g2) + wh*dtl*(fbhi - creg(1)%hi(eq, g1, g2, islot))/mh
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
         ! y-faces (n_glb > 0): transverse (x, z); x always active
         if (n_glb > 0 .and. (w_lo(2) /= 0._wp .or. w_hi(2) /= 0._wp)) then
