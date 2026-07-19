@@ -41,6 +41,11 @@ module m_constants
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50  !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp            !< scaling factor for IGR alpha
     integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
+    !> AMR fine-level restart per-block header size, in integers: region box (6) + amr_block_level (1).
+    !> The writer (m_amr:s_write_amr_restart) and BOTH readers (m_amr:s_read_amr_restart and
+    !> m_data_input:s_read_amr_data) must agree on this layout - a mismatch silently misaligns every
+    !> per-block record (see the post-process off-by-one that read the level field as the x-extent).
+    integer, parameter :: amr_restart_blk_hdr_ints = 7
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6
     !> Spatial support width of acoustic source, used in s_source_spatial

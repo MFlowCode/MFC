@@ -11,6 +11,7 @@ module m_data_input
 
     use m_derived_types
     use m_global_parameters
+    use m_constants, only: amr_restart_blk_hdr_ints
     use m_mpi_proxy
     use m_mpi_common
     use m_compile_specific
@@ -625,13 +626,14 @@ contains
         integer, intent(in)                  :: t_step
         character(LEN=path_len + 3*name_len) :: file_loc
         logical                              :: file_exist
-        integer                              :: k, i, nblk, ghdr(3), reg(6), rm, rn, rp
+        integer                              :: k, i, nblk, ghdr(3), reg(6), lvl, rm, rn, rp, cw
         integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d, rr
         integer                              :: have_loc, have_glb
         logical                              :: owns
 
 #ifdef MFC_MPI
         integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
+        integer                             :: bhdr(amr_restart_blk_hdr_ints)
         integer                             :: myext(3)
         integer, allocatable                :: wext(:), rext(:)
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -691,7 +693,7 @@ contains
             allocate (amr_fine(nblk))
             amr_num_fine = 0
             do k = 1, nblk
-                read (2) reg, rm, rn, rp
+                read (2) reg, lvl, rm, rn, rp  ! header: region(6) + amr_block_level(1) + m,n,p (mirrors s_write_amr_restart)
                 do d = 1, 3
                     isect_lo(d) = max(reg(d), sidx(d))
                     isect_hi(d) = min(reg(3 + d), sidx(d) + ext(d))
@@ -703,7 +705,15 @@ contains
                 ! Use the file's authoritative per-block fine extent (rm/rn/rp); derive rr = ref_ratio**level
                 ! from the ratio of fine cells to coarse cells (2 for L1, 4 for L2, etc.).
                 fm = rm; fn = rn; fp = rp
-                rr = (rm + 1)/max(isect_hi(1) - isect_lo(1) + 1, 1)
+                cw = max(isect_hi(1) - isect_lo(1) + 1, 1)
+                rr = (fm + 1)/cw
+                ! fail-closed: a well-formed header has level >= 1 and a fine x-extent that is an integer
+                ! (>= 2) refinement of the coarse footprint. Reading the level field as an extent (the
+                ! post/writer header-layout drift) makes rr collapse to 0 and trips this.
+                if (lvl < 1 .or. rr < 2 .or. mod(fm + 1, &
+                    & cw) /= 0) &
+                    & call s_mpi_abort('amr post: malformed fine-block header (level/extent inconsistent); the AMR restart ' &
+                    & // 'writer and reader header layouts have drifted')
                 amr_num_fine = amr_num_fine + 1
                 call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp, rr)
                 do i = 1, sys_size
@@ -732,9 +742,12 @@ contains
             amr_num_fine = 0
             disp0 = int(3*ibytes, MPI_OFFSET_KIND)
             do k = 1, nblk
-                call MPI_FILE_READ_AT_ALL(ifile, disp0, reg, 6, MPI_INTEGER, status, ierr)
-                call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(6*ibytes, MPI_OFFSET_KIND), wext, 3*num_procs, MPI_INTEGER, status, &
-                                          & ierr)
+                ! per-block header is amr_restart_blk_hdr_ints ints: region(6) + amr_block_level(1), single-sourced
+                ! in m_constants so this mirrors s_write_amr_restart (and m_amr:s_read_amr_restart) exactly.
+                call MPI_FILE_READ_AT_ALL(ifile, disp0, bhdr, amr_restart_blk_hdr_ints, MPI_INTEGER, status, ierr)
+                reg = bhdr(1:6); lvl = bhdr(amr_restart_blk_hdr_ints)
+                call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), wext, &
+                                          & 3*num_procs, MPI_INTEGER, status, ierr)
                 do d = 1, 3
                     isect_lo(d) = max(reg(d), sidx(d))
                     isect_hi(d) = min(reg(3 + d), sidx(d) + ext(d))
@@ -748,7 +761,13 @@ contains
                     fm = wext(3*proc_rank + 1)
                     if (n > 0) fn = wext(3*proc_rank + 2)
                     if (p > 0) fp = wext(3*proc_rank + 3)
-                    rr = (fm + 1)/max(isect_hi(1) - isect_lo(1) + 1, 1)
+                    cw = max(isect_hi(1) - isect_lo(1) + 1, 1)
+                    rr = (fm + 1)/cw
+                    ! fail-closed: mirror the serial path's header sanity check (see s_read_amr_data serial branch)
+                    if (lvl < 1 .or. rr < 2 .or. mod(fm + 1, &
+                        & cw) /= 0) &
+                        & call s_mpi_abort('amr post: malformed fine-block header (level/extent inconsistent); the AMR restart ' &
+                        & // 'writer and reader header layouts have drifted')
                 end if
                 ! validate the writer's per-rank layout against this run's decomposition (catches a
                 ! load_balance simulation, whose weighted splits post never reproduces)
@@ -767,7 +786,7 @@ contains
                 call MPI_EXSCAN(my_cnt, my_off, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
                 if (proc_rank == 0) my_off = int(0, MPI_OFFSET_KIND)
                 call MPI_ALLREDUCE(my_cnt, tot_cnt, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
-                ddisp = disp0 + int((6 + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
+                ddisp = disp0 + int((amr_restart_blk_hdr_ints + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
                 allocate (buf(max(cnt, 1)))
                 call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                           & status, ierr)
