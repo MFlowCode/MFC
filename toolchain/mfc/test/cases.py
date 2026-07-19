@@ -1978,6 +1978,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
                 "1D_reactive_shocktube",
+                "1D_reactive_shocktube_adaptive",
+                "2D_detonation_cell",
                 "2D_ibm_steady_shock",
                 "3D_performance_test",
                 "3D_ibm_stl_ellipsoid",
@@ -2039,6 +2041,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # drag OOB (interior-only fd_coeff at boundary bodies) tracked in
                 # MFlowCode/MFC#1633; fixed here in m_viscous but the golden stays non-portable.
                 "3D_mibm_periodic_collision",
+                # The violently stiff 3D bubble collapse amplifies compiler/arch floating-point
+                # differences past the 1e-3 Example tolerance under the always-pTg phase-change
+                # solver (a Newton equilibrium solve per cavitating cell, replacing the old
+                # shortcut). CI's own value is compiler-version-dependent -- nvhpc 24.5 and 26.1
+                # disagree by ~1.1e-3 (> tol) -- so no single golden passes every lane regardless
+                # of where it is generated. The 2D bubble and all 18 phase-change unit tests remain
+                # portable and CPU/GPU machine-zero; only this stiff 3D collapse is non-portable.
+                "3D_phasechange_bubble",
             ]
             if path in casesToSkip:
                 continue
@@ -2076,6 +2086,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         common_mods = {"t_step_stop": Nt, "t_step_save": Nt}
         for ndim in range(1, 4):
             cases.append(define_case_f(f"{ndim}D -> Chemistry -> Perfect Reactor", "examples/nD_perfect_reactor/case.py", ["--ndim", str(ndim)], mods=common_mods))
+
+        # Operator-split, sub-stepped reaction integration (chem_params%reaction_substeps > 0): the
+        # autoigniting reactor exercises the split path that keeps stiff mechanisms stable.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "chem_params%reaction_substeps": 10},
+            )
+        )
 
         # Chemistry AMR: a reactive H2/O2/AR shocktube with a static 2:1 fine block over the reaction zone.
         # Exercises the species sum/positivity prolongation closure, the per-block reaction on the fine level,

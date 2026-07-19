@@ -629,16 +629,14 @@ contains
         else if (present(q_T_sf) .and. chemistry .and. (chem_params%diffusion .or. amr)) then
             ! diffusion reads the temperature ghost directly; AMR needs it as the cons->prim Newton guess when the
             ! fine block's conversion widens over the ghost shell at a rank seam (else an uninitialized guess -> NaN)
-            chem_T_comm = .true.
-            v_size = nVar + 1
 #else
         else if (present(q_T_sf) .and. chemistry) then
             ! post_process converts cons->prim over the ghost-inclusive bounds, so the temperature
             ! Newton guess must be valid at rank seams for EVERY chemistry run (not only diffusion):
             ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output
+#endif
             chem_T_comm = .true.
             v_size = nVar + 1
-#endif
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
         else

@@ -3326,7 +3326,7 @@ contains
 
     !> ADVANCE phase of a fine RK stage: fine RHS + RK update (+ QBMM/6eq/IB) for the current block. Owner-only. Reads the block's
     !! ghost shell (coarse prolong + fine-fine halo already applied by the fill + halo phases).
-    impure subroutine s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
+    impure subroutine s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
         integer, intent(in)                                        :: s, t_step
         real(wp), intent(in)                                       :: coefs(4)
@@ -3334,7 +3334,6 @@ contains
         type(scalar_field), intent(inout)                          :: q_T_sf
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-        real(wp), intent(inout)                                    :: time_avg
 
         if (.not. amr) return
         if (.not. amr_rank_owns_block) return
@@ -3358,11 +3357,10 @@ contains
             ! the block's OWN side-state and rhs scratch: the coarse pb_in/rhs_pb must not be
             ! touched at fine indices (the coarse stage consumes them after this fine stage)
             call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
-                               & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, &
-                               & time_avg, s)
+                               & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, s)
         else
             call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
-                               & pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, s)
+                               & pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
         end if
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
@@ -3436,7 +3434,7 @@ contains
     !! per substep (s_amr_advance_children); the L2-L2 seam halo is future work. A single owned level-1 block is byte-identical to
     !! the old per-block subcycle (the halo is a no-op with < 2 adjacent same-level blocks, and is skipped at np=1).
     impure subroutine s_amr_advance_fine_subcycle_all(q_old, q_new, coefs, bc_type, q_T_sf, pb_old, mv_old, pb_in, rhs_pb, mv_in, &
-        & rhs_mv, t_step, time_avg)
+        & rhs_mv, t_step)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                  :: q_old, q_new
         real(wp), dimension(:,:), intent(in)                                                    :: coefs  !< rk_coef(1:3, 1:4)
@@ -3446,7 +3444,6 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout)                                          :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)                                           :: rhs_pb, rhs_mv
         integer, intent(in)                                                                     :: t_step
-        real(wp), intent(inout)                                                                 :: time_avg
         real(wp), parameter                                                                     :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
         integer                                                                                 :: islot, sub, s
         real(wp)                                                                                :: th
@@ -3479,7 +3476,7 @@ contains
                     call s_amr_select_slot(islot)
                     if (.not. amr_rank_owns_block) cycle
                     call s_amr_subtree_stage_advance(amr_dt_fine, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-                                                     & time_avg, s, th)
+                                                     & s, th)
                 end do
             end do
             ! after this substep each level-1 block is at t_b (q_cons) with t_a in q_cons_stor: its level-2 children subcycle
@@ -3489,8 +3486,7 @@ contains
                     if (amr_block_level(islot) /= 1) cycle
                     call s_amr_select_slot(islot)
                     if (.not. amr_rank_owns_block) cycle
-                    call s_amr_advance_children(islot, amr_dt_fine, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-                                                & time_avg)
+                    call s_amr_advance_children(islot, amr_dt_fine, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
                 end do
             end if
         end do
@@ -3528,8 +3524,7 @@ contains
     !> RHS + RK-update half of one subcycled fine substage for the selected block (amr_cur): compute the fine RHS from the (already
     !! halo-reconciled) ghost shell and apply the SSP-RK stage update at the fine substep dt_sub, plus per-stage pressure relaxation
     !! and IB correction. Split from the lerp half so the fine-fine seam halo runs between them. Owner-only (the caller guards).
-    impure subroutine s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, &
-        & s, th)
+    impure subroutine s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s, th)
 
         real(wp), intent(in)                                       :: dt_sub  !< this block's substep dt (parent step / ref_ratio)
         real(wp), dimension(:,:), intent(in)                       :: coefs   !< rk_coef(1:3, 1:4)
@@ -3539,7 +3534,6 @@ contains
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
         integer, intent(in)                                        :: t_step, s
         real(wp), intent(in)                                       :: th
-        real(wp), intent(inout)                                    :: time_avg
 
         if (rank_time_wrt) call s_rank_time_tic()
         amr_in_fine_advance = .true.
@@ -3550,11 +3544,10 @@ contains
         if (qbmm .and. .not. polytropic) then
             ! the block's OWN side-state and rhs scratch (the coarse arrays stay untouched)
             call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
-                               & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, &
-                               & time_avg, s)
+                               & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, s)
         else
             call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
-                               & pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, s)
+                               & pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
         end if
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
@@ -3585,7 +3578,7 @@ contains
     !! substep (s_amr_advance_children) at dt_sub/ref_ratio, so per-level dt falls out of the recursion. With no children this is
     !! exactly the single-level L0<->L1 advance. Used for level>=2 children (per-block); level-1 blocks run the transposed,
     !! seam-halo'd s_amr_advance_fine_subcycle_all instead.
-    recursive subroutine s_amr_advance_subtree(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
+    recursive subroutine s_amr_advance_subtree(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
         real(wp), intent(in)                                       :: dt_sub  !< this block's substep dt (parent step / ref_ratio)
         real(wp), dimension(:,:), intent(in)                       :: coefs   !< rk_coef(1:3, 1:4)
@@ -3594,7 +3587,6 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
         integer, intent(in)                                        :: t_step
-        real(wp), intent(inout)                                    :: time_avg
         real(wp), parameter                                        :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
         integer                                                    :: sub, s
         real(wp)                                                   :: th
@@ -3604,14 +3596,13 @@ contains
             do s = 1, 3
                 th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
                 call s_amr_subtree_stage_lerp(s, th)
-                call s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, &
-                                                 & s, th)
+                call s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s, th)
             end do
             ! multi-level: this block is now at t_b (q_cons) with t_a preserved in q_cons_stor. Each level+1 child subcycles WITHIN
             ! this substep - gathering its two ghost-lerp sources from those two snapshots - then folds back (restrict +
             ! Berger-Colella reflux) into this block over dt_sub. No-op when this block has no children (single-level / finest).
             if (amr_max_level >= 2) call s_amr_advance_children(amr_cur, dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, &
-                & rhs_mv, t_step, time_avg)
+                & rhs_mv, t_step)
         end do
 
     end subroutine s_amr_advance_subtree
@@ -3624,8 +3615,7 @@ contains
     !! parent-side creg captured during THIS substep). The registers already carry the matching per-substep time weights (freg
     !! 1/r*rk3_w, creg rk3_w), so conservation closes with no register changes. np=1 (child co-owned with parent); np>=2 P2P is
     !! future work (#27).
-    recursive subroutine s_amr_advance_children(pslot, dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-        & time_avg)
+    recursive subroutine s_amr_advance_children(pslot, dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
         integer, intent(in)                                        :: pslot
         real(wp), intent(in)                                       :: dt_sub
@@ -3635,7 +3625,6 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
         integer, intent(in)                                        :: t_step
-        real(wp), intent(inout)                                    :: time_avg
         integer                                                    :: kc, pslot_l
 
         ! pslot is argument-associated with the module variable amr_cur (the caller passes amr_cur as
@@ -3654,7 +3643,7 @@ contains
             call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons, .false.)  ! parent @ t_b (device C/F fill)
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_b)
             ! recurse: the child subcycles its ref_ratio substeps (and its own children) over [t_a, t_b]
-            call s_amr_advance_subtree(dt_sub*0.5_wp, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg)
+            call s_amr_advance_subtree(dt_sub*0.5_wp, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             ! fold the child back into the parent (relax the fine phase first, matching the driver's relax -> restrict order)
             if (relax) call s_amr_relax_fine()
             call s_amr_restrict_to_parent()
