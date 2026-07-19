@@ -10,11 +10,12 @@ module m_variables_conversion
 
     use m_derived_types
     use m_global_parameters
+    use m_jwl
     use m_mpi_proxy
     use m_helper_basic
     use m_helper
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, &
-        & model_eqns_4eq, avg_state_roe
+        & model_eqns_4eq, avg_state_roe, eos_stiffened_gas, eos_jwl
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
 
@@ -35,6 +36,7 @@ module m_variables_conversion
               s_compute_species_fraction, &
 #ifndef MFC_PRE_PROCESS
     s_compute_speed_of_sound, &
+              s_compute_jwl_speed_of_sound, &
               s_compute_fast_magnetosonic_speed, &
 #endif
     s_finalize_variables_conversion_module
@@ -80,7 +82,7 @@ contains
     end subroutine s_convert_to_mixture_variables
 
     !> Compute the pressure from the appropriate equation of state
-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag, jwl_Y)
 
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', cray_noinline=True)
 
@@ -91,6 +93,7 @@ contains
         real(wp), intent(inout)         :: T
         real(stp), intent(in), optional :: stress, mom
         real(wp), intent(in), optional  :: G, pres_mag
+        real(wp), intent(in), optional  :: jwl_Y  !< JWL products mass fraction; bounded inside this routine.
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
@@ -98,24 +101,38 @@ contains
         real(wp)                                       :: E_e
         real(wp)                                       :: e_Per_Kg, Pdyn_Per_Kg
         real(wp)                                       :: T_guess
+        real(wp)                                       :: eint, e_sp, Y_jwl
         integer                                        :: s  !< Generic loop iterator
         #:if not chemistry
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure for computing pressure is targeted by the
             ! procedure pointer
 
-            if (mhd) then
-                ! MHD pressure: subtract magnetic pressure from total energy
-                pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
-            else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
-                ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002): p from mixture EOS
-                pres = (energy - dyn_p - pi_inf - qv)/gamma
-            else if ((model_eqns /= model_eqns_4eq) .and. bubbles_euler) then
-                ! Bubble-augmented pressure with void fraction correction
-                pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
-            else
-                ! Four-equation model (Kapila et al. PoF 2001): Tait EOS inversion
-                pres = (pref + pi_inf)*(energy/(rhoref*(1 - alf)))**(1/gamma + 1) - pi_inf
-            end if
+            #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                if ((jwl_idx > 0) .and. (.not. mhd) .and. (model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.) &
+                    & .and. present(jwl_Y)) then
+                    Y_jwl = jwl_Y
+                    eint = energy - dyn_p
+                    e_sp = eint/max(rho, sgm_eps)
+                    ! Pressure only here; the sound speed is recomputed at the faces.
+                    call s_jwl_mix_state_er(rho, e_sp, Y_jwl, jwl_idx, pres, T)
+                else
+                #:endif
+                if (mhd) then
+                    ! MHD pressure: subtract magnetic pressure from total energy
+                    pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
+                else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
+                    ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002): p from mixture EOS
+                    pres = (energy - dyn_p - pi_inf - qv)/gamma
+                else if ((model_eqns /= model_eqns_4eq) .and. bubbles_euler) then
+                    ! Bubble-augmented pressure with void fraction correction
+                    pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
+                else
+                    ! Four-equation model (Kapila et al. PoF 2001): Tait EOS inversion
+                    pres = (pref + pi_inf)*(energy/(rhoref*(1 - alf)))**(1/gamma + 1) - pi_inf
+                end if
+                #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                end if
+            #:endif
 
             if (hypoelasticity .and. present(G)) then
                 ! Subtract elastic strain energy before computing pressure (hypoelastic model)
@@ -130,7 +147,18 @@ contains
                     end if
                 end do
 
-                pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
+                #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                    if ((jwl_idx > 0) .and. (.not. mhd) .and. (model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.) &
+                        & .and. present(jwl_Y)) then
+                        Y_jwl = jwl_Y
+                        e_sp = (energy - 0.5_wp*(mom**2._wp)/rho - E_e)/max(rho, sgm_eps)
+                        call s_jwl_mix_state_er(rho, e_sp, Y_jwl, jwl_idx, pres, T)
+                    else
+                    #:endif
+                    pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
+                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                    end if
+                #:endif
             end if
         #:else
             ! Reacting mixture pressure from temperature and species
@@ -338,6 +366,8 @@ contains
         @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
 
+        call s_initialize_jwl_module
+
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             gs_min(i) = 1.0_wp/gammas(i) + 1.0_wp
@@ -347,6 +377,9 @@ contains
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
+            if (fluid_pp(i)%eos /= eos_stiffened_gas .and. fluid_pp(i)%eos /= eos_jwl) then
+                call s_mpi_abort('Unsupported fluid_pp%eos selector. Use eos_stiffened_gas or eos_jwl.')
+            end if
         end do
         $:GPU_UPDATE(device='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc]')
 
@@ -488,7 +521,7 @@ contains
         real(wp)               :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
         real(wp)               :: vftmp, nbub_sc
         real(wp)               :: G_K
-        real(wp)               :: pres
+        real(wp)               :: pres, Y_jwl
         integer                :: i, j, k, l               !< Generic loop iterators
         real(wp)               :: T
         real(wp)               :: pres_mag
@@ -503,8 +536,8 @@ contains
         integer                :: iter                     !< Newton-Raphson iteration counter
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
-                            & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
-                            & df_dW, iter]')
+                            & rhoYks, B, pres, Y_jwl, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, &
+                            & dp_dW, df_dW, iter]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -672,8 +705,19 @@ contains
                         pres_mag = 0._wp
                     end if
 
-                    call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), dyn_pres_K, &
-                                            & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                        if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                            Y_jwl = alpha_rho_K(jwl_idx)/max(rho_K, sgm_eps)
+                            call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), &
+                                                    & dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, &
+                                                    & pres_mag=pres_mag, jwl_Y=Y_jwl)
+                        else
+                        #:endif
+                        call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), &
+                                                & dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+                        #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                        end if
+                    #:endif
 
                     qK_prim_vf(eqn_idx%E)%sf(j, k, l) = pres
 
@@ -921,6 +965,17 @@ contains
                             ! MHD energy includes magnetic pressure contribution
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, &
                                       & l) + dyn_pres + pres_mag + pi_inf + qv
+                            #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                            else if (jwl_idx > 0 .and. (model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
+                                ! JWL five-equation model: E = rho*e_mix(rho,p,Y) + 0.5*rho*|u|^2.
+                                ! Y = alpha_rho_j/rho from the primitive slot.
+                                block
+                                    real(wp) :: e_mix_jwl, Y_j
+                                    Y_j = q_prim_vf(jwl_idx)%sf(j, k, l)/max(rho, sgm_eps)
+                                    call s_jwl_mix_energy_pr(rho, q_prim_vf(eqn_idx%E)%sf(j, k, l), Y_j, jwl_idx, e_mix_jwl)
+                                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_mix_jwl + dyn_pres
+                                end block
+                            #:endif
                         else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
                             ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
@@ -1060,6 +1115,7 @@ contains
         real(wp), dimension(2) :: Re_K
         real(wp)               :: G_K
         real(wp)               :: T_K, mix_mol_weight, R_gas
+        real(wp)               :: e_mix_jwl, Y_j
         integer                :: i, j, k, l  !< Generic loop iterators
 
         is1b = is1%beg; is1e = is1%end
@@ -1072,7 +1128,7 @@ contains
         ! capillarity
 #ifdef MFC_SIMULATION
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]')
+                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas, e_mix_jwl, Y_j]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1118,6 +1174,12 @@ contains
                         T_K = pres_K/rho_K/R_gas
                         call get_mixture_energy_mass(T_K, Y_K, E_K)
                         E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
+                        #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                        else if (jwl_idx > 0 .and. (model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
+                            Y_j = min(max(qK_prim_vf(j, k, l, jwl_idx)/max(rho_K, sgm_eps), 0._wp), 1._wp)
+                            call s_jwl_mix_energy_pr(rho_K, pres_K, Y_j, jwl_idx, e_mix_jwl)
+                            E_K = rho_K*e_mix_jwl + 5.e-1_wp*rho_K*vel_K_sum
+                        #:endif
                     else
                         ! Computing the energy from the pressure
                         E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
@@ -1234,6 +1296,7 @@ contains
 
 #ifdef MFC_SIMULATION
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
+        call s_finalize_jwl_module
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1242,6 +1305,7 @@ contains
         end if
 #else
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
+        call s_finalize_jwl_module
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1250,7 +1314,26 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    !> Compute the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
+    !> Compute the JWL mixture speed of sound from explicit JWL fractions.
+    !! @param[in] pres Mixture pressure.
+    !! @param[in] rho Mixture density.
+    !! @param[in] Y_jwl JWL products mass fraction; bounded inside this routine.
+    !! @param[out] c JWL mixture speed of sound; finite negative c2 values are floored, NaN c2 propagates.
+    subroutine s_compute_jwl_speed_of_sound(pres, rho, Y_jwl, c)
+
+        $:GPU_ROUTINE(function_name='s_compute_jwl_speed_of_sound',parallelism='[seq]', cray_noinline=True)
+
+        real(wp), intent(in)  :: pres, rho, Y_jwl
+        real(wp), intent(out) :: c
+        real(wp)              :: Y_j
+
+        Y_j = min(max(Y_jwl, 0._wp), 1._wp)
+
+        call s_jwl_mix_sound_speed(rho, pres, Y_j, jwl_idx, c)
+
+    end subroutine s_compute_jwl_speed_of_sound
+
+    !> Compute the speed of sound from thermodynamic state variables for non-JWL equation-of-state models.
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
 
         $:GPU_ROUTINE(parallelism='[seq]')

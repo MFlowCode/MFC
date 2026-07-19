@@ -438,6 +438,7 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
 | `sigma`   | Real   | Surface tension coefficient                    |
 | `G`       | Real   | Shear modulus of solid.                        |
+| `eos` *   | Integer| Equation of state: `1` stiffened gas, `2` JWL. |
 
 Fluid material's parameters. All parameters except for sigma should be prepended with `fluid_pp(i)` where $i$ is the fluid index.
 
@@ -458,6 +459,25 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
+
+- `fluid_pp(i)%%eos` selects the equation of state for the `i`-th fluid: `1` stiffened gas (default), or `2` Jones-Wilkins-Lee (JWL) for detonation products. JWL setup is described in [JWL equation of state](#sec-jwl-eos) below.
+
+#### JWL equation of state {#sec-jwl-eos}
+
+The JWL equation of state models detonation products. It is supported only with `model_eqns = 2`, and at most one fluid may set `fluid_pp(i)%%eos = 2`. A JWL fluid is defined by these `fluid_pp(i)%%` parameters:
+
+| Parameter | Meaning | Requirement |
+| :--- | :--- | :--- |
+| `jwl_A`, `jwl_B`, `jwl_R1`, `jwl_R2`, `jwl_omega` | JWL products EOS coefficients | required |
+| `jwl_rho0` | products reference density \f$\rho_0\f$ | required |
+| `jwl_Q` or `jwl_E0` | detonation energy: specific (J/kg) or volumetric (J/m³). Given `jwl_Q`, MFC sets `jwl_E0 = jwl_rho0 * jwl_Q` | one of the two |
+| `jwl_air_rho0` | density of the co-existing ambient gas | required |
+| `jwl_air_e0` or `jwl_air_p0` | ambient specific internal energy or pressure | one of the two |
+| `cv` | positive heat capacity, on both the JWL fluid and the ambient fluid | required |
+
+The ambient Grüneisen coefficient is \f$\gamma - 1\f$, obtained from the ambient gas fluid's own stored `gamma` (which holds \f$1/(\gamma - 1)\f$, so its reciprocal recovers \f$\gamma - 1\f$). With a single JWL fluid and no separate ambient fluid, the JWL fluid's own `gamma` is used.
+
+Products mix with the surrounding gas through a linear mass-fraction closure: every coefficient is blended linearly in the products mass fraction \f$Y\f$, so the pressure stays linear in internal energy and the closure recovers pressure, temperature, and sound speed from \f$(\rho, e, Y)\f$ in closed form. It degenerates exactly to the pure-JWL law at \f$Y = 1\f$ and to the ambient law at \f$Y = 0\f$, and recovers the ideal-gas closure bit-identically when the ambient `pi_inf` is zero. A stiffened-gas ambient (e.g. water) is supported by setting the non-JWL fluid's `pi_inf`. JWL is not supported with `wave_speeds = 2`, characteristic (CBC) boundaries, `alt_soundspeed`, elasticity, `igr`, `bubbles_euler`, `mhd`, or `chemistry`; immersed boundaries (`ib`) and Lagrangian bubbles (`bubbles_lagrange`) are supported. See `src/common/m_jwl.fpp` for the full closure derivation.
 
 > **Stored-form parameters:** The values `gamma`, `pi_inf`, and `Re(1)`/`Re(2)` are **not** the raw physical quantities. MFC expects transformed stored forms:
 > - `gamma` = \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself

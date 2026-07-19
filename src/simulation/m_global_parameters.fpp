@@ -277,6 +277,11 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
     $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
 
+    real(wp), allocatable, dimension(:) :: jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s
+    real(wp), allocatable, dimension(:) :: jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas, jwl_air_pi_infs
+    $:GPU_DECLARE(create='[jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s]')
+    $:GPU_DECLARE(create='[jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas, jwl_air_pi_infs]')
+
     real(wp)                                    :: mytime     !< Current simulation time
     real(wp)                                    :: finaltime  !< Final simulation time
     type(pres_field), allocatable, dimension(:) :: pb_ts
@@ -440,6 +445,8 @@ contains
             fluid_pp(i)%mu_min = dflt_real
             fluid_pp(i)%mu_max = dflt_real
             fluid_pp(i)%mu_bulk = dflt_real
+            fluid_pp(i)%eos = eos_stiffened_gas
+            call s_assign_jwl_fluid_defaults(fluid_pp(i))
         end do
 
         ! Subgrid bubble parameters (bub_pp struct + scalar companions; scalar companions are

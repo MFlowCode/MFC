@@ -19,6 +19,7 @@
     {
         "category": "Physics Models",
         "modules": [
+            "m_jwl",
             "m_viscous",
             "m_hb_function",
             "m_surface_tension",

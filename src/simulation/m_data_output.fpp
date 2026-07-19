@@ -12,6 +12,7 @@ module m_data_output
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_jwl, only: jwl_idx
     use m_compile_specific
     use m_helper
     use m_helper_basic
@@ -1235,6 +1236,12 @@ contains
                                                 & pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                                                 & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
                                                 & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
+                    else if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                        ! Pass the cell's products mass fraction so pure-air/mixture probe cells
+                        ! do not evaluate the pure-products branch (matches pre/post diagnostics).
+                        call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
+                                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                                                & jwl_Y=q_cons_vf(jwl_idx)%sf(j - 2, k, l)/max(rho, sgm_eps))
                     else
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1339,6 +1346,12 @@ contains
                                                     & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
                                                     & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
                                                     & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
+                        else if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                            ! Pass the cell's products mass fraction so pure-air/mixture probe cells
+                            ! do not evaluate the pure-products branch (matches pre/post diagnostics).
+                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
+                                                    & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                                                    & jwl_Y=q_cons_vf(jwl_idx)%sf(j - 2, k - 2, l)/max(rho, sgm_eps))
                         else
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1426,6 +1439,13 @@ contains
                                                         & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
                                                         & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), G_local)
+                            else if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                                ! Pass the cell's products mass fraction so pure-air/mixture probe cells
+                                ! do not evaluate the pure-products branch (matches pre/post diagnostics).
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
+                                                        & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
+                                                        & rho, qv, rhoYks, pres, T, jwl_Y=q_cons_vf(jwl_idx)%sf(j - 2, k - 2, &
+                                                        & l - 2)/max(rho, sgm_eps))
                             else
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &

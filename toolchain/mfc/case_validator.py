@@ -713,6 +713,7 @@ class CaseValidator:
         bub_fac = 1 if (bubbles_euler) else 0
 
         for i in range(1, num_fluids + 1 + bub_fac):
+            eos = self.get(f"fluid_pp({i})%eos")
             gamma = self.get(f"fluid_pp({i})%gamma")
             pi_inf = self.get(f"fluid_pp({i})%pi_inf")
             cv = self.get(f"fluid_pp({i})%cv")
@@ -729,6 +730,71 @@ class CaseValidator:
             if model_eqns == 1:
                 self.prohibit(gamma is not None, f"model_eqns = 1 does not support fluid_pp({i})%gamma")
                 self.prohibit(pi_inf is not None, f"model_eqns = 1 does not support fluid_pp({i})%pi_inf")
+
+            self.prohibit(eos is not None and eos not in (1, 2), f"fluid_pp({i})%eos must be eos_stiffened_gas (1) or eos_jwl (2)")
+
+            if eos == 2:
+                jwl_required = ["jwl_A", "jwl_B", "jwl_R1", "jwl_R2", "jwl_omega", "jwl_rho0"]
+                for name in jwl_required:
+                    self.prohibit(self.get(f"fluid_pp({i})%{name}") is None, f"fluid_pp({i})%eos = eos_jwl requires fluid_pp({i})%{name}")
+
+                jwl_E0 = self.get(f"fluid_pp({i})%jwl_E0")
+                jwl_Q = self.get(f"fluid_pp({i})%jwl_Q")
+                jwl_rho0 = self.get(f"fluid_pp({i})%jwl_rho0")
+                self.prohibit(jwl_E0 is None and jwl_Q is None, f"fluid_pp({i})%eos = eos_jwl requires either fluid_pp({i})%jwl_Q or fluid_pp({i})%jwl_E0")
+
+                for name in ["jwl_A", "jwl_B", "jwl_R1", "jwl_R2", "jwl_omega", "jwl_rho0", "jwl_E0", "jwl_Q"]:
+                    value = self.get(f"fluid_pp({i})%{name}")
+                    self.prohibit(value is not None and value <= 0, f"fluid_pp({i})%{name} must be positive")
+
+                if jwl_E0 is not None and jwl_Q is not None and jwl_rho0 is not None:
+                    expected_E0 = jwl_rho0 * jwl_Q
+                    mismatch = abs(jwl_E0 - expected_E0) > 1.0e-8 * max(abs(jwl_E0), abs(expected_E0), 1.0)
+                    self.prohibit(mismatch, f"fluid_pp({i})%jwl_E0 must equal fluid_pp({i})%jwl_rho0 * fluid_pp({i})%jwl_Q when both are set")
+
+                jwl_air_e0 = self.get(f"fluid_pp({i})%jwl_air_e0")
+                jwl_air_p0 = self.get(f"fluid_pp({i})%jwl_air_p0")
+                self.prohibit(self.get(f"fluid_pp({i})%jwl_air_rho0") is None, f"fluid_pp({i})%eos = eos_jwl requires fluid_pp({i})%jwl_air_rho0")
+                self.prohibit(jwl_air_e0 is None and jwl_air_p0 is None, f"fluid_pp({i})%eos = eos_jwl requires either fluid_pp({i})%jwl_air_e0 or fluid_pp({i})%jwl_air_p0")
+
+                for name in ["jwl_air_rho0", "jwl_air_e0", "jwl_air_p0"]:
+                    value = self.get(f"fluid_pp({i})%{name}")
+                    self.prohibit(value is not None and value <= 0, f"fluid_pp({i})%{name} must be positive")
+
+        # Parity with the runtime checker (m_checker_common.fpp s_check_jwl_inputs),
+        # so validate rejects what the solver would abort on at startup.
+        has_jwl = any(self.get(f"fluid_pp({i})%eos") == 2 for i in range(1, num_fluids + 1))
+        if has_jwl:
+            self.prohibit(model_eqns != 2, "eos_jwl requires model_eqns = 2 (five-equation model)")
+            jwl_ids = [i for i in range(1, num_fluids + 1) if self.get(f"fluid_pp({i})%eos") == 2]
+            self.prohibit(len(jwl_ids) > 1, "At most one fluid may use eos_jwl")
+            self.prohibit(num_fluids > 1 and num_fluids - len(jwl_ids) != 1, "the JWL closure requires exactly one non-JWL ambient fluid")
+            ji = jwl_ids[0]
+            cv_jwl = self.get(f"fluid_pp({ji})%cv")
+            self.prohibit(cv_jwl is None or cv_jwl <= 0, f"the JWL closure requires positive fluid_pp({ji})%cv for the JWL fluid")
+            air_ids = [i for i in range(1, num_fluids + 1) if self.get(f"fluid_pp({i})%eos") != 2]
+            if air_ids:
+                cv_air = self.get(f"fluid_pp({air_ids[0]})%cv")
+                self.prohibit(cv_air is None or cv_air <= 0, f"the JWL closure requires positive fluid_pp({air_ids[0]})%cv for the non-JWL ambient fluid")
+            rho0 = self.get(f"fluid_pp({ji})%jwl_rho0")
+            air_rho0 = self.get(f"fluid_pp({ji})%jwl_air_rho0")
+            if rho0 is not None and air_rho0 is not None:
+                self.prohibit(rho0 <= air_rho0, "the JWL closure requires products reference density above the ambient-gas density")
+            E0 = self.get(f"fluid_pp({ji})%jwl_E0")
+            Q = self.get(f"fluid_pp({ji})%jwl_Q")
+            if E0 is None and Q is not None and rho0 is not None:
+                E0 = rho0 * Q
+            air_e0 = self.get(f"fluid_pp({ji})%jwl_air_e0")
+            if E0 is not None and rho0 is not None and air_e0 is not None:
+                self.prohibit(E0 / rho0 <= air_e0, "the JWL closure requires products reference energy above the ambient-gas energy")
+
+            # Solver paths that evaluate stiffened-gas pressure or sound speed bypass the
+            # JWL closure, so they are prohibited with eos_jwl (mirrors src/simulation/m_checker.fpp).
+            self.prohibit(self.get("wave_speeds") == 2, "wave_speeds = 2 (pressure-based) is not supported with eos_jwl; use wave_speeds = 1")
+            self.prohibit(self.get("alt_soundspeed", "F") == "T", "alt_soundspeed is not supported with eos_jwl")
+            self.prohibit(self.get("hypoelasticity", "F") == "T" or self.get("hyperelasticity", "F") == "T", "elasticity is not supported with eos_jwl")
+            self.prohibit(self.get("igr", "F") == "T", "igr is not supported with eos_jwl")
+            self.prohibit(self.get("bubbles_euler", "F") == "T" or self.get("mhd", "F") == "T" or self.get("chemistry", "F") == "T", "bubbles_euler, mhd, and chemistry are not supported with eos_jwl")
 
     def check_surface_tension(self):
         """Checks constraints on surface tension"""

@@ -887,6 +887,18 @@ def _load():
         _r(f"{px}mu_min", REAL, {"viscosity"}, math=r"\mu_{\min,k}")
         _r(f"{px}mu_max", REAL, {"viscosity"}, math=r"\mu_{\max,k}")
         _r(f"{px}mu_bulk", REAL, {"viscosity"}, math=r"\mu_{\mathrm{bulk},k}")
+        _r(f"{px}eos", INT, math=r"\mathrm{EOS}_k")
+        _r(f"{px}jwl_A", REAL, math=r"\f$A_k\f$")
+        _r(f"{px}jwl_B", REAL, math=r"\f$B_k\f$")
+        _r(f"{px}jwl_R1", REAL, math=r"\f$R_{1,k}\f$")
+        _r(f"{px}jwl_R2", REAL, math=r"\f$R_{2,k}\f$")
+        _r(f"{px}jwl_omega", REAL, math=r"\f$\omega_k\f$")
+        _r(f"{px}jwl_rho0", REAL, math=r"\f$\rho_{0,k}\f$")
+        _r(f"{px}jwl_Q", REAL, math=r"\f$Q_k\f$")
+        _r(f"{px}jwl_E0", REAL, math=r"\f$E_{0,k}\f$")
+        _r(f"{px}jwl_air_e0", REAL, math=r"\f$e_{\mathrm{air},k}\f$")
+        _r(f"{px}jwl_air_rho0", REAL, math=r"\f$\rho_{\mathrm{air},k}\f$")
+        _r(f"{px}jwl_air_p0", REAL, math=r"\f$p_{\mathrm{air},k}\f$")
 
     # bub_pp (bubble properties)
     for a, sym in [

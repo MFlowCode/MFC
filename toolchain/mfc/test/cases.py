@@ -2554,6 +2554,127 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # JWL mixture closure and primitive/conservative consistency.
+        # The linear mass-fraction closure is applied unconditionally for JWL fluids.
+        eps_jwl = 1e-8
+        rho_jwl = 1630.0
+        rho_air = 1.225
+        jwl_Q = 1.0089e10 / rho_jwl
+        stack.push(
+            "Kernel -> JWL -> Closure",
+            {
+                "m": 79,
+                "n": 0,
+                "p": 0,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "dt": 5.0e-8,
+                "t_step_stop": 10,
+                "t_step_save": 10,
+                "num_patches": 2,
+                "model_eqns": 2,
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "mixture_err": "T",
+                "recon_type": 1,
+                "weno_order": 3,
+                "mapped_weno": "T",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "prim_vars_wrt": "T",
+                "rho_wrt": "T",
+                "pres_wrt": "T",
+                "c_wrt": "T",
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%pres": 101325.0,
+                "patch_icpp(1)%alpha_rho(1)": eps_jwl * rho_jwl,
+                "patch_icpp(1)%alpha_rho(2)": (1.0 - eps_jwl) * rho_air,
+                "patch_icpp(1)%alpha(1)": eps_jwl,
+                "patch_icpp(1)%alpha(2)": 1.0 - eps_jwl,
+                "patch_icpp(2)%geometry": 1,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%x_centroid": 0.15,
+                "patch_icpp(2)%length_x": 0.3,
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%pres": 1.2e10,
+                "patch_icpp(2)%alpha_rho(1)": (1.0 - eps_jwl) * rho_jwl,
+                "patch_icpp(2)%alpha_rho(2)": eps_jwl * rho_air,
+                "patch_icpp(2)%alpha(1)": 1.0 - eps_jwl,
+                "patch_icpp(2)%alpha(2)": eps_jwl,
+                "fluid_pp(1)%eos": 2,
+                "fluid_pp(1)%gamma": 2.5,
+                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%cv": 613.5,
+                "fluid_pp(1)%jwl_A": 3.712e11,
+                "fluid_pp(1)%jwl_B": 3.231e9,
+                "fluid_pp(1)%jwl_R1": 4.15,
+                "fluid_pp(1)%jwl_R2": 0.95,
+                "fluid_pp(1)%jwl_omega": 0.30,
+                "fluid_pp(1)%jwl_rho0": rho_jwl,
+                "fluid_pp(1)%jwl_Q": jwl_Q,
+                "fluid_pp(1)%jwl_air_e0": 2.5575e5,
+                "fluid_pp(1)%jwl_air_rho0": rho_air,
+                "fluid_pp(2)%eos": 1,
+                "fluid_pp(2)%gamma": 2.5,
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%cv": 717.5,
+            },
+        )
+        # A homogeneous mixed slab exercises the linear mixture coefficients at intermediate Y;
+        # the two endpoint patches alone mostly select the ideal-air and pure-JWL limits.
+        overrides = {
+            "num_patches": 3,
+            "patch_icpp(3)%geometry": 1,
+            "patch_icpp(3)%alter_patch(1)": "T",
+            "patch_icpp(3)%alter_patch(2)": "T",
+            "patch_icpp(3)%x_centroid": 0.5,
+            "patch_icpp(3)%length_x": 0.2,
+            "patch_icpp(3)%vel(1)": 0.0,
+            "patch_icpp(3)%pres": 5.0e8,
+            "patch_icpp(3)%alpha_rho(1)": 250.0,
+            "patch_icpp(3)%alpha_rho(2)": 250.0,
+            "patch_icpp(3)%alpha(1)": 0.5,
+            "patch_icpp(3)%alpha(2)": 0.5,
+        }
+        cases.append(define_case_d(stack, "Mixture", overrides, override_tol=1e-7))
+
+        # Mild stiffened-gas ambient (non-water): exercises the cold-stiffness offset
+        # pi_c = (Gamma+1)*(1-Y)*pi of the linear closure and the stiffened p <-> e inverse.
+        rho_liq = 1000.0
+        liq_gamma_mfc = 2.5
+        liq_pi_inf_mfc = 3.5 * 1.0e7  # (gamma_mfc + 1) * true stiffness pi ~ 1e7 Pa (mild)
+        liq_e0 = (101325.0 * liq_gamma_mfc + liq_pi_inf_mfc) / rho_liq
+        overrides_stiff = {
+            "num_patches": 3,
+            "patch_icpp(1)%alpha_rho(2)": (1.0 - eps_jwl) * rho_liq,
+            "patch_icpp(2)%alpha_rho(2)": eps_jwl * rho_liq,
+            "patch_icpp(2)%pres": 9.311e9,
+            "patch_icpp(3)%geometry": 1,
+            "patch_icpp(3)%alter_patch(1)": "T",
+            "patch_icpp(3)%alter_patch(2)": "T",
+            "patch_icpp(3)%x_centroid": 0.5,
+            "patch_icpp(3)%length_x": 0.2,
+            "patch_icpp(3)%vel(1)": 0.0,
+            "patch_icpp(3)%pres": 5.0e8,
+            "patch_icpp(3)%alpha_rho(1)": 815.0,
+            "patch_icpp(3)%alpha_rho(2)": 500.0,
+            "patch_icpp(3)%alpha(1)": 0.5,
+            "patch_icpp(3)%alpha(2)": 0.5,
+            "fluid_pp(1)%jwl_air_e0": liq_e0,
+            "fluid_pp(1)%jwl_air_rho0": rho_liq,
+            "fluid_pp(2)%gamma": liq_gamma_mfc,
+            "fluid_pp(2)%pi_inf": liq_pi_inf_mfc,
+            "fluid_pp(2)%cv": 4186.0,
+        }
+        cases.append(define_case_d(stack, "Stiffened", overrides_stiff, override_tol=1e-7))
+        stack.pop()
+
         # 2D MTHINC on a stretched (non-uniform) x-grid.
         # A circular bubble creates diagonal interface normals (components in both
         # x and y), so the reference-space weighting Δx_j/(x_cc(j+1)-x_cc(j-1))

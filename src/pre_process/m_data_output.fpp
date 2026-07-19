@@ -15,6 +15,7 @@ module m_data_output
 
     use m_compile_specific
     use m_variables_conversion
+    use m_jwl, only: jwl_idx
     use m_helper
     use m_delay_file_access
     use m_boundary_common
@@ -217,9 +218,18 @@ contains
                                                    & 0)**2 + q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)**2)
                             end if
 
-                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
-                                                    & 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, gamma, &
-                                                    & rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
+                            if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                                ! Pass the cell's products mass fraction so pure-air cells do not evaluate the pure-products
+                                ! branch, matching the simulation and post-process diagnostics.
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
+                                                        & 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, &
+                                                        & gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag, &
+                                                        & jwl_Y=q_cons_vf(jwl_idx)%sf(j, 0, 0)/max(rho, sgm_eps))
+                            else
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j, 0, 0), q_cons_vf(eqn_idx%alf)%sf(j, 0, 0), &
+                                                        & 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, 0, 0)**2._wp)/rho, pi_inf, &
+                                                        & gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
+                            end if
                             write (2, FMT) x_cb(j), pres
                         else if (mhd) then
                             if (i == eqn_idx%mom%beg + 1) then  ! v

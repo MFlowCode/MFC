@@ -16,7 +16,7 @@ module m_global_parameters_common
     use m_derived_types
     use m_thermochem, only: num_species
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, &
-        & recon_type_muscl, name_len, dflt_int, dflt_real
+        & recon_type_muscl, eos_stiffened_gas, eos_jwl, name_len, dflt_int, dflt_real
 
     implicit none
 
@@ -457,5 +457,25 @@ contains
         fft_wrt = .false.
 
     end subroutine s_assign_common_defaults
+
+    !> Assign default (unset) values to a fluid's JWL parameters. Shared by all three targets so the JWL block stays identical; air
+    !! parameters default to dflt_real and are validated in m_checker_common when a JWL fluid is present.
+    impure subroutine s_assign_jwl_fluid_defaults(fluid)
+
+        type(physical_parameters), intent(inout) :: fluid
+
+        fluid%jwl_A = dflt_real
+        fluid%jwl_B = dflt_real
+        fluid%jwl_R1 = dflt_real
+        fluid%jwl_R2 = dflt_real
+        fluid%jwl_omega = dflt_real
+        fluid%jwl_rho0 = dflt_real
+        fluid%jwl_Q = dflt_real
+        fluid%jwl_E0 = dflt_real
+        fluid%jwl_air_e0 = dflt_real
+        fluid%jwl_air_rho0 = dflt_real
+        fluid%jwl_air_p0 = dflt_real
+
+    end subroutine s_assign_jwl_fluid_defaults
 
 end module m_global_parameters_common

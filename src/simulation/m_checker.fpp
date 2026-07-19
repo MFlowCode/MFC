@@ -12,7 +12,8 @@ module m_checker
     use m_mpi_proxy
     use m_helper
     use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order
+    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, eos_jwl, wave_speeds_pressure, &
+        & BC_CHAR_SLIP_WALL, BC_CHAR_SUP_OUTFLOW
 
     implicit none
 
@@ -49,6 +50,25 @@ contains
         @:PROHIBIT(chemistry .and. chem_params%adap_substeps &
                    & .and. chem_params%reaction_substeps_max < chem_params%reaction_substeps, &
                    & "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T")
+
+        ! Paths that evaluate stiffened-gas gamma/pi_inf mixture relations, which are
+        ! meaningless for a JWL fluid: the pressure-based wave-speed shock-Mach
+        ! correction, characteristic (CBC) boundary treatments, the alternative
+        ! (Wood-like) sound speed, and the elastic pressure recovery.
+        if (any(fluid_pp(1:num_fluids)%eos == eos_jwl)) then
+            @:PROHIBIT(wave_speeds == wave_speeds_pressure, &
+                       & "wave_speeds = 2 (pressure-based) is not supported with eos_jwl; use wave_speeds = 1")
+            @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) <= BC_CHAR_SLIP_WALL .and. (/bc_x%beg, &
+                       & bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) >= BC_CHAR_SUP_OUTFLOW), &
+                       & "characteristic (CBC) boundary conditions are not supported with eos_jwl")
+            @:PROHIBIT(alt_soundspeed, "alt_soundspeed is not supported with eos_jwl")
+            @:PROHIBIT(hypoelasticity .or. hyperelasticity, "elasticity is not supported with eos_jwl")
+            ! These solver paths compute pressure from stiffened-gas relations and
+            ! bypass the JWL closure entirely, so JWL cells would be silently wrong.
+            @:PROHIBIT(igr, "igr is not supported with eos_jwl (IGR evaluates stiffened-gas pressure on JWL cells)")
+            @:PROHIBIT(bubbles_euler .or. mhd .or. chemistry, &
+                       & "bubbles_euler, mhd, and chemistry are not supported with eos_jwl (their pressure paths bypass the JWL closure)")
+        end if
 
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
