@@ -2095,8 +2095,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
-        # Spatial reacting mixing layer omitted: its bf_spatial_support forcing
-        # amplifies roundoff past a portable single-golden tolerance across lanes.
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Spatial Reacting Mixing Layer",
+                "examples/2D_spatial_reacting_mixing_layer/case.py",
+                ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+                # bf_spatial_support's Fourier-mode forcing amplifies roundoff, and these
+                # reacting mixing-layer cases already drift ~3e-9 across compilers/arch
+                # (measured GNU-13-Linux vs GCC-15-macOS on the temporal case). Hold this
+                # short run to 1e-7 -- loose enough to survive that cross-lane spread, still
+                # 4 orders tighter than the Example tolerance so it catches real regressions.
+                override_tol=10 ** (-7),
+            )
+        )
 
         stack.push(
             "1D -> Chemistry -> Dual Isothermal Wall Gradient",

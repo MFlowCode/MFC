@@ -53,7 +53,7 @@ contains
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
-        @:PROHIBIT(bf_spatial_support .and. num_dims /= 2, &
+        @:PROHIBIT(bf_spatial_support .and. (n == 0 .or. p /= 0), &
                    & "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
 
         if (num_particle_clouds > 0) then
