@@ -240,7 +240,7 @@ DESCRIPTIONS = {
     "spatial_bf%x_centroid": "Streamwise center of the spatial forcing envelope",
     "spatial_bf%y_centroid": "Cross-stream center of the spatial forcing envelope",
     "spatial_bf%conv_vel": "Convective velocity advecting the streamwise forcing (conv_vel*t)",
-    "spatial_bf%sigma": "Gaussian envelope width parameter of the spatial forcing",
+    "spatial_bf%sigma": "Gaussian envelope coefficient in exp(-sigma*r^2) of the spatial forcing (larger = narrower)",
     "spatial_bf%freq": "Spatial forcing frequency ladder (per mode, 1:8)",
     "spatial_bf%phase": "Spatial forcing phase offsets (per mode, 1:8)",
     # Synthetic turbulence

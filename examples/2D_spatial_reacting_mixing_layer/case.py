@@ -128,6 +128,7 @@ if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(stream_coord) * len(cros
         num_iter=num_iter,
         cold=not args.hot,
     )
+    flamelet_ic.write_cache_key(ic_dir, cache_key)
 
 case = {
     "run_time_info": "T",

@@ -281,7 +281,9 @@ The code provides three pre-built patches for dimensional extrusion of initial c
   directly (unlike `case(270)`/`case(273)`, no component is zeroed or repurposed). Used by
   `examples/2D_spatial_reacting_mixing_layer` for a spatially-evolving mixing layer, where
   the cross-stream profile must vary with the streamwise coordinate too (via the
-  `bf_spatial_support` body force) so no single extrusion axis applies.
+  `bf_spatial_support` body force) so no single extrusion axis applies. The file's line
+  count, origin, and (uniform) cell spacing must match the run grid; a mismatched file is
+  rejected with a fatal error, so regenerate the IC whenever the grid changes.
 
 Setup: Only requires specifying `files_dir` and filename pattern via `file_extension`. The files are located, for example, at `examples/1D_flamelet/IC`, and their format is `prim.XX.YY.file_extension.dat`.
 Implementation: All variables and file handling are managed in the `case.py` file of the simulation.

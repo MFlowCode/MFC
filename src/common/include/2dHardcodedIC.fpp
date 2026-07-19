@@ -342,16 +342,23 @@
                 close (unit274)
             end do
 
-            ! Origin and spacing must match this run's grid (uniform grid assumed, as in case 270).
-            if (abs(x0_274 - x_cc(0)) > 0.5_wp*abs(x_step274)) &
-                & call s_mpi_abort("hcid=274 file x-origin does not match the grid; regenerate the IC for this grid.")
+            ! The run grid must be aligned with the file grid (uniform grid assumed, as in case 270).
+            ! Check alignment via the integer cell offset of this rank's first cell from the file
+            ! origin -- decomposition-safe: on every MPI rank x_cc(0) sits an integer number of cells
+            ! into the global file, so a non-integer offset means a shifted/mismatched IC. (Comparing
+            ! x0_274 to x_cc(0) directly would false-abort every rank whose subdomain doesn't start at
+            ! the global origin.) The spacing checks below must also hold.
+            r_align274 = (x_cc(0) - x0_274)/x_step274
+            if (abs(r_align274 - nint(r_align274)) > 1.e-6_wp) &
+                & call s_mpi_abort("hcid=274 file x-grid is misaligned with the run grid; regenerate the IC for this grid.")
             if (m_glb >= 1) then
                 if (abs(file_dx274 - x_step274) > 1.e-6_wp*abs(x_step274)) &
                     & call s_mpi_abort("hcid=274 file x-spacing does not match the grid; regenerate the IC for this grid.")
             end if
             if (n_glb >= 1) then
-                if (abs(y0_274 - y_cc(0)) > 0.5_wp*abs(y_step274)) &
-                    & call s_mpi_abort("hcid=274 file y-origin does not match the grid; regenerate the IC for this grid.")
+                r_align274 = (y_cc(0) - y0_274)/y_step274
+                if (abs(r_align274 - nint(r_align274)) > 1.e-6_wp) &
+                    & call s_mpi_abort("hcid=274 file y-grid is misaligned with the run grid; regenerate the IC for this grid.")
                 if (abs(file_dy274 - y_step274) > 1.e-6_wp*abs(y_step274)) &
                     & call s_mpi_abort("hcid=274 file y-spacing does not match the grid; regenerate the IC for this grid.")
             end if
