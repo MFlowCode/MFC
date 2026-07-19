@@ -2094,12 +2094,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # once goldens are regenerated per-backend or the tolerance model gains backend awareness.
         # cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={"t_step_stop": 1, "t_step_save": 1}, override_tol=10 ** (-10)))
 
+        # Both reacting mixing-layer goldens drift across compiler/arch: on the temporal
+        # case, a GCC-15 arm64 build (the macOS CI lane's architecture) diverges from the
+        # GNU-13-Linux golden by up to 6.65e-8 (rel) on a momentum component after 50 stiff
+        # chemistry steps, so the 1e-12 default is not portable. 1e-6 clears that with margin
+        # (and headroom for the other compiler lanes) while still catching real regressions,
+        # which shift these fields by far more. The spatial case adds bf_spatial_support's
+        # Fourier forcing but stays in the same band on this short run.
         cases.append(
             define_case_f(
                 "2D -> Chemistry -> Reacting Mixing Layer",
                 "examples/2D_reacting_mixing_layer/case.py",
                 ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
                 mods=common_mods,
+                override_tol=10 ** (-6),
             )
         )
 
@@ -2109,12 +2117,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "examples/2D_spatial_reacting_mixing_layer/case.py",
                 ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
                 mods=common_mods,
-                # bf_spatial_support's Fourier-mode forcing amplifies roundoff, and these
-                # reacting mixing-layer cases already drift ~3e-9 across compilers/arch
-                # (measured GNU-13-Linux vs GCC-15-macOS on the temporal case). Hold this
-                # short run to 1e-7 -- loose enough to survive that cross-lane spread, still
-                # 4 orders tighter than the Example tolerance so it catches real regressions.
-                override_tol=10 ** (-7),
+                override_tol=10 ** (-6),
             )
         )
 
