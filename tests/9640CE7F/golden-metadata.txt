@@ -1,16 +1,16 @@
-This file was created on 2026-07-05 17:21:06.605441.
+This file was created on 2026-07-19 10:29:06.112361.
 
 mfc.sh:
 
-    Invocation: test --generate --only 9640CE7F --mpi --no-gpu --no-reldebug --no-debug -j 1
+    Invocation: test --no-gpu --generate -o 9640CE7F -j 96
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        d84254ca25c4837e276c54960e15af4016f548b7 on up/mega (dirty)
+    Git:        f6ca7d3f50cd8c09f83e1111705dfda345d8598f on amr-scaling (dirty)
 
 simulation:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-01-007-28-0.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-03-010-1-0.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
@@ -26,7 +26,7 @@ simulation:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/MFC-lomach/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC-lomach/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -40,19 +40,19 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-01-007-28-0.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-03-010-1-0.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -60,7 +60,7 @@ syscheck:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/MFC-lomach/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC-lomach/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -78,7 +78,7 @@ post_process:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-03-002-29-0.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-03-010-1-0.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
@@ -108,19 +108,19 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
-        CMake v3.26.5 on atl1-1-01-007-28-0.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-02-009-35-0.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -128,7 +128,7 @@ pre_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/MFC-lomach/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/r-sbryngelson3-0/MFC-lomach/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               2
     Stepping:                                7
-    CPU(s) scaling MHz:                      79%
+    CPU(s) scaling MHz:                      75%
     CPU max MHz:                             2700.0000
     CPU min MHz:                             1200.0000
     BogoMIPS:                                5400.00

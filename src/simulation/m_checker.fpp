@@ -136,6 +136,13 @@ contains
             ! operation incompatible with the block-local fine advance.
             @:PROHIBIT(cyl_coord .and. p > 0, &
                        & "amr with cyl_coord supports 2D axisymmetric only: the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance")
+            ! 2D axisymmetric conservation (radius-weighted restriction + area-weighted reflux) is implemented for the L0/L1 coarse
+            ! frame only. Multi-level folds/refluxes in the PARENT-FINE frame (host-only per-block coords) and non-polytropic QBMM
+            ! carries a pb/mv side-state whose fold-back is not radius-weighted - both stay fail-closed under cyl_coord.
+            @:PROHIBIT(cyl_coord .and. amr_max_level > 1, &
+                       & "amr with cyl_coord supports amr_max_level = 1 only: multi-level axisymmetric restriction/reflux in the parent-fine frame is not yet radius-weighted (conservation would drift)")
+            @:PROHIBIT(cyl_coord .and. qbmm .and. (.not. polytropic), &
+                       & "amr with cyl_coord and non-polytropic QBMM is not supported: the pb/mv quadrature side-state fold-back is not radius-weighted (conservation would drift)")
             ! non-polytropic QBMM: each block carries its own pb/mv quadrature side-state (prolonged
             ! piecewise-constant to preserve CHyQMOM realizability, advanced with the block's own rhs
             ! scratch, restricted back with the moments). The subcycle time-lerps the pb/mv ghost
