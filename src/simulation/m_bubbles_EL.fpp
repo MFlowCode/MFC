@@ -12,6 +12,8 @@ module m_bubbles_EL
     use m_bubbles_EL_kernels
     use m_bubbles
     use m_variables_conversion
+    use m_jwl
+    use m_ibm, only: ib_markers
     use m_compile_specific
     use m_boundary_common
     use m_helper_basic
@@ -366,12 +368,35 @@ contains
             end if
         end if
 
+        ! A bubble seeded inside an immersed body would take its liquid state from
+        ! solid-interior cells (unset seeds / IBM ghost states) -- reject it at input time.
+        if (ib) then
+            if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
+                call s_mpi_abort("Lagrange bubble is initially located inside an immersed boundary.")
+            end if
+        end if
+
         call s_convert_to_mixture_variables(q_cons_vf, cell(1), cell(2), cell(3), rhol, gamma, pi_inf, qv, Re)
         dynP = 0._wp
         do i = 1, num_dims
             dynP = dynP + 0.5_wp*q_cons_vf(eqn_idx%cont%end + i)%sf(cell(1), cell(2), cell(3))**2/rhol
         end do
-        pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
+        #:if not MFC_CASE_OPTIMIZATION or jwl_active
+            if (jwl_idx > 0) then
+                ! JWL host cell: seed the bubble pressure from the JWL closure so a bubble
+                ! placed in a products/mixture cell is not initialised with a stiffened-gas pressure.
+                block
+                    real(wp) :: e_l, Y_j, T_l, c_l
+                    e_l = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP)/max(rhol, sgm_eps)
+                    Y_j = min(max(q_cons_vf(jwl_idx)%sf(cell(1), cell(2), cell(3))/max(rhol, sgm_eps), 0._wp), 1._wp)
+                    call s_jwl_mix_state_er(rhol, e_l, Y_j, jwl_idx, pliq, T_l, c_l)
+                end block
+            else
+                pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
+            end if
+        #:else
+            pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
+        #:endif
         if (pliq < 0) print *, "Negative pressure", proc_rank, q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, &
             & pliq, cell, dynP
 
@@ -826,7 +851,7 @@ contains
         real(wp), intent(in)                                :: pinf, rhol, gamma, pi_inf
         integer, dimension(3), intent(in)                   :: cell
         real(wp), intent(out)                               :: cson
-        real(wp)                                            :: E, H
+        real(wp)                                            :: E, H, Y_j
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: vel
         #:else
@@ -839,9 +864,23 @@ contains
         do i = 1, num_dims
             vel(i) = q_prim_vf(i + eqn_idx%cont%end)%sf(cell(1), cell(2), cell(3))
         end do
-        E = gamma*pinf + pi_inf + 0.5_wp*rhol*dot_product(vel, vel)
-        H = (E + pinf)/rhol
-        cson = sqrt((H - 0.5_wp*dot_product(vel, vel))/gamma)
+        #:if not MFC_CASE_OPTIMIZATION or jwl_active
+            if (jwl_idx > 0) then
+                ! JWL host cell: the liquid sound speed feeding Keller-Miksis must come
+                ! from the JWL closure, not the stiffened-gas relation below, which would
+                ! silently corrupt the bubble compressibility term in a Y>0 cell.
+                Y_j = min(max(q_prim_vf(jwl_idx)%sf(cell(1), cell(2), cell(3))/max(rhol, sgm_eps), 0._wp), 1._wp)
+                call s_jwl_mix_sound_speed(rhol, pinf, Y_j, jwl_idx, cson)
+            else
+                E = gamma*pinf + pi_inf + 0.5_wp*rhol*dot_product(vel, vel)
+                H = (E + pinf)/rhol
+                cson = sqrt((H - 0.5_wp*dot_product(vel, vel))/gamma)
+            end if
+        #:else
+            E = gamma*pinf + pi_inf + 0.5_wp*rhol*dot_product(vel, vel)
+            H = (E + pinf)/rhol
+            cson = sqrt((H - 0.5_wp*dot_product(vel, vel))/gamma)
+        #:endif
 
     end subroutine s_compute_cson_from_pinf
 
