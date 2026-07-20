@@ -16,17 +16,17 @@ module m_amr
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_box, only: f_morton  ! shared 3D Morton key (single-sourced with m_sfc_partition)
     use m_global_parameters
-    use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells, amr_restart_blk_hdr_ints
+    use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells, amr_restart_blk_hdr_ints, K_ib, K_pc
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, s_mpi_allreduce_min, &
         & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
     use m_rhs, only: s_compute_rhs
-    use m_phase_change, only: s_infinite_relaxation_k
+    use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
     use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, freg, creg
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
-        & s_update_mib, moving_immersed_boundary_flag, num_gps
+        & s_update_mib, moving_immersed_boundary_flag, num_gps, ib_markers
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
     use m_weno, only: s_compute_weno_coefficients
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
@@ -1168,28 +1168,83 @@ contains
 
     end function f_amr_own_coarse
 
+    !> Per-block measured-cost weight over each block's LEVEL-0 footprint, replicated on every rank: each rank sums the load-weight
+    !! cost model (base 1 + K_ib per IB-marked cell + K_pc per phase-change Newton iteration, when that diagnostic array is live)
+    !! over its owned coarse cells inside the footprint, then one MPI_ALLREDUCE(SUM) makes the vector identical everywhere. Cost
+    !! signals absent -> cost(k) = footprint cell count exactly (pure-geometry fallback). The Lagrangian cloud is excluded from
+    !! blocks by construction, so K_bub never applies here; pc_iter_count is populated only when a load-weight diagnostic writer is
+    !! on (enable load_weight_wrt to make the balance phase-change-aware) - guarded by allocated().
+    impure subroutine s_amr_block_cost(cost)
+
+        real(wp), intent(out) :: cost(:)
+        integer               :: k, j, kk, l, lo(3), hi(3)
+        real(wp)              :: c
+
+#ifdef MFC_MPI
+        integer :: ierr
+#endif
+
+        ! one host refresh per regrid: both signal fields advance on the device between regrids
+        if (ib) then
+            $:GPU_UPDATE(host='[ib_markers%sf]')
+        end if
+        if (allocated(pc_iter_count)) then
+            $:GPU_UPDATE(host='[pc_iter_count]')
+        end if
+        do k = 1, amr_num_blocks
+            ! block footprint /\ this rank's coarse subdomain, in local interior indices (empty -> no-trip loops)
+            lo = 0; hi = 0
+            lo(1) = max(amr_region_lo_all(1, k) - start_idx(1), 0); hi(1) = min(amr_region_hi_all(1, k) - start_idx(1), m)
+            if (n_glb > 0) then
+                lo(2) = max(amr_region_lo_all(2, k) - start_idx(2), 0); hi(2) = min(amr_region_hi_all(2, k) - start_idx(2), n)
+            end if
+            if (p_glb > 0) then
+                lo(3) = max(amr_region_lo_all(3, k) - start_idx(3), 0); hi(3) = min(amr_region_hi_all(3, k) - start_idx(3), p)
+            end if
+            c = 0._wp
+            do l = lo(3), hi(3)
+                do kk = lo(2), hi(2)
+                    do j = lo(1), hi(1)
+                        c = c + 1._wp
+                        if (ib) then
+                            if (ib_markers%sf(j, kk, l) /= 0) c = c + K_ib
+                        end if
+                        if (allocated(pc_iter_count)) c = c + K_pc*real(pc_iter_count(j, kk, l), wp)
+                    end do
+                end do
+            end do
+            cost(k) = c
+        end do
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(MPI_IN_PLACE, cost, amr_num_blocks, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+#endif
+
+    end subroutine s_amr_block_cost
+
     !> Fine-level distribution map: assigns each active block a single owner rank by chains-on-chains balancing of fine-work weight
-    !! (fine cell count) in Morton order of the block's low corner - the same SFC idea m_sfc_partition uses for the base grid, at
-    !! block granularity. Pure function of the replicated block geometry (amr_region_*_all), so it is deterministic and identical on
-    !! every rank with no communication. s_set_amr_fine_geometry applies it as amr_rank_owns_block = (amr_block_owner(amr_cur) ==
-    !! proc_rank); also prints a predicted-imbalance line.
+    !! in Morton order of the block's low corner - the same SFC idea m_sfc_partition uses for the base grid, at block granularity.
+    !! Fine work = measured coarse-footprint cost (s_amr_block_cost) x the level's refinement factor per active dim, so blocks
+    !! concentrating IB or phase-change work weigh more than equal-size quiescent ones. The cost vector is allreduced (one
+    !! collective; every rank must call this), after which the assignment is deterministic and identical on every rank.
+    !! s_set_amr_fine_geometry applies it as amr_rank_owns_block = (amr_block_owner(amr_cur) == proc_rank).
     impure subroutine s_amr_assign_block_owners()
 
         integer         :: k, kk, r, a, lev, maxlev, ord(amr_num_blocks)
-        integer(kind=8) :: wt(amr_num_blocks), twt(amr_num_blocks), key(amr_num_blocks), tmpk, cum, tgt, total
+        integer(kind=8) :: key(amr_num_blocks), tmpk
+        real(wp)        :: wt(amr_num_blocks), twt(amr_num_blocks), cost(amr_num_blocks), cum, tgt, total
         integer         :: tmpo
 
         if (amr_num_blocks < 1) return
 
-        ! per-block own fine-work weight = fine cell count (product of (2**level)*extent-1 over active dims). A level-l block is
-        ! ref_ratio**l = 2**l finer than L0, so its work is 4x (not 2x) the L0 footprint at level 2; using the level factor keeps
-        ! the co-located-tower load balance honest. Level-1 blocks (2**1 = 2) are byte-identical to the previous form.
+        call s_amr_block_cost(cost)
+
+        ! per-block own fine-work weight = footprint cost x ref_ratio**(level*active dims). A level-l block is ref_ratio**l
+        ! finer than L0 per dim, so its work is the footprint cost x rr**(l*d); using the level factor keeps the
+        ! co-located-tower load balance honest. With no cost signals this reduces to the fine cell count (geometry only).
         do k = 1, amr_num_blocks
-            wt(k) = int((ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1, 8)
-            if (n_glb > 0) wt(k) = wt(k)*int((ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, &
-                & k) + 1) - 1, 8)
-            if (p_glb > 0) wt(k) = wt(k)*int((ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, &
-                & k) + 1) - 1, 8)
+            wt(k) = cost(k)*real(ref_ratio, wp)**amr_block_level(k)
+            if (n_glb > 0) wt(k) = wt(k)*real(ref_ratio, wp)**amr_block_level(k)
+            if (p_glb > 0) wt(k) = wt(k)*real(ref_ratio, wp)**amr_block_level(k)
             key(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
             ord(k) = k
         end do
@@ -1198,7 +1253,7 @@ contains
         ! parent<->child gather/restrict/reflux stays LOCAL (no new MPI - only L0<->L1 crosses ranks). Roll each block's own
         ! work up onto its top-level (level-1) ancestor, SFC-balance only the level-1 anchors, then let descendants inherit.
         ! Single-level (all blocks level 1): twt == wt and the inherit pass is empty, so this is byte-identical to before.
-        twt = 0_8
+        twt = 0._wp
         do k = 1, amr_num_blocks
             a = k
             do while (amr_block_level(a) > 1)
@@ -1219,15 +1274,16 @@ contains
         end do
 
         ! chains-on-chains over the level-1 anchors in SFC order, weighted by whole-tower work; advance the owner rank when the
-        ! cumulative tower weight crosses the next even share
-        total = 0_8
+        ! cumulative tower weight crosses the next even share. All-real arithmetic on the replicated (allreduced) weights, in a
+        ! fixed loop order, so every rank computes the identical assignment.
+        total = 0._wp
         do k = 1, amr_num_blocks
             if (amr_block_level(k) == 1) total = total + twt(k)
         end do
-        r = 0; cum = 0_8
+        r = 0; cum = 0._wp
         do k = 1, amr_num_blocks
             if (amr_block_level(ord(k)) /= 1) cycle
-            tgt = (int(r + 1, 8)*total)/int(num_procs, 8)
+            tgt = real(r + 1, wp)*total/real(num_procs, wp)
             if (cum >= tgt .and. r < num_procs - 1) r = r + 1
             amr_block_owner(ord(k)) = r
             cum = cum + twt(ord(k))
