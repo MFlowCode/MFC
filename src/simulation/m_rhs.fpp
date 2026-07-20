@@ -101,7 +101,8 @@ module m_rhs
     type(int_bounds_info) :: is1, is2, is3
     !> @}
 
-    type(int_bounds_info) :: ab_int(1:3)  !< Active-box interior bounds for convert call (device-resident)
+    type(int_bounds_info) :: ab_int(1:3)              !< Active-box interior bounds for convert call (device-resident)
+    logical               :: ab_int_synced = .false.  !< device copy of ab_int is current (invariant once seeded unless active_box)
     $:GPU_DECLARE(create='[ab_int]')
     logical :: ab_prim_seeded = .false.  !< Active-box: whether q_prim_qp's frozen exterior has been seeded once (host-only)
     $:GPU_DECLARE(create='[is1, is2, is3]')
@@ -520,7 +521,12 @@ contains
         end if
         if (ab_active) ab_prim_seeded = .true.
 
-        $:GPU_UPDATE(device='[ab_int]')
+        ! ab_int is invariant (= idwint) for every non-active_box run: seed the device copy once
+        ! instead of re-sending it every RK stage. active_box keeps the per-stage update (the box grows).
+        if (active_box .or. .not. ab_int_synced) then
+            $:GPU_UPDATE(device='[ab_int]')
+            ab_int_synced = .true.
+        end if
 
         if (.not. igr) then
             ! Association/Population of Working Variables
