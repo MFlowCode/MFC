@@ -57,16 +57,19 @@ contains
         type(scalar_field), intent(inout), optional                 :: beta
         type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
 
-        if (load_weight_wrt) then
-            call s_compute_load_weight(q_cons_vf)
-            call s_report_load_imbalance
+        ! One load-weight compute serves both writers (s_compute_sfc_partition reads the host copy).
+
+        if (load_weight_wrt .or. sfc_partition_wrt) then
+            call s_compute_load_weight()
             $:GPU_UPDATE(host='[load_weight%sf]')
         end if
+
+        if (load_weight_wrt) call s_report_load_imbalance
 
         if (rank_time_wrt) call s_report_rank_time
 
         if (sfc_partition_wrt) then
-            call s_compute_sfc_partition(q_cons_vf)
+            call s_compute_sfc_partition()
             call s_report_sfc_partition
         end if
 

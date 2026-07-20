@@ -55,9 +55,9 @@ contains
     impure subroutine s_initialize_phasechange_module
 
 #ifdef MFC_SIMULATION
-        ! the load-weight field is computed for load_weight_wrt AND for sfc_partition_wrt (which
-        ! calls s_compute_load_weight too): allocate and populate under the same condition, else
-        ! the sfc-only path reads unallocated (or allocated-but-never-written) iteration counts
+        ! the load-weight field is computed for load_weight_wrt AND for sfc_partition_wrt:
+        ! allocate and populate under the same condition, else the sfc-only path reads
+        ! unallocated (or allocated-but-never-written) iteration counts
         if (relax .and. (load_weight_wrt .or. sfc_partition_wrt)) then
             @:ALLOCATE(pc_iter_count(0:m, 0:n, 0:p))
         end if

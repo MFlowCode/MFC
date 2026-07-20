@@ -11,7 +11,7 @@ module m_sfc_partition
     use m_global_parameters
     use m_mpi_proxy
     use m_mpi_common
-    use m_load_weight, only: load_weight, s_compute_load_weight
+    use m_load_weight, only: load_weight
     use m_box, only: f_morton
 
     implicit none
@@ -49,19 +49,15 @@ contains
 
     end subroutine s_finalize_sfc_partition_module
 
-    !> Aggregate per-cell load weights into global per-tile weights via MPI_ALLREDUCE.
-    impure subroutine s_compute_sfc_partition(q_cons_vf)
+    !> Aggregate per-cell load weights (computed by the caller) into global per-tile weights via MPI_ALLREDUCE.
+    impure subroutine s_compute_sfc_partition()
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp), allocatable                               :: tile_local(:)
-        integer                                             :: j, k, l, gx, gy, gz, tx, ty, tz, t, ierr
-        real(wp)                                            :: my_w
-        integer                                             :: sfc_start(3)  !< bounds-safe copy of start_idx (0 for inactive dims)
+        real(wp), allocatable :: tile_local(:)
+        integer               :: j, k, l, gx, gy, gz, tx, ty, tz, t, ierr
+        real(wp)              :: my_w
+        integer               :: sfc_start(3)  !< bounds-safe copy of start_idx (0 for inactive dims)
 
         if (.not. sfc_partition_wrt) return
-
-        call s_compute_load_weight(q_cons_vf)
-        $:GPU_UPDATE(host='[load_weight%sf]')
 
         ! Build a 3-element start offset safe to access regardless of num_dims.
         ! start_idx is allocated (1:num_dims) only; higher dims are always 0.

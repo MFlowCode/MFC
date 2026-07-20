@@ -10,7 +10,7 @@ module m_load_balance
     use m_derived_types
     use m_global_parameters
     use m_mpi_common
-    use m_box, only: f_weighted_splits
+    use m_box, only: f_equal_splits, f_weighted_splits
 
     implicit none
 
@@ -26,15 +26,8 @@ contains
         integer, dimension(0:), intent(in) :: off
         integer, intent(in)                :: g, parts
         logical                            :: differs
-        integer                            :: r
 
-        differs = .false.
-        do r = 0, parts
-            if (off(r) /= r*(g/parts) + min(r, mod(g, parts))) then
-                differs = .true.
-                return
-            end if
-        end do
+        differs = any(off /= f_equal_splits(g, parts))
 
     end function f_offsets_differ_from_equal
 
