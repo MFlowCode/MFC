@@ -1334,6 +1334,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if ndims == 3:
             stack.pop()
 
+        # Spatially supported body force (Wei & Freund, JFM 2005) in isolation: no
+        # bf_x/y/z, no chemistry, so this golden pins the forcing kernel (momentum
+        # sources + u*f energy work term) at the default 1e-12 tolerance. The only
+        # other coverage (Spatial Reacting Mixing Layer) entangles it with stiff
+        # chemistry at 1e-6. 2D-only by construction (m_checker rejects 1D/3D).
+        if ndims == 2:
+            stack.push(
+                "SpatialBodyforces",
+                {
+                    "bf_spatial_support": "T",
+                    "spatial_bf%amp": 1.0,
+                    "spatial_bf%x_centroid": 0.5,
+                    "spatial_bf%y_centroid": 0.5,
+                    "spatial_bf%conv_vel": 1.0,
+                    "spatial_bf%sigma": 100.0,
+                    **{f"spatial_bf%freq({i})": 2.0 * i for i in range(1, 9)},
+                    **{f"spatial_bf%phase({i})": 0.3 * i for i in range(1, 9)},
+                },
+            )
+            cases.append(define_case_d(stack, "", {}))
+            stack.pop()
+
     def alter_synthetic_turbulence(dimInfo):
         # 3-D solenoidal synthetic-turbulence forcing (m_body_forces): a quiescent,
         # triply-periodic single-fluid box driven by a deterministic (compiler-independent)
