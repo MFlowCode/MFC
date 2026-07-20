@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Per-rank compute-time (RHS + phase-change relaxation) imbalance diagnostic (Tier-2 calibration support).
+!> @brief Per-rank compute-time (RHS + phase-change relaxation) imbalance diagnostic.
 module m_rank_timing
 
     use m_derived_types

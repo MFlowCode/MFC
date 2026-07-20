@@ -662,6 +662,11 @@ def _load():
         "cons_vars_wrt",
         "fft_wrt",
         "ib_state_wrt",
+    ]:
+        _r(n, LOG, {"output"})
+
+    # Load balance and AMR (load_weight/sfc_partition/rank_time writers are diagnostics)
+    for n in [
         "load_weight_wrt",
         "sfc_partition_wrt",
         "load_balance",

@@ -469,7 +469,7 @@ contains
             do kk = 1, nt
                 amr_region_lo_all(:,kk) = tiled(kk)%lo; amr_region_hi_all(:,kk) = tiled(kk)%hi
             end do
-            call s_amr_assign_block_owners()  ! Phase 1: compute + report the fine-dist map
+            call s_amr_assign_block_owners()  ! assign each block's single owner rank (fine-dist map)
             call s_amr_reconcile_slots()  ! allocate this rank's owned initial blocks (owner-guarded geometry writes below)
             do kk = 1, nt
                 amr_cur = kk
@@ -1168,11 +1168,11 @@ contains
 
     end function f_amr_own_coarse
 
-    !> Fine-level distribution map (PHASE 1: computed + reported, NOT applied). Assigns each active block a single owner rank by
-    !! chains-on-chains balancing of fine-work weight (fine cell count) in Morton order of the block's low corner - the same SFC
-    !! idea m_sfc_partition uses for the base grid, at block granularity. Pure function of the replicated block geometry
-    !! (amr_region_*_all), so it is deterministic and identical on every rank with no communication. Mirror ownership (amr_owns_all)
-    !! is untouched; this only fills amr_block_owner for the Phase-2 switch and prints a predicted-imbalance line.
+    !> Fine-level distribution map: assigns each active block a single owner rank by chains-on-chains balancing of fine-work weight
+    !! (fine cell count) in Morton order of the block's low corner - the same SFC idea m_sfc_partition uses for the base grid, at
+    !! block granularity. Pure function of the replicated block geometry (amr_region_*_all), so it is deterministic and identical on
+    !! every rank with no communication. s_set_amr_fine_geometry applies it as amr_rank_owns_block = (amr_block_owner(amr_cur) ==
+    !! proc_rank); also prints a predicted-imbalance line.
     impure subroutine s_amr_assign_block_owners()
 
         integer         :: k, kk, r, a, lev, maxlev, ord(amr_num_blocks)

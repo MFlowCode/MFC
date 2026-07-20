@@ -117,7 +117,7 @@ is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's
 | `n_start_old`    | Integer        | Starting index from previous simulation   |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
-- `active_box` enables the causal-envelope active-box optimization, restricting the RHS compute window to the region where the solution deviates from a uniform ambient state. Requires WENO reconstruction (`recon_type = 1`) and SSP-RK3 time stepping (`time_stepper = 3`). Incompatible with immersed boundaries, acoustic sources, body forces, Lagrangian bubbles, phase change, and the IGR solver.
+- `active_box` enables the causal-envelope active-box optimization, restricting the RHS compute window to the region where the solution deviates from a uniform ambient state. Single-rank only: with more than one MPI rank the optimization disables itself with a warning (full-domain compute). Requires WENO reconstruction (`recon_type = 1`) and SSP-RK3 time stepping (`time_stepper = 3`). Incompatible with immersed boundaries, acoustic sources, body forces, Euler-Euler and Lagrangian bubbles, phase change, and the IGR solver.
 - `rdma_mpi` optimizes data transfers between GPUs using Remote Direct Memory Access (RDMA).
 The underlying MPI implementation and communication infrastructure must support this
 feature, detecting GPU pointers and performing RDMA accordingly.
@@ -948,11 +948,12 @@ Each save step writes a fine-level AMR restart file alongside the level-0 restar
 (whose format is unchanged): the current — possibly regridded — block box and the fine
 solution, per rank (an `amr_fine.dat` in each rank's step directory, or a single shared
 `amr_*.dat` next to the level-0 MPI-IO restart file when `parallel_io` is on).
-Restarting (`t_step_start > 0`) restores the saved box and fine state seamlessly; it
-requires the same rank count (and decomposition) as the run that wrote the file, and the
-same physics configuration — the number of conserved variables, which depends on
-`num_fluids`, `model_eqns`, and the enabled bubble/chemistry models — and aborts with a
-clear message otherwise.
+Restarting (`t_step_start > 0`) restores the saved box and fine state seamlessly; with
+`parallel_io` the fine blocks are repartitioned across any rank count, while the serial
+(per-rank-file) path requires the same rank count as the run that wrote the file. Both
+paths require the same physics configuration — the number of conserved variables, which
+depends on `num_fluids`, `model_eqns`, and the enabled bubble/chemistry models — and
+abort with a clear message otherwise.
 On restart the AMR block geometry (block count and boxes) is read from the AMR restart
 file, not from the `amr_block_beg`/`amr_block_end` case parameters — so editing those
 parameters for a restart run has no effect. To re-derive the blocks from parameters,

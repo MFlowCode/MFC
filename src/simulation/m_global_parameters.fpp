@@ -308,8 +308,8 @@ module m_global_parameters
     !> @}
 
     logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
-    !> true on ranks holding fine cells: block intersects this rank's subdomain in every active dim (mirror decomposition; all ranks
-    !! at np=1)
+    !> true on the current block's single owner rank: amr_block_owner(amr_cur) == proc_rank (always true at np=1); kept by
+    !! s_set_amr_fine_geometry
     logical :: amr_rank_owns_block = .true.
 
     !> Current AMR fine-block box in level-0 cell indices; mirrors amr_fine%region at all times (kept by s_set_amr_fine_geometry) so
@@ -339,10 +339,9 @@ module m_global_parameters
     integer, allocatable :: amr_block_level(:)
     integer              :: amr_num_levels = 1
 
-    !> Fine-level distribution map (fine-SFC-distribution work): SFC/work-balanced single-owner rank per active block. PHASE 1
-    !! computes and reports it but does NOT apply it - the mirror decomposition (amr_owns_all) still governs ownership, so behavior
-    !! is unchanged. Phase 2 switches amr_rank_owns_block to (amr_block_owner(k) == proc_rank) + coarse<->fine gather/scatter. See
-    !! docs/documentation/amr_fine_distribution.md.
+    !> Fine-level distribution map: SFC/work-balanced single-owner rank per active block. Governs ownership - amr_rank_owns_block =
+    !! (amr_block_owner(amr_cur) == proc_rank) - with point-to-point coarse<->fine gather/scatter between the owner and overlapping
+    !! ranks. See docs/documentation/amr_fine_distribution.md.
     integer, allocatable :: amr_block_owner(:)
 
 contains
