@@ -251,7 +251,7 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             else if (mhd .and. relativity) then
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
                                     Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
                                     vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
@@ -392,7 +392,7 @@ contains
                             ! Energy
                             if (mhd .and. (.not. relativity)) then
                                 ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     flux_rsx_vf(${SF('')}$, &
                                                 & eqn_idx%E) = (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir) &
                                                 & *(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) - s_P*(vel_L(norm_dir) &

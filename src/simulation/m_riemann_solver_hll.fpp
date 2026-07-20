@@ -258,7 +258,7 @@ contains
                             else if (mhd .and. relativity) then
                                 Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
                                 Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
                                     vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
 
@@ -274,7 +274,7 @@ contains
                                 ! Hard-coded EOS
                                 H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
                                 H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
                                     cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
                                 #:endif
@@ -282,7 +282,7 @@ contains
                                 E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
                                 E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
                             else if (mhd .and. .not. relativity) then
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
                                     pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
                                 #:endif
@@ -490,7 +490,7 @@ contains
                             ! Energy
                             if (mhd .and. (.not. relativity)) then
                                 ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
-                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     flux_rsx_vf(${SF('')}$, &
                                                 & eqn_idx%E) = (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir) &
                                                 & *(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) - s_P*(vel_L(norm_dir) &
