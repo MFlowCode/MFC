@@ -13,6 +13,7 @@
             "m_riemann_solver_hllc",
             "m_muscl",
             "m_variables_conversion",
+            "m_thermodynamics",
             "m_thinc"
         ]
     },
