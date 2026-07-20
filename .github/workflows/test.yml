@@ -431,7 +431,24 @@ jobs:
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
+        if:   ${{ !(matrix.cluster == 'frontier_amd' && matrix.device == 'gpu') }}
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
+
+      - name: Build (concurrent variants)
+        if:   matrix.cluster == 'frontier_amd' && matrix.device == 'gpu'
+        # The suite needs a base and a chemistry simulation binary, and on amdflang
+        # each device LTO link is ~1 h -- building both serially overruns the 2 h
+        # walltime. They touch disjoint staging directories, so submit one SLURM job
+        # per variant and wait on both (mirrors the case-optimization pre-build).
+        run:  |
+          pids=""
+          for v in base chem; do
+            bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} "${{ matrix.shard }}" "$v" &
+            pids="$pids $!"
+          done
+          rc=0
+          for p in $pids; do wait "$p" || rc=1; done
+          exit $rc
 
       - name: Test
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
@@ -460,7 +477,9 @@ jobs:
       - name: Print Logs
         if:   always()
         run:  |
-          for f in ${{ steps.log.outputs.build_slug }}.out ${{ steps.log.outputs.test_slug }}.out; do
+          # The build slug matches the plain log and, where the build is split per
+          # variant, the build-...-base/-chem ones.
+          for f in ${{ steps.log.outputs.build_slug }}*.out ${{ steps.log.outputs.test_slug }}.out; do
             [ -f "$f" ] && echo "=== $f ===" && cat "$f"
           done
 
@@ -470,7 +489,7 @@ jobs:
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.test_slug }}
           path: |
-            ${{ steps.log.outputs.build_slug }}.out
+            ${{ steps.log.outputs.build_slug }}*.out
             ${{ steps.log.outputs.test_slug }}.out
 
   case-optimization:
