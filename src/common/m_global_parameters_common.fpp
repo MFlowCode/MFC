@@ -123,6 +123,15 @@ module m_global_parameters_common
     integer                 :: mpi_info_int
     !> @}
 
+    !> @name Per-fluid property tables. In the simulation target these live in m_global_parameters; for pre and post process they
+    !! live here so the thermodynamics interface can read them from global parameters without a module cycle.
+    !> @{
+#ifndef MFC_SIMULATION
+    real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
+#endif
+    !> @}
+
 contains
 
     !> Initialize equation-index state (eqn_idx, sys_size, b_size, tensor_size) from the namelist parameters. This is the shared

@@ -14,11 +14,14 @@ module m_variables_conversion
     use m_helper_basic
     use m_helper
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, &
-        & model_eqns_4eq, avg_state_roe
+        & model_eqns_4eq
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
 
     use m_thermodynamics, only: s_compute_pressure
+#ifndef MFC_PRE_PROCESS
+    use m_thermodynamics, only: s_compute_speed_of_sound
+#endif
 
     implicit none
 
@@ -40,12 +43,6 @@ module m_variables_conversion
               s_compute_fast_magnetosonic_speed, &
 #endif
     s_finalize_variables_conversion_module
-
-    ! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
-#ifndef MFC_SIMULATION
-    real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
-#endif
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -1183,68 +1180,6 @@ contains
 #endif
 
     end subroutine s_finalize_variables_conversion_module
-
-#ifndef MFC_PRE_PROCESS
-    !> Compute the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in) :: pres
-        real(wp), intent(in) :: rho, gamma, pi_inf, qv
-        real(wp), intent(in) :: H
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: adv
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: adv
-        #:endif
-        real(wp), intent(in)  :: vel_sum
-        real(wp), intent(in)  :: c_c
-        real(wp), intent(out) :: c
-        real(wp)              :: blkmod1, blkmod2
-        integer               :: q
-
-        if (chemistry) then  ! Reacting mixture sound speed
-            if (avg_state == avg_state_roe .and. abs(c_c) > verysmall) then
-                c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
-            else
-                c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
-            end if
-        else if (relativity) then  ! Relativistic sound speed
-            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
-        else
-            if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
-                blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
-                blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
-                c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-            else if (model_eqns == model_eqns_6eq) then  ! Six-equation model sound speed
-                c = 0._wp
-                $:GPU_LOOP(parallelism='[seq]')
-                do q = 1, num_fluids
-                    c = c + adv(q)*gs_min(q)*(pres + pi_infs(q)/(gammas(q) + 1._wp))
-                end do
-                c = c/rho
-            else if (((model_eqns == model_eqns_4eq) .or. (model_eqns == model_eqns_5eq .and. bubbles_euler))) then
-                ! Sound speed for bubble mixture to order O(\alpha)
-
-                if (mpp_lim .and. (num_fluids > 1)) then
-                    c = (1._wp/gamma + 1._wp)*(pres + pi_inf/(gamma + 1._wp))/rho
-                else
-                    c = (1._wp/gamma + 1._wp)*(pres + pi_inf/(gamma + 1._wp))/(rho*(1._wp - adv(num_fluids)))
-                end if
-            else
-                c = (H - 5.e-1*vel_sum - qv/rho)/gamma
-            end if
-
-            if (mixture_err .and. c < 0._wp) then
-                c = 100._wp*sgm_eps
-            else
-                c = sqrt(c)
-            end if
-        end if
-
-    end subroutine s_compute_speed_of_sound
-#endif
 
 #ifndef MFC_PRE_PROCESS
     !> Compute the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
