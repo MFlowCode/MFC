@@ -75,11 +75,15 @@ contains
                        & "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
             @:PROHIBIT(chemistry, &
                        & "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
+            @:PROHIBIT(bubbles_euler, &
+                       & "active_box is incompatible with bubbles_euler (cell-local bubble sources in a non-equilibrium ambient violate the static-uniform-exterior assumption)")
         end if
 
         @:PROHIBIT(sfc_partition_wrt .and. partition_tile_size < 1, "partition_tile_size must be >= 1")
         @:PROHIBIT(load_balance .and. .not. parallel_io, "load_balance requires parallel_io = T")
         @:PROHIBIT(load_balance .and. num_procs == 1, "load_balance requires more than one MPI rank")
+        @:PROHIBIT(load_balance .and. file_per_process, &
+                   & "load_balance is incompatible with file_per_process (per-rank restart files are sized for the equal decomposition; rereading them at rebalanced extents corrupts the fields)")
 
         if (amr) then
             @:PROHIBIT((.not. igr) .and. recon_type /= recon_type_weno, "amr requires WENO reconstruction (or the IGR solver)")
