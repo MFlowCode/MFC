@@ -160,13 +160,18 @@ contains
         ! Check the buff_size-thick layer just INSIDE each box face. Those cells are updated by
         ! the RK loop, so if the disturbance front reaches them the reconstruction margin is
         ! compromised (box under-grown). The exterior layer is frozen-ambient by construction and
-        ! cannot detect under-growth. Degenerate dimensions (n=0/p=0) contribute no faces.
+        ! cannot detect under-growth. Degenerate dimensions (n=0/p=0) contribute no faces. A face
+        ! clamped to the domain edge has no frozen exterior to protect: the disturbance may
+        ! legitimately reach it (reflection/outflow), so its margin is exempt.
         do l = ab_z%beg, ab_z%end
             do k = ab_y%beg, ab_y%end
                 do j = ab_x%beg, ab_x%end
-                    in_margin = (j <= ab_x%beg + buff_size - 1 .or. j >= ab_x%end - buff_size + 1)
-                    if (n > 0) in_margin = in_margin .or. (k <= ab_y%beg + buff_size - 1 .or. k >= ab_y%end - buff_size + 1)
-                    if (p > 0) in_margin = in_margin .or. (l <= ab_z%beg + buff_size - 1 .or. l >= ab_z%end - buff_size + 1)
+                    in_margin = (ab_x%beg > 0 .and. j <= ab_x%beg + buff_size - 1) .or. (ab_x%end < m .and. j >= ab_x%end &
+                                 & - buff_size + 1)
+                    if (n > 0) in_margin = in_margin .or. (ab_y%beg > 0 .and. k <= ab_y%beg + buff_size - 1) .or. (ab_y%end < n &
+                        & .and. k >= ab_y%end - buff_size + 1)
+                    if (p > 0) in_margin = in_margin .or. (ab_z%beg > 0 .and. l <= ab_z%beg + buff_size - 1) .or. (ab_z%end < p &
+                        & .and. l >= ab_z%end - buff_size + 1)
                     if (.not. in_margin) cycle
                     do i = 1, sys_size
                         @:ASSERT(abs(q_cons_vf(i)%sf(j, k, l) - ab_ambient(i)) <= tol_ab, &
