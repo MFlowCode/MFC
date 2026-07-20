@@ -14,6 +14,8 @@ module m_constants
     real(wp), parameter  :: small_alf = 1.e-11_wp       !< Small alf tolerance
     real(wp), parameter  :: pi = 3.141592653589793_wp   !< Pi
     real(wp), parameter  :: verysmall = 1.e-12_wp       !< Very small number
+    !> Residual modulus fraction below which a damaged state's elastic energy is dropped (cont_damage)
+    real(wp), parameter :: damage_energy_cutoff = 1.e-3_wp
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5        !< Minimum # of stencils
