@@ -132,7 +132,7 @@ contains
     impure subroutine s_ibm_setup()
 
         integer                        :: i, j, k
-        integer(kind=8)                :: max_num_gps
+        integer(kind=8)                :: max_num_gps, fine_gps_est, total_gps
         type(ghost_point), allocatable :: tmp_park(:,:)
 
         call nvtxStartRange("SETUP-IBM-MODULE")
@@ -187,8 +187,19 @@ contains
         ! AMR-IB: the fine blocks swap their (larger) ghost-point list into this same declare-target
         ! ghost_points, which is allocated ONCE here and never reallocated (a realloc/move_alloc of a
         ! declare-target allocatable corrupts the Cray present table). Size it to hold the fine list too.
-        ! fine_gps_cap is set by s_ibm_alloc_fine, which runs before this routine.
-        if (allocated(ib_fine)) max_num_gps = max(max_num_gps, fine_gps_cap)
+        ! fine_gps_cap (deepest block's buffered CELL count, set by s_ibm_alloc_fine) is a volume bound;
+        ! ghost points live in a gp_layers-thick shell at the body surface, so refine it with a surface
+        ! estimate: the fine list for any block is bounded by the whole-body coarse count (global: a
+        ! seam-spanning block's buffered marker region reaches into neighbor-owned surface) scaled by the
+        ! surface refinement factor ref_ratio**(level*(num_dims-1)), x4 margin (discretization + prescribed
+        ! motion), floored for bodies under-resolved at the coarse spacing. min() with the volume bound so
+        ! capacity (and gp_park = cap x nslots+1 device words) never exceeds the previous sizing; the
+        ! overflow PROHIBITs at the swap/rebuild sites remain the hard backstop.
+        if (allocated(ib_fine)) then
+            call s_mpi_allreduce_integer_sum(int(num_gps, 8), total_gps)
+            fine_gps_est = min(fine_gps_cap, 4_8*total_gps*int(ref_ratio, 8)**(amr_max_level*(num_dims - 1)) + 4096_8)
+            max_num_gps = max(max_num_gps, fine_gps_est)
+        end if
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps]')
