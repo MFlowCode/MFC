@@ -9,6 +9,7 @@ module m_load_weight
 
     use m_derived_types
     use m_global_parameters
+    use m_constants, only: K_bub, K_ib, K_pc
     use m_mpi_proxy
     use m_mpi_common
     use m_active_box, only: ab_active, ab_x, ab_y, ab_z
@@ -25,10 +26,7 @@ module m_load_weight
     type(scalar_field) :: load_weight  !< per-cell modeled compute-cost weight
     $:GPU_DECLARE(create='[load_weight]')
 
-    ! Relative cost coefficients (calibrated against measured RHS-time imbalance; base RHS cell = 1).
-    real(wp), parameter :: K_bub = 50._wp  !< per local bubble (stiff adaptive ODE); refined by validation
-    real(wp), parameter :: K_ib = 2._wp    !< per IB ghost/interior cell
-    real(wp), parameter :: K_pc = 3._wp    !< per phase-change Newton iteration
+    ! Relative cost coefficients K_bub/K_ib/K_pc come from m_constants (shared with the AMR block-owner cost weighting).
 
 contains
 

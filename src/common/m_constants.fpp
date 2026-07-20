@@ -43,6 +43,11 @@ module m_constants
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50  !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp            !< scaling factor for IGR alpha
     integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
+    ! Load-weight relative cost coefficients (calibrated against measured RHS-time imbalance; base RHS cell = 1).
+    ! Shared by the m_load_weight diagnostic and the AMR block-owner cost weighting.
+    real(wp), parameter :: K_bub = 50._wp  !< per local Lagrangian bubble (stiff adaptive ODE)
+    real(wp), parameter :: K_ib = 2._wp    !< per IB ghost/interior cell
+    real(wp), parameter :: K_pc = 3._wp    !< per phase-change Newton iteration
     !> AMR fine-level restart per-block header size, in integers: region box (6) + amr_block_level (1).
     !> The writer (m_amr:s_write_amr_restart) and BOTH readers (m_amr:s_read_amr_restart and
     !> m_data_input:s_read_amr_data) must agree on this layout - a mismatch silently misaligns every
