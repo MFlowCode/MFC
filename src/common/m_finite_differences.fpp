@@ -16,6 +16,7 @@ contains
     !> Compute the centered finite-difference coefficients for first-order spatial derivatives in the s-coordinate direction (x, y,
     !! or z). Supports up to 4th order accuracy.
     !! @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
+    !! @param local_buff_size Size of the local buffer
     !! @param fd_number_in Finite-difference number
     !! @param fd_order_in Finite-difference order of accuracy
     !! @param offset_s Optional offset bounds in the s-coordinate direction
@@ -39,7 +40,7 @@ contains
 
 #ifdef MFC_POST_PROCESS
         if (allocated(fd_coeff_s)) deallocate (fd_coeff_s)
-        allocate (fd_coeff_s(-fd_number_in:fd_number_in,lb:lE))
+        allocate (fd_coeff_s(-fd_number_in:fd_number_in,lB:lE))
 #endif
 
         ! Computing the 1st order finite-difference coefficients

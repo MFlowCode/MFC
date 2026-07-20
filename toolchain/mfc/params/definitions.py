@@ -343,9 +343,9 @@ CONSTRAINTS = {
     },
     # Bubbles
     "bubble_model": {
-        "choices": [1, 2, 3],
-        "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
-        "names": {"gilmore": 1, "keller_miksis": 2, "rayleigh_plesset": 3},
+        "choices": [0, 1, 2, 3],
+        "value_labels": {0: "Particle", 1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
+        "names": {"particle": 0, "gilmore": 1, "keller_miksis": 2, "rayleigh_plesset": 3},
     },
     # Output
     "format": {
@@ -779,6 +779,8 @@ def _load():
         _r(n, LOG)
     _r("int_comp", INT)
     _r("case_dir", STR, str_len="path_len")
+    _r("file_extension", STR, str_len="path_len")
+    _r("files_dir", STR, str_len="path_len")
 
     # Body force
     for d in ["x", "y", "z"]:
@@ -787,6 +789,30 @@ def _load():
         _r(f"w_{d}", REAL, math=r"\f$\omega_" + d + r"\f$")
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
+
+    # Interfacial flow inputs
+    _r("normMag", REAL)
+    _r("p0_ic", REAL)
+    _r("g0_ic", REAL)
+    _r("normFac", REAL)
+    _r("interface_file", STR)
+
+    # Synthetic turbulence forcing
+    _r("synthetic_turbulence", LOG, {"synthetic_turbulence"})
+    _r("synth_seed", INT, {"synthetic_turbulence"})
+    _r("synth_n_shells", INT, {"synthetic_turbulence"})
+    _r("num_turbulent_sources", INT, {"synthetic_turbulence"})
+    _r("synth_U_inf", REAL, {"synthetic_turbulence"}, math=r"\f$U_\infty\f$")
+    NSS = _fc("num_synth_shells_max", 50)
+    NTS = _fc("num_turb_sources_max", 10)
+    for i in range(1, NSS + 1):
+        _r(f"synth_n_waves_per_shell({i})", INT, {"synthetic_turbulence"})
+        _r(f"synth_k_shell({i})", REAL, {"synthetic_turbulence"}, math=r"\f$k_s\f$")
+        _r(f"synth_amp_shell({i})", REAL, {"synthetic_turbulence"}, math=r"\f$A_s\f$")
+    for i in range(1, NTS + 1):
+        for d in range(1, 4):
+            _r(f"turb_pos({i},{d})", REAL, {"synthetic_turbulence"})
+            _r(f"synth_L({i},{d})", REAL, {"synthetic_turbulence"})
 
     # INDEXED PARAMETERS
 
@@ -1051,20 +1077,22 @@ def _load():
     # lag_params (Lagrangian bubbles)
     # Members present in bubbles_lagrange_parameters: solver_approach, cluster_type,
     # pressure_corrector, smooth_type, heatTransfer_model, massTransfer_model,
-    # write_bubbles, write_bubbles_stats, nBubs_glb, epsilonb, charwidth, valmaxvoid.
-    # T0/Thost/c0/rho0/x0 were removed from the Fortran type by upstream #1085/#1093
-    # — they must NOT be registered (namelist read would crash).
-    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]:
+    # write_bubbles, write_bubbles_stats, write_void_evol, pressure_force,
+    # gravity_force, nBubs_glb, epsilonb, charwidth, valmaxvoid. T0/Thost/c0/rho0/x0
+    # were removed from the Fortran type by upstream #1085/#1093 — they must NOT be
+    # registered (namelist read would crash).
+    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol", "kahan_summation"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
+    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
+    _r("lag_params%input_path", STR, {"bubbles"})
 
     # chem_params
-    for a in ["diffusion", "reactions"]:
+    for a in ["diffusion", "reactions", "adap_substeps"]:
         _r(f"chem_params%{a}", LOG, {"chemistry"})
-    for a in ["gamma_method", "transport_model"]:
+    for a in ["gamma_method", "transport_model", "reaction_substeps", "reaction_substeps_max"]:
         _r(f"chem_params%{a}", INT, {"chemistry"})
 
     # Per-fluid output arrays
@@ -1236,15 +1264,6 @@ _nv(
 )
 _nv(
     _PRE_SIM,
-    "x_domain",
-    "y_domain",
-    "z_domain",
-    "x_a",
-    "y_a",
-    "z_a",
-    "x_b",
-    "y_b",
-    "z_b",
     "palpha_eps",
     "ptgalpha_eps",
     "t_step_old",
@@ -1306,6 +1325,16 @@ _nv(
     "g_x",
     "g_y",
     "g_z",
+    "synthetic_turbulence",
+    "synth_seed",
+    "synth_n_shells",
+    "num_turbulent_sources",
+    "synth_U_inf",
+    "synth_n_waves_per_shell",
+    "synth_k_shell",
+    "synth_amp_shell",
+    "turb_pos",
+    "synth_L",
     "collision_model",
     "coefficient_of_restitution",
     "collision_time",
@@ -1329,6 +1358,15 @@ _nv(
 )
 _nv(
     _PRE,
+    "x_domain",
+    "y_domain",
+    "z_domain",
+    "x_a",
+    "y_a",
+    "z_a",
+    "x_b",
+    "y_b",
+    "z_b",
     "stretch_x",
     "stretch_y",
     "stretch_z",
@@ -1364,6 +1402,8 @@ _nv(
     "elliptic_smoothing_iters",
     "simplex_perturb",
     "simplex_params",
+    "files_dir",
+    "file_extension",
 )
 _nv(
     _POST,

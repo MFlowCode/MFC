@@ -122,7 +122,7 @@ PHYSICS_DOCS = {
     "check_bubbles_lagrange": {
         "title": "Euler-Lagrange Bubble Model",
         "category": "Bubble Physics",
-        "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3.",
+        "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. Kahan summation not compatible with --mixed precision.",
     },
     # Numerical Schemes
     "check_weno": {
@@ -199,6 +199,12 @@ PHYSICS_DOCS = {
         "title": "Acoustic Sources",
         "category": "Acoustic Sources",
         "explanation": ("Dimension-specific support types. Pulse type in {1,2,3,4}. Non-planar sources require foc_length and aperture."),
+    },
+    # IC Extrusion
+    "check_ic_extrusion": {
+        "title": "IC Extrusion File Parameters",
+        "category": "IC Extrusion",
+        "explanation": "Extrusion hcids (170, 270, 271, 272, 370) read initial condition data from files. Both files_dir and file_extension must be set.",
     },
     # Post-Processing
     "check_vorticity": {
@@ -1292,12 +1298,19 @@ class CaseValidator:
             return
 
         n = self.get("n", 0)
+        p = self.get("p", 0)
         file_per_process = self.get("file_per_process", "F") == "T"
         model_eqns = self.get("model_eqns")
         cluster_type = self.get("lag_params%cluster_type")
         smooth_type = self.get("lag_params%smooth_type")
         polytropic = self.get("polytropic", "F") == "T"
         thermal = self.get("thermal")
+        vel_model = self.get("lag_params%vel_model", 0)
+        drag_model = self.get("lag_params%drag_model", 0)
+        charNz = self.get("lag_params%charNz", 0)
+        charWidth = self.get("lag_params%charwidth", 0)
+        fd_order = self.get("fd_order", 0)
+        kahan_summation = self.get("lag_params%kahan_summation", "T") == "T"
 
         self.prohibit(n is not None and n == 0, "bubbles_lagrange accepts 2D and 3D simulations only")
         self.prohibit(file_per_process, "file_per_process must be false for bubbles_lagrange")
@@ -1305,6 +1318,12 @@ class CaseValidator:
         self.prohibit(polytropic, "bubbles_lagrange requires polytropic = F")
         self.prohibit(thermal is not None and thermal != 3, "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1, "cluster_type >= 2 requires smooth_type = 1")
+        self.prohibit(vel_model < 0 or vel_model > 2, "lag_params%vel_model must be 0, 1, or 2")
+        self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, 2, or 3")
+        self.prohibit(charNz <= 0 and p == 0, "lag_params%charNz must be positive for 2D bubbles_lagrange")
+        self.prohibit(charWidth <= 0 and p == 0, "lag_params%charwidth must be positive for 2D bubbles_lagrange")
+        self.prohibit(fd_order == 0 and vel_model > 0, "Non-zero lag_params%vel_model requires fd_order to be set")
+        self.prohibit(kahan_summation and CFG().mixed, "lag_params%kahan_summation = T is not compatible with --mixed precision")
 
     def check_continuum_damage(self):
         """Checks continuum damage model parameters (simulation)"""
@@ -2219,6 +2238,26 @@ class CaseValidator:
 
     # Main Validation Entry Points
 
+    def check_ic_extrusion(self):
+        """Checks that files_dir and file_extension are set for extrusion hcids."""
+        extrusion_hcids = {170, 270, 271, 272, 370}
+        num_patches = self.get("num_patches", 0)
+        if not self._is_numeric(num_patches) or num_patches <= 0:
+            return
+
+        for i in range(1, num_patches + 1):
+            hcid = self.get(f"patch_icpp({i})%hcid")
+            if hcid not in extrusion_hcids:
+                continue
+            self.prohibit(
+                not self.is_set("files_dir"),
+                f"patch_icpp({i})%hcid={hcid} requires files_dir to be set",
+            )
+            self.prohibit(
+                not self.is_set("file_extension"),
+                f"patch_icpp({i})%hcid={hcid} requires file_extension to be set",
+            )
+
     def validate_common(self):
         """Validate parameters common to all stages"""
         self.check_parameter_types()  # Type validation first
@@ -2267,7 +2306,6 @@ class CaseValidator:
         self.check_continuum_damage()
         self.check_grcbc()
         self.check_probe_integral_output()
-        self.check_chemistry()
 
     def validate_pre_process(self):
         """Validate pre-process-specific parameters"""
@@ -2277,7 +2315,6 @@ class CaseValidator:
         self.check_parallel_io_pre_process()
         self.check_grid_stretching()
         self.check_perturb_density()
-        self.check_chemistry()
         self.check_misc_pre_process()
         self.check_patch_physics()
         self.check_volume_fraction_sum()
@@ -2285,6 +2322,7 @@ class CaseValidator:
         self.check_patch_within_domain()
         self.check_velocity_components()
         self.check_bc_patches()
+        self.check_ic_extrusion()
 
     def validate_post_process(self):
         """Validate post-process-specific parameters"""
@@ -2305,7 +2343,6 @@ class CaseValidator:
         self.check_schlieren()
         self.check_surface_tension_post()
         self.check_no_flow_variables()
-        self.check_chemistry()
 
     def validate(self, stage: str = "simulation"):
         """Main validation method

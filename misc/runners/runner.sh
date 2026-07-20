@@ -10,7 +10,7 @@
 #
 # Sites:    frontier  phoenix
 # Common:   check-runners  list-runners  move-runner  rebalance-runners
-#           restart-all  restart-runner  stop-runner  rerun-failed
+#           restart-all  restart-runner  stop-runner  dedupe-runners  rerun-failed
 # Frontier: make-runner  deploy-runners
 # Phoenix:  create-runner
 #
@@ -49,7 +49,7 @@ if [ -f "$MISC_DIR/common/$CMD.sh" ]; then
 fi
 
 echo "ERROR: Unknown command '$CMD' for site '$SITE'." >&2
-echo "Common:   check-runners list-runners move-runner rebalance-runners restart-all restart-runner stop-runner rerun-failed" >&2
+echo "Common:   check-runners list-runners move-runner rebalance-runners restart-all restart-runner stop-runner dedupe-runners rerun-failed" >&2
 echo "Frontier: make-runner deploy-runners" >&2
 echo "Phoenix:  create-runner" >&2
 exit 1

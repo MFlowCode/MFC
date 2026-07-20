@@ -463,8 +463,7 @@ contains
     end subroutine s_initialize_rhs_module
 
     !> Compute the right-hand side of the semi-discrete governing equations for a single time stage
-    impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
-                                    & time_avg, stage)
+    impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
         type(scalar_field), intent(inout)                                                          :: q_T_sf
@@ -478,17 +477,13 @@ contains
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: mv_in
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_mv
         integer, intent(in) :: t_step
-        real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
-        real(wp) :: t_start, t_finish
         integer :: id
         integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
         call nvtxStartRange("COMPUTE-RHS")
-
-        call cpu_time(t_start)
 
         if (.not. igr) then
             ! Association/Population of Working Variables
@@ -811,19 +806,22 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            ! RHS additions for sub-grid bubbles_lagrange
-            call nvtxStartRange("RHS-EL-BUBBLES-SRC")
-            call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
-            call nvtxEndRange
-            ! Compute bubble dynamics
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
-                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), stage)
+                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+                call nvtxEndRange
+            end if
+
+            if (lag_params%solver_approach == 2) then
+                call nvtxStartRange("RHS-EL-BUBBLES-SRC")
+                call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
                 call nvtxEndRange
             end if
         end if
 
-        if (chemistry .and. chem_params%reactions) then
+        ! When reaction_substeps > 0 the reaction source is integrated by operator splitting
+        ! after the flow update (s_chemistry_reaction_substep), not added to the flow RHS here.
+        if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps == 0) then
             call nvtxStartRange("RHS-CHEM-REACTIONS")
             call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
             call nvtxEndRange
@@ -847,14 +845,6 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
-        end if
-
-        call cpu_time(t_finish)
-
-        if (t_step >= 2) then
-            time_avg = (abs(t_finish - t_start) + (t_step - 2)*time_avg)/(t_step - 1)
-        else
-            time_avg = 0._wp
         end if
 
         call nvtxEndRange

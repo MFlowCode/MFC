@@ -80,7 +80,7 @@ contains
 
     end function f_approx_in_array
 
-    !> Checks if a real(wp) variable is of default value.
+    !> Check if a real(wp) variable is of default value.
     logical elemental function f_is_default(var) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -90,7 +90,7 @@ contains
 
     end function f_is_default
 
-    !> Checks if ALL elements of a real(wp) array are of default value.
+    !> Check if ALL elements of a real(wp) array are of default value.
     logical function f_all_default(var_array) result(res)
 
         real(wp), intent(in) :: var_array(:)
@@ -99,7 +99,7 @@ contains
 
     end function f_all_default
 
-    !> Checks if a real(wp) variable is an integer.
+    !> Check if a real(wp) variable is an integer.
     logical elemental function f_is_integer(var) result(res)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -111,10 +111,10 @@ contains
 
     !> Compute ghost-cell buffer size and set interior/buffered coordinate index bounds.
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-        & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+        & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
         integer, intent(in)                                :: recon_type, weno_polyn, muscl_polyn
-        integer, intent(in)                                :: m, n, p, num_dims, igr_order
+        integer, intent(in)                                :: m, n, p, num_dims, igr_order, fd_number
         integer, intent(inout)                             :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in)                                :: viscous, bubbles_lagrange
@@ -137,7 +137,7 @@ contains
 
         ! Correction for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
-            buff_size = max(buff_size, 6)
+            buff_size = max(buff_size + fd_number, mapCells + 1 + fd_number)
         end if
 
         if (ib) then
@@ -158,8 +158,8 @@ contains
 
     end subroutine s_configure_coordinate_bounds
 
-    !> Updates the min and max number of cells in each set of axes
-    !! @param bounds Min and max values to update
+    !> Update the min and max number of cells in each set of axes
+    !! @param bounds min and max values to update
     elemental subroutine s_update_cell_bounds(bounds, m, n, p)
 
         type(cell_num_bounds), intent(out) :: bounds

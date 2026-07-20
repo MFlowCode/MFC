@@ -19,6 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_boundary_common
     use m_boundary_conditions
+    use m_boundary_io
     use m_thermochem, only: species_names
     use m_helper
     use m_constants, only: model_eqns_5eq, precision_single
@@ -119,6 +120,27 @@ contains
             write (1) q_cons_vf(i)%sf(0:m,0:n,0:p)
             close (1)
         end do
+
+        if (bubbles_lagrange) then
+            block
+                real(stp), allocatable                         :: beta_ones(:,:,:)
+                character(LEN=len_trim(t_step_dir) + name_len) :: beta_file_loc
+                integer                                        :: jj, kk, ll
+                allocate (beta_ones(0:m,0:n,0:p))
+                do ll = 0, p
+                    do kk = 0, n
+                        do jj = 0, m
+                            beta_ones(jj, kk, ll) = 1.0_stp
+                        end do
+                    end do
+                end do
+                write (beta_file_loc, '(A,I0,A)') trim(t_step_dir) // '/q_cons_vf', sys_size + 1, '.dat'
+                open (1, FILE=trim(beta_file_loc), form='unformatted', STATUS=status)
+                write (1) beta_ones
+                close (1)
+                deallocate (beta_ones)
+            end block
+        end if
 
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
@@ -503,6 +525,23 @@ contains
                 end if
             end if
 
+            if (bubbles_lagrange) then
+                block
+                    real(stp), allocatable :: beta_ones(:,:,:)
+                    integer                :: jj, kk, ll
+                    allocate (beta_ones(0:m,0:n,0:p))
+                    do ll = 0, p
+                        do kk = 0, n
+                            do jj = 0, m
+                                beta_ones(jj, kk, ll) = 1.0_stp
+                            end do
+                        end do
+                    end do
+                    call MPI_FILE_WRITE_ALL(ifile, beta_ones, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                    deallocate (beta_ones)
+                end block
+            end if
+
             call MPI_FILE_CLOSE(ifile, ierr)
         else
             call s_initialize_mpi_data(q_cons_vf)
@@ -558,6 +597,26 @@ contains
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
+            end if
+
+            if (bubbles_lagrange) then
+                block
+                    real(stp), allocatable :: beta_ones(:,:,:)
+                    integer                :: jj, kk, ll
+                    allocate (beta_ones(0:m,0:n,0:p))
+                    do ll = 0, p
+                        do kk = 0, n
+                            do jj = 0, m
+                                beta_ones(jj, kk, ll) = 1.0_stp
+                            end do
+                        end do
+                    end do
+                    var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(1), 'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, beta_ones, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                    deallocate (beta_ones)
+                end block
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)

@@ -54,6 +54,7 @@ docs/simulation/readme.md
 docs/post_process/readme.md
 docs/api/readme.md
 
+examples/**/IC/*.dat
 examples/*batch/*/
 examples/**/D/*
 examples/**/p*
@@ -76,8 +77,7 @@ examples/*/workloads/
 examples/*/run-*/
 examples/*/logs/
 examples/**/*.f90
-!examples/3D_lag_bubbles_shbubcollapse/input/lag_bubbles.dat
-!examples/3D_lag_bubbles_bubblescreen/input/lag_bubbles.dat
+examples/**/*.csv
 workloads/
 
 benchmarks/*batch/*/

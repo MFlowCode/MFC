@@ -15,6 +15,7 @@ module m_start_up
     use m_mpi_proxy
     use m_mpi_common
     use m_boundary_common
+    use m_boundary_io
     use m_variables_conversion
     use m_data_input
     use m_data_output
@@ -154,7 +155,11 @@ contains
 
         call s_read_data_files(t_step)
 
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwbuff)
+        ! seed the chemistry temperature over the INTERIOR only (mirrors the simulation,
+        ! m_start_up): the ghost q_cons is unread at this point, so a ghost-inclusive sweep
+        ! would Newton-iterate on garbage (NaN under NaN-init builds) at rank seams and
+        ! physical boundaries; s_populate_variables_buffers below extends q_T into the ghosts
+        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         if (buff_size > 0) then
             call s_populate_grid_variables_buffers()
@@ -937,6 +942,8 @@ contains
         call s_initialize_parallel_io()
         call s_mpi_decompose_computational_domain()
         call s_check_inputs_fft()
+
+        bc = bc_xyz_info(bc_x, bc_y, bc_z)
 
     end subroutine s_initialize_mpi_domain
 
