@@ -3246,6 +3246,45 @@ contains
 
     end function f_amr_seam_dim
 
+    !> Abort on same-level seam topologies no halo reconciles (silent conservation leaks otherwise). Run whenever the block set
+    !! changes (regrid, restart); O(nblocks^2) on the replicated region metadata, identical on every rank. Two cases: (a) adjacency
+    !! WITHOUT the exact transverse match f_amr_seam requires - reachable only through the IB body-bbox box expansion (clustering
+    !! merges any too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair up; (b) an exact seam pair
+    !! at level >= 2 under amr_subcycle, whose per-block child advance has no L2 halo (reachable via a restart mode-switch from a
+    !! lockstep-produced layout; the subcycle regrid keeps one child per box).
+    impure subroutine s_amr_check_seam_topology()
+
+        integer :: xb, yb, d, t
+        logical :: adj, tover
+
+        do xb = 1, amr_num_blocks
+            do yb = 1, amr_num_blocks
+                if (xb == yb) cycle
+                if (amr_block_level(xb) /= amr_block_level(yb)) cycle
+                if (amr_subcycle .and. amr_block_level(xb) >= 2 .and. f_amr_seam_dim(xb, yb) > 0) then
+                    call s_mpi_abort("AMR: adjacent level-2+ blocks under amr_subcycle (e.g. a lockstep-written restart " &
+                                     & // "resumed with amr_subcycle = T): the per-block child advance has no L2 seam halo, so the " // "shared-face flux would silently leak. Resume with amr_subcycle = F (lockstep).")
+                end if
+                do d = 1, num_dims
+                    ! relaxed adjacency: touching faces in dim d with ANY transverse overlap
+                    adj = amr_region_lo_all(d, yb) == amr_region_hi_all(d, xb) + 1
+                    if (.not. adj) cycle
+                    tover = .true.
+                    do t = 1, num_dims
+                        if (t /= d) tover = tover .and. amr_region_lo_all(t, xb) <= amr_region_hi_all(t, &
+                            & yb) .and. amr_region_lo_all(t, yb) <= amr_region_hi_all(t, xb)
+                    end do
+                    if (tover .and. f_amr_seam_dim(xb, yb) == 0) then
+                        call s_mpi_abort("AMR: two same-level blocks touch with PARTIAL transverse overlap (IB body-bbox " &
+                                         & // "expansion can produce this): the fine-fine seam halo only reconciles exact-match " &
+                                         & // "faces, so the shared-face flux would silently leak. Adjust amr_block/regrid inputs " // "so body-expanded boxes merge or separate.")
+                    end if
+                end do
+            end do
+        end do
+
+    end subroutine s_amr_check_seam_topology
+
     !> Rebuild the cached same-level seam-pair list (amr_seam_pairs): one O(nblocks^2) scan per regrid/restart in place of the same
     !! scan every RK stage (6x per fine step). Same (xb, yb) nested-loop order on all ranks (replicated region metadata) so the
     !! paired MPI_SENDRECVs in s_amr_fine_fine_halo stay matched. Count then fill for an exact-size list (no cap, no overflow).
@@ -3281,7 +3320,7 @@ contains
     !! ADJACENT sub-block) with the neighbour's stage-entry fine interior, so the shared fine flux matches on both sides
     !! (coarse-prolonged seam ghosts would be non-conservative). For each seam pair (xb below, yb above, dim d) the two owners
     !! exchange the buff_size-deep near-seam interior (MPI_Sendrecv, or a local copy when one rank owns both). Buffer is wp, cast to
-    !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (incl. every np=1 case, untiled).
+    !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (any untiled case, any np).
     impure subroutine s_amr_fine_fine_halo()
 
         integer :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul, idx
@@ -3493,8 +3532,9 @@ contains
     !! subcycle conserves at the seam - the per-block order did not run the halo and leaked there. Two dt/2 SSP-RK3 substeps AFTER
     !! the coarse step: q_old/q_new are the coarse t^n / t^{n+1} states; each stage's ghosts are the linear time interpolation at
     !! stage time theta = (substep-1 + c_s)/2 with SSP-RK3 abscissae c = [0, 1, 1/2]. Level-1 blocks drive their level-2 children
-    !! per substep (s_amr_advance_children); the L2-L2 seam halo is future work. A single owned level-1 block is byte-identical to
-    !! the old per-block subcycle (the halo is a no-op with < 2 adjacent same-level blocks, and is skipped at np=1).
+    !! per substep (s_amr_advance_children); the L2-L2 seam halo is future work (s_amr_check_seam_topology aborts if an L2+ seam
+    !! pair is reached under subcycle, e.g. via a restart mode-switch from a lockstep-produced layout). A single owned level-1 block
+    !! is byte-identical to the old per-block subcycle (the halo is a no-op with < 2 adjacent same-level blocks).
     impure subroutine s_amr_advance_fine_subcycle_all(q_old, q_new, coefs, bc_type, q_T_sf, pb_old, mv_old, pb_in, rhs_pb, mv_in, &
         & rhs_mv, t_step)
 
@@ -3529,9 +3569,11 @@ contains
                     if (.not. amr_rank_owns_block) cycle
                     call s_amr_subtree_stage_lerp(s, th)
                 end do
-                ! reconcile shared seam ghosts among ADJACENT same-level blocks so both sides compute a matching flux. Only np>1
-                ! tiles a feature into adjacent sub-blocks; at np=1 this is skipped, keeping the single-rank path byte-identical.
-                if (num_procs > 1) call s_amr_fine_fine_halo()
+                ! reconcile shared seam ghosts among ADJACENT same-level blocks so both sides compute a matching flux. Tiling
+                ! can split a wide feature into adjacent sub-blocks at ANY rank count (amr_maxc_fit caps a box at half the
+                ! global extent even at np=1), so the halo runs unconditionally - it self-no-ops when there are no seam pairs,
+                ! keeping every untiled case byte-identical.
+                call s_amr_fine_fine_halo()
                 ! RHS + RK update every block from the reconciled ghost shell
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) /= 1) cycle
@@ -5150,6 +5192,7 @@ contains
         if (ib) call s_amr_setup_ib()
         call s_amr_select_slot(1)
         amr_seam_pairs_dirty = .true.  ! block set changed: the cached seam-pair list must be rebuilt
+        call s_amr_check_seam_topology()  ! abort on seam topologies no halo reconciles (silent leak otherwise)
 
     end subroutine s_amr_regrid
 
@@ -5617,6 +5660,7 @@ contains
         end if
         call s_amr_select_slot(1)
         amr_seam_pairs_dirty = .true.  ! restored a new block set: the cached seam-pair list must be rebuilt
+        call s_amr_check_seam_topology()  ! abort on seam topologies no halo reconciles (e.g. restart mode-switch)
         restored = .true.
 
     end subroutine s_read_amr_restart
