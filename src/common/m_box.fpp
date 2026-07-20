@@ -34,7 +34,8 @@ contains
     end function f_equal_splits
 
     !> Cumulative offsets splitting marginal w into n_parts contiguous chunks of near-equal weight, each >= l_min cells. off(0)=0,
-    !! off(n_parts)=size(w). Feasibility (size(w) >= n_parts*l_min) is the caller's responsibility (pure; no abort).
+    !! off(n_parts)=size(w). Feasibility (size(w) >= n_parts*l_min) is the caller's responsibility (pure; no abort). A degenerate
+    !! marginal (sum(w) <= 0) falls back to the equal split.
     pure function f_weighted_splits(w, n_parts, l_min) result(off)
 
         real(wp), dimension(0:), intent(in) :: w
@@ -48,6 +49,10 @@ contains
         off(n_parts) = g
         if (n_parts == 1) return
         total = sum(w)
+        if (total <= 0._wp) then
+            off = f_equal_splits(g, n_parts)
+            return
+        end if
         r = 1
         csum = 0._wp
         do i = 0, g - 1
@@ -60,10 +65,11 @@ contains
         do while (r < n_parts)
             off(r) = g; r = r + 1
         end do
+        ! Enforce the l_min floor: gap push first (off(0)=0 makes it imply off(r) >= r*l_min inductively), then the
+        ! upper clamp - which cannot re-break the gap, since off(r-1) <= g - (n_parts-r+1)*l_min after its own pass.
         do r = 1, n_parts - 1
-            if (off(r) < r*l_min) off(r) = r*l_min
+            if (off(r) < off(r - 1) + l_min) off(r) = off(r - 1) + l_min
             if (off(r) > g - (n_parts - r)*l_min) off(r) = g - (n_parts - r)*l_min
-            if (off(r) <= off(r - 1)) off(r) = off(r - 1) + l_min
         end do
 
     end function f_weighted_splits
