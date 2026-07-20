@@ -141,7 +141,8 @@ if [ -n "$shard" ]; then
 fi
 variant_suffix=""
 if [ -n "$variant" ]; then
-    variant_suffix="-$variant"
+    # Sanitized like the rest of the slug: these become file names in the workspace.
+    variant_suffix="-$(echo "$variant" | sed 's/[^a-zA-Z0-9]/-/g')"
 fi
 job_slug="$(basename "$script_path" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g')-${device}-${interface}${shard_suffix}${variant_suffix}"
 output_file="$job_slug.out"
