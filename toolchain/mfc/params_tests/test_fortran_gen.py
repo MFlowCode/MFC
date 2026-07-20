@@ -370,6 +370,21 @@ def test_generate_bcast_fpp_class_a_real_scalars():
         assert "call MPI_BCAST(pref, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: pref missing"
 
 
+def test_generate_bcast_fpp_class_a_str_scalars():
+    """Class-(a) character scalars use the len() MPI_CHARACTER form, never mpi_p."""
+    from mfc.params.generators.fortran_gen import generate_bcast_fpp
+
+    pre = generate_bcast_fpp("pre")
+    sim = generate_bcast_fpp("sim")
+    post = generate_bcast_fpp("post")
+
+    # files_dir/file_extension are pre-only STR scalars
+    for name in ("files_dir", "file_extension"):
+        assert f"call MPI_BCAST({name}, len({name}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)" in pre, f"pre: {name} missing"
+        assert f"call MPI_BCAST({name}, " not in sim and f"call MPI_BCAST({name}, " not in post
+        assert f"call MPI_BCAST({name}, 1, mpi_p" not in pre
+
+
 def test_generate_bcast_fpp_case_opt_guard_sim():
     """Sim case-opt scalars are wrapped in #:if not MFC_CASE_OPTIMIZATION."""
     from mfc.params.generators.fortran_gen import generate_bcast_fpp

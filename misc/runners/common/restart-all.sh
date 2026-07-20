@@ -28,6 +28,11 @@ while IFS= read -r dir; do
         continue
     fi
 
+    if [ "$node" = "unknown" ]; then
+        echo "  $name: UNKNOWN location (SSH failures); skipping"
+        continue
+    fi
+
     worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '$dir/' | grep -v grep" 2>/dev/null || true)
     if [ -n "$worker" ]; then
         echo "  $name: BUSY on $node"

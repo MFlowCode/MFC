@@ -18,10 +18,10 @@ jobs:
       checkall: ${{ steps.changes.outputs.checkall }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with: 
           filters: ".github/file-filter.yml"
@@ -36,11 +36,11 @@ jobs:
           master_everything: 0
       steps:
           - name: Clone - PR
-            uses: actions/checkout@v4
+            uses: actions/checkout@v5
             with:
               path: pr
           - name: Clone - Master
-            uses: actions/checkout@v4
+            uses: actions/checkout@v5
             with:
               repository: MFlowCode/MFC
               ref: master

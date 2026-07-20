@@ -84,7 +84,7 @@ contains
         integer :: i, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, l  ! iterators and patch IDs
         real(wp) :: overlap_distance
         real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2
-        real(wp), dimension(3) :: normal_velocity, tangental_vector, normal_force, tangental_force, torque, radial_vector, &
+        real(wp), dimension(3) :: normal_velocity, tangential_vector, normal_force, tangential_force, torque, radial_vector, &
              & rotation_velocity, vel1, vel2
         real(wp) :: k, eta, effective_mass  ! the spring stiffness and damping coefficient and mass of a specific interaction
 
@@ -95,7 +95,7 @@ contains
         ! Iterate over all collisions detected
         $:GPU_PARALLEL_LOOP(private='[i, l, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, centroid_1, &
                             & centroid_2, normal_vector, overlap_distance, effective_mass, k, eta, normal_velocity, &
-                            & tangental_vector, normal_force, tangental_force, torque, radial_vector, rotation_velocity, vel1, &
+                            & tangential_vector, normal_force, tangential_force, torque, radial_vector, rotation_velocity, vel1, &
                             & vel2]', copy='[forces, torques]')
         do i = 1, num_considered_collisions
             encoded_pid1 = collision_lookup(i, 3)
@@ -108,15 +108,15 @@ contains
             ! call s_get_neighborhood_idx(pid1, pid1) ! global patch ID -> local index call s_get_neighborhood_idx(pid2, pid2)
             if (pid1 <= 0 .or. pid2 <= 0) cycle
 
-            centroid_1(1) = patch_ib(pid1)%x_centroid + real(xp1, wp)*(x_domain%end - x_domain%beg)
-            centroid_1(2) = patch_ib(pid1)%y_centroid + real(yp1, wp)*(y_domain%end - y_domain%beg)
+            centroid_1(1) = patch_ib(pid1)%x_centroid + real(xp1, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+            centroid_1(2) = patch_ib(pid1)%y_centroid + real(yp1, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
             centroid_1(3) = 0._wp
-            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp2, wp)*(x_domain%end - x_domain%beg)
-            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp2, wp)*(y_domain%end - y_domain%beg)
+            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp2, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp2, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
             centroid_2(3) = 0._wp
             if (num_dims == 3) then
-                centroid_1(3) = patch_ib(pid1)%z_centroid + real(zp1, wp)*(z_domain%end - z_domain%beg)
-                centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp2, wp)*(z_domain%end - z_domain%beg)
+                centroid_1(3) = patch_ib(pid1)%z_centroid + real(zp1, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+                centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp2, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
             end if
 
             normal_vector = centroid_2 - centroid_1
@@ -138,25 +138,25 @@ contains
                     vel2 = patch_ib(pid2)%vel + rotation_velocity
 
                     normal_velocity = dot_product(vel1 - vel2, normal_vector)*normal_vector
-                    tangental_vector = (vel1 - vel2) - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangental_vector), &
-                        & 0._wp)) tangental_vector = tangental_vector/norm2(tangental_vector)
+                    tangential_vector = (vel1 - vel2) - normal_velocity
+                    if (.not. f_approx_equal(norm2(tangential_vector), &
+                        & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
 
                     ! compute force and torque
                     normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
-                    tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector
-                    call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangental_force, torque)
+                    tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
+                    call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangential_force, torque)
 
                     do l = 1, num_dims
                         ! update the first IB
                         $:GPU_ATOMIC(atomic='update')
-                        forces(pid1, l) = forces(pid1, l) + (normal_force(l) + tangental_force(l))
+                        forces(pid1, l) = forces(pid1, l) + (normal_force(l) + tangential_force(l))
                         $:GPU_ATOMIC(atomic='update')
                         torques(pid1, l) = torques(pid1, l) + torque(l)
 
                         ! apply equal and opposite force/torque to second IB
                         $:GPU_ATOMIC(atomic='update')
-                        forces(pid2, l) = forces(pid2, l) - (normal_force(l) + tangental_force(l))
+                        forces(pid2, l) = forces(pid2, l) - (normal_force(l) + tangential_force(l))
                         $:GPU_ATOMIC(atomic='update')
                         torques(pid2, l) = torques(pid2, l) + torque(l)*patch_ib(pid2)%radius/patch_ib(pid1)%radius
                     end do
@@ -172,12 +172,12 @@ contains
 
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
         integer :: patch_id, i, l
-        real(wp), dimension(3) :: normal_force, tangental_force, normal_vector, normal_velocity, tangental_vector, &
+        real(wp), dimension(3) :: normal_force, tangential_force, normal_vector, normal_velocity, tangential_vector, &
              & collision_location, torque, radial_vector, rotation_velocity, velocity
         real(wp) :: k, eta  ! the spring stiffness and damping coefficient for a specific IB
 
         $:GPU_PARALLEL_LOOP(private='[patch_id, i, l, collision_location, normal_vector, k, eta, normal_velocity, &
-                            & tangental_vector, normal_force, tangental_force, torque, radial_vector, rotation_velocity, &
+                            & tangential_vector, normal_force, tangential_force, torque, radial_vector, rotation_velocity, &
                             & velocity]', copy='[forces, torques]', collapse=2)
         do patch_id = 1, num_ibs
             do i = 1, num_dims*2
@@ -214,16 +214,16 @@ contains
 
                     ! standard soft-sphere collision  with the wall
                     normal_velocity = dot_product(velocity, normal_vector)*normal_vector
-                    tangental_vector = velocity - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangental_vector), &
-                        & 0._wp)) tangental_vector = tangental_vector/norm2(tangental_vector)
+                    tangential_vector = velocity - normal_velocity
+                    if (.not. f_approx_equal(norm2(tangential_vector), &
+                        & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
                     normal_force = -k*wall_overlap_distances(patch_id, i)*normal_vector - eta*normal_velocity
-                    tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector
-                    call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangental_force, torque)
+                    tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
+                    call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangential_force, torque)
 
                     do l = 1, num_dims
                         $:GPU_ATOMIC(atomic='update')
-                        forces(patch_id, l) = forces(patch_id, l) + (normal_force(l) + tangental_force(l))
+                        forces(patch_id, l) = forces(patch_id, l) + (normal_force(l) + tangential_force(l))
                         $:GPU_ATOMIC(atomic='update')
                         torques(patch_id, l) = torques(patch_id, l) + torque(l)
                     end do
@@ -354,10 +354,10 @@ contains
                 periodic_search: do xp = xp_lower, xp_upper
                     do yp = yp_lower, yp_upper
                         do zp = zp_lower, zp_upper
-                            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
-                            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+                            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
                             if (num_dims == 3) centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp, &
-                                & wp)*(z_domain%end - z_domain%beg)
+                                & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
                             distance_vec = centroid_2 - centroid_1
 
                             if (norm2(distance_vec) < patch_ib(pid1)%radius + patch_ib(pid2)%radius) then
@@ -393,14 +393,15 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]')
         do patch_id = 1, num_ibs
-            #:for X, IDX in [('x', 1), ('y', 3), ('z', 5)]
+            #:for X, DIR, IDX in [('x', 1, 1), ('y', 2, 3), ('z', 3, 5)]
                 ! check if the boundaries are either of the two conditions we should compute collisions with
                 if (ib_bc_${X}$%beg == BC_SLIP_WALL .or. ib_bc_${X}$%beg == BC_NO_SLIP_WALL) then
                     ! get the location of the true IB surface towards the domain boundary
                     edge_location = patch_ib(patch_id)%${X}$_centroid - patch_ib(patch_id)%radius
                     ! check if that edge actually extends out of the comutational domain
-                    if (edge_location < ${X}$_domain%beg) then
-                        overlap_distance = ${X}$_domain%beg - edge_location  ! the distance that the IB extends out of the domain
+                    if (edge_location < glb_bounds(${DIR}$)%beg) then
+                        ! the distance that the IB extends out of the domain
+                        overlap_distance = glb_bounds(${DIR}$)%beg - edge_location
                     else
                         overlap_distance = 0._wp
                     end if
@@ -409,8 +410,8 @@ contains
 
                 if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL) then
                     edge_location = patch_ib(patch_id)%${X}$_centroid + patch_ib(patch_id)%radius
-                    if (edge_location > ${X}$_domain%end) then
-                        overlap_distance = edge_location - ${X}$_domain%end
+                    if (edge_location > glb_bounds(${DIR}$)%end) then
+                        overlap_distance = edge_location - glb_bounds(${DIR}$)%end
                     else
                         overlap_distance = 0._wp
                     end if
@@ -442,10 +443,10 @@ contains
                 if (num_dims >= ${ID}$) then
                     if (ib_bc_${X}$%beg /= BC_PERIODIC) then
                         ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
-                        if (location(${ID}$) < ${X}$_domain%beg) then
-                            projected_location(${ID}$) = ${X}$_domain%beg
-                        else if (${X}$_domain%end < location(${ID}$)) then
-                            projected_location(${ID}$) = ${X}$_domain%end - 1.0e-10_wp
+                        if (location(${ID}$) < glb_bounds(${ID}$)%beg) then
+                            projected_location(${ID}$) = glb_bounds(${ID}$)%beg
+                        else if (glb_bounds(${ID}$)%end < location(${ID}$)) then
+                            projected_location(${ID}$) = glb_bounds(${ID}$)%end - 1.0e-10_wp
                         end if
                     end if
                     owns_collision = owns_collision .and. ${X}$_cb(-1) <= projected_location(${ID}$) &
@@ -475,10 +476,10 @@ contains
                 if (num_dims >= ${ID}$) then
                     if (ib_bc_${X}$%beg == BC_PERIODIC .and. neighbor_domain_${X}$%beg >= neighbor_domain_${X}$%end) then
                         ! project right side to the left
-                        temp_neighbor_domain = neighbor_domain_${X}$%end + (${X}$_domain%end - ${X}$_domain%beg)
+                        temp_neighbor_domain = neighbor_domain_${X}$%end + (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
                         periodic_owner = neighbor_domain_${X}$%beg <= location(${ID}$) .and. location(${ID}$) < temp_neighbor_domain
                         ! project the left side to the right
-                        temp_neighbor_domain = neighbor_domain_${X}$%beg - (${X}$_domain%end - ${X}$_domain%beg)
+                        temp_neighbor_domain = neighbor_domain_${X}$%beg - (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
                         periodic_owner = periodic_owner .or. (temp_neighbor_domain <= location(${ID}$) .and. location(${ID}$) &
                                                               & < neighbor_domain_${X}$%end)
 

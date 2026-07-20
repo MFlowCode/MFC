@@ -24,7 +24,7 @@ dependencies = [
     # Code Health
     "typos",
     "ruff==0.6.5",
-    "ffmt==0.4.3",
+    "ffmt==0.4.4",
     "ansi2txt",
     "pytest",
 
@@ -34,8 +34,7 @@ dependencies = [
 
     # Chemistry
     "cantera>=3.1.0",
-    #"pyrometheus == 1.0.5",
-    "pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git",
+    "pyrometheus == 1.1.1",
 
     # Frontier Profiling
     "astunparse==1.6.2",

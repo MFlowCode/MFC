@@ -45,12 +45,25 @@ for node in "${NODES[@]}"; do node_runners[$node]=""; done
 for i in "${!dirs[@]}"; do
     node=$(find_node "${dirs[$i]}")
     runner_node[$i]="$node"
+    runner_busy[$i]=0
+    # Location could not be confirmed (SSH failures). Acting on a guess here
+    # is exactly what creates duplicate listeners, so skip this runner and
+    # leave it out of both the per-node counts and the offline placement list.
+    if [ "$node" = "unknown" ]; then
+        echo "  WARNING: ${names[$i]} location unknown (SSH failures); skipping this cycle" >&2
+        continue
+    fi
     if [ "$node" != "offline" ]; then
         node_runners[$node]="${node_runners[$node]:-} $i"
-        worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '${dirs[$i]}/' | grep -v grep" 2>/dev/null || true)
-        [ -n "$worker" ] && runner_busy[$i]=1 || runner_busy[$i]=0
-    else
-        runner_busy[$i]=0
+        worker=$(ssh $SSH_OPTS "$node" "ps aux | grep Runner.Worker | grep '${dirs[$i]}/' | grep -v grep" 2>/dev/null)
+        wrc=$?
+        if [ "$wrc" -eq 255 ]; then
+            # Could not reach the node to check — assume busy so we do not move
+            # a runner that might be mid-job (which would create a duplicate).
+            runner_busy[$i]=1
+        elif [ -n "$worker" ]; then
+            runner_busy[$i]=1
+        fi
     fi
 done
 

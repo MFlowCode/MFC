@@ -344,12 +344,16 @@ contains
         ! i.e. Spherical support -> 1/r scaling; Cylindrical support -> 1/sqrt(r) [empirical correction: ^-0.5 -> ^-0.85]
         integer, parameter :: mass_label = 1
 
-        if (n == 0) then
+        ! An unfocused source leaves foc_length at its unset default (dflt_real < 0, or 0): apply no
+        ! radial amplitude scaling. This guards every branch against the silent-corruption the default
+        ! would otherwise cause - foc_length(ai)**(-0.85) = pow(negative, non-integer) = NaN on some
+        ! compilers (e.g. nvhpc <= 24.3) in 2D, and 1/foc_length = wrong-sign or Inf in 3D/cylindrical.
+        if (n == 0 .or. foc_length(ai) <= 0._wp) then
             foc_length_factor = 1._wp
-        else if (p == 0 .and. (.not. cyl_coord)) then  ! 2D axisymmetric case is physically 3D
-            foc_length_factor = foc_length(ai)**(-0.85_wp)  ! Empirical correction
-        else
-            foc_length_factor = 1/foc_length(ai)
+        else if (p == 0 .and. (.not. cyl_coord)) then  ! 2D Cartesian: cylindrical (line-source) spreading
+            foc_length_factor = foc_length(ai)**(-0.85_wp)  ! Empirical correction to 1/sqrt(r)
+        else  ! 3D or axisymmetric: spherical spreading
+            foc_length_factor = 1._wp/foc_length(ai)
         end if
 
         source = 0._wp

@@ -57,9 +57,9 @@ contains
                 do yp = yp_lower, yp_upper
                     do zp = zp_lower, zp_upper
                         do patch_id = 1, num_ibs
-                            center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
-                            center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
-                            center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
+                            center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                            center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+                            center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
 
                             ! encode the periodicity information into the patch_id
                             call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
@@ -129,8 +129,8 @@ contains
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     do patch_id = 1, num_ibs
-                        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
-                        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+                        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
                         center(3) = 0._wp
 
                         ! encode the periodicity information into the patch_id
@@ -210,9 +210,9 @@ contains
                         $:GPU_PARALLEL_LOOP(private='[i, il, ir, j, jl, jr, k, kl, kr, xyz_local, length, radius, patch_id, &
                                             & airfoil_id, model_id, encoded_patch_id, center, eta]', copyin='[xp, yp, zp]')
                         do patch_id = 1, num_ibs
-                            center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
-                            center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
-                            center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
+                            center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                            center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+                            center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
 
                             ! encode the periodicity information into the patch_id
                             call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
@@ -279,8 +279,8 @@ contains
                     $:GPU_PARALLEL_LOOP(private='[i, il, ir, j, jl, jr, xyz_local, length, radius, patch_id, airfoil_id, &
                                         & model_id, encoded_patch_id, center, eta]', copyin='[xp, yp]')
                     do patch_id = 1, num_ibs
-                        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
-                        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+                        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
                         center(3) = 0._wp
 
                         ! encode the periodicity information into the patch_id

@@ -234,6 +234,13 @@ def generate_case_opt_decls_fpp() -> str:
 # These are kept in the manual residue of m_mpi_proxy.fpp.
 _STRUCT_ROOTS = frozenset({"bc_x", "bc_y", "bc_z", "x_domain", "y_domain", "z_domain", "x_output", "y_output", "z_output"})
 
+# Plain (non-struct) namelist arrays registered only as indexed variants (e.g.
+# synth_L(i,d)). The generator's array path (FORTRAN_ARRAY_DIMS) emits a 1D
+# broadcast only, so these — including the 2D turb_pos/synth_L — are declared and
+# broadcast by hand in m_mpi_proxy.fpp. Skipped here so the scalar classifier does
+# not treat the base name as a missing-registry scalar.
+_MANUAL_ARRAY_RESIDUE = frozenset({"synth_n_waves_per_shell", "synth_k_shell", "synth_amp_shell", "turb_pos", "synth_L"})
+
 # Variables excluded from broadcast generation (derived post-broadcast or non-namelist).
 # muscl_eps was previously excluded here on the assumption that it was derived
 # post-broadcast, but the derivation only fires under f_is_default(muscl_eps),
@@ -272,16 +279,18 @@ def _bcast_scalar(name: str, mpi_type: str, count: str = "1") -> str:
     return f"        call MPI_BCAST({name}, {count}, {mpi_type}, 0, MPI_COMM_WORLD, ierr)"
 
 
-def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str], List[str]]:
-    """Return (int_vars, log_vars, real_vars, case_opt_vars) for class-(a) scalars.
+def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
+    """Return (int_vars, log_vars, real_vars, str_vars, case_opt_vars) for class-(a) scalars.
 
     case_opt_vars are sim CASE_OPT_PARAMS (wrapped in #:if not MFC_CASE_OPTIMIZATION).
-    All four lists contain variable names suitable for a 1-element MPI_BCAST.
+    str_vars are character scalars, broadcast with the len() form like case_dir.
+    The other lists contain variable names suitable for a 1-element MPI_BCAST.
     Struct roots, TYPED_DECLS, FORTRAN_ARRAY_DIMS, case_dir, and _BCAST_EXCLUDE are removed.
     """
     int_vars: List[str] = []
     log_vars: List[str] = []
     real_vars: List[str] = []
+    str_vars: List[str] = []
     case_opt_vars: List[str] = []  # (name, mpi_type) pairs for sim case-opt section
 
     for name in sorted(NAMELIST_VARS):
@@ -292,6 +301,8 @@ def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str],
         if target == "post" and name in _POST_BCAST_EXCLUDE:
             continue
         if name in _STRUCT_ROOTS:
+            continue
+        if name in _MANUAL_ARRAY_RESIDUE:
             continue
         if name in TYPED_DECLS:
             continue
@@ -319,10 +330,12 @@ def _classify_scalar_vars(target: str) -> Tuple[List[str], List[str], List[str],
             int_vars.append(name)
         elif mpi_type == "MPI_LOGICAL":
             log_vars.append(name)
+        elif mpi_type == "MPI_CHARACTER":
+            str_vars.append(name)
         else:
             real_vars.append(name)
 
-    return sorted(int_vars), sorted(log_vars), sorted(real_vars), sorted(case_opt_vars)
+    return sorted(int_vars), sorted(log_vars), sorted(real_vars), sorted(str_vars), sorted(case_opt_vars)
 
 
 def _emit_bcast_group(lines: List[str], vars_list: List[str], mpi_type: str) -> None:
@@ -371,9 +384,14 @@ def _emit_lag_params(lines: List[str]) -> None:
     from the Fortran type by upstream #1085/#1093 and are no longer in the registry.
     """
     # Walk the registry for lag_params members, split by type.
-    lag_log = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type == ParamType.LOG)
-    lag_int = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
-    lag_real = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%") and REGISTRY.all_params[k].param_type in _REAL_TYPES)
+    lag_all = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%"))
+    lag_log = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type == ParamType.LOG)
+    lag_int = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
+    lag_real = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type in _REAL_TYPES)
+    lag_str = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type == ParamType.STR)
+    unhandled = set(lag_all) - set(lag_log) - set(lag_int) - set(lag_real) - set(lag_str)
+    if unhandled:
+        raise ValueError(f"lag_params members with unhandled ParamType (would be silently missing from the broadcast): {sorted(unhandled)}")
     lines.append("        if (bubbles_lagrange) then")
     for mem in sorted(lag_log):
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
@@ -381,6 +399,8 @@ def _emit_lag_params(lines: List[str]) -> None:
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)")
     for mem in sorted(lag_real):
         lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    for mem in sorted(lag_str):
+        lines.append(f"            call MPI_BCAST(lag_params%{mem}, len(lag_params%{mem}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end if")
 
 
@@ -439,7 +459,13 @@ def generate_bcast_fpp(target: str) -> str:
     lines.append("")
 
     # -- Class (a): simple scalar broadcasts --
-    int_vars, log_vars, real_vars, case_opt_vars = _classify_scalar_vars(target)
+    int_vars, log_vars, real_vars, str_vars, case_opt_vars = _classify_scalar_vars(target)
+
+    if str_vars:
+        lines.append("        ! Character scalars")
+        for name in str_vars:
+            lines.append(f"        call MPI_BCAST({name}, len({name}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)")
+        lines.append("")
 
     if int_vars:
         lines.append("        ! Integer scalars")
