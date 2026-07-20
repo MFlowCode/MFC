@@ -212,7 +212,9 @@ contains
         ! s_amr_advance_fine_subcycle_all advances all LEVEL-1 blocks stage-by-stage in lockstep with the halo interposed, so
         ! single-level subcycle np>1 is conservation-safe. The level-2 children still advance per-block (s_amr_advance_children),
         ! so L2-L2 seams are not yet reconciled - keep multi-level (amr_max_level > 1) subcycle gated at np>1 until the recursive
-        ! per-substep L2 halo lands. np=1 never tiles into adjacent blocks (halo skipped there, byte-identical to before).
+        ! per-substep L2 halo lands. (Tiling can produce adjacent sub-blocks at any np - amr_maxc_fit caps a box at half the
+        ! global extent even at np=1 - so the subcycle path runs the seam halo unconditionally; a regrid-time detection aborts
+        ! on the seam topologies no halo covers: partial-overlap adjacency and L2+ seams under subcycle.)
         @:PROHIBIT(amr_subcycle .and. amr_regrid_int > 0 .and. num_procs > 1 .and. amr_max_level > 1, &
                    & "multi-level (amr_max_level > 1) amr_subcycle with dynamic regrid is not yet conservation-safe at num_procs > 1: the level-2 seam halo is per-block, not lockstep (single-level subcycling IS supported at np > 1). Use amr_subcycle = F (lock-step) for multi-level dynamic multi-rank runs")
 
