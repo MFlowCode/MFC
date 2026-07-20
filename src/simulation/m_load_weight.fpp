@@ -48,11 +48,10 @@ contains
     end subroutine s_finalize_load_weight_module
 
     !> Base cost 1 everywhere; cells outside the active box get 0 (frozen).
-    impure subroutine s_compute_load_weight(q_cons_vf)
+    impure subroutine s_compute_load_weight()
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer                                             :: j, k, l
-        integer                                             :: jlo, jhi, klo, khi, llo, lhi
+        integer :: j, k, l
+        integer :: jlo, jhi, klo, khi, llo, lhi
 
         if (.not. load_weight_wrt .and. .not. sfc_partition_wrt) return
 
