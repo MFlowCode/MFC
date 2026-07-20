@@ -171,7 +171,15 @@ contains
         if (igr) recon_order = igr_order
 
         lmin = num_stcls_min*recon_order
-        call s_probe_field_marginals(wx, wy, wz)
+        if (bubbles_euler) then
+            ! EE-bubble source cost is flat across void magnitude (see the calibration note in
+            ! m_load_weight), so the first-advection-alpha marginal is not a load signal here:
+            ! use uniform marginals and let only the AMR fine-work injection move split planes.
+            allocate (wx(0:m_glb), wy(0:n_glb), wz(0:p_glb))
+            wx = 1._wp; wy = 1._wp; wz = 1._wp
+        else
+            call s_probe_field_marginals(wx, wy, wz)
+        end if
 
         ! Only axes actually split across >1 ranks must satisfy the min-cells floor;
         ! a single-rank (incl. collapsed 1D/2D) axis owns all its cells and is always feasible.

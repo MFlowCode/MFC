@@ -199,6 +199,16 @@ the block footprint are given a higher weight, biasing the rank boundaries towar
 balanced allocation of fine work. A deterministic feasibility clamp ensures the weighted
 split never violates the half-subdomain constraint.
 
+Fine-block ownership additionally weights each block by a measured cost model over its
+footprint (base cell cost, plus IB-marked cells and, when a load-weight diagnostic
+writer is on, phase-change iteration counts), so blocks concentrating expensive physics
+weigh more than equal-size quiescent ones at every regrid.
+
+The coarse split itself is static after startup. Because `s_load_balance_rebalance`
+runs at every startup from the restart file, a long run can be **rebalanced by
+checkpoint-and-restart**: stop, then restart with `load_balance = T` — the split planes
+are recomputed from the saved state at the point of restart.
+
 ### GPU {#amr-gpu}
 
 The fine-block field arrays (`q_cons`, `q_prim`, `rhs`, and the ghost-lerp sources) are
@@ -209,6 +219,14 @@ viscous, bubbles, multi-block, phase-change, and chemistry.
 
 The GPU build uses `src/simulation/` OpenACC/OpenMP macros; see @ref gpuParallelization
 for the macro API.
+
+**Scaling note.** Within a rank, owned blocks advance sequentially: the fine advance
+swaps one block at a time into a single working slot (global grid state plus a shared
+coarse-patch scratch buffer), so per-rank wall time scales with the *sum* of its
+blocks' work. Cross-rank parallelism comes from distributing block ownership; strong
+scaling therefore saturates when ranks own many small blocks. Batching per-rank block
+advances (per-slot state instead of the global swap) is the known lever and is future
+work.
 
 ---
 
