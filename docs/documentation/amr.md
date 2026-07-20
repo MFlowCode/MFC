@@ -183,7 +183,9 @@ applied rank-locally after an MPI reduction of the distributed fluxes.
 The fine block may cover at most about half of any rank's subdomain per dimension, since
 the fine advance reuses the rank-local solver scratch (sized to the base subdomain).
 
-Restart requires the same rank count as the run that wrote the fine-level file.
+Restart with `parallel_io` repartitions the fine blocks across any rank count; the
+serial (per-rank-file) restart path requires the same rank count as the run that wrote
+the fine-level file and aborts otherwise (see the Restart section below).
 
 ### Load-balance coupling {#amr-loadbalance}
 

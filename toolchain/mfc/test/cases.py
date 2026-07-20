@@ -2827,7 +2827,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         """Golden tests for the block-structured AMR module.
 
         Grows from minimal 1D single-level sanity checks (static block, dynamic regrid,
-        subcycling, multi-fluid reflux) to the full matrix: multi-level nesting, np=1/2/4
+        subcycling, multi-fluid reflux) to the full matrix: multi-level nesting, np=1/2
         distributed regrid + seam-halo + reflux, restart round-trips (serial and parallel_io),
         and per-physics coverage (viscous, Euler-Euler and QBMM bubbles, chemistry,
         hypoelastic, immersed boundaries, active_box). Each case carries an inline comment

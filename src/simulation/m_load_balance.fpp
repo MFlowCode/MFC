@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Weighted static Cartesian decomposition (Tier-2 sub-project C).
+!> @brief Weighted static Cartesian decomposition.
 module m_load_balance
 
     use m_derived_types

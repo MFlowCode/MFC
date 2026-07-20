@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief Analysis-only weighted space-filling-curve partitioner (Tier-2 sub-project B).
+!> @brief Analysis-only weighted space-filling-curve partitioner.
 module m_sfc_partition
 
     use m_derived_types

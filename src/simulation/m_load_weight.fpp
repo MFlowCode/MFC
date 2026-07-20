@@ -25,7 +25,7 @@ module m_load_weight
     type(scalar_field) :: load_weight  !< per-cell modeled compute-cost weight
     $:GPU_DECLARE(create='[load_weight]')
 
-    ! Relative cost coefficients (calibrated in Task 7; base RHS cell = 1).
+    ! Relative cost coefficients (calibrated against measured RHS-time imbalance; base RHS cell = 1).
     real(wp), parameter :: K_bub = 50._wp  !< per local bubble (stiff adaptive ODE); refined by validation
     real(wp), parameter :: K_ib = 2._wp    !< per IB ghost/interior cell
     real(wp), parameter :: K_pc = 3._wp    !< per phase-change Newton iteration

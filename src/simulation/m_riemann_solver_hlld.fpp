@@ -236,8 +236,6 @@ contains
                                 F_hlld = F_R
                             end if
 
-                            ! Hybrid Riemann: overwrite HLLD with a central/Rusanov flux at a WENO-smooth face
-
                             ! (12) Write HLLD flux to output arrays
                             flux_rsx_vf(${SF('')}$, 1) = F_hlld(1)  ! TODO multi-component
                             ! Momentum
