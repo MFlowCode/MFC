@@ -883,11 +883,12 @@ coefficients are recomputed for the active grid on every block swap/restore, arm
 when the grid is detected nonuniform at startup.
 Acoustic sources are supported on the coarse grid only: the support must not overlap the initial
 block (startup abort) and dynamic regrid keeps its boxes clear of the support.
-Multi-rank runs are supported: the fine level mirrors the base decomposition (each rank
-holds the fine cells covering the block's intersection with its own subdomain), so the
+Multi-rank runs are supported: each block has a single owner rank, assigned by
+Morton-ordered work balancing at every regrid (with state migration), and the
+coarse-side coupling moves through point-to-point coarse↔fine gather/scatter — so the
 block may span rank boundaries and move freely across them under dynamic regrid.
-The block may cover at most about half of any rank's subdomain per dimension (the fine
-advance reuses the rank-local solver scratch).
+The block may cover at most about half of the global extent per dimension (the fine
+advance reuses the rank-local solver scratch); wider features tile into adjacent blocks.
 
 **AMR + surface tension (unsupported).**
 Surface tension (`surface_tension = T`) is prohibited under AMR. *What works:* the capillary
