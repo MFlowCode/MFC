@@ -57,10 +57,11 @@
     ! y_coords/files_loaded above.
     real(wp), allocatable, dimension(:,:,:) :: stored_values274
     logical                                 :: files_loaded274 = .false.
-    integer                                 :: f274, ix274, iy274, unit274, ios274, ix_idx274, iy_idx274
+    integer                                 :: f274, ix274, iy274, unit274, ios274
+    integer                                 :: local_ix_beg274, local_iy_beg274
     character(len=300)                      :: fname274
     character(len=20)                       :: file_num_str274
-    real(wp)                                :: dummy_x274, dummy_y274, x0_274, y0_274, x_step274, y_step274
+    real(wp)                                :: dummy_x274, dummy_y274, dummy_val274, x0_274, y0_274, x_step274, y_step274
     real(wp)                                :: file_dx274, file_dy274, r_align274
 #:enddef
 
@@ -181,15 +182,18 @@
     select case (num_dims)
     case (1)
         idx = i + 1 + global_offset_x
-        ! Clamp to valid range to handle boundary/ghost cells
-        idx = max(1, min(idx, xRows))
+        ! idx must land inside the file's row range: this rank's subdomain offset
+        ! (global_offset_x) was derived from this rank's own grid, so a miss means the
+        ! IC file is misaligned/mis-sized for the run grid, not a normal boundary case.
+        if (idx < 1 .or. idx > xRows) &
+            & call s_mpi_abort("Hardcoded IC extrusion: row index out of range (IC file misaligned with the run grid)")
         do f = 1, sys_size
             q_prim_vf(f)%sf(i, 0, 0) = stored_values(idx, 1, f)
         end do
     case (2)
         idx = i + 1 + global_offset_x - index_x
-        ! Clamp to valid range to handle boundary/ghost cells
-        idx = max(1, min(idx, xRows))
+        if (idx < 1 .or. idx > xRows) &
+            & call s_mpi_abort("Hardcoded IC extrusion: row index out of range (IC file misaligned with the run grid)")
         do f = 1, sys_size - 1
             jump = merge(1, 0, f >= eqn_idx%mom%end)
             q_prim_vf(f + jump)%sf(i, j, 0) = stored_values(idx, 1, f)
@@ -198,9 +202,8 @@
     case (3)
         idx = i + 1 + global_offset_x - index_x
         idy = j + 1 + global_offset_y - index_y
-        ! Clamp to valid range to handle boundary/ghost cells
-        idx = max(1, min(idx, xRows))
-        idy = max(1, min(idy, yRows))
+        if (idx < 1 .or. idx > xRows .or. idy < 1 .or. idy > yRows) &
+            & call s_mpi_abort("Hardcoded IC extrusion: row/column index out of range (IC file misaligned with the run grid)")
         do f = 1, sys_size - 1
             jump = merge(1, 0, f >= eqn_idx%mom%end)
             q_prim_vf(f + jump)%sf(i, j, k) = stored_values(idx, idy, f)

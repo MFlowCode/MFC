@@ -243,7 +243,7 @@ contains
             return
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[support, theta_x, theta_y, pre_fac, f, j, k, l]', collapse=3, copyin='[bounds]')
+        $:GPU_PARALLEL_LOOP(private='[support, theta_x, theta_y, pre_fac, f, j, k, l]', collapse=3, copyin='[bounds, t]')
         do l = bounds(3)%beg, bounds(3)%end
             do k = bounds(2)%beg, bounds(2)%end
                 do j = bounds(1)%beg, bounds(1)%end

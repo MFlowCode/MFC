@@ -308,11 +308,20 @@
         ! start_idx is only allocated when parallel_io=T (s_initialize_parallel_io_common
         ! returns before allocating it otherwise), so a serial-IO run (the default for
         ! golden-file tests) would index into an unallocated array.
+        !
+        ! Every rank still scans the whole file (matching case(270)'s existing per-rank-reads-
+        ! everything pattern), but stored_values274 only holds this rank's LOCAL (0:m, 0:n)
+        ! slice rather than the full global grid -- a full-grid copy on every rank would scale
+        ! as O(m_glb*n_glb*sys_size) per rank, which is the wrong axis to duplicate work on for
+        ! a genuinely 2D (not 1D-profile) field. local_ix_beg274/local_iy_beg274 (this rank's
+        ! global cell offset) are pinned from f274==1's very first record, before any other
+        ! record is read, so every subsequent record -- across all variables -- can be tested
+        ! against this rank's range and dropped if it falls outside it.
         x_step274 = x_cc(1) - x_cc(0)
         y_step274 = y_cc(1) - y_cc(0)
 
         if (.not. files_loaded274) then
-            @:ALLOCATE(stored_values274(0:m_glb, 0:n_glb, sys_size))
+            @:ALLOCATE(stored_values274(0:m, 0:n, sys_size))
             do f274 = 1, sys_size
                 write (file_num_str274, '(I0)') f274
                 fname274 = trim(files_dir) // "/prim." // trim(file_num_str274) // ".00." // trim(file_extension) // ".dat"
@@ -320,7 +329,7 @@
                 if (ios274 /= 0) call s_mpi_abort("Error opening file: " // trim(fname274))
                 do ix274 = 0, m_glb
                     do iy274 = 0, n_glb
-                        read (unit274, *, iostat=ios274) dummy_x274, dummy_y274, stored_values274(ix274, iy274, f274)
+                        read (unit274, *, iostat=ios274) dummy_x274, dummy_y274, dummy_val274
                         if (ios274 /= 0) call s_mpi_abort("Error reading file (fewer lines than grid?): " // trim(fname274))
                         ! Capture the file's own origin and spacing from its first records so we can
                         ! confirm it was sampled on this run's grid (a silent mismatch would otherwise
@@ -329,9 +338,15 @@
                             if (ix274 == 0 .and. iy274 == 0) then
                                 x0_274 = dummy_x274
                                 y0_274 = dummy_y274
+                                local_ix_beg274 = nint((x_cc(0) - x0_274)/x_step274)
+                                local_iy_beg274 = nint((y_cc(0) - y0_274)/y_step274)
                             end if
                             if (ix274 == 1 .and. iy274 == 0) file_dx274 = dummy_x274 - x0_274
                             if (ix274 == 0 .and. iy274 == 1) file_dy274 = dummy_y274 - y0_274
+                        end if
+                        if (ix274 - local_ix_beg274 >= 0 .and. ix274 - local_ix_beg274 <= m .and. iy274 - local_iy_beg274 >= 0 &
+                            & .and. iy274 - local_iy_beg274 <= n) then
+                            stored_values274(ix274 - local_ix_beg274, iy274 - local_iy_beg274, f274) = dummy_val274
                         end if
                     end do
                 end do
@@ -365,10 +380,10 @@
 
             files_loaded274 = .true.
         end if
-        ix_idx274 = max(0, min(nint((x_cc(i) - x0_274)/x_step274), m_glb))
-        iy_idx274 = max(0, min(nint((y_cc(j) - y0_274)/y_step274), n_glb))
+        ! Alignment is verified above (or this rank would already have aborted), so the local
+        ! cell (i, j) maps to stored_values274(i, j, :) directly -- no re-derivation needed.
         do f274 = 1, sys_size
-            q_prim_vf(f274)%sf(i, j, 0) = stored_values274(ix_idx274, iy_idx274, f274)
+            q_prim_vf(f274)%sf(i, j, 0) = stored_values274(i, j, f274)
         end do
     case (271)  ! Premixed Flame Vortices Interaction
         @: HardcodedReadValues()
