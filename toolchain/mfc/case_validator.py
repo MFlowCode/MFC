@@ -203,7 +203,7 @@ PHYSICS_DOCS = {
             "causal support of the initial disturbance, assuming a static uniform exterior. "
             "Requires WENO reconstruction (recon_type = 1) and SSP-RK3 time stepping (time_stepper = 3). "
             "Incompatible with immersed boundaries, acoustic sources, body forces, "
-            "Lagrangian bubbles, phase change (relax), and the IGR solver. "
+            "Euler-Euler bubbles, Lagrangian bubbles, phase change (relax), and the IGR solver. "
             "Also incompatible with viscous (diffusion has no finite domain of dependence), "
             "surface_tension (nonlocal curvature coupling), cyl_coord (geometric source terms "
             "are nonzero for uniform flow, so the exterior is not static), "
@@ -1357,6 +1357,7 @@ class CaseValidator:
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
         chemistry = self.get("chemistry", "F") == "T"
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
 
         self.prohibit(recon_type is not None and recon_type != 1, "active_box requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "active_box requires time_stepper = 3 (SSP-RK3)")
@@ -1373,6 +1374,7 @@ class CaseValidator:
         self.prohibit(hyperelasticity, "active_box is incompatible with hyperelasticity (stress source terms violate the static-uniform-exterior assumption)")
         self.prohibit(mhd, "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
         self.prohibit(chemistry, "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
+        self.prohibit(bubbles_euler, "active_box is incompatible with bubbles_euler (cell-local bubble sources in a non-equilibrium ambient violate the static-uniform-exterior assumption)")
 
     def check_load_balance(self):
         """Checks load_balance requirements (simulation)"""
@@ -1383,7 +1385,9 @@ class CaseValidator:
             return
 
         parallel_io = self.get("parallel_io", "F") == "T"
+        file_per_process = self.get("file_per_process", "F") == "T"
         self.prohibit(not parallel_io, "load_balance requires parallel_io = T")
+        self.prohibit(file_per_process, "load_balance is incompatible with file_per_process (per-rank restart files are sized for the equal decomposition)")
 
     def check_amr(self):
         """Checks AMR parameter constraints (simulation)"""

@@ -52,6 +52,9 @@ contains
         logical                                             :: deviates
 
         if (.not. active_box .or. num_procs /= 1) then
+            if (active_box .and. proc_rank == 0) then
+                print '(A)', ' [active_box] WARNING: active_box supports a single MPI rank only; disabled (full-domain compute).'
+            end if
             ab_active = .false.
             $:GPU_UPDATE(device='[ab_active]')
             return
