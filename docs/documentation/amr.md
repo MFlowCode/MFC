@@ -155,7 +155,7 @@ velocities or pressure drift at the block boundary.
 
 **Element-exact multi-rank.** An `np=1` run and an `np=2` run with the block spanning
 the rank boundary produce bit-identical results (element-exact seam), confirming that
-the mirror decomposition and fine halo exchange introduce no asymmetry.
+the owner distribution and the coarse↔fine gather/scatter introduce no asymmetry.
 
 **Accuracy posture.** Inside the block the fine-level solution converges at WENO order.
 At the coarse/fine boundary the conservative-linear ghost fill is second order. The
@@ -171,17 +171,21 @@ shear well; error-estimator taggers are future work).
 
 ### Multi-rank (MPI) {#amr-mpi}
 
-The fine level uses **mirror decomposition**: each MPI rank holds the fine cells
-that cover the intersection of the block with its own base-level subdomain. A block
-may span rank boundaries and move across them freely under dynamic regrid. Fine ghost
-cells at rank seams are exchanged using a dedicated halo exchange
-(`s_mpi_sendrecv_amr_fine_halo`), which mirrors the base-level halo path but operates
-over the fine geometry. Flux registers are distributed in the same pattern — each rank
-owns the register faces that border its fine subdomain — and the reflux correction is
-applied rank-locally after an MPI reduction of the distributed fluxes.
+The fine level uses **single-owner block distribution**: each active block is assigned
+one owner rank by chains-on-chains balancing of fine-work weight (fine cell count) in
+Morton order of the block's low corner, recomputed at every regrid with state migration
+(`s_amr_assign_block_owners`). Nested refinement towers co-locate with their level-1
+anchor so parent↔child coupling stays rank-local. A block may span rank boundaries —
+the owner holds the whole fine block, and the coarse-side coupling (ghost sources,
+restriction targets, reflux faces) moves through point-to-point coarse↔fine
+gather/scatter between the owner and the ranks whose base subdomains the block
+overlaps. Same-level adjacent blocks (produced by tiling wide features) reconcile
+their shared-face ghosts with a fine-fine seam halo each stage, so both sides compute
+a matching seam flux.
 
-The fine block may cover at most about half of any rank's subdomain per dimension, since
-the fine advance reuses the rank-local solver scratch (sized to the base subdomain).
+The fine block may cover at most about half of the global extent per dimension
+(`amr_maxc`), since the fine advance reuses the rank-local solver scratch (sized to
+the base subdomain); wider features are tiled into adjacent blocks.
 
 Restart with `parallel_io` repartitions the fine blocks across any rank count; the
 serial (per-rank-file) restart path requires the same rank count as the run that wrote
