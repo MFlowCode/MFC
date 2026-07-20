@@ -1463,6 +1463,47 @@ class CaseValidator:
             cyl_coord and (self.get("p", 0) or 0) > 0,
             "amr with cyl_coord supports 2D axisymmetric only: " "the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance",
         )
+        self.prohibit(
+            cyl_coord and amr_max_level is not None and amr_max_level > 1,
+            "amr with cyl_coord supports amr_max_level = 1 only: " "multi-level axisymmetric restriction/reflux in the parent-fine frame is not yet radius-weighted (conservation would drift)",
+        )
+        qbmm = self.get("qbmm", "F") == "T"
+        polytropic = self.get("polytropic", "T") == "T"
+        self.prohibit(
+            cyl_coord and qbmm and not polytropic,
+            "amr with cyl_coord and non-polytropic QBMM is not supported: " "the pb/mv quadrature side-state fold-back is not radius-weighted (conservation would drift)",
+        )
+        num_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
+        bc_riemann_extrap = any(self.get(f"bc_{d}%{e}") == -4 for d in "xyz"[:num_dims] for e in ("beg", "end"))
+        self.prohibit(
+            bc_riemann_extrap,
+            "amr does not support Riemann-extrapolation boundary conditions (bc = -4): "
+            "they alter the WENO coefficient rows near the boundary, which the fine-block reconstruction cannot inherit correctly",
+        )
+        self.prohibit(
+            amr_regrid_int == 0 and amr_max_level is not None and amr_max_level > 2,
+            "static multi-level AMR (amr_regrid_int = 0) nests exactly one level-2 block in block 1, so it supports at most "
+            "amr_max_level = 2; use amr_regrid_int > 0 for deeper or multi-block nesting",
+        )
+        # Block-geometry bounds (mirrors the Fortran checker; global cell maxima are m/n/p in the case dict)
+        glb = {1: self.get("m"), 2: self.get("n"), 3: self.get("p")}
+        rr = ref_ratio if ref_ratio is not None else 2
+        for d in range(1, num_dims + 1):
+            beg = self.get(f"amr_block_beg({d})")
+            end = self.get(f"amr_block_end({d})")
+            self.prohibit(beg is not None and beg < 0, "amr_block_beg must be >= 0")
+            self.prohibit(
+                end is not None and glb[d] is not None and end > glb[d],
+                "amr_block_end must be <= global cell max per axis",
+            )
+            self.prohibit(
+                beg is not None and end is not None and end <= beg,
+                "amr_block_end must exceed amr_block_beg on each active axis",
+            )
+            self.prohibit(
+                beg is not None and end is not None and glb[d] is not None and rr * (end - beg + 1) - 1 > glb[d],
+                "amr fine extent exceeds the base grid (module scratch is sized to the base)",
+            )
         if ib:
             # static/prescribed-motion IB AMR (SP20/21): one or more bodies resolved on a static fine block.
             num_ibs = self.get("num_ibs") or 0
@@ -1473,6 +1514,11 @@ class CaseValidator:
                 "amr with ib supports static or prescribed-motion (moving_ibm=1) bodies only; " "force-driven moving IB (moving_ibm=2) under amr is not yet validated",
             )
             self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
+            moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, num_ibs + 1))
+            self.prohibit(
+                amr_max_level is not None and amr_max_level > 1 and moving,
+                "multi-level AMR (amr_max_level > 1) with a MOVING immersed body is not yet supported; use a static body",
+            )
         stretched = any(self.get(f"stretch_{d}", "F") == "T" for d in "xyz")
         self.prohibit(
             stretched and (bubbles_lagrange or (ib and amr_regrid_int is not None and amr_regrid_int > 0)),
