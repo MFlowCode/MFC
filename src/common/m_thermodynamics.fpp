@@ -24,6 +24,7 @@ module m_thermodynamics
     public :: s_compute_internal_energy
 #ifndef MFC_PRE_PROCESS
     public :: s_compute_speed_of_sound
+    public :: f_bulk_modulus
 #endif
 
 contains
@@ -136,6 +137,20 @@ contains
     end subroutine s_compute_internal_energy
 
 #ifndef MFC_PRE_PROCESS
+    !> Stiffened-gas bulk modulus, the thermodynamic derivative $\rho c^2 = ((\gamma+1)p+\pi_\infty)/\gamma$. Shared by the
+    !! alt_soundspeed Wood mixture sound speed here, the five-equation K-div-u source in m_rhs, and the post-process derived sound
+    !! speed, so the one derivative lives in one place.
+    pure function f_bulk_modulus(gamma, pres, pi_inf) result(blkmod)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: gamma, pres, pi_inf
+        real(wp)             :: blkmod
+
+        blkmod = ((gamma + 1._wp)*pres + pi_inf)/gamma
+
+    end function f_bulk_modulus
+
     !> Speed of sound from thermodynamic state, supporting the several equation-of-state models. Arithmetic is relocated unchanged
     !! from the conversion module: the non-chemistry branches hold c squared until a single final sqrt, the chemistry branch returns
     !! c already square-rooted, and the mixture_err floor is preserved.
@@ -167,8 +182,8 @@ contains
             c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
         else
             if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
-                blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
-                blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
+                blkmod1 = f_bulk_modulus(gammas(1), pres, pi_infs(1))
+                blkmod2 = f_bulk_modulus(gammas(2), pres, pi_infs(2))
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
             else if (model_eqns == model_eqns_6eq) then  ! Six-equation model sound speed
                 c = 0._wp

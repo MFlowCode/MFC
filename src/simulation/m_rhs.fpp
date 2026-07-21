@@ -13,6 +13,7 @@ module m_rhs
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_thermodynamics, only: f_bulk_modulus
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
         & recon_type_muscl
@@ -870,10 +871,10 @@ contains
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
-                        blkmod1(k_loop, l_loop, q_loop) = ((gammas(1) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop) + pi_infs(1))/gammas(1)
-                        blkmod2(k_loop, l_loop, q_loop) = ((gammas(2) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop) + pi_infs(2))/gammas(2)
+                        blkmod1(k_loop, l_loop, q_loop) = f_bulk_modulus(gammas(1), q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
+                                & q_loop), pi_infs(1))
+                        blkmod2(k_loop, l_loop, q_loop) = f_bulk_modulus(gammas(2), q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
+                                & q_loop), pi_infs(2))
                         alpha1(k_loop, l_loop, q_loop) = q_cons_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop)
 
                         if (bubbles_euler) then
