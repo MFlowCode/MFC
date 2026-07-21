@@ -76,6 +76,12 @@ module m_global_parameters
     $:GPU_DECLARE(create='[accel_bf]')
     ! $:GPU_DECLARE(create='[k_x,w_x,p_x,g_x,k_y,w_y,p_y,g_y,k_z,w_z,p_z,g_z]')
 
+    !> Source fields for the spatially supported body force. `spatial_bf` and
+    !> `bf_spatial_support` are auto-generated in generated_decls.fpp.
+    real(wp), allocatable, dimension(:,:,:) :: spbf_source_x
+    real(wp), allocatable, dimension(:,:,:) :: spbf_source_y
+    $:GPU_DECLARE(create='[spbf_source_x, spbf_source_y]')
+
     ! Synthetic turbulence (scalars auto-generated in generated_decls.fpp; their
     ! GPU_DECLARE lines live in m_global_parameters_common)
     integer, dimension(num_synth_shells_max)     :: synth_n_waves_per_shell
@@ -473,6 +479,17 @@ contains
         glb_bounds(1)%beg = dflt_real; glb_bounds(1)%end = dflt_real
         glb_bounds(2)%beg = dflt_real; glb_bounds(2)%end = dflt_real
         glb_bounds(3)%beg = dflt_real; glb_bounds(3)%end = dflt_real
+
+        bf_spatial_support = .false.
+        spatial_bf%amp = 0._wp
+        spatial_bf%x_centroid = 0._wp
+        spatial_bf%y_centroid = 0._wp
+        spatial_bf%conv_vel = 0._wp
+        spatial_bf%sigma = 0._wp
+        do i = 1, 8
+            spatial_bf%freq(i) = 0._wp
+            spatial_bf%phase(i) = 0._wp
+        end do
 
         ! Fluids physical parameters (sim-specific; Re(:) and G=0._wp differ from post)
         do i = 1, num_fluids_max

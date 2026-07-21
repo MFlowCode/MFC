@@ -435,6 +435,17 @@ module m_derived_types
         real(wp) :: zmax  !< Max. boundary third coordinate direction
     end type integral_parameters
 
+    !> Parameters for body force with spatial support
+    type spbf_parameters
+        real(wp)               :: amp
+        real(wp)               :: x_centroid
+        real(wp)               :: y_centroid
+        real(wp)               :: conv_vel
+        real(wp)               :: sigma
+        real(wp), dimension(8) :: freq
+        real(wp), dimension(8) :: phase
+    end type spbf_parameters
+
     !> Acoustic source parameters
     type acoustic_parameters
         integer                :: pulse                  !< Type of pulse

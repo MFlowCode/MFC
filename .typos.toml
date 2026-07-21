@@ -25,6 +25,7 @@ Sur = "Sur"
 thi = "thi"           # AMR clustering local: tagged-box hi index (tlo/thi)
 alo = "alo"           # AMR clustering local: accepted-box lo array (alo/ahi)
 thr = "thr"           # AMR clustering local: min-separation merge threshold
+equil = "equil"       # abbreviation for "equilibrium" (flamelet chemistry)
 chioces = "chioces"   # typo for "choices" - tests constraint key validation
 reqires = "reqires"   # typo for "requires" - tests dependency key validation
 choises = "choises"   # appears in comment explaining validation purpose

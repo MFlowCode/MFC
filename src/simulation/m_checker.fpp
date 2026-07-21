@@ -218,6 +218,9 @@ contains
         @:PROHIBIT(amr_subcycle .and. amr_regrid_int > 0 .and. num_procs > 1 .and. amr_max_level > 1, &
                    & "multi-level (amr_max_level > 1) amr_subcycle with dynamic regrid is not yet conservation-safe at num_procs > 1: the level-2 seam halo is per-block, not lockstep (single-level subcycling IS supported at np > 1). Use amr_subcycle = F (lock-step) for multi-level dynamic multi-rank runs")
 
+        @:PROHIBIT(bf_spatial_support .and. (n == 0 .or. p /= 0), &
+                   & "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
+
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
         end if
