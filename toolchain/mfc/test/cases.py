@@ -2926,6 +2926,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, restart_check=True))
         stack.pop()
 
+        # (a') ref_ratio=4: the ONLY golden at ref_ratio /= 2 (the checker allows 2 or 4; 4 is
+        # single-level/no-subcycle only). Same static Sod as (a) with the block halved to width
+        # 16 (24..39) so the fine extent 4*16 - 1 = 63 exactly fills the base-grid scratch (the
+        # extent-guard limit). Protects the ref_ratio-scaled prolong/restrict/reflux index
+        # arithmetic (child offsets, fold-back averaging weights, c/f face flux scaling) that
+        # every other golden exercises only at 2 - a hard-coded 2 anywhere would pass the rest
+        # of the suite unnoticed.
+        stack.push(
+            "AMR -> 1D -> static block ref_ratio 4",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "ref_ratio": 4,
+                "amr_block_beg(1)": 24,
+                "amr_block_end(1)": 39,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         # (b) dynamic regrid
         stack.push(
             "AMR -> 1D -> dynamic regrid",
@@ -3087,6 +3107,48 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
         stack.pop()
 
+        # (c') subcycle + TILED same-level blocks at np=1: amr_maxc_fit caps a regrid box at
+        # half the global extent EVEN at np=1, so a wide tagged feature tiles into ADJACENT
+        # same-level blocks whose shared face is a fine-fine seam. The subcycle formerly
+        # guarded its per-substep seam halo with num_procs > 1 - at np=1 the seam ghosts
+        # stayed at the coarse time-lerp and mass silently leaked at the shared face (fixed
+        # by running the halo at every rank count). The ONLY golden exercising the subcycle
+        # seam halo at np=1. Geometry: density interfaces at x=1/3 and 2/3 (rho 1|0.4|1)
+        # advecting at u=0.5 under uniform p; amr_buf=10 bridges the two buffered tag
+        # clusters into ONE 44-cell box > amr_maxc (32), which s_amr_tile_box splits into
+        # the adjacent 22-cell blocks [10,31] and [32,53] (tiling verified via the
+        # amr_fine.dat restart metadata: 2 level-1 blocks sharing the face at 31|32).
+        # The static initial block stays 16..47
+        # (the checker caps it at amr_maxc); the wide box comes from dynamic regrid growth.
+        stack.push(
+            "AMR -> 1D -> subcycle tiled seam np=1",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 10,
+                "amr_subcycle": "T",
+                "amr_max_blocks": 4,
+                "patch_icpp(1)%x_centroid": 1.0 / 6.0,
+                "patch_icpp(1)%length_x": 1.0 / 3.0,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 1.0 / 3.0,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%alpha_rho(1)": 0.4,
+                "patch_icpp(3)%x_centroid": 5.0 / 6.0,
+                "patch_icpp(3)%length_x": 1.0 / 3.0,
+                "patch_icpp(3)%vel(1)": 0.5,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(3)%alpha_rho(1)": 1.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         # (d) 3D static block — z-dimension coverage. 26^3 base grid (the
         # checker's WENO5 floor is 26 cells per axis) with the Sod-like slabs
         # stacked along z; 12^3 fine block at coarse indices 6..17 per axis
@@ -3142,6 +3204,27 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         }
 
         stack.push("AMR -> 3D -> static block", {**amr_3d_base, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # (d') 3D dynamic regrid: the static block above is the ONLY other 3D golden, so no
+        # golden ran the 3D tagger/clusterer/regrid at all - a z-index slip in the tagging or
+        # box build would pass the whole suite. Same slab Sod with regrid armed: the density-
+        # gradient tagger fires on both z-interfaces (full-x/y slabs), the candidate boxes
+        # exceed amr_maxc_fit (13 per axis on the 26^3 base) and TILE into adjacent same-level
+        # sub-blocks in x/y - amr_max_blocks=16 covers the 2x2 tiling of both interfaces
+        # (verified via the amr_fine.dat metadata: 8 level-1 blocks at the final save, a
+        # 2x2 x/y tile set over each z-interface).
+        stack.push(
+            "AMR -> 3D -> dynamic regrid",
+            {
+                **amr_3d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_max_blocks": 16,
+            },
+        )
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
@@ -4374,6 +4457,50 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     load_balance_tests()
+
+    def diagnostic_writer_tests():
+        """Smoke golden for the three load-diagnostic writers (load_weight_wrt,
+        sfc_partition_wrt, rank_time_wrt) - previously ZERO coverage. All three are rank-0
+        stdout reporters ([load_weight]/[sfc_partition]/[rank_time] imbalance lines printed
+        from s_write_data_files), so the golden captures the ordinary field output and the
+        test proves the writers execute without perturbing the solution (rank_time's
+        wall-clock metric reaches stdout only, keeping the golden deterministic). np=2 for
+        genuine cross-rank reductions (the load-balance context they diagnose); no
+        parallel_io needed; partition_tile_size keeps its default (8 -> 8 tiles on m=63)."""
+        stack.push(
+            "Diagnostics -> 1D -> load writers np=2",
+            {
+                "m": 63,
+                "n": 0,
+                "p": 0,
+                "dt": 5.0e-4,
+                "t_step_stop": 6,
+                "t_step_save": 6,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.05,
+                "patch_icpp(1)%length_x": 0.1,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(2)%geometry": 1,
+                "patch_icpp(2)%x_centroid": 0.45,
+                "patch_icpp(2)%length_x": 0.7,
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(3)%geometry": 1,
+                "patch_icpp(3)%x_centroid": 0.9,
+                "patch_icpp(3)%length_x": 0.2,
+                "patch_icpp(3)%vel(1)": 0.0,
+                "load_weight_wrt": "T",
+                "sfc_partition_wrt": "T",
+                "rank_time_wrt": "T",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+    diagnostic_writer_tests()
 
     add_convergence_cases(cases)
 
