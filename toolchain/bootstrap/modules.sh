@@ -13,6 +13,7 @@ show_help() {
   echo "                              Bridges2 (b) | Expanse (e) | Delta (d) | DeltaAI (dai)"
   echo "                              Phoenix (p) | Richardson (r) | Oscar (o)"
   echo "                              Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
+  echo "                              Isaac (i)"
   echo "  -m, --mode MODE             Configures into MODE."
   echo "                 Options:     gpu (g) | cpu (c)"
   echo ""
@@ -46,11 +47,12 @@ if [ -v $u_c ]; then
     log   "$R""Caltech$W: Richardson (r)"
     log   "$BR""Brown$W: Oscar (o)"
     log   "$BR""Purdue$W: Anvil (pa)"
+    log   "$OR""Tennessee$W: Isaac (i)"
     log   "$B""DoD$W:     Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
     log   "$OR""Florida$W: HiPerGator (h)"
     log   "$C""WPI $W:   Turing   (t)"
     log   "$R""AMD$W:     HPCFund  (amdfund)"
-    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$B""tuo$W/$C""b$W/$C""e$CR/$C""d/$C""dai$CR/$Y""p$CR/$R""r$CR/$B""cc$CR/$B""c$CR/$B""n$CR/$BR""o$CR/$BR""pa"$CR"/$OR""h"$CR/$C""t""$CR"): "
+    log_n "(${G}a${W}/${G}f${W}/${G}s${W}/${G}w${W}/${B}tuo${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${BR}pa${CR}/${OR}i${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
     read u_c
     log
 fi

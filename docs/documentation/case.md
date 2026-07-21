@@ -273,6 +273,19 @@ The code provides three pre-built patches for dimensional extrusion of initial c
 - `case(170)`: Load 1D profile from data files
 - `case(270)`: Extrude 1D data to 2D domain
 - `case(370)`: Extrude 2D data to 3D domain
+- `case(273)`: Extrude 1D data to 2D domain, with the mom%%beg data column carrying the
+  extruded-axis (mom%%end) velocity profile instead of its own (zeroed) component. Used by
+  `examples/2D_reacting_mixing_layer` to give a temporally-evolving mixing layer a nonzero
+  streamwise velocity profile along the extruded axis, which `case(270)` cannot represent since
+  it always zeros that component.
+- `case(274)`: Load a full 2D `(x, y)` field with no extrusion -- one data file per variable,
+  `(m_glb+1)*(n_glb+1)` lines each in x-major order, covering all primitive variables
+  directly (unlike `case(270)`/`case(273)`, no component is zeroed or repurposed). Used by
+  `examples/2D_spatial_reacting_mixing_layer` for a spatially-evolving mixing layer, where
+  the cross-stream profile must vary with the streamwise coordinate too (via the
+  `bf_spatial_support` body force) so no single extrusion axis applies. The file's line
+  count, origin, and (uniform) cell spacing must match the run grid; a mismatched file is
+  rejected with a fatal error, so regenerate the IC whenever the grid changes.
 
 Setup: Only requires specifying `files_dir` and filename pattern via `file_extension`. The files are located, for example, at `examples/1D_flamelet/IC`, and their format is `prim.XX.YY.file_extension.dat`.
 Implementation: All variables and file handling are managed in the `case.py` file of the simulation.
@@ -1264,19 +1277,26 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models whe
 
 ### 13. Body Forces
 
-| Parameter         | Type    | Description                                |
-| ---:              | :---:   | :---                                       |
-| `bf_x[y,z]`       | Logical | Enable body forces in the x[y,z] direction |
-| `k_x[y,y]`        | Real    | Magnitude of oscillating acceleration      |
-| `w_x[y,z]`        | Real    | Frequency of oscillating acceleration      |
-| `p_x[y,z]`        | Real    | Phase shift of oscillating acceleration    |
-| `g_x[y,z]`        | Real    | Magnitude of background acceleration       |
+| Parameter            | Type    | Description                                                              |
+| ---:                 | :---:   | :---                                                                     |
+| `bf_x[y,z]`          | Logical | Enable body forces in the x[y,z] direction                               |
+| `k_x[y,z]`           | Real    | Magnitude of oscillating acceleration                                    |
+| `w_x[y,z]`           | Real    | Frequency of oscillating acceleration                                    |
+| `p_x[y,z]`           | Real    | Phase shift of oscillating acceleration                                  |
+| `g_x[y,z]`           | Real    | Magnitude of background acceleration                                     |
+| `bf_spatial_support` | Logical | Enable spatially supported body force (Wei & Freund, JFM 2005)           |
 
 `k_x[y,z]`, `w_x[y,z]`, `p_x[y,z]`, and `g_x[y,z]` define an oscillating acceleration in the `x[y,z]` direction with the form
 
 \f[ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). \f]
 
 By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
+
+When `bf_spatial_support` is enabled, the body force is given a localized spatial envelope following Wei & Freund (JFM, 2005), parameterized through the `spatial_bf` derived type with attributes `amp`, `x_centroid`, `y_centroid`, `conv_vel`, `sigma`, and per-mode arrays `freq(1:8)`, `phase(1:8)`.
+Unlike the domain-wide `k/w/p/g` forcing above, it seeds a downstream instability at a fixed streamwise location with a ladder of forcing frequencies.
+`x` is the streamwise direction by convention for this forcing: the `x` component advects with the mean flow via a `conv_vel*t` term, while the cross-stream (`y`) component does not.
+The source is constructed from a streamfunction, so it is divergence-free, and the corresponding `u*f` work term is added to the energy equation.
+This forcing is implemented for **2D cases only**; enabling it in 1D or 3D is rejected at startup.
 
 ### 14. Magnetohydrodynamics (MHD)
 
