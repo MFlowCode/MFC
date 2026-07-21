@@ -2186,7 +2186,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_ib(1)%geometry": 3,
                 "patch_ib(1)%x_centroid": 0.025,
                 "patch_ib(1)%y_centroid": -0.0025,
-                "patch_ib(1)%length_x": 0.05,
+                # length_x overhangs the domain (x_end=0.05) so the IB's vertical faces
+                # sit outside [0, x_end]. Inside the domain the only IB surface is the
+                # horizontal top at y=0 (normal +y), so every ghost point's image point
+                # reflects straight into fluid — no diagonal corner stencils reading
+                # solid/buffer cells (which otherwise diverge CPU vs GPU).
+                "patch_ib(1)%length_x": 0.06,
                 "patch_ib(1)%length_y": 0.005,
                 "patch_ib(1)%slip": "F",
                 "patch_ib(1)%isothermal": "T",

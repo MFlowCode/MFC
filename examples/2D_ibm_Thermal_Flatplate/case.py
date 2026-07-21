@@ -67,7 +67,11 @@ case = {
     "patch_ib(1)%geometry": 3,
     "patch_ib(1)%x_centroid": Lx / 2,
     "patch_ib(1)%y_centroid": -Ly / 20,
-    "patch_ib(1)%length_x": Lx,
+    # Overhang the domain so the IB's vertical faces sit outside [0, Lx]. Inside the
+    # domain the only IB surface is the horizontal top (normal +y), so ghost-point
+    # image points reflect straight into fluid — avoids ill-conditioned corner
+    # stencils at the domain edge that diverge between CPU and GPU.
+    "patch_ib(1)%length_x": 1.2 * Lx,
     "patch_ib(1)%length_y": Ly / 10,
     "patch_ib(1)%slip": "F",
     "patch_ib(1)%isothermal": "T",
