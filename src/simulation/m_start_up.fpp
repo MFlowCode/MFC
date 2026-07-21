@@ -58,6 +58,8 @@ module m_start_up
     use m_load_balance, only: s_load_balance_rebalance
     use m_sfc_partition
     use m_amr
+    use m_amr_regrid, only: s_amr_regrid, s_amr_check_active_box_containment
+    use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
 
