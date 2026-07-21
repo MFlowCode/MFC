@@ -14,12 +14,14 @@ module m_thermodynamics
     use m_derived_types
     use m_global_parameters
     use m_constants, only: model_eqns_4eq, model_eqns_5eq, model_eqns_6eq, avg_state_roe, verysmall, sgm_eps
-    use m_thermochem, only: num_species, get_temperature, get_pressure
+    use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
+        & get_mixture_energy_mass
 
     implicit none
 
     private
     public :: s_compute_pressure
+    public :: s_compute_internal_energy
 #ifndef MFC_PRE_PROCESS
     public :: s_compute_speed_of_sound
 #endif
@@ -94,6 +96,44 @@ contains
         #:endif
 
     end subroutine s_compute_pressure
+
+    !> Conserved energy from the primitive pressure and mixture properties: the inverse of s_compute_pressure over the same model
+    !! branches. The chemistry adapter builds the mixture internal energy from temperature and species. Arithmetic is relocated
+    !! unchanged from the conversion module.
+    subroutine s_compute_internal_energy(pres, alf, dyn_p, pi_inf, gamma, rho, qv, Ys, energy, pres_mag)
+
+        $:GPU_ROUTINE(function_name='s_compute_internal_energy',parallelism='[seq]', cray_noinline=True)
+
+        real(stp), intent(in)                          :: pres, alf
+        real(wp), intent(in)                           :: dyn_p, pi_inf, gamma, rho, qv
+        real(stp), intent(out)                         :: energy
+        real(wp), intent(in), optional                 :: pres_mag
+        real(wp), dimension(1:num_species), intent(in) :: Ys
+        real(wp)                                       :: e_mix, mix_mol_weight, T
+        #:if not chemistry
+            ! Computing the energy from the pressure
+            if (mhd) then
+                ! MHD energy includes magnetic pressure contribution
+                energy = gamma*pres + dyn_p + pres_mag + pi_inf + qv
+            else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
+                ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
+                energy = gamma*pres + dyn_p + pi_inf + qv
+            else if ((model_eqns /= model_eqns_4eq) .and. bubbles_euler) then
+                ! Bubble-augmented energy with void fraction correction
+                energy = dyn_p + (1._wp - alf)*(gamma*pres + pi_inf)
+            else
+                ! Four-equation model (Kapila et al. PoF 2001): Tait EOS, no conserved energy variable
+                energy = 0._wp
+            end if
+        #:else
+            ! Reacting mixture: compute conserved energy from species mass fractions and temperature
+            call get_mixture_molecular_weight(Ys, mix_mol_weight)
+            T = pres*mix_mol_weight/(gas_constant*rho)
+            call get_mixture_energy_mass(T, Ys, e_mix)
+            energy = dyn_p + rho*e_mix
+        #:endif
+
+    end subroutine s_compute_internal_energy
 
 #ifndef MFC_PRE_PROCESS
     !> Speed of sound from thermodynamic state, supporting the several equation-of-state models. Arithmetic is relocated unchanged

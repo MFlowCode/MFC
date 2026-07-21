@@ -18,7 +18,7 @@ module m_variables_conversion
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
 
-    use m_thermodynamics, only: s_compute_pressure
+    use m_thermodynamics, only: s_compute_pressure, s_compute_internal_energy
 #ifndef MFC_PRE_PROCESS
     use m_thermodynamics, only: s_compute_speed_of_sound
 #endif
@@ -731,7 +731,6 @@ contains
         real(wp), dimension(2)           :: Re_K
         integer                          :: i, j, k, l  !< Generic loop iterators
         real(wp), dimension(num_species) :: Ys
-        real(wp)                         :: e_mix, mix_mol_weight, T
         real(wp)                         :: pres_mag
         real(wp)                         :: Ga          !< Lorentz factor (gamma in relativity)
         real(wp)                         :: h           !< relativistic enthalpy
@@ -829,42 +828,27 @@ contains
                     end do
 
                     if (chemistry) then
-                        ! Reacting mixture: compute conserved energy from species mass fractions and temperature
                         do i = eqn_idx%species%beg, eqn_idx%species%end
                             Ys(i - eqn_idx%species%beg + 1) = q_prim_vf(i)%sf(j, k, l)
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
-
-                        call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                        T = q_prim_vf(eqn_idx%E)%sf(j, k, l)*mix_mol_weight/(gas_constant*rho)
-                        call get_mixture_energy_mass(T, Ys, e_mix)
-
-                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + rho*e_mix
-                    else
-                        ! Computing the energy from the pressure
-                        if (mhd) then
-                            if (n == 0) then
-                                pres_mag = 0.5_wp*(Bx0**2 + q_prim_vf(eqn_idx%B%beg)%sf(j, k, &
-                                                   & l)**2 + q_prim_vf(eqn_idx%B%beg + 1)%sf(j, k, l)**2)
-                            else
-                                pres_mag = 0.5_wp*(q_prim_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + q_prim_vf(eqn_idx%B%beg + 1)%sf(j, &
-                                                   & k, l)**2 + q_prim_vf(eqn_idx%B%beg + 2)%sf(j, k, l)**2)
-                            end if
-                            ! MHD energy includes magnetic pressure contribution
-                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, &
-                                      & l) + dyn_pres + pres_mag + pi_inf + qv
-                        else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
-                            ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
-                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
-                        else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler)) then
-                            ! Bubble-augmented energy with void fraction correction
-                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + (1._wp - q_prim_vf(eqn_idx%alf)%sf(j, k, &
-                                      & l))*(gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + pi_inf)
-                        else
-                            ! Four-equation model (Kapila et al. PoF 2001): Tait EOS, no conserved energy variable
-                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
-                        end if
                     end if
+
+                    if (mhd) then
+                        if (n == 0) then
+                            pres_mag = 0.5_wp*(Bx0**2 + q_prim_vf(eqn_idx%B%beg)%sf(j, k, &
+                                               & l)**2 + q_prim_vf(eqn_idx%B%beg + 1)%sf(j, k, l)**2)
+                        else
+                            pres_mag = 0.5_wp*(q_prim_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + q_prim_vf(eqn_idx%B%beg + 1)%sf(j, k, &
+                                               & l)**2 + q_prim_vf(eqn_idx%B%beg + 2)%sf(j, k, l)**2)
+                        end if
+                    else
+                        pres_mag = 0._wp
+                    end if
+
+                    call s_compute_internal_energy(q_prim_vf(eqn_idx%E)%sf(j, k, l), q_prim_vf(eqn_idx%alf)%sf(j, k, l), &
+                                                   & dyn_pres, pi_inf, gamma, rho, qv, Ys, q_cons_vf(eqn_idx%E)%sf(j, k, l), &
+                                                   & pres_mag=pres_mag)
 
                     ! Six-equation model (Saurel et al. JCP 2009): compute per-phase internal energies
                     if (model_eqns == model_eqns_6eq) then
