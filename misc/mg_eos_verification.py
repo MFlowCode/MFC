@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
-"""Manufactured verification for the generic Mie-Gruneisen EOS core in
-src/common/m_eos_mie_gruneisen.fpp.
+"""Manufactured verification for src/common/m_eos_mie_gruneisen.fpp.
 
-The Mie-Gruneisen backend is not yet selectable at runtime, so it has no golden
-regression case; this standalone check is its verification instead. It mirrors the
-Fortran formulas line for line and exercises the two properties that fix the generic
-assembler: exact reduction to the existing stiffened-gas EOS, and agreement of the
-analytic sound speed with a finite-difference of the frozen identity for a density
-dependent reference curve.
-
-Reference: Arienti, Morano and Shepherd, GALCIT FM99-8 (2004); Menikoff and Plohr,
-Rev. Mod. Phys. 61, 75 (1989). Run with python3; exits nonzero on any failure.
+The Mie-Gruneisen backend is not yet runtime-selectable, so it has no golden case; this
+script mirrors the Fortran formulas and checks exact reduction to stiffened gas and the
+analytic sound speed against a finite difference of the frozen identity (Arienti et al.
+2004; Menikoff and Plohr 1989). Run with python3; exits nonzero on failure.
 """
 
 import sys

@@ -4,15 +4,10 @@
 
 #:include 'macros.fpp'
 
-!> @brief Generic Mie-Gruneisen equation of state with a constant Gruneisen coefficient, structured as a reference-curve provider
-!! plus a curve-agnostic assembler. A Mie-Gruneisen material obeys p = p_ref(rho) + Gamma*rho*(e - e_ref(rho)); the reference pair
-!! (p_ref, e_ref) and its density derivatives are the only thing that distinguishes one Mie-Gruneisen material from another.
-!! Following the production hydrocode structure (Arienti, Morano and Shepherd, GALCIT FM99-8, 2004; LLNL singularity-eos), one
-!! provider returns the reference curve for a chosen material and one assembler consumes it, so stiffened gas, ideal gas, and JWL
-!! differ only in the provider. This PR ships the stiffened-gas reference curve, which recovers the existing stiffened-gas pressure
-!! and sound speed exactly (Gamma = gamma_s - 1, p_ref = -pi_inf, e_ref = pi_inf/rho); the JWL principal isentrope is the next
-!! provider, added with its consumer. This is a leaf module (it uses only the precision kinds) and no solver path calls it yet: it
-!! is the verified thermodynamic core for the Mie-Gruneisen backend, landed ahead of the reference curve that consumes it.
+!> @brief Generic Mie-Gruneisen equation of state, p = p_ref(rho) + Gamma*rho*(e - e_ref(rho)) with constant Gamma, split into a
+!! reference-curve provider and a curve-agnostic assembler (Arienti et al., GALCIT FM99-8, 2004). Materials differ only in the
+!! provider: stiffened gas ships here and the JWL principal isentrope follows with its consumer. Leaf module; no solver path calls
+!! it yet.
 module m_eos_mie_gruneisen
 
     use m_precision_select
@@ -24,10 +19,8 @@ module m_eos_mie_gruneisen
 
 contains
 
-    !> Stiffened gas expressed as a Mie-Gruneisen reference curve. Returns the Gruneisen coefficient, the reference pressure and
-    !! energy, and their density derivatives, which together make the generic assembler reproduce stiffened gas. This is the first
-    !! concrete reference curve and the template the JWL principal isentrope follows. The reference pressure is density-independent
-    !! for stiffened gas, so its derivative is zero; ideal gas is the pi_inf = 0 sub-case.
+    !> Stiffened gas as a Mie-Gruneisen reference curve: Gamma = gamma_s - 1, p_ref = -pi_inf, e_ref = pi_inf/rho, plus the density
+    !! derivatives. Template for the JWL isentrope; ideal gas is the pi_inf = 0 sub-case.
     pure subroutine s_mg_stiffened_reference(gamma_s, pi_inf, rho, gamma_mg, p_ref, dp_ref, e_ref, de_ref)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -43,8 +36,7 @@ contains
 
     end subroutine s_mg_stiffened_reference
 
-    !> Mie-Gruneisen pressure from density and specific internal energy against a reference curve: p = p_ref + Gamma*rho*(e -
-    !! e_ref).
+    !> p = p_ref + Gamma*rho*(e - e_ref).
     pure function f_mg_pressure(gamma_mg, rho, e_int, p_ref, e_ref) result(pres)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -56,8 +48,7 @@ contains
 
     end function f_mg_pressure
 
-    !> Specific internal energy from pressure, the inverse of f_mg_pressure: e = e_ref + (p - p_ref)/(Gamma*rho). The Gamma*rho
-    !! divisor is positive for every admissible state (Gamma > 0, rho > 0).
+    !> Inverse of f_mg_pressure: e = e_ref + (p - p_ref)/(Gamma*rho).
     pure function f_mg_internal_energy(gamma_mg, rho, pres, p_ref, e_ref) result(e_int)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -69,11 +60,9 @@ contains
 
     end function f_mg_internal_energy
 
-    !> Squared sound speed c^2 = dp/drho at constant entropy for a constant Gruneisen coefficient, from the frozen identity c^2 =
-    !! dp/drho|_e + (p/rho^2) dp/de|_rho with dp/de|_rho = Gamma*rho (Arienti et al. 2004, Eq. 12; Menikoff and Plohr 1989). Written
-    !! in terms of pressure so no separate internal-energy argument is needed: c^2 = dp_ref - Gamma*rho*de_ref + ((1 + Gamma)*p -
-    !! p_ref)/rho, where dp_ref and de_ref are the reference-curve density derivatives dp_ref/drho and de_ref/drho. The result can
-    !! be negative outside the admissible domain, so the caller tests it before taking a square root.
+    !> Squared sound speed from the frozen identity c^2 = dp/drho|_e + (p/rho^2)*dp/de|_rho (Menikoff and Plohr 1989): c^2 = dp_ref
+    !! - Gamma*rho*de_ref + ((1 + Gamma)*p - p_ref)/rho. Can be negative outside the admissible domain, so the caller tests it
+    !! before taking a square root.
     pure function f_mg_sound_speed_sq(gamma_mg, rho, pres, p_ref, dp_ref, de_ref) result(c_sq)
 
         $:GPU_ROUTINE(parallelism='[seq]')
