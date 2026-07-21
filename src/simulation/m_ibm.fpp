@@ -155,7 +155,7 @@ contains
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
         real(wp) :: T_IP
-        real(wp) :: T_GP, MW_GP, E_GP
+        real(wp) :: T_GP, E_GP
         real(wp), dimension(num_species) :: Ys_IP
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -211,18 +211,24 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (p > 0) then
-            ! Parallel loop or simple assignment if compiler supports it Typically simpler to just do:
-            ghost_points_index%sf = 0
-        else
-            ghost_points_index%sf(0:m,0:n,0:0) = 0
-        end if
+        ! Clear the ghost-point flag on the device before re-tagging this step's
+        ! ghost points. This must run on the device (not a host array assignment)
+        ! so the flag read during conservative-to-primitive conversion is correct.
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    ghost_points_index%sf(j, k, l) = 0
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, T_GP, MW_GP, E_GP]')
+                                & Ys_IP, T_IP, T_GP, E_GP]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -270,12 +276,17 @@ contains
                     end do
                 end if
 
-                if (patch_ib(patch_id)%isothermal) then
-                    T_GP = 2.0_wp*patch_ib(patch_id)%twall - T_IP
-                else
-                    T_GP = T_IP
+                if (chemistry) then
+                    ! Reflect temperature across the wall: isothermal imposes the wall
+                    ! temperature (linear extrapolation), adiabatic mirrors the image point
+                    ! (zero normal gradient). Energy at the ghost point follows from T_GP.
+                    if (patch_ib(patch_id)%isothermal) then
+                        T_GP = 2.0_wp*patch_ib(patch_id)%twall - T_IP
+                    else
+                        T_GP = T_IP
+                    end if
+                    call get_mixture_energy_mass(T_GP, Ys_IP, E_GP)
                 end if
-                call get_mixture_energy_mass(T_GP, Ys_IP, E_GP)
 
                 if (surface_tension) then
                     q_prim_vf(eqn_idx%c)%sf(j, k, l) = c_IP
@@ -820,10 +831,15 @@ contains
         alpha_IP = 0._wp
         pres_IP = 0._wp
         vel_IP = 0._wp
-        Ys_IP = 0.0_wp
-        T_IP = 0.0_wp
         T_S = 0.0_wp
         MW_IPS = 0.0_wp
+
+        ! Ys_IP/T_IP are only supplied (and only meaningful) for chemistry; the
+        ! bubbles/qbmm call paths do not pass them, so guard the access.
+        if (chemistry) then
+            Ys_IP = 0.0_wp
+            T_IP = 0.0_wp
+        end if
 
         if (surface_tension) c_IP = 0._wp
 
