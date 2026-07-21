@@ -15,7 +15,7 @@ module m_eos_mie_gruneisen
     implicit none
 
     private
-    public :: s_mg_stiffened_reference, f_mg_pressure, f_mg_internal_energy, f_mg_sound_speed_sq
+    public :: s_mg_stiffened_reference, f_mg_pressure, f_mg_internal_energy, f_mg_dp_drho, f_mg_dp_de, f_mg_sound_speed_sq
 
 contains
 
@@ -60,9 +60,34 @@ contains
 
     end function f_mg_internal_energy
 
-    !> Squared sound speed from the frozen identity c^2 = dp/drho|_e + (p/rho^2)*dp/de|_rho (Menikoff and Plohr 1989): c^2 = dp_ref
-    !! - Gamma*rho*de_ref + ((1 + Gamma)*p - p_ref)/rho. Can be negative outside the admissible domain, so the caller tests it
-    !! before taking a square root.
+    !> Thermodynamic derivative dp/drho at constant specific internal energy, in terms of pressure: dp_ref + (p - p_ref)/rho -
+    !! Gamma*rho*de_ref, where dp_ref and de_ref are the reference-curve density derivatives.
+    pure function f_mg_dp_drho(gamma_mg, rho, pres, p_ref, dp_ref, de_ref) result(dp_drho)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: gamma_mg, rho, pres, p_ref, dp_ref, de_ref
+        real(wp)             :: dp_drho
+
+        dp_drho = dp_ref + (pres - p_ref)/rho - gamma_mg*rho*de_ref
+
+    end function f_mg_dp_drho
+
+    !> Thermodynamic derivative dp/de at constant density: Gamma*rho, the defining property of the Gruneisen coefficient.
+    pure function f_mg_dp_de(gamma_mg, rho) result(dp_de)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: gamma_mg, rho
+        real(wp)             :: dp_de
+
+        dp_de = gamma_mg*rho
+
+    end function f_mg_dp_de
+
+    !> Squared sound speed, assembled from the exposed derivatives per the frozen identity c^2 = dp/drho|_e + (p/rho^2)*dp/de|_rho
+    !! (Arienti et al. 2004; Menikoff and Plohr 1989). Can be negative outside the admissible domain, so the caller tests it before
+    !! taking a square root.
     pure function f_mg_sound_speed_sq(gamma_mg, rho, pres, p_ref, dp_ref, de_ref) result(c_sq)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -70,7 +95,7 @@ contains
         real(wp), intent(in) :: gamma_mg, rho, pres, p_ref, dp_ref, de_ref
         real(wp)             :: c_sq
 
-        c_sq = dp_ref - gamma_mg*rho*de_ref + ((1._wp + gamma_mg)*pres - p_ref)/rho
+        c_sq = f_mg_dp_drho(gamma_mg, rho, pres, p_ref, dp_ref, de_ref) + pres/rho**2*f_mg_dp_de(gamma_mg, rho)
 
     end function f_mg_sound_speed_sq
 
