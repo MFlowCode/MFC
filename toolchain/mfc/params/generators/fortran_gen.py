@@ -153,6 +153,10 @@ def generate_constants_fpp() -> str:
 
     lines = [_HEADER.rstrip()]
     for param in sorted(CONSTRAINTS):
+        # Compound keys (e.g. fluid_pp(1)%eos) cannot form valid Fortran identifiers;
+        # their enum constants are hand-written in m_constants.fpp instead.
+        if "%" in param or "(" in param:
+            continue
         names = CONSTRAINTS[param].get("names")
         if not names:
             continue

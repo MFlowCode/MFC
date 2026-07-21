@@ -211,6 +211,7 @@ contains
             fluid_pp(i)%cv = 0._wp
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
+            fluid_pp(i)%eos = merge(eos_ideal_gas_mixture, eos_stiffened_gas, chemistry)
             fluid_pp(i)%G = dflt_real
             fluid_pp(i)%non_newtonian = .false.
             fluid_pp(i)%K = dflt_real

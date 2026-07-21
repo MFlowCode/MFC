@@ -379,6 +379,7 @@ module m_derived_types
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
     type physical_parameters
+        integer                :: eos            !< Equation of state selector (eos_* in m_constants)
         real(wp)               :: gamma          !< Sp. heat ratio
         real(wp)               :: pi_inf         !< Liquid stiffness
         real(wp), dimension(2) :: Re             !< Reynolds number

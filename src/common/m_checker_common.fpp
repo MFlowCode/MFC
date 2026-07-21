@@ -25,11 +25,29 @@ contains
 #ifndef MFC_SIMULATION
         call s_check_total_cells
 #endif
+        call s_check_eos
         #:if USING_AMD
             call s_check_amd
         #:endif
 
     end subroutine s_check_inputs_common
+
+    !> Restrict the per-fluid EOS selector to the currently supported adapters. Only stiffened_gas (non-chemistry) and
+    !! ideal_gas_mixture (chemistry) are backed by a thermodynamics backend, and a single run uses one family for every fluid, so
+    !! the unimplemented values and any intra-cell EOS mixing are both rejected here.
+    impure subroutine s_check_eos
+
+        integer :: i
+
+        do i = 1, num_fluids
+            @:PROHIBIT(chemistry .and. fluid_pp(i)%eos /= eos_ideal_gas_mixture, &
+                       & "fluid_pp(:)%eos must be 'ideal_gas_mixture' for every fluid when chemistry is enabled")
+            @:PROHIBIT(.not. chemistry .and. fluid_pp(i)%eos /= eos_stiffened_gas, &
+                       & "fluid_pp(:)%eos selector is not supported; only 'stiffened_gas' is available " &
+                       & // "(or 'ideal_gas_mixture' with a chemistry build)")
+        end do
+
+    end subroutine s_check_eos
 
 #ifndef MFC_SIMULATION
     !> Verify that the total number of grid cells meets the minimum required by the number of dimensions and MPI ranks.

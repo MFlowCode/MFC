@@ -338,6 +338,7 @@ PATTERNS = [
     (r"fluid_pp\((\d+)\)%cv", "Specific heat at constant volume for fluid {0}"),
     (r"fluid_pp\((\d+)\)%qv", "Heat of formation for fluid {0}"),
     (r"fluid_pp\((\d+)\)%qvp", "Heat of formation prime for fluid {0}"),
+    (r"fluid_pp\((\d+)\)%eos", "Equation of state selector for fluid {0}"),
     (r"fluid_pp\((\d+)\)%Re\((\d+)\)", "Reynolds number component {1} for fluid {0}"),
     (r"fluid_pp\((\d+)\)%non_newtonian", "Enable Herschel-Bulkley non-Newtonian viscosity for fluid {0}"),
     (r"fluid_pp\((\d+)\)%K", "HB consistency index for fluid {0}"),

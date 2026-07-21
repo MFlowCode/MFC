@@ -114,6 +114,15 @@ module m_constants
     integer, parameter :: BC_NO_SLIP_WALL = -16
     integer, parameter :: BC_DIRICHLET = -17
 
+    ! Equation-of-state selector (fluid_pp(:)%eos). Values must match _EOS_NAMES in
+    ! toolchain/mfc/params/definitions.py. Only stiffened_gas and ideal_gas_mixture
+    ! are currently backed by a thermodynamics adapter.
+    integer, parameter :: eos_stiffened_gas = 1
+    integer, parameter :: eos_ideal_gas_mixture = 2
+    integer, parameter :: eos_mie_gruneisen = 3
+    integer, parameter :: eos_jwl = 4
+    integer, parameter :: eos_table = 5
+
     ! Synthetic turbulence array size limits
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
     integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
