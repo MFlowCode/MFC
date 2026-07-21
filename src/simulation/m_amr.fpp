@@ -552,9 +552,8 @@ contains
     !! patch cells it does not hold from exactly the (SFC-local) coarse-owners that hold them - each rank's contribution is the
     !! intersection of the patch with its contiguous owned coarse range (s_amr_rank_coarse_range, = the f_amr_own_coarse set), read
     !! from the replicated amr_decomp table. Non-participants send/recv nothing (no global collective). At np=1 the owner is the
-    !! sole rank and just copies its own coarse over the patch, bit-for-bit. Runtime (pull_host) packs/unpacks the overlap boxes on
-    !! the DEVICE (q_coarse device-current with valid ghosts); init/regrid fills from the host (q_coarse host-current with valid
-    !! ghosts). The packed data is wp, cast to stp into amr_cg (identity for stp coarse), device-current on exit. INVARIANT:
+    !! sole rank and just copies its own coarse over the patch, bit-for-bit. Host fill (q_coarse must be host-current with valid
+    !! ghosts); the packed data is wp, cast to stp into amr_cg (identity for stp coarse), then pushed to the device. INVARIANT:
     !! "coarse" here means the block's PARENT level (level l-1), NOT the base grid (level 0). For a level-1 block the parent IS L0,
     !! but a level>=2 block folds to/from its parent block's fine array; the C<->F prolong/restrict/gather routines all operate in
     !! the parent-fine frame, not the L0 frame.
@@ -621,20 +620,18 @@ contains
             return
         end if
 
-        ! np>1 runtime (pull_host): NO full-field host pull - the owner's own-box copy, the non-owner pack, and the received-box
-        ! unpacks all run on the DEVICE over only the overlap boxes, so just the contiguous wire buffers cross PCIe (MPI stays on
-        ! host buffers). Init/regrid (.not. pull_host): host is truth, so the host pack/unpack paths below read it directly.
+        ! np>1 runtime: pull q_coarse to host for the owner's local unpack and the non-owner MPI pack below.
+        if (pull_host) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[q_coarse(i)%sf]')
+            end do
+        end if
 
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            if (pull_host) then
-                ! runtime: q_coarse is device-current - copy the own box on the device (same index map/assignment as the host path)
-                call s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
-            else
-                call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
-            end if
+            call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
             ! count + post recvs from every OTHER rank whose owned range overlaps the patch
             nsrc = 0
             do r = 0, num_procs - 1
@@ -663,12 +660,6 @@ contains
                 do idx = 1, nsrc
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    if (pull_host) then
-                        ! runtime: unpack ONLY this box's wire buffer on the device (same order/cast as the host unpack below)
-                        boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                        call s_amr_unpack_box_device(bl, bh, rbuf(1:boxsz,idx))
-                        cycle
-                    end if
                     ! unpack in the SAME (i, g3, g2, g1) order the sender packed; place at amr_cg patch-local index
                     r = 0
                     do i = 1, sys_size
@@ -685,13 +676,9 @@ contains
                 end do
                 deallocate (rbuf, reqs, srank)
             end if
-            ! host path only: the runtime device path wrote amr_cg on the device directly (host amr_cg stays stale, as at np=1 -
-            ! runtime consumers read the device copy)
-            if (.not. pull_host) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[amr_cg(i)%sf]')
-                end do
-            end if
+            do i = 1, sys_size
+                $:GPU_UPDATE(device='[amr_cg(i)%sf]')
+            end do
         else
             ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
@@ -699,21 +686,16 @@ contains
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                 allocate (sbuf(boxsz))
-                if (pull_host) then
-                    ! runtime: pack the overlap box on the device straight into sbuf (only the box crosses PCIe)
-                    call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, sbuf)
-                else
-                    idx = 0
-                    do i = 1, sys_size
-                        do g3 = bl(3), bh(3)
-                            do g2 = bl(2), bh(2)
-                                do g1 = bl(1), bh(1)
-                                    idx = idx + 1; sbuf(idx) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
-                                end do
+                idx = 0
+                do i = 1, sys_size
+                    do g3 = bl(3), bh(3)
+                        do g2 = bl(2), bh(2)
+                            do g1 = bl(1), bh(1)
+                                idx = idx + 1; sbuf(idx) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
                             end do
                         end do
                     end do
-                end if
+                end do
 #ifdef MFC_MPI
                 call MPI_SEND(sbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
 #endif
@@ -792,33 +774,29 @@ contains
             return
         end if
 
-        ! np>1 runtime (pull_host): NO full-field host pull - the owner's own-box copy, the non-owner pack, and the received-box
-        ! unpacks all run on the DEVICE over only the overlap boxes (mirror of s_amr_gather_coarse_patch). Init/regrid
-        ! (.not. pull_host): host is truth, so the host pack/unpack paths below read it directly.
+        ! np>1 runtime: pull pb/mv to host for the owner's local unpack and the non-owner MPI pack below.
+        if (pull_host) then
+            $:GPU_UPDATE(host='[pb_coarse, mv_coarse]')
+        end if
 
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            if (pull_host) then
-                ! runtime: pb/mv are device-current - copy the own box on the device (same index map/assignment as the host path)
-                call s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)
-            else
-                do ib_ = 1, nb
-                    do q = 1, nnode
-                        do g3 = bl(3), bh(3)
-                            do g2 = bl(2), bh(2)
-                                do g1 = bl(1), bh(1)
-                                    amr_cg_pb(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
-                                              & ib_) = pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
-                                    amr_cg_mv(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
-                                              & ib_) = mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
-                                end do
+            do ib_ = 1, nb
+                do q = 1, nnode
+                    do g3 = bl(3), bh(3)
+                        do g2 = bl(2), bh(2)
+                            do g1 = bl(1), bh(1)
+                                amr_cg_pb(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
+                                          & ib_) = pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
+                                amr_cg_mv(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
+                                          & ib_) = mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
                             end do
                         end do
                     end do
                 end do
-            end if
+            end do
             ! count + post recvs from every OTHER rank whose owned range overlaps the patch
             nsrc = 0
             do r = 0, num_procs - 1
@@ -847,12 +825,6 @@ contains
                 do idx = 1, nsrc
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    if (pull_host) then
-                        ! runtime: unpack ONLY this box's wire buffer on the device (same order/cast as the host unpack below)
-                        boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                        call s_amr_unpack_box_pbmv_device(bl, bh, rbuf(1:boxsz,idx))
-                        cycle
-                    end if
                     ! unpack in the SAME (ib_, q, g3, g2, g1) order the sender packed - pb block then mv block
                     r = 0
                     do ib_ = 1, nb
@@ -884,11 +856,7 @@ contains
                 end do
                 deallocate (rbuf, reqs, srank)
             end if
-            ! host path only: the runtime device path wrote amr_cg_pb/mv on the device directly (host copies stay stale, as at
-            ! np=1 - runtime consumers read the device copy)
-            if (.not. pull_host) then
-                $:GPU_UPDATE(device='[amr_cg_pb, amr_cg_mv]')
-            end if
+            $:GPU_UPDATE(device='[amr_cg_pb, amr_cg_mv]')
         else
             ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
@@ -896,34 +864,29 @@ contains
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                 allocate (sbuf(boxsz))
-                if (pull_host) then
-                    ! runtime: pack the overlap box on the device straight into sbuf (only the box crosses PCIe)
-                    call s_amr_pack_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3, sbuf)
-                else
-                    idx = 0
-                    do ib_ = 1, nb
-                        do q = 1, nnode
-                            do g3 = bl(3), bh(3)
-                                do g2 = bl(2), bh(2)
-                                    do g1 = bl(1), bh(1)
-                                        idx = idx + 1; sbuf(idx) = real(pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
-                                    end do
+                idx = 0
+                do ib_ = 1, nb
+                    do q = 1, nnode
+                        do g3 = bl(3), bh(3)
+                            do g2 = bl(2), bh(2)
+                                do g1 = bl(1), bh(1)
+                                    idx = idx + 1; sbuf(idx) = real(pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
                                 end do
                             end do
                         end do
                     end do
-                    do ib_ = 1, nb
-                        do q = 1, nnode
-                            do g3 = bl(3), bh(3)
-                                do g2 = bl(2), bh(2)
-                                    do g1 = bl(1), bh(1)
-                                        idx = idx + 1; sbuf(idx) = real(mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
-                                    end do
+                end do
+                do ib_ = 1, nb
+                    do q = 1, nnode
+                        do g3 = bl(3), bh(3)
+                            do g2 = bl(2), bh(2)
+                                do g1 = bl(1), bh(1)
+                                    idx = idx + 1; sbuf(idx) = real(mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
                                 end do
                             end do
                         end do
                     end do
-                end if
+                end do
 #ifdef MFC_MPI
                 call MPI_SEND(sbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
 #endif
@@ -1100,179 +1063,6 @@ contains
         end do
 
     end subroutine s_amr_unpack_patch
-
-    !> Runtime device analogue of s_amr_unpack_patch: copy the owner's own coarse box [bl:bh] GLOBAL from q_coarse (device) into
-    !! amr_cg (device) in the patch-local frame - no host round-trip. Same index map and direct stp assignment as the host path.
-    impure subroutine s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: bl(3), bh(3), o1, o2, o3
-        integer                                             :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, coff1, coff2, coff3
-
-        ! scalar copies: no host array may be referenced inside the device region (nvfortran/Cray demand it PRESENT)
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do g3 = bl3, bh3
-                do g2 = bl2, bh2
-                    do g1 = bl1, bh1
-                        amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_gather_own_box_device
-
-    !> Runtime device pack of the overlap box [bl:bh] GLOBAL from q_coarse (device) into the contiguous wire buffer buf (host, via
-    !! copyout) - only the box crosses PCIe, not the full field. Explicit-loop linear buf indexing (g1 fastest, then g2, g3, i) and
-    !! the wp cast match the host pack in s_amr_gather_coarse_patch element-for-element, so the receiver's unpack is layout- and
-    !! byte-identical (same discipline as s_amr_fine_slice: no array-section syntax near the device map).
-    impure subroutine s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, buf)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: bl(3), bh(3), o1, o2, o3
-        real(wp), intent(inout), contiguous                 :: buf(:)
-        integer                                             :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
-        do i = 1, sys_size
-            do g3 = bl3, bh3
-                do g2 = bl2, bh2
-                    do g1 = bl1, bh1
-                        buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*(i - 1)))) = real(q_coarse(i)%sf(g1 - o1, &
-                            & g2 - o2, g3 - o3), wp)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_pack_box_device
-
-    !> Runtime device unpack of a received overlap box [bl:bh] GLOBAL from the contiguous wire buffer buf (host, via copyin) into
-    !! amr_cg (device) in the patch-local frame - only the box crosses PCIe. Same linear order and stp cast as the host unpack in
-    !! s_amr_gather_coarse_patch.
-    impure subroutine s_amr_unpack_box_device(bl, bh, buf)
-
-        integer, intent(in)              :: bl(3), bh(3)
-        real(wp), intent(in), contiguous :: buf(:)
-        integer                          :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, coff1, coff2, coff3
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
-        do i = 1, sys_size
-            do g3 = bl3, bh3
-                do g2 = bl2, bh2
-                    do g1 = bl1, bh1
-                        amr_cg(i)%sf(g1 - coff1, g2 - coff2, &
-                               & g3 - coff3) = real(buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*(i - 1)))), stp)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_unpack_box_device
-
-    !> Runtime device own-box copy for the pbmv gather: pb/mv (device) -> amr_cg_pb/mv (device) over [bl:bh] GLOBAL in the
-    !! patch-local frame. Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch_pbmv.
-    impure subroutine s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)
-
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
-        integer, intent(in) :: bl(3), bh(3), o1, o2, o3
-        integer :: q, ib_, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, coff1, coff2, coff3
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=5)
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do g3 = bl3, bh3
-                    do g2 = bl2, bh2
-                        do g1 = bl1, bh1
-                            amr_cg_pb(g1 - coff1, g2 - coff2, g3 - coff3, q, ib_) = pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
-                            amr_cg_mv(g1 - coff1, g2 - coff2, g3 - coff3, q, ib_) = mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
-                        end do
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_gather_own_box_pbmv_device
-
-    !> Runtime device pack for the pbmv gather: pb block then mv block of the overlap box [bl:bh] GLOBAL into the contiguous wire
-    !! buffer buf (host, via copyout). Linear order (g1 fastest, then g2, g3, q, ib_; mv offset by half the message) and wp cast
-    !! match the host pack in s_amr_gather_coarse_patch_pbmv element-for-element.
-    impure subroutine s_amr_pack_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3, buf)
-
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
-        integer, intent(in) :: bl(3), bh(3), o1, o2, o3
-        real(wp), intent(inout), contiguous :: buf(:)
-        integer :: q, ib_, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, half
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        half = n1*n2*n3*nnode*nb
-        $:GPU_PARALLEL_LOOP(collapse=5, copyout='[buf]')
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do g3 = bl3, bh3
-                    do g2 = bl2, bh2
-                        do g1 = bl1, bh1
-                            buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*((q - 1) + nnode*(ib_ - 1))))) &
-                                & = real(pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
-                            buf(half + 1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*((q - 1) + nnode*(ib_ - 1))))) &
-                                & = real(mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
-                        end do
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_pack_box_pbmv_device
-
-    !> Runtime device unpack for the pbmv gather: received wire buffer buf (host, via copyin) -> amr_cg_pb/mv (device) over [bl:bh]
-    !! GLOBAL in the patch-local frame. Same linear order and stp cast as the host unpack in s_amr_gather_coarse_patch_pbmv.
-    impure subroutine s_amr_unpack_box_pbmv_device(bl, bh, buf)
-
-        integer, intent(in)              :: bl(3), bh(3)
-        real(wp), intent(in), contiguous :: buf(:)
-        integer                          :: q, ib_, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, half, coff1, coff2, coff3
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        half = n1*n2*n3*nnode*nb
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=5, copyin='[buf]')
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do g3 = bl3, bh3
-                    do g2 = bl2, bh2
-                        do g1 = bl1, bh1
-                            amr_cg_pb(g1 - coff1, g2 - coff2, g3 - coff3, q, &
-                                      & ib_) = real(buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*((q - 1) &
-                                      & + nnode*(ib_ - 1))))), stp)
-                            amr_cg_mv(g1 - coff1, g2 - coff2, g3 - coff3, q, &
-                                      & ib_) = real(buf(half + 1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*((q - 1) &
-                                      & + nnode*(ib_ - 1))))), stp)
-                        end do
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_unpack_box_pbmv_device
 
     !> True iff rank r is a reflux applier for the current block: it owns the coarse cell layer just OUTSIDE some block face AND its
     !! subdomain overlaps the block transversely. Mirrors s_amr_reflux_face_flags exactly, but parameterized by r's subdomain from
@@ -1968,9 +1758,9 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = sys_size*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
 
-        ! cyl_coord: fine radial volume weights = this block's fine cell-center radii, pushed to device for the restriction
-        ! kernels. Only the owner restricts (device overwrite + device scatter pack), so only the owner needs them; single-sourced
-        ! from y_cc so the owner-local and scattered child-averages are bit-identical.
+        ! cyl_coord: fine radial volume weights = this block's fine cell-center radii, pushed to device for the restriction kernel.
+        ! Only the owner restricts (device overwrite + host scatter), so only the owner needs them; single-sourced from y_cc so the
+        ! device (owner-local) and host (scatter) child-averages are bit-identical.
         if (cyl_coord .and. proc_rank == owner) then
             amr_rvw(0:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%y_cc(0:amr_slots(amr_cur)%n)
             $:GPU_UPDATE(device='[amr_rvw]')
@@ -1993,6 +1783,10 @@ contains
                 if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
                 return
             end if
+            ! fine -> host for the cross-rank send-slice packing below (the local overwrite reads the fine on the device)
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_slots(amr_cur)%q_cons(i)%sf]')
+            end do
             ! owner-local covered cells: restrict fine(device) -> coarse(device) touching ONLY those cells (no whole-coarse
             ! device push, which clobbered the device-advanced non-covered coarse cells - the same GPU-only bug fixed at np=1)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device(coarse_tgt, &
@@ -2014,10 +1808,17 @@ contains
                     if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     nsrc = nsrc + 1; drank(nsrc) = r
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    ! pack this destination's covered slice on the DEVICE: restrict averages straight into the wire buffer (same
-                    ! child-sum order and wp values as the device overwrite above) - no full-field fine host pull
-                    call s_amr_restrict_pack_device(amr_slots(amr_cur)%q_cons, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, &
-                                                    & sbuf(1:boxsz,nsrc))
+                    idx = 0
+                    do i = 1, sys_size
+                        do ck = bl(3), bh(3)
+                            do cj = bl(2), bh(2)
+                                do ci = bl(1), bh(1)
+                                    idx = idx + 1
+                                    sbuf(idx, nsrc) = f_amr_restrict_cell(i, ci, cj, ck, rlo, rr, dj_hi, dk_hi, nchild)
+                                end do
+                            end do
+                        end do
+                    end do
 #ifdef MFC_MPI
                     call MPI_ISEND(sbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
@@ -2141,13 +1942,66 @@ contains
 
     end subroutine s_amr_rank_interior
 
-    !> Device-native restriction overwrite: restrict the fine block q_fine (DEVICE) to coarse averages over the covered coarse cells
-    !! [bl:bh] GLOBAL and write coarse_tgt (DEVICE) directly - no host round-trip, only the covered cells touched (the old
-    !! whole-coarse device push clobbered non-covered cells). Same child-sum order (ddk, ddj, then fi0 and fi0+1; /nchild; stp cast)
-    !! as the old host restrict path, so it is bit-identical to it on CPU and matches the coarse restriction. q_fine (==
-    !! amr_slots(amr_cur)%q_cons) and coarse_tgt are device-resident (ACC_SETUP_SFs). TWIN: s_amr_restrict_pack_device runs this
-    !! same child-sum into a wire buffer - any change to the loop order, arithmetic, or casts here must be mirrored there,
-    !! byte-identically (owner-local and scattered coarse cells must match bit-for-bit).
+    !> Volume-weighted restriction of one covered coarse cell (ci,cj,ck) for variable i: average of its ref_ratio^d fine children
+    !! from the owner's fine block, block-relative (fine origin (ci-rlo)*rr). Same child-sum order as the old device kernel.
+    impure real(wp) function f_amr_restrict_cell(i, ci, cj, ck, rlo, rr, dj_hi, dk_hi, nchild) result(v)
+        integer, intent(in) :: i, ci, cj, ck, rlo(3), rr, dj_hi, dk_hi, nchild
+        integer             :: fi0, fj0, fk0, ddi, ddj, ddk
+        real(wp)            :: acc, wacc, w
+        fi0 = (ci - rlo(1))*rr; fj0 = (cj - rlo(2))*rr; fk0 = (ck - rlo(3))*rr
+        acc = 0._wp
+        if (cyl_coord) then
+            ! axisymmetric: cell volume ~ radius, so weight each fine child by its cell-center radius (amr_rvw = fine y_cc)
+            wacc = 0._wp
+            do ddk = 0, dk_hi
+                do ddj = 0, dj_hi
+                    w = amr_rvw(fj0 + ddj)
+                    do ddi = 0, rr - 1
+                        acc = acc + real(amr_slots(amr_cur)%q_cons(i)%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)*w
+                        wacc = wacc + w
+                    end do
+                end do
+            end do
+            v = acc/wacc
+            return
+        end if
+        do ddk = 0, dk_hi
+            do ddj = 0, dj_hi
+                do ddi = 0, rr - 1
+                    acc = acc + real(amr_slots(amr_cur)%q_cons(i)%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)
+                end do
+            end do
+        end do
+        v = acc/real(nchild, wp)
+
+    end function f_amr_restrict_cell
+
+    !> Owner overwrites the covered coarse cells in box [bl:bh] (global) that it holds locally, from the block restriction. LOCAL
+    !! coarse index = cell - start_idx (o1/o2/o3). stp cast of acc/nchild matches the old device restriction exactly.
+    impure subroutine s_amr_restrict_overwrite(coarse_tgt, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+        integer, intent(in)                                    :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
+        integer                                                :: i, ci, cj, ck
+
+        do i = 1, sys_size
+            do ck = bl(3), bh(3)
+                do cj = bl(2), bh(2)
+                    do ci = bl(1), bh(1)
+                        coarse_tgt(i)%sf(ci - o1, cj - o2, ck - o3) = real(f_amr_restrict_cell(i, ci, cj, ck, rlo, rr, dj_hi, &
+                                   & dk_hi, nchild), stp)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_amr_restrict_overwrite
+
+    !> Device-native restriction overwrite (np=1): restrict the fine block q_fine (DEVICE) to coarse averages over the covered
+    !! coarse cells [bl:bh] GLOBAL and write coarse_tgt (DEVICE) directly - no host round-trip, only the covered cells touched (the
+    !! old whole-coarse device push clobbered non-covered cells). Inlines f_amr_restrict_cell EXACTLY (same child-sum order: ddk,
+    !! ddj, then fi0 and fi0+1; /nchild; stp cast) so it is bit-identical to the host path on CPU and matches the coarse
+    !! restriction. q_fine (== amr_slots(amr_cur)%q_cons) and coarse_tgt are device-resident (ACC_SETUP_SFs).
     impure subroutine s_amr_restrict_overwrite_device(coarse_tgt, q_fine, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -2160,7 +2014,7 @@ contains
         rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
         if (cyl_coord) then
             ! axisymmetric volume-weighted fold-back: weight each fine child by its cell-center radius (amr_rvw = fine y_cc, on
-            ! device). Same child order as the Cartesian path and as the scatter pack, so CPU==GPU and np=1==np>=2.
+            ! device). Same child order as the Cartesian path and as the host f_amr_restrict_cell, so CPU==GPU and np=1==np>=2.
             $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc, wacc, w]')
             do i = 1, sys_size
                 do ck = bl3, bh3
@@ -2207,72 +2061,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_restrict_overwrite_device
-
-    !> Device pack of one destination's covered restrict slice (np>=2 scatter): restrict the fine block q_fine (DEVICE) over the
-    !! covered coarse box [bl:bh] GLOBAL straight into the contiguous wire buffer buf (host, via copyout) - only the slice crosses
-    !! PCIe, not the full fine field. Same child-sum order and wp values as s_amr_restrict_overwrite_device (no stp cast: the wire
-    !! carries wp and the receiver casts), packed with ci fastest, then cj, ck, i, matching the receiver's sequential unpack. TWIN:
-    !! s_amr_restrict_overwrite_device runs this same child-sum in place - any change to the loop order, arithmetic, or casts here
-    !! must be mirrored there, byte-identically (owner-local and scattered coarse cells must match bit-for-bit).
-    impure subroutine s_amr_restrict_pack_device(q_fine, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_fine
-        integer, intent(in) :: bl(3), bh(3), rlo(3), rr, dj_hi, dk_hi, nchild
-        real(wp), intent(inout), contiguous :: buf(:)
-        integer :: i, ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3, n1, n2, n3
-        real(wp) :: acc, wacc, w
-
-        bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
-        rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        if (cyl_coord) then
-            ! axisymmetric volume-weighted pack (amr_rvw = fine y_cc, on device); same child order as the overwrite kernel
-            $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc, wacc, w]', copyout='[buf]')
-            do i = 1, sys_size
-                do ck = bl3, bh3
-                    do cj = bl2, bh2
-                        do ci = bl1, bh1
-                            fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
-                            acc = 0._wp; wacc = 0._wp
-                            do ddk = 0, dk_hi
-                                do ddj = 0, dj_hi
-                                    w = amr_rvw(fj0 + ddj)
-                                    do ddi = 0, rr - 1
-                                        acc = acc + real(q_fine(i)%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)*w
-                                        wacc = wacc + w
-                                    end do
-                                end do
-                            end do
-                            buf(1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*(i - 1)))) = acc/wacc
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-            return
-        end if
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]', copyout='[buf]')
-        do i = 1, sys_size
-            do ck = bl3, bh3
-                do cj = bl2, bh2
-                    do ci = bl1, bh1
-                        fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
-                        acc = 0._wp
-                        do ddk = 0, dk_hi
-                            do ddj = 0, dj_hi
-                                do ddi = 0, rr - 1
-                                    acc = acc + real(q_fine(i)%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)
-                                end do
-                            end do
-                        end do
-                        buf(1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*(i - 1)))) = acc/real(nchild, wp)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_restrict_pack_device
 
     !> Apply phase-change relaxation (relax) to the current fine block's interior, BEFORE restriction. Relaxation is a cell-local,
     !! mass/energy-conserving equilibration (no stencil, no ghosts), so it needs no coarse/fine coupling: it just runs over the fine
@@ -2607,6 +2395,38 @@ contains
 
     end subroutine s_restrict_pbmv
 
+    !> Non-polytropic QBMM np>=2: host volume-weighted average of one covered coarse cell (ci,cj,ck), quadrature node (q,ib_), from
+    !! the owner's fine block (pb side if ispb, else mv), for packing an MPI send slice. Same child-sum as s_restrict_pbmv, fine
+    !! origin (ci-rlo)*rr. Reads the host-current fine side-state (the caller pulls it to host first).
+    impure real(wp) function f_amr_restrict_cell_pbmv(ispb, ci, cj, ck, q, ib_, rlo, rr, dj_hi, dk_hi, nchild) result(v)
+        logical, intent(in) :: ispb
+        integer, intent(in) :: ci, cj, ck, q, ib_, rlo(3), rr, dj_hi, dk_hi, nchild
+        integer             :: fi0, fj0, fk0, ddi, ddj, ddk
+        real(wp)            :: acc
+
+        fi0 = (ci - rlo(1))*rr; fj0 = (cj - rlo(2))*rr; fk0 = (ck - rlo(3))*rr
+        acc = 0._wp
+        if (ispb) then
+            do ddk = 0, dk_hi
+                do ddj = 0, dj_hi
+                    do ddi = 0, rr - 1
+                        acc = acc + real(amr_slots(amr_cur)%pb_f%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                    end do
+                end do
+            end do
+        else
+            do ddk = 0, dk_hi
+                do ddj = 0, dj_hi
+                    do ddi = 0, rr - 1
+                        acc = acc + real(amr_slots(amr_cur)%mv_f%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
+                    end do
+                end do
+            end do
+        end if
+        v = acc/real(nchild, wp)
+
+    end function f_amr_restrict_cell_pbmv
+
     !> Non-polytropic QBMM np>=2: DEVICE restriction of pb/mv over the covered box [bl:bh] GLOBAL into pb_c/mv_c (device), fine
     !! origin (ci-rlo)*rr, LOCAL coarse index cell - o. Only the covered cells the owner holds are touched (no whole-array push -
     !! same GPU-only clobber the q_cons device overwrite avoids). Same child-sum as s_restrict_pbmv. TWIN:
@@ -2651,59 +2471,11 @@ contains
 
     end subroutine s_amr_restrict_pbmv_box_device
 
-    !> Non-polytropic QBMM np>=2 scatter pack: DEVICE restriction of pb/mv over the covered box [bl:bh] GLOBAL straight into the
-    !! contiguous wire buffer buf (host, via copyout; pb block then mv block, ci fastest) - only the slice crosses PCIe, not the
-    !! full fine side-state. Same child-sum as s_amr_restrict_pbmv_box_device; the wire carries wp and the receiver casts to stp.
-    !! TWIN: s_amr_restrict_pbmv_box_device runs this same child-sum in place - any change to the loop order, arithmetic, or casts
-    !! here must be mirrored there, byte-identically (local and scattered coarse pb/mv must match bit-for-bit).
-    impure subroutine s_amr_restrict_pbmv_pack_device(pb_fin, mv_fin, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
-
-        real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
-             & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pb_fin, mv_fin
-        integer, intent(in) :: bl(3), bh(3), rlo(3), rr, dj_hi, dk_hi, nchild
-        real(wp), intent(inout), contiguous :: buf(:)
-        integer :: ci, cj, ck, q, ib_, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
-        integer :: n1, n2, n3, half
-        real(wp) :: accp, accm
-
-        bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
-        rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        half = n1*n2*n3*nnode*nb
-        $:GPU_PARALLEL_LOOP(collapse=5, private='[fi0, fj0, fk0, ddi, ddj, ddk, accp, accm]', copyout='[buf]')
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do ck = bl3, bh3
-                    do cj = bl2, bh2
-                        do ci = bl1, bh1
-                            fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
-                            accp = 0._wp; accm = 0._wp
-                            do ddk = 0, dk_hi
-                                do ddj = 0, dj_hi
-                                    do ddi = 0, rr - 1
-                                        accp = accp + real(pb_fin(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
-                                        accm = accm + real(mv_fin(fi0 + ddi, fj0 + ddj, fk0 + ddk, q, ib_), wp)
-                                    end do
-                                end do
-                            end do
-                            buf(1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*((q - 1) + nnode*(ib_ - 1))))) &
-                                & = accp/real(nchild, wp)
-                            buf(half + 1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*((q - 1) + nnode*(ib_ - 1))))) &
-                                & = accm/real(nchild, wp)
-                        end do
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_restrict_pbmv_pack_device
-
     !> Non-polytropic QBMM: distributed fine->coarse fold-back of the block's pb/mv onto the coarse side-state pb_ts/mv_ts,
     !! mirroring the q_cons scatter in s_restrict_fine_to_coarse. The owner restricts the covered cells it holds (device, owned box)
-    !! and SENDS each other coarse-owner its covered pb/mv slice (device-packed averages, pb block then mv block); that owner
-    !! overwrites its local coarse. Called on ALL ranks at np>=2 (owner/non-owner split inside) so the P2P send/recv pair up; np=1
-    !! is handled locally by the direct s_restrict_pbmv call (this routine is reached only when num_procs > 1).
+    !! and SENDS each other coarse-owner its covered pb/mv slice (host averages, pb block then mv block); that owner overwrites its
+    !! local coarse. Called on ALL ranks at np>=2 (owner/non-owner split inside) so the P2P send/recv pair up; np=1 is handled
+    !! locally by the direct s_restrict_pbmv call (this routine is reached only when num_procs > 1).
     impure subroutine s_amr_scatter_pbmv(pb_fin, mv_fin)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
@@ -2731,6 +2503,7 @@ contains
             ! overwrite the covered cells this rank owns (device, owned box), then send each other coarse-owner its covered slice
             call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+            $:GPU_UPDATE(host='[amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf]')
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_pbmv_box_device(pb_ts(1)%sf, &
                 & mv_ts(1)%sf, pb_fin, mv_fin, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
             nsrc = 0
@@ -2750,9 +2523,33 @@ contains
                     if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     nsrc = nsrc + 1; drank(nsrc) = r
                     boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    ! pack this destination's covered pb/mv slice on the DEVICE (restrict averages straight into the wire
-                    ! buffer, same child-sum as the device overwrite above) - no full-field fine host pull
-                    call s_amr_restrict_pbmv_pack_device(pb_fin, mv_fin, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, sbuf(1:boxsz,nsrc))
+                    idx = 0
+                    do ib_ = 1, nb
+                        do q = 1, nnode
+                            do ck = bl(3), bh(3)
+                                do cj = bl(2), bh(2)
+                                    do ci = bl(1), bh(1)
+                                        idx = idx + 1
+                                        sbuf(idx, nsrc) = f_amr_restrict_cell_pbmv(.true., ci, cj, ck, q, ib_, rlo, rr, dj_hi, &
+                                             & dk_hi, nchild)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                    do ib_ = 1, nb
+                        do q = 1, nnode
+                            do ck = bl(3), bh(3)
+                                do cj = bl(2), bh(2)
+                                    do ci = bl(1), bh(1)
+                                        idx = idx + 1
+                                        sbuf(idx, nsrc) = f_amr_restrict_cell_pbmv(.false., ci, cj, ck, q, ib_, rlo, rr, dj_hi, &
+                                             & dk_hi, nchild)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
 #ifdef MFC_MPI
                     call MPI_ISEND(sbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
