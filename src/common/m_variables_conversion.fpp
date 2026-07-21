@@ -18,7 +18,7 @@ module m_variables_conversion
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
 
-    use m_thermodynamics, only: s_compute_pressure, s_compute_internal_energy
+    use m_thermodynamics, only: s_compute_pressure, s_compute_internal_energy, f_compute_temperature
 #ifndef MFC_PRE_PROCESS
     use m_thermodynamics, only: s_compute_speed_of_sound
 #endif
@@ -1032,7 +1032,7 @@ contains
                         ! Computing the energy from the internal energy of the mixture
                         call get_mixture_molecular_weight(Y_k, mix_mol_weight)
                         R_gas = gas_constant/mix_mol_weight
-                        T_K = pres_K/rho_K/R_gas
+                        T_K = f_compute_temperature(pres_K, rho_K, R_gas)
                         call get_mixture_energy_mass(T_K, Y_K, E_K)
                         E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
                     else

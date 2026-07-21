@@ -11,7 +11,7 @@ module m_derived_variables
     use m_mpi_proxy
     use m_helper_basic
     use m_variables_conversion
-    use m_thermodynamics, only: f_bulk_modulus
+    use m_thermodynamics, only: f_bulk_modulus, f_validate_state
     use m_constants, only: model_eqns_gamma_law
 
     implicit none
@@ -103,8 +103,8 @@ contains
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
                     if (alt_soundspeed .neqv. .true.) then
-                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_inf_sf(i, j, &
-                             & k))/(gamma_sf(i, j, k)*rho_sf(i, j, k)))
+                        q_sf(i, j, k) = f_bulk_modulus(gamma_sf(i, j, k), q_prim_vf(eqn_idx%E)%sf(i, j, k), pi_inf_sf(i, j, &
+                             & k))/rho_sf(i, j, k)
                     else
                         blkmod1 = f_bulk_modulus(gammas(1), q_prim_vf(eqn_idx%E)%sf(i, j, k), pi_infs(1))
                         blkmod2 = f_bulk_modulus(gammas(2), q_prim_vf(eqn_idx%E)%sf(i, j, k), pi_infs(2))
@@ -112,7 +112,7 @@ contains
                              & k)/blkmod1 + (1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k))/blkmod2)))
                     end if
 
-                    if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
+                    if (mixture_err .and. .not. f_validate_state(q_sf(i, j, k))) then
                         q_sf(i, j, k) = 1.e-16_wp
                     else
                         q_sf(i, j, k) = sqrt(q_sf(i, j, k))

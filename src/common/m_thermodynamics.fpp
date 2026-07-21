@@ -5,10 +5,11 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief Central equation-of-state interface. Every genuine thermodynamic query (pressure here; energy, temperature, sound speed,
-!! and derivatives in later PRs) is answered through one module so no solver path carries its own EOS algebra. Compile-time
-!! chemistry selects the adapter: the stiffened-gas analytic branch or the Pyrometheus temperature-then-query branch. This is a leaf
-!! module (it uses global parameters and the thermochemistry surface, never m_variables_conversion) so no cycle forms.
+!> @brief Central equation-of-state interface. Every genuine thermodynamic query (pressure, internal energy, temperature, sound
+!! speed, and the rho c^2 derivative) is answered through one module so no solver path carries its own EOS algebra. Compile-time
+!! chemistry selects the adapter: the stiffened_gas adapter (analytic mixture EOS) or the pyrometheus adapter
+!! (temperature-then-query against the thermochemistry surface). This is a leaf module (it uses global parameters and the
+!! thermochemistry surface, never m_variables_conversion) so no cycle forms.
 module m_thermodynamics
 
     use m_derived_types
@@ -22,6 +23,8 @@ module m_thermodynamics
     private
     public :: s_compute_pressure
     public :: s_compute_internal_energy
+    public :: f_compute_temperature
+    public :: f_validate_state
 #ifndef MFC_PRE_PROCESS
     public :: s_compute_speed_of_sound
     public :: f_bulk_modulus
@@ -136,6 +139,35 @@ contains
 
     end subroutine s_compute_internal_energy
 
+    !> Mixture temperature from pressure via the ideal-gas relation T = p/(rho R_gas), where R_gas is the specific gas constant of
+    !! the local composition. The one temperature query shared by the conversion routines, so the chemistry cons->prim path no
+    !! longer carries its own copy. Arithmetic is relocated unchanged from the conversion module.
+    pure function f_compute_temperature(pres, rho, R_gas) result(T)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: pres, rho, R_gas
+        real(wp)             :: T
+
+        T = pres/rho/R_gas
+
+    end function f_compute_temperature
+
+    !> Thermodynamic-state admissibility: a state is physical only when its squared sound speed is non-negative, i.e. the wave speed
+    !! is real. The mixture_err sound-speed guards in the interface and in post-processing both consult this one predicate instead
+    !! of testing the sign inline, so the validity criterion lives in one place. Pure and device-safe: it returns a flag and never
+    !! aborts, because GPU device code cannot. Later adapters (Mie-Gruneisen, JWL) tighten the admissible domain here.
+    pure function f_validate_state(sound_speed_sq) result(is_admissible)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: sound_speed_sq
+        logical              :: is_admissible
+
+        is_admissible = (sound_speed_sq >= 0._wp)
+
+    end function f_validate_state
+
 #ifndef MFC_PRE_PROCESS
     !> Stiffened-gas bulk modulus, the thermodynamic derivative $\rho c^2 = ((\gamma+1)p+\pi_\infty)/\gamma$. Shared by the
     !! alt_soundspeed Wood mixture sound speed here, the five-equation K-div-u source in m_rhs, and the post-process derived sound
@@ -204,7 +236,7 @@ contains
                 c = (H - 5.e-1*vel_sum - qv/rho)/gamma
             end if
 
-            if (mixture_err .and. c < 0._wp) then
+            if (mixture_err .and. .not. f_validate_state(c)) then
                 c = 100._wp*sgm_eps
             else
                 c = sqrt(c)
