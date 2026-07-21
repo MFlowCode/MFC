@@ -1164,10 +1164,13 @@ contains
         logical, intent(out)    :: old_owns(:)
         integer                 :: old_chi(3, amr_max_blocks), old_owner(amr_max_blocks)
         integer                 :: k, i
+        integer                 :: np_l  !< local mirror of old_np: an INTENT(OUT) dummy is not allowed in the
+        !                                   BLOCK specification expressions below (F2018 restricted expressions)
 
         ! 5) stash every live slot's fine interior (dead-between-steps q_cons_stor bounce), keeping its old intersection origin
 
         old_np = amr_num_blocks
+        np_l = old_np
         do k = 1, old_np
             ! GLOBAL block origin + extents (replicated, valid on every rank - not the owner-only isect), so the
             ! cross-rank
@@ -1260,8 +1263,8 @@ contains
         if (num_procs > 1) then
             block
                 integer               :: kk, k2, ii, gi, gj, gk, idx2, ierr2, rr, maxcnt, nrq
-                integer               :: cnt(old_np)
-                logical               :: getk(old_np), isdest(0:num_procs - 1)
+                integer               :: cnt(np_l)
+                logical               :: getk(np_l), isdest(0:num_procs - 1)
                 real(wp), allocatable :: spack(:,:), rpack(:,:)
                 integer, allocatable  :: rq(:)
                 maxcnt = 0
