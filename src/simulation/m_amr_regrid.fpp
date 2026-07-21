@@ -46,7 +46,9 @@ contains
     !! WITHOUT the exact transverse match f_amr_seam requires - reachable only through the IB body-bbox box expansion (clustering
     !! merges any too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair up; (b) an exact seam pair
     !! at level >= 2 under amr_subcycle, whose per-block child advance has no L2 halo (reachable via a restart mode-switch from a
-    !! lockstep-produced layout; the subcycle regrid keeps one child per box).
+    !! lockstep-produced layout; the subcycle regrid keeps one child per box); (c) same-level box INTERSECTION - reachable only
+    !! through the CHILD IB body-bbox expansion, which unlike the L1 path has no overlap-merge pass - which double-restricts and
+    !! double-refluxes the shared cells.
     impure subroutine s_amr_check_seam_topology()
 
         integer :: xb, yb, d, t
@@ -56,6 +58,15 @@ contains
             do yb = 1, amr_num_blocks
                 if (xb == yb) cycle
                 if (amr_block_level(xb) /= amr_block_level(yb)) cycle
+                ! same-level INTERSECTION (different levels legitimately nest; tiling emits disjoint tiles and the L1 IB
+                ! pass merges overlapping boxes, but the CHILD IB body-bbox expansion has no overlap-merge pass)
+                if (f_amr_boxes_overlap(amr_region_lo_all(:,xb), amr_region_hi_all(:,xb), amr_region_lo_all(:,yb), &
+                    & amr_region_hi_all(:,yb))) then
+                    call s_mpi_abort("AMR: two same-level blocks INTERSECT (the child IB body-bbox expansion route can " &
+                                     & // "produce this - it has no overlap-merge pass): the overlapping cells would be " &
+                                     & // "restricted and refluxed twice, silently breaking conservation. Adjust the body/" &
+                                     & // "regrid inputs so body-expanded child boxes merge or separate.")
+                end if
                 if (amr_subcycle .and. amr_block_level(xb) >= 2 .and. f_amr_seam_dim(xb, yb) > 0) then
                     call s_mpi_abort("AMR: adjacent level-2+ blocks under amr_subcycle (e.g. a lockstep-written restart " &
                                      & // "resumed with amr_subcycle = T): the per-block child advance has no L2 seam halo, so the " // "shared-face flux would silently leak. Resume with amr_subcycle = F (lockstep).")
@@ -1225,6 +1236,9 @@ contains
             ! levels.
             amr_block_level(k) = box_level(k)
         end do
+        ! block set changed: dirty the cached seam-pair AND overlap-rank lists NOW - the rebuild's per-block P2P gathers
+        ! (s_amr_regrid_rebuild_slots) consume the overlap lists with the NEW boxes, so flagging after them would be too late
+        amr_seam_pairs_dirty = .true.
         ! Proper-nesting guard: each level>=2 block must be covered by EXACTLY ONE parent-level block.
         ! f_amr_parent_block (and
         ! the gather/reflux that key off it) take the FIRST overlap, so a fine tile straddling two parent tiles - an
@@ -1444,7 +1458,6 @@ contains
         ! image points recomputed from the body definitions; no state carries across regrids)
         if (ib) call s_amr_setup_ib()
         call s_amr_select_slot(1)
-        amr_seam_pairs_dirty = .true.  ! block set changed: the cached seam-pair list must be rebuilt
         call s_amr_check_seam_topology()  ! abort on seam topologies no halo reconciles (silent leak otherwise)
 
     end subroutine s_amr_regrid_rebuild_slots
