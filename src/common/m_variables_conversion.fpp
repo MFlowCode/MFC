@@ -846,7 +846,8 @@ contains
                         pres_mag = 0._wp
                     end if
 
-                    call s_compute_internal_energy(q_prim_vf(eqn_idx%E)%sf(j, k, l), q_prim_vf(eqn_idx%alf)%sf(j, k, l), &
+                    ! eqn_idx%alf = 0 for non-bubble configs; clamp the index (value read only in the bubble branch)
+                    call s_compute_internal_energy(q_prim_vf(eqn_idx%E)%sf(j, k, l), q_prim_vf(max(1, eqn_idx%alf))%sf(j, k, l), &
                                                    & dyn_pres, pi_inf, gamma, rho, qv, Ys, q_cons_vf(eqn_idx%E)%sf(j, k, l), &
                                                    & pres_mag=pres_mag)
 
