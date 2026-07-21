@@ -2472,24 +2472,24 @@ contains
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_t, mv_t
-        integer               :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
-        integer               :: s, ns, l1, u1, l2, u2, l3, u3
-        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3
-        logical               :: d2, d3
+        integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, fm, fn, fp, b1, e1, b2, e2, b3, e3, ox, oy, oz
+        logical :: d2, d3
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         d2 = n_glb > 0; d3 = p_glb > 0
         rr = amr_slots(amr_cur)%ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
-        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        do s = 1, ns
-            l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-            $:GPU_PARALLEL_LOOP(collapse=5, private='[ci, cj, ck]')
-            do ib_ = 1, nb
-                do q = 1, nnode
-                    do fk = l3, u3
-                        do fj = l2, u2
-                            do fi = l1, u1
+        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
+        b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
+        b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
+        b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=5, private='[ci, cj, ck]')
+        do ib_ = 1, nb
+            do q = 1, nnode
+                do fk = b3, e3
+                    do fj = b2, e2
+                        do fi = b1, e1
+                            if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
                                 ck = 0
                                 if (d3) ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
                                 cj = 0
@@ -2497,13 +2497,13 @@ contains
                                 ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
                                 pb_t(fi, fj, fk, q, ib_) = pb_c(ci, cj, ck, q, ib_)
                                 mv_t(fi, fj, fk, q, ib_) = mv_c(ci, cj, ck, q, ib_)
-                            end do
+                            end if
                         end do
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_fill_fine_ghosts_pbmv
 
@@ -3115,36 +3115,6 @@ contains
 
     end subroutine s_amr_sync_grid_state_to_device
 
-    !> Decompose the current fine block's ghost shell (buffered extent minus interior) into ns disjoint face slabs whose union is
-    !! exactly the non-interior cells, so the ghost-fill kernels do O(surface) work instead of masking the full buffered volume. x
-    !! slabs span the full transverse extent; y slabs restrict x to the interior; z slabs restrict x and y. Degenerate dims
-    !! (n_glb/p_glb == 0) contribute no slabs.
-    pure subroutine s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-
-        integer, intent(out)               :: ns
-        integer, dimension(6), intent(out) :: sb1, se1, sb2, se2, sb3, se3
-        integer                            :: fm, fn, fp, b1, e1, b2, e2, b3, e3
-
-        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
-        b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
-        b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
-        b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
-        ns = 2
-        sb1(1) = b1; se1(1) = -1; sb1(2) = fm + 1; se1(2) = e1
-        sb2(1:2) = b2; se2(1:2) = e2; sb3(1:2) = b3; se3(1:2) = e3
-        if (n_glb > 0) then
-            ns = 4
-            sb2(3) = b2; se2(3) = -1; sb2(4) = fn + 1; se2(4) = e2
-            sb1(3:4) = 0; se1(3:4) = fm; sb3(3:4) = b3; se3(3:4) = e3
-        end if
-        if (p_glb > 0) then
-            ns = 6
-            sb3(5) = b3; se3(5) = -1; sb3(6) = fp + 1; se3(6) = e3
-            sb1(5:6) = 0; se1(5:6) = fm; sb2(5:6) = 0; se2(5:6) = fn
-        end if
-
-    end subroutine s_amr_build_ghost_slabs
-
     !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse - the gathered block-local coarse patch
     !! amr_cg (fine-level distribution; the caller gathers the source first). Device kernel: reads the patch and writes the fine
     !! target in device memory. floor/modulo mapping is valid for negative fine indices (ghosts). Interior untouched. Multi-fluid
@@ -3154,10 +3124,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_coarse
         type(scalar_field), dimension(sys_size), intent(inout) :: q_fine
         integer                                                :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
-        integer                                                :: rr, lo1, lo2, lo3
+        integer                                                :: rr, lo1, lo2, lo3, fm, fn, fp, b1, e1, b2, e2, b3, e3
         integer                                                :: advb, adve, bbeg, bend, bstride
-        integer                                                :: s, ns, l1, u1, l2, u2, l3, u3
-        integer, dimension(6)                                  :: sb1, se1, sb2, se2, sb3, se3
         logical                                                :: d2, d3, multi, shx, shy, shz, bubEE
         real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
 
@@ -3168,71 +3136,72 @@ contains
         d2 = n_glb > 0; d3 = p_glb > 0
         rr = amr_slots(amr_cur)%ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
+        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
+        b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
+        b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
+        b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
         multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
         bubEE = bubbles_euler; bbeg = eqn_idx%bub%beg; bend = eqn_idx%bub%end
         bstride = 1; if (bubEE) bstride = (bend - bbeg + 1)/nb
-        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        do s = 1, ns
-            l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-            $:GPU_PARALLEL_LOOP(collapse=4, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
-            do i = 1, sys_size
-                do fk = l3, u3
-                    do fj = l2, u2
-                        do fi = l1, u1
-                            ! the slabs cover exactly the ghost shell; multi-fluid, skip the volume fractions (closure kernel below)
-                            if (.not. (multi .and. i >= advb .and. i <= adve)) then
-                                ck = 0; xiz = 0._wp
-                                if (d3) then
-                                    ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                                    xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                                end if
-                                cj = 0; xiy = 0._wp
-                                if (d2) then
-                                    cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                                    xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                                end if
-                                ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                                xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                                sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, &
-                                            & ck), wp))
-                                sy = 0._wp
-                                if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
-                                    & cj - 1, ck), wp))
-                                sz = 0._wp
-                                if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
-                                    & cj, ck - 1), wp))
-                                ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the
-                                ! coarse cell's realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component
-                                ! minmod slopes would break that joint constraint). Non-QBMM Euler-Euler bubbles instead
-                                ! floor their positive moments (nR / npb / nmv); the signed velocity moment nV (offset 1)
-                                ! is skipped.
-                                if (qbmm .and. i >= bbeg .and. i <= bend) then
-                                    sx = 0._wp; sy = 0._wp; sz = 0._wp
-                                end if
-                                q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
-                                if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
-                                    if (mod(i - bbeg, bstride) /= 1) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, &
-                                        & fk), wp), bub_pos_frac*u0)
-                                end if
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
+        do i = 1, sys_size
+            do fk = b3, e3
+                do fj = b2, e2
+                    do fi = b1, e1
+                        ! skip the interior (only the ghost shell is filled) and, multi-fluid, the volume
+                        ! fractions (closure kernel below)
+                        if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp) &
+                            & .and. .not. (multi .and. i >= advb .and. i <= adve)) then
+                            ck = 0; xiz = 0._wp
+                            if (d3) then
+                                ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                                xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                             end if
-                        end do
+                            cj = 0; xiy = 0._wp
+                            if (d2) then
+                                cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                                xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                            end if
+                            ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                            xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                            u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                            sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
+                                        & wp))
+                            sy = 0._wp
+                            if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
+                                & cj - 1, ck), wp))
+                            sz = 0._wp
+                            if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
+                                & ck - 1), wp))
+                            ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the
+                            ! coarse cell's realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component
+                            ! minmod slopes would break that joint constraint). Non-QBMM Euler-Euler bubbles instead
+                            ! floor their positive moments (nR / npb / nmv); the signed velocity moment nV (offset 1)
+                            ! is skipped.
+                            if (qbmm .and. i >= bbeg .and. i <= bend) then
+                                sx = 0._wp; sy = 0._wp; sz = 0._wp
+                            end if
+                            q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
+                            if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
+                                if (mod(i - bbeg, bstride) /= 1) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, fk), &
+                                    & wp), bub_pos_frac*u0)
+                            end if
+                        end if
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (shared
         ! limiter switch over all fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
         if (multi) then
-            do s = 1, ns
-                l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
-                do fk = l3, u3
-                    do fj = l2, u2
-                        do fi = l1, u1
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
+            do fk = b3, e3
+                do fj = b2, e2
+                    do fi = b1, e1
+                        if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
                             ck = 0; xiz = 0._wp
                             if (d3) then
                                 ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
@@ -3278,11 +3247,11 @@ contains
                                 asum = asum + av
                             end do
                             q_fine(adve)%sf(fi, fj, fk) = 1._wp - asum
-                        end do
+                        end if
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_amr_fill_fine_ghosts
@@ -3294,25 +3263,26 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_a, q_b
         type(scalar_field), dimension(sys_size), intent(inout) :: q_tgt
         real(wp), intent(in)                                   :: th
-        integer                                                :: i, fi, fj, fk, s, ns, l1, u1, l2, u2, l3, u3
-        integer, dimension(6)                                  :: sb1, se1, sb2, se2, sb3, se3
+        integer                                                :: i, fi, fj, fk, fm, fn, fp, b1, e1, b2, e2, b3, e3
 
-        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        do s = 1, ns
-            l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do fk = l3, u3
-                    do fj = l2, u2
-                        do fi = l1, u1
+        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
+        b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
+        b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
+        b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do fk = b3, e3
+                do fj = b2, e2
+                    do fi = b1, e1
+                        if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
                             q_tgt(i)%sf(fi, fj, fk) = (1._wp - th)*real(q_a(i)%sf(fi, fj, fk), wp) + th*real(q_b(i)%sf(fi, fj, &
                                   & fk), wp)
-                        end do
+                        end if
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_lerp_fine_ghosts
 
@@ -3325,30 +3295,31 @@ contains
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_t, mv_t
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pga, mga, pgb, mgb
-        real(wp), intent(in)  :: th
-        integer               :: fi, fj, fk, q, ib_, s, ns, l1, u1, l2, u2, l3, u3
-        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3
+        real(wp), intent(in) :: th
+        integer              :: fi, fj, fk, q, ib_, fm, fn, fp, b1, e1, b2, e2, b3, e3
 
-        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        do s = 1, ns
-            l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do ib_ = 1, nb
-                do q = 1, nnode
-                    do fk = l3, u3
-                        do fj = l2, u2
-                            do fi = l1, u1
+        fm = amr_slots(amr_cur)%m; fn = amr_slots(amr_cur)%n; fp = amr_slots(amr_cur)%p
+        b1 = amr_slots(amr_cur)%idwbuff(1)%beg; e1 = amr_slots(amr_cur)%idwbuff(1)%end
+        b2 = amr_slots(amr_cur)%idwbuff(2)%beg; e2 = amr_slots(amr_cur)%idwbuff(2)%end
+        b3 = amr_slots(amr_cur)%idwbuff(3)%beg; e3 = amr_slots(amr_cur)%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=5)
+        do ib_ = 1, nb
+            do q = 1, nnode
+                do fk = b3, e3
+                    do fj = b2, e2
+                        do fi = b1, e1
+                            if (.not. (fi >= 0 .and. fi <= fm .and. fj >= 0 .and. fj <= fn .and. fk >= 0 .and. fk <= fp)) then
                                 pb_t(fi, fj, fk, q, ib_) = (1._wp - th)*real(pga(fi, fj, fk, q, ib_), wp) + th*real(pgb(fi, fj, &
                                      & fk, q, ib_), wp)
                                 mv_t(fi, fj, fk, q, ib_) = (1._wp - th)*real(mga(fi, fj, fk, q, ib_), wp) + th*real(mgb(fi, fj, &
                                      & fk, q, ib_), wp)
-                            end do
+                            end if
                         end do
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_lerp_fine_ghosts_pbmv
 
