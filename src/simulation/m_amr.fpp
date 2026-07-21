@@ -104,6 +104,13 @@ module m_amr
     integer, allocatable :: amr_seam_pairs(:,:)
     integer              :: amr_num_seam_pairs, amr_seam_pairs_nblk
     logical              :: amr_seam_pairs_dirty
+    !! cached per-block P2P overlap-rank lists (rebuilt with the seam list - same dirty flag): amr_ovl_gather(:,k) = ranks
+    !! whose owned coarse range (s_amr_rank_coarse_range) intersects block k's amr_cpat_mar-padded patch box (the gather
+    !! contributor set); amr_ovl_scatter(:,k) = ranks whose coarse interior (s_amr_rank_interior) intersects block k's region
+    !! box (the restrict-scatter destination set). Rank-ASCENDING and NOT owner-excluded (the consumers keep their owner
+    !! skip), so iterating a list reproduces the replaced per-call 0..num_procs-1 scan's MPI send/recv order exactly.
+    integer, allocatable :: amr_ovl_gather(:,:), amr_ovl_scatter(:,:)  !< (num_procs, amr_max_blocks)
+    integer, allocatable :: amr_ovl_gather_n(:), amr_ovl_scatter_n(:)  !< per-block list lengths
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min over ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
@@ -202,6 +209,8 @@ contains
         allocate (amr_owns_all(amr_max_blocks))
         allocate (amr_block_owner(amr_max_blocks))
         allocate (amr_block_level(amr_max_blocks))
+        allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
+        allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
         amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
         amr_block_owner = 0
         amr_block_level = 1  ! single fine level today; the regrid tags each block's level once multi-level nesting lands
@@ -625,6 +634,9 @@ contains
         ! unpacks all run on the DEVICE over only the overlap boxes, so just the contiguous wire buffers cross PCIe (MPI stays on
         ! host buffers). Init/regrid (.not. pull_host): host is truth, so the host pack/unpack paths below read it directly.
 
+        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
+        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
+
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
@@ -635,22 +647,20 @@ contains
             else
                 call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
             end if
-            ! count + post recvs from every OTHER rank whose owned range overlaps the patch
+            ! count + post recvs from every OTHER rank whose owned range overlaps the patch (cached list; every listed rank
+            ! overlaps by construction)
             nsrc = 0
-            do r = 0, num_procs - 1
-                if (r == owner) cycle
-                call s_amr_rank_coarse_range(r, crlo, crhi)
-                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
+            do idx = 1, amr_ovl_gather_n(amr_cur)
+                if (amr_ovl_gather(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
             if (nsrc > 0) then
                 allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc))
                 nsrc = 0
-                do r = 0, num_procs - 1
+                do idx = 1, amr_ovl_gather_n(amr_cur)
+                    r = amr_ovl_gather(idx, amr_cur)
                     if (r == owner) cycle
                     call s_amr_rank_coarse_range(r, crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     nsrc = nsrc + 1; srank(nsrc) = r
 #ifdef MFC_MPI
@@ -796,6 +806,9 @@ contains
         ! unpacks all run on the DEVICE over only the overlap boxes (mirror of s_amr_gather_coarse_patch). Init/regrid
         ! (.not. pull_host): host is truth, so the host pack/unpack paths below read it directly.
 
+        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
+        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
+
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
@@ -819,22 +832,20 @@ contains
                     end do
                 end do
             end if
-            ! count + post recvs from every OTHER rank whose owned range overlaps the patch
+            ! count + post recvs from every OTHER rank whose owned range overlaps the patch (cached list; every listed rank
+            ! overlaps by construction)
             nsrc = 0
-            do r = 0, num_procs - 1
-                if (r == owner) cycle
-                call s_amr_rank_coarse_range(r, crlo, crhi)
-                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
+            do idx = 1, amr_ovl_gather_n(amr_cur)
+                if (amr_ovl_gather(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
             if (nsrc > 0) then
                 allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc))
                 nsrc = 0
-                do r = 0, num_procs - 1
+                do idx = 1, amr_ovl_gather_n(amr_cur)
+                    r = amr_ovl_gather(idx, amr_cur)
                     if (r == owner) cycle
                     call s_amr_rank_coarse_range(r, crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     nsrc = nsrc + 1; srank(nsrc) = r
 #ifdef MFC_MPI
@@ -1976,6 +1987,9 @@ contains
             $:GPU_UPDATE(device='[amr_rvw]')
         end if
 
+        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
+        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
+
         if (proc_rank == owner) then
             ! overwrite the covered cells this rank owns, then send each other coarse-owner its covered slice
             call s_amr_rank_interior(proc_rank, ilo, ihi)
@@ -1997,21 +2011,19 @@ contains
             ! device push, which clobbered the device-advanced non-covered coarse cells - the same GPU-only bug fixed at np=1)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device(coarse_tgt, &
                 & amr_slots(amr_cur)%q_cons, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+            ! cached destination list (every listed rank's interior overlaps the region by construction)
             nsrc = 0
-            do r = 0, num_procs - 1
-                if (r == owner) cycle
-                call s_amr_rank_interior(r, ilo, ihi)
-                call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
-                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
+            do idx = 1, amr_ovl_scatter_n(amr_cur)
+                if (amr_ovl_scatter(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
             if (nsrc > 0) then
                 allocate (sbuf(maxsz, nsrc), reqs(nsrc), drank(nsrc))
                 nsrc = 0
-                do r = 0, num_procs - 1
+                do idx = 1, amr_ovl_scatter_n(amr_cur)
+                    r = amr_ovl_scatter(idx, amr_cur)
                     if (r == owner) cycle
                     call s_amr_rank_interior(r, ilo, ihi)
                     call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
-                    if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     nsrc = nsrc + 1; drank(nsrc) = r
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     ! pack this destination's covered slice on the DEVICE: restrict averages straight into the wire buffer (same
@@ -2727,27 +2739,28 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = cellsz*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
 
+        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
+        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
+
         if (proc_rank == owner) then
             ! overwrite the covered cells this rank owns (device, owned box), then send each other coarse-owner its covered slice
             call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_pbmv_box_device(pb_ts(1)%sf, &
                 & mv_ts(1)%sf, pb_fin, mv_fin, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+            ! cached destination list (every listed rank's interior overlaps the region by construction)
             nsrc = 0
-            do r = 0, num_procs - 1
-                if (r == owner) cycle
-                call s_amr_rank_interior(r, ilo, ihi)
-                call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
-                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) nsrc = nsrc + 1
+            do idx = 1, amr_ovl_scatter_n(amr_cur)
+                if (amr_ovl_scatter(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
             if (nsrc > 0) then
                 allocate (sbuf(maxsz, nsrc), reqs(nsrc), drank(nsrc))
                 nsrc = 0
-                do r = 0, num_procs - 1
+                do idx = 1, amr_ovl_scatter_n(amr_cur)
+                    r = amr_ovl_scatter(idx, amr_cur)
                     if (r == owner) cycle
                     call s_amr_rank_interior(r, ilo, ihi)
                     call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
-                    if (.not. (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3))) cycle
                     nsrc = nsrc + 1; drank(nsrc) = r
                     boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     ! pack this destination's covered pb/mv slice on the DEVICE (restrict averages straight into the wire
@@ -3499,10 +3512,13 @@ contains
 
     !> Rebuild the cached same-level seam-pair list (amr_seam_pairs): one O(nblocks^2) scan per regrid/restart in place of the same
     !! scan every RK stage (6x per fine step). Same (xb, yb) nested-loop order on all ranks (replicated region metadata) so the
-    !! paired MPI_SENDRECVs in s_amr_fine_fine_halo stay matched. Count then fill for an exact-size list (no cap, no overflow).
+    !! paired MPI_SENDRECVs in s_amr_fine_fine_halo stay matched. Count then fill for an exact-size list (no cap, no overflow). Also
+    !! rebuilds the per-block gather/scatter overlap-rank lists (amr_ovl_gather/scatter): one O(nblocks*num_procs) scan of the
+    !! static amr_decomp table here in place of the same scan per block per RK stage in the P2P gather/scatter coupling.
     impure subroutine s_amr_build_seam_pairs()
 
-        integer :: xb, yb, d, np
+        integer :: xb, yb, d, np, k, r
+        integer :: plo(3), phi(3), rlo(3), rhi(3), clo(3), chi(3), bl(3), bh(3)
 
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         np = 0
@@ -3520,6 +3536,37 @@ contains
                 if (d > 0) then
                     np = np + 1
                     amr_seam_pairs(1, np) = xb; amr_seam_pairs(2, np) = yb; amr_seam_pairs(3, np) = d
+                end if
+            end do
+        end do
+        ! per-block P2P overlap-rank lists (gather: rank coarse range vs the amr_cpat_mar-padded patch box; scatter: rank
+        ! coarse interior vs the region box - the exact tests the consumers ran per call), rank-ascending so iterating a
+        ! list preserves the replaced 0..num_procs-1 scans' MPI send/recv order.
+        do k = 1, amr_num_blocks
+            plo = 0; phi = 0; rlo = 0; rhi = 0
+            plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, k) + amr_cpat_mar
+            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
+            if (n_glb > 0) then
+                plo(2) = amr_region_lo_all(2, k) - amr_cpat_mar; phi(2) = amr_region_hi_all(2, k) + amr_cpat_mar
+                rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k)
+            end if
+            if (p_glb > 0) then
+                plo(3) = amr_region_lo_all(3, k) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, k) + amr_cpat_mar
+                rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k)
+            end if
+            amr_ovl_gather_n(k) = 0; amr_ovl_scatter_n(k) = 0
+            do r = 0, num_procs - 1
+                call s_amr_rank_coarse_range(r, clo, chi)
+                call s_amr_box_isect(plo, phi, clo, chi, bl, bh)
+                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
+                    amr_ovl_gather_n(k) = amr_ovl_gather_n(k) + 1
+                    amr_ovl_gather(amr_ovl_gather_n(k), k) = r
+                end if
+                call s_amr_rank_interior(r, clo, chi)
+                call s_amr_box_isect(rlo, rhi, clo, chi, bl, bh)
+                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
+                    amr_ovl_scatter_n(k) = amr_ovl_scatter_n(k) + 1
+                    amr_ovl_scatter(amr_ovl_scatter_n(k), k) = r
                 end if
             end do
         end do
@@ -4300,6 +4347,7 @@ contains
         deallocate (amr_slot_live)
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
+        deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
         do i = 1, sys_size
             @:DEALLOCATE(amr_cg(i)%sf)
         end do
