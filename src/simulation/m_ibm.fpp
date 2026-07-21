@@ -214,15 +214,20 @@ contains
         ! Clear the ghost-point flag on the device before re-tagging this step's
         ! ghost points. This must run on the device (not a host array assignment)
         ! so the flag read during conservative-to-primitive conversion is correct.
-        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    ghost_points_index%sf(j, k, l) = 0
+        ! Static IBs keep the same ghost set every stage (and the device copy is
+        ! zero-initialized at allocation), so only moving IBs need the whole-domain
+        ! clear - skipping it avoids a full-grid pass per RK sub-stage.
+        if (moving_immersed_boundary_flag) then
+            $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        ghost_points_index%sf(j, k, l) = 0
+                    end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &

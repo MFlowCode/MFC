@@ -53,6 +53,9 @@ contains
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
+        @:PROHIBIT(chemistry .and. ib .and. (bubbles_euler .or. qbmm), &
+                   & "immersed boundaries with chemistry are not supported together with bubbles_euler/qbmm: the ghost-point image interpolation uses a bubble/QBMM call path that does not carry the chemistry state")
+
         @:PROHIBIT(bf_spatial_support .and. (n == 0 .or. p /= 0), &
                    & "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
 
