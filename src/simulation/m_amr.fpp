@@ -1927,49 +1927,11 @@ contains
 
     end subroutine s_amr_build_static_multilevel
 
-    !> Volume-weighted restriction for a single variable pair. Reads from qf (fine, must include interior 0:amr_slots(amr_cur)%m
-    !! etc.); writes to qc (coarse, over the block).
-    impure subroutine s_restrict_one_var(qf, qc)
-
-        type(scalar_field), intent(in)    :: qf
-        type(scalar_field), intent(inout) :: qc
-        integer                           :: ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, nchild, ox, oy, oz
-        real(wp)                          :: acc
-
-        ! host operator-check diagnostic only: coarse target qc is the block-local patch (amr_cg frame), so the covered global
-        ! coarse cell ci writes qc at the patch-local index ci - amr_cpat_off (the same frame s_prolong_one_var reads)
-
-        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-        nchild = amr_slots(amr_cur)%ref_ratio
-        if (n_glb > 0) nchild = nchild*amr_slots(amr_cur)%ref_ratio
-        if (p_glb > 0) nchild = nchild*amr_slots(amr_cur)%ref_ratio
-        do ck = amr_isect_lo(3), merge(amr_isect_hi(3), amr_isect_lo(3), p_glb > 0)
-            fk0 = (ck - amr_isect_lo(3))*amr_slots(amr_cur)%ref_ratio
-            do cj = amr_isect_lo(2), merge(amr_isect_hi(2), amr_isect_lo(2), n_glb > 0)
-                fj0 = (cj - amr_isect_lo(2))*amr_slots(amr_cur)%ref_ratio
-                do ci = amr_isect_lo(1), amr_isect_hi(1)
-                    fi0 = (ci - amr_isect_lo(1))*amr_slots(amr_cur)%ref_ratio
-                    acc = 0._wp
-                    do ddk = 0, merge(amr_slots(amr_cur)%ref_ratio - 1, 0, p_glb > 0)
-                        do ddj = 0, merge(amr_slots(amr_cur)%ref_ratio - 1, 0, n_glb > 0)
-                            do ddi = 0, amr_slots(amr_cur)%ref_ratio - 1
-                                acc = acc + real(qf%sf(fi0 + ddi, fj0 + ddj, fk0 + ddk), wp)
-                            end do
-                        end do
-                    end do
-                    qc%sf(ci - ox, cj - oy, ck - oz) = acc/real(nchild, wp)
-                end do
-            end do
-        end do
-
-    end subroutine s_restrict_one_var
-
     !> Volume-weighted restriction: each covered coarse cell = volume-weighted average of its ref_ratio^d fine children (equal
     !! weight on Cartesian grids where the children share a volume; radius-weighted by fine y_cc on cyl_coord, where cell volume ~
     !! radius - amr_rvw, single-sourced so the device and host paths agree bit-for-bit). Writes the caller's coarse target - in
     !! production the level-0 state q_cons_ts(1)%vf (the deliberate fold-back of fine data each step, plus coarse pb/mv for
-    !! non-polytropic QBMM); the init-time diagnostics pass a scratch buffer instead. Device kernel (per-cell arithmetic identical
-    !! to s_restrict_one_var, which remains the host path for the diagnostics).
+    !! non-polytropic QBMM); the init-time diagnostics pass a scratch buffer instead. Device kernel.
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -2184,7 +2146,9 @@ contains
     !! [bl:bh] GLOBAL and write coarse_tgt (DEVICE) directly - no host round-trip, only the covered cells touched (the old
     !! whole-coarse device push clobbered non-covered cells). Same child-sum order (ddk, ddj, then fi0 and fi0+1; /nchild; stp cast)
     !! as the old host restrict path, so it is bit-identical to it on CPU and matches the coarse restriction. q_fine (==
-    !! amr_slots(amr_cur)%q_cons) and coarse_tgt are device-resident (ACC_SETUP_SFs).
+    !! amr_slots(amr_cur)%q_cons) and coarse_tgt are device-resident (ACC_SETUP_SFs). TWIN: s_amr_restrict_pack_device runs this
+    !! same child-sum into a wire buffer - any change to the loop order, arithmetic, or casts here must be mirrored there,
+    !! byte-identically (owner-local and scattered coarse cells must match bit-for-bit).
     impure subroutine s_amr_restrict_overwrite_device(coarse_tgt, q_fine, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -2248,7 +2212,9 @@ contains
     !> Device pack of one destination's covered restrict slice (np>=2 scatter): restrict the fine block q_fine (DEVICE) over the
     !! covered coarse box [bl:bh] GLOBAL straight into the contiguous wire buffer buf (host, via copyout) - only the slice crosses
     !! PCIe, not the full fine field. Same child-sum order and wp values as s_amr_restrict_overwrite_device (no stp cast: the wire
-    !! carries wp and the receiver casts), packed with ci fastest, then cj, ck, i, matching the receiver's sequential unpack.
+    !! carries wp and the receiver casts), packed with ci fastest, then cj, ck, i, matching the receiver's sequential unpack. TWIN:
+    !! s_amr_restrict_overwrite_device runs this same child-sum in place - any change to the loop order, arithmetic, or casts here
+    !! must be mirrored there, byte-identically (owner-local and scattered coarse cells must match bit-for-bit).
     impure subroutine s_amr_restrict_pack_device(q_fine, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_fine
@@ -2593,7 +2559,7 @@ contains
     end subroutine s_amr_fine_rk_update_pbmv
 
     !> Non-polytropic QBMM: volume-weighted restriction of the block's pb/mv onto the coarse side-state under the block (device
-    !! kernel; mirror of s_restrict_one_var's child average).
+    !! kernel; same equal-weight child average as the q_cons restrict).
     impure subroutine s_restrict_pbmv(pb_c, mv_c, pb_fin, mv_fin)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_c, mv_c
@@ -2644,7 +2610,9 @@ contains
 
     !> Non-polytropic QBMM np>=2: DEVICE restriction of pb/mv over the covered box [bl:bh] GLOBAL into pb_c/mv_c (device), fine
     !! origin (ci-rlo)*rr, LOCAL coarse index cell - o. Only the covered cells the owner holds are touched (no whole-array push -
-    !! same GPU-only clobber the q_cons device overwrite avoids). Same child-sum as s_restrict_pbmv.
+    !! same GPU-only clobber the q_cons device overwrite avoids). Same child-sum as s_restrict_pbmv. TWIN:
+    !! s_amr_restrict_pbmv_pack_device runs this same child-sum into a wire buffer - any change to the loop order, arithmetic, or
+    !! casts here must be mirrored there, byte-identically (local and scattered coarse pb/mv must match bit-for-bit).
     impure subroutine s_amr_restrict_pbmv_box_device(pb_c, mv_c, pb_fin, mv_fin, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_c, mv_c
@@ -2687,6 +2655,8 @@ contains
     !> Non-polytropic QBMM np>=2 scatter pack: DEVICE restriction of pb/mv over the covered box [bl:bh] GLOBAL straight into the
     !! contiguous wire buffer buf (host, via copyout; pb block then mv block, ci fastest) - only the slice crosses PCIe, not the
     !! full fine side-state. Same child-sum as s_amr_restrict_pbmv_box_device; the wire carries wp and the receiver casts to stp.
+    !! TWIN: s_amr_restrict_pbmv_box_device runs this same child-sum in place - any change to the loop order, arithmetic, or casts
+    !! here must be mirrored there, byte-identically (local and scattered coarse pb/mv must match bit-for-bit).
     impure subroutine s_amr_restrict_pbmv_pack_device(pb_fin, mv_fin, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
