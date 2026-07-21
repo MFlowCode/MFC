@@ -343,9 +343,9 @@ CONSTRAINTS = {
     },
     # Bubbles
     "bubble_model": {
-        "choices": [1, 2, 3],
-        "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
-        "names": {"gilmore": 1, "keller_miksis": 2, "rayleigh_plesset": 3},
+        "choices": [0, 1, 2, 3],
+        "value_labels": {0: "Particle", 1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
+        "names": {"particle": 0, "gilmore": 1, "keller_miksis": 2, "rayleigh_plesset": 3},
     },
     # Output
     "format": {
@@ -790,6 +790,21 @@ def _load():
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
+    # Interfacial flow inputs
+    _r("normMag", REAL)
+    _r("p0_ic", REAL)
+    _r("g0_ic", REAL)
+    _r("normFac", REAL)
+    _r("interface_file", STR)
+
+    # Body force with spatial support (Wei & Freund, JFM 2005)
+    _r("bf_spatial_support", LOG)
+    for a in ["amp", "x_centroid", "y_centroid", "conv_vel", "sigma"]:
+        _r(f"spatial_bf%{a}", REAL)
+    for j in range(1, 9):
+        _r(f"spatial_bf%freq({j})", REAL)
+        _r(f"spatial_bf%phase({j})", REAL)
+
     # Synthetic turbulence forcing
     _r("synthetic_turbulence", LOG, {"synthetic_turbulence"})
     _r("synth_seed", INT, {"synthetic_turbulence"})
@@ -1070,20 +1085,22 @@ def _load():
     # lag_params (Lagrangian bubbles)
     # Members present in bubbles_lagrange_parameters: solver_approach, cluster_type,
     # pressure_corrector, smooth_type, heatTransfer_model, massTransfer_model,
-    # write_bubbles, write_bubbles_stats, nBubs_glb, epsilonb, charwidth, valmaxvoid.
-    # T0/Thost/c0/rho0/x0 were removed from the Fortran type by upstream #1085/#1093
-    # — they must NOT be registered (namelist read would crash).
-    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]:
+    # write_bubbles, write_bubbles_stats, write_void_evol, pressure_force,
+    # gravity_force, nBubs_glb, epsilonb, charwidth, valmaxvoid. T0/Thost/c0/rho0/x0
+    # were removed from the Fortran type by upstream #1085/#1093 — they must NOT be
+    # registered (namelist read would crash).
+    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol", "kahan_summation"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
+    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
+    _r("lag_params%input_path", STR, {"bubbles"})
 
     # chem_params
-    for a in ["diffusion", "reactions"]:
+    for a in ["diffusion", "reactions", "adap_substeps"]:
         _r(f"chem_params%{a}", LOG, {"chemistry"})
-    for a in ["gamma_method", "transport_model"]:
+    for a in ["gamma_method", "transport_model", "reaction_substeps", "reaction_substeps_max"]:
         _r(f"chem_params%{a}", INT, {"chemistry"})
 
     # Per-fluid output arrays
@@ -1174,6 +1191,7 @@ TYPED_DECLS: dict[str, tuple] = {
     "lag_params": ("type(bubbles_lagrange_parameters)", None, True, "Lagrange bubbles' parameters"),
     "particle_cloud": ("type(particle_cloud_parameters)", "num_particle_clouds_max", False, "Particle bed specifications"),
     "simplex_params": ("type(simplex_noise_params)", None, False, None),
+    "spatial_bf": ("type(spbf_parameters)", None, True, "Parameters for spatially supported body force (Wei & Freund, JFM 2005)"),
 }
 
 
@@ -1255,15 +1273,6 @@ _nv(
 )
 _nv(
     _PRE_SIM,
-    "x_domain",
-    "y_domain",
-    "z_domain",
-    "x_a",
-    "y_a",
-    "z_a",
-    "x_b",
-    "y_b",
-    "z_b",
     "palpha_eps",
     "ptgalpha_eps",
     "t_step_old",
@@ -1313,6 +1322,8 @@ _nv(
     "bf_x",
     "bf_y",
     "bf_z",
+    "bf_spatial_support",
+    "spatial_bf",
     "k_x",
     "k_y",
     "k_z",
@@ -1358,6 +1369,15 @@ _nv(
 )
 _nv(
     _PRE,
+    "x_domain",
+    "y_domain",
+    "z_domain",
+    "x_a",
+    "y_a",
+    "z_a",
+    "x_b",
+    "y_b",
+    "z_b",
     "stretch_x",
     "stretch_y",
     "stretch_z",

@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -56,10 +56,10 @@ jobs:
       changed_files: ${{ steps.changes.outputs.checkall_files }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with:
           filters: ".github/file-filter.yml"
@@ -150,7 +150,7 @@ jobs:
           df -h /
 
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # ── NVHPC: pull image and start a long-lived container ──────────────
       # Replaces the container: directive so we can free disk space first.
@@ -341,47 +341,47 @@ jobs:
           # Phoenix (GT) — build+test combined in SLURM job
           - runner:       'gt'
             cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
+            cluster_name: 'Georgia Tech | Phoenix (NVHPC)'
             device: 'gpu'
             interface: 'acc'
           - runner:       'gt'
             cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
+            cluster_name: 'Georgia Tech | Phoenix (NVHPC)'
             device: 'gpu'
             interface: 'omp'
           - runner:       'gt'
             cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
+            cluster_name: 'Georgia Tech | Phoenix (GNU)'
             device: 'cpu'
             interface: 'none'
           # Frontier (ORNL) — CCE
           - runner:       'frontier'
             cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
+            cluster_name: 'Oak Ridge | Frontier (CCE)'
             device: 'gpu'
             interface: 'acc'
             shard: '1/2'
           - runner:       'frontier'
             cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
+            cluster_name: 'Oak Ridge | Frontier (CCE)'
             device: 'gpu'
             interface: 'acc'
             shard: '2/2'
           - runner:       'frontier'
             cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
+            cluster_name: 'Oak Ridge | Frontier (CCE)'
             device: 'gpu'
             interface: 'omp'
             shard: '1/2'
           - runner:       'frontier'
             cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
+            cluster_name: 'Oak Ridge | Frontier (CCE)'
             device: 'gpu'
             interface: 'omp'
             shard: '2/2'
           - runner:       'frontier'
             cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
+            cluster_name: 'Oak Ridge | Frontier (CCE)'
             device: 'cpu'
             interface: 'none'
           # Frontier AMD — build on login node, GPU tests sharded for batch partition
@@ -416,7 +416,7 @@ jobs:
       NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # clean: false preserves .slurm_job_id files across reruns so
           # submit-slurm-job.sh can detect and cancel stale SLURM jobs on retry.
@@ -431,7 +431,24 @@ jobs:
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
+        if:   ${{ !(matrix.cluster == 'frontier_amd' && matrix.device == 'gpu') }}
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
+
+      - name: Build (concurrent variants)
+        if:   matrix.cluster == 'frontier_amd' && matrix.device == 'gpu'
+        # The suite needs a base and a chemistry simulation binary, and on amdflang
+        # each device LTO link is ~1 h -- building both serially overruns the 2 h
+        # walltime. They touch disjoint staging directories, so submit one SLURM job
+        # per variant and wait on both (mirrors the case-optimization pre-build).
+        run:  |
+          pids=""
+          for v in base chem; do
+            bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} "${{ matrix.shard }}" "$v" &
+            pids="$pids $!"
+          done
+          rc=0
+          for p in $pids; do wait "$p" || rc=1; done
+          exit $rc
 
       - name: Test
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
@@ -460,17 +477,19 @@ jobs:
       - name: Print Logs
         if:   always()
         run:  |
-          for f in ${{ steps.log.outputs.build_slug }}.out ${{ steps.log.outputs.test_slug }}.out; do
+          # The build slug matches the plain log and, where the build is split per
+          # variant, the build-...-base/-chem ones.
+          for f in ${{ steps.log.outputs.build_slug }}*.out ${{ steps.log.outputs.test_slug }}.out; do
             [ -f "$f" ] && echo "=== $f ===" && cat "$f"
           done
 
       - name: Archive Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if:   matrix.cluster != 'phoenix'
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.test_slug }}
           path: |
-            ${{ steps.log.outputs.build_slug }}.out
+            ${{ steps.log.outputs.build_slug }}*.out
             ${{ steps.log.outputs.test_slug }}.out
 
   case-optimization:
@@ -485,22 +504,22 @@ jobs:
         include:
           - runner:       'gt'
             cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
+            cluster_name: 'Georgia Tech | Phoenix (NVHPC)'
             device: 'gpu'
             interface: 'acc'
           - runner:       'gt'
             cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
+            cluster_name: 'Georgia Tech | Phoenix (NVHPC)'
             device: 'gpu'
             interface: 'omp'
           - runner:       'frontier'
             cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
+            cluster_name: 'Oak Ridge | Frontier (CCE)'
             device: 'gpu'
             interface: 'acc'
           - runner:       'frontier'
             cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
+            cluster_name: 'Oak Ridge | Frontier (CCE)'
             device: 'gpu'
             interface: 'omp'
           - runner:       'frontier'
@@ -513,7 +532,7 @@ jobs:
       labels: ${{ matrix.runner }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
 
@@ -530,21 +549,21 @@ jobs:
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'frontier_amd'
-        # AMD flang is slow enough that one serial pre-build job exceeds its
-        # walltime, so split the case list across two concurrent SLURM jobs.
-        # The shards share this workspace and skip their in-job staging clean,
-        # so clean once here on the login node before submitting.
+        # AMD flang case-opt builds are ~30 min/case, so one serial pre-build
+        # job exceeds its walltime. Split the case list across three concurrent
+        # SLURM jobs (heavy shard ~2 cases). The shards share this workspace and
+        # skip their in-job staging clean, so clean once here first.
         run:  |
-          find build/staging -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
-          find build/install -maxdepth 1 -regex '.*/[0-9a-f]+' -type d -exec rm -rf {} + 2>/dev/null || true
-          rm -f build/.prebuild-shared-targets-done
-          bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }} 1/2 &
-          pid1=$!
-          bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }} 2/2 &
-          pid2=$!
+          find build/staging -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
+          find build/install -maxdepth 1 -regex '.*/\(gpu-acc\|gpu-mp\|cpu\)-.*' -type d -exec rm -rf {} + 2>/dev/null || true
+          rm -f build/.prebuild-shared-targets-done build/.prebuild-shared-targets-failed
+          pids=""
+          for s in 1/3 2/3 3/3; do
+            bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh gpu ${{ matrix.interface }} ${{ matrix.cluster }} "$s" &
+            pids="$pids $!"
+          done
           rc=0
-          wait "$pid1" || rc=1
-          wait "$pid2" || rc=1
+          for p in $pids; do wait "$p" || rc=1; done
           exit $rc
 
       - name: Build & Run Case-Optimization Tests
@@ -552,8 +571,22 @@ jobs:
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Run Case-Optimization Tests
-        if:   matrix.cluster == 'phoenix' || matrix.cluster == 'frontier_amd'
+        if:   matrix.cluster == 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+
+      - name: Run Case-Optimization Tests
+        if:   matrix.cluster == 'frontier_amd'
+        # Mirror the pre-build sharding so each run job executes only the cases
+        # it has binaries for, concurrently within the batch walltime.
+        run:  |
+          pids=""
+          for s in 1/3 2/3 3/3; do
+            bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} "$s" &
+            pids="$pids $!"
+          done
+          rc=0
+          for p in $pids; do wait "$p" || rc=1; done
+          exit $rc
 
       - name: Cancel SLURM Jobs
         if: cancelled()
@@ -567,18 +600,15 @@ jobs:
       - name: Print Logs
         if:   always()
         run:  |
-          for f in prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out \
-                   prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}-1-of-2.out \
-                   prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}-2-of-2.out \
-                   run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out; do
+          for f in prebuild-case-optimization-*.out run-case-optimization-*.out; do
             [ -f "$f" ] && echo "=== $f ===" && cat "$f"
           done
 
       - name: Archive Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if:   always()
         with:
           name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
           path: |
-            prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}*.out
-            run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+            prebuild-case-optimization-*.out
+            run-case-optimization-*.out

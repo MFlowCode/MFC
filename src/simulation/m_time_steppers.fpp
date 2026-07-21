@@ -11,6 +11,7 @@ module m_time_steppers
     use m_derived_types
     use m_global_parameters
     use m_rhs
+    use m_chemistry
     use m_pressure_relaxation
     use m_data_output
     use m_bubbles_EE
@@ -39,13 +40,12 @@ module m_time_steppers
     real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_pb
     type(scalar_field)                            :: q_T_sf  !< Cell-average temperature variables at the current time-stage
     real(wp), allocatable, dimension(:,:,:,:,:)   :: rhs_mv
-    real(wp), allocatable, dimension(:,:,:)       :: max_dt
     integer, private                              :: num_ts  !< Number of time stages in the time-stepping scheme
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
 
-    $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, max_dt, rk_coef, stor, bc_type]')
+    $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 
     !> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
@@ -72,7 +72,6 @@ contains
 #endif
 #endif
         integer :: i, j  !< Generic loop iterators
-        ! Setting number of time-stages for selected time-stepping scheme
 
         if (time_stepper == time_stepper_rk1) then
             num_ts = 1
@@ -395,10 +394,6 @@ contains
             call s_open_run_time_information_file()
         end if
 
-        if (cfl_dt) then
-            @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
-        end if
-
         ! Allocating arrays to store the bc types
         @:ALLOCATE(bc_type(1:num_dims,1:2))
 
@@ -459,6 +454,9 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         real(wp)                :: start, finish
+        integer(kind=8)         :: stage_t0, stage_t1, clock_rate, clock_max
+        real(wp)                :: stage_time
+        integer, parameter      :: n_warmup = 2      !< time steps excluded before the timing floor (warmup/JIT/first-touch)
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
@@ -467,8 +465,9 @@ contains
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         do s = 1, nstage
+            call system_clock(stage_t0)
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
-                               & t_step, time_avg, s)
+                               & t_step, s)
 
             if (s == 1) then
                 if (run_time_info) then
@@ -492,7 +491,7 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -566,7 +565,34 @@ contains
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
                 end if
             end if
+
+            ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
+            ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
+            ! (not cpu_time, which counts MPI spin-wait) and the minimum (jitter only adds
+            ! time) make it reproducible; the min over stages drops the I/O-bearing s==1 stage.
+            call system_clock(stage_t1, clock_rate, clock_max)
+            ! Correct the delta for the rare case of the clock counter wrapping past clock_max.
+            if (stage_t1 >= stage_t0) then
+                stage_time = real(stage_t1 - stage_t0, wp)/real(clock_rate, wp)
+            else
+                stage_time = real(stage_t1 - stage_t0 + clock_max + 1_8, wp)/real(clock_rate, wp)
+            end if
+            if (t_step - t_step_start < n_warmup) then
+                time_avg = 0._wp
+            else if (time_avg <= 0._wp) then
+                time_avg = stage_time
+            else
+                time_avg = min(time_avg, stage_time)
+            end if
         end do
+
+        ! Operator-split reaction: integrate the stiff chemistry ODE per cell after the flow update,
+        ! with sub-stepping, instead of adding the reaction source to the flow RHS (chem_params%reaction_substeps > 0).
+        if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0) then
+            call nvtxStartRange("CHEM-REACTION-SUBSTEP")
+            call s_chemistry_reaction_substep(q_cons_ts(1)%vf, q_T_sf, dt, idwint)
+            call nvtxEndRange
+        end if
 
         if (ib) then
             if (moving_immersed_boundary_flag) then
@@ -598,23 +624,21 @@ contains
 
         integer, intent(in) :: stage
 
-        call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
+        call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwbuff)
 
         if (bubbles_euler) then
             call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, divu)
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
         else if (bubbles_lagrange) then
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf)
-            call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
-            call s_transfer_data_to_tmp()
-            call s_smear_voidfraction()
+            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
-                    call s_write_lag_particles(mytime)
+                    call s_write_lag_bubble_evol(mytime)
                 end if
-                call s_write_void_evol(mytime)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
             end if
         end if
 
@@ -640,6 +664,7 @@ contains
         real(wp)               :: c        !< Cell-avg. sound speed
         real(wp)               :: H        !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
+        real(wp)               :: max_dt
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
         integer                :: fl       !< Fluid loop iterator
@@ -648,7 +673,9 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl]')
+        dt_local = huge(1.0_wp)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt]', &
+                            & reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -674,14 +701,12 @@ contains
                     end if
 
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+
+                    dt_local = min(dt_local, max_dt)
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-
-        #:call GPU_PARALLEL(copyout='[dt_local]', copyin='[max_dt]')
-            dt_local = minval(max_dt)
-        #:endcall GPU_PARALLEL
 
         if (num_procs == 1) then
             dt = dt_local
@@ -703,7 +728,7 @@ contains
         integer                                                  :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")
-        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
+        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = eqn_idx%mom%beg, eqn_idx%E
@@ -1019,9 +1044,6 @@ contains
         @:DEALLOCATE(mv_ts(2)%sf)
         @:DEALLOCATE(rhs_mv)
         @:DEALLOCATE(mv_ts)
-        if (cfl_dt) then
-            @:DEALLOCATE(max_dt)
-        end if
         do i = 1, num_dims
             @:DEALLOCATE(bc_type(i,1)%sf)
             @:DEALLOCATE(bc_type(i,2)%sf)

@@ -19,10 +19,10 @@ jobs:
       checkall: ${{ steps.changes.outputs.checkall }}
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: changes
         with: 
           filters: ".github/file-filter.yml"
@@ -34,7 +34,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - name: Checkouts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Get system info for cache key
         id: sys-info
@@ -48,7 +48,7 @@ jobs:
           echo "sys-hash=$(cat /tmp/sys-hash)" >> "$GITHUB_OUTPUT"
 
       - name: Restore Build Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build
           key: mfc-coverage-${{ steps.sys-info.outputs.sys-hash }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
@@ -67,7 +67,7 @@ jobs:
         run: /bin/bash mfc.sh test -v -a -j $(nproc)
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           fail_ci_if_error: false
           verbose: true

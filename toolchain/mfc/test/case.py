@@ -485,7 +485,7 @@ def create_input_lagrange(path_test):
         os.mkdir(folder_path_lagrange)
 
     with open(file_path_lagrange, "w") as file:
-        file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0")
+        file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0\n")
 
 
 def copy_input_lagrange(path_example_input, path_test):

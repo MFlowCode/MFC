@@ -76,11 +76,11 @@ contains
         call nvtxStartRange("SETUP-IBM-MODULE")
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x%beg, ib_bc_y%beg]')
+        $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, dx, dy, ib_bc_x%beg, ib_bc_y%beg]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z%beg]')
+            $:GPU_UPDATE(device='[z_cc, dz, ib_bc_z%beg]')
         end if
-        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs), glb_bounds]')
 
         ! do all set up for moving immersed boundaries
         $:GPU_PARALLEL_LOOP(private='[i]')
@@ -320,12 +320,12 @@ contains
                 if (patch_ib(patch_id)%moving_ibm /= 0) then
                     ! get the vector that points from the centroid to the ghost
                     radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
-                                  & wp)*(x_domain%end - x_domain%beg))
+                                  & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
                     radial_vector(2) = physical_loc(2) - (patch_ib(patch_id)%y_centroid + real(ghost_points(i)%y_periodicity, &
-                                  & wp)*(y_domain%end - y_domain%beg))
+                                  & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
                     radial_vector(3) = 0._wp
                     if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
-                        & + real(ghost_points(i)%z_periodicity, wp)*(z_domain%end - z_domain%beg))
+                        & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
                 end if
 
                 ! Calculate velocity of ghost cell
@@ -525,7 +525,7 @@ contains
                                 print *, [x_cc(i), y_cc(j), z_cc(k)]
                             end if
                             print *, "We are searching in dimension ", dim, " for image point at ", ghost_points_in(q)%ip_loc(:)
-                            print *, "Domain size: ", [x_cc(-buff_size), y_cc(-buff_size), z_cc(-buff_size)]
+                            print *, "Domain size: "
                             print *, "x: ", x_cc(-buff_size), " to: ", x_cc(m + buff_size - 1)
                             print *, "y: ", y_cc(-buff_size), " to: ", y_cc(n + buff_size - 1)
                             if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
@@ -616,8 +616,7 @@ contains
         if (p == 0) gp_layers_z = 0
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, neighborhood_patch_id, &
-                            & xp, yp, zp]', copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, &
-                            & gp_layers_z]', collapse=3)
+                            & xp, yp, zp]', copyin='[count, count_i, glb_bounds]', firstprivate='[gp_layers, gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -651,26 +650,26 @@ contains
                             ghost_points_in(local_idx)%z_periodicity = zp
                             ghost_points_in(local_idx)%slip = patch_ib(neighborhood_patch_id)%slip
 
-                            if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                            if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
                                 ghost_points_in(local_idx)%DB(1) = -1
-                            else if ((x_cc(i) + dx(i)) > x_domain%end) then
+                            else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
                                 ghost_points_in(local_idx)%DB(1) = 1
                             else
                                 ghost_points_in(local_idx)%DB(1) = 0
                             end if
 
-                            if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                            if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
                                 ghost_points_in(local_idx)%DB(2) = -1
-                            else if ((y_cc(j) + dy(j)) > y_domain%end) then
+                            else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
                                 ghost_points_in(local_idx)%DB(2) = 1
                             else
                                 ghost_points_in(local_idx)%DB(2) = 0
                             end if
 
                             if (p /= 0) then
-                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
+                                if ((z_cc(k) - dz(k)) < glb_bounds(3)%beg) then
                                     ghost_points_in(local_idx)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
+                                else if ((z_cc(k) + dz(k)) > glb_bounds(3)%end) then
                                     ghost_points_in(local_idx)%DB(3) = 1
                                 else
                                     ghost_points_in(local_idx)%DB(3) = 0
@@ -1038,11 +1037,13 @@ contains
                         call s_get_neighborhood_idx(ib_idx_temp, ib_idx)  ! global patch ID -> local index
                         if (ib_idx > 0) then
                             ! get the vector pointing to the grid cell from the IB centroid
-                            radial_vector(1) = x_cc(i) - (patch_ib(ib_idx)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg))
-                            radial_vector(2) = y_cc(j) - (patch_ib(ib_idx)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg))
+                            radial_vector(1) = x_cc(i) - (patch_ib(ib_idx)%x_centroid + real(xp, &
+                                          & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
+                            radial_vector(2) = y_cc(j) - (patch_ib(ib_idx)%y_centroid + real(yp, &
+                                          & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
                             radial_vector(3) = 0._wp
                             if (num_dims == 3) radial_vector(3) = z_cc(k) - (patch_ib(ib_idx)%z_centroid + real(zp, &
-                                & wp)*(z_domain%end - z_domain%beg))
+                                & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
                             local_force_contribution(:) = 0._wp
 
@@ -1277,19 +1278,19 @@ contains
         $:GPU_PARALLEL_LOOP(private='[patch_id]')
         do patch_id = 1, num_ibs
             ! check domain wraps in x, y,
-            #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-                if (num_dims >= ${ID}$) then
+            #:for X, DIR in [('x', 1), ('y', 2), ('z', 3)]
+                if (num_dims >= ${DIR}$) then
                     ! check for periodicity
                     if (ib_bc_${X}$%beg == BC_PERIODIC) then
                         ! check if the boundary has left the domain, and then correct
-                        if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
+                        if (patch_ib(patch_id)%${X}$_centroid < glb_bounds(${DIR}$)%beg) then
                             ! if the boundary exited "left", wrap it back around to the "right"
-                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end &
-                                     & - ${X}$_domain%beg)
-                        else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
+                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${DIR}$)%end &
+                                     & - glb_bounds(${DIR}$)%beg)
+                        else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${DIR}$)%end) then
                             ! if the boundary exited "right", wrap it back around to the "left"
-                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end &
-                                     & - ${X}$_domain%beg)
+                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${DIR}$)%end &
+                                     & - glb_bounds(${DIR}$)%beg)
                         end if
                     end if
                 end if
