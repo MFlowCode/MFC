@@ -191,7 +191,11 @@ exit 0
                     target_compile_options(${a_target} PRIVATE -fopenmp)
                     target_link_options(${a_target} PRIVATE -fopenmp)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -O3 -fopenmp-assume-threads-oversubscription -fopenmp-assume-teams-oversubscription)
+                    # assume-no-nested-parallelism is for correctness, not speed: the two
+                    # oversubscription flags are the trigger for llvm#198621 (a suffix of
+                    # loop iterations silently skipped), which -O3 happens to mask today.
+                    # Codegen is unchanged on amdflang; it is a win on upstream flang.
+                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -O3 -fopenmp-assume-threads-oversubscription -fopenmp-assume-teams-oversubscription -fopenmp-assume-no-nested-parallelism)
                     target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS})
                 endif()
             endif()
