@@ -11,6 +11,7 @@ DOCS = [
     "docs/documentation/gpuParallelization.md",
     "docs/documentation/running.md",
     "docs/documentation/case.md",
+    "docs/documentation/amr.md",
     "docs/documentation/equations.md",
     "docs/documentation/testing.md",
     "docs/documentation/getting-started.md",
