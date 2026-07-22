@@ -214,10 +214,11 @@ contains
         ! Clear the ghost-point flag on the device before re-tagging this step's
         ! ghost points. This must run on the device (not a host array assignment)
         ! so the flag read during conservative-to-primitive conversion is correct.
-        ! Static IBs keep the same ghost set every stage (and the device copy is
-        ! zero-initialized at allocation), so only moving IBs need the whole-domain
-        ! clear - skipping it avoids a full-grid pass per RK sub-stage.
-        if (moving_immersed_boundary_flag) then
+        ! Only chemistry reads the flag; static IBs keep the same ghost set every
+        ! stage (and the device copy is zero-initialized at allocation), so only a
+        ! moving IB needs the whole-domain clear - skipping it avoids a full-grid
+        ! pass per RK sub-stage.
+        if (chemistry .and. moving_immersed_boundary_flag) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = 0, p
                 do k = 0, n
@@ -241,7 +242,7 @@ contains
                 l = gp%loc(3)
                 patch_id = ghost_points(i)%ib_patch_id
 
-                ghost_points_index%sf(j, k, l) = 1
+                if (chemistry) ghost_points_index%sf(j, k, l) = 1
 
                 ! Calculate physical location of GP
                 if (p > 0) then
@@ -300,7 +301,6 @@ contains
                 ! set the pressure
                 if (patch_ib(patch_id)%moving_ibm <= 1) then
                     q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
-                    pressure_ghost_point%sf(j, k, l) = pres_IP
                 else
                     q_prim_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
@@ -311,6 +311,11 @@ contains
                                   & *dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm))
                     end do
                 end if
+
+                ! Chemistry re-imposes this ghost-point pressure through the
+                ! conservative-to-primitive conversion, so store the final value
+                ! (both the static and moving-IB branches above).
+                if (chemistry) pressure_ghost_point%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, l)
 
                 if (model_eqns /= model_eqns_4eq) then
                     ! If in simulation, use acc mixture subroutines

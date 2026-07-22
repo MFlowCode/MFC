@@ -370,7 +370,9 @@ contains
             $:GPU_UPDATE(device='[Res_vc, Re_idx, Re_size]')
         end if
 
-        if (ib) then
+        ! These fields back the IB ghost-point pressure re-imposition, which is only
+        ! read (and written) when chemistry is enabled - skip them for non-reacting IB.
+        if (ib .and. chemistry) then
             if (p > 0) then
                 @:ALLOCATE(ghost_points_index%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
                 @:ALLOCATE(pressure_ghost_point%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
@@ -1288,7 +1290,7 @@ contains
 
 #ifdef MFC_SIMULATION
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
-        if (ib) then
+        if (ib .and. chemistry) then
             @:DEALLOCATE(ghost_points_index%sf)
             @:DEALLOCATE(pressure_ghost_point%sf)
         end if
