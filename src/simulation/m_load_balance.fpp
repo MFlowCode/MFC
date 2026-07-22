@@ -19,8 +19,8 @@ module m_load_balance
 
 contains
 
-    !> Returns true if the cumulative offsets off(0:parts) differ from the equal-split boundaries for a global extent of g cells
-    !! distributed over parts ranks (matching the remainder distribution used by s_mpi_decompose_computational_domain).
+    !> True if cumulative offsets off(0:parts) differ from the equal-split boundaries for g cells over parts ranks (same remainder
+    !! distribution as s_mpi_decompose_computational_domain).
     pure function f_offsets_differ_from_equal(off, g, parts) result(differs)
 
         integer, dimension(0:), intent(in) :: off
@@ -31,10 +31,10 @@ contains
 
     end function f_offsets_differ_from_equal
 
-    !> True iff, for one axis's cumulative offsets, every part's intersection with the AMR block satisfies the mirror-decomposition
-    !! scratch cap 2*(isect cells) - 1 <= part cells - 1 (the per-dim bound s_initialize_amr_module aborts on). Checking each axis
-    !! part independently is equivalent to checking every rank's box: a rank owns the block iff its intersection is nonempty in
-    !! every active dim, and its per-dim intersection depends only on that axis's part index.
+    !> True iff, for one axis's cumulative offsets, every part's AMR-block intersection satisfies the mirror-decomposition scratch
+    !! cap 2*(isect cells) - 1 <= part cells - 1 (the per-dim bound s_initialize_amr_module aborts on). Per-axis-part checks equal
+    !! per-rank-box checks: a rank owns the block iff its intersection is nonempty in every active dim, and each per-dim
+    !! intersection depends only on that axis's part index.
     pure function f_amr_isect_fits(off, n_parts, pbeg, pend) result(ok)
 
         integer, dimension(0:), intent(in) :: off
@@ -50,9 +50,9 @@ contains
 
     end function f_amr_isect_fits
 
-    !> Read the first advection variable at the equal layout from the restart file and build global per-axis marginals. wx(0:m_glb),
-    !! wy(0:n_glb), wz(0:p_glb) are allocated here; caller deallocates. Requires eqn_idx%adv%beg to be valid (call
-    !! s_initialize_eqn_idx before invoking this).
+    !> Read the first advection variable at the equal layout from the restart file, build global per-axis marginals. Allocates
+    !! wx(0:m_glb), wy(0:n_glb), wz(0:p_glb); caller deallocates. Requires a valid eqn_idx%adv%beg (call s_initialize_eqn_idx
+    !! first).
     impure subroutine s_probe_field_marginals(wx, wy, wz)
 
         real(wp), allocatable, dimension(:), intent(out) :: wx, wy, wz
@@ -73,7 +73,7 @@ contains
         wx = 1._wp; wy = 1._wp; wz = 1._wp
 
 #ifdef MFC_MPI
-        ! Build the restart file path (mirrors s_read_parallel_data_files non-file_per_process path)
+        ! Restart file path (mirrors s_read_parallel_data_files non-file_per_process path)
         if (cfl_dt) then
             write (step_str, '(I0)') n_start
         else
@@ -158,9 +158,9 @@ contains
 
         if (.not. load_balance) return
 
-        ! Populate eqn_idx so that s_probe_field_marginals can pick eqn_idx%adv%beg.
-        ! s_initialize_eqn_idx is pure index arithmetic (no allocations); it is safe to call
-        ! here and again at its normal site in s_initialize_global_parameters_module.
+        ! Populate eqn_idx so s_probe_field_marginals can pick eqn_idx%adv%beg. s_initialize_eqn_idx
+        ! is pure index arithmetic (no allocations); safe to call here and again at its normal site
+        ! in s_initialize_global_parameters_module.
         call s_initialize_eqn_idx(nmom, nb)
 
         if (recon_type == recon_type_weno) then
@@ -172,17 +172,17 @@ contains
 
         lmin = num_stcls_min*recon_order
         if (bubbles_euler) then
-            ! EE-bubble source cost is flat across void magnitude (see the calibration note in
-            ! m_load_weight), so the first-advection-alpha marginal is not a load signal here:
-            ! use uniform marginals and let only the AMR fine-work injection move split planes.
+            ! EE-bubble source cost is flat across void magnitude (calibration note in m_load_weight),
+            ! so the first-advection-alpha marginal is not a load signal here: use uniform marginals
+            ! and let only the AMR fine-work injection move split planes.
             allocate (wx(0:m_glb), wy(0:n_glb), wz(0:p_glb))
             wx = 1._wp; wy = 1._wp; wz = 1._wp
         else
             call s_probe_field_marginals(wx, wy, wz)
         end if
 
-        ! Only axes actually split across >1 ranks must satisfy the min-cells floor;
-        ! a single-rank (incl. collapsed 1D/2D) axis owns all its cells and is always feasible.
+        ! Only axes split across >1 ranks must satisfy the min-cells floor; a single-rank axis
+        ! (incl. collapsed 1D/2D) owns all its cells and is always feasible.
         @:PROHIBIT(num_procs_x > 1 .and. (m_glb + 1) < num_procs_x*lmin, "load_balance: x-axis too small for min cells per rank")
         @:PROHIBIT(num_procs_y > 1 .and. (n_glb + 1) < num_procs_y*lmin, "load_balance: y-axis too small for min cells per rank")
         @:PROHIBIT(num_procs_z > 1 .and. (p_glb + 1) < num_procs_z*lmin, "load_balance: z-axis too small for min cells per rank")
@@ -191,7 +191,7 @@ contains
         allocate (vx(0:m_glb), vy(0:n_glb), vz(0:p_glb))
 
         ! AMR fine-work injection: each block-covered coarse cell costs an extra 2**num_dims (interleaved;
-        ! x2 subcycled) fine-cell RHS evaluations per coarse step, so the block's axis projections gain
+        ! x2 subcycled) fine-cell RHS evals per coarse step, so the block's axis projections gain
         ! fine_factor * (block transverse cells) in each marginal's own units (per-cell scale =
         ! sum(w_axis)/total cells per axis: the probe's marginal sums are all equal, the missing-file
         ! fallback's are per-index and differ across axes).
@@ -208,9 +208,9 @@ contains
         end if
 
         ! Deterministic feasibility clamp: if the weighted boxes would violate the AMR scratch cap on any
-        ! rank, halve the amr contribution and re-split (<= 3 retries; the final fallback drops it, which
-        ! s_initialize_amr_module's own init check governs). Pure arithmetic on rank-identical arrays, so
-        ! every rank takes the same branches.
+        ! rank, halve the amr contribution and re-split (<= 3 retries; the final fallback drops it, governed
+        ! by s_initialize_amr_module's own init check). Pure arithmetic on rank-identical arrays, so every
+        ! rank takes the same branches.
         scale = 1._wp
         do try = 1, 4
             if (try == 4) scale = 0._wp

@@ -97,7 +97,7 @@ contains
         ab_y%beg = max(0, jb - buff_size); ab_y%end = min(n, je + buff_size)
         ab_z%beg = max(0, kb - buff_size); ab_z%end = min(p, ke + buff_size)
 
-        ! If the box already covers the whole domain there is no benefit; disable.
+        ! Box already covers the whole domain -> no benefit; disable.
         ab_active = .not. (ab_x%beg == 0 .and. ab_x%end == m .and. ab_y%beg == 0 .and. ab_y%end == n .and. ab_z%beg == 0 &
                            & .and. ab_z%end == p)
 
@@ -119,21 +119,20 @@ contains
 
         if (.not. ab_active) return
 
-        ! Growth by buff_size cells/step outruns the physical front: a stable run has CFL <= ~1.4
-        ! cells/step, so the box edge progressively leads the physical disturbance and sits in the
-        ! exponentially-decaying, sub-tolerance numerical precursor. This gives agreement to
-        ! round-off (~1e-14), not bit-identical, which is what the spec requires.
-        ! Caveat: this is a finite-horizon round-off guarantee, not a strict numerical-light-cone
-        ! containment. A bit-identical variant would grow by nstage*(weno_polyn+1) = ~9 cells/step
-        ! (the full numerical domain of dependence) at the cost of a looser box and lower speedup -
-        ! left as a future option. Under-growth (CFL > buff_size) implies an already-diverging run.
+        ! Growth by buff_size cells/step outruns the physical front (stable run: CFL <= ~1.4
+        ! cells/step), so the box edge leads the disturbance and sits in the exponentially-decaying,
+        ! sub-tolerance numerical precursor. Agreement to round-off (~1e-14), not bit-identical,
+        ! which the spec requires. Caveat: a finite-horizon round-off guarantee, not strict
+        ! numerical-light-cone containment. A bit-identical variant would grow nstage*(weno_polyn+1)
+        ! = ~9 cells/step (full numerical domain of dependence) for a looser box and lower speedup -
+        ! future option. Under-growth (CFL > buff_size) implies an already-diverging run.
         g = buff_size
 
         ab_x%beg = max(0, ab_x%beg - g); ab_x%end = min(m, ab_x%end + g)
         ab_y%beg = max(0, ab_y%beg - g); ab_y%end = min(n, ab_y%end + g)
         ab_z%beg = max(0, ab_z%beg - g); ab_z%end = min(p, ab_z%end + g)
 
-        ! Once the box fills the domain, disable the optimization (full-domain is correct and avoids the bookkeeping).
+        ! Once the box fills the domain, disable (full-domain is correct and avoids the bookkeeping).
         if (ab_x%beg == 0 .and. ab_x%end == m .and. ab_y%beg == 0 .and. ab_y%end == n .and. ab_z%beg == 0 .and. ab_z%end == p) then
             ab_active = .false.
         end if
@@ -157,12 +156,12 @@ contains
             $:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
         end do
 #endif
-        ! Check the buff_size-thick layer just INSIDE each box face. Those cells are updated by
-        ! the RK loop, so if the disturbance front reaches them the reconstruction margin is
-        ! compromised (box under-grown). The exterior layer is frozen-ambient by construction and
-        ! cannot detect under-growth. Degenerate dimensions (n=0/p=0) contribute no faces. A face
-        ! clamped to the domain edge has no frozen exterior to protect: the disturbance may
-        ! legitimately reach it (reflection/outflow), so its margin is exempt.
+        ! Check the buff_size-thick layer just INSIDE each box face. The RK loop updates these cells,
+        ! so a front reaching them means the reconstruction margin is compromised (box under-grown).
+        ! The exterior layer is frozen-ambient by construction and cannot detect under-growth.
+        ! Degenerate dims (n=0/p=0) contribute no faces. A face clamped to the domain edge has no
+        ! frozen exterior: the disturbance may legitimately reach it (reflection/outflow), so its
+        ! margin is exempt.
         do l = ab_z%beg, ab_z%end
             do k = ab_y%beg, ab_y%end
                 do j = ab_x%beg, ab_x%end

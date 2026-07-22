@@ -5,32 +5,32 @@
 #:include 'macros.fpp'
 
 !> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine block boundary (SP4). Depends only on m_derived_types +
-!! m_global_parameters so both m_rhs (capture) and m_time_steppers (apply) can use it without cycles. NOTE: m_amr uses m_rhs which
-!! uses m_amr_registers, so adding "use m_amr" here would create a compilation cycle. Region info is therefore read from
-!! amr_region_lo/hi and amr_isect_lo/hi (m_global_parameters), which s_set_amr_fine_geometry keeps mirroring across regrids. creg
-!! uses 0-based transverse indexing relative to the rank's block INTERSECTION (= the block at np=1); freg uses 0-based LOCAL fine
-!! indexing (aligned: fine children of isect cell t are 2*t and 2*t+1). All arrays are preallocated at max size so regrid requires
-!! no reallocation.
+!! m_global_parameters so both m_rhs (capture) and m_time_steppers (apply) can use it without cycles. "use m_amr" would cycle (m_amr
+!! -> m_rhs -> m_amr_registers), so region info is read from amr_region_lo/hi and amr_isect_lo/hi (m_global_parameters), mirrored
+!! across regrids by s_set_amr_fine_geometry. creg uses 0-based transverse indexing relative to the rank's block INTERSECTION (= the
+!! block at np=1); freg uses 0-based LOCAL fine (fine children of isect cell t are 2*t and 2*t+1). All arrays are preallocated at
+!! max size, so regrid needs no reallocation.
 !!
-!! Multi-fluid (5-eq HLLC, the amr-gated path): the volume-fraction ADVECTIVE flux alpha_i*u_star travels through flux_n (the
+!! Multi-fluid (5-eq HLLC, amr-gated path): the volume-fraction ADVECTIVE flux alpha_i*u_star travels through flux_n (the
 !! "VOLUME FRACTION FLUX" block of m_riemann_solver_hllc, same form as the mass flux), so the uniform 1:sys_size capture below
-!! refluxes the per-fluid masses, momentum, energy, AND alpha's advective part with no extra registers. The non-conservative
-!! remainder (the +alpha*d(u_star)/dx compression term m_rhs assembles from flux_src_n = u_star) is deliberately NOT captured:
-!! alpha is genuinely non-conservative, so forcing flux-matching on u_star would be wrong; coarse/fine volume-fraction
-!! consistency is instead maintained by mpp_lim's clamp+renormalize (required by the checker for amr with num_fluids > 1).
+!! refluxes per-fluid masses, momentum, energy, AND alpha's advective part with no extra registers. The non-conservative remainder
+!! (the +alpha*d(u_star)/dx compression term m_rhs assembles from flux_src_n = u_star) is deliberately NOT captured: alpha is
+!! genuinely non-conservative, so flux-matching u_star would be wrong; coarse/fine volume-fraction consistency is instead held by
+!! mpp_lim's clamp+renormalize (required by the checker for amr with num_fluids > 1).
 !!
-!! Viscous (SP11): the viscous stress/work face fluxes travel through flux_src_n for the momentum and energy equations
-!! (m_rhs s_compute_additional_physics_rhs: rhs += (flux_src_n(j-1) - flux_src_n(j))/dx, identical face indexing and sign to the
-!! advective flux_n). They are captured into the SAME registers (added on top of the advective flux for mom..E) so the c/f reflux
-!! matches the TOTAL advective+viscous flux; energy conservation therefore includes the viscous work. Fine-ghost velocity gradients
-!! at the c/f boundary come from the conservative-linear cons prolongation (no special gradient reconstruction) - like the alpha
-!! K-term, that inconsistency is bounded, and conservation is enforced by the flux-register matching.
+!! Viscous (SP11): the viscous stress/work face fluxes travel through flux_src_n for mom and energy (m_rhs
+!! s_compute_additional_physics_rhs: rhs += (flux_src_n(j-1) - flux_src_n(j))/dx, identical face indexing and sign to advective
+!! flux_n). Captured into the SAME registers (added on top of advective flux for mom..E) so the c/f reflux matches the TOTAL
+!! advective+viscous flux; energy conservation thus includes viscous work. Fine-ghost velocity gradients at the c/f boundary come
+!! from the conservative-linear cons prolongation (no special gradient reconstruction) - like the alpha K-term, that inconsistency
+!! is bounded, and conservation is enforced by the flux-register matching.
 !!
-!! Chemistry species diffusion (SP17): the mixture-averaged species mass fluxes travel through flux_src_n for the species equations,
-!! and the thermal-conduction + enthalpy energy flux through the energy equation - the same face-difference assembly as viscous.
-!! They are captured into the SAME registers (species always; energy only when NOT viscous, since a viscous run already captures the
-!! combined flux_src_n(E)) so the c/f reflux matches the total advective+diffusive flux and species/element/energy conservation holds
-!! across the block boundary. Fine-ghost species gradients come from the species-closure cons prolongation - bounded like viscous.
+!! Chemistry species diffusion (SP17): the mixture-averaged species mass fluxes travel through flux_src_n for the species
+!! equations, and the thermal-conduction + enthalpy energy flux through the energy equation - same face-difference assembly as
+!! viscous. Captured into the SAME registers (species always; energy only when NOT viscous, since a viscous run already captures
+!! the combined flux_src_n(E)) so the c/f reflux matches the total advective+diffusive flux and species/element/energy conservation
+!! holds across the block boundary. Fine-ghost species gradients come from the species-closure cons prolongation - bounded like
+!! viscous.
 module m_amr_registers
 
     use m_derived_types
@@ -45,20 +45,20 @@ module m_amr_registers
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
 
     !> Registers for the two block faces normal to one direction: (1:sys_size, transverse-1, transverse-2, 1:amr_max_blocks). The
-    !! trailing dimension is the block slot (indexed by amr_cur); each slot's registers are captured/applied independently.
+    !! trailing dimension is the block slot (indexed by amr_cur); each slot is captured/applied independently.
     type t_face_reg
         real(wp), allocatable :: lo(:,:,:,:)
         real(wp), allocatable :: hi(:,:,:,:)
     end type t_face_reg
 
-    type(t_face_reg) :: creg(3)  !< coarse flux at the block boundary faces (relative 0-based transverse)
-    type(t_face_reg) :: freg(3)  !< fine flux at the covering fine faces (0-based fine transverse)
+    type(t_face_reg) :: creg(3)  !< coarse flux at block boundary faces (relative 0-based transverse)
+    type(t_face_reg) :: freg(3)  !< fine flux at covering fine faces (0-based fine transverse)
     $:GPU_DECLARE(create='[creg, freg]')
 
-    !> Per-slot geometry scratch for the batched creg capture kernels (1:amr_max_blocks): host-filled from the per-slot
-    !! flags/overlap, then GPU_UPDATE'd so ONE kernel iterates the slot dimension instead of O(blocks) tiny launches. bactive gates
-    !! the slot; bt1lo/bt1hi/bt2lo/bt2hi are the per-slot transverse window (a slot outside the rectangular max caps is cycled);
-    !! bjlo/bjhi are the normal-face flux indices; bo1/bo2 the transverse origins; bclo/bchi the per-face capture gates.
+    !> Per-slot geometry scratch for the batched creg capture kernels (1:amr_max_blocks): host-filled from per-slot flags/overlap,
+    !! then GPU_UPDATE'd so ONE kernel iterates the slot dimension instead of O(blocks) tiny launches. bactive gates the slot;
+    !! bt1lo/bt1hi/bt2lo/bt2hi are the per-slot transverse window (a slot outside the rectangular max caps is cycled); bjlo/bjhi are
+    !! the normal-face flux indices; bo1/bo2 the transverse origins; bclo/bchi the per-face capture gates.
     integer, allocatable :: bjlo(:), bjhi(:), bo1(:), bo2(:), bt1lo(:), bt1hi(:), bt2lo(:), bt2hi(:)
     logical, allocatable :: bclo(:), bchi(:), bactive(:)
     $:GPU_DECLARE(create='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
@@ -67,12 +67,11 @@ contains
 
     !> Reflux-face participation for THIS rank: own_lo(d)/own_hi(d) = it owns the coarse cell layer just OUTSIDE the block's
     !! low/high face in dim d (where the coarse capture and both reflux applies run; at an interior face the same rank also holds
-    !! the inside cells) - i.e. the outside layer lies in its subdomain in dim d and the block's transverse range overlaps its
-    !! subdomain. Fine-level distribution: participation is derived from the REPLICATED block range vs this rank's coarse subdomain
-    !! (NOT amr_isect, which is owner-only under whole-block ownership); tlo/thi return the GLOBAL transverse overlap
-    !! [max(region_lo, sidx) : min(region_hi, sidx+ext)] per dim, so capture and apply share a block-relative frame aligned with the
-    !! owner's freg. All true / full-block at np=1. Also returns sidx/ext (collapsed dims pinned to 0). Reads the COARSE grid state
-    !! in m/n/p.
+    !! the inside cells) - i.e. the outside layer lies in its subdomain in dim d and the block's transverse range overlaps it.
+    !! Fine-level distribution: participation derives from the REPLICATED block range vs this rank's coarse subdomain (NOT
+    !! amr_isect, which is owner-only under whole-block ownership); tlo/thi return the GLOBAL transverse overlap [max(region_lo,
+    !! sidx) : min(region_hi, sidx+ext)] per dim, so capture and apply share a block-relative frame aligned with the owner's freg.
+    !! All true / full-block at np=1. Also returns sidx/ext (collapsed dims pinned to 0). Reads the COARSE grid m/n/p.
     impure subroutine s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
 
         integer, intent(out) :: sidx(3), ext(3)
@@ -85,7 +84,7 @@ contains
         sidx(1) = start_idx(1); ext(1) = m
         if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
         if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
-        ! global transverse overlap of the block with this rank's coarse subdomain (collapsed dims pin to 0)
+        ! global transverse overlap of block with this rank's coarse subdomain (collapsed dims pin to 0)
         do d = 1, 3
             tlo(d) = max(amr_region_lo(d), sidx(d))
             thi(d) = min(amr_region_hi(d), sidx(d) + ext(d))
@@ -103,7 +102,7 @@ contains
             own_hi(d) = tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d)
             ! max_grid_size tiling: a face shared with an adjacent sub-block is fine-fine, NOT a c/f boundary - exclude it from
             ! reflux (its outside cell is inside the neighbour block; refluxing there would corrupt that cell mid-step). The
-            ! block-to-block fine-fine halo already makes the shared flux match. (No seams without tiling, so np=1/untiled: no-op.)
+            ! block-to-block fine-fine halo already matches the shared flux. (No seams without tiling, so np=1/untiled: no-op.)
             if (own_lo(d) .and. f_amr_face_is_seam(d, -1)) own_lo(d) = .false.
             if (own_hi(d) .and. f_amr_face_is_seam(d, 1)) own_hi(d) = .false.
         end do
@@ -111,7 +110,7 @@ contains
     end subroutine s_amr_reflux_face_flags
 
     !> True iff the current block's face on `side` (+1 high / -1 low) in dim d is shared with an ADJACENT sub-block (max_grid_size
-    !! tiling) - i.e. some other block's opposite face is exactly one cell away with matching transverse extents. Such a seam is
+    !! tiling) - i.e. another block's opposite face is exactly one cell away with matching transverse extents. Such a seam is
     !! fine-fine, not a c/f boundary. Reads the replicated block list (amr_region_*_all) - no tiling means no match.
     pure logical function f_amr_face_is_seam(d, side) result(seam)
 
@@ -143,11 +142,11 @@ contains
         integer             :: maxc1, maxc2, maxc3, max_f1, max_f2, max_f3
 
         if (.not. amr) return
-        ! Registers on ALL ranks: regrid moves the block faces, so any rank can become a participant (fine cells for freg; outside
-        ! face layer for creg capture + apply and for RECEIVING freg from the block owner). Fine-level distribution: freg is
-        ! captured for the WHOLE block and indexed block-relative by every applier, so registers must span a whole block. The
-        ! largest block a rank can own is amr_maxc_fit (the scratch-constraint cap), so size to it - matches m_amr's fine arrays
-        ! and right-sizes the face registers to ~1/num_procs^(d-1) the global-half memory at scale.
+        ! Registers on ALL ranks: regrid moves block faces, so any rank can participate (fine cells for freg; outside-face layer
+        ! for creg capture/apply and for receiving freg from the block owner). Fine-level distribution: freg is captured for the
+        ! WHOLE block and indexed block-relative by every applier, so registers must span a whole block. The largest block a rank
+        ! can own is amr_maxc_fit (the scratch-constraint cap), so size to it - matches m_amr's fine arrays and right-sizes the face
+        ! registers to ~1/num_procs^(d-1) the global-half memory at scale.
         maxc1 = maxc_fit(1)
         maxc2 = 1; maxc3 = 1
         if (n_glb > 0) maxc2 = maxc_fit(2)
@@ -157,7 +156,7 @@ contains
         if (n_glb > 0) max_f2 = amr_ref_ratio*maxc2 - 1
         if (p_glb > 0) max_f3 = amr_ref_ratio*maxc3 - 1
         ! creg: relative 0-based transverse (0:maxc_t-1); freg: 0-based fine (0:max_f_t).
-        ! Device-resident (@:ALLOCATE): capture and both applies run as kernels; no host copies are read.
+        ! Device-resident (@:ALLOCATE): capture and both applies run as kernels; no host copies read.
         @:ALLOCATE(creg(1)%lo(1:sys_size,0:maxc2 - 1,0:maxc3 - 1,1:amr_max_blocks), creg(1)%hi(1:sys_size,0:maxc2 - 1, &
                    & 0:maxc3 - 1,1:amr_max_blocks))
         @:ALLOCATE(freg(1)%lo(1:sys_size,0:max_f2,0:max_f3,1:amr_max_blocks), freg(1)%hi(1:sys_size,0:max_f2,0:max_f3, &
@@ -174,7 +173,7 @@ contains
             @:ALLOCATE(freg(3)%lo(1:sys_size,0:max_f1,0:max_f2,1:amr_max_blocks), freg(3)%hi(1:sys_size,0:max_f1,0:max_f2, &
                        & 1:amr_max_blocks))
         end if
-        ! per-slot geometry scratch for the batched capture kernels (device-resident: filled on host, GPU_UPDATE'd before each call)
+        ! per-slot geometry scratch for the batched capture kernels (device-resident: host-filled, GPU_UPDATE'd before each call)
         @:ALLOCATE(bjlo(1:amr_max_blocks), bjhi(1:amr_max_blocks), bo1(1:amr_max_blocks), bo2(1:amr_max_blocks))
         @:ALLOCATE(bt1lo(1:amr_max_blocks), bt1hi(1:amr_max_blocks), bt2lo(1:amr_max_blocks), bt2hi(1:amr_max_blocks))
         @:ALLOCATE(bclo(1:amr_max_blocks), bchi(1:amr_max_blocks), bactive(1:amr_max_blocks))
@@ -186,9 +185,9 @@ contains
     !! transverse window [bt1lo:bt1hi] x [bt2lo:bt2hi]. acc=.true. accumulates, .false. overwrites (the merge picks the old value or
     !! 0 with no arithmetic, so a stage-1 overwrite reads no uninitialized creg). bclo/bchi gate the low/high face (unowned coarse
     !! faces off; child faces always on). The device kernel collapses (slot, t2, t1, eq) over the rectangular caps
-    !! [0:maxt2]x[0:maxt1] (max over slots) and cycles inactive slots / out-of-window cells - one launch replaces the O(blocks)
-    !! per-slot launches. The per-slot geometry (bjlo etc.) is filled on host and GPU_UPDATE'd by the caller. Used for the advective
-    !! (flux_dir, eqb=1..sys_size) and viscous (flux_src, eqb=mom..E) captures on BOTH the coarse-self and child sides.
+    !! [0:maxt2]x[0:maxt1] (max over slots) and cycles inactive slots / out-of-window cells - one launch replaces O(blocks) per-slot
+    !! launches. Per-slot geometry (bjlo etc.) is host-filled and GPU_UPDATE'd by the caller. Used for the advective (flux_dir,
+    !! eqb=1..sys_size) and viscous (flux_src, eqb=mom..E) captures on BOTH the coarse-self and child sides.
     impure subroutine s_amr_capture_creg_dense_batch(nb, id, flux, cf, acc, maxt1, maxt2, eqb, eqe)
 
         integer, intent(in)            :: nb, id, maxt1, maxt2, eqb, eqe
@@ -231,7 +230,7 @@ contains
 
     !> Shared creg boundary-flux capture (chemistry species diffusion), BATCHED over the slot dimension: always-accumulate the
     !! species mass fluxes, plus the energy flux only when NOT viscous (the viscous pass already captured flux_src(E)). Species use
-    !! a seq inner loop (a runtime range). The device kernel collapses (slot, t2, t1) over the rectangular caps [0:maxt2]x[0:maxt1]
+    !! a seq inner loop (runtime range). The device kernel collapses (slot, t2, t1) over the rectangular caps [0:maxt2]x[0:maxt1]
     !! (max over slots) and cycles inactive slots / out-of-window cells. Per-slot geometry is host-filled + GPU_UPDATE'd by the
     !! caller. Used for the chem capture on BOTH the coarse-self and child sides. TWIN of the chemistry freg capture in
     !! s_amr_capture_boundary_flux (fine branch): same species-always + energy-only-when-not-viscous policy - keep lockstep.
@@ -295,9 +294,8 @@ contains
     end subroutine s_amr_capture_creg_chem_batch
 
     !> Capture the c/f boundary-face fluxes for direction id from the just-finalized flux array. Runs INSIDE s_compute_rhs: coarse
-    !! call (amr_in_fine_advance false, coarse globals) fills creg at the block boundary faces; fine call (flag true, globals
-    !! swapped to the fine block) fills freg at fine faces -1 and m/n/p. creg uses relative 0-based transverse; freg uses 0-based
-    !! fine.
+    !! call (amr_in_fine_advance false, coarse globals) fills creg at block boundary faces; fine call (flag true, globals swapped to
+    !! the fine block) fills freg at fine faces -1 and m/n/p. creg uses relative 0-based transverse; freg uses 0-based fine.
     impure subroutine s_amr_capture_boundary_flux(id, flux_dir, flux_src, stage)
 
         integer, intent(in)            :: id
@@ -322,20 +320,19 @@ contains
                 coef = rk3_w(stage); accum = (stage > 1)  ! stage 1 overwrites = implicit zero per coarse step
             end if
         else if (amr_in_fine_advance .and. amr_block_level(amr_cur) >= 2) then
-            ! lock-step L2->L1 reflux: the parent already RK-updated by the time we reflux, so freg must hold the rk3_w-weighted
-            ! step-integral flux for the once-per-step STATE correction (stage 1 overwrites = implicit zero, cf. the coarse creg).
+            ! lock-step L2->L1 reflux: parent is already RK-updated by reflux time, so freg must hold the rk3_w-weighted
+            ! step-integral flux for the once-per-step STATE correction (stage 1 overwrites = implicit zero, cf. coarse creg).
             coef = rk3_w(stage); accum = (stage > 1)
         else
-            coef = 1._wp; accum = .false.  ! overwrite each stage - default behavior, byte-identical
+            coef = 1._wp; accum = .false.  ! overwrite each stage - default, byte-identical
         end if
         if (amr_in_fine_advance) then
             ! fine branch: globals swapped; jlo=-1, jhi=current fine extent in direction id.
             ! TWIN of the creg capture: the advective / viscous (flux_src mom..E) / chemistry (flux_src species always, energy only
-            ! when NOT viscous) captures below must stay lockstep with s_amr_capture_creg_dense_batch +
-            ! s_amr_capture_creg_chem_batch,
-            ! which encode the identical policy on the coarse side. The "energy only when not viscous" rule appears in FOUR places -
-            ! here (the freg viscous + chemistry blocks) and in both creg batch helpers - change one and change all, or the c/f
-            ! reflux subtracts mismatched coarse/fine fluxes (a conservation leak no single-level test catches).
+            ! when NOT viscous) captures below stay lockstep with s_amr_capture_creg_dense_batch + s_amr_capture_creg_chem_batch,
+            ! which encode the identical policy on the coarse side. The "energy only when not viscous" rule lives in FOUR places -
+            ! here (freg viscous + chemistry blocks) and both creg batch helpers - change one, change all, or the c/f reflux
+            ! subtracts mismatched coarse/fine fluxes (a conservation leak no single-level test catches).
             select case (id)
             case (1); jlo = -1; jhi = m; t1_hi = n; t2_hi = p
             case (2); jlo = -1; jhi = n; t1_hi = m; t2_hi = p
@@ -381,9 +378,9 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            ! total-flux matching: add the viscous momentum/energy face fluxes (flux_src) into the same fine
-            ! registers so the c/f reflux sees advective+viscous. Base coef/accum are applied above; always
-            ! accumulate here. Inviscid path skips this entirely (registers stay byte-identical).
+            ! total-flux matching: add the viscous mom/energy face fluxes (flux_src) into the same fine registers so the c/f reflux
+            ! sees advective+viscous. Base coef applied above; always accumulate here. Inviscid path skips this (registers stay
+            ! byte-identical).
             if (viscous) then
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do t2 = 0, t2_hi
@@ -411,10 +408,9 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
-            ! total-flux matching (chemistry species diffusion): the mixture-averaged species mass fluxes
-            ! travel through flux_src_n for the species equations; the thermal-conduction + enthalpy energy
-            ! flux travels through the energy equation and is captured here only when NOT viscous (the
-            ! viscous block above already captured flux_src_n(E), which holds viscous+diffusion combined).
+            ! total-flux matching (chemistry species diffusion): the mixture-averaged species mass fluxes travel through flux_src_n
+            ! for the species equations; the thermal-conduction + enthalpy energy flux travels through the energy equation, captured
+            ! here only when NOT viscous (the viscous block above already captured flux_src_n(E), which holds viscous+diffusion).
             if (chemistry .and. chem_params%diffusion) then
                 $:GPU_PARALLEL_LOOP(collapse=2)
                 do t2 = 0, t2_hi
@@ -469,8 +465,8 @@ contains
             ! (s_amr_reflux_to_parent). Captures the TOTAL flux - advective (flux_dir), then viscous (flux_src, mom..E), then
             ! chemistry species+energy - mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves (no
             ! checker gate). np=1 (children co-owned with the parent); np>=2 P2P delivery is future work.
-            ! fill the per-slot (per-child) geometry, then issue ONE batched kernel per capture category. Each child is its OWN creg
-            ! slot (slot=kc); both faces always owned (child co-located), t1lo=t2lo=0.
+            ! Fill per-slot (per-child) geometry, then one batched kernel per capture category. Each child is its OWN creg slot
+            ! (slot=kc); both faces always owned (child co-located), t1lo=t2lo=0.
             ccoef = rk3_w(stage); cacc = (stage > 1)
             bactive = .false.
             maxt1 = 0; maxt2 = 0
@@ -500,7 +496,7 @@ contains
             end do
             if (any(bactive(1:amr_num_blocks))) then
                 $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
-                ! shared capture into each CHILD's creg (parent-fine frame): advective, then total-flux viscous, then chemistry.
+                ! shared capture into each CHILD's creg (parent-fine frame): advective, then total-flux viscous, then chemistry
                 call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_dir, ccoef, cacc, maxt1, maxt2, 1, sys_size)
                 if (viscous) call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, ccoef, .true., maxt1, maxt2, &
                     & eqn_idx%mom%beg, eqn_idx%E)
@@ -508,12 +504,11 @@ contains
                     & ccoef, maxt1, maxt2)
             end if
         else
-            ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its
-            ! flux_n covers that face; at a rank-interior face the same rank also holds the inside cells).
-            ! jlo/jhi = LOCAL flux indices of the block's low/high faces; t1/t2 = 0-based transverse indices
-            ! relative to this rank's block INTERSECTION (o1/o2 = local transverse origins), aligned with the
-            ! fine registers: the fine children of isect-relative cell t are faces 2*t and 2*t+1. At np=1 the
-            ! intersection is the block and both flags hold, recovering the single-rank behavior exactly.
+            ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its flux_n covers that face;
+            ! at a rank-interior face the same rank also holds the inside cells). jlo/jhi = LOCAL flux indices of the block's
+            ! low/high faces; t1/t2 = 0-based transverse indices relative to this rank's block INTERSECTION (o1/o2 = local
+            ! transverse origins), aligned with the fine registers: fine children of isect-relative cell t are faces 2*t and 2*t+1.
+            ! At np=1 the intersection is the block and both flags hold, recovering single-rank behavior exactly.
             ! ONE coarse s_compute_rhs pass fills EVERY active block's registers: revisit each slot's region+intersection in turn.
             save_cur = amr_cur
             bactive = .false.
@@ -525,8 +520,8 @@ contains
                 call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
                 cap_lo = own_lo(id); cap_hi = own_hi(id)
                 if (cap_lo .or. cap_hi) then
-                    ! block-relative transverse frame (0-based from region_lo, aligned with the owner's freg): this rank fills
-                    ! creg over its owned overlap [tlo-region_lo : thi-region_lo]; o1/o2 map that back to LOCAL flux indices.
+                    ! block-relative transverse frame (0-based from region_lo, aligned with the owner's freg): this rank fills creg
+                    ! over its owned overlap [tlo-region_lo : thi-region_lo]; o1/o2 map that back to LOCAL flux indices.
                     select case (id)
                     case (1); jlo = amr_region_lo(1) - 1 - sidx(1); jhi = amr_region_hi(1) - sidx(1)
                         t1_lo = tlo(2) - amr_region_lo(2); t1_hi = thi(2) - amr_region_lo(2); o1 = amr_region_lo(2) - sidx(2)
@@ -548,7 +543,7 @@ contains
             if (any(bactive(1:amr_num_blocks))) then
                 $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
                 ! shared capture into each coarse block's creg (region/sidx frame, per-face ownership gating): advective, then
-                ! total-flux viscous, then chemistry species+energy.
+                ! total-flux viscous, then chemistry species+energy
                 call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_dir, coef, accum, maxt1, maxt2, 1, sys_size)
                 if (viscous) call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, coef, .true., maxt1, maxt2, &
                     & eqn_idx%mom%beg, eqn_idx%E)
@@ -577,13 +572,13 @@ contains
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         rr = amr_ref_ratio
         ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer (all faces at np=1).
-        ! Under whole-block ownership the block's freg is already resident on its owner, so no broadcast is needed here.
+        ! Under whole-block ownership the block's freg is already resident on its owner, so no broadcast here.
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
         if (.not. (any(own_lo) .or. any(own_hi))) return
         ! device kernels: the coarse rhs stays device-resident for the coarse RK update kernel
         d2 = n_glb > 0; d3 = p_glb > 0
         ! block-relative transverse frame (aligned with the owner's freg): loop c over each dim's owned overlap [bl:bh] =
-        ! [tlo-region_lo : thi-region_lo]; creg/freg use c directly, LOCAL cell = tl + c with tl = region_lo - sidx.
+        ! [tlo-region_lo : thi-region_lo]; creg/freg use c directly, LOCAL cell = tl + c, tl = region_lo - sidx.
         bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
         bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
         bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
@@ -602,10 +597,11 @@ contains
             if (has_lo) mlo = dx(ol1)
             if (has_hi) mhi = dx(oh1)
             if (cyl_coord) then
-                ! axisymmetric x-face (axial): the rr covering fine faces are stacked in the RADIAL (transverse) direction at
-                ! DIFFERENT radii, so Fbar_fine must be area-weighted by fine-face radius (fine y_cc rebuilt from the coarse y_cb of
-                ! transverse cell tl2+c1). Outside-cell axial divergence has no radial factor (axial face area ~ cell volume ~ y_cc,
-                ! cancels), so the width stays dx.
+                ! axisymmetric x-face (axial): the rr covering fine faces stack in the RADIAL (transverse) direction at DIFFERENT
+                ! radii, so Fbar_fine must be area-weighted by fine-face radius (fine y_cc rebuilt from the coarse y_cb of
+                ! transverse
+                ! cell tl2+c1). Outside-cell axial divergence has no radial factor (axial face area ~ cell volume ~ y_cc, cancels),
+                ! so the width stays dx.
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi, wsum, rf]')
                 do eq = 1, sys_size
                     do c2 = bl3, bh3
@@ -663,9 +659,9 @@ contains
             mlo = 1._wp; mhi = 1._wp
             if (has_lo) mlo = dy(ol2)
             if (has_hi) mhi = dy(oh2)
-            ! cyl_coord (axisymmetric): the radial c/f flux correction is area-weighted - the low/high face carries radius y_cb, the
-            ! outside cell volume carries y_cc, so fold r_face/r_cell into the width (kernel divides by it). r_+ = y_cb(ol2) at the
-            ! block's low face; r_- = y_cb(oh2-1) at the high face. Byte-identical to the previous form on Cartesian grids.
+            ! cyl_coord (axisymmetric): the radial c/f flux correction is area-weighted - low/high face carries radius y_cb, outside
+            ! cell volume carries y_cc, so fold r_face/r_cell into the width (kernel divides by it). r_+ = y_cb(ol2) at the block's
+            ! low face; r_- = y_cb(oh2-1) at the high face. Byte-identical to the previous form on Cartesian grids.
             if (cyl_coord) then
                 if (has_lo) mlo = mlo*y_cc(ol2)/y_cb(ol2)
                 if (has_hi) mhi = mhi*y_cc(oh2)/y_cb(oh2 - 1)
@@ -767,9 +763,9 @@ contains
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
         if (.not. (any(own_lo) .or. any(own_hi))) return
-        ! L0/L1 (coarse) frame for the shared kernel: outside cell = region boundary +/-1 in local (sidx-offset) coords; the
-        ! creg-local loop range is the owned transverse overlap [tlo:thi] block-relative; ownership -> unit face weights; cell
-        ! widths from the global coarse grid (amr_ref_ratio = 2, dt = coarse step).
+        ! L0/L1 (coarse) frame for the shared kernel: outside cell = region boundary +/-1 in local (sidx-offset) coords; creg-local
+        ! loop range is the owned transverse overlap [tlo:thi] block-relative; ownership -> unit face weights; cell widths from the
+        ! global coarse grid (amr_ref_ratio = 2, dt = coarse step).
         olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; w_lo = 0._wp; w_hi = 0._wp; mlo = 1._wp; mhi = 1._wp
         do d = 1, num_dims
             olo(d) = amr_region_lo(d) - 1 - sidx(d); ohi(d) = amr_region_hi(d) + 1 - sidx(d)
@@ -784,7 +780,7 @@ contains
             if (own_lo(2)) mlo(2) = dy(olo(2))
             if (own_hi(2)) mhi(2) = dy(ohi(2))
             ! cyl_coord (axisymmetric): area-weight the radial c/f correction by r_face/r_cell (mirror of s_amr_apply_reflux). L0/L1
-            ! coarse frame -> global y_cb/y_cc for the owned outside cell. r_+ = y_cb(olo(2)) low face; r_- = y_cb(ohi(2)-1) high.
+            ! coarse frame -> global y_cb/y_cc for the owned outside cell. r_+ = y_cb(olo(2)) low; r_- = y_cb(ohi(2)-1) high.
             if (cyl_coord) then
                 if (own_lo(2)) mlo(2) = mlo(2)*y_cc(olo(2))/y_cb(olo(2))
                 if (own_hi(2)) mhi(2) = mhi(2)*y_cc(ohi(2))/y_cb(ohi(2) - 1)
@@ -802,13 +798,12 @@ contains
     !! w*dtl*(Fbar_fine - F_coarse)/m on the high face for each active dim, where F_coarse is creg and Fbar_fine averages freg over
     !! the rr**(ndim-1) covering fine faces. Used by BOTH s_amr_apply_reflux_state (L0/L1, coarse/sidx frame, unit weights from
     !! ownership, rr=2) and s_amr_reflux_to_parent (L2->L1, parent-fine frame, sibling-seam weights, rr=amr_ref_ratio). All framing
-    !! is passed by the caller so the flux-correction math is single-sourced: islot - register slot (amr_cur) rr - refinement ratio
-    !! (fine faces per coarse face per transverse dim) dtl - reflux dt olo/ohi(d) - the outside coarse-cell index just below/above
-    !! the block face in dim d glo/ghi(d) - creg-local loop range in dim d (transverse for the two faces d' /= d) woff(d) -
-    !! transverse write origin so the cell index is woff(d) + g w_lo/w_hi(d) - per-face weight (0 skips the write: unowned face at
-    !! np>1, or a fine-fine sibling-tile seam) mlo/mhi(d) - outside-cell width for the low/high face (invalid/unused where the
-    !! weight is 0) A zero weight SKIPS the write (not multiply-by-0) because the outside index may be out of bounds on an unowned
-    !! face.
+    !! is caller-passed so the flux-correction math is single-sourced: islot - register slot (amr_cur); rr - refinement ratio (fine
+    !! faces per coarse face per transverse dim); dtl - reflux dt; olo/ohi(d) - outside coarse-cell index just below/above the block
+    !! face in dim d; glo/ghi(d) - creg-local loop range in dim d (transverse for the two faces d' /= d); woff(d) - transverse write
+    !! origin so the cell index is woff(d) + g; w_lo/w_hi(d) - per-face weight (0 skips the write: unowned face at np>1, or a
+    !! fine-fine sibling-tile seam); mlo/mhi(d) - outside-cell width for the low/high face (invalid/unused where weight is 0). A
+    !! zero weight SKIPS the write (not multiply-by-0) because the outside index may be out of bounds on an unowned face.
     impure subroutine s_amr_reflux_apply_faces(q, islot, rr, dtl, olo, ohi, glo, ghi, woff, w_lo, w_hi, mlo, mhi)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q
@@ -829,7 +824,7 @@ contains
             ol = olo(1); oh = ohi(1); w2 = woff(2); w3 = woff(3); wl = w_lo(1); wh = w_hi(1); ml = mlo(1); mh = mhi(1)
             if (cyl_coord) then
                 ! axisymmetric x-face: area-weight Fbar_fine by fine-face radius (rebuilt from the coarse y_cb of transverse cell
-                ! w2+g1) - the rr covering fine faces sit at different radii. cyl reaches here only single-level (L0 frame), so the
+                ! w2+g1) - the rr covering fine faces sit at different radii. cyl reaches here only single-level (L0 frame), so
                 ! global y_cb is the correct coarse grid.
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi, wsum, rf]')
                 do eq = 1, sys_size

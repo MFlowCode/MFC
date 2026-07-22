@@ -21,13 +21,13 @@ module m_rank_timing
     !> system_clock tick captured at the most recent tic
     integer(8) :: tic_count
     !> tic/toc nesting depth: only the outermost pair measures, so the AMR fine advance can bracket its compute segments while the
-    !! s_compute_rhs pair inside becomes a no-op (no double counting)
+    !! inner s_compute_rhs pair becomes a no-op (no double counting)
     integer :: tic_depth = 0
 
 contains
 
-    !> Start a per-rank wall-clock timing region. The device sync first ensures any prior GPU work has completed, so the interval
-    !! that follows measures only the timed region.
+    !> Start a per-rank wall-clock timing region. The device sync first drains any prior GPU work, so the interval that follows
+    !! measures only the timed region.
     impure subroutine s_rank_time_tic
 
         if (.not. rank_time_wrt) return
@@ -38,9 +38,8 @@ contains
 
     end subroutine s_rank_time_tic
 
-    !> End a per-rank wall-clock timing region and accumulate its wall duration. The device sync first forces the timed GPU kernels
-    !! to complete, so the wall interval reflects real compute time (cpu_time would capture only host-side launch overhead on the
-    !! GPU backend).
+    !> End a per-rank wall-clock timing region and accumulate its wall duration. The device sync first drains the timed GPU kernels,
+    !! so the wall interval reflects real compute time (cpu_time would capture only host-side launch overhead on the GPU backend).
     impure subroutine s_rank_time_toc
 
         integer(8) :: toc_count, rate
@@ -59,7 +58,7 @@ contains
 
     end subroutine s_rank_time_toc
 
-    !> Reduce per-rank accumulated compute time to a max/mean imbalance and print on rank 0, then reset the accumulator for the next
+    !> Reduce per-rank accumulated compute time to a max/mean imbalance, print on rank 0, then reset the accumulator for the next
     !! interval.
     impure subroutine s_report_rank_time
 

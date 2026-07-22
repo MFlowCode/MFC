@@ -59,8 +59,8 @@ contains
 
         if (.not. sfc_partition_wrt) return
 
-        ! Build a 3-element start offset safe to access regardless of num_dims.
-        ! start_idx is allocated (1:num_dims) only; higher dims are always 0.
+        ! 3-element start offset safe to access regardless of num_dims (start_idx is allocated
+        ! (1:num_dims) only; higher dims are always 0).
         sfc_start = 0
         sfc_start(1) = start_idx(1)
         if (num_dims >= 2) sfc_start(2) = start_idx(2)
@@ -158,9 +158,9 @@ contains
                 end do
             end do
         end do
-        ! index sort by Morton code: bottom-up mergesort, O(n_tiles log n_tiles). A selection
-        ! loop is prohibitive at fine tile sizes (n_tiles reaches 1e6+ on large 3D grids).
-        ! Codes are unique (one per tile), so the order is deterministic on every rank.
+        ! Index sort by Morton code: bottom-up mergesort, O(n_tiles log n_tiles). A selection loop is
+        ! prohibitive at fine tile sizes (n_tiles reaches 1e6+ on large 3D grids). Codes are unique
+        ! (one per tile), so the order is deterministic on every rank.
         do i = 1, n_tiles
             order(i) = i - 1
         end do
