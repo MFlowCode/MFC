@@ -516,6 +516,11 @@ contains
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
+        ! AMR NOTE: when amr_in_fine_advance is true, the grid globals (m/n/p, idwint/idwbuff, x_cb..dz) are SWAPPED to a fine
+        ! block's values (s_amr_swap_to_fine). Code that reads a module-level array precomputed against the COARSE grid must guard
+        ! on .not. amr_in_fine_advance or read the swapped/refreshed state - see the ab_int GPU_UPDATE below and the swap contract
+        ! in m_amr.fpp. Adding a physics hook here that indexes coarse-baked state is the ab_int/acoustic-source hazard.
+
         call nvtxStartRange("COMPUTE-RHS")
 
         if (ab_active .and. ab_prim_seeded) then

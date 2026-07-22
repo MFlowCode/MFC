@@ -4,9 +4,9 @@
 
 #:include 'macros.fpp'
 
-!> @brief Block-structured AMR: up to amr_max_blocks 2:1 refined level-1 blocks, advanced with the shared solver via grid-state
-!! swap, conservatively coupled to level 0 (ghost prolongation, Berger-Colella flux reflux, restriction), with optional dt/2
-!! subcycling and dynamic regrid.
+!> @brief Block-structured AMR: up to amr_max_blocks refined blocks (2:1 or 4:1 per ref_ratio), optionally nested to amr_max_level,
+!! advanced with the shared solver via grid-state swap and conservatively coupled to each block's parent level (ghost prolongation,
+!! Berger-Colella flux reflux, restriction), with optional dt/2 subcycling and dynamic regrid.
 module m_amr
 
 #ifdef MFC_MPI
@@ -117,6 +117,14 @@ module m_amr
     !! 2*(isect cells) - 1 <= local extent holds by construction. Equals amr_maxc at np=1.
     integer :: amr_maxc_fit(3) = 1
 
+    !> SWAP CONTRACT (s_amr_swap_to_fine / s_amr_restore_coarse). The AMR fine advance runs the shared solver on a fine block by
+    !! swapping these coarse-grid globals to the block's values and restoring them after: m/n/p, idwint/idwbuff, the nine coordinate
+    !! arrays (sw_x_cb..sw_dz below), acoustic_source, ab_active; the WENO/hypoelastic/IGR spacing coefficients are recomputed for
+    !! the active grid rather than saved. RULE for anyone adding grid-dependent state: any module-level variable DERIVED from
+    !! m/n/p/idwint/idwbuff/coords that a kernel reads on the fine grid must be swapped here OR refreshed on every fine call at its
+    !! use site - and if it is GPU_DECLARE'd, its DEVICE copy must be refreshed too. A stale device copy of coarse bounds reads out
+    !! of range on the fine grid under CCE OpenACC (the ab_int regression, fixed by a per-call GPU_UPDATE in s_compute_rhs; see
+    !! m_rhs.fpp and .claude/rules/common-pitfalls.md). amr_swapped guards against a nested/unpaired swap.
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
@@ -132,7 +140,10 @@ module m_amr
     !> Per-fine-cell radial volume weight for cyl_coord restriction (axisymmetric): the fold-back must be volume-weighted and cell
     !! volume is proportional to radius, so a fine child is weighted by its own cell-center radius y_cc. Filled from the active
     !! block's fine y_cc each restriction and read IDENTICALLY by the device kernel and the host scatter path so np=1 == np>=2 stays
-    !! element-exact. Allocated only for cyl_coord (Cartesian restriction is untouched).
+    !! element-exact. Allocated only for cyl_coord (Cartesian restriction is untouched). Its DEVICE copy is refreshed (GPU_UPDATE)
+    !! only in s_restrict_fine_to_coarse; s_amr_restrict_to_parent reads it WITHOUT refreshing, which is safe ONLY because
+    !! m_checker.fpp forbids cyl_coord with amr_max_level > 1 - lifting that gate makes this an ab_int-class stale-device bug (the
+    !! parent fold needs a fresh per-block radius table). See the SWAP CONTRACT note above.
     real(wp), allocatable :: amr_rvw(:)
     $:GPU_DECLARE(create='[amr_rvw]')
 
@@ -213,7 +224,7 @@ contains
         allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
         amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
         amr_block_owner = 0
-        amr_block_level = 1  ! single fine level today; the regrid tags each block's level once multi-level nesting lands
+        amr_block_level = 1  ! init default (level-1); regrid re-tags each block's level for multi-level nesting
         amr_num_levels = 1
         amr_num_blocks = 1
         amr_cur = 1
@@ -566,7 +577,8 @@ contains
     !! ghosts). The packed data is wp, cast to stp into amr_cg (identity for stp coarse), device-current on exit. INVARIANT:
     !! "coarse" here means the block's PARENT level (level l-1), NOT the base grid (level 0). For a level-1 block the parent IS L0,
     !! but a level>=2 block folds to/from its parent block's fine array; the C<->F prolong/restrict/gather routines all operate in
-    !! the parent-fine frame, not the L0 frame.
+    !! the parent-fine frame, not the L0 frame. TWIN s_amr_gather_coarse_patch_pbmv (q<->pb/mv): same P2P skeleton (rank-range,
+    !! intersection, pack/send/recv/unpack) and patch-local frame - keep them lockstep.
     impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -736,7 +748,8 @@ contains
     !> Non-polytropic QBMM analogue of s_amr_gather_coarse_patch: gather the current block's coarse pb/mv patch into amr_cg_pb/
     !! amr_cg_mv (block-local/patch frame, cell 0 == amr_cpat_off), P2P from the coarse-cell owners into the block owner. Per-cell
     !! payload = 2*nnode*nb (pb block then mv block). Single-level only (level>=2 QBMM np>=2 is checker-gated); wire is wp, cast to
-    !! stp on unpack (identity for stp coarse), so at np=1 the owner copies its own coarse over the patch bit-for-bit.
+    !! stp on unpack (identity for stp coarse), so at np=1 the owner copies its own coarse over the patch bit-for-bit. TWIN
+    !! s_amr_gather_coarse_patch (pb/mv<->q): mirrors the q_cons gather's P2P skeleton and patch-local frame - keep lockstep.
     impure subroutine s_amr_gather_coarse_patch_pbmv(pb_coarse, mv_coarse, pull_host)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
@@ -1114,6 +1127,7 @@ contains
 
     !> Runtime device analogue of s_amr_unpack_patch: copy the owner's own coarse box [bl:bh] GLOBAL from q_coarse (device) into
     !! amr_cg (device) in the patch-local frame - no host round-trip. Same index map and direct stp assignment as the host path.
+    !! TWIN s_amr_gather_own_box_pbmv_device (q<->pb/mv): same own-box index map; keep lockstep.
     impure subroutine s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -1141,7 +1155,8 @@ contains
     !> Runtime device pack of the overlap box [bl:bh] GLOBAL from q_coarse (device) into the contiguous wire buffer buf (host, via
     !! copyout) - only the box crosses PCIe, not the full field. Explicit-loop linear buf indexing (g1 fastest, then g2, g3, i) and
     !! the wp cast match the host pack in s_amr_gather_coarse_patch element-for-element, so the receiver's unpack is layout- and
-    !! byte-identical (same discipline as s_amr_fine_slice: no array-section syntax near the device map).
+    !! byte-identical (same discipline as s_amr_fine_slice: no array-section syntax near the device map). TWIN
+    !! s_amr_pack_box_pbmv_device (q<->pb/mv): same wire linear order + wp cast; keep lockstep.
     impure subroutine s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, buf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -1168,7 +1183,7 @@ contains
 
     !> Runtime device unpack of a received overlap box [bl:bh] GLOBAL from the contiguous wire buffer buf (host, via copyin) into
     !! amr_cg (device) in the patch-local frame - only the box crosses PCIe. Same linear order and stp cast as the host unpack in
-    !! s_amr_gather_coarse_patch.
+    !! s_amr_gather_coarse_patch. TWIN s_amr_unpack_box_pbmv_device (q<->pb/mv): same wire linear order + stp cast; keep lockstep.
     impure subroutine s_amr_unpack_box_device(bl, bh, buf)
 
         integer, intent(in)              :: bl(3), bh(3)
@@ -1194,7 +1209,8 @@ contains
     end subroutine s_amr_unpack_box_device
 
     !> Runtime device own-box copy for the pbmv gather: pb/mv (device) -> amr_cg_pb/mv (device) over [bl:bh] GLOBAL in the
-    !! patch-local frame. Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch_pbmv.
+    !! patch-local frame. Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch_pbmv. TWIN
+    !! s_amr_gather_own_box_device (pb/mv<->q): q_cons sibling of this own-box copy; keep the index map lockstep.
     impure subroutine s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
@@ -1222,7 +1238,8 @@ contains
 
     !> Runtime device pack for the pbmv gather: pb block then mv block of the overlap box [bl:bh] GLOBAL into the contiguous wire
     !! buffer buf (host, via copyout). Linear order (g1 fastest, then g2, g3, q, ib_; mv offset by half the message) and wp cast
-    !! match the host pack in s_amr_gather_coarse_patch_pbmv element-for-element.
+    !! match the host pack in s_amr_gather_coarse_patch_pbmv element-for-element. TWIN s_amr_pack_box_device (pb/mv<->q): q_cons
+    !! sibling; keep the wire linear order + wp cast lockstep.
     impure subroutine s_amr_pack_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3, buf)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
@@ -1253,7 +1270,8 @@ contains
     end subroutine s_amr_pack_box_pbmv_device
 
     !> Runtime device unpack for the pbmv gather: received wire buffer buf (host, via copyin) -> amr_cg_pb/mv (device) over [bl:bh]
-    !! GLOBAL in the patch-local frame. Same linear order and stp cast as the host unpack in s_amr_gather_coarse_patch_pbmv.
+    !! GLOBAL in the patch-local frame. Same linear order and stp cast as the host unpack in s_amr_gather_coarse_patch_pbmv. TWIN
+    !! s_amr_unpack_box_device (pb/mv<->q): q_cons sibling; keep the wire linear order + stp cast lockstep.
     impure subroutine s_amr_unpack_box_pbmv_device(bl, bh, buf)
 
         integer, intent(in)              :: bl(3), bh(3)
@@ -1689,7 +1707,9 @@ contains
 
     !> Conservative-linear prolongation: fill amr_fine interior from coarse (level-0), minmod-limited. Symmetric child offsets
     !! (+/-1/4 of a coarse cell) => the ref_ratio^d children average to the coarse value. Multi-fluid volume fractions take the
-    !! sum-preserving closure path instead (single-fluid runs never branch, so their prolongation is untouched).
+    !! sum-preserving closure path instead (single-fluid runs never branch, so their prolongation is untouched). TWIN
+    !! s_amr_prolong_pbmv (q<->pb/mv): pb/mv sibling of this prolongation (piecewise-constant there); keep the child-offset frame
+    !! and volume-fraction closure lockstep.
     impure subroutine s_interpolate_coarse_to_fine()
 
         integer :: i, bstride
@@ -2085,6 +2105,8 @@ contains
         integer :: pblk, rr, nchild, dj_hi, dk_hi
 
         if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner folds locally
+        ! NOTE: reads amr_rvw's device copy without a GPU_UPDATE - safe only while cyl_coord + amr_max_level > 1 is checker-gated
+        ! (this path never runs under cyl_coord). If that gate is lifted, refresh amr_rvw here first (see its declaration).
         pblk = f_amr_parent_block(amr_cur)
         rr = amr_slots(amr_cur)%ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
@@ -2159,7 +2181,8 @@ contains
     !! as the old host restrict path, so it is bit-identical to it on CPU and matches the coarse restriction. q_fine (==
     !! amr_slots(amr_cur)%q_cons) and coarse_tgt are device-resident (ACC_SETUP_SFs). TWIN: s_amr_restrict_pack_device runs this
     !! same child-sum into a wire buffer - any change to the loop order, arithmetic, or casts here must be mirrored there,
-    !! byte-identically (owner-local and scattered coarse cells must match bit-for-bit).
+    !! byte-identically (owner-local and scattered coarse cells must match bit-for-bit). TWIN(q<->pb/mv)
+    !! s_amr_restrict_pbmv_box_device runs this same child-sum on pb/mv - keep the stencil lockstep.
     impure subroutine s_amr_restrict_overwrite_device(coarse_tgt, q_fine, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -2225,7 +2248,8 @@ contains
     !! PCIe, not the full fine field. Same child-sum order and wp values as s_amr_restrict_overwrite_device (no stp cast: the wire
     !! carries wp and the receiver casts), packed with ci fastest, then cj, ck, i, matching the receiver's sequential unpack. TWIN:
     !! s_amr_restrict_overwrite_device runs this same child-sum in place - any change to the loop order, arithmetic, or casts here
-    !! must be mirrored there, byte-identically (owner-local and scattered coarse cells must match bit-for-bit).
+    !! must be mirrored there, byte-identically (owner-local and scattered coarse cells must match bit-for-bit). TWIN(q<->pb/mv)
+    !! s_amr_restrict_pbmv_pack_device runs this same child-sum into a wire buffer - keep it lockstep.
     impure subroutine s_amr_restrict_pack_device(q_fine, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_fine
@@ -2424,7 +2448,9 @@ contains
 
     !> Non-polytropic QBMM: piecewise-constant prolongation of the block's pb/mv interior from the gathered coarse side-state
     !! amr_cg_pb/mv (patch-local frame; the callers run s_amr_gather_coarse_patch_pbmv on ALL ranks first, so np>=2 couples to the
-    !! correct coarse rank). HOST loops + device push; the gather is host-current (.not. pull_host).
+    !! correct coarse rank). HOST loops + device push; the gather is host-current (.not. pull_host). TWIN
+    !! s_interpolate_coarse_to_fine (pb/mv<->q): pb/mv is piecewise-constant where q_cons is minmod-limited, but the child-offset
+    !! frame and realizability/closure policy track it; keep those lockstep.
     impure subroutine s_amr_prolong_pbmv()
 
         integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
@@ -2463,7 +2489,8 @@ contains
     !> Non-polytropic QBMM: piecewise-constant prolongation of the fine pb/mv GHOST shell from the coarse side-state (device kernel;
     !! interior untouched). The ghosts feed the widened-idwint conversions and the qbmm rhs over the shell, mirroring the q_cons
     !! ghost fill. All four arrays are assumed-shape dummies with %sf pointer-member actuals (the device-proven pb_ts pattern); only
-    !! raw derived-type 5D members as actuals tripped nvfortran's component-section data clauses on device.
+    !! raw derived-type 5D members as actuals tripped nvfortran's component-section data clauses on device. TWIN
+    !! s_amr_fill_fine_ghosts (pb/mv<->q): q_cons sibling; keep the ghost-fill mapping lockstep.
     impure subroutine s_amr_fill_fine_ghosts_pbmv(pb_c, mv_c, pb_t, mv_t)
 
         !> coarse pb/mv are read from the gathered block-local patch amr_cg_pb/mv (0-based patch frame, cell 0 == amr_cpat_off): the
@@ -2507,7 +2534,8 @@ contains
 
     end subroutine s_amr_fill_fine_ghosts_pbmv
 
-    !> Non-polytropic QBMM: device copy of the block's pb/mv into the step-entry backup (SSP-RK).
+    !> Non-polytropic QBMM: device copy of the block's pb/mv into the step-entry backup (SSP-RK). TWIN s_amr_copy_fine_fields
+    !! (pb/mv<->q): q_cons sibling of this step-entry backup; keep lockstep.
     impure subroutine s_amr_backup_pbmv(pb_s, mv_s, pb_d, mv_d)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
@@ -2537,7 +2565,8 @@ contains
     end subroutine s_amr_backup_pbmv
 
     !> Non-polytropic QBMM: SSP-RK stage update of the block's pb/mv (device kernel, interior only; mirror of the coarse pb_ts/mv_ts
-    !! stage combination in m_time_steppers).
+    !! stage combination in m_time_steppers). TWIN s_amr_fine_rk_update + s_tvd_rk (m_time_steppers): same SSP-RK stage combination
+    !! on pb/mv; keep all three lockstep.
     impure subroutine s_amr_fine_rk_update_pbmv(pb_u, mv_u, pb_s, mv_s, rpb, rmv, c1, c2, c3, c4, dtl)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
@@ -2624,6 +2653,7 @@ contains
     !! same GPU-only clobber the q_cons device overwrite avoids). Same child-sum as s_restrict_pbmv. TWIN:
     !! s_amr_restrict_pbmv_pack_device runs this same child-sum into a wire buffer - any change to the loop order, arithmetic, or
     !! casts here must be mirrored there, byte-identically (local and scattered coarse pb/mv must match bit-for-bit).
+    !! TWIN(pb/mv<->q) s_amr_restrict_overwrite_device is the q_cons sibling of this child-sum - keep the stencil lockstep.
     impure subroutine s_amr_restrict_pbmv_box_device(pb_c, mv_c, pb_fin, mv_fin, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_c, mv_c
@@ -2667,7 +2697,8 @@ contains
     !! contiguous wire buffer buf (host, via copyout; pb block then mv block, ci fastest) - only the slice crosses PCIe, not the
     !! full fine side-state. Same child-sum as s_amr_restrict_pbmv_box_device; the wire carries wp and the receiver casts to stp.
     !! TWIN: s_amr_restrict_pbmv_box_device runs this same child-sum in place - any change to the loop order, arithmetic, or casts
-    !! here must be mirrored there, byte-identically (local and scattered coarse pb/mv must match bit-for-bit).
+    !! here must be mirrored there, byte-identically (local and scattered coarse pb/mv must match bit-for-bit). TWIN(pb/mv<->q)
+    !! s_amr_restrict_pack_device is the q_cons sibling of this packed child-sum - keep it lockstep.
     impure subroutine s_amr_restrict_pbmv_pack_device(pb_fin, mv_fin, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
@@ -2715,7 +2746,9 @@ contains
     !! mirroring the q_cons scatter in s_restrict_fine_to_coarse. The owner restricts the covered cells it holds (device, owned box)
     !! and SENDS each other coarse-owner its covered pb/mv slice (device-packed averages, pb block then mv block); that owner
     !! overwrites its local coarse. Called on ALL ranks at np>=2 (owner/non-owner split inside) so the P2P send/recv pair up; np=1
-    !! is handled locally by the direct s_restrict_pbmv call (this routine is reached only when num_procs > 1).
+    !! is handled locally by the direct s_restrict_pbmv call (this routine is reached only when num_procs > 1). TWIN
+    !! s_restrict_fine_to_coarse (scatter half, pb/mv<->q): same scatter skeleton (owner sends covered coarse slices, each
+    !! coarse-owner overwrites its local cells) - keep lockstep.
     impure subroutine s_amr_scatter_pbmv(pb_fin, mv_fin)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
@@ -3148,7 +3181,8 @@ contains
     !> Fill the fine ghost shell of q_fine by conservative-linear prolongation from q_coarse - the gathered block-local coarse patch
     !! amr_cg (fine-level distribution; the caller gathers the source first). Device kernel: reads the patch and writes the fine
     !! target in device memory. floor/modulo mapping is valid for negative fine indices (ghosts). Interior untouched. Multi-fluid
-    !! volume fractions get the same sum-preserving closure as the interior prolongation (second kernel).
+    !! volume fractions get the same sum-preserving closure as the interior prolongation (second kernel). TWIN
+    !! s_amr_fill_fine_ghosts_pbmv (q<->pb/mv): pb/mv sibling of this ghost prolongation; keep the mapping lockstep.
     impure subroutine s_amr_fill_fine_ghosts(q_coarse, q_fine)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_coarse
@@ -3288,7 +3322,7 @@ contains
     end subroutine s_amr_fill_fine_ghosts
 
     !> Lerp the fine ghost shell of q_tgt between q_a (coarse t^n) and q_b (coarse t^{n+1}) at time fraction th (device kernel).
-    !! Interior untouched.
+    !! Interior untouched. TWIN s_amr_lerp_fine_ghosts_pbmv (q<->pb/mv): pb/mv sibling of this ghost lerp; keep lockstep.
     impure subroutine s_amr_lerp_fine_ghosts(q_a, q_b, q_tgt, th)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_a, q_b
@@ -3318,7 +3352,8 @@ contains
 
     !> Non-polytropic QBMM twin of s_amr_lerp_fine_ghosts: lerp the block's pb/mv ghost shell between the coarse t^n and t^{n+1}
     !! sources at the substage time (device kernel; interior untouched). Ghost pb feeds the mixture pressure in the widened
-    !! conversion, so it gets the same time treatment as the conservative ghosts.
+    !! conversion, so it gets the same time treatment as the conservative ghosts. TWIN s_amr_lerp_fine_ghosts (pb/mv<->q): q_cons
+    !! sibling; keep the lerp lockstep.
     impure subroutine s_amr_lerp_fine_ghosts_pbmv(pb_t, mv_t, pga, mga, pgb, mgb, th)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
@@ -3352,7 +3387,8 @@ contains
 
     end subroutine s_amr_lerp_fine_ghosts_pbmv
 
-    !> Device copy q_src -> q_dst over [b1:e1, b2:e2, b3:e3] for all sys_size fields (RK step-entry backup).
+    !> Device copy q_src -> q_dst over [b1:e1, b2:e2, b3:e3] for all sys_size fields (RK step-entry backup). TWIN s_amr_backup_pbmv
+    !! (q<->pb/mv): pb/mv sibling of this step-entry backup; keep lockstep.
     impure subroutine s_amr_copy_fine_fields(q_src, q_dst, b1, e1, b2, e2, b3, e3)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_src
@@ -3375,7 +3411,8 @@ contains
     end subroutine s_amr_copy_fine_fields
 
     !> Device RK stage update over the fine interior: q = (c1*q + c2*q_stor + c3*dt_in*rhs)/c4 (compute in wp, store stp). Mirrors
-    !! the coarse non-IGR rk_coef form in s_tvd_rk.
+    !! the coarse non-IGR rk_coef form in s_tvd_rk. TWIN s_amr_fine_rk_update_pbmv + s_tvd_rk (m_time_steppers): same SSP-RK stage
+    !! combination; keep all three lockstep.
     impure subroutine s_amr_fine_rk_update(q_upd, q_stor, q_rhs, c1, c2, c3, c4, dt_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_upd

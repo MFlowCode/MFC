@@ -322,14 +322,17 @@ module m_global_parameters
     !! m_amr_registers can read it without a use-cycle through m_amr.
     integer :: amr_region_lo(3) = 0, amr_region_hi(3) = 0
 
-    !> Per-dim intersection of the block with THIS rank's subdomain, GLOBAL level-0 cell indices (kept by s_set_amr_fine_geometry;
-    !! collapsed dims 0:0). May be empty (lo > hi) in a dim; amr_rank_owns_block = nonempty in all active dims. The rank's fine
-    !! level covers exactly this intersection: local fine index 0 = block-global fine index 2*(amr_isect_lo - amr_region_lo).
+    !> The block's coarse footprint driving the coarse<->fine gather/scatter, per dim (kept by s_set_amr_fine_geometry; collapsed
+    !! dims 0:0). Under whole-block ownership it is the ENTIRE block on its owner and empty (lo > hi) on every other rank
+    !! (amr_rank_owns_block = nonempty in all active dims). Frame is level-dependent: a LEVEL-1 block records GLOBAL level-0 cell
+    !! indices; a LEVEL>=2 owner records its PARENT block's fine-cell frame, ref_ratio*(region - parent_region_lo) with the parent's
+    !! ref_ratio (a level-l block's coarse side is level l-1). Local fine index 0 maps to footprint cell amr_isect_lo; the owner
+    !! holds ref_ratio*(footprint width) fine cells per dim.
     integer :: amr_isect_lo(3) = 0, amr_isect_hi(3) = 0
 
-    !> Number of currently-active AMR fine-block slots (T1: forced to 1) and the working slot index selecting which slot the
-    !! per-block machinery (advance/reflux/restrict/regrid/IO) operates on. Read by m_amr and m_amr_registers (mirrors, no
-    !! use-cycle).
+    !> Number of currently-active AMR fine-block slots (>= 1; grows with max_grid_size tiling, multi-block regrid, and nesting) and
+    !! the working slot index selecting which slot the per-block machinery (advance/reflux/restrict/regrid/IO) operates on. Read by
+    !! m_amr and m_amr_registers (mirrors, no use-cycle).
     integer :: amr_num_blocks = 1, amr_cur = 1
 
     !> Per-slot mirror storage (allocated 1:amr_max_blocks by the AMR module): the region box, the rank's intersection, and its
@@ -341,7 +344,8 @@ module m_global_parameters
     logical, allocatable :: amr_owns_all(:)
     !> Multi-level nesting (amr_multilevel.md): the refinement level of each active block (1..amr_max_level). A level-l block
     !! refines a covering level-(l-1) region, so its coupling coarse side is level l-1 (L0 when l==1). amr_num_levels is the deepest
-    !! level currently populated. Both are 1 today (single fine level); the block region stays in L0 cell indices at every level.
+    !! level currently populated. The block region stays in L0 cell indices at every level (the fine extent per dim is
+    !! ref_ratio**level * region-width - 1).
     integer, allocatable :: amr_block_level(:)
     integer              :: amr_num_levels = 1
 
