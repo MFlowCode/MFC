@@ -523,9 +523,10 @@ contains
                     call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                   & t_step)
                     ! reflux into "the coarse". A level-1 block corrects the L0 rhs (rhs form; L0 updates after the stage loop). A
-                    ! level>=2 block's coarse side is its PARENT L1 - its Berger-Colella correction needs L1's flux at the block's
-                    ! footprint faces (creg captured during L1's advance) and applies as a STATE reflux; that parent-flux capture is
-                    ! the remaining piece (increment 3 step 4b), so level>=2 blocks skip the L0 reflux here for now.
+                    ! level>=2 block's coarse side is its PARENT (level l-1) - its Berger-Colella correction needs the parent's flux
+                    ! at the block's footprint faces (creg captured during the parent's advance) and applies as a STATE reflux into
+                    ! the parent via s_amr_reflux_to_parent after the stage loop, NOT into L0 - so level>=2 blocks skip L0 reflux
+                    ! here.
                     if (amr_block_level(amr_cur) >= 2) cycle
                     ! freg slices of the block faces move to the coarse-outside-owners (ALL ranks call; no-op at np=1)
                     call s_amr_p2p_reflux_faces()
@@ -534,6 +535,9 @@ contains
                 call s_amr_select_slot(1)
             end if
 
+            ! TWIN of the AMR fine-block RK updates: this coarse rk_coef stage combination (q = (c1*q + c2*q_stor + c3*dt*rhs)/c4)
+            ! is mirrored by s_amr_fine_rk_update (q_cons) and s_amr_fine_rk_update_pbmv (pb/mv) in m_amr - change the coefficient
+            ! algebra here and both must follow, or fine blocks integrate a different scheme.
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
             if (ab_active) then
                 jlo = ab_x%beg; jhi = ab_x%end

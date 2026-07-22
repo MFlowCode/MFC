@@ -33,6 +33,16 @@ covered in `docs/documentation/contributing.md`.
   to/from its parent block's fine array. `s_amr_gather_coarse_patch`,
   `s_interpolate_coarse_to_fine`, and the restrict/reflux path all operate in the
   parent-fine frame — assuming L0 silently corrupts level≥2 coupling.
+- **The fine advance SWAPS the coarse grid globals (`m/n/p`, `idwint/idwbuff`, coords,
+  `acoustic_source`, `ab_active`) to a fine block and restores them after — see the SWAP
+  CONTRACT block at the `sw_*` declarations in `m_amr.fpp`.** Any module-level variable
+  DERIVED from the grid that a kernel reads during the fine advance must be swapped there or
+  refreshed per fine call at its use site; if it is `GPU_DECLARE`'d, its DEVICE copy must be
+  refreshed too. A stale device copy of coarse bounds reads out of range on the fine grid
+  under **CCE OpenACC only** (NVHPC/CCE-omp evaluate bounds host-side) — this was the `ab_int`
+  regression, fixed by an unconditional `GPU_UPDATE` in `s_compute_rhs`. `amr_rvw` (cyl_coord
+  radius weights) is the next candidate, currently safe only via a `m_checker.fpp` gate.
+  A CPU-only or NVHPC-acc pass proves NOTHING here; this class is CCE-acc-specific.
 
 ## GPU
 

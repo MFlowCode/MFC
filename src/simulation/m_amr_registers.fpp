@@ -233,7 +233,8 @@ contains
     !! species mass fluxes, plus the energy flux only when NOT viscous (the viscous pass already captured flux_src(E)). Species use
     !! a seq inner loop (a runtime range). The device kernel collapses (slot, t2, t1) over the rectangular caps [0:maxt2]x[0:maxt1]
     !! (max over slots) and cycles inactive slots / out-of-window cells. Per-slot geometry is host-filled + GPU_UPDATE'd by the
-    !! caller. Used for the chem capture on BOTH the coarse-self and child sides.
+    !! caller. Used for the chem capture on BOTH the coarse-self and child sides. TWIN of the chemistry freg capture in
+    !! s_amr_capture_boundary_flux (fine branch): same species-always + energy-only-when-not-viscous policy - keep lockstep.
     impure subroutine s_amr_capture_creg_chem_batch(nb, id, flux, cf, maxt1, maxt2)
 
         integer, intent(in)            :: nb, id, maxt1, maxt2
@@ -328,7 +329,13 @@ contains
             coef = 1._wp; accum = .false.  ! overwrite each stage - default behavior, byte-identical
         end if
         if (amr_in_fine_advance) then
-            ! fine branch: globals swapped; jlo=-1, jhi=current fine extent in direction id
+            ! fine branch: globals swapped; jlo=-1, jhi=current fine extent in direction id.
+            ! TWIN of the creg capture: the advective / viscous (flux_src mom..E) / chemistry (flux_src species always, energy only
+            ! when NOT viscous) captures below must stay lockstep with s_amr_capture_creg_dense_batch +
+            ! s_amr_capture_creg_chem_batch,
+            ! which encode the identical policy on the coarse side. The "energy only when not viscous" rule appears in FOUR places -
+            ! here (the freg viscous + chemistry blocks) and in both creg batch helpers - change one and change all, or the c/f
+            ! reflux subtracts mismatched coarse/fine fluxes (a conservation leak no single-level test catches).
             select case (id)
             case (1); jlo = -1; jhi = m; t1_hi = n; t2_hi = p
             case (2); jlo = -1; jhi = n; t1_hi = m; t2_hi = p
