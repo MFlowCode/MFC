@@ -647,8 +647,11 @@ contains
             particle_cloud(i)%radius = dflt_real
             particle_cloud(i)%mass = dflt_real
             particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%shell_inner_radius = dflt_real
+            particle_cloud(i)%shell_outer_radius = dflt_real
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
+            particle_cloud(i)%geometry = 1
             particle_cloud(i)%packing_method = dflt_int
         end do
 

@@ -628,7 +628,12 @@ class CaseValidator:
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
+            geometry = self.get(f"particle_cloud({i})%geometry", 1)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
+            self.prohibit(
+                geometry not in [1, 2],
+                f"particle_cloud({i})%geometry must be 1 (box) or 2 (hemisphere shell)",
+            )
             self.prohibit(
                 packing_method is None,
                 f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
@@ -636,6 +641,16 @@ class CaseValidator:
             self.prohibit(
                 packing_method is not None and packing_method not in [1, 2],
                 f"particle_cloud({i})%packing_method must be 1 (rejection sampling) or 2 (lattice)",
+            )
+            shell_outer_radius = self.get(f"particle_cloud({i})%shell_outer_radius", None)
+            shell_inner_radius = self.get(f"particle_cloud({i})%shell_inner_radius", None)
+            self.prohibit(
+                geometry == 2 and (shell_outer_radius is None or shell_inner_radius is None or shell_outer_radius <= shell_inner_radius),
+                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius",
+            )
+            self.prohibit(
+                geometry == 2 and packing_method == 2,
+                f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
             )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
