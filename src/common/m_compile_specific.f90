@@ -51,15 +51,19 @@ contains
 
     end subroutine s_delete_directory
 
-    !> Inquires on the existence of a directory
-    !! @param dircheck Switch that indicates if directory exists
+    !> Inquire on the existence of a directory or file
     impure subroutine my_inquire(fileloc, dircheck)
 
         character(LEN=*), intent(in) :: fileloc
         logical, intent(inout)       :: dircheck
 
 #ifdef __INTEL_COMPILER
-        inquire (DIRECTORY=trim(fileloc), EXIST=dircheck)  ! Intel
+        block
+            logical :: file_exist, dir_exist
+            inquire (FILE=trim(fileloc), EXIST=file_exist)
+            inquire (DIRECTORY=trim(fileloc), EXIST=dir_exist)
+            dircheck = file_exist .or. dir_exist
+        end block
 #else
         inquire (FILE=trim(fileloc), EXIST=dircheck)  ! GCC
 #endif

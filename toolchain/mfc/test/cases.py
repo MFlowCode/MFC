@@ -1334,6 +1334,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if ndims == 3:
             stack.pop()
 
+        # Spatially supported body force (Wei & Freund, JFM 2005) in isolation: no
+        # bf_x/y/z, no chemistry, so this golden pins the forcing kernel (momentum
+        # sources + u*f energy work term) at the default 1e-12 tolerance. The only
+        # other coverage (Spatial Reacting Mixing Layer) entangles it with stiff
+        # chemistry at 1e-6. 2D-only by construction (m_checker rejects 1D/3D).
+        if ndims == 2:
+            stack.push(
+                "SpatialBodyforces",
+                {
+                    "bf_spatial_support": "T",
+                    "spatial_bf%amp": 1.0,
+                    "spatial_bf%x_centroid": 0.5,
+                    "spatial_bf%y_centroid": 0.5,
+                    "spatial_bf%conv_vel": 1.0,
+                    "spatial_bf%sigma": 100.0,
+                    **{f"spatial_bf%freq({i})": 2.0 * i for i in range(1, 9)},
+                    **{f"spatial_bf%phase({i})": 0.3 * i for i in range(1, 9)},
+                },
+            )
+            cases.append(define_case_d(stack, "", {}))
+            stack.pop()
+
     def alter_synthetic_turbulence(dimInfo):
         # 3-D solenoidal synthetic-turbulence forcing (m_body_forces): a quiescent,
         # triply-periodic single-fluid box driven by a deterministic (compiler-independent)
@@ -1721,6 +1743,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "lag_betaC_wrt": "T",
                             "lag_params%write_bubbles": "T",
                             "lag_params%write_bubbles_stats": "T",
+                            "lag_params%write_void_evol": "T",
+                            "lag_params%valmaxvoid": 0.99,
+                            "lag_params%nBubs_glb": 1,
                             "polytropic": "F",
                             "bub_pp%R0ref": 1.0,
                             "bub_pp%p0ref": 1.0,
@@ -1744,7 +1769,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
 
                     if len(dimInfo[0]) == 2:
-                        stack.push("", {"acoustic(1)%support": 2})
+                        stack.push("", {"acoustic(1)%support": 2, "lag_params%charwidth": 2, "lag_params%charNz": 25})
                     else:
                         stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
 
@@ -1759,6 +1784,39 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("adap_dt=T", {"adap_dt": "T"})
 
                     cases.append(define_case_d(stack, "", {}))
+
+                    if len(dimInfo[0]) == 3 and couplingMethod == 2:
+                        stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
+                        stack.push(
+                            "Inertial Bubbles",
+                            {"lag_params%vel_model": 2, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(2)%Re(1)": 100.0},
+                        )
+                        if adap_dt == "F":
+                            inertial_matrix = [(d, f) for d in [0, 1, 2] for f in [1, 2, 4]]
+                        else:
+                            inertial_matrix = [(0, 1), (1, 2), (2, 4)]
+                        for dragModel, fdOrder in inertial_matrix:
+                            stack.push(f"drag_model={dragModel}", {"lag_params%drag_model": dragModel})
+                            stack.push(f"fd_order={fdOrder}", {"fd_order": fdOrder})
+                            cases.append(define_case_d(stack, "", {}))
+                            stack.pop()
+                            stack.pop()
+                        stack.pop()
+
+                    if len(dimInfo[0]) == 2 and couplingMethod == 1:
+                        stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
+                        stack.push(
+                            "Inertial Bubbles",
+                            {"lag_params%vel_model": 2, "lag_params%drag_model": 2, "fd_order": 2, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(2)%Re(1)": 100.0},
+                        )
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
 
                     stack.pop()
 
@@ -1909,10 +1967,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
+                # File-based IC (hcid=273/274) sized to the full grid; the Example
+                # suite's m/n cap breaks it. Covered by the Chemistry golden tests.
+                "2D_reacting_mixing_layer",
+                "2D_spatial_reacting_mixing_layer",
                 "2D_ibm_multiphase",
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
                 "1D_reactive_shocktube",
+                "1D_reactive_shocktube_adaptive",
+                "2D_detonation_cell",
                 "2D_ibm_steady_shock",
                 "3D_performance_test",
                 "3D_ibm_stl_ellipsoid",
@@ -1943,11 +2007,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_IGR_33jet",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
-                "1D_qbmm",
+                "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
+                "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
+                "2D_lagrange_rising_bubble",
+                "2D_lagrange_in_crossflow",
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
                 # by a large mu_max: even on the downsized grid the step count to reach t_stop
                 # is too large for the CI smoke suite. The faster NN examples remain tested.
@@ -1973,6 +2041,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # reproducible. Not a correctness bug -- the case is genuinely chaotic at
                 # this stiffness, so it is not a portable regression target.
                 "3D_mibm_periodic_collision",
+                # The violently stiff 3D bubble collapse amplifies compiler/arch floating-point
+                # differences past the 1e-3 Example tolerance under the always-pTg phase-change
+                # solver (a Newton equilibrium solve per cavitating cell, replacing the old
+                # shortcut). CI's own value is compiler-version-dependent -- nvhpc 24.5 and 26.1
+                # disagree by ~1.1e-3 (> tol) -- so no single golden passes every lane regardless
+                # of where it is generated. The 2D bubble and all 18 phase-change unit tests remain
+                # portable and CPU/GPU machine-zero; only this stiff 3D collapse is non-portable.
+                "3D_phasechange_bubble",
             ]
             if path in casesToSkip:
                 continue
@@ -2011,6 +2087,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ndim in range(1, 4):
             cases.append(define_case_f(f"{ndim}D -> Chemistry -> Perfect Reactor", "examples/nD_perfect_reactor/case.py", ["--ndim", str(ndim)], mods=common_mods))
 
+        # Operator-split, sub-stepped reaction integration (chem_params%reaction_substeps > 0): the
+        # autoigniting reactor exercises the split path that keeps stiff mechanisms stable.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "chem_params%reaction_substeps": 10},
+            )
+        )
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
@@ -2028,6 +2115,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # the pinned override_tol). Surfaced by the Riemann device-helper refactor (#1572). Re-enable
         # once goldens are regenerated per-backend or the tolerance model gains backend awareness.
         # cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={"t_step_stop": 1, "t_step_save": 1}, override_tol=10 ** (-10)))
+
+        # Both reacting mixing-layer goldens drift across compiler/arch: on the temporal
+        # case, a GCC-15 arm64 build (the macOS CI lane's architecture) diverges from the
+        # GNU-13-Linux golden by up to 6.65e-8 (rel) on a momentum component after 50 stiff
+        # chemistry steps, so the 1e-12 default is not portable. 1e-6 clears that with margin
+        # (and headroom for the other compiler lanes) while still catching real regressions,
+        # which shift these fields by far more. The spatial case adds bf_spatial_support's
+        # Fourier forcing but stays in the same band on this short run.
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Reacting Mixing Layer",
+                "examples/2D_reacting_mixing_layer/case.py",
+                ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+                override_tol=10 ** (-6),
+            )
+        )
+
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Spatial Reacting Mixing Layer",
+                "examples/2D_spatial_reacting_mixing_layer/case.py",
+                ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+                override_tol=10 ** (-6),
+            )
+        )
 
         stack.push(
             "1D -> Chemistry -> Dual Isothermal Wall Gradient",

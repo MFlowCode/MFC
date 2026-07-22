@@ -271,10 +271,39 @@ The code provides three pre-built patches for dimensional extrusion of initial c
 - `case(170)`: Load 1D profile from data files
 - `case(270)`: Extrude 1D data to 2D domain
 - `case(370)`: Extrude 2D data to 3D domain
+- `case(273)`: Extrude 1D data to 2D domain, with the mom%%beg data column carrying the
+  extruded-axis (mom%%end) velocity profile instead of its own (zeroed) component. Used by
+  `examples/2D_reacting_mixing_layer` to give a temporally-evolving mixing layer a nonzero
+  streamwise velocity profile along the extruded axis, which `case(270)` cannot represent since
+  it always zeros that component.
+- `case(274)`: Load a full 2D `(x, y)` field with no extrusion -- one data file per variable,
+  `(m_glb+1)*(n_glb+1)` lines each in x-major order, covering all primitive variables
+  directly (unlike `case(270)`/`case(273)`, no component is zeroed or repurposed). Used by
+  `examples/2D_spatial_reacting_mixing_layer` for a spatially-evolving mixing layer, where
+  the cross-stream profile must vary with the streamwise coordinate too (via the
+  `bf_spatial_support` body force) so no single extrusion axis applies. The file's line
+  count, origin, and (uniform) cell spacing must match the run grid; a mismatched file is
+  rejected with a fatal error, so regenerate the IC whenever the grid changes.
 
 Setup: Only requires specifying `files_dir` and filename pattern via `file_extension`. The files are located, for example, at `examples/1D_flamelet/IC`, and their format is `prim.XX.YY.file_extension.dat`.
 Implementation: All variables and file handling are managed in the `case.py` file of the simulation.
 Usage: Ideal for initializing simulations from lower-dimensional solutions, enabling users to add perturbations or modifications to the base extruded fields for flow instability studies.
+
+The following parameters support hardcoded initial conditions that read interface data from files:
+
+| Parameter        | Type    | Description                                               |
+| ---:             | :---:   | :---                                                      |
+| `interface_file` | String  | Path to interface geometry data file                      |
+| `normFac`        | Real    | Interface normalization factor                            |
+| `normMag`        | Real    | Interface normal magnitude                                |
+| `g0_ic`          | Real    | Gravitational acceleration for the interfacial IC pressure field |
+| `p0_ic`          | Real    | Reference pressure at the interface                       |
+
+These parameters are only read by the file-based hardcoded-IC patches (`hcid = 304` and `305` in `src/common/include/3dHardcodedIC.fpp`); they are ignored otherwise.
+
+- `interface_file` gives the path to a text file that supplies the interface-position field \f$h(i,j)\f$ used to place the material interface. The run aborts if the file is not found.
+- `normMag` and `normFac` rescale and offset the raw interface data, \f$h \leftarrow \texttt{normMag}\,h + \texttt{normFac}\f$. Each is applied only when set (defaults leave the data unchanged).
+- `p0_ic` and `g0_ic` set the initial (hydrostatic) pressure field about the interface, \f$p = p_{0} + \rho\, g_{0}\,\big(h - x\big)\f$, where \f$x\f$ is the coordinate normal to the interface.
 
 #### Parameter Descriptions
 
@@ -930,23 +959,33 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 #### 9.2 Volume-Averaged Bubble Model
 
-| Parameter             | Type    | Description                                               |
-| ---:                  | :---:   | :---                                                      |
-| `bubbles_lagrange`    | Logical | Lagrangian subgrid bubble model switch                    |
-| `nBubs_glb`           | Integer | Global number of bubbles                                  |
-| `solver_approach`     | Integer | 1: One-way coupling, 2: two-way coupling                  |
-| `cluster_type`        | Integer | Method to find p_inf                                      |
-| `pressure_corrector`  | Logical | Cell pressure correction term                             |
-| `smooth_type`         | Integer | Smoothing function. 1: Gaussian, 2:Delta 3x3              |
-| `heatTransfer_model`  | Logical | Activates the interface heat transfer model               |
-| `massTransfer_model`  | Logical | Activates the interface mass transfer model               |
-| `write_bubbles`       | Logical | Write files to track the bubble evolution each time step  |
-| `write_bubbles_stats` | Logical | Write the maximum and minimum radius of each bubble       |
-| `epsilonb`            | Real    | Standard deviation scaling for the gaussian function      |
-| `charwidth`           | Real    | Domain virtual depth (z direction, for 2D simulations)    |
-| `valmaxvoid`          | Real    | Maximum void fraction permitted                           |
+| Parameter             | Type    | Description                                                    |
+| ---:                  | :---:   | :---                                                           |
+| `bubbles_lagrange`    | Logical | Lagrangian subgrid bubble model switch                         |
+| `nBubs_glb`           | Integer | Global number of bubbles                                       |
+| `solver_approach`     | Integer | 1: One-way coupling, 2: two-way coupling                       |
+| `cluster_type`        | Integer | Method to find p_inf                                           |
+| `pressure_corrector`  | Logical | Cell pressure correction term                                  |
+| `smooth_type`         | Integer | Smoothing function. 1: Gaussian, 2:Delta 3x3                   |
+| `heatTransfer_model`  | Logical | Activates the interface heat transfer model                    |
+| `massTransfer_model`  | Logical | Activates the interface mass transfer model                    |
+| `write_bubbles`       | Logical | Write files to track the bubble evolution each time step       |
+| `write_bubbles_stats` | Logical | Write the maximum and minimum radius of each bubble            |
+| `write_void_evol`     | Logical | Write stats about the void fraction evolution over time        |
+| `epsilonb`            | Real    | Standard deviation scaling for the gaussian function           |
+| `charwidth`           | Real    | Domain virtual depth (z direction, for 2D simulations)         |
+| `charNz`              | Integer | Number of cells in the virtual depth direction                 |
+| `valmaxvoid`          | Real    | Maximum void fraction permitted                                |
+| `vel_model`           | Integer | Model for translational motion (default 0, disabled)           |
+| `drag_model`          | Integer | Model for drag force (default 0, disabled)                     |
+| `gravity_force`       | Logical | Enable gravity force (default false)                           |
+| `pressure_force`      | Logical | Enable pressure force (default true)                           |
+| `input_path`          | String  | Path to bubble input file (default: `./input/lag_bubbles.dat`) |
+| `kahan_summation`     | Logical | Use Kahan compensated summation when accumulating the void fraction |
 
-- `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
+- `nBubs_glb` Total number of bubbles. Their initial conditions are read from the file given by `input_path`.
+
+- `input_path` Path to the bubble input file (default `./input/lag_bubbles.dat`). Each row specifies the initial state of one bubble, with columns `xPosition/x0  yPosition/x0  zPosition/x0  xVel/c0  yVel/c0  zVel/c0  radius/x0  interfaceVelocity/c0`. See `examples/3D_lagrange_shbubcollapse/input/lag_bubbles.dat` for a checked-in example, or the other Lagrange example cases (e.g. `examples/2D_lagrange_bubblescreen/case.py`), which generate this file programmatically.
 
 - `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on \cite Maeda18, where the effect of the bubbles is added in the Eulerian field as source terms.
 
@@ -957,6 +996,14 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on (\cite Preston07).
 
 - `massTransfer_model` Activates the mass transfer model at the bubble's interface based on (\cite Preston07).
+
+- `vel_model` activates translational motion of the bubbles (\cite Wilfong26): [1] tracer bubbles, which are advected with the local carrier velocity \f$\underline{u}\f$ so that \f$\dot{\underline{x}}_b = \underline{u}(\underline{x}_b)\f$; [2] Newton's second law, which integrates \f$m_b \ddot{\underline{x}}_b = \underline{F}_D + \underline{F}_p + \underline{F}_g\f$, where \f$m_b\f$ is the bubble mass and the right-hand side collects the drag, pressure, and gravity forces below. The carrier velocity at the bubble is interpolated with a Lagrange polynomial of order set by `fd_order`, which must be specified when `vel_model > 0`.
+
+    - `drag_model` selects the drag force \f$\underline{F}_D\f$ acting on the slip velocity \f$\underline{u}_{\rm rel} = \underline{u}_b - \underline{u}\f$, with bubble radius \f$a\f$ and Reynolds number \f$Re\f$: [0] no drag (default); [1] free-slip drag (clean-interface creeping-flow limit, \cite Hadamard1911, \cite Rybczynski1911), \f$\underline{F}_D = -4\pi a\,\underline{u}_{\rm rel}/Re\f$; [2] no-slip Stokes drag (rigid sphere, \cite Stokes1851), \f$\underline{F}_D = -6\pi a\,\underline{u}_{\rm rel}/Re\f$; [3] Levich drag (clean bubble at high \f$Re\f$, \cite Levich1962), \f$\underline{F}_D = -12\pi a\,\underline{u}_{\rm rel}/Re\f$. See \cite Magnaudet2000 for a review of these bubble-drag regimes.
+    - `pressure_force` (default true) enables the pressure-gradient force \f$\underline{F}_p = -V_b\,\nabla p\f$, where \f$V_b = \frac{4}{3}\pi a^3\f$ is the bubble volume.
+    - `gravity_force` (default false) enables the body force \f$\underline{F}_g = m_b\,\underline{g}\f$, with \f$\underline{g}\f$ the acceleration set by the body-force parameters.
+
+- `kahan_summation` uses Kahan compensated summation when smearing the bubble contributions onto the Eulerian void fraction, reducing the round-off sensitivity of the accumulation to the summation order. It is not compatible with `--mixed` precision builds.
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 
@@ -1021,19 +1068,26 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models whe
 
 ### 13. Body Forces
 
-| Parameter         | Type    | Description                                |
-| ---:              | :---:   | :---                                       |
-| `bf_x[y,z]`       | Logical | Enable body forces in the x[y,z] direction |
-| `k_x[y,y]`        | Real    | Magnitude of oscillating acceleration      |
-| `w_x[y,z]`        | Real    | Frequency of oscillating acceleration      |
-| `p_x[y,z]`        | Real    | Phase shift of oscillating acceleration    |
-| `g_x[y,z]`        | Real    | Magnitude of background acceleration       |
+| Parameter            | Type    | Description                                                              |
+| ---:                 | :---:   | :---                                                                     |
+| `bf_x[y,z]`          | Logical | Enable body forces in the x[y,z] direction                               |
+| `k_x[y,z]`           | Real    | Magnitude of oscillating acceleration                                    |
+| `w_x[y,z]`           | Real    | Frequency of oscillating acceleration                                    |
+| `p_x[y,z]`           | Real    | Phase shift of oscillating acceleration                                  |
+| `g_x[y,z]`           | Real    | Magnitude of background acceleration                                     |
+| `bf_spatial_support` | Logical | Enable spatially supported body force (Wei & Freund, JFM 2005)           |
 
 `k_x[y,z]`, `w_x[y,z]`, `p_x[y,z]`, and `g_x[y,z]` define an oscillating acceleration in the `x[y,z]` direction with the form
 
 \f[ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). \f]
 
 By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
+
+When `bf_spatial_support` is enabled, the body force is given a localized spatial envelope following Wei & Freund (JFM, 2005), parameterized through the `spatial_bf` derived type with attributes `amp`, `x_centroid`, `y_centroid`, `conv_vel`, `sigma`, and per-mode arrays `freq(1:8)`, `phase(1:8)`.
+Unlike the domain-wide `k/w/p/g` forcing above, it seeds a downstream instability at a fixed streamwise location with a ladder of forcing frequencies.
+`x` is the streamwise direction by convention for this forcing: the `x` component advects with the mean flow via a `conv_vel*t` term, while the cross-stream (`y`) component does not.
+The source is constructed from a streamfunction, so it is divergence-free, and the corresponding `u*f` work term is added to the energy equation.
+This forcing is implemented for **2D cases only**; enabling it in 1D or 3D is rejected at startup.
 
 ### 14. Magnetohydrodynamics (MHD)
 
@@ -1103,9 +1157,14 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `chem_params%%reactions`       | Logical | Enable chemical reactions                                |
 | `chem_params%%gamma_method`    | Integer | Methodology for calculating the heat capacity ratio      |
 | `chem_params%%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
+| `chem_params%%reaction_substeps` | Integer | Sub-steps for operator-split reaction integration (0 = off) |
+| `chem_params%%adap_substeps`   | Logical | Per-rank adaptive sub-step count driven by local stiffness  |
+| `chem_params%%reaction_substeps_max` | Integer | Sub-step ceiling when `adap_substeps` is enabled       |
 | `cantera_file`                | String  | Cantera-format mechanism file (e.g., .yaml)              |
 
 - `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
+- `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
+- `chem_params%%adap_substeps` (default `F`) makes each rank choose its α-QSS sub-step count per flow step from the largest chemical stiffness among its own cells: the count sits at `reaction_substeps` (the floor) in inert or burned gas and rises toward `reaction_substeps_max` (the ceiling) only across the reaction front. It uses no MPI collectives. When enabled, `reaction_substeps >= 1` and `reaction_substeps_max >= reaction_substeps` are required
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
@@ -1286,14 +1345,14 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
 
-| #    | Name               | Dim.   |
-| ---: | :----:             | :---   |
-| 2    | 2D Circle          | 2      |
-| 3    | 2D Rectangle       | 2      |
-| 4    | 2D Airfoil         | 2      |
-| 8    | 3D Sphere          | 3      |
+| #    | Name               | Dim.   | Notes                                             |
+| ---: | :----:             | :---:  | :---                                              |
+| 2    | 2D Circle          | 2      |                                                   |
+| 3    | 2D Rectangle       | 2      |                                                   |
+| 4    | 2D Airfoil         | 2      |                                                   |
+| 8    | 3D Sphere          | 3      |                                                   |
 | 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder. |
-| 11   | 3D Airfoil         | 3      |
+| 11   | 3D Airfoil         | 3      |                                                   |
 
 ### Acoustic Supports {#acoustic-supports}
 
