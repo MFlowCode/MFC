@@ -637,7 +637,7 @@ contains
                         & cj - 1, ck)))
                     if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj, ck + 1) - f_amr_rho_tot(q_cons_base, ci, cj, &
                         & ck - 1)))
-                    ! 2*r0 normalizes the 2-cell central difference (rho at i+1..i-1); the 2 is the stencil span, NOT ref_ratio
+                    ! 2*r0 normalizes the 2-cell central difference (rho at i+1..i-1); the 2 is the stencil span, NOT amr_ref_ratio
                     if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
                     ! the acoustic source support stays coarse (its spatials are coarse cell
                     ! indices): suppress tags there so the clusterer splits around the source
@@ -1192,11 +1192,11 @@ contains
             ! fine extent = (2**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating it
             ! with the
             ! level-1 factor (2x) truncates half its fine cells. Level-1 blocks (2**1 = 2) are byte-identical to before.
-            old_ext(1, k) = (ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
-            old_ext(2, k) = merge((ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1) - 1, 0, &
-                    & n_glb > 0)
-            old_ext(3, k) = merge((ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1) - 1, 0, &
-                    & p_glb > 0)
+            old_ext(1, k) = (amr_ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
+            old_ext(2, k) = merge((amr_ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, &
+                    & k) + 1) - 1, 0, n_glb > 0)
+            old_ext(3, k) = merge((amr_ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, &
+                    & k) + 1) - 1, 0, p_glb > 0)
             old_owner(k) = amr_block_owner(k)
             ! overlap-copy must match levels: an old L2's stash is in the 4x parent-fine frame
             old_level(k) = amr_block_level(k)
@@ -1398,7 +1398,7 @@ contains
                     ! same-level overlap only (a child's stash is 4x-framed)
                     if (old_level(kk) /= amr_block_level(amr_cur)) cycle
                     ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
-                    sh = ref_ratio*(amr_isect_lo - old_ilo(:,kk))
+                    sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
                     do i = 1, sys_size
                         do fk = 0, amr_slots(k)%p
                             ofk = fk + sh(3)
@@ -1428,7 +1428,7 @@ contains
                     do kk = 1, old_np
                         if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
                         if (.not. old_owns(kk)) cycle
-                        sh = ref_ratio*(amr_isect_lo - old_ilo(:,kk))
+                        sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
                         do fk = 0, amr_slots(k)%p
                             ofk = fk + sh(3)
                             if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
@@ -1476,7 +1476,7 @@ contains
         real(wp)               :: r0, g
         logical                :: tagged
 
-        rr = amr_slots(ob)%ref_ratio
+        rr = amr_slots(ob)%amr_ref_ratio
         olo = amr_region_lo_all(:,ob)
         fm1 = amr_slots(ob)%m; fm2 = amr_slots(ob)%n; fm3 = amr_slots(ob)%p
         ! overlap of this old block with the parent window, in L0 cells
@@ -1502,7 +1502,7 @@ contains
                                     & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, max(fj - 1, 0), fk)))
                                 if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, min(fk + 1, &
                                     & fm3)) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, max(fk - 1, 0))))
-                                ! 2*r0 normalizes the 2-cell central difference; the 2 is the stencil span, NOT ref_ratio
+                                ! 2*r0 normalizes the 2-cell central difference; the 2 is the stencil span, NOT amr_ref_ratio
                                 if (g/(2._wp*r0) > amr_tag_eps) tagged = .true.
                             end do
                         end do

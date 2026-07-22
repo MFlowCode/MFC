@@ -4,9 +4,9 @@
 
 #:include 'macros.fpp'
 
-!> @brief Block-structured AMR: up to amr_max_blocks refined blocks (2:1 or 4:1 per ref_ratio), optionally nested to amr_max_level,
-!! advanced with the shared solver via grid-state swap and conservatively coupled to each block's parent level (ghost prolongation,
-!! Berger-Colella flux reflux, restriction), with optional dt/2 subcycling and dynamic regrid.
+!> @brief Block-structured AMR: up to amr_max_blocks refined blocks (2:1 or 4:1 per amr_ref_ratio), optionally nested to
+!! amr_max_level, advanced with the shared solver via grid-state swap and conservatively coupled to each block's parent level (ghost
+!! prolongation, Berger-Colella flux reflux, restriction), with optional dt/2 subcycling and dynamic regrid.
 module m_amr
 
 #ifdef MFC_MPI
@@ -59,7 +59,7 @@ module m_amr
     !> One refined level: its own grid + conservative fields. Field arrays are device-resident (@:ALLOCATE); coords/metadata
     !! host-only.
     type t_level
-        integer                         :: ref_ratio
+        integer                         :: amr_ref_ratio
         type(t_box)                     :: region          !< block extent in parent (level-0) cell indices
         integer                         :: m, n, p         !< this level's interior extents
         integer                         :: buff_size
@@ -236,15 +236,15 @@ contains
                 & '): the fine level can occupy at most amr_max_blocks ranks - raise amr_max_blocks for better fine-level balance'
         end if
 
-        ! Lock-step advances every fine block at the coarse dt, but a level-l cell is ref_ratio**l smaller, so its
-        ! CFL limit is ref_ratio**amr_max_level tighter than the coarse grid's. The dt (fixed, or the coarse-only
+        ! Lock-step advances every fine block at the coarse dt, but a level-l cell is amr_ref_ratio**l smaller, so its
+        ! CFL limit is amr_ref_ratio**amr_max_level tighter than the coarse grid's. The dt (fixed, or the coarse-only
         ! cfl_dt estimate) is NOT scaled down for that, so a coarse-CFL dt silently runs the finest block unstable
-        ! (subcycling instead advances each level at dt/ref_ratio and is stable by construction). We cannot know the
+        ! (subcycling instead advances each level at dt/amr_ref_ratio and is stable by construction). We cannot know the
         ! true CFL at init, so warn rather than abort - a small enough dt is valid.
-        if (proc_rank == 0 .and. .not. amr_subcycle .and. (ref_ratio > 2 .or. amr_max_level > 1)) then
+        if (proc_rank == 0 .and. .not. amr_subcycle .and. (amr_ref_ratio > 2 .or. amr_max_level > 1)) then
             print '(A,I0,A)', &
                 & ' [amr] WARNING: lock-step (amr_subcycle = F) advances fine blocks at the coarse dt, but the ' &
-                & // 'finest cell is ref_ratio**amr_max_level = ', ref_ratio**amr_max_level, &
+                & // 'finest cell is amr_ref_ratio**amr_max_level = ', amr_ref_ratio**amr_max_level, &
                 & 'x smaller - ensure dt satisfies the FINEST cell CFL (roughly the coarse-stable dt divided by that ' &
                 & // 'factor), or enable amr_subcycle, else the fine block may go unstable'
         end if
@@ -275,9 +275,9 @@ contains
         ! keeps a single contiguous block per body, so an IB block must itself fit a rank's local half-extent.
         bad_loc = 0
         if (ib) then
-            if (ref_ratio*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m) bad_loc = 1
-            if (n_glb > 0 .and. ref_ratio*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n) bad_loc = 1
-            if (p_glb > 0 .and. ref_ratio*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p) bad_loc = 1
+            if (amr_ref_ratio*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m) bad_loc = 1
+            if (n_glb > 0 .and. amr_ref_ratio*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n) bad_loc = 1
+            if (p_glb > 0 .and. amr_ref_ratio*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p) bad_loc = 1
         end if
         call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
         if (bad_glb == 1) then
@@ -287,16 +287,16 @@ contains
         end if
 
         ! max coarse block cells per dim (upper bound for any future regrid box); 1 for collapsed dims
-        amr_maxc(1) = (m_glb + 1)/ref_ratio
+        amr_maxc(1) = (m_glb + 1)/amr_ref_ratio
         amr_maxc(2) = 1; amr_maxc(3) = 1
-        if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/ref_ratio
-        if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/ref_ratio
+        if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/amr_ref_ratio
+        if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/amr_ref_ratio
 
         ! regrid size cap: min over ranks of the local half-extent (see the declaration; = amr_maxc at np=1),
         ! so any clamped box satisfies every rank's scratch constraint and can move freely across ranks
         amr_maxc_fit = amr_maxc
         do d = 1, num_dims
-            call s_mpi_allreduce_integer_min((ext(d) + 1)/ref_ratio, fit_d)
+            call s_mpi_allreduce_integer_min((ext(d) + 1)/amr_ref_ratio, fit_d)
             amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
         end do
 
@@ -308,10 +308,10 @@ contains
         maxc_loc = amr_maxc_fit
 
         ! max fine extents and buffered bounds for preallocation
-        max_f1 = ref_ratio*maxc_loc(1) - 1
+        max_f1 = amr_ref_ratio*maxc_loc(1) - 1
         max_f2 = 0; max_f3 = 0
-        if (n_glb > 0) max_f2 = ref_ratio*maxc_loc(2) - 1
-        if (p_glb > 0) max_f3 = ref_ratio*maxc_loc(3) - 1
+        if (n_glb > 0) max_f2 = amr_ref_ratio*maxc_loc(2) - 1
+        if (p_glb > 0) max_f3 = amr_ref_ratio*maxc_loc(3) - 1
 
         ! fine-fine seam pack buffers: sized ONCE to the largest possible seam (sys_size*buff_size * max transverse fine
         ! face), so s_amr_fine_fine_halo reuses them instead of allocating per seam per stage. Transverse cap = the largest
@@ -417,7 +417,7 @@ contains
 
         ! fine-level distribution: coarse-patch gather buffer (see decl). Sized to the largest block's coarse footprint
         ! (block coarse cells + 2*nmar halo, block-local frame). Device-mapped so the runtime ghost-fill reads it on the owner.
-        amr_cpat_mar = (buff_size + ref_ratio - 1)/ref_ratio + 1
+        amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         amr_cpat_hi = 0
         amr_cpat_hi(1) = maxc_loc(1) - 1 + 2*amr_cpat_mar
         if (n_glb > 0) amr_cpat_hi(2) = maxc_loc(2) - 1 + 2*amr_cpat_mar
@@ -511,7 +511,7 @@ contains
         real(wp)                             :: xl, xr
         ! pcb(k) = parent_cb(k + pcb_lb - 1); to access parent_cb(j): k = j - pcb_lb + 1
 
-        rr = amr_slots(amr_cur)%ref_ratio
+        rr = amr_slots(amr_cur)%amr_ref_ratio
         idx_offset = 1 - pcb_lb
         ! fine cell fi (0..nfine) subdivides coarse cell c = lo + fi/rr into rr equal parts
         fcb(-1) = pcb(lo - 1 + idx_offset)  ! left boundary of the fine region
@@ -1441,13 +1441,13 @@ contains
 
         call s_amr_block_cost(cost)
 
-        ! per-block own fine-work weight = footprint cost x ref_ratio**(level*active dims). A level-l block is ref_ratio**l
+        ! per-block own fine-work weight = footprint cost x amr_ref_ratio**(level*active dims). A level-l block is amr_ref_ratio**l
         ! finer than L0 per dim, so its work is the footprint cost x rr**(l*d); using the level factor keeps the
         ! co-located-tower load balance honest. With no cost signals this reduces to the fine cell count (geometry only).
         do k = 1, amr_num_blocks
-            wt(k) = cost(k)*real(ref_ratio, wp)**amr_block_level(k)
-            if (n_glb > 0) wt(k) = wt(k)*real(ref_ratio, wp)**amr_block_level(k)
-            if (p_glb > 0) wt(k) = wt(k)*real(ref_ratio, wp)**amr_block_level(k)
+            wt(k) = cost(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
+            if (n_glb > 0) wt(k) = wt(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
+            if (p_glb > 0) wt(k) = wt(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
             key(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
             ord(k) = k
         end do
@@ -1524,10 +1524,10 @@ contains
     !> Set the fine level's geometry (region, intersection, extents, bounds, coordinates) for the box lo:hi. Arrays are preallocated
     !! at max size; this only updates metadata and refills coords. Collective: ALL ranks must call together (init and regrid do) -
     !! it also refreshes the allreduced amr_xchg_coarse_ghosts flag for the new box. INVARIANT: a level-l block's fine extent is
-    !! ref_ratio**l * (coarse-region width) - 1, NOT ref_ratio*width. (ref_ratio*width holds only for the level-1 initial block;
-    !! nested boxes compound by ref_ratio per level.) Every fine-extent computation - here, the restart-reader check, the
-    !! load-weight, the fmul - uses ref_ratio**level; assuming ref_ratio*width rejects level>=2 blocks as corrupt (the exact bug
-    !! that bit the multi-level restart reader).
+    !! amr_ref_ratio**l * (coarse-region width) - 1, NOT amr_ref_ratio*width. (amr_ref_ratio*width holds only for the level-1
+    !! initial block; nested boxes compound by amr_ref_ratio per level.) Every fine-extent computation - here, the restart-reader
+    !! check, the load-weight, the fmul - uses amr_ref_ratio**level; assuming amr_ref_ratio*width rejects level>=2 blocks as corrupt
+    !! (the exact bug that bit the multi-level restart reader).
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
@@ -1549,10 +1549,11 @@ contains
             amr_isect_lo = lo; amr_isect_hi = hi
             if (amr_block_level(amr_cur) >= 2) then
                 ! multi-level: express the coarse footprint in the PARENT block's fine-cell frame (a level-l block's coarse side
-                ! is level l-1). parent-fine index of L0 cell c is rr*(c - R1.lo) where rr is the parent's ref_ratio; the block
-                ! spans rr fine cells per parent-covered L0 cell. m below then gets ref_ratio*(footprint) cells, as for a level-1
+                ! is level l-1). parent-fine index of L0 cell c is rr*(c - R1.lo) where rr is the parent's amr_ref_ratio; the block
+                ! spans rr fine cells per parent-covered L0 cell. m below then gets amr_ref_ratio*(footprint) cells, as for a
+                ! level-1
                 ! block over L0. amr_cg / the prolong read this frame, so no other coupling code changes for the local (np=1) path.
-                pblk = f_amr_parent_block(amr_cur); rr = amr_slots(pblk)%ref_ratio
+                pblk = f_amr_parent_block(amr_cur); rr = amr_slots(pblk)%amr_ref_ratio
                 do d = 1, 3
                     amr_isect_lo(d) = rr*(lo(d) - amr_region_lo_all(d, pblk))
                     amr_isect_hi(d) = rr*(hi(d) - amr_region_lo_all(d, pblk)) + (rr - 1)
@@ -1568,10 +1569,10 @@ contains
         amr_isect_lo_all(:,amr_cur) = amr_isect_lo; amr_isect_hi_all(:,amr_cur) = amr_isect_hi
         amr_owns_all(amr_cur) = amr_rank_owns_block
         ! fine extents cover the WHOLE block on the owner; -1 (empty) on non-owners
-        amr_slots(amr_cur)%m = ref_ratio*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
+        amr_slots(amr_cur)%m = amr_ref_ratio*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
         amr_slots(amr_cur)%n = 0; amr_slots(amr_cur)%p = 0
-        if (n_glb > 0) amr_slots(amr_cur)%n = ref_ratio*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
-        if (p_glb > 0) amr_slots(amr_cur)%p = ref_ratio*max(amr_isect_hi(3) - amr_isect_lo(3) + 1, 0) - 1
+        if (n_glb > 0) amr_slots(amr_cur)%n = amr_ref_ratio*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
+        if (p_glb > 0) amr_slots(amr_cur)%p = amr_ref_ratio*max(amr_isect_hi(3) - amr_isect_lo(3) + 1, 0) - 1
         amr_slots(amr_cur)%idwbuff(1)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(1)%end = amr_slots(amr_cur)%m + buff_size
         amr_slots(amr_cur)%idwbuff(2)%beg = 0; amr_slots(amr_cur)%idwbuff(2)%end = 0
         amr_slots(amr_cur)%idwbuff(3)%beg = 0; amr_slots(amr_cur)%idwbuff(3)%end = 0
@@ -1610,7 +1611,7 @@ contains
         sidx(1) = start_idx(1); ext(1) = m
         if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
         if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
-        nmar = (buff_size + ref_ratio - 1)/ref_ratio + 1
+        nmar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         bad_loc = 0
         if (amr_rank_owns_block) then
             if (amr_isect_lo(1) - sidx(1) < nmar .or. sidx(1) + ext(1) - amr_isect_hi(1) < nmar) bad_loc = 1
@@ -1641,17 +1642,19 @@ contains
         ! equals region_lo on the owner, so amr_isect_lo + f/rr - amr_cpat_off = nmar + f/rr is the patch-local coarse index
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
-            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), &
-                             & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%amr_ref_ratio - oz; if (p_glb == 0) ck = 0
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%amr_ref_ratio), &
+                             & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                             & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
             do fj = 0, amr_slots(amr_cur)%n
-                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), &
-                                 & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%amr_ref_ratio - oy; if (n_glb == 0) cj = 0
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%amr_ref_ratio), &
+                                 & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                                 & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
                 do fi = 0, amr_slots(amr_cur)%m
-                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - real(amr_slots(amr_cur)%ref_ratio - 1, &
-                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%amr_ref_ratio - ox
+                    xix = (real(mod(fi, amr_slots(amr_cur)%amr_ref_ratio), wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
                     u0 = real(qc%sf(ci, cj, ck), wp)
                     sx = minmod(real(qc%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc%sf(ci - 1, cj, ck), wp))
                     sy = 0._wp
@@ -1671,7 +1674,7 @@ contains
     end subroutine s_prolong_one_var
 
     !> Conservative-linear prolongation: fill amr_fine interior from coarse (level-0), minmod-limited. Symmetric child offsets
-    !! (+/-1/4 of a coarse cell) => the ref_ratio^d children average to the coarse value. Multi-fluid volume fractions take the
+    !! (+/-1/4 of a coarse cell) => the amr_ref_ratio^d children average to the coarse value. Multi-fluid volume fractions take the
     !! sum-preserving closure path instead (single-fluid runs never branch, so their prolongation is untouched). TWIN
     !! s_amr_prolong_pbmv (q<->pb/mv): pb/mv sibling of this prolongation (piecewise-constant there); keep the child-offset frame
     !! and volume-fraction closure lockstep.
@@ -1720,17 +1723,19 @@ contains
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
-            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), &
-                             & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%amr_ref_ratio - oz; if (p_glb == 0) ck = 0
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%amr_ref_ratio), &
+                             & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                             & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
             do fj = 0, amr_slots(amr_cur)%n
-                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), &
-                                 & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%amr_ref_ratio - oy; if (n_glb == 0) cj = 0
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%amr_ref_ratio), &
+                                 & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                                 & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
                 do fi = 0, amr_slots(amr_cur)%m
-                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - real(amr_slots(amr_cur)%ref_ratio - 1, &
-                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%amr_ref_ratio - ox
+                    xix = (real(mod(fi, amr_slots(amr_cur)%amr_ref_ratio), wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
                     call s_alpha_shared_switch(qc, ci, cj, ck, shx, shy, shz)
                     asum = 0._wp
                     do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
@@ -1770,17 +1775,19 @@ contains
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
-            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%ref_ratio), &
-                             & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%amr_ref_ratio - oz; if (p_glb == 0) ck = 0
+            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%amr_ref_ratio), &
+                             & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                             & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
             do fj = 0, amr_slots(amr_cur)%n
-                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%ref_ratio), &
-                                 & wp) - real(amr_slots(amr_cur)%ref_ratio - 1, wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%amr_ref_ratio - oy; if (n_glb == 0) cj = 0
+                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%amr_ref_ratio), &
+                                 & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                                 & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
                 do fi = 0, amr_slots(amr_cur)%m
-                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%ref_ratio), wp) - real(amr_slots(amr_cur)%ref_ratio - 1, &
-                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%ref_ratio, wp)
+                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%amr_ref_ratio - ox
+                    xix = (real(mod(fi, amr_slots(amr_cur)%amr_ref_ratio), wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
+                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
                     rsum = 0._wp
                     do i = eqn_idx%species%beg, eqn_idx%species%end
                         u0 = real(qc(i)%sf(ci, cj, ck), wp)
@@ -1889,9 +1896,9 @@ contains
             & L2) > amr_region_hi_all(2, L2)) .or. (p_glb > 0 .and. amr_region_lo_all(3, L2) > amr_region_hi_all(3, &
             & L2))) call s_mpi_abort('amr static multi-level: level-1 block 1 is too small to nest a level-2 block (the fixed ' &
             & // 'inset inverts the box); enlarge the base amr block or reduce amr_cpat_mar')
-        if (ref_ratio*(amr_region_hi_all(1, L2) - amr_region_lo_all(1, &
-            & L2) + 1) > amr_maxc_fit(1) .or. (n_glb > 0 .and. ref_ratio*(amr_region_hi_all(2, L2) - amr_region_lo_all(2, &
-            & L2) + 1) > amr_maxc_fit(2)) .or. (p_glb > 0 .and. ref_ratio*(amr_region_hi_all(3, L2) - amr_region_lo_all(3, &
+        if (amr_ref_ratio*(amr_region_hi_all(1, L2) - amr_region_lo_all(1, &
+            & L2) + 1) > amr_maxc_fit(1) .or. (n_glb > 0 .and. amr_ref_ratio*(amr_region_hi_all(2, L2) - amr_region_lo_all(2, &
+            & L2) + 1) > amr_maxc_fit(2)) .or. (p_glb > 0 .and. amr_ref_ratio*(amr_region_hi_all(3, L2) - amr_region_lo_all(3, &
             & L2) + 1) > amr_maxc_fit(3))) &
             & call s_mpi_abort('amr static multi-level: the nested level-2 block exceeds the per-rank scratch cap ' &
             & // '(2*L0-extent > amr_maxc_fit); static multi-level does not tile the level-2 block - use a smaller base amr ' &
@@ -1922,7 +1929,7 @@ contains
 
     end subroutine s_amr_build_static_multilevel
 
-    !> Volume-weighted restriction: each covered coarse cell = volume-weighted average of its ref_ratio^d fine children (equal
+    !> Volume-weighted restriction: each covered coarse cell = volume-weighted average of its amr_ref_ratio^d fine children (equal
     !! weight on Cartesian grids where the children share a volume; radius-weighted by fine y_cc on cyl_coord, where cell volume ~
     !! radius - amr_rvw, single-sourced so the device and host paths agree bit-for-bit). Writes the caller's coarse target - in
     !! production the level-0 state q_cons_ts(1)%vf (the deliberate fold-back of fine data each step, plus coarse pb/mv for
@@ -1951,7 +1958,7 @@ contains
         ! cells it holds locally and SENDS each other coarse-owner exactly its covered slice (all sys_size in one message). Covered
         ! cells are in-domain (no ghosts), so each is owned by exactly one interior owner. At np=1 the owner owns every covered
         ! cell, sends nothing, and overwrites locally with the same child-sum -> bit-identical.
-        rr = amr_slots(amr_cur)%ref_ratio
+        rr = amr_slots(amr_cur)%amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
         rlo = 0; rhi = 0
@@ -2073,7 +2080,7 @@ contains
         ! NOTE: reads amr_rvw's device copy without a GPU_UPDATE - safe only while cyl_coord + amr_max_level > 1 is checker-gated
         ! (this path never runs under cyl_coord). If that gate is lifted, refresh amr_rvw here first (see its declaration).
         pblk = f_amr_parent_block(amr_cur)
-        rr = amr_slots(amr_cur)%ref_ratio
+        rr = amr_slots(amr_cur)%amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
         if (amr_isect_lo(1) <= amr_isect_hi(1) .and. amr_isect_lo(2) <= amr_isect_hi(2) .and. amr_isect_lo(3) <= amr_isect_hi(3)) &
@@ -2121,8 +2128,8 @@ contains
         mlo(1) = amr_slots(pblk)%dx(olo(1)); mhi(1) = amr_slots(pblk)%dx(ohi(1))
         if (n_glb > 0) then; mlo(2) = amr_slots(pblk)%dy(olo(2)); mhi(2) = amr_slots(pblk)%dy(ohi(2)); end if
         if (p_glb > 0) then; mlo(3) = amr_slots(pblk)%dz(olo(3)); mhi(3) = amr_slots(pblk)%dz(ohi(3)); end if
-        call s_amr_reflux_apply_faces(amr_slots(pblk)%q_cons, amr_cur, amr_slots(amr_cur)%ref_ratio, dt_reflux, olo, ohi, glo, &
-                                      & ghi, woff, w_lo, w_hi, mlo, mhi)
+        call s_amr_reflux_apply_faces(amr_slots(pblk)%q_cons, amr_cur, amr_slots(amr_cur)%amr_ref_ratio, dt_reflux, olo, ohi, &
+                                      & glo, ghi, woff, w_lo, w_hi, mlo, mhi)
 
     end subroutine s_amr_reflux_to_parent
 
@@ -2428,7 +2435,7 @@ contains
         ! cell 0 == amr_cpat_off (matching s_prolong_one_var). The gather is a host loop (.not. pull_host) done by the callers.
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-        rr = amr_slots(amr_cur)%ref_ratio
+        rr = amr_slots(amr_cur)%amr_ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
         do ib_ = 1, nb
             do q = 1, nnode
@@ -2471,7 +2478,7 @@ contains
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         d2 = n_glb > 0; d3 = p_glb > 0
-        rr = amr_slots(amr_cur)%ref_ratio
+        rr = amr_slots(amr_cur)%amr_ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
         call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
         do s = 1, ns
@@ -2578,7 +2585,7 @@ contains
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
-        rr = amr_slots(amr_cur)%ref_ratio
+        rr = amr_slots(amr_cur)%amr_ref_ratio
         nchild = rr
         if (n_glb > 0) nchild = nchild*rr
         if (p_glb > 0) nchild = nchild*rr
@@ -2723,7 +2730,7 @@ contains
         real(wp), allocatable :: sbuf(:,:), rbuf(:)
         integer, allocatable :: reqs(:), drank(:)
 
-        rr = amr_slots(amr_cur)%ref_ratio
+        rr = amr_slots(amr_cur)%amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
         cellsz = 2*nnode*nb
@@ -2866,7 +2873,7 @@ contains
         block
             integer               :: jg, cl, pblk2, k, rr
             real(wp), allocatable :: cxb(:), cyb(:), czb(:)
-            rr = amr_slots(amr_cur)%ref_ratio
+            rr = amr_slots(amr_cur)%amr_ref_ratio
             ! ghost parent boundaries: a level>=2 block's coarse side is its PARENT's fine grid (indexed in the parent-fine
             ! amr_isect frame, matching the interior s_build_level_coords), NOT the L0 global boundaries. amr_isect_lo is a
             ! parent-fine index, so indexing amr_g?cb (sized for L0) reads OUT OF BOUNDS -> garbage on host, NaN on the device
@@ -3040,10 +3047,10 @@ contains
         do l = fb3, fe3
             do k = fb2, fe2
                 do j = fb1, fe1
-                    ci = lo1 + floor(real(j, wp)/real(ref_ratio, wp)) - ox
+                    ci = lo1 + floor(real(j, wp)/real(amr_ref_ratio, wp)) - ox
                     cj = 0; ck = 0
-                    if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(ref_ratio, wp)) - oy
-                    if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(ref_ratio, wp)) - oz
+                    if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(amr_ref_ratio, wp)) - oy
+                    if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(amr_ref_ratio, wp)) - oz
                     ci = min(max(ci, cb1), ce1)
                     cj = min(max(cj, cb2), ce2)
                     ck = min(max(ck, cb3), ce3)
@@ -3165,7 +3172,7 @@ contains
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         d2 = n_glb > 0; d3 = p_glb > 0
-        rr = amr_slots(amr_cur)%ref_ratio
+        rr = amr_slots(amr_cur)%amr_ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
         multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
@@ -3603,7 +3610,7 @@ contains
             ! L0-coarse cells but its own grid is 2**L finer (each level halves dx), so fine = 2**L*(coarse extent)-1; xb, yb
             ! share the level (same-level seam). 2**1 keeps L1 byte-identical; L2 tiles need 2**2 (an L1-frame 2* mislocates the
             ! seam slice to half the block, filling the seam ghost from the wrong cells - the source of the L2-L2 leak).
-            fmul = ref_ratio**amr_block_level(xb)
+            fmul = amr_ref_ratio**amr_block_level(xb)
             xm(1) = fmul*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
             xm(2) = merge(fmul*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
             xm(3) = merge(fmul*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
@@ -3891,14 +3898,14 @@ contains
     !! and IB correction. Split from the lerp half so the fine-fine seam halo runs between them. Owner-only (the caller guards).
     impure subroutine s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s, th)
 
-        real(wp), intent(in)                                       :: dt_sub  !< this block's substep dt (parent step / ref_ratio)
-        real(wp), dimension(:,:), intent(in)                       :: coefs   !< rk_coef(1:3, 1:4)
+        real(wp), intent(in) :: dt_sub                 !< this block's substep dt (parent step / amr_ref_ratio)
+        real(wp), dimension(:,:), intent(in) :: coefs  !< rk_coef(1:3, 1:4)
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        type(scalar_field), intent(inout)                          :: q_T_sf
-        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
-        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-        integer, intent(in)                                        :: t_step, s
-        real(wp), intent(in)                                       :: th
+        type(scalar_field), intent(inout) :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout) :: rhs_pb, rhs_mv
+        integer, intent(in) :: t_step, s
+        real(wp), intent(in) :: th
 
         if (rank_time_wrt) call s_rank_time_tic()
         amr_in_fine_advance = .true.
@@ -3940,21 +3947,21 @@ contains
     !! is the two-source time-lerp of the block's q_ghost_a (parent t^n) / q_ghost_b (parent t^{n+1}) sources, filled by the caller
     !! before this call. Fine flux registers are zeroed here and accumulate over all six stages so the end-of-step reflux sees the
     !! time-averaged effective fine flux. RECURSIVE: after each of this block's substeps, its level+1 children subcycle within that
-    !! substep (s_amr_advance_children) at dt_sub/ref_ratio, so per-level dt falls out of the recursion. With no children this is
-    !! exactly the single-level L0<->L1 advance. Used for level>=2 children (per-block); level-1 blocks run the transposed,
+    !! substep (s_amr_advance_children) at dt_sub/amr_ref_ratio, so per-level dt falls out of the recursion. With no children this
+    !! is exactly the single-level L0<->L1 advance. Used for level>=2 children (per-block); level-1 blocks run the transposed,
     !! seam-halo'd s_amr_advance_fine_subcycle_all instead.
     recursive subroutine s_amr_advance_subtree(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
-        real(wp), intent(in)                                       :: dt_sub  !< this block's substep dt (parent step / ref_ratio)
-        real(wp), dimension(:,:), intent(in)                       :: coefs   !< rk_coef(1:3, 1:4)
+        real(wp), intent(in) :: dt_sub                 !< this block's substep dt (parent step / amr_ref_ratio)
+        real(wp), dimension(:,:), intent(in) :: coefs  !< rk_coef(1:3, 1:4)
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        type(scalar_field), intent(inout)                          :: q_T_sf
-        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
-        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-        integer, intent(in)                                        :: t_step
-        real(wp), parameter                                        :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
-        integer                                                    :: sub, s
-        real(wp)                                                   :: th
+        type(scalar_field), intent(inout) :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout) :: rhs_pb, rhs_mv
+        integer, intent(in) :: t_step
+        real(wp), parameter :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
+        integer :: sub, s
+        real(wp) :: th
 
         call s_amr_zero_fine_registers()
         do sub = 1, 2
@@ -3975,7 +3982,7 @@ contains
     !> Recursively subcycle every level+1 child of parent slot pslot within ONE of the parent's substeps [t_a, t_b] (duration
     !! dt_sub). The parent has just finished that substep: q_cons = parent @ t_b, q_cons_stor = parent @ t_a. For each child: gather
     !! its two ghost-lerp sources from those two parent snapshots (parent-fine frame), recurse s_amr_advance_subtree at dt_sub/2
-    !! (the child takes ref_ratio substeps covering [t_a, t_b]), then fold the child back into the parent - restrict the covered
+    !! (the child takes amr_ref_ratio substeps covering [t_a, t_b]), then fold the child back into the parent - restrict the covered
     !! cells and apply the Berger-Colella C/F flux correction (s_amr_reflux_to_parent over dt_sub, consuming the child's freg + the
     !! parent-side creg captured during THIS substep). The registers already carry the matching per-substep time weights (freg
     !! 1/r*rk3_w, creg rk3_w), so conservation closes with no register changes. np=1 (child co-owned with parent); np>=2 P2P is
@@ -4007,7 +4014,7 @@ contains
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_a)
             call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons, .false.)  ! parent @ t_b (device C/F fill)
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_b)
-            ! recurse: the child subcycles its ref_ratio substeps (and its own children) over [t_a, t_b]
+            ! recurse: the child subcycles its amr_ref_ratio substeps (and its own children) over [t_a, t_b]
             call s_amr_advance_subtree(dt_sub*0.5_wp, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             ! fold the child back into the parent (relax the fine phase first, matching the driver's relax -> restrict order)
             if (relax) call s_amr_relax_fine()
@@ -4214,7 +4221,7 @@ contains
         integer             :: i
 
         if (amr_slot_live(islot)) return
-        amr_slots(islot)%ref_ratio = ref_ratio
+        amr_slots(islot)%amr_ref_ratio = amr_ref_ratio
         amr_slots(islot)%buff_size = buff_size
         allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
         if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), amr_slots(islot)%dy(0:max_f2))

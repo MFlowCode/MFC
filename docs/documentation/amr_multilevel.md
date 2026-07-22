@@ -26,7 +26,7 @@ Multi-level replaces "coarse = L0" with "**the coarse side of level `l+1` is lev
 ## Target architecture
 
 - Levels `0 .. amr_max_level`. A level-`l` block (`l ≥ 1`) refines a covering level-`(l-1)`
-  region by `ref_ratio` (2 today). Level `l+1` must be **properly nested** inside level `l`
+  region by `amr_ref_ratio` (2 today). Level `l+1` must be **properly nested** inside level `l`
   (surrounded by level-`l` cells; never adjacent to level `l-1`).
 - **Flat pool + per-block level tag** (chosen over a per-level pool array): `amr_slots` stays
   one pool; each block gains `level` and `parent` (the covering coarser block, or 0 for an
@@ -36,7 +36,7 @@ Multi-level replaces "coarse = L0" with "**the coarse side of level `l+1` is lev
   A per-level pool array would force rewriting every `amr_slots(k)` reference (high churn,
   silent-bug-prone — the same reason the #4 lazy-alloc avoided a global→local pool remap).
 - **Recursive subcycling** (chosen over lock-step): `advance(l)` advances level `l` by `dt_l`,
-  then for `s = 1..ref_ratio` recursively advances level `l+1` by `dt_{l+1} = dt_l/ref_ratio`
+  then for `s = 1..amr_ref_ratio` recursively advances level `l+1` by `dt_{l+1} = dt_l/amr_ref_ratio`
   with time-interpolated C/F boundary data from level `l` (extends today's 2-level subcycle,
   `q_ghost_a/b`, recursively), then refluxes `l+1 → l`. Most accurate and efficient; the
   standard Berger–Colella time integration.
@@ -51,12 +51,12 @@ Multi-level replaces "coarse = L0" with "**the coarse side of level `l+1` is lev
    data instead of only `q_cons_base`. The L1↔L0 path is the `l = 0` case and stays byte-identical.
 
    **The one hard detail — the coarse frame.** The prolong reads `amr_cg` via
-   (`amr_isect_lo`, `amr_cpat_off`, `ref_ratio`) and is reused unchanged as long as `amr_cg` and
+   (`amr_isect_lo`, `amr_cpat_off`, `amr_ref_ratio`) and is reused unchanged as long as `amr_cg` and
    that frame are in **parent-level cell indices**. Level-1 block: parent level is L0, frame is
    L0 indices (today). Level-2 block with L0 region `R2`, parent L1 block `p` with L0 region `R1`:
-   - parent-fine index of L0 cell `c` is `2*(c - R1.lo)` (ref_ratio per level);
+   - parent-fine index of L0 cell `c` is `2*(c - R1.lo)` (amr_ref_ratio per level);
    - coarse footprint in the parent's fine frame: `isect = 2*(R2 - R1.lo)`;
-   - fine extent `m = ref_ratio*(parent-fine footprint) - 1 = ref_ratio^2 * |R2| - 1`;
+   - fine extent `m = amr_ref_ratio*(parent-fine footprint) - 1 = amr_ref_ratio^2 * |R2| - 1`;
    - `amr_cg` holds the parent's fine cells `[isect.lo - nmar : isect.hi + nmar]`, gathered from
      `amr_slots(p)%%q_cons` (np=1: local copy; np≥2: P2P via `amr_block_owner`);
    - "coarse coords" are the parent's fine coords `amr_slots(p)%%x_cb`, not `amr_gxcb` — needed
@@ -78,7 +78,7 @@ Multi-level replaces "coarse = L0" with "**the coarse side of level `l+1` is lev
    **Lock-step first** (all levels advance at L0's `dt`, interleaved per RK stage — extends
    today's non-subcycle mode; no time-interpolation/recursion): first milestone is a np=1
    static 2-level case that runs several steps and conserves (~1e-13). **Then** add recursive
-   subcycling (level l+1 takes `ref_ratio` substeps with time-interpolated ghosts) on top,
+   subcycling (level l+1 takes `amr_ref_ratio` substeps with time-interpolated ghosts) on top,
    generalizing `s_advance_amr_fine_substeps` (already Berger-Colella for L0↔L1).
 4. **Per-level regrid + proper nesting.** Tag each level for the next-finer one; build level
    `l+1` boxes clustered + tiled + nested inside level `l`; distribute (reusing the SFC map).
@@ -89,7 +89,7 @@ Multi-level replaces "coarse = L0" with "**the coarse side of level `l+1` is lev
 
 - Flat pool + per-block `level`/`parent` tag (not a per-level pool array).
 - Recursive subcycling with time-interpolated C/F BCs (not lock-step).
-- `ref_ratio` stays 2 for now (ratio-4 is separate, banked work); nesting/coupling are written
+- `amr_ref_ratio` stays 2 for now (ratio-4 is separate, banked work); nesting/coupling are written
   ratio-generic so ratio-4 drops in later.
 - Load balance: the existing SFC map distributes blocks across **all** levels from the flat
   pool; the `amr_max_blocks < num_procs` warning applies per the total block count.
