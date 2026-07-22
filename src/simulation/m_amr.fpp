@@ -621,24 +621,9 @@ contains
         ! round-trip (q_coarse pull + host unpack + amr_cg push). Same index map as s_amr_unpack_patch. At init/regrid
         ! (.not. pull_host) q_coarse's device copy may be stale, so fall through to the host path.
         if (num_procs == 1 .and. pull_host) then
-            block
-                integer :: bl1, bh1, bl2, bh2, bl3, bh3, coff1, coff2, coff3
-                call s_amr_rank_coarse_range(owner, crlo, crhi)
-                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-                coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do g3 = bl3, bh3
-                        do g2 = bl2, bh2
-                            do g1 = bl1, bh1
-                                amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end block
+            call s_amr_rank_coarse_range(owner, crlo, crhi)
+            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+            call s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)  ! same kernel the np>1 owner path uses
             return
         end if
 
@@ -789,29 +774,9 @@ contains
         ! pb_coarse/mv_coarse (device) -> amr_cg_pb/mv (device) with a DEVICE kernel over the in-domain patch. At init/regrid
         ! (.not. pull_host) the device copy may be stale, so fall through to the host path.
         if (num_procs == 1 .and. pull_host) then
-            block
-                integer :: bl1, bh1, bl2, bh2, bl3, bh3, coff1, coff2, coff3
-                call s_amr_rank_coarse_range(owner, crlo, crhi)
-                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-                coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-                $:GPU_PARALLEL_LOOP(collapse=5)
-                do ib_ = 1, nb
-                    do q = 1, nnode
-                        do g3 = bl3, bh3
-                            do g2 = bl2, bh2
-                                do g1 = bl1, bh1
-                                    amr_cg_pb(g1 - coff1, g2 - coff2, g3 - coff3, q, ib_) = pb_coarse(g1 - o1, g2 - o2, g3 - o3, &
-                                              & q, ib_)
-                                    amr_cg_mv(g1 - coff1, g2 - coff2, g3 - coff3, q, ib_) = mv_coarse(g1 - o1, g2 - o2, g3 - o3, &
-                                              & q, ib_)
-                                end do
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end block
+            call s_amr_rank_coarse_range(owner, crlo, crhi)
+            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+            call s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)  ! same kernel the np>1 owner path uses
             return
         end if
 
