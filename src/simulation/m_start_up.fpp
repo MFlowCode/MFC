@@ -57,7 +57,7 @@ module m_start_up
     use m_load_weight
     use m_load_balance, only: s_load_balance_rebalance
     use m_sfc_partition
-    use m_amr
+    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
     use m_amr_regrid, only: s_amr_regrid, s_amr_check_active_box_containment
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers

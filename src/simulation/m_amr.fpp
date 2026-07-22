@@ -36,11 +36,12 @@ module m_amr
     implicit none
 
     private
-    public :: t_level, amr_maxc, amr_maxc_fit, amr_dt_fine, s_initialize_amr_module, s_populate_amr_fine, &
-        & s_interpolate_coarse_to_fine, s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_swap_to_fine, &
-        & s_amr_restore_coarse, s_amr_fill_fine_ghosts, s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, &
-        & s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, s_amr_p2p_reflux_faces, &
-        & s_amr_reflux_to_parent
+    public :: t_level, amr_maxc, amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
+        & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_fine_stage_fill, s_amr_fine_stage_advance, &
+        & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, &
+        & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
+    ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal to this module (no external
+    ! caller); keeping them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the regrid/restart drivers split
     !! out of this module). State stays HERE - only the drivers moved.
     public :: amr_slots, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reconcile_slots, &
