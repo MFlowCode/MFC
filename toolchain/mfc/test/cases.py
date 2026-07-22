@@ -2075,6 +2075,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # of where it is generated. The 2D bubble and all 18 phase-change unit tests remain
                 # portable and CPU/GPU machine-zero; only this stiff 3D collapse is non-portable.
                 "3D_phasechange_bubble",
+                # The Example suite caps the grid at 25x25, but an AMR block must sit >= buff_size
+                # cells inside the domain AND span at most half of it - there is no room for a valid
+                # block on a 25-cell grid, and the block indices (sized to the example's own grid)
+                # fall outside the capped one. AMR is covered directly by the amr_golden_tests suite.
+                "2D_amr_droplet",
             ]
             if path in casesToSkip:
                 continue
