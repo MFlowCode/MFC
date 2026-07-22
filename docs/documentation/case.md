@@ -358,6 +358,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `airfoil_id`         | Integer | Index into `ib_airfoil` array for NACA airfoil geometry patches. |
 | `model_id`           | Integer | Index into `stl_models` array for STL/OBJ geometry patches. |
 | `slip`               | Logical | Apply a slip boundary |
+| `isothermal`         | Logical | Impose an isothermal wall (fixed temperature) at the patch surface (reacting flows). |
+| `twall`              | Real    | Wall temperature [K] for an isothermal immersed boundary. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
 | `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
@@ -395,6 +397,8 @@ Definitions for currently implemented immersed boundary patch types are listed i
 Additional details on this specification can be found in [NACA airfoil](https://en.wikipedia.org/wiki/NACA_airfoil).
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
+
+- `isothermal` imposes an isothermal wall at the immersed surface for reacting flows: the ghost-point temperature is set so that the surface is held at the fixed wall temperature `twall` (in Kelvin). When false (the default), the wall is adiabatic (zero normal temperature gradient). Isothermal immersed boundaries model heat conduction and therefore require ``chemistry = 'T'`` and ``chem_params%%diffusion = 'T'``, and `twall` must be strictly positive. To keep the ghost-point image-point interpolation well-posed, avoid placing the patch flush with a domain boundary — extend it slightly past the domain so its faces lie outside the computational domain.
 
 - For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
 

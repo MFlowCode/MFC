@@ -217,6 +217,19 @@ PHYSICS_DOCS = {
         "category": "Post-Processing",
         "explanation": ("Requires 3D with all periodic boundaries. Global dimensions must be even. Incompatible with cylindrical coordinates."),
     },
+    # Reacting Flow Constraints
+    "check_chemistry": {
+        "title": "Chemistry and Isothermal Walls",
+        "category": "Thermodynamic Constraints",
+        "math": r"N_f = 1, \quad T_w > 0",
+        "explanation": (
+            "Chemistry is single-component (num_fluids = 1). Isothermal walls — whether imposed at a domain boundary "
+            "(bc_[x,y,z]%isothermal_in/out on a slip/no-slip wall, bc = -15 or -16) or at an immersed boundary "
+            "(patch_ib(i)%isothermal) — model heat conduction, so they require both chemistry = 'T' and "
+            "chem_params%diffusion = 'T', and their wall temperature (Twall_in/out or patch_ib(i)%twall) must be set and "
+            "strictly positive."
+        ),
+    },
 }
 
 
