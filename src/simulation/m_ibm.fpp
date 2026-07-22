@@ -4,24 +4,24 @@
 
 #:include 'macros.fpp'
 
-!> @brief Per-block fine-grid immersed-boundary state for single-body AMR (SP20 static, SP21 prescribed-motion). This is a SEPARATE
-!! module from m_ibm on purpose: declaring these non-declare-target derived-type allocatables inside m_ibm corrupts CCE's OpenMP
-!! declare-target descriptor table for m_ibm's ghost_points and aborts its @:ALLOCATE with "lib-4425: Uninitialized descriptor for
-!! ALLOCATE statement argument" (even for a plain non-AMR IBM run, which never touches this state). A distinct module keeps m_ibm's
-!! compiled image identical to the pre-AMR-IB baseline. Do not fold these declarations back into m_ibm.
+!> @brief Per-block fine-grid immersed-boundary state for single-body AMR (SP20 static, SP21 prescribed-motion). A SEPARATE module
+!! from m_ibm: declaring these non-declare-target derived-type allocatables inside m_ibm corrupts CCE's OpenMP declare-target
+!! descriptor table for m_ibm's ghost_points and aborts its @:ALLOCATE with "lib-4425: Uninitialized descriptor for ALLOCATE
+!! statement argument" (even for a non-AMR IBM run, which never touches this state). Keeps m_ibm's compiled image identical to the
+!! pre-AMR-IB baseline. Do not fold these declarations back into m_ibm.
 module m_ibm_fine
 
     use m_derived_types
 
     implicit none
 
-    !> Per-block fine IB state: each AMR slot keeps a HOST-side copy of its fine-grid markers field, computed from the geometry at
-    !! fine resolution so the body is resolved on the fine block, and COPIED into m_ibm's declare-target ib_markers for the fine
-    !! advance's setup / per-substep moving recompute / correct-state, then copied back. markers%sf is host-only parking storage (no
+    !> Per-block fine IB state: each AMR slot keeps a HOST-side copy of its markers field, computed from the geometry at fine
+    !! resolution so the body is resolved on the fine block, then COPIED into m_ibm's declare-target ib_markers for the fine
+    !! advance's setup / per-substep moving recompute / correct-state and copied back. markers%sf is host-only parking storage (no
     !! device mapping): the declare-target ib_markers is allocated once and NEVER reallocated/move_alloc'd/pointer-swapped, so the
-    !! swap syncs its data via GPU_UPDATE rather than churning the device present table (detach/attach/move_alloc of a declared
-    !! array corrupts it on Cray). The fine ghost-point lists park on-device in gp_park (below), not here; num_gps records each
-    !! slot's ghost-point count across a swap.
+    !! swap syncs via GPU_UPDATE rather than churning the device present table (detach/attach/move_alloc of a declared array
+    !! corrupts it on Cray). Fine ghost-point lists park on-device in gp_park (below), not here; num_gps records each slot's
+    !! ghost-point count across a swap.
     type ib_fine_state
         type(integer_field) :: markers
         integer             :: num_gps
@@ -29,25 +29,25 @@ module m_ibm_fine
     type(ib_fine_state), allocatable :: ib_fine(:)
     integer                          :: num_gps_save
 
-    !> Device-resident park for the coarse and fine ghost-point lists across an AMR fine swap - replaces the per-slot host
-    !! ib_fine%gps. Because the declare-target ghost_points and ALL its consumers run on-device, the swap copies between gp_park and
+    !> Device-resident park for the coarse and fine ghost-point lists across an AMR fine swap; replaces the per-slot host
+    !! ib_fine%gps. The declare-target ghost_points and ALL its consumers run on-device, so the swap copies between gp_park and
     !! ghost_points with on-device kernels (no host round-trip). Column j (1..nslots) parks fine slot j's list; column
     !! ib_coarse_slot parks the coarse list. Mapped dynamically via move_alloc + GPU_ENTER_DATA (the amr_cg idiom) so the bare
     !! derived-type allocatable gets a valid descriptor - a direct @:ALLOCATE aborts with lib-4425 on CCE OpenMP-offload.
     type(ghost_point), allocatable :: gp_park(:,:)
 
-    !> The coarse ghost points AND coarse markers are parked (host copies) across a fine swap in an EXTRA ib_fine slot rather than
-    !! dedicated module variables: adding ANY new module-level derived-type allocatable to this module compile-time corrupts a
-    !! sibling allocatable's descriptor on CCE OpenMP-offload (the plain-IBM lib-4425 class), so reuse ib_fine's proven-safe
-    !! storage. ib_coarse_slot indexes that extra slot (= nslots+1).
+    !> The coarse ghost points AND coarse markers park (host copies) across a fine swap in an EXTRA ib_fine slot rather than
+    !! dedicated module variables: adding ANY new module-level derived-type allocatable here corrupts a sibling allocatable's
+    !! descriptor on CCE OpenMP-offload (the plain-IBM lib-4425 class), so reuse ib_fine's proven-safe storage. ib_coarse_slot
+    !! indexes that slot (= nslots+1).
     integer :: ib_coarse_slot = 0
 
-    !> Fine-block ghost-point capacity (= buffered fine-block cell count), set by s_ibm_alloc_fine before the coarse s_ibm_setup so
-    !! the declare-target ghost_points is sized once to hold the larger of the coarse and fine lists. 0 when AMR-IB is inactive.
+    !> Fine-block ghost-point capacity (= buffered fine-block cell count), set by s_ibm_alloc_fine before s_ibm_setup sizes the
+    !! declare-target ghost_points once to hold the larger of the coarse and fine lists. 0 when AMR-IB is inactive.
     integer(kind=8) :: fine_gps_cap = 0_8
 
-    !> Bounds for the ib_markers marker field, sized once to enclose BOTH the coarse and fine blocks so the declare-target
-    !! ib_markers holds either without a reallocation/pointer-swap. Set by s_ibm_alloc_fine, read by s_ibm_setup.
+    !> Bounds for the ib_markers marker field, sized once to enclose BOTH coarse and fine blocks so the declare-target ib_markers
+    !! holds either without a reallocation/pointer-swap. Set by s_ibm_alloc_fine, read by s_ibm_setup.
     integer :: mkr_lo(3) = 0, mkr_hi(3) = 0
 end module m_ibm_fine
 
@@ -69,10 +69,9 @@ module m_ibm
     use m_patch_geometries
     use m_collisions
 
-    ! Fine-IB AMR state (ib_fine/num_gps_save/mkr bounds) lives in a
-    ! separate module so it is NOT part of m_ibm's compiled image: on CCE OpenMP-offload,
-    ! declaring those derived-type allocatables here corrupts the declare-target descriptor
-    ! for ghost_points and aborts its @:ALLOCATE with lib-4425. See m_ibm_fine.
+    ! Fine-IB AMR state (ib_fine/num_gps_save/mkr bounds) lives in a separate module, kept OUT of m_ibm's compiled image: on CCE
+    ! OpenMP-offload, declaring those derived-type allocatables here corrupts the declare-target descriptor for ghost_points and
+    ! aborts its @:ALLOCATE with lib-4425. See m_ibm_fine.
     use m_ibm_fine
 
     implicit none
@@ -107,11 +106,11 @@ contains
     impure subroutine s_initialize_ibm_module()
 
         if (amr .and. ib) then
-            ! Size the declare-target ib_markers for the DEEPEST fine level: it must both hold an L2 (4x) block's
-            ! markers when swapped to a fine block and conform to the level-aware park slots (s_ibm_alloc_fine)
-            ! that the whole-array park/restore copies assign to/from. ib_markers is device-mapped once here and
-            ! never reallocated (Cray present-table), so the widening must happen at this ALLOCATE. At
-            ! amr_max_level = 1 the bounds reduce to the plain coarse extents (byte-identical).
+            ! Size the declare-target ib_markers for the DEEPEST fine level: it must hold an L2 (4x) block's markers
+            ! when swapped to a fine block and conform to the level-aware park slots (s_ibm_alloc_fine) the whole-array
+            ! park/restore copies assign to/from. ib_markers is device-mapped once here and never reallocated (Cray
+            ! present-table), so the widening must happen at this ALLOCATE. At amr_max_level = 1 the bounds reduce to
+            ! the plain coarse extents (byte-identical).
             call s_ibm_marker_bounds()
             @:ALLOCATE(ib_markers%sf(mkr_lo(1):mkr_hi(1), mkr_lo(2):mkr_hi(2), mkr_lo(3):mkr_hi(3)))
         else if (p > 0) then
@@ -184,17 +183,16 @@ contains
         else
             max_num_gps = int(num_gps, 8)
         end if
-        ! AMR-IB: the fine blocks swap their (larger) ghost-point list into this same declare-target
-        ! ghost_points, which is allocated ONCE here and never reallocated (a realloc/move_alloc of a
-        ! declare-target allocatable corrupts the Cray present table). Size it to hold the fine list too.
-        ! fine_gps_cap (deepest block's buffered CELL count, set by s_ibm_alloc_fine) is a volume bound;
-        ! ghost points live in a gp_layers-thick shell at the body surface, so refine it with a surface
-        ! estimate: the fine list for any block is bounded by the whole-body coarse count (global: a
-        ! seam-spanning block's buffered marker region reaches into neighbor-owned surface) scaled by the
-        ! surface refinement factor amr_ref_ratio**(level*(num_dims-1)), x4 margin (discretization + prescribed
-        ! motion), floored for bodies under-resolved at the coarse spacing. min() with the volume bound so
-        ! capacity (and gp_park = cap x nslots+1 device words) never exceeds the previous sizing; the
-        ! overflow PROHIBITs at the swap/rebuild sites remain the hard backstop.
+        ! AMR-IB: the fine blocks swap their (larger) ghost-point list into this same declare-target ghost_points,
+        ! allocated ONCE here and never reallocated (a realloc/move_alloc of a declare-target allocatable corrupts
+        ! the Cray present table), so size it to hold the fine list too. fine_gps_cap (deepest block's buffered CELL
+        ! count, set by s_ibm_alloc_fine) is a volume bound; ghost points live in a gp_layers-thick shell at the body
+        ! surface, so refine it with a surface estimate: the fine list for any block is bounded by the whole-body
+        ! coarse count (global: a seam-spanning block's buffered marker region reaches into neighbor-owned surface)
+        ! scaled by the surface refinement factor amr_ref_ratio**(level*(num_dims-1)), x4 margin (discretization +
+        ! prescribed motion), floored for bodies under-resolved at the coarse spacing. min() with the volume bound so
+        ! capacity (and gp_park = cap x nslots+1 device words) never exceeds the previous sizing; the overflow
+        ! PROHIBITs at the swap/rebuild sites remain the hard backstop.
         if (allocated(ib_fine)) then
             call s_mpi_allreduce_integer_sum(int(num_gps, 8), total_gps)
             fine_gps_est = min(fine_gps_cap, 4_8*total_gps*int(amr_ref_ratio, 8)**(amr_max_level*(num_dims - 1)) + 4096_8)
@@ -203,13 +201,13 @@ contains
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps]')
-        ! ghost_points is GPU_DECLARE'd and @:ALLOCATE establishes its device mapping; no
-        ! explicit copyin (contents are written by the device pipeline below) - an extra
-        ! dynamic map on top of the declared entry corrupts CCE-OMP's descriptor (lib-4425)
+        ! ghost_points is GPU_DECLARE'd and @:ALLOCATE establishes its device mapping; no explicit copyin (contents
+        ! are written by the device pipeline below) - an extra dynamic map on top of the declared entry corrupts
+        ! CCE-OMP's descriptor (lib-4425)
         @:ALLOCATE(ghost_points(1:max_num_gps))
-        ! AMR-IB: device-resident park for the coarse/fine ghost-point swap (replaces host ib_fine%gps).
-        ! move_alloc + GPU_ENTER_DATA (the amr_cg idiom) gives the bare derived-type allocatable a valid
-        ! descriptor and device mapping; a direct @:ALLOCATE of it aborts with lib-4425 on CCE OpenMP-offload.
+        ! AMR-IB: device-resident park for the coarse/fine ghost-point swap (replaces host ib_fine%gps). move_alloc +
+        ! GPU_ENTER_DATA (the amr_cg idiom) gives the bare derived-type allocatable a valid descriptor and device
+        ! mapping; a direct @:ALLOCATE of it aborts with lib-4425 on CCE OpenMP-offload.
         if (allocated(ib_fine)) then
             allocate (tmp_park(1:max_num_gps,1:ib_coarse_slot))
             call move_alloc(tmp_park, gp_park)
@@ -641,9 +639,9 @@ contains
     !> Locate all ghost points in the domain
     subroutine s_find_ghost_points()
 
-        ! Operates on the declare-target module-global ghost_points directly (not via a dummy argument):
-        ! the on-device parallel loop writes it and the on-device sort below reorders it, both under the
-        ! SAME declare-target name and both on the device, so nothing ever crosses host<->device here.
+        ! Operates on the declare-target module-global ghost_points directly, not a dummy argument: the on-device parallel loop
+        ! writes it and the on-device sort below reorders it, both under the SAME declare-target name on the device, so nothing
+        ! ever crosses host<->device here.
         integer           :: i, j, k, ii, jj, kk, gp_layers_z  !< Iterator variables
         integer           :: xp, yp, zp                        !< periodicities
         integer           :: count, count_i, local_idx
@@ -726,18 +724,15 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! The atomic capture above assigns array slots in thread-completion order, so the ghost-point LIST
-        ! order is nondeterministic on the GPU and differs from the CPU's serial (loop) order. Any
-        ! order-sensitive consumer downstream (e.g. the surface-force reduction) then produces a
-        ! backend-dependent result, which the discrete image-point stencil amplifies -> the moving AMR-IB
-        ! golden diverges across backends. (Only moving AMR-IB rebuilds the list on-device per substep, so
-        ! only it is affected.) Reorder into deterministic lexicographic (i,j,k) order with a single-thread
-        ! ON-DEVICE insertion sort (num_gps ~ O(1e2); the single-trip outer loop pins it to one thread).
-        ! Sorting on the device is deliberate: a host round-trip here needs a GPU_UPDATE of the declare-target
-        ! ghost_points, which fails Cray OpenACC's present-table lookup and aborts CCE OpenMP-offload with
-        ! lib-4425 in the AMR fine path (this routine runs mid-swap, see s_ibm_swap_to_fine).
-        ! Non-AMR runs keep the original (unsorted) ghost order - only moving AMR-IB rebuilds the
-        ! list on-device per substep, so only it needs the deterministic ordering.
+        ! The atomic capture above assigns array slots in thread-completion order, so the ghost-point LIST order is nondeterministic
+        ! on the GPU and differs from the CPU's serial order. An order-sensitive consumer downstream (e.g. the surface-force
+        ! reduction) then produces a backend-dependent result, which the discrete image-point stencil amplifies -> the moving
+        ! AMR-IB golden diverges across backends. Reorder into deterministic lexicographic (i,j,k) order with a single-thread
+        ! ON-DEVICE insertion sort (num_gps ~ O(1e2); the single-trip outer loop pins it to one thread). Sorting on the device is
+        ! deliberate: a host round-trip here needs a GPU_UPDATE of the declare-target ghost_points, which fails Cray OpenACC's
+        ! present-table lookup and aborts CCE OpenMP-offload with lib-4425 in the AMR fine path (this routine runs mid-swap, see
+        ! s_ibm_swap_to_fine). Only moving AMR-IB rebuilds the list on-device per substep, so only it needs the ordering; non-AMR
+        ! runs keep the original (unsorted) order.
         if (.not. amr) return
         $:GPU_PARALLEL_LOOP(private='[a, b, tmp, less]')
         do local_idx = 1, 1
@@ -989,12 +984,12 @@ contains
 
         integer, intent(in) :: num_ibs
         !> AMR subcycling: fine sub-time fraction in [0,1] of the coarse step. When present and >= 0 the moving body is snapshotted
-        !! to the linear time interpolation between its coarse t^n position (step_*) and t^{n+1} position (current), matching the
-        !! fluid-ghost lerp the subcycle applies, and restored afterwards. Absent/negative => current position.
+        !! to the linear interpolation between its coarse t^n position (step_*) and t^{n+1} position (current) - matching the
+        !! fluid-ghost lerp the subcycle applies - and restored afterwards. Absent/negative => current position.
         real(wp), intent(in), optional :: th
-        integer :: i, j, k, z_gp_layers
-        logical :: snap
-        real(wp) :: sc(3, num_ibs), sa(3, num_ibs)  !< body centroids/angles saved across the sub-time snapshot
+        integer                        :: i, j, k, z_gp_layers
+        logical                        :: snap
+        real(wp)                       :: sc(3, num_ibs), sa(3, num_ibs)  !< body centroids/angles saved across the snapshot
 
         call nvtxStartRange("UPDATE-MIBM")
 
@@ -1003,9 +998,9 @@ contains
             if (th >= 0._wp) snap = .true.
         end if
         if (snap) then
-            ! The body position/angles were just updated on device by the RK body-motion loop
-            ! (m_time_steppers); sync to host before the host-side sub-time interpolation reads them, else the
-            ! fine block is built at the stale t^n position on GPU (host-current on CPU, so this only bites GPU).
+            ! The body position/angles were just updated on device by the RK body-motion loop (m_time_steppers);
+            ! sync to host before the host-side sub-time interpolation reads them, else the fine block is built at
+            ! the stale t^n position on GPU (host stays current on CPU, so this only bites GPU).
             $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
             do i = 1, num_ibs
                 sc(1, i) = patch_ib(i)%x_centroid; sc(2, i) = patch_ib(i)%y_centroid; sc(3, i) = patch_ib(i)%z_centroid
@@ -1045,10 +1040,9 @@ contains
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps)
-        ! the ghost_points capacity (a setup-time heuristic) can be outgrown when the moving surface's
-        ! discrete cell count increases (body entering the domain, bodies separating, rotating
-        ! non-convex geometry); the fill below has no bound check, so overflow would be a silent
-        ! device out-of-bounds write. size(ghost_points) is the ACTIVE array's capacity - the coarse
+        ! the ghost_points capacity (a setup-time heuristic) can be outgrown when the moving surface's discrete cell count increases
+        ! (body entering the domain, bodies separating, rotating non-convex geometry); the fill below has no bound check, so
+        ! overflow would be a silent device out-of-bounds write. size(ghost_points) is the ACTIVE array's capacity: the coarse
         ! list here, or the fine slot's own (larger) list when the AMR advance has swapped it in.
         @:PROHIBIT(num_gps > size(ghost_points), &
                    & "moving IB: the ghost-point count outgrew the ghost-point array capacity; the body's surface-cell count increased beyond the setup-time sizing")
@@ -1676,12 +1670,12 @@ contains
 
     end subroutine s_update_ib_lookup
 
-    !> Compute the deepest-level marker-field bounds into the module mkr_lo/mkr_hi. Sized to enclose BOTH the coarse block (m/n/p
-    !! with ghosts) AND the deepest fine block a rank can own (level amr_max_level). A level-l block has amr_ref_ratio**l * base_ext
-    !! - 1 interior cells per active dim, where base_ext = amr_block_end(d) - amr_block_beg(d) + 1 (the user-specified block
-    !! footprint in coarse cells). The max() keeps the coarse extent as the floor so the coarse layout is never shrunk. At
-    !! amr_max_level = 1, amr_ref_ratio**1 = amr_ref_ratio gives the correct sizing for any supported refinement ratio. Called from
-    !! both s_initialize_ibm_module (to size the declare-target ib_markers before the device map) and s_ibm_alloc_fine.
+    !> Compute the deepest-level marker-field bounds into the module mkr_lo/mkr_hi. Encloses BOTH the coarse block (m/n/p with
+    !! ghosts) AND the deepest fine block a rank can own (level amr_max_level). A level-l block has amr_ref_ratio**l * base_ext - 1
+    !! interior cells per active dim, base_ext = amr_block_end(d) - amr_block_beg(d) + 1 (the user-specified footprint in coarse
+    !! cells). The max() keeps the coarse extent as the floor so the coarse layout is never shrunk. At amr_max_level = 1,
+    !! amr_ref_ratio gives the correct sizing for any supported refinement ratio. Called from s_initialize_ibm_module (to size the
+    !! declare-target ib_markers before the device map) and s_ibm_alloc_fine.
     impure subroutine s_ibm_marker_bounds()
 
         mkr_lo(1) = -buff_size
@@ -1702,8 +1696,8 @@ contains
     end subroutine s_ibm_marker_bounds
 
     !> Allocate the per-slot fine-IB marker fields (static-body AMR). One integer field per AMR slot, sized to the max buffered fine
-    !! extents (mirrors the coarse ib_markers bounds); ghost-point lists start empty and are filled by s_ibm_setup_fine. No-op
-    !! unless amr .and. ib.
+    !! extents (mirrors the coarse ib_markers bounds); ghost-point lists start empty, filled by s_ibm_setup_fine. No-op unless amr
+    !! .and. ib.
     impure subroutine s_ibm_alloc_fine(nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi)
 
         integer, intent(in) :: nslots, f1_lo, f1_hi, f2_lo, f2_hi, f3_lo, f3_hi
@@ -1713,16 +1707,15 @@ contains
         @:PROHIBIT(f1_hi > mkr_hi(1) .or. f2_hi > mkr_hi(2) .or. (p > 0 .and. f3_hi > mkr_hi(3)), &
                    & "AMR fine IB: fine block extent exceeds the deepest-level ib_markers bounds; the copy-based fine-marker swap needs ib_markers sized to enclose the fine block")
 
-        ! ghost-point capacity: upper bound for the deepest fine block = its buffered cell count. Computed from
-        ! the widened mkr bounds so it matches ib_markers (the declare-target never reallocated on Cray GPU).
-        ! s_ibm_setup reads this to size the shared declare-target ghost_points.
+        ! ghost-point capacity: upper bound for the deepest fine block = its buffered cell count. Computed from the widened mkr
+        ! bounds so it matches ib_markers (the declare-target never reallocated on Cray GPU). s_ibm_setup reads this to size the
+        ! shared declare-target ghost_points.
         fine_gps_cap = int(mkr_hi(1) - mkr_lo(1) + 1, 8)*int(mkr_hi(2) - mkr_lo(2) + 1, 8)*int(max(mkr_hi(3) - mkr_lo(3) + 1, 1), 8)
 
-        ! Extra slot (nslots+1) parks the coarse markers during a fine swap - reusing an ib_fine slot avoids
-        ! adding a new module-level derived-type allocatable (which corrupts descriptors on CCE OpenMP,
-        ! lib-4425). markers%sf is HOST-only park storage (no ACC_SETUP / device map); the declare-target
-        ! ib_markers holds the active data and the swap copies to/from it. The fine ghost-point lists park
-        ! on-device in gp_park (sized here via fine_gps_cap, allocated in s_ibm_setup).
+        ! Extra slot (nslots+1) parks the coarse markers during a fine swap - reusing an ib_fine slot avoids adding a new
+        ! module-level derived-type allocatable (which corrupts descriptors on CCE OpenMP, lib-4425). markers%sf is HOST-only park
+        ! storage (no ACC_SETUP / device map); the declare-target ib_markers holds the active data and the swap copies to/from it.
+        ! The fine ghost-point lists park on-device in gp_park (sized here via fine_gps_cap, allocated in s_ibm_setup).
         ib_coarse_slot = nslots + 1
         allocate (ib_fine(1:ib_coarse_slot))
         do islot = 1, ib_coarse_slot
@@ -1742,11 +1735,10 @@ contains
         logical, intent(in) :: gps_on_device  !< fine ghost points already present on device (per-stage correct path)
         integer             :: n_c, n_f, csl, fsl, a
 
-        ! ib_markers: declare-target field, allocated once and device-resident; NEVER pointer-swapped or
-        ! detach-attach'd (that corrupts the Cray present table and leaves the device descriptor pointing at
-        ! the stale coarse array). Park the coarse markers as a host copy, then on the correct/moving path
-        ! copy this slot's fine markers in and push to device. On the setup path s_ibm_setup_fine rebuilds the
-        ! fine markers directly in ib_markers.
+        ! ib_markers: declare-target field, allocated once and device-resident; NEVER pointer-swapped or detach-attach'd (that
+        ! corrupts the Cray present table and leaves the device descriptor pointing at the stale coarse array). Park the coarse
+        ! markers as a host copy, then on the correct/moving path copy this slot's fine markers in and push to device. On the setup
+        ! path s_ibm_setup_fine rebuilds the fine markers directly in ib_markers.
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
         ib_fine(ib_coarse_slot)%markers%sf = ib_markers%sf
@@ -1755,18 +1747,17 @@ contains
             $:GPU_UPDATE(device='[ib_markers%sf]')
         end if
 
-        ! ghost_points and gp_park are both device-resident and are NEVER move_alloc'd/reallocated after setup
-        ! (that corrupts the Cray present table). Park the coarse list into gp_park's coarse column, then on
-        ! the correct/moving path pull this slot's fine list in - both via on-device kernels, no host round-trip
-        ! (all ghost_points consumers run on-device). This also removes the whole-array ghost_points GPU_UPDATE
-        ! that amdflang lowered to a per-element custom mapper (ROCm HSA OUT_OF_RESOURCES abort). On the setup
-        ! path the fine list does not exist yet - s_ibm_setup_fine fills ghost_points in place next.
-        ! These swap/restore kernels carry an AMD-only defaultmap(present:allocatable): AMD's default='present'
-        ! emits no defaultmap, so flang otherwise generates a map ENTRY for these device-resident allocatable
-        ! derived-type arrays (ghost_points/gp_park) that it lowers to a per-element custom mapper - the offload
-        ! runtime then busy-loops for minutes recursing through targetDataBegin/targetDataEnd (same amdflang
-        ! per-element-mapper failure as the removed whole-array GPU_UPDATE above). defaultmap(present:allocatable)
-        ! asserts them present with NO map entry, so no mapper is generated. CCE gets this via its default='present'.
+        ! ghost_points and gp_park are both device-resident and NEVER move_alloc'd/reallocated after setup (that corrupts the Cray
+        ! present table). Park the coarse list into gp_park's coarse column, then on the correct/moving path pull this slot's fine
+        ! list in - both via on-device kernels, no host round-trip (all ghost_points consumers run on-device). This also removes
+        ! the whole-array ghost_points GPU_UPDATE that amdflang lowered to a per-element custom mapper (ROCm HSA OUT_OF_RESOURCES
+        ! abort). On the setup path the fine list does not exist yet - s_ibm_setup_fine fills ghost_points in place next. These
+        ! swap/restore kernels carry an AMD-only defaultmap(present:allocatable): AMD's default='present' emits no defaultmap, so
+        ! flang otherwise generates a map ENTRY for these device-resident allocatable derived-type arrays (ghost_points/gp_park)
+        ! that it lowers to a per-element custom mapper - the offload runtime then busy-loops for minutes recursing through
+        ! targetDataBegin/targetDataEnd (same amdflang per-element-mapper failure as the removed whole-array GPU_UPDATE above).
+        ! defaultmap(present:allocatable) asserts them present with NO map entry, so no mapper is generated. CCE gets this via its
+        ! default='present'.
         n_c = num_gps
         @:PROHIBIT(int(n_c, 8) > size(gp_park, dim=1, kind=8), "AMR fine IB: coarse ghost-point count exceeds the gp_park capacity")
         csl = ib_coarse_slot
@@ -1798,10 +1789,10 @@ contains
         integer, intent(in) :: islot
         integer             :: n_c, n_f, csl, fsl, a
 
-        ! Mirror s_ibm_swap_to_fine: save this slot's (freshly computed / motion-updated) fine markers back to
-        ! its host store, then copy the parked coarse markers into the device-resident ib_markers. The fine and
-        ! coarse ghost-point lists are parked/restored via on-device kernels between gp_park and ghost_points.
-        ! No pointer-swap/detach/move_alloc of the declared arrays.
+        ! Mirror s_ibm_swap_to_fine: save this slot's (freshly computed / motion-updated) fine markers back to its host store, then
+        ! copy the parked coarse markers into the device-resident ib_markers. The fine and coarse ghost-point lists are
+        ! parked/restored via on-device kernels between gp_park and ghost_points. No pointer-swap/detach/move_alloc of the declared
+        ! arrays.
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
         ib_fine(islot)%markers%sf = ib_markers%sf
@@ -1831,8 +1822,8 @@ contains
     end subroutine s_ibm_restore_from_fine
 
     !> Compute the fine-grid IB state (markers, ghost points, levelset, image points, interpolation coeffs) for the current block.
-    !! The grid globals must be swapped to the fine block AND the IB globals swapped to this slot (s_ibm_swap_to_fine) before the
-    !! call: the pipeline writes into the module globals, which then hold this slot's fine state. Mirrors the static-body portion of
+    !! The grid globals must be swapped to the fine block AND the IB globals swapped to this slot (s_ibm_swap_to_fine) first: the
+    !! pipeline writes into the module globals, which then hold this slot's fine state. Mirrors the static-body portion of
     !! s_ibm_setup at fine resolution.
     impure subroutine s_ibm_setup_fine()
 
@@ -1843,9 +1834,9 @@ contains
 
         call s_find_num_ghost_points(num_gps)
         $:GPU_UPDATE(device='[num_gps]')
-        ! ghost_points is allocated once (s_ibm_setup, sized to the fine-block cell-count cap) and filled
-        ! in place; it is never reallocated here (a realloc/move_alloc of the declare-target array corrupts
-        ! the Cray present table). The cap bounds any block's ghost-point count, so this cannot overflow.
+        ! ghost_points is allocated once (s_ibm_setup, sized to the fine-block cell-count cap) and filled in place; never
+        ! reallocated here (a realloc/move_alloc of the declare-target array corrupts the Cray present table). The cap bounds any
+        ! block's ghost-point count, so this cannot overflow.
         @:PROHIBIT(int(num_gps, 8) > size(ghost_points, kind=8), &
                    & "AMR fine IB: ghost-point count exceeds the ghost_points capacity sized at s_ibm_setup")
 

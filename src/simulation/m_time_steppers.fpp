@@ -457,8 +457,7 @@ contains
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
-        !> block-slot loop variable (s_amr_select_slot assigns the global amr_cur, so amr_cur itself must not be the active DO
-        !! variable)
+        !> block-slot loop variable (s_amr_select_slot sets global amr_cur, so amr_cur must not be the active DO variable)
         integer            :: islot
         integer            :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
         real(wp)           :: start, finish
@@ -501,16 +500,16 @@ contains
                 end if
             end if
 
-            ! AMR fine-level stage advance (interleaved, non-subcycled): q_cons_ts(1)%vf still holds
-            ! the coarse stage-entry state here (the stage-1 backup and RK update below have not run yet).
-            ! Each active block slot is advanced + refluxed in turn; amr_cur is reset to 1
-            ! afterwards so the next stage's coarse RHS captures creg into slot 1.
+            ! AMR fine-level stage advance (interleaved, non-subcycled): q_cons_ts(1)%vf still holds the
+            ! coarse stage-entry state (the stage-1 backup and RK update below have not run yet). Each
+            ! active block slot is advanced + refluxed in turn; amr_cur resets to 1 afterwards so the
+            ! next stage's coarse RHS captures creg into slot 1.
             if (amr .and. .not. amr_subcycle) then
                 ! max_grid_size tiling: three phases so a sub-block's seam ghosts read its neighbours' STAGE-ENTRY interior.
                 ! Phase 1 - FILL every block's ghost shell top-down. s_amr_fine_stage_fill is level-aware: a level>=2 block gathers
-                ! its ghosts from its PARENT (s_amr_gather_coarse_patch's level branch), a level-1 block from L0. Blocks are stored
-                ! parent-before-child (L2 at a higher slot), so slot order fills the parent's stage-entry state before the child
-                ! reads it.
+                ! ghosts from its PARENT (s_amr_gather_coarse_patch's level branch), a level-1 block from L0. Blocks are stored
+                ! parent-before-child (L2 at higher slot), so slot order fills the parent's stage-entry state before the child reads
+                ! it.
                 do islot = 1, amr_num_blocks
                     call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                     call s_amr_fine_stage_fill(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
@@ -523,10 +522,11 @@ contains
                     call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                   & t_step)
                     ! reflux into "the coarse". A level-1 block corrects the L0 rhs (rhs form; L0 updates after the stage loop). A
-                    ! level>=2 block's coarse side is its PARENT (level l-1) - its Berger-Colella correction needs the parent's flux
-                    ! at the block's footprint faces (creg captured during the parent's advance) and applies as a STATE reflux into
-                    ! the parent via s_amr_reflux_to_parent after the stage loop, NOT into L0 - so level>=2 blocks skip L0 reflux
-                    ! here.
+                    ! level>=2 block's coarse side is its PARENT (level l-1): its Berger-Colella correction needs the parent's flux
+                    ! at
+                    ! the footprint faces (creg captured during the parent's advance) and applies as a STATE reflux into the parent
+                    ! via
+                    ! s_amr_reflux_to_parent after the stage loop, NOT into L0 - so level>=2 blocks skip L0 reflux here.
                     if (amr_block_level(amr_cur) >= 2) cycle
                     ! freg slices of the block faces move to the coarse-outside-owners (ALL ranks call; no-op at np=1)
                     call s_amr_p2p_reflux_faces()
@@ -536,8 +536,8 @@ contains
             end if
 
             ! TWIN of the AMR fine-block RK updates: this coarse rk_coef stage combination (q = (c1*q + c2*q_stor + c3*dt*rhs)/c4)
-            ! is mirrored by s_amr_fine_rk_update (q_cons) and s_amr_fine_rk_update_pbmv (pb/mv) in m_amr - change the coefficient
-            ! algebra here and both must follow, or fine blocks integrate a different scheme.
+            ! is mirrored by s_amr_fine_rk_update (q_cons) and s_amr_fine_rk_update_pbmv (pb/mv) in m_amr - change the algebra
+            ! here and both must follow, else fine blocks integrate a different scheme.
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
             if (ab_active) then
                 jlo = ab_x%beg; jhi = ab_x%end
@@ -648,23 +648,22 @@ contains
             call nvtxEndRange
         end if
 
-        ! AMR: (subcycle) two dt/2 fine substeps between the coarse t^n backup (q_cons_ts(stor), written
-        ! at stage 1 and read-only afterwards) and the coarse t^{n+1} state; then fine solution ->
-        ! level-0 covered cells (the only deliberate level-0 write); then (subcycle) the time-accumulated
-        ! Berger-Colella state reflux on the first coarse cells outside the block
+        ! AMR: (subcycle) two dt/2 fine substeps between the coarse t^n backup (q_cons_ts(stor), written at
+        ! stage 1, read-only afterwards) and the coarse t^{n+1} state; then fine solution -> level-0 covered
+        ! cells (the only deliberate level-0 write); then (subcycle) the time-accumulated Berger-Colella
+        ! state reflux on the first coarse cells outside the block.
         if (amr) then
             ! ghost lerp sources, restriction target, and state-reflux target are all device-resident:
             ! the substep/restriction/reflux machinery runs as device kernels (M2). Each active block slot
             ! is restricted and state-refluxed in turn (the subcycle advance ran above); amr_cur resets to 1 afterwards.
             ! RESTRICT bottom-up: a level>=2 block folds into its PARENT (level-aware s_restrict_fine_to_coarse =
-            ! restrict-to-parent)
-            ! and must do so BEFORE the parent folds into L0, so the L0 covered cells reflect the finest data. Finer levels live at
-            ! higher slots (child after parent), so iterate slots in REVERSE. Disjoint same-level blocks make this bit-identical to
-            ! forward order for single-level runs.
+            ! restrict-to-parent) and must do so BEFORE the parent folds into L0, so the L0 covered cells reflect the finest
+            ! data. Finer levels live at higher slots (child after parent), so iterate slots in REVERSE. Disjoint same-level
+            ! blocks make this bit-identical to forward order for single-level runs.
             ! subcycle: advance ALL level-1 blocks together, transposed stage-by-stage with the per-substep fine-fine seam halo
             ! (s_amr_advance_fine_subcycle_all), so max_grid_size-tiled adjacent sub-blocks conserve at their shared seam. Each
-            ! block's level-2 children subcycle within it (s_amr_advance_children). The restrict + reflux fold below is then a
-            ! separate per-block pass (block footprints are disjoint, so order-independent).
+            ! block's level-2 children subcycle within it (s_amr_advance_children). The restrict + reflux fold below is a
+            ! separate per-block pass (footprints disjoint, order-independent).
             if (amr_subcycle) then
                 call s_amr_advance_fine_subcycle_all(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, &
                                                      & pb_ts(stor)%sf, mv_ts(stor)%sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
@@ -673,17 +672,15 @@ contains
             do islot = amr_num_blocks, 1, -1
                 call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                 ! subcycle multi-level: a level>=2 block was advanced, restricted, AND Berger-Colella refluxed into its parent
-                ! INSIDE the parent's subcycle (s_amr_advance_children), so it is skipped in this per-block restrict/reflux loop.
-                ! Only level-1 blocks fold to L0 here.
+                ! INSIDE the parent's subcycle (s_amr_advance_children), so it is skipped here. Only level-1 blocks fold to L0.
                 if (amr_subcycle .and. amr_block_level(amr_cur) >= 2) cycle
                 ! equilibrate the fine solution (phase change) before it restricts to the coarse level
                 if (relax) call s_amr_relax_fine()
                 call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
                 ! multi-level lock-step: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the parent's
                 ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured during
-                ! the
-                ! advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle multi-level
-                ! reflux is future work; dt is the shared lock-step step.
+                ! the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle
+                ! multi-level reflux is future work; dt is the shared lock-step step.
                 if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) call s_amr_reflux_to_parent(dt)
                 ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
                 if (amr_subcycle) call s_amr_p2p_reflux_faces()
