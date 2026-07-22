@@ -26,7 +26,7 @@ module m_load_weight
     type(scalar_field) :: load_weight  !< per-cell modeled compute-cost weight
     $:GPU_DECLARE(create='[load_weight]')
 
-    ! Relative cost coefficients K_bub/K_ib/K_pc come from m_constants (shared with the AMR block-owner cost weighting).
+    ! Cost coefficients K_bub/K_ib/K_pc from m_constants (shared with the AMR block-owner cost weighting).
 
 contains
 
@@ -76,18 +76,17 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         ! EE bubbles: NO weight contribution. Calibration (rank_time_wrt vs load_weight_wrt,
-        ! bubblescreen -n 4) showed measured RHS-time imbalance is flat (~1.02-1.03) across
-        ! vf0 = 4e-5 -> 0.1 (2500x void range), while a K_bub*void term manufactured up to
-        ! 1.59x modeled imbalance. The EE bubble source (s_compute_bubble_EE_source, inside
-        ! s_compute_rhs) is a roughly-uniform per-cell term whose cost does NOT scale with void
-        ! magnitude -- so it is not a load-imbalance driver and gets no weight. (K_bub is an EL
-        ! per-bubble-ODE constant; it does not apply to EE.) If a future EE regime -- QBMM,
-        ! adv_n number-density, very high resolution -- shows real EE imbalance, re-add with an
-        ! EE-specific coefficient calibrated against measured rank_time.
+        ! bubblescreen -n 4) showed measured RHS-time imbalance flat (~1.02-1.03) across
+        ! vf0 = 4e-5 -> 0.1 (2500x void range), while a K_bub*void term manufactured up to 1.59x
+        ! modeled imbalance. The EE bubble source (s_compute_bubble_EE_source, inside s_compute_rhs)
+        ! is a roughly-uniform per-cell term whose cost does NOT scale with void magnitude -- not a
+        ! load-imbalance driver, so no weight. (K_bub is an EL per-bubble-ODE constant; N/A to EE.)
+        ! A future EE regime -- QBMM, adv_n number-density, very high resolution -- with real EE
+        ! imbalance: re-add with an EE-specific coefficient calibrated against measured rank_time.
 
         ! EL bubble contributor: K_bub * per-cell bubble void fraction.
         ! q_beta(1)%sf holds the liquid volume fraction (1 - alpha_bub) after s_smear_voidfraction;
-        ! 1 - q_beta(1)%sf gives the smeared bubble void fraction as a per-cell count proxy.
+        ! 1 - q_beta(1)%sf is the smeared bubble void fraction, a per-cell count proxy.
         if (bubbles_lagrange) then
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p

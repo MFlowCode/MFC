@@ -6,7 +6,7 @@
 
 !> @brief Block-structured AMR: up to amr_max_blocks refined blocks (2:1 or 4:1 per amr_ref_ratio), optionally nested to
 !! amr_max_level, advanced with the shared solver via grid-state swap and conservatively coupled to each block's parent level (ghost
-!! prolongation, Berger-Colella flux reflux, restriction), with optional dt/2 subcycling and dynamic regrid.
+!! prolongation, Berger-Colella flux reflux, restriction); optional dt/2 subcycling and dynamic regrid.
 module m_amr
 
 #ifdef MFC_MPI
@@ -40,10 +40,10 @@ module m_amr
         & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_fine_stage_fill, s_amr_fine_stage_advance, &
         & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, &
         & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
-    ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal to this module (no external
-    ! caller); keeping them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
-    !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the regrid/restart drivers split
-    !! out of this module). State stays HERE - only the drivers moved.
+    ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
+    ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
+    !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
+    !! module). State stays HERE - only the drivers moved.
     public :: amr_slots, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reconcile_slots, &
         & s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
         & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
@@ -52,9 +52,9 @@ module m_amr
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
 
-    !> Realizability floor for prolonged Euler-Euler bubble POSITIVE moments (radius nR, and non-polytropic partial pressure npb /
-    !! vapor mass nmv): a positive fraction of the coarse parent so the derived R = nR/n, pb, mv stay >= 0. Minmod already keeps a
-    !! positive field positive, so this fires only under floating-point edge cases (conservation defect ~0 otherwise).
+    !> Realizability floor for prolonged Euler-Euler bubble POSITIVE moments (radius nR, non-polytropic partial pressure npb / vapor
+    !! mass nmv): a positive fraction of the coarse parent so derived R = nR/n, pb, mv stay >= 0. Minmod keeps a positive field
+    !! positive, so this fires only under floating-point edge cases (conservation defect ~0 otherwise).
     real(wp), parameter :: bub_pos_frac = 1.0e-10_wp
 
     !> One refined level: its own grid + conservative fields. Field arrays are device-resident (@:ALLOCATE); coords/metadata
@@ -76,7 +76,7 @@ module m_amr
         type(scalar_field), allocatable :: q_ghost_b(:)    !< subcycle ghost-lerp source at coarse t^{n+1} (ghost shell only)
         !> non-polytropic QBMM quadrature side-state on the block (nnode x nb per cell). pb/mv evolve cell-locally (their rhs reads
         !! only the local cell + the block's own moment fluxes), so the fine treatment is prolong -> advance -> restrict with no
-        !! reflux; ghosts feed the widened- idwint conversions and are prolonged piecewise-constant (CHyQMOM realizability, like the
+        !! reflux; ghosts feed the widened-idwint conversions and are prolonged piecewise-constant (CHyQMOM realizability, like the
         !! moments).
         type(pres_field) :: pb_f, mv_f        !< fine pb/mv (ghost-inclusive)
         type(pres_field) :: pb_stor, mv_stor  !< SSP-RK step-entry backup (also the regrid bounce)
@@ -91,41 +91,41 @@ module m_amr
     type(t_level), allocatable :: amr_slots(:)
     integer                    :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
-    !> Per-slot field-array sizing (module-scope so s_amr_alloc_slot/s_amr_free_slot, called from init/regrid/restart/finalize, see
-    !! them): max fine cells per dim (2*maxc_loc-1) and the buffered array bounds. amr_slot_live(k) tracks whether slot k's
-    !! per-block field arrays are currently allocated - lazy owned-only sizing keeps a rank's fine memory ~1/num_procs of the pool.
+    !> Per-slot field-array sizing (module-scope, used by s_amr_alloc_slot/s_amr_free_slot): max fine cells per dim (2*maxc_loc-1)
+    !! and the buffered array bounds. amr_slot_live(k) tracks whether slot k's field arrays are allocated - lazy owned-only sizing
+    !! keeps a rank's fine memory ~1/num_procs of the pool.
     integer              :: max_f1, max_f2, max_f3
     integer              :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
     logical, allocatable :: amr_slot_live(:)
     !! fine-fine seam pack buffers, hoisted out of the per-seam s_amr_fine_fine_halo loop (allocated once at max seam extent)
     real(wp), allocatable :: amr_seambuf_x(:), amr_seambuf_y(:)
-    !! cached same-level adjacent-seam list (3, npairs) = (xb, yb, seam-dim), so s_amr_fine_fine_halo iterates O(#seams)
-    !! instead of rescanning all O(nblocks^2) pairs every RK stage. Block topology (regions/levels/count) changes only at
-    !! regrid/restart, so the list is rebuilt only when amr_seam_pairs_dirty is set (or the block count changes - a tripwire).
+    !! cached same-level adjacent-seam list (3, npairs) = (xb, yb, seam-dim), so s_amr_fine_fine_halo iterates O(#seams) instead of
+    !! rescanning all O(nblocks^2) pairs every RK stage. Block topology changes only at regrid/restart, so the list is rebuilt only
+    !! when amr_seam_pairs_dirty is set (or the block count changes - a tripwire).
     integer, allocatable :: amr_seam_pairs(:,:)
     integer              :: amr_num_seam_pairs, amr_seam_pairs_nblk
     logical              :: amr_seam_pairs_dirty
-    !! cached per-block P2P overlap-rank lists (rebuilt with the seam list - same dirty flag): amr_ovl_gather(:,k) = ranks
-    !! whose owned coarse range (s_amr_rank_coarse_range) intersects block k's amr_cpat_mar-padded patch box (the gather
-    !! contributor set); amr_ovl_scatter(:,k) = ranks whose coarse interior (s_amr_rank_interior) intersects block k's region
-    !! box (the restrict-scatter destination set). Rank-ASCENDING and NOT owner-excluded (the consumers keep their owner
-    !! skip), so iterating a list reproduces the replaced per-call 0..num_procs-1 scan's MPI send/recv order exactly.
+    !! cached per-block P2P overlap-rank lists (rebuilt with the seam list - same dirty flag): amr_ovl_gather(:,k) = ranks whose
+    !! owned coarse range (s_amr_rank_coarse_range) intersects block k's amr_cpat_mar-padded patch box (gather contributors);
+    !! amr_ovl_scatter(:,k) = ranks whose coarse interior (s_amr_rank_interior) intersects block k's region box (restrict-scatter
+    !! destinations). Rank-ASCENDING and NOT owner-excluded (consumers keep their owner skip), so iterating a list reproduces the
+    !! replaced per-call 0..num_procs-1 scan's MPI send/recv order exactly.
     integer, allocatable :: amr_ovl_gather(:,:), amr_ovl_scatter(:,:)  !< (num_procs, amr_max_blocks)
     integer, allocatable :: amr_ovl_gather_n(:), amr_ovl_scatter_n(:)  !< per-block list lengths
 
-    !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min over ranks
+    !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min-over-ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
     !! 2*(isect cells) - 1 <= local extent holds by construction. Equals amr_maxc at np=1.
     integer :: amr_maxc_fit(3) = 1
 
-    !> SWAP CONTRACT (s_amr_swap_to_fine / s_amr_restore_coarse). The AMR fine advance runs the shared solver on a fine block by
-    !! swapping these coarse-grid globals to the block's values and restoring them after: m/n/p, idwint/idwbuff, the nine coordinate
-    !! arrays (sw_x_cb..sw_dz below), acoustic_source, ab_active; the WENO/hypoelastic/IGR spacing coefficients are recomputed for
-    !! the active grid rather than saved. RULE for anyone adding grid-dependent state: any module-level variable DERIVED from
+    !> SWAP CONTRACT (s_amr_swap_to_fine / s_amr_restore_coarse). The fine advance runs the shared solver on a fine block by
+    !! swapping these coarse-grid globals to the block's values and restoring after: m/n/p, idwint/idwbuff, the nine coordinate
+    !! arrays (sw_x_cb..sw_dz below), acoustic_source, ab_active; WENO/hypoelastic/IGR spacing coefficients are recomputed for the
+    !! active grid rather than saved. RULE for anyone adding grid-dependent state: any module-level variable DERIVED from
     !! m/n/p/idwint/idwbuff/coords that a kernel reads on the fine grid must be swapped here OR refreshed on every fine call at its
-    !! use site - and if it is GPU_DECLARE'd, its DEVICE copy must be refreshed too. A stale device copy of coarse bounds reads out
-    !! of range on the fine grid under CCE OpenACC (the ab_int regression, fixed by a per-call GPU_UPDATE in s_compute_rhs; see
-    !! m_rhs.fpp and .claude/rules/common-pitfalls.md). amr_swapped guards against a nested/unpaired swap.
+    !! use site - and if GPU_DECLARE'd, its DEVICE copy too. A stale device copy of coarse bounds reads out of range on the fine
+    !! grid under CCE OpenACC (the ab_int regression, fixed by a per-call GPU_UPDATE in s_compute_rhs; see m_rhs.fpp and
+    !! .claude/rules/common-pitfalls.md). amr_swapped guards against a nested/unpaired swap.
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
@@ -139,17 +139,17 @@ module m_amr
     $:GPU_DECLARE(create='[sw_jac, sw_jac_old]')
 
     !> Per-fine-cell radial volume weight for cyl_coord restriction (axisymmetric): the fold-back must be volume-weighted and cell
-    !! volume is proportional to radius, so a fine child is weighted by its own cell-center radius y_cc. Filled from the active
-    !! block's fine y_cc each restriction and read IDENTICALLY by the device kernel and the host scatter path so np=1 == np>=2 stays
-    !! element-exact. Allocated only for cyl_coord (Cartesian restriction is untouched). Its DEVICE copy is refreshed (GPU_UPDATE)
-    !! only in s_restrict_fine_to_coarse; s_amr_restrict_to_parent reads it WITHOUT refreshing, which is safe ONLY because
-    !! m_checker.fpp forbids cyl_coord with amr_max_level > 1 - lifting that gate makes this an ab_int-class stale-device bug (the
-    !! parent fold needs a fresh per-block radius table). See the SWAP CONTRACT note above.
+    !! volume ~ radius, so a fine child is weighted by its own cell-center radius y_cc. Filled from the active block's fine y_cc
+    !! each restriction, read IDENTICALLY by the device kernel and host scatter path so np=1 == np>=2 stays element-exact. Allocated
+    !! only for cyl_coord. Its DEVICE copy is refreshed (GPU_UPDATE) only in s_restrict_fine_to_coarse; s_amr_restrict_to_parent
+    !! reads it WITHOUT refreshing, safe ONLY because m_checker.fpp forbids cyl_coord with amr_max_level > 1 - lifting that gate
+    !! makes this an ab_int-class stale-device bug (the parent fold needs a fresh per-block radius table). See the SWAP CONTRACT
+    !! note above.
     real(wp), allocatable :: amr_rvw(:)
     $:GPU_DECLARE(create='[amr_rvw]')
 
     !> Non-polytropic QBMM fine rhs scratch, shared across slots (slots advance sequentially). Module-level raw arrays mirror the
-    !! coarse rhs_pb/rhs_mv pattern: derived-type component actuals for these tripped nvfortran's component-section data clauses on
+    !! coarse rhs_pb/rhs_mv pattern: derived-type component actuals here tripped nvfortran's component-section data clauses on
     !! device.
     real(wp), allocatable :: amr_rhs_pb_f(:,:,:,:,:), amr_rhs_mv_f(:,:,:,:,:)
     $:GPU_DECLARE(create='[amr_rhs_pb_f, amr_rhs_mv_f]')
@@ -157,7 +157,7 @@ module m_amr
     logical :: amr_swapped = .false.  !< paired-swap guard: a nested swap would corrupt the bounce buffers silently
     !> True when the coarse grid is nonuniform (stretched grids, or 2D-axisymmetric's half-width axis cell): the spacing-dependent
     !! WENO coefficients are then recomputed for the ACTIVE grid on every block swap (the fine block's grid is itself nonuniform
-    !! under stretching) and restored after. False on fully uniform grids - the recompute is skipped and behavior is bit-identical.
+    !! under stretching) and restored after. False on fully uniform grids - the recompute is skipped, behavior bit-identical.
     logical :: amr_weno_coef_recompute = .false.
     logical :: amr_grid_stretched = .false.  !< stretched coarse spacing (beyond the axisym axis half-cell; set at init)
     !> Persistent GLOBAL coarse cell-boundary arrays (indices -1:X_glb), assembled once at init. The fine-distribution owner
@@ -177,11 +177,11 @@ module m_amr
 
     !> Per-block gathered coarse patch (fine-level distribution). The block owner may not hold the coarse cells its block refines,
     !! so before each prolongation/ghost-fill the coarse patch spanning region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full
-    !! coarse-cell reach of every prolongation stencil) is gathered here POINT-TO-POINT from the coarse-owners (s_amr_gather_coarse_
-    !! patch). Stored in amr_cg as stp scalar_fields (a drop-in for the coarse q_cons in the prolong/ghost-fill kernels) in a
-    !! block-LOCAL frame: amr_cg cell 0 is GLOBAL coarse cell amr_cpat_off(d). Messages carry wp, cast to stp (identity for stp
-    !! coarse), so at np=1 (owner copies its own coarse) the patch equals the local coarse read bit-for-bit. Sized to the largest
-    !! block.
+    !! coarse-cell reach of every prolongation stencil) is gathered here POINT-TO-POINT from the coarse-owners
+    !! (s_amr_gather_coarse_patch). Stored in amr_cg as stp scalar_fields (a drop-in for the coarse q_cons in the prolong/ghost-fill
+    !! kernels) in a block-LOCAL frame: amr_cg cell 0 is GLOBAL coarse cell amr_cpat_off(d). Messages carry wp, cast to stp
+    !! (identity for stp coarse), so at np=1 (owner copies its own coarse) the patch equals the local coarse read bit-for-bit. Sized
+    !! to the largest block.
     type(scalar_field), allocatable :: amr_cg(:)
     integer                         :: amr_cpat_mar = 0     !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
     integer                         :: amr_cpat_hi(3) = 0   !< amr_cg upper local bounds per dim (0 in collapsed dims)
@@ -193,15 +193,15 @@ module m_amr
     $:GPU_DECLARE(create='[amr_cg_pb, amr_cg_mv]')
 
     !> Replicated coarse-decomposition table (fine-level distribution, point-to-point coupling): amr_decomp(1:3, r) = rank r's
-    !! coarse start_idx per dim, amr_decomp(4:6, r) = its coarse extent (m/n/p). Allgathered once at init (the coarse decomposition
-    !! is fixed for the run). Lets any rank compute which ranks own a given global coarse-cell range, so the gather/scatter/reflux
-    !! coupling is owner <-> only the (SFC-local) coarse-owners - no global collective per block per stage.
+    !! coarse start_idx per dim, amr_decomp(4:6, r) = its coarse extent (m/n/p). Allgathered once at init (coarse decomposition
+    !! fixed for the run). Lets any rank compute which ranks own a given global coarse-cell range, so gather/scatter/reflux coupling
+    !! is owner <-> only the (SFC-local) coarse-owners - no global collective per block per stage.
     integer, allocatable :: amr_decomp(:,:)  !< (1:6, 0:num_procs-1)
 
 contains
 
-    !> Build the static refined level-1 block. No-op unless amr. Called after level-0 grid (x_cb/dx ready) and time-steppers
-    !! (sys_size/buff_size set). Per-slot fine arrays are allocated lazily (s_amr_reconcile_slots) - only the blocks a rank owns.
+    !> Build the static refined level-1 block. No-op unless amr. Called after the level-0 grid (x_cb/dx ready) and time-steppers
+    !! (sys_size/buff_size set). Per-slot fine arrays allocated lazily (s_amr_reconcile_slots) - only the blocks a rank owns.
     impure subroutine s_initialize_amr_module()
 
         integer                         :: i, d, islot, tcap
@@ -213,8 +213,7 @@ contains
 
         amr_dt_fine = 0.5_wp*dt
 
-        ! fixed pool of amr_max_blocks slots; init activates exactly one (slot amr_cur = 1); dynamic regrid clusters into up to
-        ! amr_max_blocks slots
+        ! fixed pool of amr_max_blocks slots; init activates exactly one (amr_cur = 1); regrid clusters into up to amr_max_blocks
         allocate (amr_slots(1:amr_max_blocks))
         allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
@@ -225,23 +224,24 @@ contains
         allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
         amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
         amr_block_owner = 0
-        amr_block_level = 1  ! init default (level-1); regrid re-tags each block's level for multi-level nesting
+        amr_block_level = 1  ! init default (level-1); regrid re-tags each block's level for nesting
         amr_num_levels = 1
         amr_num_blocks = 1
         amr_cur = 1
 
         ! fine-level load balance is capped at min(num blocks, amr_max_blocks) ranks: the SFC map spreads whole blocks, so with
-        ! fewer blocks than ranks some ranks own no fine work. Warn when the pool itself is the limit (raise amr_max_blocks).
+        ! fewer
+        ! blocks than ranks some ranks own no fine work. Warn when the pool itself is the limit (raise amr_max_blocks).
         if (proc_rank == 0 .and. num_procs > amr_max_blocks) then
             print '(A,I0,A,I0,A)', ' [amr] WARNING: amr_max_blocks (', amr_max_blocks, ') < num_procs (', num_procs, &
                 & '): the fine level can occupy at most amr_max_blocks ranks - raise amr_max_blocks for better fine-level balance'
         end if
 
-        ! Lock-step advances every fine block at the coarse dt, but a level-l cell is amr_ref_ratio**l smaller, so its
-        ! CFL limit is amr_ref_ratio**amr_max_level tighter than the coarse grid's. The dt (fixed, or the coarse-only
-        ! cfl_dt estimate) is NOT scaled down for that, so a coarse-CFL dt silently runs the finest block unstable
-        ! (subcycling instead advances each level at dt/amr_ref_ratio and is stable by construction). We cannot know the
-        ! true CFL at init, so warn rather than abort - a small enough dt is valid.
+        ! Lock-step advances every fine block at the coarse dt, but a level-l cell is amr_ref_ratio**l smaller, so its CFL limit is
+        ! amr_ref_ratio**amr_max_level tighter than the coarse grid's. The dt (fixed, or the coarse-only cfl_dt estimate) is NOT
+        ! scaled for that, so a coarse-CFL dt silently runs the finest block unstable (subcycling instead advances each level at
+        ! dt/amr_ref_ratio and is stable by construction). The true CFL is unknown at init, so warn rather than abort - a small
+        ! enough dt is valid.
         if (proc_rank == 0 .and. .not. amr_subcycle .and. (amr_ref_ratio > 2 .or. amr_max_level > 1)) then
             print '(A,I0,A)', &
                 & ' [amr] WARNING: lock-step (amr_subcycle = F) advances fine blocks at the coarse dt, but the ' &
@@ -250,30 +250,30 @@ contains
                 & // 'factor), or enable amr_subcycle, else the fine block may go unstable'
         end if
 
-        ! Mirror decomposition: each rank holds the fine cells covering block /\ its own subdomain
-        ! (np=1: the intersection is the whole block). buff_size is not available at checker time,
-        ! so the geometric aborts below must live here.
+        ! Mirror decomposition: each rank holds the fine cells covering block /\ its own subdomain (np=1: the intersection is the
+        ! whole block). buff_size is not available at checker time, so the geometric aborts below must live here.
         sidx = 0; ext = 0
         sidx(1) = start_idx(1); ext(1) = m
         if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
         if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
         call s_amr_compute_isect(amr_block_beg, amr_block_end)
 
-        ! the fine ghost shell and the reflux outside cells must stay inside the global domain (identical
-        ! inputs on all ranks; every rank takes the same branch)
+        ! the fine ghost shell and reflux outside cells must stay inside the global domain (identical inputs on all ranks; every
+        ! rank takes the same branch)
         if (amr_block_beg(1) < buff_size .or. amr_block_end(1) > m_glb - buff_size .or. (n_glb > 0 .and. (amr_block_beg(2) &
             & < buff_size .or. amr_block_end(2) > n_glb - buff_size)) .or. (p_glb > 0 .and. (amr_block_beg(3) < buff_size &
             & .or. amr_block_end(3) > p_glb - buff_size))) then
             call s_mpi_abort('amr block must lie at least buff_size cells inside the domain boundaries')
         end if
 
-        ! Scratch constraint: the fine advance reuses the solver scratch (m_rhs/WENO/Riemann work arrays) and the global
-        ! coordinate arrays, all sized to THIS rank's local grid. Fine-level distribution gives a block WHOLE to its owner, so
-        ! the WHOLE block's fine extent (2*block-1) must fit every rank's local extent (a big block cannot be whole-owned; it
-        ! must be split into <= local-half boxes - the mirror model instead split the block ACROSS ranks). Checked on the
-        ! replicated block box so all ranks agree. (np=1: local extent = global, so 2*block-1 <= m_glb always holds.)
-        ! non-IB: the block is TILED into <= amr_maxc_fit sub-blocks (each fits every rank's scratch), so no cap is needed. IB
-        ! keeps a single contiguous block per body, so an IB block must itself fit a rank's local half-extent.
+        ! Scratch constraint: the fine advance reuses the solver scratch (m_rhs/WENO/Riemann work arrays) and the global coordinate
+        ! arrays, all sized to THIS rank's local grid. Fine-level distribution gives a block WHOLE to its owner, so the WHOLE
+        ! block's fine extent (2*block-1) must fit every rank's local extent (a big block cannot be whole-owned; it must be split
+        ! into <= local-half boxes - the mirror model instead split the block ACROSS ranks). Checked on the replicated block box so
+        ! all ranks agree. (np=1: local extent = global, so 2*block-1 <= m_glb always holds.) non-IB: the block is TILED into <=
+        ! amr_maxc_fit sub-blocks (each fits every rank's scratch), so no cap is needed. IB keeps a single contiguous block per
+        ! body,
+        ! so an IB block must itself fit a rank's local half-extent.
         bad_loc = 0
         if (ib) then
             if (amr_ref_ratio*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m) bad_loc = 1
@@ -293,19 +293,19 @@ contains
         if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/amr_ref_ratio
         if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/amr_ref_ratio
 
-        ! regrid size cap: min over ranks of the local half-extent (see the declaration; = amr_maxc at np=1),
-        ! so any clamped box satisfies every rank's scratch constraint and can move freely across ranks
+        ! regrid size cap: min over ranks of the local half-extent (see the declaration; = amr_maxc at np=1), so any clamped box
+        ! satisfies every rank's scratch constraint and can move freely across ranks
         amr_maxc_fit = amr_maxc
         do d = 1, num_dims
             call s_mpi_allreduce_integer_min((ext(d) + 1)/amr_ref_ratio, fit_d)
             amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
         end do
 
-        ! preallocation cap for MY fine arrays: fine-level distribution gives a block WHOLE to its owner, so any rank must hold an
-        ! entire block - but the scratch-constraint abort above (allreduced over every rank's local half-extent) guarantees no
-        ! block exceeds amr_maxc_fit = min-over-ranks local-half, and regrid clamps boxes to it. So amr_maxc_fit (NOT the global-
-        ! half amr_maxc) is the true max block a rank can own; sizing to it right-sizes the fine/coord arrays (~1/num_procs the
-        ! memory of global-half at scale). At np=1 amr_maxc_fit == amr_maxc, so the sizing (and everything) is unchanged.
+        ! preallocation cap for MY fine arrays: a block is owned WHOLE, so any rank must hold an entire block - but the
+        ! scratch-constraint abort above (allreduced over every rank's local half-extent) guarantees no block exceeds amr_maxc_fit =
+        ! min-over-ranks local-half, and regrid clamps boxes to it. So amr_maxc_fit (NOT the global-half amr_maxc) is the true max
+        ! block a rank can own; sizing to it right-sizes the fine/coord arrays (~1/num_procs the memory of global-half at scale). At
+        ! np=1 amr_maxc_fit == amr_maxc, so the sizing (and everything) is unchanged.
         maxc_loc = amr_maxc_fit
 
         ! max fine extents and buffered bounds for preallocation
@@ -314,9 +314,9 @@ contains
         if (n_glb > 0) max_f2 = amr_ref_ratio*maxc_loc(2) - 1
         if (p_glb > 0) max_f3 = amr_ref_ratio*maxc_loc(3) - 1
 
-        ! fine-fine seam pack buffers: sized ONCE to the largest possible seam (sys_size*buff_size * max transverse fine
-        ! face), so s_amr_fine_fine_halo reuses them instead of allocating per seam per stage. Transverse cap = the largest
-        ! fine face over the choice of seam dimension: 3D -> max pairwise product, 2D -> the larger single dim, 1D -> 1.
+        ! fine-fine seam pack buffers: sized ONCE to the largest possible seam (sys_size*buff_size * max transverse fine face), so
+        ! s_amr_fine_fine_halo reuses them instead of allocating per seam per stage. Transverse cap = the largest fine face over the
+        ! choice of seam dimension: 3D -> max pairwise product, 2D -> the larger single dim, 1D -> 1.
         tcap = 1
         if (n_glb > 0 .and. p_glb > 0) then
             tcap = max((max_f1 + 1)*(max_f2 + 1), (max_f2 + 1)*(max_f3 + 1), (max_f1 + 1)*(max_f3 + 1))
@@ -352,22 +352,19 @@ contains
             @:ALLOCATE(amr_rvw(0:max_f2))
         end if
 
-        ! Grid uniformity policy. The two spacing-uniformity consumers are both handled exactly:
-        ! the fine-block ghost-shell coordinates extend by exact parent-cell bisection (reads
-        ! sw_*_cb), and the spacing-dependent WENO reconstruction coefficients are recomputed for
-        ! the active grid on every swap/restore when the grid is nonuniform anywhere (stretched
-        ! grids, or 2D-axisymmetric's half-width axis cell dy(0) = dy/2). The tolerance is epsilon-
-        ! scaled: an absolute 1e-12 would sit below single-precision grid roundoff and classify
-        ! every grid as stretched (spuriously tripping the stretched-combo gates). On uniform grids
-        ! the flag stays false and behavior is bit-identical to the reuse path. The stretch_*
-        ! flags are pre_process-only, so the grid itself is checked (this also catches
-        ! externally generated grids).
+        ! Grid uniformity policy. Both spacing-uniformity consumers are handled exactly: fine-block ghost-shell coordinates extend
+        ! by exact parent-cell bisection (reads sw_*_cb), and the spacing-dependent WENO reconstruction coefficients are recomputed
+        ! for the active grid on every swap/restore when the grid is nonuniform anywhere (stretched grids, or 2D-axisymmetric's
+        ! half-width axis cell dy(0) = dy/2). Tolerance is epsilon-scaled: an absolute 1e-12 would sit below single-precision grid
+        ! roundoff and classify every grid as stretched (spuriously tripping the stretched-combo gates). On uniform grids the flag
+        ! stays false and behavior is bit-identical to the reuse path. The stretch_* flags are pre_process-only, so the grid itself
+        ! is checked (this also catches externally generated grids).
         if (maxval(dx(0:m)) - minval(dx(0:m)) > 1.e3_wp*epsilon(1._wp)*maxval(dx(0:m))) then
             amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
         end if
         if (n_glb > 0) then
-            ! interior nonuniformity is stretching; a lone dy(0) deviation is stretching only
-            ! when it is NOT the axisymmetric half-width axis cell
+            ! interior nonuniformity is stretching; a lone dy(0) deviation is stretching only when it is NOT the axisymmetric
+            ! half-width axis cell
             if (n > 0 .and. maxval(dy(1:n)) - minval(dy(1:n)) > 1.e3_wp*epsilon(1._wp)*maxval(dy(1:n))) then
                 amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
             end if
@@ -383,31 +380,27 @@ contains
         end if
         if (weno_order == 1 .or. igr) amr_weno_coef_recompute = .false.  ! order 1 / IGR: no grid-dependent WENO coefficients
 
-        ! persistent global coarse boundaries: the fine-distribution owner rebuilds whole-block
-        ! fine coordinates from these (needed once the fine level is decoupled from the coarse
-        ! decomposition; harmless otherwise)
+        ! persistent global coarse boundaries: the fine-distribution owner rebuilds whole-block fine coordinates from these (needed
+        ! once the fine level is decoupled from the coarse decomposition; harmless otherwise)
         call s_amr_build_global_cb()
-        ! Fail closed on stretched grid + Lagrangian/IB-dynamic-regrid. TWO independent blockers
-        ! (both confirmed by experiment):
-        !  (1) the position->global-cell-index conversions here use int((x-beg)/dx(0)), inexact
-        !      on a stretched grid and rank-inconsistent (dx(0) is rank-local). FIXABLE: assemble
-        !      the global cell-boundary arrays (allreduce-MAX of owned boundaries) and bisection-
-        !      search them - correct on any grid, identical on every rank.
-        !  (2) THE HARDER BLOCKER: IB/Lagrangian floor buff_size (10/6), but s_amr_recompute_weno_coefs
-        !      (armed only on nonuniform grids) indexes poly_coef_cb* over -buff_size:m+buff_size
-        !      while m_weno sized those arrays with a smaller buff_size at init -> OOB write in
-        !      s_compute_weno_coefficients (gfortran bounds trap at m_weno.fpp weno5 branch). Needs
-        !      the WENO coefficient arrays sized to the final buff_size (or the recompute clamped
-        !      to the module's true bounds) before this gate can lift. Fix (1) alone is insufficient.
+        ! Fail closed on stretched grid + Lagrangian/IB-dynamic-regrid. TWO independent blockers (both confirmed by experiment):
+        !  (1) the position->global-cell-index conversions here use int((x-beg)/dx(0)), inexact on a stretched grid and
+        !      rank-inconsistent (dx(0) is rank-local). FIXABLE: assemble the global cell-boundary arrays (allreduce-MAX of owned
+        !      boundaries) and bisection-search them - correct on any grid, identical on every rank.
+        !  (2) THE HARDER BLOCKER: IB/Lagrangian floor buff_size (10/6), but s_amr_recompute_weno_coefs (armed only on nonuniform
+        !      grids) indexes poly_coef_cb* over -buff_size:m+buff_size while m_weno sized those arrays with a smaller buff_size at
+        !      init -> OOB write in s_compute_weno_coefficients (gfortran bounds trap at m_weno.fpp weno5 branch). Needs the WENO
+        !      coefficient arrays sized to the final buff_size (or the recompute clamped to the module's true bounds) before this
+        !      gate can lift. Fix (1) alone is insufficient.
         if (amr_grid_stretched .and. (bubbles_lagrange .or. (ib .and. amr_regrid_int > 0))) then
             call s_mpi_abort('amr on a stretched grid does not support ' &
                              & // 'Lagrangian bubbles or dynamic regrid with immersed bodies: their ' &
                              & // 'position-to-cell-index conversions assume uniform spacing')
         end if
 
-        ! per-slot field arrays are allocated by s_amr_alloc_slot / freed by s_amr_free_slot (sized to the max buffered block).
-        ! Increment 1 allocates every slot here (bit-identical to the old inline loop); the lazy owned-only reconcile that keeps a
-        ! rank's fine memory ~1/num_procs of the pool follows. The QBMM RHS scratch (amr_rhs_pb_f/mv_f) is single - allocate once.
+        ! per-slot field arrays are allocated by s_amr_alloc_slot / freed by s_amr_free_slot (sized to the max buffered block). The
+        ! lazy owned-only reconcile that keeps a rank's fine memory ~1/num_procs of the pool follows. The QBMM RHS scratch
+        ! (amr_rhs_pb_f/mv_f) is single - allocate once.
         allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
         if (qbmm .and. .not. polytropic) then
             @:ALLOCATE(amr_rhs_pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
@@ -416,19 +409,19 @@ contains
         ! per-slot field arrays are allocated lazily by s_amr_reconcile_slots once ownership is known (after the block setup +
         ! s_amr_assign_block_owners below), so a rank holds only its owned blocks' fine arrays - not all amr_max_blocks slots.
 
-        ! fine-level distribution: coarse-patch gather buffer (see decl). Sized to the largest block's coarse footprint
-        ! (block coarse cells + 2*nmar halo, block-local frame). Device-mapped so the runtime ghost-fill reads it on the owner.
+        ! fine-level distribution: coarse-patch gather buffer (see decl). Sized to the largest block's coarse footprint (block
+        ! coarse
+        ! cells + 2*nmar halo, block-local frame). Device-mapped so the runtime ghost-fill reads it on the owner.
         amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         amr_cpat_hi = 0
         amr_cpat_hi(1) = maxc_loc(1) - 1 + 2*amr_cpat_mar
         if (n_glb > 0) amr_cpat_hi(2) = maxc_loc(2) - 1 + 2*amr_cpat_mar
         if (p_glb > 0) amr_cpat_hi(3) = maxc_loc(3) - 1 + 2*amr_cpat_mar
-        ! CCE OpenMP-offload leaves a bare module-scope derived-type (scalar_field) allocatable's
-        ! descriptor uninitialized, so a direct allocate(amr_cg(1:sys_size)) aborts with lib-4425 at
-        ! program start (verified by an early module-init probe; a LOCAL scalar_field array and a
-        ! GPU_DECLARE'd module one like q_prim_vf both allocate fine - only this bare module array does
-        ! not). Allocate a local, which gets a valid descriptor, and hand it to the module variable via
-        ! move_alloc, then map. OpenACC is unaffected but takes the same path correctly.
+        ! CCE OpenMP-offload leaves a bare module-scope derived-type (scalar_field) allocatable's descriptor uninitialized, so a
+        ! direct allocate(amr_cg(1:sys_size)) aborts with lib-4425 at program start (verified by an early module-init probe; a LOCAL
+        ! scalar_field array and a GPU_DECLARE'd module one like q_prim_vf both allocate fine - only this bare module array does
+        ! not). Allocate a local, which gets a valid descriptor, and hand it to the module variable via move_alloc, then map.
+        ! OpenACC is unaffected but takes the same path correctly.
         allocate (tmp_cg(1:sys_size))
         call move_alloc(tmp_cg, amr_cg)
         $:GPU_ENTER_DATA(create='[amr_cg]')
@@ -438,16 +431,17 @@ contains
             @:ACC_SETUP_SFs(amr_cg(i))
         end do
 
-        ! non-polytropic QBMM: gathered coarse pb/mv patch (analogue of amr_cg, same patch footprint + trailing (nnode, nb) dims).
-        ! Plain 5D arrays (amr_rhs_pb_f idiom): the module GPU_DECLARE + @:ALLOCATE handle device mapping - no @:ACC_SETUP_SFs.
+        ! non-polytropic QBMM: gathered coarse pb/mv patch (analogue of amr_cg, same footprint + trailing (nnode, nb) dims). Plain
+        ! 5D
+        ! arrays (amr_rhs_pb_f idiom): the module GPU_DECLARE + @:ALLOCATE handle device mapping - no @:ACC_SETUP_SFs.
         if (qbmm .and. .not. polytropic) then
             @:ALLOCATE(amr_cg_pb(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3), 1:nnode, 1:nb))
             @:ALLOCATE(amr_cg_mv(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3), 1:nnode, 1:nb))
             amr_cg_pb = 0._stp; amr_cg_mv = 0._stp
         end if
 
-        ! replicated coarse-decomposition table for point-to-point coupling (see decl). The coarse decomposition is fixed for the
-        ! run, so this is allgathered once. Row r = [start_idx(1:3), m, n, p] for rank r (collapsed dims pinned to 0).
+        ! replicated coarse-decomposition table for point-to-point coupling (see decl). Coarse decomposition is fixed for the run,
+        ! so allgathered once. Row r = [start_idx(1:3), m, n, p] for rank r (collapsed dims pinned to 0).
         allocate (amr_decomp(6,0:num_procs - 1))
         block
             integer :: myrow(6), ierr
@@ -462,16 +456,15 @@ contains
 #endif
         end block
 
-        ! per-slot fine-grid IB marker fields (static-body AMR); sized to the same max buffered fine extents
-        ! as q_cons so the fine IB pipeline can resolve the body on the block
+        ! per-slot fine-grid IB marker fields (static-body AMR); sized to the same max buffered fine extents as q_cons so the fine
+        ! IB pipeline can resolve the body on the block
         if (ib) call s_ibm_alloc_fine(amr_max_blocks, mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi)
 
-        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial block (slot amr_cur = 1).
-        ! Under dynamic regrid with bodies the initial block gets the same body-containment
-        ! expansion regrid boxes get (the moving-body containment guard requires it from step 1);
-        ! for a static block (amr_regrid_int = 0) the user's placement is authoritative.
-        ! max_grid_size tiling: the initial block splits into <= amr_maxc_fit sub-blocks (at np=1 amr_maxc_fit == amr_maxc so a
-        ! normal block stays a single tile - unchanged), one per slot; IB keeps a single contiguous block.
+        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial block (amr_cur = 1). Under dynamic regrid with bodies
+        ! the initial block gets the same body-containment expansion regrid boxes get (the moving-body containment guard requires it
+        ! from step 1); for a static block (amr_regrid_int = 0) the user's placement is authoritative. max_grid_size tiling: the
+        ! initial block splits into <= amr_maxc_fit sub-blocks (at np=1 amr_maxc_fit == amr_maxc so a normal block stays a single
+        ! tile - unchanged), one per slot; IB keeps a single contiguous block.
         blk_lo = amr_block_beg; blk_hi = amr_block_end
         if (ib .and. amr_regrid_int > 0) call s_amr_expand_box_over_bodies(blk_lo, blk_hi)
         block
@@ -484,8 +477,8 @@ contains
                 call s_amr_tile_box(blk_lo, blk_hi, tiled, nt, amr_max_blocks, capt)
             end if
             amr_num_blocks = nt
-            ! set the block regions FIRST so the owner assignment (which reads amr_region_*_all) can run BEFORE the owner-dependent
-            ! geometry - otherwise s_set_amr_fine_geometry would size the whole-block owner from a stale (default) amr_block_owner
+            ! set block regions FIRST so the owner assignment (reads amr_region_*_all) runs BEFORE the owner-dependent geometry -
+            ! else s_set_amr_fine_geometry would size the whole-block owner from a stale (default) amr_block_owner
             do kk = 1, nt
                 amr_region_lo_all(:,kk) = tiled(kk)%lo; amr_region_hi_all(:,kk) = tiled(kk)%hi
             end do
@@ -502,7 +495,7 @@ contains
     end subroutine s_initialize_amr_module
 
     !> Fill level-1 fcb/fcc/fdx by bisecting parent cells; pcb_lb is lbound(parent_cb, 1). Passing pcb as assumed-shape resets
-    !! lbound to 1; pcb_lb + idx_offset recovers original indexing. Arrays must be preallocated at max size; only 0..nfine filled.
+    !! lbound to 1; pcb_lb + idx_offset recovers original indexing. Arrays preallocated at max size; only 0..nfine filled.
     subroutine s_build_level_coords(pcb, pcb_lb, lo, nfine, fcb, fcc, fdx)
 
         real(wp), intent(in)                 :: pcb(:)
@@ -539,7 +532,7 @@ contains
     !! in m/n/p (never from inside the fine advance).
     !> Assemble the persistent global coarse cell-boundary arrays. Each rank writes the boundaries of the cells it owns (shared
     !! inter-rank faces written identically by both neighbours) into a sentinel-filled global array; an elementwise MAX allreduce
-    !! recovers the exact global array on every rank. Grid is fixed for the run, so this runs once.
+    !! recovers the exact global array on every rank. Grid fixed for the run, so this runs once.
     impure subroutine s_amr_build_global_cb()
 
         integer             :: j
@@ -571,15 +564,15 @@ contains
     !! region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full reach of every prolongation/ghost-fill stencil) for all sys_size
     !! variables, stored in amr_cg in a block-LOCAL frame (cell 0 == global amr_cpat_off). POINT-TO-POINT: the owner receives the
     !! patch cells it does not hold from exactly the (SFC-local) coarse-owners that hold them - each rank's contribution is the
-    !! intersection of the patch with its contiguous owned coarse range (s_amr_rank_coarse_range, = the f_amr_own_coarse set), read
-    !! from the replicated amr_decomp table. Non-participants send/recv nothing (no global collective). At np=1 the owner is the
-    !! sole rank and just copies its own coarse over the patch, bit-for-bit. Runtime (pull_host) packs/unpacks the overlap boxes on
-    !! the DEVICE (q_coarse device-current with valid ghosts); init/regrid fills from the host (q_coarse host-current with valid
-    !! ghosts). The packed data is wp, cast to stp into amr_cg (identity for stp coarse), device-current on exit. INVARIANT:
-    !! "coarse" here means the block's PARENT level (level l-1), NOT the base grid (level 0). For a level-1 block the parent IS L0,
-    !! but a level>=2 block folds to/from its parent block's fine array; the C<->F prolong/restrict/gather routines all operate in
-    !! the parent-fine frame, not the L0 frame. TWIN s_amr_gather_coarse_patch_pbmv (q<->pb/mv): same P2P skeleton (rank-range,
-    !! intersection, pack/send/recv/unpack) and patch-local frame - keep them lockstep.
+    !! patch intersected with its contiguous owned coarse range (s_amr_rank_coarse_range, = the f_amr_own_coarse set), from the
+    !! replicated amr_decomp table. Non-participants send/recv nothing (no global collective). At np=1 the owner just copies its own
+    !! coarse over the patch, bit-for-bit. Runtime (pull_host) packs/unpacks the overlap boxes on the DEVICE (q_coarse
+    !! device-current with valid ghosts); init/regrid fills from the host (host-current with valid ghosts). Packed data is wp, cast
+    !! to stp into amr_cg (identity for stp coarse), device-current on exit. INVARIANT: "coarse" here means the block's PARENT level
+    !! (level l-1), NOT the base grid (level 0). For a level-1 block the parent IS L0, but a level>=2 block folds to/from its parent
+    !! block's fine array; the C<->F prolong/restrict/gather routines all operate in the parent-fine frame, not the L0 frame. TWIN
+    !! s_amr_gather_coarse_patch_pbmv (q<->pb/mv): same P2P skeleton (rank-range, intersection, pack/send/recv/unpack) and
+    !! patch-local frame - keep lockstep.
     impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -591,8 +584,9 @@ contains
         integer, allocatable  :: reqs(:), srank(:)
 
         ! multi-level: a level>=2 block's coarse side is its PARENT block's fine cells, not the L0 base grid q_coarse - gather
-        ! amr_cg from the parent's fine array in the parent-fine frame (isect already parent-fine from s_set_amr_fine_geometry).
-        ! np=1 is a local copy; the np>=2 P2P version (parent owner -> block owner, mirroring the L0 path) is future work.
+        ! amr_cg
+        ! from the parent's fine array in the parent-fine frame (isect already parent-fine from s_set_amr_fine_geometry). np=1 is a
+        ! local copy; the np>=2 P2P version (parent owner -> block owner, mirroring the L0 path) is future work.
 
         if (amr_block_level(amr_cur) >= 2) then
             call s_amr_gather_from_parent(pull_host)
@@ -617,10 +611,9 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = sys_size*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
 
-        ! np=1 runtime: the sole owner holds every covered coarse cell and q_coarse is device-current (pull_host), so copy
-        ! q_coarse (device) -> amr_cg (device) with a DEVICE kernel over the in-domain patch, avoiding the device->host->device
-        ! round-trip (q_coarse pull + host unpack + amr_cg push). Same index map as s_amr_unpack_patch. At init/regrid
-        ! (.not. pull_host) q_coarse's device copy may be stale, so fall through to the host path.
+        ! np=1: the sole owner holds every covered coarse cell, so copy q_coarse->amr_cg on-device (same index map as
+        ! s_amr_unpack_patch), skipping the device->host->device round-trip. Only for pull_host; init/regrid (.not. pull_host) falls
+        ! through to the host path (device copy may be stale).
         if (num_procs == 1 .and. pull_host) then
             call s_amr_rank_coarse_range(owner, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
@@ -636,7 +629,7 @@ contains
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
 
         if (proc_rank == owner) then
-            ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
+            ! fill the cells this rank holds locally (own box), then receive the rest from the other coarse-owners
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (pull_host) then
@@ -731,10 +724,10 @@ contains
 
     end subroutine s_amr_gather_coarse_patch
 
-    !> Non-polytropic QBMM analogue of s_amr_gather_coarse_patch: gather the current block's coarse pb/mv patch into amr_cg_pb/
-    !! amr_cg_mv (block-local/patch frame, cell 0 == amr_cpat_off), P2P from the coarse-cell owners into the block owner. Per-cell
-    !! payload = 2*nnode*nb (pb block then mv block). Single-level only (level>=2 QBMM np>=2 is checker-gated); wire is wp, cast to
-    !! stp on unpack (identity for stp coarse), so at np=1 the owner copies its own coarse over the patch bit-for-bit. TWIN
+    !> Non-polytropic QBMM analogue of s_amr_gather_coarse_patch: gather the current block's coarse pb/mv patch into amr_cg_pb/mv
+    !! (patch frame, cell 0 == amr_cpat_off), P2P from the coarse-cell owners into the block owner. Per-cell payload = 2*nnode*nb
+    !! (pb block then mv block). Single-level only (level>=2 QBMM np>=2 is checker-gated); wire is wp, cast to stp on unpack
+    !! (identity for stp coarse), so at np=1 the owner copies its own coarse over the patch bit-for-bit. TWIN
     !! s_amr_gather_coarse_patch (pb/mv<->q): mirrors the q_cons gather's P2P skeleton and patch-local frame - keep lockstep.
     impure subroutine s_amr_gather_coarse_patch_pbmv(pb_coarse, mv_coarse, pull_host)
 
@@ -746,8 +739,8 @@ contains
         real(wp), allocatable :: rbuf(:,:), sbuf(:)
         integer, allocatable  :: reqs(:), srank(:)
 
-        ! single-level only: a level>=2 block's coarse side is its parent's fine pb/mv, distributed only at np=1 - Task 4's checker
-        ! gate keeps multi-level QBMM np>=2 fail-closed, so this must never be reached at level>=2.
+        ! single-level only: a level>=2 block's coarse side is its parent's fine pb/mv, distributed only at np=1 - the checker gate
+        ! keeps multi-level QBMM np>=2 fail-closed, so this must never be reached at level>=2.
 
         if (amr_block_level(amr_cur) >= 2) return
 
@@ -771,9 +764,9 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = cellsz*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
 
-        ! np=1 runtime: the sole owner holds every covered coarse cell and pb/mv are device-current (pull_host), so copy
-        ! pb_coarse/mv_coarse (device) -> amr_cg_pb/mv (device) with a DEVICE kernel over the in-domain patch. At init/regrid
-        ! (.not. pull_host) the device copy may be stale, so fall through to the host path.
+        ! np=1: the sole owner holds every covered coarse cell, so copy pb_coarse/mv_coarse->amr_cg_pb/mv on-device over the
+        ! in-domain patch. Only for pull_host; init/regrid (.not. pull_host) falls through to the host path (device copy may be
+        ! stale).
         if (num_procs == 1 .and. pull_host) then
             call s_amr_rank_coarse_range(owner, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
@@ -789,11 +782,11 @@ contains
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
 
         if (proc_rank == owner) then
-            ! fill the cells this rank holds locally (own contribution box), then receive the rest from the other coarse-owners
+            ! fill the cells this rank holds locally (own box), then receive the rest from the other coarse-owners
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (pull_host) then
-                ! runtime: pb/mv are device-current - copy the own box on the device (same index map/assignment as the host path)
+                ! runtime: pb/mv device-current - copy the own box on the device (same index map/assignment as the host path)
                 call s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)
             else
                 do ib_ = 1, nb
@@ -874,8 +867,9 @@ contains
                 end do
                 deallocate (rbuf, reqs, srank)
             end if
-            ! host path only: the runtime device path wrote amr_cg_pb/mv on the device directly (host copies stay stale, as at
-            ! np=1 - runtime consumers read the device copy)
+            ! host path only: the runtime device path wrote amr_cg_pb/mv on the device directly (host copies stay stale, as at np=1
+            ! -
+            ! runtime consumers read the device copy)
             if (.not. pull_host) then
                 $:GPU_UPDATE(device='[amr_cg_pb, amr_cg_mv]')
             end if
@@ -929,8 +923,8 @@ contains
     end subroutine s_amr_gather_coarse_patch_pbmv
 
     !> Multi-level gather: fill amr_cg (the current level>=2 block's coarse patch) from its PARENT block's fine array, in the
-    !! parent-fine cell frame (amr_isect_lo/hi are already parent-fine from s_set_amr_fine_geometry). np=1 = a local copy on the
-    !! owner (which also owns the parent); the np>=2 point-to-point version (parent owner -> block owner) is future work.
+    !! parent-fine cell frame (amr_isect_lo/hi already parent-fine from s_set_amr_fine_geometry). np=1 = a local copy on the owner
+    !! (which also owns the parent); the np>=2 P2P version (parent owner -> block owner) is future work.
     impure subroutine s_amr_gather_from_parent(pull_host)
 
         logical, intent(in) :: pull_host
@@ -939,9 +933,10 @@ contains
         pblk = f_amr_parent_block(amr_cur)
         ! lock-step fill: gather from the parent's CURRENT fine state. pull_host stays in the signature for the level-1 path.
         ! Owner-guard at the CALL SITE: on a non-owner rank the parent slot is unallocated (co-located tower - owner holds both
-        ! block and parent), and passing amr_slots(pblk)%q_cons would dereference it before the callee's internal early-return.
-        ! to_host = .not. pull_host: init/regrid (pull_host=F) feed the host prolong/self-test; runtime (pull_host=T) reads amr_cg
-        ! on the device in the C/F ghost-fill, so skip the device->host copy.
+        ! block
+        ! and parent), and passing amr_slots(pblk)%q_cons would dereference it before the callee's internal early-return. to_host =
+        ! .not. pull_host: init/regrid (pull_host=F) feed the host prolong/self-test; runtime (pull_host=T) reads amr_cg on the
+        ! device in the C/F ghost-fill, so skip the device->host copy.
         if (amr_rank_owns_block) call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons, .not. pull_host)
 
     end subroutine s_amr_gather_from_parent
@@ -949,8 +944,8 @@ contains
     !> Gather amr_cg (the current level>=2 block's coarse patch) from a SPECIFIC parent snapshot field qp, in the parent-fine cell
     !! frame (amr_isect_lo/hi already parent-fine from s_set_amr_fine_geometry). The subcycle recursion calls this twice per parent
     !! substep - qp = the parent slot's q_cons_stor (t^n bracket) then q_cons (t^{n+1} bracket) - to build the child's two
-    !! ghost-lerp sources. np=1 = a local copy on the owner (which also owns the parent); the np>=2 P2P version (parent owner ->
-    !! block owner) is future work.
+    !! ghost-lerp sources. np=1 = a local copy on the owner (which also owns the parent); np>=2 P2P (parent owner -> block owner) is
+    !! future work.
     impure subroutine s_amr_gather_from_parent_field(pblk, qp, to_host)
 
         integer, intent(in)                                 :: pblk
@@ -968,21 +963,21 @@ contains
         if (p_glb > 0) w3 = (amr_isect_hi(3) - amr_isect_lo(3)) + 2*amr_cpat_mar
         if (.not. amr_rank_owns_block) return  ! np=1: the owner holds both this block and its parent
         ! copy the parent's fine patch into amr_cg with a DEVICE kernel (qp passed as an argument, present-table safe like
-        ! s_amr_restrict_overwrite_device). np>=2 P2P (parent owner -> block owner) is future work.
+        ! s_amr_restrict_overwrite_device). np>=2 P2P is future work.
         call s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
 
     end subroutine s_amr_gather_from_parent_field
 
     !> Device kernel for s_amr_gather_from_parent: copy the parent block's fine patch into amr_cg over [amr_cpat_off : + w]. The
     !! parent q_cons is passed as the qp ARGUMENT (not indexed as amr_slots(pblk) inside the kernel) so its deep %sf attach resolves
-    !! present-table safe, like s_amr_restrict_overwrite_device. amr_cg is then synced to host for host consumers (the init
-    !! self-test's restrict-prolong check).
+    !! present-table safe, like s_amr_restrict_overwrite_device. amr_cg is then synced to host for host consumers (init self-test's
+    !! restrict-prolong check).
     impure subroutine s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qp
         integer, intent(in)                                 :: w1, w2, w3
-        !> .true. only for the init/regrid HOST consumers (the whole-block host prolong + the restrict-prolong self-test). The
-        !! runtime C/F ghost-fill reads amr_cg on the DEVICE (filled by the kernel below), so no device->host copy is needed.
+        !> .true. only for the init/regrid HOST consumers (whole-block host prolong + restrict-prolong self-test). The runtime C/F
+        !! ghost-fill reads amr_cg on the DEVICE (filled by the kernel below), so no device->host copy is needed.
         logical, intent(in) :: to_host
         integer             :: i, g1, g2, g3, o1, o2, o3
 
@@ -998,7 +993,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-        ! amr_cg is now device-current for the runtime C/F ghost-fill. Only sync to host when a host consumer follows.
+        ! amr_cg is now device-current for the runtime C/F ghost-fill. Sync to host only when a host consumer follows.
         if (to_host) then
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[amr_cg(i)%sf]')
@@ -1007,8 +1002,8 @@ contains
 
     end subroutine s_amr_copy_parent_patch
 
-    !> This rank's (r's) contiguous owned coarse-cell range per dim from the replicated amr_decomp table: interior [start:start+ext]
-    !! plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal to the set where
+    !> Rank r's contiguous owned coarse-cell range per dim from the replicated amr_decomp table: interior [start:start+ext] plus its
+    !! physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal to the set where
     !! f_amr_own_coarse is true, but as one contiguous span so box intersections identify contributors without a per-cell scan.
     pure subroutine s_amr_rank_coarse_range(r, crlo, crhi)
 
@@ -1051,7 +1046,7 @@ contains
     end function f_amr_boxes_overlap
 
     !> Multi-level nesting: index of the covering level-(level(k)-1) block that block k refines - its coarse parent - or 0 when
-    !! block k is level 1 (its parent is the L0 base grid). Regions are in L0 cell indices at every level, so the parent is the
+    !! block k is level 1 (parent is the L0 base grid). Regions are in L0 cell indices at every level, so the parent is the
     !! level-below block whose box contains k's; proper nesting guarantees exactly one, and the first overlap is returned.
     pure integer function f_amr_parent_block(k) result(p)
 
@@ -1270,9 +1265,9 @@ contains
     end subroutine s_amr_unpack_box_pbmv_device
 
     !> True iff rank r is a reflux applier for the current block: it owns the coarse cell layer just OUTSIDE some block face AND its
-    !! subdomain overlaps the block transversely. Mirrors s_amr_reflux_face_flags exactly, but parameterized by r's subdomain from
-    !! the replicated amr_decomp table (so the block owner can decide which ranks to send freg to, and each rank agrees on whether
-    !! it receives). Uses amr_region_lo/hi (the current block, set on every rank by s_amr_select_slot).
+    !! subdomain overlaps the block transversely. Mirrors s_amr_reflux_face_flags, but parameterized by r's subdomain from the
+    !! replicated amr_decomp table (so the block owner can decide which ranks to send freg to, and each rank agrees on whether it
+    !! receives). Uses amr_region_lo/hi (the current block, set on every rank by s_amr_select_slot).
     pure logical function f_amr_reflux_participates(r) result(part)
 
         integer, intent(in) :: r
@@ -1301,8 +1296,7 @@ contains
     !> Fine-level distribution: deliver the current block's fine flux registers freg (captured by the owner during the fine advance)
     !! to exactly the (SFC-local) coarse-outside-owners that apply the reflux - POINT-TO-POINT, replacing the global broadcast. The
     !! owner sends its whole freg slot (block-relative; each applier reads its own transverse slice) to every participant; non-owner
-    !! participants receive it. Device-resident: the owner stages its slot to host, receivers push it back. No-op without MPI/at
-    !! np=1.
+    !! participants receive it. Device-resident: owner stages its slot to host, receivers push it back. No-op without MPI/at np=1.
     impure subroutine s_amr_p2p_reflux_faces()
 
 #ifdef MFC_MPI
@@ -1374,10 +1368,10 @@ contains
 
     !> Per-block measured-cost weight over each block's LEVEL-0 footprint, replicated on every rank: each rank sums the load-weight
     !! cost model (base 1 + K_ib per IB-marked cell + K_pc per phase-change Newton iteration, when that diagnostic array is live)
-    !! over its owned coarse cells inside the footprint, then one MPI_ALLREDUCE(SUM) makes the vector identical everywhere. Cost
-    !! signals absent -> cost(k) = footprint cell count exactly (pure-geometry fallback). The Lagrangian cloud is excluded from
-    !! blocks by construction, so K_bub never applies here; pc_iter_count is populated only when a load-weight diagnostic writer is
-    !! on (enable load_weight_wrt to make the balance phase-change-aware) - guarded by allocated().
+    !! over its owned coarse cells inside the footprint, then one MPI_ALLREDUCE(SUM) makes the vector identical everywhere. No cost
+    !! signals -> cost(k) = footprint cell count exactly (pure-geometry fallback). The Lagrangian cloud is excluded from blocks by
+    !! construction, so K_bub never applies here; pc_iter_count is populated only when a load-weight diagnostic writer is on (enable
+    !! load_weight_wrt to make the balance phase-change-aware) - guarded by allocated().
     impure subroutine s_amr_block_cost(cost)
 
         real(wp), intent(out) :: cost(:)
@@ -1443,8 +1437,8 @@ contains
         call s_amr_block_cost(cost)
 
         ! per-block own fine-work weight = footprint cost x amr_ref_ratio**(level*active dims). A level-l block is amr_ref_ratio**l
-        ! finer than L0 per dim, so its work is the footprint cost x rr**(l*d); using the level factor keeps the
-        ! co-located-tower load balance honest. With no cost signals this reduces to the fine cell count (geometry only).
+        ! finer than L0 per dim, so its work is the footprint cost x rr**(l*d); the level factor keeps the co-located-tower load
+        ! balance honest. With no cost signals this reduces to the fine cell count (geometry only).
         do k = 1, amr_num_blocks
             wt(k) = cost(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
             if (n_glb > 0) wt(k) = wt(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
@@ -1454,9 +1448,9 @@ contains
         end do
 
         ! CO-LOCATE refinement towers: a level-1 block and all its nested descendants are owned WHOLE by one rank so every
-        ! parent<->child gather/restrict/reflux stays LOCAL (no new MPI - only L0<->L1 crosses ranks). Roll each block's own
-        ! work up onto its top-level (level-1) ancestor, SFC-balance only the level-1 anchors, then let descendants inherit.
-        ! Single-level (all blocks level 1): twt == wt and the inherit pass is empty, so this is byte-identical to before.
+        ! parent<->child gather/restrict/reflux stays LOCAL (no new MPI - only L0<->L1 crosses ranks). Roll each block's own work up
+        ! onto its top-level (level-1) ancestor, SFC-balance only the level-1 anchors, then let descendants inherit. Single-level
+        ! (all blocks level 1): twt == wt and the inherit pass is empty, so this is byte-identical to before.
         twt = 0._wp
         do k = 1, amr_num_blocks
             a = k
@@ -1478,8 +1472,9 @@ contains
         end do
 
         ! chains-on-chains over the level-1 anchors in SFC order, weighted by whole-tower work; advance the owner rank when the
-        ! cumulative tower weight crosses the next even share. All-real arithmetic on the replicated (allreduced) weights, in a
-        ! fixed loop order, so every rank computes the identical assignment.
+        ! cumulative tower weight crosses the next even share. All-real arithmetic on the replicated (allreduced) weights, fixed
+        ! loop
+        ! order, so every rank computes the identical assignment.
         total = 0._wp
         do k = 1, amr_num_blocks
             if (amr_block_level(k) == 1) total = total + twt(k)
@@ -1538,19 +1533,18 @@ contains
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
         amr_region_lo_all(:,amr_cur) = lo; amr_region_hi_all(:,amr_cur) = hi
 
-        ! FINE-LEVEL DISTRIBUTION: a block is owned WHOLE by amr_block_owner(k). The owner holds
-        ! fine cells for the ENTIRE block; every other rank holds none. amr_isect_lo/hi records
-        ! the block's coarse footprint (= the whole block on the owner) - it drives the
-        ! coarse<->fine gather/scatter (which coarse cells the owner pulls in / pushes back).
-        ! At np=1 the owner is rank 0 and the footprint is the whole domain-resident block, so
-        ! this reduces exactly to the old mirror (block \cap subdomain == whole block).
+        ! FINE-LEVEL DISTRIBUTION: a block is owned WHOLE by amr_block_owner(k). The owner holds fine cells for the ENTIRE block;
+        ! every other rank holds none. amr_isect_lo/hi records the block's coarse footprint (= the whole block on the owner) - it
+        ! drives the coarse<->fine gather/scatter (which coarse cells the owner pulls in / pushes back). At np=1 the owner is rank 0
+        ! and the footprint is the whole domain-resident block, so this reduces exactly to the old mirror (block \cap subdomain ==
+        ! whole block).
         amr_rank_owns_block = (amr_block_owner(amr_cur) == proc_rank)
         pblk = 0
         if (amr_rank_owns_block) then
             amr_isect_lo = lo; amr_isect_hi = hi
             if (amr_block_level(amr_cur) >= 2) then
-                ! multi-level: express the coarse footprint in the PARENT block's fine-cell frame (a level-l block's coarse side
-                ! is level l-1). parent-fine index of L0 cell c is rr*(c - R1.lo) where rr is the parent's amr_ref_ratio; the block
+                ! multi-level: express the coarse footprint in the PARENT block's fine-cell frame (a level-l block's coarse side is
+                ! level l-1). parent-fine index of L0 cell c is rr*(c - R1.lo) where rr is the parent's amr_ref_ratio; the block
                 ! spans rr fine cells per parent-covered L0 cell. m below then gets amr_ref_ratio*(footprint) cells, as for a
                 ! level-1
                 ! block over L0. amr_cg / the prolong read this frame, so no other coupling code changes for the local (np=1) path.
@@ -1583,8 +1577,8 @@ contains
         if (p_glb > 0) then
             amr_slots(amr_cur)%idwbuff(3)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(3)%end = amr_slots(amr_cur)%p + buff_size
         end if
-        ! coord building only on ranks with fine cells (others never read their coord arrays); the parent origin
-        ! is this rank's INTERSECTION start, converted to LOCAL indexing so the bisection reads its x_cb slice
+        ! coord building only on ranks with fine cells (others never read their coord arrays); the parent origin is this rank's
+        ! INTERSECTION start, converted to LOCAL indexing so the bisection reads its x_cb slice
         if (amr_rank_owns_block .and. amr_block_level(amr_cur) >= 2) then
             ! level >= 2: bisect the PARENT block's fine coords (its x_cb, lbound -1), parent origin = the parent-fine footprint
             call s_build_level_coords(amr_slots(pblk)%x_cb, -1, amr_isect_lo(1), amr_slots(amr_cur)%m, amr_slots(amr_cur)%x_cb, &
@@ -1595,7 +1589,8 @@ contains
                 & amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, amr_slots(amr_cur)%dz)
         else if (amr_rank_owns_block) then
             ! level 1: whole-block fine coords from the GLOBAL L0 boundaries (owner may not hold the coarse coordinate slice for
-            ! cells it now refines). amr_gxcb has lbound -1; the parent origin is the block's GLOBAL low corner.
+            ! cells
+            ! it now refines). amr_gxcb has lbound -1; the parent origin is the block's GLOBAL low corner.
             call s_build_level_coords(amr_gxcb, -1, amr_isect_lo(1), amr_slots(amr_cur)%m, amr_slots(amr_cur)%x_cb, &
                                       & amr_slots(amr_cur)%x_cc, amr_slots(amr_cur)%dx)
             if (n_glb > 0) call s_build_level_coords(amr_gycb, -1, amr_isect_lo(2), amr_slots(amr_cur)%n, &
@@ -1604,10 +1599,10 @@ contains
                 & amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, amr_slots(amr_cur)%dz)
         end if
 
-        ! Fine ghost prolongation reads up to nmar coarse cells past each face of the intersection; if that
-        ! stencil leaves ANY rank's interior (block near/at/across a rank boundary), the coarse CONS ghosts it
-        ! reads must be halo-exchanged before every fill (the solver populates only PRIM ghosts). All ranks
-        ! agree on the flag, so the pairwise exchanges are called consistently.
+        ! Fine ghost prolongation reads up to nmar coarse cells past each face of the intersection; if that stencil leaves ANY
+        ! rank's
+        ! interior (block near/at/across a rank boundary), the coarse CONS ghosts it reads must be halo-exchanged before every fill
+        ! (the solver populates only PRIM ghosts). All ranks agree on the flag, so the pairwise exchanges are called consistently.
         sidx = 0; ext = 0
         sidx(1) = start_idx(1); ext(1) = m
         if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
@@ -1639,8 +1634,8 @@ contains
         floor_pos = .false.; if (present(pos)) floor_pos = pos
         pw_const = .false.; if (present(inject)) pw_const = inject
 
-        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): amr_isect_lo is GLOBAL and
-        ! equals region_lo on the owner, so amr_isect_lo + f/rr - amr_cpat_off = nmar + f/rr is the patch-local coarse index
+        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): amr_isect_lo is GLOBAL and equals
+        ! region_lo on the owner, so amr_isect_lo + f/rr - amr_cpat_off = nmar + f/rr is the patch-local coarse index
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         do fk = 0, amr_slots(amr_cur)%p
             ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%amr_ref_ratio - oz; if (p_glb == 0) ck = 0
@@ -1686,16 +1681,15 @@ contains
         bstride = 1
         if (bubbles_euler) bstride = (eqn_idx%bub%end - eqn_idx%bub%beg + 1)/nb
         do i = 1, sys_size
-            ! Lagrangian bubbles: alphas sum to the LOCAL liquid fraction beta (not 1), so the
-            ! sum-to-one closure would corrupt the EL state; each alpha prolongs plainly instead
+            ! Lagrangian bubbles: alphas sum to the LOCAL liquid fraction beta (not 1), so the sum-to-one closure would corrupt the
+            ! EL state; each alpha prolongs plainly instead
             if (num_fluids > 1 .and. (.not. bubbles_lagrange) .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
             if (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end) cycle  ! sum/positivity closure below
-            ! QBMM carries a bivariate 6-moment set per R0 bin whose CHyQMOM inversion requires realizability
-            ! (variance c20 = m20/m00 - (m10/m00)^2 > 0); per-component minmod prolongation can break that joint
-            ! constraint, so the whole bub block is injected piecewise-constant (each child inherits the coarse
-            ! cell's realizable moment set exactly). Non-QBMM Euler-Euler bubbles instead floor their POSITIVE
-            ! moments (radius nR, non-polytropic partial pressure npb / vapor mass nmv); the signed velocity moment
-            ! nV (offset 1 in each bin's stride) prolongs freely.
+            ! QBMM carries a bivariate 6-moment set per R0 bin whose CHyQMOM inversion requires realizability (variance c20 =
+            ! m20/m00 - (m10/m00)^2 > 0); per-component minmod prolongation can break that joint constraint, so the whole bub block
+            ! is injected piecewise-constant (each child inherits the coarse cell's realizable moment set exactly). Non-QBMM
+            ! Euler-Euler bubbles instead floor their POSITIVE moments (radius nR, non-polytropic partial pressure npb / vapor mass
+            ! nmv); the signed velocity moment nV (offset 1 in each bin's stride) prolongs freely.
             call s_prolong_one_var(amr_cg(i), amr_slots(amr_cur)%q_cons(i), &
                                    & pos=bubbles_euler .and. .not. qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end &
                                    & .and. mod(i - eqn_idx%bub%beg, bstride) /= 1, &
@@ -1763,8 +1757,8 @@ contains
     !> Species mass-fraction prolongation closure (chemistry): each partial density rho*Y_k is minmod-prolonged and clamped
     !! non-negative, then all species are rescaled so sum_k(rho*Y_k) equals the (already prolonged) continuity density at the fine
     !! cell. This keeps the fine species realizable (Y_k >= 0, and sum(Y_k) = 1 exactly under the cons->prim recovery rho = sum
-    !! rho*Y_k) and consistent with the continuity variable the reaction source reads. Same fine/coarse index mapping as
-    !! s_prolong_one_var; cont is prolonged in the main loop before this runs.
+    !! rho*Y_k) and consistent with the continuity variable the reaction source reads. Same index mapping as s_prolong_one_var; cont
+    !! is prolonged in the main loop before this runs.
     impure subroutine s_prolong_species_closure(qc, qf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: qc
@@ -1812,7 +1806,7 @@ contains
     end subroutine s_prolong_species_closure
 
     !> Shared per-cell limiter switch for the volume-fraction closure prolongation: per dim, slopes stay on only if NO fluid's
-    !! centered differences change sign there (symmetric in the fluids, including the closure fluid).
+    !! centered differences change sign there (symmetric in the fluids, incl. the closure fluid).
     pure subroutine s_alpha_shared_switch(qc, ci, cj, ck, shx, shy, shz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qc
@@ -1844,7 +1838,8 @@ contains
         if (.not. amr) return
         ! Prolong EVERY block (max_grid_size tiling can make several) from its gathered coarse patch. The P2P gather pulls each
         ! patch's inter-rank coarse cells from neighbour interiors, so no coarse-ghost halo exchange is needed; host q_cons_base
-        ! holds the ICs here (this runs before s_initialize_gpu_vars). ALL ranks call the gather (P2P); only owners prolong.
+        ! holds
+        ! the ICs here (this runs before s_initialize_gpu_vars). ALL ranks call the gather (P2P); only owners prolong.
         do islot = 1, amr_num_blocks
             call s_amr_select_slot(islot)
             call s_amr_gather_coarse_patch(q_cons_base, .false.)
@@ -1866,8 +1861,8 @@ contains
 
     !> Build the STATIC multi-level hierarchy (amr_regrid_int = 0): nest exactly one level-2 block inside level-1 block 1 by a fixed
     !! geometric inset (a regrid would place it by sensor-on-fine instead), prolong the parent state into it, and keep it persistent
-    !! so the advance driver steps it every timestep. The restrict/reflux identity that this construction relies on is protected by
-    !! the static multi-level goldens (75AD6885 et al.) and the runtime conservation-defect probe.
+    !! so the advance driver steps it every timestep. The restrict/reflux identity it relies on is protected by the static
+    !! multi-level goldens (75AD6885 et al.) and the runtime conservation-defect probe.
     impure subroutine s_amr_build_static_multilevel(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
@@ -1876,9 +1871,9 @@ contains
         if (amr_max_level < 2) return  ! np>=2: the L2 is co-located with block 1
         n1 = amr_num_blocks
         if (n1 < 1) return
-        ! the static hierarchy nests exactly one level-2 block; without pool room it would SILENTLY refine only to level 1
-        ! (an under-resolved but "successful" run). n1 (the level-1 tile count) is only known here, not at checker time, so abort
-        ! at the point of failure. Replicated inputs -> every rank takes the same branch (collective-safe).
+        ! the static hierarchy nests exactly one level-2 block; without pool room it would SILENTLY refine only to level 1 (an
+        ! under-resolved but "successful" run). n1 (the level-1 tile count) is only known here, not at checker time, so abort at the
+        ! point of failure. Replicated inputs -> every rank takes the same branch (collective-safe).
         if (n1 + 1 > amr_max_blocks) call s_mpi_abort('amr static multi-level (amr_max_level > 1, amr_regrid_int = 0): ' &
             & // 'amr_max_blocks is too small to nest the level-2 block (need >= level-1 block count + 1); increase amr_max_blocks')
         L2 = n1 + 1
@@ -1888,11 +1883,12 @@ contains
         if (p_glb > 0) inset(3) = max((amr_region_hi_all(3, 1) - amr_region_lo_all(3, 1) + 1)/4, amr_cpat_mar)
         amr_region_lo_all(:,L2) = amr_region_lo_all(:,1) + inset
         amr_region_hi_all(:,L2) = amr_region_hi_all(:,1) - inset
-        ! Guard the fixed-inset box against configs this single-block static builder cannot represent - the dynamic regrid path
-        ! has the analogous checks (proper-nesting skip + amr_maxc_fit/2 clamp), but the static path bypasses them. Replicated
-        ! inputs -> every rank takes the same branch (collective-safe). (a) a level-1 block smaller than 2*inset inverts the box;
-        ! (b) a level-2 L0-extent > amr_maxc_fit/2 makes its parent-fine transverse extent (2*L0) overrun the creg register
-        ! (allocated 0:amr_maxc_fit-1), a silent out-of-bounds device write in the L2->L1 reflux capture.
+        ! Guard the fixed-inset box against configs this single-block static builder cannot represent - the dynamic regrid path has
+        ! the analogous checks (proper-nesting skip + amr_maxc_fit/2 clamp), but the static path bypasses them. Replicated inputs ->
+        ! every rank takes the same branch (collective-safe). (a) a level-1 block smaller than 2*inset inverts the box; (b) a
+        ! level-2
+        ! L0-extent > amr_maxc_fit/2 makes its parent-fine transverse extent (2*L0) overrun the creg register (allocated
+        ! 0:amr_maxc_fit-1), a silent out-of-bounds device write in the L2->L1 reflux capture.
         if (amr_region_lo_all(1, L2) > amr_region_hi_all(1, L2) .or. (n_glb > 0 .and. amr_region_lo_all(2, &
             & L2) > amr_region_hi_all(2, L2)) .or. (p_glb > 0 .and. amr_region_lo_all(3, L2) > amr_region_hi_all(3, &
             & L2))) call s_mpi_abort('amr static multi-level: level-1 block 1 is too small to nest a level-2 block (the fixed ' &
@@ -1915,26 +1911,26 @@ contains
         if (amr_rank_owns_block) then
             call s_interpolate_coarse_to_fine()
             ! push the host-side prolong to the device (mirror s_populate_amr_fine): s_prolong_one_var is a host loop, so without
-            ! this the persistent L2 block's device q_cons is never valued (NaN) - a GPU-only failure invisible on CPU
-            ! (host==device)
+            ! this
+            ! the persistent L2 block's device q_cons is never valued (NaN) - a GPU-only failure invisible on CPU (host==device)
             do i = 1, sys_size
                 $:GPU_UPDATE(device='[amr_slots(amr_cur)%q_cons(i)%sf]')
             end do
         end if
         ! persistent L2 block: KEEP the level-2 block in the active set (amr_num_blocks = L2, amr_num_levels = 2) so the advance
-        ! driver steps it across timesteps. amr_num_blocks stays = L2 (set above); no free/revert.
-        ! restore amr_cg + the patch frame (amr_cpat_off) to block 1: the L2 gather above overwrote them with the parent-fine
-        ! frame, and the normal single-block conservation check that follows reads block 1's frame.
+        ! driver steps it across timesteps; no free/revert.
+        ! restore amr_cg + the patch frame (amr_cpat_off) to block 1: the L2 gather above overwrote them with the parent-fine frame,
+        ! and the normal single-block conservation check that follows reads block 1's frame.
         call s_amr_select_slot(1)
         call s_amr_gather_coarse_patch(q_cons_base, .false.)
 
     end subroutine s_amr_build_static_multilevel
 
     !> Volume-weighted restriction: each covered coarse cell = volume-weighted average of its amr_ref_ratio^d fine children (equal
-    !! weight on Cartesian grids where the children share a volume; radius-weighted by fine y_cc on cyl_coord, where cell volume ~
-    !! radius - amr_rvw, single-sourced so the device and host paths agree bit-for-bit). Writes the caller's coarse target - in
+    !! weight on Cartesian grids where children share a volume; radius-weighted by fine y_cc on cyl_coord, where cell volume ~
+    !! radius - amr_rvw, single-sourced so device and host paths agree bit-for-bit). Writes the caller's coarse target - in
     !! production the level-0 state q_cons_ts(1)%vf (the deliberate fold-back of fine data each step, plus coarse pb/mv for
-    !! non-polytropic QBMM); the init-time diagnostics pass a scratch buffer instead. Device kernel.
+    !! non-polytropic QBMM); init-time diagnostics pass a scratch buffer instead. Device kernel.
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -1945,9 +1941,9 @@ contains
 
         if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_tic()
 
-        ! multi-level: a level>=2 block folds back into its PARENT block's fine array (the coarse side of level l is level l-1),
-        ! not the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. Co-located towers
-        ! keep a level>=2 block and its parent on the same rank, so the restrict is always local (no cross-rank P2P needed).
+        ! multi-level: a level>=2 block folds back into its PARENT block's fine array (the coarse side of level l is level l-1), not
+        ! the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. Co-located towers keep a
+        ! level>=2 block and its parent on the same rank, so the restrict is always local (no cross-rank P2P needed).
         if (amr_block_level(amr_cur) >= 2) then
             if (amr_rank_owns_block) call s_amr_restrict_to_parent()
             if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
@@ -1955,10 +1951,11 @@ contains
         end if
 
         ! whole-block-per-rank fold-back: the block owner restricts its fine block to coarse averages over the covered cells
-        ! [region_lo:region_hi] and SCATTERS them POINT-TO-POINT to the coarse-cell owners - the owner overwrites the covered
-        ! cells it holds locally and SENDS each other coarse-owner exactly its covered slice (all sys_size in one message). Covered
-        ! cells are in-domain (no ghosts), so each is owned by exactly one interior owner. At np=1 the owner owns every covered
-        ! cell, sends nothing, and overwrites locally with the same child-sum -> bit-identical.
+        ! [region_lo:region_hi] and SCATTERS them POINT-TO-POINT to the coarse-cell owners - the owner overwrites the covered cells
+        ! it holds locally and SENDS each other coarse-owner exactly its covered slice (all sys_size in one message). Covered cells
+        ! are in-domain (no ghosts), so each is owned by exactly one interior owner. At np=1 the owner owns every covered cell,
+        ! sends
+        ! nothing, and overwrites locally with the same child-sum -> bit-identical.
         rr = amr_slots(amr_cur)%amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
@@ -1972,9 +1969,9 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = sys_size*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
 
-        ! cyl_coord: fine radial volume weights = this block's fine cell-center radii, pushed to device for the restriction
-        ! kernels. Only the owner restricts (device overwrite + device scatter pack), so only the owner needs them; single-sourced
-        ! from y_cc so the owner-local and scattered child-averages are bit-identical.
+        ! cyl_coord: fine radial volume weights = this block's fine cell-center radii, pushed to device for the restriction kernels.
+        ! Only the owner restricts (device overwrite + device scatter pack), so only the owner needs them; single-sourced from y_cc
+        ! so the owner-local and scattered child-averages are bit-identical.
         if (cyl_coord .and. proc_rank == owner) then
             amr_rvw(0:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%y_cc(0:amr_slots(amr_cur)%n)
             $:GPU_UPDATE(device='[amr_rvw]')
@@ -1988,11 +1985,11 @@ contains
             call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
             if (num_procs == 1) then
-                ! np=1 device-native fold-back: restrict the fine block (device) into the coarse (device) over the COVERED
-                ! cells only - no host round-trip. The old path pulled the fine to host, restricted on host, then pushed the
-                ! WHOLE coarse array back to the device (GPU_UPDATE device coarse_tgt), clobbering the device-advanced
-                ! NON-covered coarse cells with the stale host copy - a GPU-only divergence (invisible on CPU where
-                ! host==device) that IGR/MHD/acoustic amplify. The owner holds every covered cell at np=1.
+                ! np=1 device-native fold-back: restrict the fine block (device) into the coarse (device) over the COVERED cells
+                ! only - no host round-trip. The old path pulled fine to host, restricted on host, then pushed the WHOLE coarse
+                ! array back to the device (GPU_UPDATE device coarse_tgt), clobbering the device-advanced NON-covered coarse cells
+                ! with the stale host copy - a GPU-only divergence (invisible on CPU where host==device) that IGR/MHD/acoustic
+                ! amplify. The owner holds every covered cell at np=1.
                 if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device(coarse_tgt, &
                     & amr_slots(amr_cur)%q_cons, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
                 if (qbmm .and. .not. polytropic .and. amr_rank_owns_block) call s_restrict_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, &
@@ -2000,8 +1997,8 @@ contains
                 if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
                 return
             end if
-            ! owner-local covered cells: restrict fine(device) -> coarse(device) touching ONLY those cells (no whole-coarse
-            ! device push, which clobbered the device-advanced non-covered coarse cells - the same GPU-only bug fixed at np=1)
+            ! owner-local covered cells: restrict fine(device) -> coarse(device) touching ONLY those cells (no whole-coarse device
+            ! push, which clobbered the device-advanced non-covered coarse cells - the same GPU-only bug fixed at np=1)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device(coarse_tgt, &
                 & amr_slots(amr_cur)%q_cons, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
             ! cached destination list (every listed rank's interior overlaps the region by construction)
@@ -2020,7 +2017,7 @@ contains
                     nsrc = nsrc + 1; drank(nsrc) = r
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     ! pack this destination's covered slice on the DEVICE: restrict averages straight into the wire buffer (same
-                    ! child-sum order and wp values as the device overwrite above) - no full-field fine host pull
+                    ! child-sum order and wp values as the device overwrite above) - no full-field host pull
                     call s_amr_restrict_pack_device(amr_slots(amr_cur)%q_cons, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, &
                                                     & sbuf(1:boxsz,nsrc))
 #ifdef MFC_MPI
@@ -2054,8 +2051,8 @@ contains
                     end do
                 end do
                 deallocate (rbuf)
-                ! push ONLY the covered cells to the device - a whole-array update would clobber the device-advanced
-                ! non-covered coarse cells with this rank's stale host copy (the same GPU-only bug fixed at np=1)
+                ! push ONLY the covered cells to the device - a whole-array update would clobber the device-advanced non-covered
+                ! coarse cells with this rank's stale host copy (the same GPU-only bug fixed at np=1)
                 do i = 1, sys_size
                     $:GPU_UPDATE(device='[coarse_tgt(i)%sf(bl(1) - o1:bh(1) - o1, bl(2) - o2:bh(2) - o2, bl(3) - o3:bh(3) - o3)]')
                 end do
@@ -2063,23 +2060,24 @@ contains
         end if
 
         ! non-polytropic QBMM: distributed pb/mv fold-back - the owner restricts the covered cells it holds and scatters each other
-        ! coarse-owner its slice (mirror of the q_cons scatter above). Called on ALL ranks so the P2P send/recv pair up (np=1 is
-        ! handled by the direct s_restrict_pbmv in the num_procs==1 branch above, which returns before reaching here)
+        ! coarse-owner its slice (mirror of the q_cons scatter above). Called on ALL ranks so the P2P send/recv pair up (np=1
+        ! handled
+        ! by the direct s_restrict_pbmv in the num_procs==1 branch above, which returns before reaching here)
         if (qbmm .and. .not. polytropic) call s_amr_scatter_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
         if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
 
     !> Multi-level restriction: fold the current level>=2 block's fine averages back into its PARENT block's fine array over the
-    !! covered cells. Same child-sum kernel as the L0 fold-back, targeted at the parent in the parent-fine frame (amr_isect is
-    !! already parent-fine; offset 0 = the parent's local fine indexing). np=1 local; the np>=2 P2P scatter is future work.
+    !! covered cells. Same child-sum kernel as the L0 fold-back, targeted at the parent in the parent-fine frame (amr_isect already
+    !! parent-fine; offset 0 = the parent's local fine indexing). np=1 local; the np>=2 P2P scatter is future work.
     impure subroutine s_amr_restrict_to_parent()
 
         integer :: pblk, rr, nchild, dj_hi, dk_hi
 
         if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner folds locally
         ! NOTE: reads amr_rvw's device copy without a GPU_UPDATE - safe only while cyl_coord + amr_max_level > 1 is checker-gated
-        ! (this path never runs under cyl_coord). If that gate is lifted, refresh amr_rvw here first (see its declaration).
+        ! (this path never runs under cyl_coord). If that gate lifts, refresh amr_rvw here first (see its declaration).
         pblk = f_amr_parent_block(amr_cur)
         rr = amr_slots(amr_cur)%amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
@@ -2118,8 +2116,8 @@ contains
         end do
         ! parent-fine frame for the shared reflux kernel: outside cell = isect boundary +/-1; creg-local loop range 0:extent;
         ! transverse write at the isect origin. Per-face parent-fine cell widths - dx at the low/high OUTSIDE cell (olo/ohi),
-        ! mirroring the L0/L1 s_amr_apply_reflux_state so a stretched parent grid corrects each C/F face with its own width
-        ! (on a uniform grid dx is constant, so this is byte-identical to the previous single-dxf form).
+        ! mirroring the L0/L1 s_amr_apply_reflux_state so a stretched parent grid corrects each C/F face with its own width (on a
+        ! uniform grid dx is constant, so this is byte-identical to the previous single-dxf form).
         olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; mlo = 1._wp; mhi = 1._wp
         do d = 1, num_dims
             olo(d) = amr_isect_lo(d) - 1; ohi(d) = amr_isect_hi(d) + 1
@@ -2151,9 +2149,9 @@ contains
     !> Device-native restriction overwrite: restrict the fine block q_fine (DEVICE) to coarse averages over the covered coarse cells
     !! [bl:bh] GLOBAL and write coarse_tgt (DEVICE) directly - no host round-trip, only the covered cells touched (the old
     !! whole-coarse device push clobbered non-covered cells). Same child-sum order (ddk, ddj, then fi0 and fi0+1; /nchild; stp cast)
-    !! as the old host restrict path, so it is bit-identical to it on CPU and matches the coarse restriction. q_fine (==
+    !! as the old host restrict path, so bit-identical to it on CPU and matches the coarse restriction. q_fine (==
     !! amr_slots(amr_cur)%q_cons) and coarse_tgt are device-resident (ACC_SETUP_SFs). TWIN: s_amr_restrict_pack_device runs this
-    !! same child-sum into a wire buffer - any change to the loop order, arithmetic, or casts here must be mirrored there,
+    !! same child-sum into a wire buffer - any change to the loop order, arithmetic, or casts here must be mirrored there
     !! byte-identically (owner-local and scattered coarse cells must match bit-for-bit). TWIN(q<->pb/mv)
     !! s_amr_restrict_pbmv_box_device runs this same child-sum on pb/mv - keep the stencil lockstep.
     impure subroutine s_amr_restrict_overwrite_device(coarse_tgt, q_fine, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
@@ -2168,7 +2166,7 @@ contains
         rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
         if (cyl_coord) then
             ! axisymmetric volume-weighted fold-back: weight each fine child by its cell-center radius (amr_rvw = fine y_cc, on
-            ! device). Same child order as the Cartesian path and as the scatter pack, so CPU==GPU and np=1==np>=2.
+            ! device). Same child order as the Cartesian path and the scatter pack, so CPU==GPU and np=1==np>=2.
             $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc, wacc, w]')
             do i = 1, sys_size
                 do ck = bl3, bh3
@@ -2221,8 +2219,8 @@ contains
     !! PCIe, not the full fine field. Same child-sum order and wp values as s_amr_restrict_overwrite_device (no stp cast: the wire
     !! carries wp and the receiver casts), packed with ci fastest, then cj, ck, i, matching the receiver's sequential unpack. TWIN:
     !! s_amr_restrict_overwrite_device runs this same child-sum in place - any change to the loop order, arithmetic, or casts here
-    !! must be mirrored there, byte-identically (owner-local and scattered coarse cells must match bit-for-bit). TWIN(q<->pb/mv)
-    !! s_amr_restrict_pbmv_pack_device runs this same child-sum into a wire buffer - keep it lockstep.
+    !! must be mirrored there byte-identically (owner-local and scattered coarse cells must match bit-for-bit). TWIN(q<->pb/mv)
+    !! s_amr_restrict_pbmv_pack_device runs this same child-sum into a wire buffer - keep lockstep.
     impure subroutine s_amr_restrict_pack_device(q_fine, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_fine
@@ -2287,7 +2285,7 @@ contains
     !! mass/energy-conserving equilibration (no stencil, no ghosts), so it needs no coarse/fine coupling: it just runs over the fine
     !! interior. Swaps m/n/p to the fine extents so s_infinite_relaxation_k's 0:m,0:n,0:p loop covers this block. Matches the coarse
     !! timing (once per full step; the coarse relax runs once after s_tvd_rk on q_cons_ts(1)) but on the fine solution so the fine
-    !! dynamics equilibrate at fine resolution rather than only the restricted coarse average.
+    !! dynamics equilibrate at fine resolution, not only the restricted coarse average.
     impure subroutine s_amr_relax_fine()
 
         if (.not. amr_rank_owns_block) return
@@ -2332,10 +2330,10 @@ contains
         end do
         call s_amr_select_slot(save_cur)
 
-        ! The fine-IB image-point stencil is not decomposition-exact across a rank seam.
-        ! If the body's fine ghost points appear on more than one rank (i.e. the body
-        ! straddles a coarse/fine rank boundary), abort rather than return a wrong
-        ! body-surface state. A body wholly within one rank is decomposition-exact.
+        ! The fine-IB image-point stencil is not decomposition-exact across a rank seam. If the body's fine ghost points appear on
+        ! more than one rank (the body straddles a coarse/fine rank boundary), abort rather than return a wrong body-surface state.
+        ! A
+        ! body wholly within one rank is decomposition-exact.
         call s_mpi_allreduce_integer_sum(merge(1_8, 0_8, my_ib_gps > 0_8), nrank_ib)
         if (nrank_ib > 1_8) then
             call s_mpi_abort('amr with ib: the immersed body straddles a rank boundary, where the ' &
@@ -2355,8 +2353,8 @@ contains
         call s_amr_swap_to_fine()
         call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
         if (qbmm .and. .not. polytropic) then
-            ! mirror the coarse correct-state: non-polytropic QBMM also corrects the block's own
-            ! pb/mv side-state at the body ghost points (bounds match the swapped fine idwbuff)
+            ! mirror the coarse correct-state: non-polytropic QBMM also corrects the block's own pb/mv side-state at the body ghost
+            ! points (bounds match the swapped fine idwbuff)
             call s_ibm_correct_state(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_prim, amr_slots(amr_cur)%pb_f%sf, &
                                      & amr_slots(amr_cur)%mv_f%sf)
         else
@@ -2371,7 +2369,7 @@ contains
     !! motion, moving_ibm==1). Reuses the coarse s_update_mib recompute on the swapped-in fine slot (grid + IB globals swapped to
     !! the fine block, recompute writes into the slot store, restore). For the subcycled advance pass th in [0,1], the fine
     !! substep's fraction of the coarse step: s_update_mib snapshots the body to the linear time interpolation between the coarse
-    !! t^n and t^{n+1} positions, the same time-interpolation the subcycle applies to the fluid ghost shell. Pass th < 0 for the
+    !! t^n and t^{n+1} positions, the same interpolation the subcycle applies to the fluid ghost shell. Pass th < 0 for the
     !! non-subcycled lockstep stage (uses the body's current position). No-op unless ib. Must precede s_amr_ib_correct_fine.
     impure subroutine s_amr_update_mib_fine(th)
 
@@ -2381,14 +2379,12 @@ contains
 
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return
-        ! A moving body must stay inside its block (a body overlapping the block edge gets
-        ! silently clipped forcing - abort instead). Under dynamic regrid the expansion
-        ! contained it with margin max(amr_buf,4) and we require body + image-point stencil
-        ! reach (2 coarse cells) to remain contained between regrids; on a STATIC block the
-        ! user's placement is authoritative (validated configs sit tighter than the regrid
-        ! margin), so only the body bbox itself must stay inside. Consecutive contained
-        ! positions keep every sub-time interpolate contained (axis-aligned boxes are
-        ! convex in the linearly-moving corners).
+        ! A moving body must stay inside its block (a body overlapping the block edge gets silently clipped forcing - abort
+        ! instead).
+        ! Under dynamic regrid the expansion contained it with margin max(amr_buf,4) and we require body + image-point stencil reach
+        ! (2 coarse cells) to remain contained between regrids; on a STATIC block the user's placement is authoritative (validated
+        ! configs sit tighter than the regrid margin), so only the body bbox itself must stay inside. Consecutive contained
+        ! positions keep every sub-time interpolate contained (axis-aligned boxes are convex in the linearly-moving corners).
         if (any(patch_ib(1:num_ibs)%moving_ibm /= 0)) then
             do i = 1, num_ibs
                 if (patch_ib(i)%moving_ibm == 0) cycle
@@ -2428,12 +2424,12 @@ contains
 
         integer :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
 
-        ! HOST prolongation (both call paths make the coarse pb/mv host mirrors current first:
-        ! init writes them on the host, regrid refreshes them from the device); the device copy of the fine
-        ! side-state is pushed at the end
+        ! HOST prolongation (both call paths make the coarse pb/mv host mirrors current first: init writes them on the host, regrid
+        ! refreshes them from the device); the device copy of the fine side-state is pushed at the end
 
-        ! coarse pb/mv are read from the gathered block-local patch amr_cg_pb/mv (fine-level distribution): patch-local frame,
-        ! cell 0 == amr_cpat_off (matching s_prolong_one_var). The gather is a host loop (.not. pull_host) done by the callers.
+        ! coarse pb/mv are read from the gathered block-local patch amr_cg_pb/mv (fine-level distribution): patch-local frame, cell
+        ! 0
+        ! == amr_cpat_off (matching s_prolong_one_var). The gather is a host loop (.not. pull_host) done by the callers.
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         rr = amr_slots(amr_cur)%amr_ref_ratio
@@ -2466,7 +2462,7 @@ contains
     !! s_amr_fill_fine_ghosts (pb/mv<->q): q_cons sibling; keep the ghost-fill mapping lockstep.
     impure subroutine s_amr_fill_fine_ghosts_pbmv(pb_c, mv_c, pb_t, mv_t)
 
-        !> coarse pb/mv are read from the gathered block-local patch amr_cg_pb/mv (0-based patch frame, cell 0 == amr_cpat_off): the
+        !> coarse pb/mv read from the gathered block-local patch amr_cg_pb/mv (0-based patch frame, cell 0 == amr_cpat_off): the
         !! callers run s_amr_gather_coarse_patch_pbmv on ALL ranks first, so np>=2 reads the correct coarse rank's side-state
         real(stp), dimension(0:,0:,0:,1:,1:), intent(in) :: pb_c, mv_c
 
@@ -2625,8 +2621,8 @@ contains
     !! origin (ci-rlo)*rr, LOCAL coarse index cell - o. Only the covered cells the owner holds are touched (no whole-array push -
     !! same GPU-only clobber the q_cons device overwrite avoids). Same child-sum as s_restrict_pbmv. TWIN:
     !! s_amr_restrict_pbmv_pack_device runs this same child-sum into a wire buffer - any change to the loop order, arithmetic, or
-    !! casts here must be mirrored there, byte-identically (local and scattered coarse pb/mv must match bit-for-bit).
-    !! TWIN(pb/mv<->q) s_amr_restrict_overwrite_device is the q_cons sibling of this child-sum - keep the stencil lockstep.
+    !! casts here must be mirrored there byte-identically (local and scattered coarse pb/mv must match bit-for-bit). TWIN(pb/mv<->q)
+    !! s_amr_restrict_overwrite_device is the q_cons sibling of this child-sum - keep the stencil lockstep.
     impure subroutine s_amr_restrict_pbmv_box_device(pb_c, mv_c, pb_fin, mv_fin, bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_c, mv_c
@@ -2670,8 +2666,8 @@ contains
     !! contiguous wire buffer buf (host, via copyout; pb block then mv block, ci fastest) - only the slice crosses PCIe, not the
     !! full fine side-state. Same child-sum as s_amr_restrict_pbmv_box_device; the wire carries wp and the receiver casts to stp.
     !! TWIN: s_amr_restrict_pbmv_box_device runs this same child-sum in place - any change to the loop order, arithmetic, or casts
-    !! here must be mirrored there, byte-identically (local and scattered coarse pb/mv must match bit-for-bit). TWIN(pb/mv<->q)
-    !! s_amr_restrict_pack_device is the q_cons sibling of this packed child-sum - keep it lockstep.
+    !! here must be mirrored there byte-identically (local and scattered coarse pb/mv must match bit-for-bit). TWIN(pb/mv<->q)
+    !! s_amr_restrict_pack_device is the q_cons sibling of this packed child-sum - keep lockstep.
     impure subroutine s_amr_restrict_pbmv_pack_device(pb_fin, mv_fin, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
@@ -2828,19 +2824,20 @@ contains
     !> Swap the global grid state to the fine block. MUST be paired with s_amr_restore_coarse.
     impure subroutine s_amr_swap_to_fine()
 
-        ! a nested swap would overwrite the sw_* bounce buffers with FINE state, and the eventual
-        ! restore would install fine extents as the coarse grid - silent corruption of everything after
+        ! a nested swap would overwrite the sw_* bounce buffers with FINE state, and the eventual restore would install fine extents
+        ! as the coarse grid - silent corruption of everything after
         @:ASSERT(.not. amr_swapped, "nested s_amr_swap_to_fine (swap/restore must pair)")
         amr_swapped = .true.
         sw_m = m; sw_n = n; sw_p = p
         sw_idwint = idwint; sw_idwbuff = idwbuff
-        ! the acoustic source's precomputed spatials are coarse-grid cell indices: applying them on
-        ! the fine block would inject at wrong cells (or out of bounds). The support is guaranteed
-        ! not to overlap the block (checked at startup), so the fine RHS correctly skips the source.
+        ! the acoustic source's precomputed spatials are coarse-grid cell indices: applying them on the fine block would inject at
+        ! wrong cells (or out of bounds). The support is guaranteed not to overlap the block (checked at startup), so the fine RHS
+        ! correctly skips the source.
         sw_acoustic_source = acoustic_source; acoustic_source = .false.
-        ! active-box windows are COARSE cell indices: applying them on the swapped fine grid
-        ! would window the wrong cells. Blocks are contained in the active window (init check +
-        ! regrid clamp), so the fine advance legitimately treats its whole block as active.
+        ! active-box windows are COARSE cell indices: applying them on the swapped fine grid would window the wrong cells. Blocks
+        ! are
+        ! contained in the active window (init check + regrid clamp), so the fine advance legitimately treats its whole block as
+        ! active.
         sw_ab_active = ab_active; ab_active = .false.
         $:GPU_UPDATE(device='[ab_active]')
         m = amr_slots(amr_cur)%m; n = amr_slots(amr_cur)%n; p = amr_slots(amr_cur)%p
@@ -2865,20 +2862,21 @@ contains
             z_cc(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%z_cc(0:amr_slots(amr_cur)%p)
             dz(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%dz(0:amr_slots(amr_cur)%p)
         end if
-        ! Extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m).
-        ! Ghost cells use the EXACT parent-cell bisection - the same formula as the interior, with floor
-        ! division for negative indices. Fine-level distribution: the owner may not hold the block's coarse
-        ! coordinate slice locally, so the ghost parent boundaries come from the GLOBAL boundaries amr_g?cb
-        ! (cl is a GLOBAL coarse index, region_lo + floor(jg/rr)), matching the interior build. Blocks stay
-        ! buff_size inside the domain, so every ghost parent is an in-domain coarse cell with exact coords.
+        ! Extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m). Ghost cells use the EXACT
+        ! parent-cell bisection - the same formula as the interior, with floor division for negative indices. Fine-level
+        ! distribution: the owner may not hold the block's coarse coordinate slice locally, so ghost parent boundaries come from the
+        ! GLOBAL boundaries amr_g?cb (cl is a GLOBAL coarse index, region_lo + floor(jg/rr)), matching the interior build. Blocks
+        ! stay buff_size inside the domain, so every ghost parent is an in-domain coarse cell with exact coords.
         block
             integer               :: jg, cl, pblk2, k, rr
             real(wp), allocatable :: cxb(:), cyb(:), czb(:)
             rr = amr_slots(amr_cur)%amr_ref_ratio
             ! ghost parent boundaries: a level>=2 block's coarse side is its PARENT's fine grid (indexed in the parent-fine
-            ! amr_isect frame, matching the interior s_build_level_coords), NOT the L0 global boundaries. amr_isect_lo is a
-            ! parent-fine index, so indexing amr_g?cb (sized for L0) reads OUT OF BOUNDS -> garbage on host, NaN on the device
-            ! copy. Source the parent's fine coords for level>=2, the global L0 boundaries for level 1.
+            ! amr_isect
+            ! frame, matching the interior s_build_level_coords), NOT the L0 global boundaries. amr_isect_lo is a parent-fine index,
+            ! so indexing amr_g?cb (sized for L0) reads OUT OF BOUNDS -> garbage on host, NaN on the device copy. Source the
+            ! parent's
+            ! fine coords for level>=2, the global L0 boundaries for level 1.
             if (amr_block_level(amr_cur) >= 2) then
                 pblk2 = f_amr_parent_block(amr_cur)
                 allocate (cxb(lbound(amr_slots(pblk2)%x_cb, 1):ubound(amr_slots(pblk2)%x_cb, 1))); cxb = amr_slots(pblk2)%x_cb
@@ -2970,21 +2968,22 @@ contains
                 end do
             end if
         end block
-        ! sync the swapped extents/bounds/coordinates to the device: RHS kernels read the
-        ! device copies of these GPU_DECLARE'd globals (stale coarse bounds = OOB kernels)
+        ! sync the swapped extents/bounds/coordinates to the device: RHS kernels read the device copies of these GPU_DECLARE'd
+        ! globals (stale coarse bounds = OOB kernels)
         call s_amr_sync_grid_state_to_device()
-        ! hypoelastic stress sources use grid-spacing-dependent FD coefficients: recompute
-        ! them from the (now fine) grid, else every fine velocity gradient is halved
+        ! hypoelastic stress sources use grid-spacing-dependent FD coefficients: recompute them from the (now fine) grid, else every
+        ! fine velocity gradient is halved
         if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
-        ! nonuniform coarse grid (stretched, or the axisymmetric axis half-cell): the per-cell
-        ! WENO coefficients must be rebuilt for the block's own grid (no-op flag on uniform grids)
+        ! nonuniform coarse grid (stretched, or the axisymmetric axis half-cell): the per-cell WENO coefficients must be rebuilt for
+        ! the block's own grid (no-op flag on uniform grids)
         if (amr_weno_coef_recompute) call s_amr_recompute_weno_coefs()
 
-        ! IGR: save the coarse sigma state and seed the fine solve. jac holds THIS stage's
-        ! converged coarse sigma (the coarse RHS ran first), so its parent values are both the
-        ! best initial guess and the frozen Dirichlet ghost data for the block-local Jacobi
-        ! solve (the per-iteration BC/halo populate is skipped under amr_in_fine_advance).
-        ! Piecewise-constant parent injection over the full buffered fine range.
+        ! IGR: save the coarse sigma state and seed the fine solve. jac holds THIS stage's converged coarse sigma (the coarse RHS
+        ! ran
+        ! first), so its parent values are both the best initial guess and the frozen Dirichlet ghost data for the block-local
+        ! Jacobi
+        ! solve (the per-iteration BC/halo populate is skipped under amr_in_fine_advance). Piecewise-constant parent injection over
+        ! the full buffered fine range.
         if (igr) call s_amr_igr_swap_sigma()
 
     end subroutine s_amr_swap_to_fine
@@ -3013,16 +3012,15 @@ contains
 
     !> Save the coarse jac/jac_old and seed the (already swapped-in) fine block's sigma state by piecewise-constant parent injection
     !! from the saved coarse sigma: interior = initial guess, ghost shell = frozen Dirichlet coupling data for the block-local
-    !! iterative solve.
+    !! solve.
     impure subroutine s_amr_igr_swap_sigma()
 
         integer :: j, k, l, ci, cj, ck
         integer :: cb1, ce1, cb2, ce2, cb3, ce3, fb1, fe1, fb2, fe2, fb3, fe3
         integer :: lo1, lo2, lo3, ox, oy, oz
 
-        ! bounds/offsets hoisted to scalars: sw_idwbuff (and friends) are host-only module
-        ! state - referencing them inside the kernels makes OpenACC's present lookup fail
-        ! (OpenMP's implicit map(to) tolerates it, which is why only acc lanes crashed)
+        ! bounds/offsets hoisted to scalars: sw_idwbuff (and friends) are host-only module state - referencing them inside the
+        ! kernels makes OpenACC's present lookup fail (OpenMP's implicit map(to) tolerates it, which is why only acc lanes crashed)
 
         cb1 = sw_idwbuff(1)%beg; ce1 = sw_idwbuff(1)%end
         cb2 = sw_idwbuff(2)%beg; ce2 = sw_idwbuff(2)%end
@@ -3107,7 +3105,7 @@ contains
     end subroutine s_amr_recompute_weno_coefs
 
     !> Push the (host-side) global grid state to its device copies after a swap/restore. m/n/p, idwint/idwbuff, and the coordinate
-    !! arrays are GPU_DECLARE'd; kernels read the device copies. No-op on CPU builds.
+    !! arrays are GPU_DECLARE'd; kernels read the device copies. No-op on CPU.
     impure subroutine s_amr_sync_grid_state_to_device()
 
         $:GPU_UPDATE(device='[m, n, p, idwint, idwbuff]')
@@ -3123,7 +3121,7 @@ contains
 
     !> Decompose the current fine block's ghost shell (buffered extent minus interior) into ns disjoint face slabs whose union is
     !! exactly the non-interior cells, so the ghost-fill kernels do O(surface) work instead of masking the full buffered volume. x
-    !! slabs span the full transverse extent; y slabs restrict x to the interior; z slabs restrict x and y. Degenerate dims
+    !! slabs span the full transverse extent; y slabs restrict x to the interior; z slabs restrict x and y. Collapsed dims
     !! (n_glb/p_glb == 0) contribute no slabs.
     pure subroutine s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
 
@@ -3155,7 +3153,7 @@ contains
     !! amr_cg (fine-level distribution; the caller gathers the source first). Device kernel: reads the patch and writes the fine
     !! target in device memory. floor/modulo mapping is valid for negative fine indices (ghosts). Interior untouched. Multi-fluid
     !! volume fractions get the same sum-preserving closure as the interior prolongation (second kernel). TWIN
-    !! s_amr_fill_fine_ghosts_pbmv (q<->pb/mv): pb/mv sibling of this ghost prolongation; keep the mapping lockstep.
+    !! s_amr_fill_fine_ghosts_pbmv (q<->pb/mv): pb/mv sibling; keep the mapping lockstep.
     impure subroutine s_amr_fill_fine_ghosts(q_coarse, q_fine)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_coarse
@@ -3168,8 +3166,8 @@ contains
         logical                                                :: d2, d3, multi, shx, shy, shz, bubEE
         real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
 
-        ! q_coarse is the gathered block-local patch amr_cg (fine-level distribution); amr_isect_lo (GLOBAL, == region_lo on
-        ! the owner) + f/rr - amr_cpat_off is the patch-local coarse index. Fine indices are LOCAL to this block.
+        ! q_coarse is the gathered block-local patch amr_cg (fine-level distribution); amr_isect_lo (GLOBAL, == region_lo on the
+        ! owner) + f/rr - amr_cpat_off is the patch-local coarse index. Fine indices are LOCAL to this block.
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         d2 = n_glb > 0; d3 = p_glb > 0
@@ -3210,11 +3208,10 @@ contains
                                 sz = 0._wp
                                 if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
                                     & cj, ck - 1), wp))
-                                ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the
-                                ! coarse cell's realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component
-                                ! minmod slopes would break that joint constraint). Non-QBMM Euler-Euler bubbles instead
-                                ! floor their positive moments (nR / npb / nmv); the signed velocity moment nV (offset 1)
-                                ! is skipped.
+                                ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the coarse cell's
+                                ! realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component minmod slopes would break
+                                ! that joint constraint). Non-QBMM Euler-Euler bubbles instead floor their positive moments (nR /
+                                ! npb / nmv); the signed velocity moment nV (offset 1) is skipped.
                                 if (qbmm .and. i >= bbeg .and. i <= bend) then
                                     sx = 0._wp; sy = 0._wp; sz = 0._wp
                                 end if
@@ -3231,8 +3228,8 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end do
 
-        ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (shared
-        ! limiter switch over all fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
+        ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (shared limiter switch over all
+        ! fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
         if (multi) then
             do s = 1, ns
                 l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
@@ -3326,7 +3323,7 @@ contains
     !> Non-polytropic QBMM twin of s_amr_lerp_fine_ghosts: lerp the block's pb/mv ghost shell between the coarse t^n and t^{n+1}
     !! sources at the substage time (device kernel; interior untouched). Ghost pb feeds the mixture pressure in the widened
     !! conversion, so it gets the same time treatment as the conservative ghosts. TWIN s_amr_lerp_fine_ghosts (pb/mv<->q): q_cons
-    !! sibling; keep the lerp lockstep.
+    !! sibling; keep lockstep.
     impure subroutine s_amr_lerp_fine_ghosts_pbmv(pb_t, mv_t, pga, mga, pgb, mgb, th)
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
@@ -3455,25 +3452,25 @@ contains
 
         integer, intent(in)                                    :: slot, d, dlo, dhi, dir
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons  ! amr_slots(slot)%q_cons: pass the
-        !                                    scalar_field array in so the device kernel reads the mapped %sf via a
-        !                                    dummy - amr_slots itself is not GPU_DECLARE'd, so indexing the module
-        !                                    array amr_slots(slot)%q_cons inside a kernel dereferences a null descriptor
+        !                                    scalar_field array in so the device kernel reads the mapped %sf via a dummy - amr_slots
+        !                                    itself is not GPU_DECLARE'd, so indexing the module array amr_slots(slot)%q_cons inside
+        !                                    a kernel dereferences a null descriptor
         real(wp), intent(inout), contiguous :: buf(:)
         integer                             :: i, a, b, c, fm(3), na, nb, nc
 
         fm(1) = amr_slots(slot)%m; fm(2) = amr_slots(slot)%n; fm(3) = amr_slots(slot)%p
         nc = dhi - dlo + 1
-        ! Pack (dir=1) / unpack (dir=-1) the near-seam slab ON THE DEVICE straight into the contiguous buffer buf,
-        ! then move ONLY buf host<->device. flang miscomputes a STRIDED section (seam dim d < num_dims) of the
-        ! doubly-nested amr_slots%q_cons%sf in a target-update map clause, corrupting the 2D+ np>1 seam ghosts; the
-        ! base-grid halo (s_mpi_sendrecv_variables_buffers) device-packs into a contiguous buffer for the same reason.
-        ! buf index runs a fastest, then b, then c, then i, so a pack and an unpack with matching extents align cell-
-        ! for-cell (na/nb are the transverse fine sizes, nc the slab depth).
+        ! Pack (dir=1) / unpack (dir=-1) the near-seam slab ON THE DEVICE straight into the contiguous buffer buf, then move ONLY
+        ! buf
+        ! host<->device. flang miscomputes a STRIDED section (seam dim d < num_dims) of the doubly-nested amr_slots%q_cons%sf in a
+        ! target-update map clause, corrupting the 2D+ np>1 seam ghosts; the base-grid halo (s_mpi_sendrecv_variables_buffers)
+        ! device-packs into a contiguous buffer for the same reason. buf index runs a fastest, then b, then c, then i, so a pack and
+        ! an unpack with matching extents align cell-for-cell (na/nb are the transverse fine sizes, nc the slab depth).
         #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
             #:set IDX = {1: '(c, a, b)', 2: '(a, c, b)', 3: '(a, b, c)'}[D]
             if (d == ${D}$) then
-                na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1  ! scalars; the kernel loop bounds MUST use na-1/nb-1, not fm(..),
-                !                     so no host array is referenced in the device region (nvfortran/Cray demand it PRESENT)
+                na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1  ! scalars; kernel loop bounds MUST use na-1/nb-1, not fm(..), so no host
+                !                     array is referenced in the device region (nvfortran/Cray demand it PRESENT)
                 if (dir == 1) then  ! host <- device: pack on the device, copyout moves the contiguous buffer to host
                     $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
                     do i = 1, sys_size
@@ -3505,8 +3502,8 @@ contains
     end subroutine s_amr_fine_slice
 
     !> Seam dimension of the ordered pair (xb, yb): the dim d in which yb is the immediate high-face neighbour of xb at matched
-    !! resolution (same level), or 0 if they are not a same-level fine-fine seam. Face adjacency requires transverse overlap, so a
-    !! pair is adjacent in at most one dim; the last-true assignment reproduces the original inline scan in s_amr_fine_fine_halo.
+    !! resolution (same level), or 0 if not a same-level fine-fine seam. Face adjacency requires transverse overlap, so a pair is
+    !! adjacent in at most one dim; the last-true assignment reproduces the original inline scan in s_amr_fine_fine_halo.
     pure integer function f_amr_seam_dim(xb, yb) result(d)
 
         integer, intent(in) :: xb, yb
@@ -3549,9 +3546,9 @@ contains
                 end if
             end do
         end do
-        ! per-block P2P overlap-rank lists (gather: rank coarse range vs the amr_cpat_mar-padded patch box; scatter: rank
-        ! coarse interior vs the region box - the exact tests the consumers ran per call), rank-ascending so iterating a
-        ! list preserves the replaced 0..num_procs-1 scans' MPI send/recv order.
+        ! per-block P2P overlap-rank lists (gather: rank coarse range vs the amr_cpat_mar-padded patch box; scatter: rank coarse
+        ! interior vs the region box - the exact tests the consumers ran per call), rank-ascending so iterating a list preserves the
+        ! replaced 0..num_procs-1 scans' MPI send/recv order.
         do k = 1, amr_num_blocks
             plo = 0; phi = 0; rlo = 0; rhi = 0
             plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, k) + amr_cpat_mar
@@ -3598,19 +3595,21 @@ contains
         if (amr_num_blocks < 2) return
 
         ! iterate the cached same-level seam list (rebuilt only when the topology changes) instead of the old O(nblocks^2)
-        ! f_amr_seam rescan every stage; the list preserves the original (xb, yb) order so paired MPI_SENDRECVs still match.
+        ! f_amr_seam
+        ! rescan every stage; the list preserves the original (xb, yb) order so paired MPI_SENDRECVs still match.
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
-        ! device<->host of the fine state is done per-seam inside s_amr_fine_slice, moving only the buff_size-deep near-seam
-        ! slab each pack/unpack touches (not the whole block) - a large PCIe saving since this runs per stage (6x per fine step)
+        ! device<->host of the fine state is done per-seam inside s_amr_fine_slice, moving only the buff_size-deep near-seam slab
+        ! each
+        ! pack/unpack touches (not the whole block) - a large PCIe saving since this runs per stage (6x per fine step)
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
             rX = amr_block_owner(xb); rY = amr_block_owner(yb)
             if (proc_rank /= rX .and. proc_rank /= rY) cycle
-            ! fine extents from the REPLICATED region metadata (not amr_slots%m/n/p: at np>1 this rank may own only one of the
-            ! pair, and the transverse size (used for the buffer count) must be valid for both). A level-L block's region is in
-            ! L0-coarse cells but its own grid is 2**L finer (each level halves dx), so fine = 2**L*(coarse extent)-1; xb, yb
-            ! share the level (same-level seam). 2**1 keeps L1 byte-identical; L2 tiles need 2**2 (an L1-frame 2* mislocates the
-            ! seam slice to half the block, filling the seam ghost from the wrong cells - the source of the L2-L2 leak).
+            ! fine extents from the REPLICATED region metadata (not amr_slots%m/n/p: at np>1 this rank may own only one of the pair,
+            ! and the transverse size (used for the buffer count) must be valid for both). A level-L block's region is in L0-coarse
+            ! cells but its own grid is 2**L finer (each level halves dx), so fine = 2**L*(coarse extent)-1; xb, yb share the level
+            ! (same-level seam). 2**1 keeps L1 byte-identical; L2 tiles need 2**2 (an L1-frame 2* mislocates the seam slice to half
+            ! the block, filling the seam ghost from the wrong cells - the source of the L2-L2 leak).
             fmul = amr_ref_ratio**amr_block_level(xb)
             xm(1) = fmul*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
             xm(2) = merge(fmul*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
@@ -3667,11 +3666,11 @@ contains
         if (.not. amr) return
         ! valid coarse CONS ghosts for the ghost prolongation below (ALL ranks call: pairwise halo)
         if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_coarse)
-        ! the Lagrangian-cloud guard runs on EVERY rank (rank-local bubbles vs the block's
-        ! GLOBAL box): a non-owner rank's bubbles can reach into a block across a rank seam
+        ! the Lagrangian-cloud guard runs on EVERY rank (rank-local bubbles vs the block's GLOBAL box): a non-owner rank's bubbles
+        ! can reach into a block across a rank seam
         call s_amr_check_lag_clear()
-        ! fine-level distribution: gather the block's coarse patch onto its owner (collective - ALL ranks, before the
-        ! owner-only return). The device ghost-fill below then reads the gathered patch amr_cg instead of local coarse.
+        ! fine-level distribution: gather the block's coarse patch onto its owner (collective - ALL ranks, before the owner-only
+        ! return). The device ghost-fill below then reads the gathered patch amr_cg instead of local coarse.
         call s_amr_gather_coarse_patch(q_cons_coarse, .true.)
         ! non-polytropic QBMM: gather the coarse pb/mv patch too (collective - ALL ranks, before the owner return; owners fill
         ! below)
@@ -3679,12 +3678,14 @@ contains
         if (.not. amr_rank_owns_block) return
 
         ! ghost prolongation from the coarse stage-entry conservative state (device kernel reads the gathered patch amr_cg);
-        ! rank_time brackets cover the fine-advance compute segments and pause across the MPI exchanges (the inner
-        ! s_compute_rhs pair nests to a no-op)
+        ! rank_time brackets cover the fine-advance compute segments and pause across the MPI exchanges (the inner s_compute_rhs
+        ! pair
+        ! nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
         call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_cons)
         ! the coarse-prolonged ghost shell is the final ghost state EXCEPT at faces shared with an adjacent sub-block (tiling),
-        ! which the block-to-block fine-fine halo overwrites with the neighbour's fine interior after this fill.
+        ! which
+        ! the block-to-block fine-fine halo overwrites with the neighbour's fine interior after this fill.
 
         ! non-polytropic QBMM: prolong the block's pb/mv ghost shell from the gathered coarse patch amr_cg_pb/mv (its rhs is
         ! cell-local, so ghosts only feed the widened-idwint conversions)
@@ -3724,8 +3725,8 @@ contains
         idwint = amr_slots(amr_cur)%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
         $:GPU_UPDATE(device='[idwint]')
         if (qbmm .and. .not. polytropic) then
-            ! the block's OWN side-state and rhs scratch: the coarse pb_in/rhs_pb must not be
-            ! touched at fine indices (the coarse stage consumes them after this fine stage)
+            ! the block's OWN side-state and rhs scratch: the coarse pb_in/rhs_pb must not be touched at fine indices (the coarse
+            ! stage consumes them after this fine stage)
             call s_compute_rhs(amr_slots(amr_cur)%q_cons, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
                                & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, s)
         else
@@ -3735,8 +3736,8 @@ contains
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
 
-        ! RK stage update (device kernel; mirror of the coarse form - under IGR the rhs already
-        ! embeds dt, matching the coarse igr update, so the dt factor is 1)
+        ! RK stage update (device kernel; mirror of the coarse form - under IGR the rhs already embeds dt, matching the coarse igr
+        ! update, so the dt factor is 1)
         call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
                                   & coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
         if (qbmm .and. .not. polytropic) call s_amr_fine_rk_update_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
@@ -3755,15 +3756,15 @@ contains
     !> Per-block SETUP for the transposed subcycle advance (amr_subcycle): exchange valid coarse ghosts, gather+prolong the selected
     !! block's two time-lerp ghost sources (parent t^n in q_ghost_a, t^{n+1} in q_ghost_b), and zero its flux registers. The
     !! collective exchanges/gathers run on ALL ranks; the owner-only fills and register-zero are guarded. Called once per level-1
-    !! block before the transposed stage loop (which then reuses the prepared ghost sources every substep).
+    !! block before the transposed stage loop (which reuses the prepared ghost sources every substep).
     impure subroutine s_amr_subcycle_setup_block(q_old, q_new, pb_old, mv_old, pb_in, mv_in)
 
         type(scalar_field), dimension(sys_size), intent(inout)                                  :: q_old, q_new
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_old, mv_old
         real(stp), dimension(:,:,:,:,:), intent(inout)                                          :: pb_in, mv_in
 
-        ! valid coarse CONS ghosts on both lerp sources (ALL ranks call: pairwise halo); the exchanged t^n /
-        ! t^{n+1} ghost layers make the prolonged block-boundary ghosts correct even at rank boundaries
+        ! valid coarse CONS ghosts on both lerp sources (ALL ranks call: pairwise halo); the exchanged t^n / t^{n+1} ghost layers
+        ! make the prolonged block-boundary ghosts correct even at rank boundaries
 
         if (amr_xchg_coarse_ghosts) then
             call s_amr_exchange_coarse_cons_halo(q_old)
@@ -3771,11 +3772,12 @@ contains
         end if
         call s_amr_check_lag_clear()  ! EVERY rank: non-owner bubbles can reach the block across a seam
 
-        ! fine-level distribution: gather each lerp source's coarse patch (collective - ALL ranks) then prolong its ghost shell
-        ! on the owner. Interleaved so the single amr_cg buffer is consumed by the fill before the next gather overwrites it.
+        ! fine-level distribution: gather each lerp source's coarse patch (collective - ALL ranks) then prolong its ghost shell on
+        ! the owner. Interleaved so the single amr_cg buffer is consumed by the fill before the next gather overwrites it.
         ! non-polytropic QBMM: the pb/mv ghost shell gets the same two-source time-lerp treatment, gathered + filled INTERLEAVED
-        ! with q_cons so the single amr_cg_pb/mv buffer is consumed by each fill before the next gather overwrites it. Gathers are
-        ! collective (ALL ranks - P2P); fills are owner-only.
+        ! with
+        ! q_cons so the single amr_cg_pb/mv buffer is consumed by each fill before the next gather overwrites it. Gathers collective
+        ! (ALL ranks - P2P); fills owner-only.
         call s_amr_gather_coarse_patch(q_old, .true.)
         if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_old, mv_old, .true.)
         if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_ghost_a)
@@ -3788,22 +3790,22 @@ contains
             & amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf)
         if (.not. amr_rank_owns_block) return
 
-        ! registers accumulate over all six stages of the transposed loop, so zero them once at setup (the stage-1 overwrite
-        ! trick cannot span two substeps)
+        ! registers accumulate over all six stages of the transposed loop, so zero them once at setup (the stage-1 overwrite trick
+        ! cannot span two substeps)
         call s_amr_zero_fine_registers()
 
     end subroutine s_amr_subcycle_setup_block
 
     !> Subcycled fine advance (amr_subcycle) over ALL level-1 blocks, TRANSPOSED: instead of each block running its full 2x3-stage
     !! subcycle in turn, every same-level block advances stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo
-    !! (s_amr_fine_fine_halo) interposed between the ghost lerp and the RHS at each stage. That is what makes max_grid_size-tiled
-    !! ADJACENT sub-blocks (which appear at np>1 when a feature exceeds a rank's slot) compute a MATCHING shared-face flux, so the
-    !! subcycle conserves at the seam - the per-block order did not run the halo and leaked there. Two dt/2 SSP-RK3 substeps AFTER
-    !! the coarse step: q_old/q_new are the coarse t^n / t^{n+1} states; each stage's ghosts are the linear time interpolation at
-    !! stage time theta = (substep-1 + c_s)/2 with SSP-RK3 abscissae c = [0, 1, 1/2]. Level-1 blocks drive their level-2 children
-    !! per substep (s_amr_advance_children); the L2-L2 seam halo is future work (s_amr_check_seam_topology aborts if an L2+ seam
-    !! pair is reached under subcycle, e.g. via a restart mode-switch from a lockstep-produced layout). A single owned level-1 block
-    !! is byte-identical to the old per-block subcycle (the halo is a no-op with < 2 adjacent same-level blocks).
+    !! (s_amr_fine_fine_halo) interposed between the ghost lerp and the RHS at each stage. That makes max_grid_size-tiled ADJACENT
+    !! sub-blocks (which appear at np>1 when a feature exceeds a rank's slot) compute a MATCHING shared-face flux, so the subcycle
+    !! conserves at the seam - the per-block order did not run the halo and leaked there. Two dt/2 SSP-RK3 substeps AFTER the coarse
+    !! step: q_old/q_new are the coarse t^n / t^{n+1} states; each stage's ghosts are the linear time interpolation at stage time
+    !! theta = (substep-1 + c_s)/2 with SSP-RK3 abscissae c = [0, 1, 1/2]. Level-1 blocks drive their level-2 children per substep
+    !! (s_amr_advance_children); the L2-L2 seam halo is future work (s_amr_check_seam_topology aborts if an L2+ seam pair is reached
+    !! under subcycle, e.g. via a restart mode-switch from a lockstep-produced layout). A single owned level-1 block is
+    !! byte-identical to the old per-block subcycle (the halo is a no-op with < 2 adjacent same-level blocks).
     impure subroutine s_amr_advance_fine_subcycle_all(q_old, q_new, coefs, bc_type, q_T_sf, pb_old, mv_old, pb_in, rhs_pb, mv_in, &
         & rhs_mv, t_step)
 
@@ -3838,10 +3840,11 @@ contains
                     if (.not. amr_rank_owns_block) cycle
                     call s_amr_subtree_stage_lerp(s, th)
                 end do
-                ! reconcile shared seam ghosts among ADJACENT same-level blocks so both sides compute a matching flux. Tiling
-                ! can split a wide feature into adjacent sub-blocks at ANY rank count (amr_maxc_fit caps a box at half the
-                ! global extent even at np=1), so the halo runs unconditionally - it self-no-ops when there are no seam pairs,
-                ! keeping every untiled case byte-identical.
+                ! reconcile shared seam ghosts among ADJACENT same-level blocks so both sides compute a matching flux. Tiling can
+                ! split a wide feature into adjacent sub-blocks at ANY rank count (amr_maxc_fit caps a box at half the global extent
+                ! even at np=1), so the halo runs unconditionally - it self-no-ops when there are no seam pairs, keeping every
+                ! untiled
+                ! case byte-identical.
                 call s_amr_fine_fine_halo()
                 ! RHS + RK update every block from the reconciled ghost shell
                 do islot = 1, amr_num_blocks
@@ -3852,8 +3855,8 @@ contains
                                                      & s, th)
                 end do
             end do
-            ! after this substep each level-1 block is at t_b (q_cons) with t_a in q_cons_stor: its level-2 children subcycle
-            ! within [t_a, t_b] then fold back (restrict + Berger-Colella reflux). No-op for single-level.
+            ! after this substep each level-1 block is at t_b (q_cons) with t_a in q_cons_stor: its level-2 children subcycle within
+            ! [t_a, t_b] then fold back (restrict + Berger-Colella reflux). No-op for single-level.
             if (amr_max_level >= 2) then
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) /= 1) cycle
@@ -3868,8 +3871,8 @@ contains
     end subroutine s_amr_advance_fine_subcycle_all
 
     !> Ghost-lerp half of one subcycled fine substage for the selected block (amr_cur): time-interpolate the ghost shell to stage
-    !! time th and, on substep stage 1, back up the substep-entry state. Split from the RHS half so that same-level blocks can run
-    !! this together and the block-to-block fine-fine seam halo can be interposed before any block reads a neighbour's interior.
+    !! time th and, on substep stage 1, back up the substep-entry state. Split from the RHS half so same-level blocks can run this
+    !! together and the block-to-block fine-fine seam halo can be interposed before any block reads a neighbour's interior.
     !! Owner-only (the caller guards); no numerical coupling between blocks here.
     impure subroutine s_amr_subtree_stage_lerp(s, th)
 
@@ -3896,7 +3899,7 @@ contains
 
     !> RHS + RK-update half of one subcycled fine substage for the selected block (amr_cur): compute the fine RHS from the (already
     !! halo-reconciled) ghost shell and apply the SSP-RK stage update at the fine substep dt_sub, plus per-stage pressure relaxation
-    !! and IB correction. Split from the lerp half so the fine-fine seam halo runs between them. Owner-only (the caller guards).
+    !! and IB correction. Split from the lerp half so the fine-fine seam halo runs between them. Owner-only (caller guards).
     impure subroutine s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s, th)
 
         real(wp), intent(in) :: dt_sub                 !< this block's substep dt (parent step / amr_ref_ratio)
@@ -3973,7 +3976,8 @@ contains
             end do
             ! multi-level: this block is now at t_b (q_cons) with t_a preserved in q_cons_stor. Each level+1 child subcycles WITHIN
             ! this substep - gathering its two ghost-lerp sources from those two snapshots - then folds back (restrict +
-            ! Berger-Colella reflux) into this block over dt_sub. No-op when this block has no children (single-level / finest).
+            ! Berger-Colella
+            ! reflux) into this block over dt_sub. No-op when this block has no children (single-level / finest).
             if (amr_max_level >= 2) call s_amr_advance_children(amr_cur, dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, &
                 & rhs_mv, t_step)
         end do
@@ -4000,9 +4004,9 @@ contains
         integer, intent(in)                                        :: t_step
         integer                                                    :: kc, pslot_l
 
-        ! pslot is argument-associated with the module variable amr_cur (the caller passes amr_cur as
-        ! pslot); the s_amr_select_slot(kc) below reassigns amr_cur and would silently corrupt pslot.
-        ! Copy it to a local read before any slot switch.
+        ! pslot is argument-associated with the module variable amr_cur (the caller passes amr_cur as pslot); the
+        ! s_amr_select_slot(kc) below reassigns amr_cur and would silently corrupt pslot. Copy it to a local read before any slot
+        ! switch.
 
         pslot_l = pslot
         do kc = 1, amr_num_blocks
@@ -4099,9 +4103,9 @@ contains
             call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
                              & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
         end select
-        ! physical bbox -> global coarse indices: valid for uniform spacing only (stretched
-        ! grids with ib-dynamic-regrid/Lagrangian are aborted at init; the axisymmetric half
-        ! axis cell only shrinks dy(0), so the floor is still conservative)
+        ! physical bbox -> global coarse indices: uniform spacing only (stretched grids with ib-dynamic-regrid/Lagrangian are
+        ! aborted
+        ! at init; the axisymmetric half axis cell only shrinks dy(0), so the floor is still conservative)
         blo(1) = int((c(1) - half(1) - glb_bounds(1)%beg)/dx(0)) - mrg
         bhi(1) = int((c(1) + half(1) - glb_bounds(1)%beg)/dx(0)) + mrg
         blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
@@ -4122,19 +4126,19 @@ contains
         integer                :: i, d, blo(3), bhi(3), mrg
         logical                :: ovl
 
-        ! containment margin: the IB image-point stencil reaches a few cells beyond the surface
-        ! (the validated static-block goldens keep ~5); buff_size (floored to 10 by ib) would
-        ! exceed the per-rank block cap for ordinary bodies. For amr_max_level > 1 the body must
-        ! survive every child nesting inset (amr_cpat_mar per level down to amr_max_level), so the
-        ! parent block clears the body by that many extra cells - keeping the finest C/F boundary a
-        ! full image-point stencil off the surface (refining the surface, not the interior).
+        ! containment margin: the IB image-point stencil reaches a few cells beyond the surface (the validated static-block goldens
+        ! keep ~5); buff_size (floored to 10 by ib) would exceed the per-rank block cap for ordinary bodies. For amr_max_level > 1
+        ! the
+        ! body must survive every child nesting inset (amr_cpat_mar per level down to amr_max_level), so the parent block clears the
+        ! body by that many extra cells - keeping the finest C/F boundary a full image-point stencil off the surface (refining the
+        ! surface, not the interior).
 
         mrg = max(amr_buf, 4) + max(0, amr_max_level - 1)*amr_cpat_mar
 
         do i = 1, num_ibs
             call s_amr_body_bbox(i, mrg, blo, bhi)
-            ! blocks must stay buff_size inside the domain: a body whose margin-padded bbox does
-            ! not fit cannot be contained - fail with a named message instead of a clipped body
+            ! blocks must stay buff_size inside the domain: a body whose margin-padded bbox does not fit cannot be contained - fail
+            ! with a named message instead of a clipped body
             if (blo(1) < buff_size .or. bhi(1) > m_glb - buff_size .or. (n_glb > 0 .and. (blo(2) < buff_size .or. bhi(2) > n_glb &
                 & - buff_size)) .or. (p_glb > 0 .and. (blo(3) < buff_size .or. bhi(3) > p_glb - buff_size))) then
                 call s_mpi_abort('amr dynamic regrid with ib: the immersed body plus its containment ' &
@@ -4170,8 +4174,8 @@ contains
         integer                       :: ntl(3), s(3), t1, t2, t3, qlo(3), qhi(3), tc(3)
 
         tc = amr_maxc_fit; if (present(tsz)) tc = tsz
-        tc = max(tc, 1)  ! a level>=2 caller passes amr_maxc_fit/2, which is 0 when a rank's fine half-extent is 1 (small
-        !                  subdomain at high np) - a 0 tile size would divide-by-zero below; a 1-cell tile is the valid floor
+        tc = max(tc, 1)  ! a level>=2 caller passes amr_maxc_fit/2, which is 0 when a rank's fine half-extent is 1 (small subdomain
+        !                  at high np) - a 0 tile size would divide-by-zero below; a 1-cell tile is the valid floor
         ntl = 1; s = 1
         ntl(1) = (hi(1) - lo(1) + tc(1))/tc(1); s(1) = (hi(1) - lo(1) + ntl(1))/ntl(1)
         if (n_glb > 0) then
@@ -4214,8 +4218,8 @@ contains
     end function minmod
 
     !> Allocate slot islot's per-block field arrays (coords + the 6 device-resident field vectors + non-poly QBMM side-state), sized
-    !! to the max buffered block - mirrors the old init inline loop. Idempotent (no-op if already live). The single QBMM RHS scratch
-    !! amr_rhs_pb_f/mv_f and the global amr_cg/amr_decomp are NOT per-slot and stay in init/finalize.
+    !! to the max buffered block. Idempotent (no-op if already live). The single QBMM RHS scratch amr_rhs_pb_f/mv_f and the global
+    !! amr_cg/amr_decomp are NOT per-slot and stay in init/finalize.
     impure subroutine s_amr_alloc_slot(islot)
 
         integer, intent(in) :: islot
@@ -4276,10 +4280,11 @@ contains
         integer             :: i
 
         if (.not. amr_slot_live(islot)) return
-        ! Undo each field's ACC_SETUP_SFs (Cray descriptor + %sf copyin) BEFORE the @:DEALLOCATE - Cray
-        ! 'exit data delete' decrements the ref count, so the lone @:DEALLOCATE would leave the descriptor
-        ! and the ACC_SETUP %sf ref dangling; the leaked host address is later reused (e.g. by Gs_rs at
-        ! restart), tripping a Cray "Error placing / already present" present-table crash (gpu-acc).
+        ! Undo each field's ACC_SETUP_SFs (Cray descriptor + %sf copyin) BEFORE the @:DEALLOCATE - Cray 'exit data delete'
+        ! decrements
+        ! the ref count, so the lone @:DEALLOCATE would leave the descriptor and the ACC_SETUP %sf ref dangling; the leaked host
+        ! address is later reused (e.g. by Gs_rs at restart), tripping a Cray "Error placing / already present" present-table crash
+        ! (gpu-acc).
         do i = 1, sys_size
             @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_cons(i))
             @:DEALLOCATE(amr_slots(islot)%q_cons(i)%sf)
@@ -4322,7 +4327,7 @@ contains
     !> Reconcile the allocated per-slot field arrays to the CURRENT ownership: allocate every active block this rank owns, free
     !! everything else. Call after ownership is set (init/regrid/restart). A rank ends holding only its owned blocks' fine arrays
     !! (~amr_num_blocks/num_procs of the pool), not all amr_max_blocks. Regrid must alloc its transient (received/old) slots BEFORE
-    !! calling this, since it frees anything not currently owned.
+    !! this call, since it frees anything not currently owned.
     impure subroutine s_amr_reconcile_slots()
 
         integer :: k

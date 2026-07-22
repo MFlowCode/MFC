@@ -5,8 +5,8 @@
 #:include 'macros.fpp'
 
 !> @brief Dynamic regrid for the block-structured AMR level set: density-gradient tagging, Berger-Rigoutsos clustering, box shaping
-!! (pad/clamp/tile/IB merge), hierarchical child nesting, and the slot rebuild with cross-rank fine-state migration. Split out of
-!! m_amr; the block/slot state stays in m_amr (and m_global_parameters) - this module only drives it.
+!! (pad/clamp/tile/IB merge), hierarchical child nesting, slot rebuild with cross-rank fine-state migration. Block/slot state lives
+!! in m_amr (and m_global_parameters); this module only drives it.
 module m_amr_regrid
 
 #ifdef MFC_MPI
@@ -32,23 +32,22 @@ module m_amr_regrid
     private
     public :: s_amr_regrid, s_amr_check_seam_topology, s_amr_check_active_box_containment
 
-    !> Lagrangian bubble-cloud exclusion support: padded global coarse-index bbox of the cloud (positions + mapCells smearing +
-    !! stencil headroom [+ drift margin at regrid]). Blocks and regrid boxes stay clear of it: a bubble inside a block loses two-way
-    !! coupling (the fine advance skips the EL hooks and the coarse result under the block is discarded by restriction). Recomputed
-    !! collectively at each regrid; guarded rank-locally per stage.
+    !> Lagrangian bubble-cloud exclusion support: padded global coarse-index bbox (positions + mapCells smearing + stencil headroom
+    !! [+ drift margin at regrid]). Blocks and regrid boxes stay clear: a bubble inside a block loses two-way coupling (fine advance
+    !! skips the EL hooks, restriction discards the coarse result under the block). Recomputed collectively each regrid; guarded
+    !! rank-locally per stage.
     integer :: lag_supp_lo(3), lag_supp_hi(3)
     logical :: lag_supp_on = .false.
 
 contains
 
     !> Abort on same-level seam topologies no halo reconciles (silent conservation leaks otherwise). Run whenever the block set
-    !! changes (regrid, restart); O(nblocks^2) on the replicated region metadata, identical on every rank. Two cases: (a) adjacency
-    !! WITHOUT the exact transverse match f_amr_seam requires - reachable only through the IB body-bbox box expansion (clustering
-    !! merges any too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair up; (b) an exact seam pair
-    !! at level >= 2 under amr_subcycle, whose per-block child advance has no L2 halo (reachable via a restart mode-switch from a
-    !! lockstep-produced layout; the subcycle regrid keeps one child per box); (c) same-level box INTERSECTION - reachable only
-    !! through the CHILD IB body-bbox expansion, which unlike the L1 path has no overlap-merge pass - which double-restricts and
-    !! double-refluxes the shared cells.
+    !! changes (regrid, restart); O(nblocks^2) on the replicated region metadata, identical on every rank. Three cases: (a)
+    !! adjacency WITHOUT the exact transverse match f_amr_seam requires - reachable only via IB body-bbox expansion (clustering
+    !! merges any too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair; (b) an exact seam pair at
+    !! level >= 2 under amr_subcycle, whose per-block child advance has no L2 halo (reachable via a restart mode-switch from a
+    !! lockstep layout; the subcycle regrid keeps one child per box); (c) same-level box INTERSECTION - reachable only via CHILD IB
+    !! body-bbox expansion, which unlike the L1 path has no overlap-merge pass - double-restricting/refluxing the shared cells.
     impure subroutine s_amr_check_seam_topology()
 
         integer :: xb, yb, d, t
@@ -58,8 +57,8 @@ contains
             do yb = 1, amr_num_blocks
                 if (xb == yb) cycle
                 if (amr_block_level(xb) /= amr_block_level(yb)) cycle
-                ! same-level INTERSECTION (different levels legitimately nest; tiling emits disjoint tiles and the L1 IB
-                ! pass merges overlapping boxes, but the CHILD IB body-bbox expansion has no overlap-merge pass)
+                ! same-level INTERSECTION (different levels legitimately nest; tiling emits disjoint tiles, the L1 IB pass merges
+                ! overlapping boxes, but the CHILD IB body-bbox expansion has no overlap-merge pass)
                 if (f_amr_boxes_overlap(amr_region_lo_all(:,xb), amr_region_hi_all(:,xb), amr_region_lo_all(:,yb), &
                     & amr_region_hi_all(:,yb))) then
                     call s_mpi_abort("AMR: two same-level blocks INTERSECT (the child IB body-bbox expansion route can " &
@@ -91,8 +90,8 @@ contains
 
     end subroutine s_amr_check_seam_topology
 
-    !> Shrink box [blo:bhi] to the tight bounding box of the tagged cells inside it. ok=.false. if no tagged cell. Collapsed dims
-    !! (lo=hi=0) survive unchanged. Deterministic (integer scan of the identical sparse tag list).
+    !> Shrink box [blo:bhi] to the tight bbox of its tagged cells. ok=.false. if none tagged. Collapsed dims (lo=hi=0) survive
+    !! unchanged. Deterministic (integer scan of the identical sparse tag list).
     impure subroutine s_amr_trim_box(tags, ts, te, blo, bhi, ok)
 
         integer, intent(in)    :: tags(:,:), ts, te
@@ -213,9 +212,9 @@ contains
 
     end function f_in_acoustic_support
 
-    !> Clip a candidate regrid box (global indices) so it does not overlap any acoustic source support bbox: per overlapping source,
-    !! remove the overlap along the single axis/side that keeps the largest remaining extent (deterministic: lower axis, then begin
-    !! side, wins ties). Clipping only shrinks the box and may empty it (hi < lo); the caller drops empties.
+    !> Clip a candidate regrid box (global indices) clear of every acoustic source support bbox: per overlapping source, remove the
+    !! overlap along the single axis/side keeping the largest remaining extent (deterministic: lower axis, then begin side, wins
+    !! ties). Only shrinks; may empty the box (hi < lo); the caller drops empties.
     impure subroutine s_amr_clip_box_from_sources(lo, hi)
 
         integer, intent(inout) :: lo(3), hi(3)
@@ -315,17 +314,17 @@ contains
     end subroutine s_amr_clip_box_from_supp
 
     !> active_box + AMR containment: every active block must sit strictly inside the active window (one-cell margin). Two reasons:
-    !! the coarse RK update is windowed, so a reflux correction at a face cell outside the window would be silently dropped
-    !! (conservation leak), and the coarse RHS only computes fluxes inside the window. The window only ever GROWS (s_grow_active_box
-    !! is monotone, self-disabling at full domain), so containment established at init and re-established at each regrid holds
-    !! between them. Collective (same window and block metadata on all ranks).
+    !! the windowed coarse RK update would silently drop a reflux correction at a face cell outside the window (conservation leak),
+    !! and the coarse RHS only computes fluxes inside it. The window only GROWS (s_grow_active_box monotone, self-disabling at full
+    !! domain), so containment set at init and re-established each regrid holds between. Collective (same window/block metadata on
+    !! all ranks).
     impure subroutine s_amr_check_active_box_containment()
 
         integer :: k
         logical :: ok
 
-        ! ab_active is only ever true at num_procs == 1 (m_active_box disables itself under
-        ! MPI), so ab and block indices share the same (global == local) index space
+        ! ab_active is only true at num_procs == 1 (m_active_box disables itself under MPI), so ab and block indices share
+        ! the same (global == local) index space
 
         if ((.not. amr) .or. (.not. ab_active)) return
         do k = 1, amr_num_blocks
@@ -342,9 +341,9 @@ contains
     end subroutine s_amr_check_active_box_containment
 
     !> Rank-invariant SPARSE tag list for level clustering (SP7a): all-gathers each rank's tagged-cell global linear indices, then
-    !! decodes them into a coordinate list tags(1:3, 1:ntag). Replaces the O(global-grid) dense tag field entirely, so per-rank
-    !! memory scales with the number of tagged cells. At np=1 the list is built directly from tag_grid (no allgather).
-    !! Deterministic: every rank decodes the same gathered index set into the same list, so the bisection is rank-invariant.
+    !! decodes them into a coordinate list tags(1:3, 1:ntag). Replaces the O(global-grid) dense tag field, so per-rank memory scales
+    !! with tagged-cell count. At np=1 built directly from tag_grid (no allgather). Deterministic: every rank decodes the same
+    !! gathered index set into the same list, so the bisection is rank-invariant.
     impure subroutine s_amr_union_gtag(tags, ntag, tag_grid, mg, ng, pg, sidx)
 
         integer, allocatable, intent(out) :: tags(:,:)
@@ -432,11 +431,10 @@ contains
     end subroutine s_amr_grow_pack
 
     !> Pack this rank's OWNED tagged cells of the child window [mlo:mhi] as (linear-index, kb) pairs, appended to the per-level send
-    !! arrays sidx(:) (int8 linear index) / skb(:) (parent box id). The int8 encode matches the decode in s_amr_regrid's pass 2, so
-    !! gathering these pairs across ranks and setting them into a per-parent dense window reproduces the old per-parent dense-window
-    !! dedup (replicated/overlapping tags collapse) and the (k,j,i) extraction order exactly -> byte-identical child boxes. Batching
-    !! all parents of a level into one allgatherv (in the caller) drops the collective count from O(#parent-boxes) to O(#levels).
-    !! gwin is read here (not modified).
+    !! arrays sidx(:) (int8 linear index) / skb(:) (parent box id). The int8 encode matches the pass-2 decode, so gathering these
+    !! pairs across ranks and setting them into a per-parent dense window reproduces the old dense-window dedup (replicated/
+    !! overlapping tags collapse) and the (k,j,i) extraction order exactly -> byte-identical child boxes. One allgatherv per level
+    !! (caller) drops the collective count from O(#parent-boxes) to O(#levels). gwin is read, not modified.
     impure subroutine s_amr_pack_gwin_pairs(gwin, mlo, mhi, mg, ng, kb, sidx, skb, nloc)
 
         integer, intent(in)                    :: mlo(3), mhi(3), mg, ng, kb
@@ -461,11 +459,11 @@ contains
     end subroutine s_amr_pack_gwin_pairs
 
     !> Cluster a rank-invariant SPARSE tag list (global level-0 cell coords, tags(1:3, 1:ntag_in)) into a LIST of separated block
-    !! boxes, identically on every rank. The caller builds the list (s_amr_union_gtag / s_amr_pack_gwin_pairs). Per-rank memory is
-    !! O(#tagged), not O(global grid). Runs Berger-Rigoutsos recursive bisection until each box's tag efficiency reaches
-    !! amr_cluster_eff (or it is atomic / the amr_max_blocks cap is reached), then merges any two boxes whose amr_buf-padded extents
-    !! come within buff_size (guaranteeing no fine-fine adjacency: separated boxes stay >= buff_size apart, nearby ones collapse to
-    !! a single box == the legacy bounding box). Boxes are the raw tagged extents; the caller pads, clamps and size-caps each one.
+    !! boxes, identically on every rank. Caller builds the list (s_amr_union_gtag / s_amr_pack_gwin_pairs); per-rank memory is
+    !! O(#tagged), not O(global grid). Berger-Rigoutsos recursive bisection until each box's tag efficiency reaches amr_cluster_eff
+    !! (or it is atomic / the amr_max_blocks cap is hit), then merges any two boxes whose amr_buf-padded extents come within
+    !! buff_size (so no fine-fine adjacency: separated boxes stay >= buff_size apart, nearby ones collapse to one box == the legacy
+    !! bounding box). Boxes are raw tagged extents; the caller pads, clamps, size-caps each.
     impure subroutine s_amr_cluster(tags, ntag_in, boxes, nboxes)
 
         integer, intent(in)                   :: tags(:,:), ntag_in
@@ -560,10 +558,10 @@ contains
 
     end subroutine s_amr_cluster
 
-    !> Regrid: tag by relative density gradient into a per-cell field, cluster (Berger-Rigoutsos + min-separation merge) into a list
-    !! of separated boxes, pad/clamp/size-cap each, and rebuild every active slot. Each new box's slot prolongs from coarse then
-    !! overwrites its overlap with whichever OLD slot(s) covered it (rank-local by construction; a split copies from one old slot, a
-    !! merge from both). Called between steps only. No-op if nothing is tagged or the box set is unchanged.
+    !> Regrid: tag by relative density gradient, cluster (Berger-Rigoutsos + min-separation merge) into separated boxes, pad/clamp/
+    !! size-cap each, rebuild every active slot. Each new slot prolongs from coarse then overwrites its overlap with whichever OLD
+    !! slot(s) covered it (rank-local; a split copies from one old slot, a merge from both). Called between steps only. No-op if
+    !! nothing is tagged or the box set is unchanged.
     impure subroutine s_amr_regrid(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
@@ -576,8 +574,7 @@ contains
         logical                                                :: old_owns(amr_max_blocks), same
         integer                                                :: i
 
-        ! valid coarse CONS ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the rebuild
-        ! prolongation
+        ! valid coarse CONS ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the rebuild prolongation
         ! reads past the new intersection (ALL ranks call: pairwise per-direction exchange; complete no-op at np=1).
 
         call s_amr_exchange_coarse_cons_halo(q_cons_base)
@@ -585,8 +582,8 @@ contains
             $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
         end do
 
-        ! Lagrangian-cloud exclusion bbox for this regrid (collective): smearing (mapCells) +
-        ! stencil headroom (2) + drift margin until the next regrid (amr_buf)
+        ! Lagrangian-cloud exclusion bbox for this regrid (collective): smearing (mapCells) + stencil headroom (2) + drift
+        ! margin until the next regrid (amr_buf)
         if (bubbles_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
 
         call s_amr_regrid_tag_cells(q_cons_base, tag_grid, sidx)
@@ -613,7 +610,7 @@ contains
         integer                                             :: tg_lo(3), tg_hi(3), ci, cj, ck
         real(wp)                                            :: r0, g
 
-        ! 1) per-cell tag field (density-gradient criterion, unchanged), skipping the two global boundary cells per active dim
+        ! 1) per-cell tag field (density-gradient criterion), skipping the two global boundary cells per active dim
 
         sidx = 0
         sidx(1) = start_idx(1)
@@ -627,10 +624,8 @@ contains
         do ck = tg_lo(3), tg_hi(3)
             do cj = tg_lo(2), tg_hi(2)
                 do ci = tg_lo(1), tg_hi(1)
-                    ! total density gradient (sum of the continuity variables): degenerates to the single-fluid tagger
-                    ! and is
-                    ! immune to trace-fluid noise. Matched-density composition-only interfaces are invisible (documented
-                    ! limit).
+                    ! total density gradient (sum of the continuity variables): degenerates to the single-fluid tagger, immune to
+                    ! trace-fluid noise. Matched-density composition-only interfaces are invisible (documented limit).
                     r0 = max(abs(f_amr_rho_tot(q_cons_base, ci, cj, ck)), 1.e-30_wp)
                     g = abs(f_amr_rho_tot(q_cons_base, ci + 1, cj, ck) - f_amr_rho_tot(q_cons_base, ci - 1, cj, ck))
                     if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj + 1, ck) - f_amr_rho_tot(q_cons_base, ci, &
@@ -639,13 +634,13 @@ contains
                         & ck - 1)))
                     ! 2*r0 normalizes the 2-cell central difference (rho at i+1..i-1); the 2 is the stencil span, NOT amr_ref_ratio
                     if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
-                    ! the acoustic source support stays coarse (its spatials are coarse cell
-                    ! indices): suppress tags there so the clusterer splits around the source
+                    ! the acoustic source support stays coarse (its spatials are coarse cell indices): suppress tags there so
+                    ! the clusterer splits around the source
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
                         if (f_in_acoustic_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
                     end if
-                    ! the Lagrangian bubble cloud stays coarse (two-way coupling lives on the
-                    ! coarse grid): suppress tags over its padded bbox
+                    ! the Lagrangian bubble cloud stays coarse (two-way coupling lives on the coarse grid): suppress tags over
+                    ! its padded bbox
                     if (bubbles_lagrange .and. tag_grid(ci, cj, ck)) then
                         if (f_in_lag_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
                     end if
@@ -693,10 +688,8 @@ contains
         do kk = 1, nboxes
             lo = boxes(kk)%lo; hi = boxes(kk)%hi
             lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
-            ! IB keeps the size-cap CLAMP (a body needs one contiguous block; splitting a body across tiles is
-            ! untested); the
-            ! general path leaves boxes full-size and TILES them (below) into <= amr_maxc_fit sub-blocks with a
-            ! fine-fine halo
+            ! IB keeps the size-cap CLAMP (a body needs one contiguous block; splitting a body across tiles is untested); the
+            ! general path leaves boxes full-size and TILES them (below) into <= amr_maxc_fit sub-blocks with a fine-fine halo
             if (ib .and. hi(1) - lo(1) + 1 > amr_maxc_fit(1)) hi(1) = lo(1) + amr_maxc_fit(1) - 1
             if (n_glb > 0) then
                 lo(2) = max(lo(2) - amr_buf, buff_size); hi(2) = min(hi(2) + amr_buf, n_glb - buff_size)
@@ -710,22 +703,21 @@ contains
             else
                 lo(3) = 0; hi(3) = 0
             end if
-            ! keep candidate boxes clear of every acoustic source support (the source acts on the
-            ! coarse grid only); clipping only shrinks, so boxes stay disjoint - empties drop below
+            ! keep candidate boxes clear of every acoustic source support (the source acts on the coarse grid only); clipping
+            ! only shrinks, so boxes stay disjoint - empties drop below
             if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
             if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
-            ! active_box: boxes stay strictly inside the active window (the windowed coarse
-            ! update would drop reflux corrections at faces outside it). Tags cannot arise
-            ! outside (frozen-ambient exterior), so only the amr_buf padding is ever cut -
-            ! and the cut cells are ambient. np=1 only (ab_active is false under MPI).
+            ! active_box: boxes stay strictly inside the active window (the windowed coarse update would drop reflux corrections
+            ! at faces outside it). Tags cannot arise outside (frozen-ambient exterior), so only the amr_buf padding is ever cut
+            ! - and the cut cells are ambient. np=1 only (ab_active is false under MPI).
             if (ab_active) then
                 lo(1) = max(lo(1), ab_x%beg + 1); hi(1) = min(hi(1), ab_x%end - 1)
                 if (n_glb > 0) then; lo(2) = max(lo(2), ab_y%beg + 1); hi(2) = min(hi(2), ab_y%end - 1); end if
                 if (p_glb > 0) then; lo(3) = max(lo(3), ab_z%beg + 1); hi(3) = min(hi(3), ab_z%end - 1); end if
             end if
-            ! a fine block that PARTIALLY covers an immersed body is an untested regime (ghost
-            ! prolongation through body-interior cells, refluxing across the body): any box that
-            ! overlaps a body's bounding box is expanded to contain the whole body plus margin
+            ! a fine block that PARTIALLY covers an immersed body is an untested regime (ghost prolongation through body-interior
+            ! cells, refluxing across the body): any box overlapping a body's bounding box expands to contain the whole body plus
+            ! margin
             if (ib) call s_amr_expand_box_over_bodies(lo, hi)
             if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) cycle  ! confined to the domain margin
             k = k + 1; boxes(k)%lo = lo; boxes(k)%hi = hi
@@ -733,12 +725,9 @@ contains
         nboxes = k
         if (nboxes == 0) return
 
-        ! max_grid_size tiling (non-IB): split any box larger than amr_maxc_fit into contiguous <= amr_maxc_fit
-        ! sub-blocks so a
+        ! max_grid_size tiling (non-IB): split any box larger than amr_maxc_fit into contiguous <= amr_maxc_fit sub-blocks so a
         ! whole block fits a rank's local solver scratch. Tiles are adjacent; the block-to-block fine-fine halo
-        ! (s_amr_fine_
-        ! fine_halo) makes the seams conservative and the reflux skips fine-fine faces. (IB keeps the clamp - see
-        ! above.)
+        ! (s_amr_fine_fine_halo) makes the seams conservative and the reflux skips fine-fine faces. (IB keeps the clamp - above.)
         if (.not. ib) then
             block
                 type(t_box), allocatable :: tiled(:)
@@ -756,9 +745,9 @@ contains
         end if
 
         if (ib) then
-            ! body-containment expansion can make boxes overlap (bisection guaranteed disjoint
-            ! boxes; two boxes near one body both grow over it): merge overlapping pairs to a
-            ! bounding box until none remain - overlapping blocks would double-restrict/reflux
+            ! body-containment expansion can make boxes overlap (bisection guarantees disjoint boxes, but two boxes near one body
+            ! both grow over it): merge overlapping pairs to a bbox until none remain - overlapping blocks would
+            ! double-restrict/reflux
             merged = .true.
             do while (merged)
                 merged = .false.
@@ -782,9 +771,8 @@ contains
                     end do
                 end do outer
             end do
-            ! the expansion may also have grown a box onto an acoustic source support or the
-            ! Lagrangian cloud: the constraints (contain the body, exclude the source/cloud)
-            ! cannot both hold - fail closed
+            ! the expansion may also have grown a box onto an acoustic source support or the Lagrangian cloud: the constraints
+            ! (contain the body, exclude the source/cloud) cannot both hold - fail closed
             if (acoustic_source .or. (bubbles_lagrange .and. lag_supp_on)) then
                 do k = 1, nboxes
                     lo = boxes(k)%lo; hi = boxes(k)%hi
@@ -815,30 +803,22 @@ contains
         integer, intent(inout)                  :: box_level(:)
         integer                                 :: i
 
-        ! 3b) multi-level nesting: hierarchically append a box at level l nested inside each level-(l-1) box, for l =
-        ! 2..amr_max_
-        ! level. Parents-first ordering (every level-(l-1) box precedes its level-l children) so the build loop fills a
-        ! parent
-        ! before its child's gather-from-parent reads it. SENSOR-ON-FINE: each child's extent is the density-gradient
-        ! sensor run
-        ! on the parent-level FINE solution (the still-live OLD level-(l-1) blocks, read here BEFORE the step-5 stash),
-        ! coarsened
-        ! to L0-cell granularity and clustered - so children track features inside the parent instead of a fixed centre.
-        ! A
-        ! brand-new region with no old fine data falls back to a centred inset (the sensor takes over next regrid); a
-        ! parent
-        ! whose
-        ! fine solution is smooth gets no child. Tagging only places boxes - conservation (restrict/reflux) is
-        ! independent of
-        ! where they sit. np=1 + non-IB (multi-level distribution / IB nesting are future work). Regions stay in L0 cell
-        ! indices.
+        ! 3b) multi-level nesting: hierarchically append a level-l box nested inside each level-(l-1) box, for l = 2..amr_max_level.
+        ! Parents-first ordering (every level-(l-1) box precedes its level-l children) so the build loop fills a parent before its
+        ! child's gather-from-parent reads it. SENSOR-ON-FINE: each child's extent is the density-gradient sensor run on the
+        ! parent-level FINE solution (the still-live OLD level-(l-1) blocks, read here BEFORE the step-5 stash), coarsened to
+        ! L0-cell
+        ! granularity and clustered - children track features inside the parent, not a fixed centre. A brand-new region with no old
+        ! fine data falls back to a centred inset (sensor takes over next regrid); a parent with a smooth fine solution gets no
+        ! child.
+        ! Tagging only places boxes - conservation (restrict/reflux) is independent of where they sit. np=1 + non-IB (multi-level
+        ! distribution / IB nesting are future work). Regions stay in L0 cell indices.
 
         box_level(1:nboxes) = 1
         if (amr_max_level >= 2) then
-            ! the nesting loop below APPENDS level-l child boxes into `boxes` (up to amr_max_blocks total). The non-IB
-            ! path already grew `boxes` to amr_max_blocks via the tiling move_alloc; the IB path (which only merges,
-            ! never
-            ! grows) leaves `boxes` at the cluster count, so grow it here or the child appends overrun the allocation.
+            ! the nesting loop below APPENDS level-l child boxes into `boxes` (up to amr_max_blocks total). The non-IB path already
+            ! grew `boxes` to amr_max_blocks via the tiling move_alloc; the IB path (only merges, never grows) leaves `boxes` at the
+            ! cluster count, so grow it here or the child appends overrun the allocation.
             if (size(boxes) < amr_max_blocks) then
                 block
                     type(t_box), allocatable :: grown(:)
@@ -861,24 +841,22 @@ contains
                 integer, allocatable :: rcnt(:), rdsp(:)
 #endif
 
-                ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads
-                ! amr_slots(ob)%q_cons on the
-                ! host, but the GPU_UPDATE host that the step-5 stash does runs AFTER this nesting - so the host copy is
-                ! stale
-                ! here
+                ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads amr_slots(ob)%q_cons on the
+                ! host, but the step-5 stash's GPU_UPDATE(host) runs AFTER this nesting - so the host copy is stale here
                 do ob = 1, amr_num_blocks
                     if (.not. amr_owns_all(ob)) cycle  ! np>1: only the owner holds this old block's fine q_cons
                     do obi = eqn_idx%cont%beg, eqn_idx%cont%end
                         $:GPU_UPDATE(host='[amr_slots(ob)%q_cons(obi)%sf]')
                     end do
                 end do
-                ! Fine-sensor tags accumulate in a GLOBAL L0 frame: at np>1 an old block is read only by its owner, but
-                ! its
-                ! tag footprint can fall in ANOTHER rank's subdomain. Each parent's nesting window [mlo:mhi] is small vs
-                ! the global grid, so a WINDOW-LOCAL dense field gwin (allocated per parent below) holds each owner's
-                ! tags; s_amr_pack_gwin_pairs extracts them as (linear-index, kb) pairs, one per-level allgatherv unions all
-                ! parents' pairs across ranks, and pass 2 rebuilds each parent's window from them (no O(global-grid) tag
-                ! field, no local slice; the clusterer consumes the sparse per-parent list directly).
+                ! Fine-sensor tags accumulate in a GLOBAL L0 frame: at np>1 an old block is read only by its owner, but its tag
+                ! footprint can fall in ANOTHER rank's subdomain. Each parent's nesting window [mlo:mhi] is small vs the global
+                ! grid,
+                ! so a WINDOW-LOCAL dense field gwin (per parent, below) holds each owner's tags; s_amr_pack_gwin_pairs extracts
+                ! them
+                ! as (linear-index, kb) pairs, one per-level allgatherv unions all parents' pairs across ranks, and pass 2 rebuilds
+                ! each parent's window from them (no O(global-grid) tag field, no local slice; the clusterer consumes the sparse
+                ! per-parent list directly).
                 mg = m_glb; ng = 0; pg = 0
                 if (n_glb > 0) ng = n_glb
                 if (p_glb > 0) pg = p_glb
@@ -886,12 +864,12 @@ contains
                 plo = 1; phi = nboxes  ! [plo:phi] = the boxes at the previous level (lev-1) to nest inside
                 do lev = 2, amr_max_level
                     newlo = nboxes + 1
-                    ! COLLECT -> ONE COMMUNICATE -> PROCESS, per level: the per-parent cross-rank union (the old per-(lev,kb)
-                    ! allgather) is batched into a SINGLE allgatherv per level, so the collective count is O(#levels) not
-                    ! O(#parent-boxes). Pass 1 tags each parent's window from OWNED obs and appends this rank's tagged cells as
-                    ! (linear-index, parent-kb) pairs; one allgatherv unions them; Pass 2 rebuilds each parent's dense window from
-                    ! the gathered pairs whose gkb==kb, which reproduces the old per-parent dense-window dedup and the (k,j,i)
-                    ! extraction order exactly -> each parent's ctags set (and thus its child boxes) is byte-identical.
+                    ! COLLECT -> ONE COMMUNICATE -> PROCESS, per level: the per-parent cross-rank union is batched into a SINGLE
+                    ! allgatherv per level, so the collective count is O(#levels) not O(#parent-boxes). Pass 1 tags each parent's
+                    ! window from OWNED obs and appends this rank's tagged cells as (linear-index, parent-kb) pairs; one allgatherv
+                    ! unions them; Pass 2 rebuilds each parent's dense window from the gathered pairs whose gkb==kb, reproducing the
+                    ! old dense-window dedup and the (k,j,i) extraction order exactly -> each parent's ctags set (and thus its child
+                    ! boxes) is byte-identical.
                     np_lev = phi - plo + 1
                     if (np_lev < 1) exit  ! nothing nested at the previous level -> no deeper levels possible
                     allocate (covered(plo:phi), mlo_all(3,plo:phi), mhi_all(3,plo:phi))
@@ -910,8 +888,7 @@ contains
                         if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
                         if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
 
-                        ! sensor-on-fine: tag from every OLD level-(lev-1) block overlapping this parent window
-                        ! (amr_block_level
+                        ! sensor-on-fine: tag from every OLD level-(lev-1) block overlapping this parent window (amr_block_level
                         ! still holds the old levels here - it is reset to box_level at step 5b, below)
                         allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
                         gwin = .false.; any_tag = .false.
@@ -929,29 +906,25 @@ contains
                             covered(kb) = .true.  ! replicated (metadata) - identical on every rank regardless of ownership
                             if (amr_owns_all(ob)) call s_amr_tag_child_from_fine(ob, mlo, mhi, gwin, any_tag)
                         end do
-                        ! IB: always refine the body region at this level, even where the density sensor is quiet - mark
+                        ! IB: always refine the body region at this level, even where the density sensor is quiet - mark the body's
+                        ! L0-frame bbox into gwin so it is clustered into a child (mirrors the L1 expand at :3836). Containment
+                        ! margin
+                        ! = max(amr_buf, 4) + amr_cpat_mar: the child window (mlo:mhi) is the parent inset by amr_cpat_mar, and
+                        ! clamping the tag to that window can eat up to amr_cpat_mar of the body's stencil margin at the
+                        ! parent-adjacent side. The parent (widened in s_amr_expand_box_over_bodies by
+                        ! (amr_max_level-1)*amr_cpat_mar)
+                        ! now clears the body enough that this window contains the body plus max(amr_buf, 4), so the tag survives
                         ! the
-                        ! body's L0-frame bbox into gwin so it is clustered into a child (mirrors the L1 expand at
-                        ! :3836).
-                        ! Containment margin = max(amr_buf, 4) + amr_cpat_mar: the child window (mlo:mhi) is the parent
-                        ! inset by
-                        ! amr_cpat_mar, and clamping the tag to that window can eat up to amr_cpat_mar of the body's
-                        ! stencil
-                        ! margin at the parent-adjacent side. The parent (widened in s_amr_expand_box_over_bodies by
-                        ! (amr_max_level-1)*amr_cpat_mar) now clears the body by enough that this window contains the
-                        ! body plus
-                        ! max(amr_buf, 4), so the tag survives the inset with a full image-point stencil of fluid on
-                        ! every side:
-                        ! the body SURFACE is refined at every level and the C/F boundary sits a full stencil off it, in
-                        ! fluid.
+                        ! inset with a full image-point stencil of fluid on every side: the body SURFACE is refined at every level
+                        ! and
+                        ! the C/F boundary sits a full stencil off it, in fluid.
                         if (ib) then
                             block
                                 integer :: ib_i, bb_lo(3), bb_hi(3), gii, gjj, gkk
                                 do ib_i = 1, num_ibs
                                     call s_amr_body_bbox(ib_i, max(amr_buf, 4) + amr_cpat_mar, bb_lo, bb_hi)
-                                    ! clamp the body bbox to this parent's nesting window (global L0 frame -
-                                    ! s_amr_body_bbox
-                                    ! returns GLOBAL L0 cell indices, same frame as mlo/mhi)
+                                    ! clamp the body bbox to this parent's nesting window (s_amr_body_bbox returns GLOBAL L0
+                                    ! cell indices, same frame as mlo/mhi)
                                     bb_lo = max(bb_lo, mlo); bb_hi = min(bb_hi, mhi)
                                     if (bb_hi(1) < bb_lo(1)) cycle
                                     if (n_glb > 0 .and. bb_hi(2) < bb_lo(2)) cycle
@@ -967,9 +940,9 @@ contains
                                 end do
                             end block
                         end if
-                        ! extract THIS rank's OWNED tagged cells as (linear-index, kb) pairs into the per-level send
-                        ! arrays. The int8 linear index matches the decode in pass 2, so the gathered pairs reproduce the
-                        ! same window coords. gwin is read here, then freed.
+                        ! extract THIS rank's OWNED tagged cells as (linear-index, kb) pairs into the per-level send arrays. The
+                        ! int8 linear index matches the pass-2 decode, so the gathered pairs reproduce the same window coords. gwin
+                        ! is read, then freed.
                         call s_amr_pack_gwin_pairs(gwin, mlo, mhi, mg, ng, kb, sidx, skb, nloc_send)
                         deallocate (gwin)
                     end do
@@ -1010,9 +983,9 @@ contains
                         if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
                         if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
 
-                        ! rebuild this parent's dense window from the gathered pairs whose gkb==kb: setting .true. once per
-                        ! gathered cell reproduces the old per-parent dedup (replicated/overlapping tags collapse), and the
-                        ! (k,j,i) sparse extract below matches the old scan order -> byte-identical ctags.
+                        ! rebuild this parent's dense window from the gathered pairs whose gkb==kb: setting .true. once per gathered
+                        ! cell reproduces the old per-parent dedup (replicated/overlapping tags collapse), and the (k,j,i) sparse
+                        ! extract below matches the old scan order -> byte-identical ctags.
                         allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
                         gwin = .false.
                         do i = 1, ntot_g
@@ -1059,41 +1032,26 @@ contains
                                 else
                                     clo(3) = 0; chi(3) = 0
                                 end if
-                                ! IB: a child clustered from the (widened) body tag must fully contain every overlapping
-                                ! body -
-                                ! expand over bodies (mirrors the L1 expand at :3836), then re-clamp to the nesting
-                                ! window so
-                                ! the
-                                ! child stays nested. Because the parent was widened by (amr_max_level-1)*amr_cpat_mar,
-                                ! its
-                                ! nesting window (mlo:mhi) already contains the body plus max(amr_buf, 4), so the
-                                ! re-clamp does
-                                ! NOT cut the body's stencil: the child CONTAINS the body bbox and the C/F boundary
-                                ! lands a full
-                                ! image-point stencil off the surface, in fluid (surface refined, not just the
-                                ! interior).
+                                ! IB: a child clustered from the (widened) body tag must fully contain every overlapping body -
+                                ! expand over bodies (mirrors the L1 expand at :3836), then re-clamp to the nesting window so the
+                                ! child stays nested. Because the parent was widened by (amr_max_level-1)*amr_cpat_mar, its nesting
+                                ! window (mlo:mhi) already contains the body plus max(amr_buf, 4), so the re-clamp does NOT cut the
+                                ! body's stencil: the child CONTAINS the body bbox and the C/F boundary lands a full image-point
+                                ! stencil off the surface, in fluid (surface refined, not just the interior).
                                 if (ib) then
                                     call s_amr_expand_box_over_bodies(clo, chi)
                                     clo(1) = max(clo(1), mlo(1)); chi(1) = min(chi(1), mhi(1))
                                     if (n_glb > 0) then; clo(2) = max(clo(2), mlo(2)); chi(2) = min(chi(2), mhi(2)); end if
                                     if (p_glb > 0) then; clo(3) = max(clo(3), mlo(3)); chi(3) = min(chi(3), mhi(3)); end if
                                 end if
-                                ! slot cap: a level->=2 block's fine grid spans 4*(its L0 extent) cells while the slot
-                                ! holds
-                                ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. In
-                                ! LOCK-STEP a
-                                ! feature wider than that TILES into adjacent <= amr_maxc_fit/2 sub-blocks (like the L1
-                                ! tiling):
-                                ! the per-stage fine-fine halo (s_amr_fine_fine_halo, level-aware) matches the shared
-                                ! seam flux
-                                ! and the L2->L1 reflux skips those fine-fine faces. SUBCYCLE advances level-2 children
-                                ! per-block
-                                ! (s_amr_advance_children) with no L2-L2 halo, so it keeps ONE capped child (adjacent
-                                ! tiles
-                                ! would
-                                ! leak at their seam there - transposing that path is future work); a wide feature is
-                                ! under-
-                                ! refined rather than non-conservative.
+                                ! slot cap: a level>=2 block's fine grid spans 4*(its L0 extent) cells while the slot holds
+                                ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. LOCK-STEP tiles a
+                                ! wider feature into adjacent <= amr_maxc_fit/2 sub-blocks (like the L1 tiling): the per-stage
+                                ! fine-fine halo (s_amr_fine_fine_halo, level-aware) matches the shared seam flux and the L2->L1
+                                ! reflux skips those fine-fine faces. SUBCYCLE advances level-2 children per-block
+                                ! (s_amr_advance_children) with no L2-L2 halo, so it keeps ONE capped child (adjacent tiles would
+                                ! leak at their seam - transposing that path is future work); a wide feature is under-refined rather
+                                ! than non-conservative.
                                 if (amr_subcycle) then
                                     chi(1) = min(chi(1), clo(1) + amr_maxc_fit(1)/2 - 1)
                                     if (n_glb > 0) chi(2) = min(chi(2), clo(2) + amr_maxc_fit(2)/2 - 1)
@@ -1142,10 +1100,9 @@ contains
 
     end subroutine s_amr_regrid_nest_children
 
-    ! 4) unchanged? (same count, boxes AND levels as the live slots -> keep them; a rebuild would reproduce them
-    ! exactly
-    ! anyway). The level must be compared too: a box that keeps its coordinates but changes refinement level would
-    ! otherwise slip through with a stale amr_block_level, corrupting the level-aware coupling.
+    ! 4) unchanged? (same count, boxes AND levels as the live slots -> keep them; a rebuild would reproduce them exactly).
+    ! The level must be compared too: a box that keeps its coordinates but changes refinement level would otherwise slip
+    ! through with a stale amr_block_level, corrupting the level-aware coupling.
     impure subroutine s_amr_regrid_boxes_unchanged(boxes, nboxes, box_level, same)
 
         type(t_box), intent(in) :: boxes(:)
@@ -1183,14 +1140,11 @@ contains
         old_np = amr_num_blocks
         np_l = old_np
         do k = 1, old_np
-            ! GLOBAL block origin + extents (replicated, valid on every rank - not the owner-only isect), so the
-            ! cross-rank
-            ! migration below and the overlap-copy's index shift are correct even where this rank did not own the old
-            ! block
+            ! GLOBAL block origin + extents (replicated, valid on every rank - not the owner-only isect), so the cross-rank
+            ! migration below and the overlap-copy's index shift are correct even where this rank did not own the old block
             old_ilo(:,k) = amr_region_lo_all(:,k)
             old_chi(:,k) = amr_region_hi_all(:,k)  ! old COARSE hi (for the P2P migration overlap test below)
-            ! fine extent = (2**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating it
-            ! with the
+            ! fine extent = (2**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating it with the
             ! level-1 factor (2x) truncates half its fine cells. Level-1 blocks (2**1 = 2) are byte-identical to before.
             old_ext(1, k) = (amr_ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
             old_ext(2, k) = merge((amr_ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, &
@@ -1209,8 +1163,8 @@ contains
                     amr_slots(k)%q_cons_stor(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, &
                               & k)) = amr_slots(k)%q_cons(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k))
                 end do
-                ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like
-                ! q_cons (both stors are dead between steps)
+                ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like q_cons (both stors are dead between
+                ! steps)
                 if (qbmm .and. .not. polytropic) then
                     $:GPU_UPDATE(host='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f%sf]')
                     amr_slots(k)%pb_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
@@ -1230,21 +1184,16 @@ contains
         amr_num_blocks = nboxes
         do k = 1, nboxes
             amr_region_lo_all(:,k) = boxes(k)%lo; amr_region_hi_all(:,k) = boxes(k)%hi
-            ! box_level(k) is the refinement level assigned during the hierarchical nesting above (1 for the L0->L1
-            ! boxes, l for
-            ! a box nested at level l). Setting it every regrid resets a stale level when a slot is reused across
-            ! levels.
+            ! box_level(k) is the refinement level assigned during the hierarchical nesting above (1 for L0->L1 boxes, l for a
+            ! box nested at level l). Setting it every regrid resets a stale level when a slot is reused across levels.
             amr_block_level(k) = box_level(k)
         end do
         ! block set changed: dirty the cached seam-pair AND overlap-rank lists NOW - the rebuild's per-block P2P gathers
         ! (s_amr_regrid_rebuild_slots) consume the overlap lists with the NEW boxes, so flagging after them would be too late
         amr_seam_pairs_dirty = .true.
-        ! Proper-nesting guard: each level>=2 block must be covered by EXACTLY ONE parent-level block.
-        ! f_amr_parent_block (and
-        ! the gather/reflux that key off it) take the FIRST overlap, so a fine tile straddling two parent tiles - an
-        ! internal
-        ! parent-level tile seam crossed by a nested feature - would silently couple to only one parent (wrong coarse BC
-        ! + a
+        ! Proper-nesting guard: each level>=2 block must be covered by EXACTLY ONE parent-level block. f_amr_parent_block (and
+        ! the gather/reflux that key off it) take the FIRST overlap, so a fine tile straddling two parent tiles - an internal
+        ! parent-level tile seam crossed by a nested feature - would silently couple to only one parent (wrong coarse BC + a
         ! conservation leak on the other). Abort fail-closed instead. Replicated boxes -> every rank aborts together.
         block
             integer :: bk, bkk, npar
@@ -1264,16 +1213,11 @@ contains
         call s_amr_assign_block_owners()
 
 #ifdef MFC_MPI
-        ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by
-        ! reading
-        ! amr_slots(kk)%q_cons_stor, but an old block may be owned by a rank OTHER than the one now owning a covering
-        ! new block.
-        ! POINT-TO-POINT (mirrors s_amr_gather_coarse_patch): each old owner sends its stashed fine state ONLY to the
-        ! distinct
-        ! new-block owners whose region overlaps that old block. A rank that did not receive old block kk never reads it
-        ! - the
-        ! overlap-copy's per-(k,kk) index guard skips every cell of a non-overlapping pair. No-op at np=1 (single owner,
-        ! local).
+        ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by reading
+        ! amr_slots(kk)%q_cons_stor, but an old block may be owned by a rank OTHER than the one now owning a covering new block.
+        ! POINT-TO-POINT (mirrors s_amr_gather_coarse_patch): each old owner sends its stashed fine state ONLY to the distinct
+        ! new-block owners whose region overlaps that old block. A rank that did not receive old block kk never reads it - the
+        ! overlap-copy's per-(k,kk) index guard skips every cell of a non-overlapping pair. No-op at np=1 (single owner, local).
         if (num_procs > 1) then
             block
                 integer               :: kk, k2, ii, gi, gj, gk, idx2, ierr2, rr, maxcnt, nrq
@@ -1382,17 +1326,12 @@ contains
             if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (.not. amr_rank_owns_block) cycle
             call s_interpolate_coarse_to_fine()
-            ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so
-            ! copy
-            ! the overlap from EVERY covering old block regardless of who owned it - sh is the old->new LOCAL fine index
-            ! shift.
-            ! A level>=2 block SKIPS this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its
-            ! PARENT-fine
-            ! frame,
-            ! so the shift is wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid instead;
-            ! the
-            ! coupling
-            ! keeps conservation. Detail-preserving same-level L2 migration (parent-fine overlap) is a later increment.
+            ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy the
+            ! overlap from EVERY covering old block regardless of owner - sh is the old->new LOCAL fine index shift. A level>=2
+            ! block
+            ! SKIPS this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its PARENT-fine frame, so the shift is
+            ! wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid instead; the coupling keeps
+            ! conservation. Detail-preserving same-level L2 migration (parent-fine overlap) is a later increment.
             if (amr_block_level(amr_cur) < 2) then
                 do kk = 1, old_np
                     ! same-level overlap only (a child's stash is 4x-framed)
@@ -1419,8 +1358,8 @@ contains
             do i = 1, sys_size
                 $:GPU_UPDATE(device='[amr_slots(k)%q_cons(i)%sf]')
             end do
-            ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant),
-            ! then overwrite the overlap with the old blocks' fine data (same index shift)
+            ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant), then overwrite the overlap with the
+            ! old blocks' fine data (same index shift)
             if (qbmm .and. .not. polytropic) then
                 call s_amr_prolong_pbmv()
                 ! level>=2 re-prolongs only (the L0-frame overlap shift is wrong for a child)
@@ -1451,11 +1390,10 @@ contains
         end do
         amr_xchg_coarse_ghosts = any_xchg  ! coarse halo exchanged once per step if ANY block needs it
         ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
-        ! new-owned slots were allocated in the build loop, so this only frees - a rank keeps just its owned blocks'
-        ! fine arrays
+        ! new-owned slots were allocated in the build loop, so this only frees - a rank keeps just its owned blocks' fine arrays
         call s_amr_reconcile_slots()
-        ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/
-        ! image points recomputed from the body definitions; no state carries across regrids)
+        ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/image points recomputed from the
+        ! body definitions; no state carries across regrids)
         if (ib) call s_amr_setup_ib()
         call s_amr_select_slot(1)
         call s_amr_check_seam_topology()  ! abort on seam topologies no halo reconciles (silent leak otherwise)
@@ -1463,10 +1401,10 @@ contains
     end subroutine s_amr_regrid_rebuild_slots
 
     !> Sensor-on-fine child tagging: OR-accumulate density-gradient tags from an OLD fine block's solution into an L0-cell tag grid,
-    !! restricted to a parent nesting window. Reads amr_slots(ob)%q_cons on the HOST (the caller host-refreshes the cont range
-    !! first; the step-5 stash's GPU_UPDATE runs later). Fine cell (fi,fj,fk) covers L0 cell (ci,cj,ck) with fi = rr*(ci-olo(1))+d
-    !! etc.; the gradient uses one-sided differences at the fine-interior edges so no stale fine ghost is read. Only decides
-    !! placement - conservation is enforced downstream by restrict/reflux regardless of the box extent.
+    !! restricted to a parent nesting window. Reads amr_slots(ob)%q_cons on the HOST (caller host-refreshes the cont range first;
+    !! the step-5 stash's GPU_UPDATE runs later). Fine cell (fi,fj,fk) covers L0 cell (ci,cj,ck) with fi = rr*(ci-olo(1))+d etc.;
+    !! the gradient uses one-sided differences at the fine-interior edges so no stale fine ghost is read. Only decides placement -
+    !! conservation is enforced downstream by restrict/reflux regardless of box extent.
     impure subroutine s_amr_tag_child_from_fine(ob, win_lo, win_hi, ctag, any_tag)
 
         integer, intent(in)    :: ob, win_lo(3), win_hi(3)

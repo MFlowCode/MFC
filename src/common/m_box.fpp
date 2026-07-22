@@ -17,8 +17,8 @@ module m_box
 
 contains
 
-    !> Cumulative equal-cell offsets for g cells over n_parts ranks: off(r) = r*(g/n_parts) + min(r, mod(g,n_parts)). Reproduces
-    !! MFC's block distribution (remainder to the first ranks) exactly. Pure integer path.
+    !> Cumulative equal-cell offsets for g cells over n_parts ranks: off(r) = r*(g/n_parts) + min(r, mod(g,n_parts)). Exactly
+    !! reproduces MFC's block distribution (remainder to the first ranks). Pure integer path.
     pure function f_equal_splits(g, n_parts) result(off)
 
         integer, intent(in)           :: g, n_parts
@@ -65,8 +65,8 @@ contains
         do while (r < n_parts)
             off(r) = g; r = r + 1
         end do
-        ! Enforce the l_min floor: gap push first (off(0)=0 makes it imply off(r) >= r*l_min inductively), then the
-        ! upper clamp - which cannot re-break the gap, since off(r-1) <= g - (n_parts-r+1)*l_min after its own pass.
+        ! Enforce the l_min floor: gap push first (off(0)=0 makes it imply off(r) >= r*l_min inductively), then the upper
+        ! clamp - which cannot re-break the gap, since off(r-1) <= g - (n_parts-r+1)*l_min after its own pass.
         do r = 1, n_parts - 1
             if (off(r) < off(r - 1) + l_min) off(r) = off(r - 1) + l_min
             if (off(r) > g - (n_parts - r)*l_min) off(r) = g - (n_parts - r)*l_min
@@ -74,8 +74,8 @@ contains
 
     end function f_weighted_splits
 
-    !> Assemble this rank's box from per-axis cumulative offsets and the rank's Cartesian coords (0-based). lo(d) =
-    !! off_d(coords(d)); hi(d) = off_d(coords(d)+1) - 1. Works for collapsed axes (off_d = [0,1] -> lo=hi=0).
+    !> Assemble this rank's box from per-axis cumulative offsets and the rank's 0-based Cartesian coords: lo(d) = off_d(coords(d));
+    !! hi(d) = off_d(coords(d)+1) - 1. Works for collapsed axes (off_d = [0,1] -> lo=hi=0).
     pure function f_box_from_splits(off_x, off_y, off_z, coords) result(box)
 
         integer, dimension(0:), intent(in) :: off_x, off_y, off_z
@@ -90,7 +90,7 @@ contains
 
     !> 3D Morton (Z-order) key interleaving the bits of (ix, iy, iz); collapsed dims contribute 0. 21 bits/dim (fits a 64-bit key
     !! for grids up to 2^21 cells/dim). Shared by the AMR block partition (m_amr) and the SFC-partition diagnostic
-    !! (m_sfc_partition); negative coordinates clamp to 0.
+    !! (m_sfc_partition); negative coords clamp to 0.
     pure integer(kind=8) function f_morton(ix, iy, iz) result(key)
         integer, intent(in) :: ix, iy, iz
         integer             :: b
