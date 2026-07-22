@@ -183,11 +183,11 @@ contains
                        & .and. amr_block_end(3) > p_glb), "amr_block_end must be <= global cell max per axis")
             @:PROHIBIT(any(amr_block_end(1:num_dims) <= amr_block_beg(1:num_dims)), &
                        & "amr_block_end must exceed amr_block_beg on each active axis")
-            @:PROHIBIT(ref_ratio*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m_glb, &
+            @:PROHIBIT(amr_ref_ratio*(amr_block_end(1) - amr_block_beg(1) + 1) - 1 > m_glb, &
                        & "amr fine x-extent exceeds the base grid (module scratch is sized to the base)")
-            @:PROHIBIT(num_dims >= 2 .and. ref_ratio*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n_glb, &
+            @:PROHIBIT(num_dims >= 2 .and. amr_ref_ratio*(amr_block_end(2) - amr_block_beg(2) + 1) - 1 > n_glb, &
                        & "amr fine y-extent exceeds the base grid")
-            @:PROHIBIT(num_dims >= 3 .and. ref_ratio*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p_glb, &
+            @:PROHIBIT(num_dims >= 3 .and. amr_ref_ratio*(amr_block_end(3) - amr_block_beg(3) + 1) - 1 > p_glb, &
                        & "amr fine z-extent exceeds the base grid")
             @:PROHIBIT(amr_regrid_int < 0, "amr_regrid_int must be >= 0")
             @:PROHIBIT(amr_regrid_int > 0 .and. amr_tag_eps <= 0._wp, "amr_tag_eps must be > 0 when regridding")
@@ -204,9 +204,9 @@ contains
                        & "static multi-level AMR (amr_regrid_int = 0) nests exactly one level-2 block in block 1, so it supports at most amr_max_level = 2; use amr_regrid_int > 0 for deeper or multi-block nesting")
             @:PROHIBIT(amr_cluster_eff <= 0._wp .or. amr_cluster_eff > 1._wp, &
                        & "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1")
-            @:PROHIBIT(ref_ratio /= 2 .and. ref_ratio /= 4, "ref_ratio must be 2 or 4")
-            @:PROHIBIT(ref_ratio /= 2 .and. (amr_max_level > 1 .or. amr_subcycle), &
-                       & "ref_ratio /= 2 is only supported at amr_max_level = 1 without subcycling (v1)")
+            @:PROHIBIT(amr_ref_ratio /= 2 .and. amr_ref_ratio /= 4, "amr_ref_ratio must be 2 or 4")
+            @:PROHIBIT(amr_ref_ratio /= 2 .and. (amr_max_level > 1 .or. amr_subcycle), &
+                       & "amr_ref_ratio /= 2 is only supported at amr_max_level = 1 without subcycling (v1)")
         end if
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")

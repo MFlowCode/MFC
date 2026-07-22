@@ -68,8 +68,8 @@ contains
             open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
             write (2) num_procs, amr_num_blocks, sys_size
             do k = 1, amr_num_blocks
-                ! per-block header: region box, refinement LEVEL (a level-l block's fine extent is ref_ratio**l,
-                ! not ref_ratio, of the region - the reader needs the level to rebuild multi-level geometry), extents
+                ! per-block header: region box, refinement LEVEL (a level-l block's fine extent is amr_ref_ratio**l,
+                ! not amr_ref_ratio, of the region - the reader needs the level to rebuild multi-level geometry), extents
                 write (2) amr_slots(k)%region%lo, amr_slots(k)%region%hi, amr_block_level(k), amr_slots(k)%m, amr_slots(k)%n, &
                        & amr_slots(k)%p
                 if (amr_owns_all(k)) then
@@ -120,7 +120,8 @@ contains
                 my_off = my_off_vec(k)
                 if (proc_rank == 0) then
                     ! amr_restart_blk_hdr_ints-int per-block header: region box (6) + refinement LEVEL (a level-l block's fine
-                    ! extent is ref_ratio**l, not ref_ratio, of the region - the reader needs the level to rebuild multi-level
+                    ! extent is amr_ref_ratio**l, not amr_ref_ratio, of the region - the reader needs the level to rebuild
+                    ! multi-level
                     ! geometry). The header layout is single-sourced in m_constants so both readers stay in lockstep.
                     bhdr(1:3) = amr_slots(k)%region%lo; bhdr(4:6) = amr_slots(k)%region%hi
                     bhdr(amr_restart_blk_hdr_ints) = amr_block_level(k)
@@ -258,10 +259,11 @@ contains
                 amr_block_level(k) = lvl
                 had_data(k) = rm >= 0
                 if (had_data(k)) then
-                    ! whole-block owner extents are region-derived per level (a level-l block covers ref_ratio**l
-                    ! fine cells per L0 cell of its region, not ref_ratio); a stored extent that disagrees is corrupt
-                    if (rm /= (ref_ratio**lvl)*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge((ref_ratio**lvl)*(reg(5) - reg(2) + 1) &
-                        & - 1, 0, n_glb > 0) .or. rp /= merge((ref_ratio**lvl)*(reg(6) - reg(3) + 1) - 1, 0, p_glb > 0)) then
+                    ! whole-block owner extents are region-derived per level (a level-l block covers amr_ref_ratio**l
+                    ! fine cells per L0 cell of its region, not amr_ref_ratio); a stored extent that disagrees is corrupt
+                    if (rm /= (amr_ref_ratio**lvl)*(reg(4) - reg(1) + 1) - 1 .or. rn /= merge((amr_ref_ratio**lvl)*(reg(5) &
+                        & - reg(2) + 1) - 1, 0, n_glb > 0) .or. rp /= merge((amr_ref_ratio**lvl)*(reg(6) - reg(3) + 1) - 1, 0, &
+                        & p_glb > 0)) then
                         call s_mpi_abort('amr restart: block fine extents disagree with the region (corrupt file)')
                     end if
                     ! serial (same rank count): had_data == this run's ownership, so this is the owned slot
@@ -335,9 +337,9 @@ contains
                 ! s_set_amr_fine_geometry key off amr_block_level to place L>=2 blocks under their parent
                 amr_block_level(k) = lvl
                 blk_base(k) = disp0
-                ! data size is region-derived per level: a level-l block covers ref_ratio**l fine cells per L0 cell
-                cnt = sys_size*((ref_ratio**lvl)*(reg(4) - reg(1) + 1))*merge((ref_ratio**lvl)*(reg(5) - reg(2) + 1), 1, &
-                                & n_glb > 0)*merge((ref_ratio**lvl)*(reg(6) - reg(3) + 1), 1, p_glb > 0)
+                ! data size is region-derived per level: a level-l block covers amr_ref_ratio**l fine cells per L0 cell
+                cnt = sys_size*((amr_ref_ratio**lvl)*(reg(4) - reg(1) + 1))*merge((amr_ref_ratio**lvl)*(reg(5) - reg(2) + 1), 1, &
+                                & n_glb > 0)*merge((amr_ref_ratio**lvl)*(reg(6) - reg(3) + 1), 1, p_glb > 0)
                 disp0 = disp0 + int((amr_restart_blk_hdr_ints + 3*np_old)*ibytes, MPI_OFFSET_KIND) + int(cnt, &
                                     & MPI_OFFSET_KIND)*int(sbytes, MPI_OFFSET_KIND)
             end do

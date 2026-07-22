@@ -152,10 +152,10 @@ contains
         maxc2 = 1; maxc3 = 1
         if (n_glb > 0) maxc2 = maxc_fit(2)
         if (p_glb > 0) maxc3 = maxc_fit(3)
-        max_f1 = ref_ratio*maxc1 - 1
+        max_f1 = amr_ref_ratio*maxc1 - 1
         max_f2 = 0; max_f3 = 0
-        if (n_glb > 0) max_f2 = ref_ratio*maxc2 - 1
-        if (p_glb > 0) max_f3 = ref_ratio*maxc3 - 1
+        if (n_glb > 0) max_f2 = amr_ref_ratio*maxc2 - 1
+        if (p_glb > 0) max_f3 = amr_ref_ratio*maxc3 - 1
         ! creg: relative 0-based transverse (0:maxc_t-1); freg: 0-based fine (0:max_f_t).
         ! Device-resident (@:ALLOCATE): capture and both applies run as kernels; no host copies are read.
         @:ALLOCATE(creg(1)%lo(1:sys_size,0:maxc2 - 1,0:maxc3 - 1,1:amr_max_blocks), creg(1)%hi(1:sys_size,0:maxc2 - 1, &
@@ -575,7 +575,7 @@ contains
         if (.not. amr) return
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
-        rr = ref_ratio
+        rr = amr_ref_ratio
         ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer (all faces at np=1).
         ! Under whole-block ownership the block's freg is already resident on its owner, so no broadcast is needed here.
         call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
@@ -769,7 +769,7 @@ contains
         if (.not. (any(own_lo) .or. any(own_hi))) return
         ! L0/L1 (coarse) frame for the shared kernel: outside cell = region boundary +/-1 in local (sidx-offset) coords; the
         ! creg-local loop range is the owned transverse overlap [tlo:thi] block-relative; ownership -> unit face weights; cell
-        ! widths from the global coarse grid (ref_ratio = 2, dt = coarse step).
+        ! widths from the global coarse grid (amr_ref_ratio = 2, dt = coarse step).
         olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; w_lo = 0._wp; w_hi = 0._wp; mlo = 1._wp; mhi = 1._wp
         do d = 1, num_dims
             olo(d) = amr_region_lo(d) - 1 - sidx(d); ohi(d) = amr_region_hi(d) + 1 - sidx(d)
@@ -801,8 +801,8 @@ contains
     !> Shared Berger-Colella STATE reflux kernel: apply q(outside) += w*dtl*(F_coarse - Fbar_fine)/m on the low face and +=
     !! w*dtl*(Fbar_fine - F_coarse)/m on the high face for each active dim, where F_coarse is creg and Fbar_fine averages freg over
     !! the rr**(ndim-1) covering fine faces. Used by BOTH s_amr_apply_reflux_state (L0/L1, coarse/sidx frame, unit weights from
-    !! ownership, rr=2) and s_amr_reflux_to_parent (L2->L1, parent-fine frame, sibling-seam weights, rr=ref_ratio). All framing is
-    !! passed by the caller so the flux-correction math is single-sourced: islot - register slot (amr_cur) rr - refinement ratio
+    !! ownership, rr=2) and s_amr_reflux_to_parent (L2->L1, parent-fine frame, sibling-seam weights, rr=amr_ref_ratio). All framing
+    !! is passed by the caller so the flux-correction math is single-sourced: islot - register slot (amr_cur) rr - refinement ratio
     !! (fine faces per coarse face per transverse dim) dtl - reflux dt olo/ohi(d) - the outside coarse-cell index just below/above
     !! the block face in dim d glo/ghi(d) - creg-local loop range in dim d (transverse for the two faces d' /= d) woff(d) -
     !! transverse write origin so the cell index is woff(d) + g w_lo/w_hi(d) - per-face weight (0 skips the write: unowned face at

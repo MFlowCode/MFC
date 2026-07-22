@@ -589,7 +589,7 @@ contains
 
     !> Populate block slot `k` metadata, allocate its conservative fields, and reconstruct its fine coordinates from the coarse cell
     !! boundaries (x_cb/y_cb/z_cb, already read for this t_step). isect_lo is the block's global coarse origin; sidx is this rank's
-    !! global coarse origin (0 for a single-rank/no-MPI run). rr is the refinement factor for this block (ref_ratio**level).
+    !! global coarse origin (0 for a single-rank/no-MPI run). rr is the refinement factor for this block (amr_ref_ratio**level).
     impure subroutine s_setup_amr_block(k, reg, isect_lo, sidx, fm, fn, fp, rr)
 
         integer, intent(in) :: k, reg(6), isect_lo(3), sidx(3), fm, fn, fp, rr
@@ -702,7 +702,7 @@ contains
                 if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
                 if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
                 if (.not. owns) cycle  ! writer emitted no data record for a block this rank does not own
-                ! Use the file's authoritative per-block fine extent (rm/rn/rp); derive rr = ref_ratio**level
+                ! Use the file's authoritative per-block fine extent (rm/rn/rp); derive rr = amr_ref_ratio**level
                 ! from the ratio of fine cells to coarse cells (2 for L1, 4 for L2, etc.).
                 fm = rm; fn = rn; fp = rp
                 cw = max(isect_hi(1) - isect_lo(1) + 1, 1)

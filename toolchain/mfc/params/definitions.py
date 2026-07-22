@@ -684,7 +684,7 @@ def _load():
     _r("amr_max_blocks", INT)
     _r("amr_max_level", INT)
     _r("amr_cluster_eff", REAL)
-    _r("ref_ratio", INT)
+    _r("amr_ref_ratio", INT)
     _r("partition_tile_size", INT, {"output"})
     for n in [
         "schlieren_wrt",
@@ -1407,7 +1407,7 @@ _nv(
     "amr_max_blocks",
     "amr_max_level",
     "amr_cluster_eff",
-    "ref_ratio",
+    "amr_ref_ratio",
     "alf_factor",
     "num_igr_iters",
     "num_igr_warm_start_iters",

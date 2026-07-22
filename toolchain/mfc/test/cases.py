@@ -2886,8 +2886,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         hypoelastic, immersed boundaries, active_box). Each case carries an inline comment
         stating exactly what code path it guards and why its parameters are chosen.
 
-        Extent guard (per axis): ref_ratio**level * (amr_block_end - amr_block_beg + 1) - 1
-        must not exceed the base grid; the 1D base uses m=63, block 16..47 (ref_ratio=2 ->
+        Extent guard (per axis): amr_ref_ratio**level * (amr_block_end - amr_block_beg + 1) - 1
+        must not exceed the base grid; the 1D base uses m=63, block 16..47 (amr_ref_ratio=2 ->
         2*32 - 1 = 63).
         """
         # Common 1D domain + Sod IC setup shared by all three AMR cases
@@ -2926,10 +2926,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, restart_check=True))
         stack.pop()
 
-        # (a') ref_ratio=4: the ONLY golden at ref_ratio /= 2 (the checker allows 2 or 4; 4 is
+        # (a') amr_ref_ratio=4: the ONLY golden at amr_ref_ratio /= 2 (the checker allows 2 or 4; 4 is
         # single-level/no-subcycle only). Same static Sod as (a) with the block halved to width
         # 16 (24..39) so the fine extent 4*16 - 1 = 63 exactly fills the base-grid scratch (the
-        # extent-guard limit). Protects the ref_ratio-scaled prolong/restrict/reflux index
+        # extent-guard limit). Protects the amr_ref_ratio-scaled prolong/restrict/reflux index
         # arithmetic (child offsets, fold-back averaging weights, c/f face flux scaling) that
         # every other golden exercises only at 2 - a hard-coded 2 anywhere would pass the rest
         # of the suite unnoticed.
@@ -2938,7 +2938,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {
                 **amr_1d_base,
                 "amr_regrid_int": 0,
-                "ref_ratio": 4,
+                "amr_ref_ratio": 4,
                 "amr_block_beg(1)": 24,
                 "amr_block_end(1)": 39,
             },
@@ -4147,8 +4147,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
         # (h2) multi-level restart roundtrip: same static L2 hierarchy as (h), but restart_check proves the
-        # AMR restart file round-trips a MULTI-LEVEL block set. A level-2 block's fine extent is ref_ratio**2
-        # (not ref_ratio) times its coarse region, so the single-level restart reader rejected every L2 block
+        # AMR restart file round-trips a MULTI-LEVEL block set. A level-2 block's fine extent is amr_ref_ratio**2
+        # (not amr_ref_ratio) times its coarse region, so the single-level restart reader rejected every L2 block
         # as "corrupt"; the per-block level stored in the file lets the reader rebuild the multi-level geometry.
         stack.push(
             "AMR -> 1D -> multi-level restart",
@@ -4251,7 +4251,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # (l') multi-level restart via parallel_io (MPI-IO): (l)'s static 2-level hierarchy at np=2, but the restart
         # roundtrip goes through the MPI-IO path. Proves the shared restart file round-trips a MULTI-LEVEL block set:
-        # a level-2 block's fine data is ref_ratio**2 (not ref_ratio) of its region, so the per-block MPI-IO header
+        # a level-2 block's fine data is amr_ref_ratio**2 (not amr_ref_ratio) of its region, so the per-block MPI-IO header
         # must carry the refinement level. Without it the reader sized L2 blocks at level-1 extents and mislaid every
         # downstream block offset (caught only by the total-size tripwire). This is the ONLY multi-level MPI-IO restart.
         stack.push(

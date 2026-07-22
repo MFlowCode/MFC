@@ -715,7 +715,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `amr_max_blocks`       | Integer | Number of fixed refined-block slots preallocated (each max-block sized; ~N x device memory); must be >= 1 (default 4) |
 | `amr_max_level`        | Integer | Maximum AMR refinement depth (number of refined levels above L0); must be >= 1 (default 1). Multi-level nesting (>= 2) is supported: static AMR (`amr_regrid_int = 0`) nests up to level 2, dynamic regrid (`amr_regrid_int > 0`) nests deeper (see @ref amr_multilevel) |
 | `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered block box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
-| `ref_ratio`             | Integer | AMR refinement ratio between coarse and fine levels; must be 2 or 4 (default 2). Only ref_ratio = 2 is supported with multi-level AMR or subcycling (v1). |
+| `amr_ref_ratio`             | Integer | AMR refinement ratio between coarse and fine levels; must be 2 or 4 (default 2). Only amr_ref_ratio = 2 is supported with multi-level AMR or subcycling (v1). |
 | `partition_tile_size`   | Integer | Tile side for the SFC partitioner (default 8) |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
@@ -952,8 +952,8 @@ boxes (`amr_cluster_eff` sets the min tag efficiency each box reaches before spl
 **Multi-level nesting.**
 `amr_max_level` (default 1) sets the maximum refinement depth. With `amr_max_level > 1`,
 blocks nest recursively: a level-`l` block refines a region of its parent level-(`l-1`)
-block by a further `ref_ratio`, so refinement tracks a moving feature to arbitrary depth.
-Multi-level nesting requires `ref_ratio = 2` (the default) and `amr_max_blocks >= 2`; static
+block by a further `amr_ref_ratio`, so refinement tracks a moving feature to arbitrary depth.
+Multi-level nesting requires `amr_ref_ratio = 2` (the default) and `amr_max_blocks >= 2`; static
 AMR (`amr_regrid_int = 0`) nests up to level 2, dynamic regrid (`amr_regrid_int > 0`) nests
 deeper. See @ref amr_multilevel for the nesting and reflux details.
 

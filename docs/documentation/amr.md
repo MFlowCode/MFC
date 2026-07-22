@@ -32,24 +32,24 @@ The hierarchy spans levels `0` through `amr_max_level` (default `1`, i.e. two le
 - **Level 0** — the base grid with cell spacing `dx`, `dy`, `dz`. The ordinary MFC solver
   advances this level every step.
 - **Level 1** — a list of up to `amr_max_blocks` rectangular refined blocks, each covering
-  a sub-region of the level-0 domain at `ref_ratio`:1 refinement (`ref_ratio` = 2 or 4;
-  the cell spacing shrinks by `ref_ratio` in every active direction).
+  a sub-region of the level-0 domain at `amr_ref_ratio`:1 refinement (`amr_ref_ratio` = 2 or 4;
+  the cell spacing shrinks by `amr_ref_ratio` in every active direction).
 - **Levels 2 … `amr_max_level`** — when `amr_max_level > 1`, blocks nest recursively: a
   level-`l` block refines a region of its parent level-(`l-1`) block by a further
-  `ref_ratio`, tracking a moving feature to arbitrary depth. Multi-level nesting requires
-  `ref_ratio = 2`. See @ref amr_multilevel for the nesting and reflux details.
+  `amr_ref_ratio`, tracking a moving feature to arbitrary depth. Multi-level nesting requires
+  `amr_ref_ratio = 2`. See @ref amr_multilevel for the nesting and reflux details.
 
 Each block is described by its bounding box in level-0 cell-index space
 (`amr_block_beg(1:num_dims)` to `amr_block_end(1:num_dims)`). The initial (level-1)
 fine-block extents must satisfy:
 
 ```
-ref_ratio*(amr_block_end(i) - amr_block_beg(i) + 1) - 1 <= N_i
+amr_ref_ratio*(amr_block_end(i) - amr_block_beg(i) + 1) - 1 <= N_i
 ```
 
 where `N_i` is the global cell count in direction `i`. This ensures the fine scratch
 (which is sized to the base grid) is never overflowed. A level-`l` block's fine extent
-grows as `ref_ratio**l`, so the nested boxes are sized accordingly.
+grows as `amr_ref_ratio**l`, so the nested boxes are sized accordingly.
 
 **Fixed-slot storage.** All block slots are pre-allocated at init to the maximum possible
 block size (half the per-rank subdomain in each dimension). Setting `amr_max_blocks = N`
@@ -285,8 +285,8 @@ default values, and cross-parameter constraints see @ref case section 7.1.
 | `amr_buf` | Integer | 3 | Coarse-cell padding around tagged cells; required `>= 1` when `amr_regrid_int > 0` |
 | `amr_subcycle` | Logical | F | Advance fine level at `dt/2` (two substeps per coarse step) with Berger-Colella refluxing |
 | `amr_max_blocks` | Integer | 4 | Number of fixed refined-block slots preallocated; each slot is max-block sized (~N times device memory for N slots) |
-| `amr_max_level` | Integer | 1 | Maximum refinement depth: `1` = single refined level, `> 1` = recursive multi-level nesting (needs `amr_max_blocks >= 2` and `ref_ratio = 2`). See @ref amr_multilevel |
-| `ref_ratio` | Integer | 2 | Cell-refinement ratio between adjacent levels; must be 2 or 4. `ref_ratio = 4` is single-level only (no nesting, no subcycling) |
+| `amr_max_level` | Integer | 1 | Maximum refinement depth: `1` = single refined level, `> 1` = recursive multi-level nesting (needs `amr_max_blocks >= 2` and `amr_ref_ratio = 2`). See @ref amr_multilevel |
+| `amr_ref_ratio` | Integer | 2 | Cell-refinement ratio between adjacent levels; must be 2 or 4. `amr_ref_ratio = 4` is single-level only (no nesting, no subcycling) |
 | `amr_cluster_eff` | Real | 0.7 | Berger-Rigoutsos min tag efficiency a clustered box reaches before splitting stops; must satisfy `0 < amr_cluster_eff <= 1` |
 
 ---
@@ -341,8 +341,8 @@ For multi-fluid (5-equation), additionally set:
 - **Half-subdomain limit.** Each block may span at most half of any rank's local subdomain
   per dimension, because the fine advance reuses the rank-local solver scratch.
 - **Multi-level constraints.** Recursive multi-level nesting (`amr_max_level > 1`) requires
-  `ref_ratio = 2`; with immersed boundaries it is single-rank only, and a moving body is
-  not yet supported. `ref_ratio = 4` is single-level only.
+  `amr_ref_ratio = 2`; with immersed boundaries it is single-rank only, and a moving body is
+  not yet supported. `amr_ref_ratio = 4` is single-level only.
 - **Level-0 output only.** Standard visualization output (HDF5/SILO) is written at
   level-0 resolution; the restricted fine solution is already folded into the coarse
   fields over the block region, so existing visualization workflows are unchanged.
