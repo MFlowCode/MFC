@@ -130,6 +130,11 @@ contains
             ! converged coarse sigma; the Berger-Colella reflux is not yet captured from the
             ! fused IGR flux kernels, so seam conservation is truncation-order, not exact
             @:PROHIBIT(igr .and. amr_subcycle, "amr_subcycle with the IGR solver is not yet supported (lockstep only)")
+            ! The fine block's sigma Dirichlet seed is injected from the OWNER's LOCAL coarse jac (s_amr_igr_swap_sigma),
+            ! clamped to the owner's buffer bounds - unlike q_cons it is NOT P2P-gathered, so a block whose footprint or ghost
+            ! shell crosses a rank boundary reads clamped edge values instead of the neighbour's sigma. Fail-closed at np>1.
+            @:PROHIBIT(igr .and. num_procs > 1, &
+                       & "amr with the IGR solver is only supported at num_procs = 1: the fine block's sigma (jac) Dirichlet seed is injected from the owner's LOCAL coarse jac (not P2P-gathered like q_cons), so a block crossing a rank boundary would read clamped edge values")
             ! Lagrangian bubbles are supported with the cloud EXCLUDED from fine blocks (two-way
             ! coupling lives on the coarse grid): regrid suppresses tags and clips boxes around
             ! the cloud's padded bbox, and a per-stage guard aborts if the cloud reaches a block
