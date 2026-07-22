@@ -3203,8 +3203,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_end(3)": 17,
         }
 
+        # restart_check gives the ONLY 3D AMR restart coverage: the restart reader validates the fine
+        # extent per axis (rm/rn/rp), so a z-extent slip would pass every non-restart 3D golden. Reuses
+        # the straight-run golden (no new golden) and adds the midpoint roundtrip.
         stack.push("AMR -> 3D -> static block", {**amr_3d_base, "amr_regrid_int": 0})
-        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
         stack.pop()
 
         # (d') 3D dynamic regrid: the static block above is the ONLY other 3D golden, so no
