@@ -5,7 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief Assembles the right-hand side of the governing equations using finite-volume flux differencing, Riemann solvers, and
+!> @brief Assemble the right-hand side of the governing equations using finite-volume flux differencing, Riemann solvers, and
 !! physical source terms
 module m_rhs
 
