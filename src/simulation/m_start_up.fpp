@@ -57,7 +57,8 @@ module m_start_up
     use m_load_weight
     use m_load_balance, only: s_load_balance_rebalance
     use m_sfc_partition
-    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
+    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib, &
+        & s_l0_tiles_init, s_l0_tiles_finalize
     use m_amr_regrid, only: s_amr_regrid, s_amr_check_active_box_containment
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
@@ -898,6 +899,7 @@ contains
         call s_populate_grid_variables_buffers()
 
         call s_initialize_amr_module()
+        call s_l0_tiles_init()  ! L0-as-blocks spike (l0_ntile > 0); no-op otherwise
         call s_initialize_amr_registers(amr_maxc_fit)
         ! restarts restore the saved (possibly regridded) box and fine state; otherwise prolong from coarse
         call s_read_amr_restart(amr_restored)
@@ -1120,6 +1122,7 @@ contains
 
         call s_finalize_amr_registers()
         call s_finalize_amr_module()
+        call s_l0_tiles_finalize()  ! L0-as-blocks spike; no-op otherwise
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
         if (hyperelasticity) call s_finalize_hyperelastic_module()

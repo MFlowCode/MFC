@@ -16,7 +16,7 @@ module m_amr
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_box, only: f_morton  ! shared 3D Morton key (single-sourced with m_sfc_partition)
     use m_global_parameters
-    use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells, K_ib, K_pc
+    use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells, K_ib, K_pc, BC_GHOST_EXTRAP
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, s_mpi_allreduce_min, &
@@ -39,7 +39,8 @@ module m_amr
     public :: t_level, amr_maxc, amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_fine_stage_fill, s_amr_fine_stage_advance, &
         & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, &
-        & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
+        & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
+        & s_l0_tiles_init, s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_tiles_finalize
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -197,6 +198,14 @@ module m_amr
     !! fixed for the run). Lets any rank compute which ranks own a given global coarse-cell range, so gather/scatter/reflux coupling
     !! is owner <-> only the (SFC-local) coarse-owners - no global collective per block per stage.
     integer, allocatable :: amr_decomp(:,:)  !< (1:6, 0:num_procs-1)
+
+    !> L0-AS-BLOCKS SPIKE (l0_ntile > 0, amr off). Feasibility probe for AMReX-style dynamic load balancing: tile the base grid into
+    !! l0_ntile**num_dims base-resolution (refinement-ratio-1) blocks and advance each through the SAME swap-based per-block solver
+    !! the AMR fine overlay uses, with tile-tile same-level seam halos (s_amr_fine_fine_halo, fmul=1) at interior faces and the
+    !! physical BC at domain-edge faces. Correctness bar: l0_ntile>0 must be BYTE-IDENTICAL to l0_ntile=0 (monolithic). Reuses the
+    !! full amr_slots/region/owner/seam machinery; the tiles ARE level-1 blocks with amr_ref_ratio 1. Off (l0_ntile=0) => no effect.
+    integer :: l0_ntiles_tot = 0     !< total tiles = l0_ntile**num_dims (0 when off)
+    integer :: l0_nt(3) = 1          !< tiles per dim (1 in collapsed dims)
 
 contains
 
@@ -3591,7 +3600,7 @@ contains
 
         integer :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul, idx
 
-        if (.not. amr) return
+        if (.not. amr .and. l0_ntile == 0) return
         if (amr_num_blocks < 2) return
 
         ! iterate the cached same-level seam list (rebuilt only when the topology changes) instead of the old O(nblocks^2)
@@ -3706,7 +3715,7 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
 
-        if (.not. amr) return
+        if (.not. amr .and. l0_ntile == 0) return
         if (.not. amr_rank_owns_block) return
         if (rank_time_wrt) call s_rank_time_tic()
 
@@ -4344,6 +4353,402 @@ contains
         end do
 
     end subroutine s_amr_reconcile_slots
+
+    ! === L0-AS-BLOCKS SPIKE (l0_ntile > 0) ==============================================================================
+    ! Base grid tiled into l0_ntiles_tot refinement-ratio-1 blocks advanced through the shared swap-based per-block solver; the
+    ! bit-identity oracle is l0_ntile=0 (monolithic). See the l0_ntiles_tot declaration above for the design.
+
+    !> Low global-cell index of tile `it` (0-based) when `ncell` cells split into `nt` balanced tiles: the first mod(ncell,nt) tiles
+    !! get one extra cell. Tile `it` spans [f_l0_lo(it) : f_l0_lo(it+1)-1]; the widest tile is ceil(ncell/nt) cells.
+    pure integer function f_l0_lo(ncell, nt, it)
+        integer, intent(in) :: ncell, nt, it
+        f_l0_lo = it*(ncell/nt) + min(it, mod(ncell, nt))
+    end function f_l0_lo
+
+    !> Build the base-grid tiling: allocate the slot/region/seam machinery for l0_ntiles_tot rr=1 tiles covering L0, set each tile's
+    !! geometry (extent, L0-slice coords, whole-tile footprint, owner) and copy the current L0 state in. Standalone (does not call
+    !! s_initialize_amr_module) so the spike lifts out cleanly. np=1 spike: rank 0 owns every tile.
+    impure subroutine s_l0_tiles_init()
+
+        integer :: nt(3), ix, iy, iz, k, j, tcap
+        integer :: tlo(3), thi(3), gcell(3)
+
+        if (l0_ntile <= 0) return
+
+        ! Milestone 1 supports only extrapolation-family BC (bc <= BC_GHOST_EXTRAP), the family whose ghost fill commutes with the
+        ! cons->prim convert so a tile matches the monolithic prim-space BC bit-for-bit. Validate once here (host), not per stage.
+        if (bc_x%beg > BC_GHOST_EXTRAP .or. bc_x%end > BC_GHOST_EXTRAP &
+            & .or. (n_glb > 0 .and. (bc_y%beg > BC_GHOST_EXTRAP .or. bc_y%end > BC_GHOST_EXTRAP)) &
+            & .or. (p_glb > 0 .and. (bc_z%beg > BC_GHOST_EXTRAP .or. bc_z%end > BC_GHOST_EXTRAP))) then
+            call s_mpi_abort('l0_ntile spike (milestone 1) supports only extrapolation BC (bc <= -3) on every domain face')
+        end if
+        ! the monolithic L0 RHS is skipped for l0_ntile>0, so the global q_prim_vf it populated is stale: run-time-info and probes
+        ! (which read it at stage 1) are not supported in the spike.
+        if (run_time_info .or. probe_wrt) then
+            call s_mpi_abort('l0_ntile spike does not support run_time_info or probe_wrt (monolithic q_prim_vf is not maintained)')
+        end if
+
+        ! rr=1 makes the swap ghost-coord bisection and the fine-fine-halo fmul (=amr_ref_ratio**level) both identity; slots inherit
+        ! it via s_amr_alloc_slot. amr is off, so the amr_ref_ratio in {2,4} checker never runs.
+        amr_ref_ratio = 1
+
+        nt = 1
+        nt(1) = l0_ntile
+        if (n_glb > 0) nt(2) = l0_ntile
+        if (p_glb > 0) nt(3) = l0_ntile
+        l0_nt = nt
+        l0_ntiles_tot = nt(1)*nt(2)*nt(3)
+        gcell(1) = m_glb + 1; gcell(2) = n_glb + 1; gcell(3) = p_glb + 1
+
+        amr_max_blocks = l0_ntiles_tot
+        amr_num_blocks = l0_ntiles_tot
+        amr_num_levels = 1
+        amr_cur = 1
+
+        ! block-metadata pool (mirror of s_initialize_amr_module's allocation)
+        allocate (amr_slots(1:amr_max_blocks))
+        allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
+        allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
+        allocate (amr_owns_all(amr_max_blocks))
+        allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
+        allocate (amr_block_level(amr_max_blocks)); amr_block_level = 1
+        allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
+        allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
+        allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
+        amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
+
+        ! max tile extent per dim = widest tile cells - 1 = ceil(gcell/nt) - 1
+        max_f1 = (gcell(1) + nt(1) - 1)/nt(1) - 1
+        max_f2 = 0; max_f3 = 0
+        if (n_glb > 0) max_f2 = (gcell(2) + nt(2) - 1)/nt(2) - 1
+        if (p_glb > 0) max_f3 = (gcell(3) + nt(3) - 1)/nt(3) - 1
+        mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
+        mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
+        if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
+        if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
+
+        ! fine-fine seam pack buffers (sys_size*buff_size * largest transverse fine face), reused per seam per stage
+        tcap = 1
+        if (n_glb > 0 .and. p_glb > 0) then
+            tcap = max((max_f1 + 1)*(max_f2 + 1), (max_f2 + 1)*(max_f3 + 1), (max_f1 + 1)*(max_f3 + 1))
+        else if (n_glb > 0) then
+            tcap = max(max_f1, max_f2) + 1
+        end if
+        allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
+        amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1
+
+        ! swap bounce buffers (same bounds as the L0 global coord arrays) + persistent global L0 cell boundaries for the swap
+        allocate (sw_x_cb(-1 - buff_size:m + buff_size), sw_x_cc(-buff_size:m + buff_size), sw_dx(-buff_size:m + buff_size))
+        if (n_glb > 0) allocate (sw_y_cb(-1 - buff_size:n + buff_size), sw_y_cc(-buff_size:n + buff_size), &
+            & sw_dy(-buff_size:n + buff_size))
+        if (p_glb > 0) allocate (sw_z_cb(-1 - buff_size:p + buff_size), sw_z_cc(-buff_size:p + buff_size), &
+            & sw_dz(-buff_size:p + buff_size))
+        call s_l0_build_extended_global_cb()  ! global L0 boundaries EXTENDED into the domain ghost shell (edge tiles need it)
+        amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
+        amr_xchg_coarse_ghosts = .false.  ! tiles never prolong from a coarser level
+
+        ! replicated coarse-decomposition table (seam-pair overlap-rank lists read it)
+        allocate (amr_decomp(6, 0:num_procs - 1))
+        block
+            integer :: myrow(6), ierr
+            myrow = 0
+            myrow(1) = start_idx(1); myrow(4) = m
+            if (n_glb > 0) then; myrow(2) = start_idx(2); myrow(5) = n; end if
+            if (p_glb > 0) then; myrow(3) = start_idx(3); myrow(6) = p; end if
+#ifdef MFC_MPI
+            call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+#else
+            amr_decomp(:, 0) = myrow
+#endif
+        end block
+
+        ! per-tile geometry: level-1 rr=1 blocks covering L0, laid out x-fastest so f_amr_seam_dim finds adjacent pairs
+        k = 0
+        do iz = 0, nt(3) - 1
+            do iy = 0, nt(2) - 1
+                do ix = 0, nt(1) - 1
+                    k = k + 1
+                    tlo(1) = f_l0_lo(gcell(1), nt(1), ix); thi(1) = f_l0_lo(gcell(1), nt(1), ix + 1) - 1
+                    tlo(2) = 0; thi(2) = 0
+                    if (n_glb > 0) then; tlo(2) = f_l0_lo(gcell(2), nt(2), iy); thi(2) = f_l0_lo(gcell(2), nt(2), iy + 1) - 1; end if
+                    tlo(3) = 0; thi(3) = 0
+                    if (p_glb > 0) then; tlo(3) = f_l0_lo(gcell(3), nt(3), iz); thi(3) = f_l0_lo(gcell(3), nt(3), iz + 1) - 1; end if
+                    amr_cur = k
+                    amr_block_owner(k) = 0
+                    amr_owns_all(k) = (amr_block_owner(k) == proc_rank)
+                    amr_region_lo_all(:, k) = tlo; amr_region_hi_all(:, k) = thi
+                    amr_isect_lo_all(:, k) = tlo; amr_isect_hi_all(:, k) = thi  ! footprint = whole tile on the owner (rr=1)
+                    call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio (= 1)
+                    amr_slots(k)%m = thi(1) - tlo(1); amr_slots(k)%n = 0; amr_slots(k)%p = 0
+                    if (n_glb > 0) amr_slots(k)%n = thi(2) - tlo(2)
+                    if (p_glb > 0) amr_slots(k)%p = thi(3) - tlo(3)
+                    amr_slots(k)%idwbuff(1)%beg = -buff_size; amr_slots(k)%idwbuff(1)%end = amr_slots(k)%m + buff_size
+                    amr_slots(k)%idwbuff(2)%beg = 0; amr_slots(k)%idwbuff(2)%end = 0
+                    amr_slots(k)%idwbuff(3)%beg = 0; amr_slots(k)%idwbuff(3)%end = 0
+                    if (n_glb > 0) then
+                        amr_slots(k)%idwbuff(2)%beg = -buff_size; amr_slots(k)%idwbuff(2)%end = amr_slots(k)%n + buff_size
+                    end if
+                    if (p_glb > 0) then
+                        amr_slots(k)%idwbuff(3)%beg = -buff_size; amr_slots(k)%idwbuff(3)%end = amr_slots(k)%p + buff_size
+                    end if
+                    ! rr=1: tile cell j (right boundary) IS the global L0 boundary amr_g?cb(tlo + j); interior coords only (the swap
+                    ! extends the ghost shell from amr_g?cb identically).
+                    do j = -1, amr_slots(k)%m
+                        amr_slots(k)%x_cb(j) = amr_gxcb(tlo(1) + j)
+                    end do
+                    do j = 0, amr_slots(k)%m
+                        amr_slots(k)%dx(j) = amr_slots(k)%x_cb(j) - amr_slots(k)%x_cb(j - 1)
+                        amr_slots(k)%x_cc(j) = 0.5_wp*(amr_slots(k)%x_cb(j - 1) + amr_slots(k)%x_cb(j))
+                    end do
+                    if (n_glb > 0) then
+                        do j = -1, amr_slots(k)%n
+                            amr_slots(k)%y_cb(j) = amr_gycb(tlo(2) + j)
+                        end do
+                        do j = 0, amr_slots(k)%n
+                            amr_slots(k)%dy(j) = amr_slots(k)%y_cb(j) - amr_slots(k)%y_cb(j - 1)
+                            amr_slots(k)%y_cc(j) = 0.5_wp*(amr_slots(k)%y_cb(j - 1) + amr_slots(k)%y_cb(j))
+                        end do
+                    end if
+                    if (p_glb > 0) then
+                        do j = -1, amr_slots(k)%p
+                            amr_slots(k)%z_cb(j) = amr_gzcb(tlo(3) + j)
+                        end do
+                        do j = 0, amr_slots(k)%p
+                            amr_slots(k)%dz(j) = amr_slots(k)%z_cb(j) - amr_slots(k)%z_cb(j - 1)
+                            amr_slots(k)%z_cc(j) = 0.5_wp*(amr_slots(k)%z_cb(j - 1) + amr_slots(k)%z_cb(j))
+                        end do
+                    end if
+                end do
+            end do
+        end do
+        call s_amr_select_slot(1)
+        ! tile field arrays are filled from L0 at each timestep's first RK stage (s_l0_copy_coarse_to_tiles); no init-time device
+        ! copy here (q_cons device state is not guaranteed live at module init).
+
+    end subroutine s_l0_tiles_init
+
+    !> Global L0 cell boundaries EXTENDED into the domain ghost shell (-1-buff_size : G+buff_size), unlike s_amr_build_global_cb
+    !! (-1:G). The swap rebuilds a block's ghost-shell coordinates from these, and a tile that touches the domain boundary reaches
+    !! indices beyond G (AMR fine blocks never do, being buff_size inside). Sourced from the monolithic x_cb, whose ghost cells
+    !! already hold the domain's ghost coordinates - so a tile's ghost coords match the monolithic grid's bit-for-bit.
+    impure subroutine s_l0_build_extended_global_cb()
+
+        integer             :: j
+        real(wp), parameter :: sentinel = -huge(1._wp)
+
+        allocate (amr_gxcb(-1 - buff_size:m_glb + buff_size)); amr_gxcb = sentinel
+        do j = -1 - buff_size, m + buff_size
+            amr_gxcb(start_idx(1) + j) = x_cb(j)
+        end do
+        call s_mpi_allreduce_array_max(amr_gxcb, m_glb + 2 + 2*buff_size)
+        if (n_glb > 0) then
+            allocate (amr_gycb(-1 - buff_size:n_glb + buff_size)); amr_gycb = sentinel
+            do j = -1 - buff_size, n + buff_size
+                amr_gycb(start_idx(2) + j) = y_cb(j)
+            end do
+            call s_mpi_allreduce_array_max(amr_gycb, n_glb + 2 + 2*buff_size)
+        end if
+        if (p_glb > 0) then
+            allocate (amr_gzcb(-1 - buff_size:p_glb + buff_size)); amr_gzcb = sentinel
+            do j = -1 - buff_size, p + buff_size
+                amr_gzcb(start_idx(3) + j) = z_cb(j)
+            end do
+            call s_mpi_allreduce_array_max(amr_gzcb, p_glb + 2 + 2*buff_size)
+        end if
+
+    end subroutine s_l0_build_extended_global_cb
+
+    !> Copy the current L0 interior state into every owned tile's interior (global cell tlo+j -> tile-local cell j).
+    impure subroutine s_l0_copy_coarse_to_tiles(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        integer :: k, o1, o2, o3, fm1, fm2, fm3
+
+        do k = 1, l0_ntiles_tot
+            if (amr_block_owner(k) /= proc_rank) cycle
+            call s_l0_tile_l0_offsets(k, o1, o2, o3)
+            fm1 = amr_slots(k)%m; fm2 = amr_slots(k)%n; fm3 = amr_slots(k)%p
+            call s_l0_copy_block(amr_slots(k)%q_cons, q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .true.)
+        end do
+
+    end subroutine s_l0_copy_coarse_to_tiles
+
+    !> Local-index offset of tile k's global origin in the L0 field: o(d) = region_lo(d) - start_idx(d) for active dims, 0 for a
+    !! collapsed dim (start_idx is sized num_dims, so start_idx(3) must not be touched in 2D).
+    subroutine s_l0_tile_l0_offsets(k, o1, o2, o3)
+        integer, intent(in)  :: k
+        integer, intent(out) :: o1, o2, o3
+        o1 = amr_region_lo_all(1, k) - start_idx(1)
+        o2 = 0; if (n_glb > 0) o2 = amr_region_lo_all(2, k) - start_idx(2)
+        o3 = 0; if (p_glb > 0) o3 = amr_region_lo_all(3, k) - start_idx(3)
+    end subroutine s_l0_tile_l0_offsets
+
+    !> Scatter every owned tile's interior back into the L0 field (tile-local cell j -> global cell tlo+j).
+    impure subroutine s_l0_scatter_tiles_to_coarse(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        integer :: k, o1, o2, o3, fm1, fm2, fm3
+
+        do k = 1, l0_ntiles_tot
+            if (amr_block_owner(k) /= proc_rank) cycle
+            call s_l0_tile_l0_offsets(k, o1, o2, o3)
+            fm1 = amr_slots(k)%m; fm2 = amr_slots(k)%n; fm3 = amr_slots(k)%p
+            call s_l0_copy_block(amr_slots(k)%q_cons, q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .false.)
+        end do
+
+    end subroutine s_l0_scatter_tiles_to_coarse
+
+    !> Device copy between a tile interior [0:fm] and the L0 field [o+0:o+fm]. to_tile=T copies L0->tile, F copies tile->L0. The
+    !! slot q_cons is a dummy so the kernel reads a valid mapped descriptor (indexing module amr_slots%q_cons in a kernel is a null
+    !! deref - see s_amr_fine_slice).
+    impure subroutine s_l0_copy_block(q_tile, q_l0, o1, o2, o3, fm1, fm2, fm3, to_tile)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_tile, q_l0
+        integer, intent(in) :: o1, o2, o3, fm1, fm2, fm3
+        logical, intent(in) :: to_tile
+        integer :: i, j, k, l
+
+        if (to_tile) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, fm3
+                    do k = 0, fm2
+                        do j = 0, fm1
+                            q_tile(i)%sf(j, k, l) = q_l0(i)%sf(o1 + j, o2 + k, o3 + l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, fm3
+                    do k = 0, fm2
+                        do j = 0, fm1
+                            q_l0(i)%sf(o1 + j, o2 + k, o3 + l) = q_tile(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+    end subroutine s_l0_copy_block
+
+    !> Fill each tile's DOMAIN-EDGE face ghosts with the physical BC (interior-seam faces are overwritten by s_amr_fine_fine_halo
+    !! afterward). Milestone 1 supports extrapolation (bc <= BC_GHOST_EXTRAP); other codes abort. A face (d,side) is a domain edge
+    !! iff the tile touches the global boundary there.
+    impure subroutine s_l0_fill_edge_bc()
+
+        integer :: k, fm(3), gcell(3)
+
+        gcell(1) = m_glb; gcell(2) = n_glb; gcell(3) = p_glb
+        do k = 1, l0_ntiles_tot
+            if (amr_block_owner(k) /= proc_rank) cycle
+            fm(1) = amr_slots(k)%m; fm(2) = amr_slots(k)%n; fm(3) = amr_slots(k)%p
+            call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(1, k), amr_region_hi_all(1, k), gcell(1), fm, 1)
+            if (n_glb > 0) call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(2, k), amr_region_hi_all(2, k), gcell(2), &
+                                   & fm, 2)
+            if (p_glb > 0) call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(3, k), amr_region_hi_all(3, k), gcell(3), &
+                                   & fm, 3)
+        end do
+
+    end subroutine s_l0_fill_edge_bc
+
+    !> One tile, one dimension d: extrapolate the low/high face ghost from the edge interior cell, but only where the tile touches
+    !! the domain boundary (rlo==0 low / rhi==gcell high). Applied to q_cons; convert (identity-commuting for extrapolation) makes
+    !! the prim ghost the monolithic path produces. The transverse loop spans the FACE interior only (dimension-split scheme reads
+    !! no corner ghost).
+    impure subroutine s_l0_edge_bc_tile(q, rlo, rhi, gcell, fm, d)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        integer, intent(in) :: rlo, rhi, gcell, fm(3), d
+
+        ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces.
+        if (rlo == 0) call s_l0_extrap_one(q, d, -1, fm)
+        if (rhi == gcell) call s_l0_extrap_one(q, d, 1, fm)
+
+    end subroutine s_l0_edge_bc_tile
+
+    !> Extrapolate tile face ghosts in dim d, side (-1 low / +1 high): ghost cells 1..buff_size = the edge interior cell (0 or md).
+    !! Transverse extents (na, nb) and md are read into scalars before the device region (no host array element in the kernel).
+    impure subroutine s_l0_extrap_one(q, d, side, fm)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        integer, intent(in) :: d, side, fm(3)
+        integer :: i, jg, a, b, e, gc, na, nb, md
+
+        #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+            #:set SIDX = {1: '(e, a, b)', 2: '(a, e, b)', 3: '(a, b, e)'}[D]
+            #:set GIDX = {1: '(gc, a, b)', 2: '(a, gc, b)', 3: '(a, b, gc)'}[D]
+            if (d == ${D}$) then
+                na = fm(${TA}$); nb = fm(${TB}$); md = fm(${D}$)
+                e = merge(0, md, side == -1)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[gc]')
+                do i = 1, sys_size
+                    do b = 0, nb
+                        do a = 0, na
+                            do jg = 1, buff_size
+                                gc = merge(-jg, md + jg, side == -1)
+                                q(i)%sf${GIDX}$ = q(i)%sf${SIDX}$
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_l0_extrap_one
+
+    !> Advance every tile one RK stage: fill domain-edge BC ghosts (phase 1), overwrite interior-seam ghosts with neighbour interior
+    !! (phase 2, fmul=1), then advance + RK-update each tile through the shared swap-based solver (phase 3). Mirrors the AMR
+    !! fine-block phase structure (m_time_steppers) with prolong/reflux dropped - a base-res tile has no coarser level.
+    impure subroutine s_l0_advance_stage(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+
+        integer, intent(in) :: s, t_step
+        real(wp), intent(in) :: coefs(4)
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout) :: q_T_sf
+        real(stp), dimension(:, :, :, :, :), intent(inout) :: pb_in, mv_in
+        real(wp), dimension(:, :, :, :, :), intent(inout) :: rhs_pb, rhs_mv
+        integer :: islot
+
+        call s_l0_fill_edge_bc()
+        call s_amr_fine_fine_halo()
+        do islot = 1, l0_ntiles_tot
+            call s_amr_select_slot(islot)
+            call s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        end do
+        call s_amr_select_slot(1)
+
+    end subroutine s_l0_advance_stage
+
+    !> Free the base-grid tiling allocations (mirror of s_l0_tiles_init).
+    impure subroutine s_l0_tiles_finalize()
+
+        integer :: islot
+
+        if (l0_ntile <= 0) return
+        do islot = 1, amr_max_blocks
+            call s_amr_free_slot(islot)
+        end do
+        deallocate (amr_slot_live)
+        if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
+        if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
+        deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
+        deallocate (amr_decomp, amr_slots)
+        deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
+        deallocate (amr_block_owner, amr_block_level)
+        if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
+        if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
+        if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
+        if (allocated(amr_gxcb)) deallocate (amr_gxcb)
+        if (allocated(amr_gycb)) deallocate (amr_gycb)
+        if (allocated(amr_gzcb)) deallocate (amr_gzcb)
+
+    end subroutine s_l0_tiles_finalize
 
     impure subroutine s_finalize_amr_module()
 
