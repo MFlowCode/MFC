@@ -151,8 +151,11 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     # cannot select, crashing llc (signal 6) while building the release container
     # images (e.g. s_read_stl_binary in m_model.fpp). Skip -Mfprelaxed for
     # container builds only; cluster/normal builds are unaffected. The switch is
-    # set in .github/Dockerfile (MFC_CONTAINER_BUILD).
-    if (NOT DEFINED ENV{MFC_CONTAINER_BUILD})
+    # set in .github/Dockerfile (MFC_CONTAINER_BUILD=1). Read it as a boolean so a
+    # stray empty/0/false export doesn't silently drop the flag from a normal
+    # build; only a truthy value skips it.
+    set(_mfc_container_build "$ENV{MFC_CONTAINER_BUILD}")
+    if (NOT _mfc_container_build)
         add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-Mfprelaxed>)
     endif()
 
