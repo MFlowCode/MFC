@@ -3442,15 +3442,34 @@ contains
 
     end subroutine s_amr_exchange_coarse_cons_halo
 
+    !> True iff dim d is periodic (BC_PERIODIC on its low face). Reliable at num_procs==1, the only regime the tile wrap-seam runs in
+    !! (at np>1 MFC overwrites bc_?%beg with a neighbour rank; periodic is rejected there by f_l0_bc_unsupported).
+    pure logical function f_l0_dim_periodic(d) result(per)
+        integer, intent(in) :: d
+        per = .false.
+        if (d == 1) per = (bc_x%beg == BC_PERIODIC)
+        if (d == 2) per = (bc_y%beg == BC_PERIODIC)
+        if (d == 3) per = (bc_z%beg == BC_PERIODIC)
+    end function f_l0_dim_periodic
+
     !> True iff sub-block yb sits immediately above sub-block xb on xb's HIGH face in dim d: yb's low coarse face is xb's high face
     !! + 1, and (tiling produces a regular grid) they share the transverse coarse extents exactly. Each fine-fine seam is exactly
-    !! one such ordered (xb, yb) pair (the lower block is xb).
+    !! one such ordered (xb, yb) pair (the lower block is xb). For an L0-tile periodic dim there is ALSO a wrap-seam: xb at the domain
+    !! HIGH face (region_hi == gcell) and yb at the domain LOW face (region_lo == 0) with matching transverse - the fine-fine halo then
+    !! fills xb's high ghost from yb's low interior and vice versa, exactly the periodic connection. Gated on l0_ntile>0 so the AMR
+    !! fine-block path (blocks never touch the domain edge) is byte-unchanged.
     pure logical function f_amr_seam(xb, yb, d) result(seam)
 
         integer, intent(in) :: xb, yb, d
-        integer             :: t
+        integer             :: t, gc
+        logical             :: adj
 
-        seam = amr_region_lo_all(d, yb) == amr_region_hi_all(d, xb) + 1
+        adj = amr_region_lo_all(d, yb) == amr_region_hi_all(d, xb) + 1
+        if (l0_ntile > 0 .and. f_l0_dim_periodic(d)) then
+            gc = merge(m_glb, merge(n_glb, p_glb, d == 2), d == 1)
+            adj = adj .or. (amr_region_hi_all(d, xb) == gc .and. amr_region_lo_all(d, yb) == 0)
+        end if
+        seam = adj
         do t = 1, 3
             if (t /= d) seam = seam .and. amr_region_lo_all(t, xb) == amr_region_lo_all(t, yb) .and. amr_region_hi_all(t, &
                 & xb) == amr_region_hi_all(t, yb)
@@ -4372,12 +4391,13 @@ contains
     end function f_l0_lo
 
     !> True if a domain-face BC code is a PHYSICAL boundary the spike does not support. Extrapolation-family (bc <= BC_GHOST_EXTRAP)
-    !! and reflective (BC_REFLECTIVE) are supported; MPI processor boundaries (bc >= 0, the neighbour rank MFC writes into
-    !! bc_?%beg/end at np>1) are interior seams handled by the fine-fine halo, not physical faces. Only periodic (BC_PERIODIC, a
-    !! domain wrap-seam, not a local face fill) is still rejected.
+    !! and reflective (BC_REFLECTIVE) are supported at any np; periodic (BC_PERIODIC) is supported only at num_procs==1 (a within-rank
+    !! wrap: self-wrap for a spanning tile, cross-tile wrap-seam otherwise). At np>1 MFC folds periodicity into the MPI cart topology
+    !! (bc_?%beg/end become wrap-neighbour ranks), which the tile wrap-seam does not yet follow, so periodic is rejected there. MPI
+    !! processor boundaries (bc >= 0) are interior seams handled by the fine-fine halo, never flagged here.
     pure logical function f_l0_bc_unsupported(bc)
         integer, intent(in) :: bc
-        f_l0_bc_unsupported = (bc == BC_PERIODIC)
+        f_l0_bc_unsupported = (bc == BC_PERIODIC .and. num_procs > 1)
     end function f_l0_bc_unsupported
 
     !> Build the base-grid tiling: allocate the slot/region/seam machinery for l0_ntiles_tot rr=1 tiles covering L0, set each tile's
@@ -4390,12 +4410,14 @@ contains
 
         if (l0_ntile <= 0) return
 
-        ! Milestone 1 supports only extrapolation-family BC (bc <= BC_GHOST_EXTRAP), the family whose ghost fill commutes with the
-        ! cons->prim convert so a tile matches the monolithic prim-space BC bit-for-bit. Validate once here (host), not per stage.
+        ! Supported physical faces: extrapolation-family (bc <= BC_GHOST_EXTRAP) and reflective (BC_REFLECTIVE) at any np, plus
+        ! periodic (BC_PERIODIC) at num_procs==1 - each has a cons-space tile fill that commutes with the cons->prim convert so a tile
+        ! matches the monolithic prim-space BC bit-for-bit. Periodic at np>1 (MPI-cart wrap topology) is not yet followed. Validate
+        ! once here (host), not per stage.
         if (f_l0_bc_unsupported(bc_x%beg) .or. f_l0_bc_unsupported(bc_x%end) &
             & .or. (n_glb > 0 .and. (f_l0_bc_unsupported(bc_y%beg) .or. f_l0_bc_unsupported(bc_y%end))) &
             & .or. (p_glb > 0 .and. (f_l0_bc_unsupported(bc_z%beg) .or. f_l0_bc_unsupported(bc_z%end)))) then
-            call s_mpi_abort('l0_ntile spike (milestone 1) supports only extrapolation BC (bc <= -3) on every physical domain face')
+            call s_mpi_abort('l0_ntile spike: unsupported physical BC - extrapolation/reflective ok at any np, periodic only at np=1')
         end if
         ! the monolithic L0 RHS is skipped for l0_ntile>0, so the global q_prim_vf it populated is stale: run-time-info and probes
         ! (which read it at stage 1) are not supported in the spike.
@@ -4914,11 +4936,17 @@ contains
         integer, intent(in) :: rlo, rhi, gcell, fm(3), d, bcbeg, bcend
 
         ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces. Reflective mirrors the
-        ! near-edge interior with the normal momentum flipped; everything else in the supported set is 0th-order extrapolation.
-        if (rlo == 0) then
+        ! near-edge interior with the normal momentum flipped; extrapolation is 0th-order. Periodic is a wrap: a tile that SPANS dim d
+        ! (rlo==0 .and. rhi==gcell, i.e. l0_ntile==1 in d) self-wraps here; a partial tile's periodic face is a cross-tile wrap-seam
+        ! filled by s_amr_fine_fine_halo (so it is skipped below - never extrapolated).
+        if (rlo == 0 .and. rhi == gcell .and. bcbeg == BC_PERIODIC) then
+            call s_l0_wrap_one(q, d, fm)
+            return
+        end if
+        if (rlo == 0 .and. bcbeg /= BC_PERIODIC) then
             if (bcbeg == BC_REFLECTIVE) then; call s_l0_reflect_one(q, d, -1, fm); else; call s_l0_extrap_one(q, d, -1, fm); end if
         end if
-        if (rhi == gcell) then
+        if (rhi == gcell .and. bcend /= BC_PERIODIC) then
             if (bcend == BC_REFLECTIVE) then; call s_l0_reflect_one(q, d, 1, fm); else; call s_l0_extrap_one(q, d, 1, fm); end if
         end if
 
@@ -4989,6 +5017,42 @@ contains
         #:endfor
 
     end subroutine s_l0_reflect_one
+
+    !> Periodic self-wrap for a tile that SPANS dim d (its low AND high faces are both the domain boundary, i.e. l0_ntile==1 in d):
+    !! fill both ghost shells from the opposite-end interior of the SAME tile - low ghost -jg <- interior md-(jg-1), high ghost md+jg
+    !! <- interior jg-1 (a pure copy, matching the monolithic prim-space s_periodic; copy commutes with cons->prim convert). Partial
+    !! tiles never reach here (their periodic faces are cross-tile wrap-seams handled by s_amr_fine_fine_halo). Face interior only.
+    impure subroutine s_l0_wrap_one(q, d, fm)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        integer, intent(in) :: d, fm(3)
+        integer :: i, jg, a, b, glo, shi, ghi, slo, na, nb, md
+
+        #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+            #:set GLO = {1: '(glo, a, b)', 2: '(a, glo, b)', 3: '(a, b, glo)'}[D]
+            #:set SHI = {1: '(shi, a, b)', 2: '(a, shi, b)', 3: '(a, b, shi)'}[D]
+            #:set GHI = {1: '(ghi, a, b)', 2: '(a, ghi, b)', 3: '(a, b, ghi)'}[D]
+            #:set SLO = {1: '(slo, a, b)', 2: '(a, slo, b)', 3: '(a, b, slo)'}[D]
+            if (d == ${D}$) then
+                na = fm(${TA}$); nb = fm(${TB}$); md = fm(${D}$)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[glo, shi, ghi, slo]')
+                do i = 1, sys_size
+                    do b = 0, nb
+                        do a = 0, na
+                            do jg = 1, buff_size
+                                glo = -jg; shi = md - (jg - 1)
+                                ghi = md + jg; slo = jg - 1
+                                q(i)%sf${GLO}$ = q(i)%sf${SHI}$
+                                q(i)%sf${GHI}$ = q(i)%sf${SLO}$
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_l0_wrap_one
 
     !> Advance every tile one RK stage: fill domain-edge BC ghosts (phase 1), overwrite interior-seam ghosts with neighbour interior
     !! (phase 2, fmul=1), then advance + RK-update each tile through the shared swap-based solver (phase 3). Mirrors the AMR
