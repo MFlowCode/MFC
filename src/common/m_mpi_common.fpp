@@ -45,6 +45,8 @@ contains
     !> Initialize the module.
     impure subroutine s_initialize_mpi_common_module
 
+    integer :: beta_v_size, beta_comm_size_1, beta_comm_size_2, beta_comm_size_3, beta_halo_size
+
 #ifdef MFC_MPI
         ! Allocating buff_send/recv and. Please note that for the sake of simplicity, both variables are provided sufficient storage
         ! to hold the largest buffer in the computational domain.
