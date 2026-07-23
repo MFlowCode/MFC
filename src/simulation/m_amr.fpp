@@ -4682,8 +4682,9 @@ contains
     !> Copy the current L0 interior state into every owned tile's interior (global cell tlo+j -> tile-local cell j).
     impure subroutine s_l0_copy_coarse_to_tiles(q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer                                             :: k, o1, o2, o3, fm1, fm2, fm3
+        ! inout (not in): passed as the bidirectional s_l0_copy_block q_l0 dummy (intent(inout)); read-only here (L0 -> tile)
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3
 
         ! Persistent tiles: seed from L0 exactly once. After the first fill the tiles are authoritative; re-copying would be an
         ! identity round-trip (each stage scatters tile->L0, so L0 already mirrors the tile interior at the next timestep's stage
