@@ -65,7 +65,7 @@ contains
             end do
         end if
 
-        if (bubbles_lagrange .or. particles_lagrange) then
+        if (bubbles_lagrange) then
             beta_bc_bounds(1)%beg = -mapcells - 1
             beta_bc_bounds(1)%end = m + mapcells + 1
             ! n > 0 always for bubbles_lagrange
