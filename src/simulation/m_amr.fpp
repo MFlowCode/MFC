@@ -207,6 +207,9 @@ module m_amr
     !! full amr_slots/region/owner/seam machinery; the tiles ARE level-1 blocks with amr_ref_ratio 1. Off (l0_ntile=0) => no effect.
     integer :: l0_ntiles_tot = 0     !< total tiles = l0_ntile**num_dims (0 when off)
     integer :: l0_nt(3) = 1          !< tiles per dim (1 in collapsed dims)
+    logical :: l0_periodic(3) = .false.  !< per-dim global periodicity, allreduced from periodic_bc in s_l0_tiles_init (periodic_bc is
+    !!                                      set on rank 0 only - s_read_input_file is rank-0-guarded - so it must be made consistent for
+    !!                                      the wrap-seam decision in f_amr_seam / s_l0_edge_bc_tile, which every rank must agree on)
     logical :: l0_tiles_need_fill = .false.  !< tiles are persistent: L0 seeds them ONCE (first timestep); set at init, cleared after fill
     integer, allocatable :: amr_tile_l0_owner(:)  !< rank owning each tile's L0 STORAGE cells (fixed = init owner); scatter routes the
     !!                                               compute-owner's interior back to this rank when a tile has MIGRATED (owner != l0_owner)
@@ -3442,14 +3445,12 @@ contains
 
     end subroutine s_amr_exchange_coarse_cons_halo
 
-    !> True iff dim d is periodic (BC_PERIODIC on its low face). Reliable at num_procs==1, the only regime the tile wrap-seam runs in
-    !! (at np>1 MFC overwrites bc_?%beg with a neighbour rank; periodic is rejected there by f_l0_bc_unsupported).
+    !> True iff dim d is globally periodic. Uses l0_periodic (periodic_bc allreduced to all ranks in s_l0_tiles_init); periodic_bc
+    !! itself is captured from the ORIGINAL bc before MFC folds periodicity into the MPI-cart topology, but only on rank 0, so the
+    !! allreduced copy is the one that is consistent on every rank - required since f_amr_seam builds a replicated seam list.
     pure logical function f_l0_dim_periodic(d) result(per)
         integer, intent(in) :: d
-        per = .false.
-        if (d == 1) per = (bc_x%beg == BC_PERIODIC)
-        if (d == 2) per = (bc_y%beg == BC_PERIODIC)
-        if (d == 3) per = (bc_z%beg == BC_PERIODIC)
+        per = l0_periodic(d)
     end function f_l0_dim_periodic
 
     !> True iff sub-block yb sits immediately above sub-block xb on xb's HIGH face in dim d: yb's low coarse face is xb's high face
@@ -4390,14 +4391,14 @@ contains
         f_l0_lo = it*(ncell/nt) + min(it, mod(ncell, nt))
     end function f_l0_lo
 
-    !> True if a domain-face BC code is a PHYSICAL boundary the spike does not support. Extrapolation-family (bc <= BC_GHOST_EXTRAP)
-    !! and reflective (BC_REFLECTIVE) are supported at any np; periodic (BC_PERIODIC) is supported only at num_procs==1 (a within-rank
-    !! wrap: self-wrap for a spanning tile, cross-tile wrap-seam otherwise). At np>1 MFC folds periodicity into the MPI cart topology
-    !! (bc_?%beg/end become wrap-neighbour ranks), which the tile wrap-seam does not yet follow, so periodic is rejected there. MPI
-    !! processor boundaries (bc >= 0) are interior seams handled by the fine-fine halo, never flagged here.
+    !> True if a domain-face BC code is a PHYSICAL boundary the spike does not support. Supported: extrapolation (BC_GHOST_EXTRAP),
+    !! reflective (BC_REFLECTIVE), and periodic (BC_PERIODIC) - each has a cons-space tile fill matching the monolithic prim-space BC.
+    !! The characteristic / slip-wall / dirichlet family (bc < BC_GHOST_EXTRAP) has no tile fill yet and is rejected. MPI processor
+    !! boundaries (bc >= 0, incl. a periodic wrap-neighbour rank at np>1) are interior seams handled by the fine-fine halo, never a
+    !! physical face here.
     pure logical function f_l0_bc_unsupported(bc)
         integer, intent(in) :: bc
-        f_l0_bc_unsupported = (bc == BC_PERIODIC .and. num_procs > 1)
+        f_l0_bc_unsupported = (bc < BC_GHOST_EXTRAP)
     end function f_l0_bc_unsupported
 
     !> Build the base-grid tiling: allocate the slot/region/seam machinery for l0_ntiles_tot rr=1 tiles covering L0, set each tile's
@@ -4407,17 +4408,26 @@ contains
 
         integer :: nt(3), ix, iy, iz, k, j, r, e, tcap
         integer :: tlo(3), thi(3)
+        integer :: ierr
 
         if (l0_ntile <= 0) return
 
-        ! Supported physical faces: extrapolation-family (bc <= BC_GHOST_EXTRAP) and reflective (BC_REFLECTIVE) at any np, plus
-        ! periodic (BC_PERIODIC) at num_procs==1 - each has a cons-space tile fill that commutes with the cons->prim convert so a tile
-        ! matches the monolithic prim-space BC bit-for-bit. Periodic at np>1 (MPI-cart wrap topology) is not yet followed. Validate
-        ! once here (host), not per stage.
+        ! periodic_bc is set on rank 0 only (s_read_input_file is rank-0-guarded), so make it globally consistent: every rank must build
+        ! the SAME wrap-seam list in f_amr_seam / apply the same periodic edge fill, else an unmatched MPI_SENDRECV deadlocks. MPI_LOR:
+        ! rank 0's .true. wins on all ranks (others hold the .false. default). No-op at np=1.
+        l0_periodic = periodic_bc
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(MPI_IN_PLACE, l0_periodic, 3, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+#endif
+
+        ! Supported physical faces (any np): extrapolation (BC_GHOST_EXTRAP), reflective (BC_REFLECTIVE), periodic (BC_PERIODIC) - each
+        ! has a cons-space tile fill that commutes with the cons->prim convert so a tile matches the monolithic prim-space BC bit-for-
+        ! bit. The characteristic/slip/dirichlet family (bc < BC_GHOST_EXTRAP) is not yet handled. Validate once here (host), not per
+        ! stage.
         if (f_l0_bc_unsupported(bc_x%beg) .or. f_l0_bc_unsupported(bc_x%end) &
             & .or. (n_glb > 0 .and. (f_l0_bc_unsupported(bc_y%beg) .or. f_l0_bc_unsupported(bc_y%end))) &
             & .or. (p_glb > 0 .and. (f_l0_bc_unsupported(bc_z%beg) .or. f_l0_bc_unsupported(bc_z%end)))) then
-            call s_mpi_abort('l0_ntile spike: unsupported physical BC - extrapolation/reflective ok at any np, periodic only at np=1')
+            call s_mpi_abort('l0_ntile spike: unsupported physical BC (only extrapolation, reflective, periodic are handled)')
         end if
         ! the monolithic L0 RHS is skipped for l0_ntile>0, so the global q_prim_vf it populated is stale: run-time-info and probes
         ! (which read it at stage 1) are not supported in the spike.
@@ -4935,18 +4945,19 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q
         integer, intent(in) :: rlo, rhi, gcell, fm(3), d, bcbeg, bcend
 
-        ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces. Reflective mirrors the
-        ! near-edge interior with the normal momentum flipped; extrapolation is 0th-order. Periodic is a wrap: a tile that SPANS dim d
-        ! (rlo==0 .and. rhi==gcell, i.e. l0_ntile==1 in d) self-wraps here; a partial tile's periodic face is a cross-tile wrap-seam
-        ! filled by s_amr_fine_fine_halo (so it is skipped below - never extrapolated).
-        if (rlo == 0 .and. rhi == gcell .and. bcbeg == BC_PERIODIC) then
-            call s_l0_wrap_one(q, d, fm)
+        ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces. Periodicity is read from
+        ! the global periodic_bc(d) (not bcbeg, which becomes a wrap-neighbour RANK at a decomposed periodic boundary): a periodic dim
+        ! wraps - a tile that SPANS it (rlo==0 .and. rhi==gcell) self-wraps here, a partial tile's periodic faces are cross-tile
+        ! wrap-seams filled by s_amr_fine_fine_halo (skipped here). A non-periodic domain-edge face gets reflective (mirror + normal
+        ! momentum flip) or 0th-order extrapolation per its physical bc code.
+        if (l0_periodic(d)) then
+            if (rlo == 0 .and. rhi == gcell) call s_l0_wrap_one(q, d, fm)
             return
         end if
-        if (rlo == 0 .and. bcbeg /= BC_PERIODIC) then
+        if (rlo == 0) then
             if (bcbeg == BC_REFLECTIVE) then; call s_l0_reflect_one(q, d, -1, fm); else; call s_l0_extrap_one(q, d, -1, fm); end if
         end if
-        if (rhi == gcell .and. bcend /= BC_PERIODIC) then
+        if (rhi == gcell) then
             if (bcend == BC_REFLECTIVE) then; call s_l0_reflect_one(q, d, 1, fm); else; call s_l0_extrap_one(q, d, 1, fm); end if
         end if
 
