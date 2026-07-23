@@ -371,8 +371,11 @@ module m_derived_types
         real(wp) :: radius  !< Particle radius
         real(wp) :: mass  !< Particle mass
         real(wp) :: min_spacing  !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
+        real(wp) :: shell_inner_radius  !< Inner radius for shell packing
+        real(wp) :: shell_outer_radius  !< Outer radius for shell packing
         integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer  :: seed  !< Random seed for reproducible placement
+        integer  :: geometry  !< Cloud geometry: 1=box, 2=hemisphere shell
         integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
     end type particle_cloud_parameters
 
