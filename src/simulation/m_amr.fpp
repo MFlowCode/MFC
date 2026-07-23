@@ -4486,7 +4486,8 @@ contains
         allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
         allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
         allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
-        allocate (amr_block_level(amr_max_blocks)); amr_block_level = 1
+        ! L0 tiles are the BASE level (Option 2: fine blocks become level>=1 on a tile)
+        allocate (amr_block_level(amr_max_blocks)); amr_block_level = 0
         allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
         allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
         allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
@@ -4627,7 +4628,9 @@ contains
         integer             :: j, tlo(3), thi(3)
 
         tlo = amr_region_lo_all(:,k); thi = amr_region_hi_all(:,k)
-        call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio (= 1)
+        call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio
+        ! a base-level tile is rr=1 regardless of the global refinement ratio (Option 2: global may be 2/4 for fine blocks)
+        amr_slots(k)%amr_ref_ratio = 1
         amr_slots(k)%m = thi(1) - tlo(1); amr_slots(k)%n = 0; amr_slots(k)%p = 0
         if (n_glb > 0) amr_slots(k)%n = thi(2) - tlo(2)
         if (p_glb > 0) amr_slots(k)%p = thi(3) - tlo(3)
