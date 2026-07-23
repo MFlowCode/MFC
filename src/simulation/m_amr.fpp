@@ -210,6 +210,8 @@ module m_amr
     logical :: l0_tiles_need_fill = .false.  !< tiles are persistent: L0 seeds them ONCE (first timestep); set at init, cleared after fill
     integer, allocatable :: amr_tile_l0_owner(:)  !< rank owning each tile's L0 STORAGE cells (fixed = init owner); scatter routes the
     !!                                               compute-owner's interior back to this rank when a tile has MIGRATED (owner != l0_owner)
+    real(wp), allocatable :: amr_tile_cost(:)  !< accumulated MEASURED compute time per owned tile since the last rebalance (GPU-synced
+    !!                                            wall time); allreduced to a replicated cost vector that drives s_l0_rebalance, then reset
 
 contains
 
@@ -4427,6 +4429,7 @@ contains
         allocate (amr_owns_all(amr_max_blocks))
         allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
         allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
+        allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
         allocate (amr_block_level(amr_max_blocks)); amr_block_level = 1
         allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
         allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
@@ -4736,44 +4739,36 @@ contains
 
     end subroutine s_l0_forced_remap
 
-    !> Deterministic SYNTHETIC per-tile work estimate for the closed-loop rebalance demo: a base cost of 1 per tile plus a boost for
-    !! the tile(s) the sweeping x-band "hotspot" currently overlaps. hot_cell is a pure function of t_step (integer arithmetic, no
-    !! measured wall time), so every rank computes identical costs -> the rebalance decision is deterministic and output stays
-    !! bit-reproducible. This stands in for a real hotspot/cost metric; wiring measured cost is the (deferred) full version.
-    pure integer function f_l0_tile_cost(k, t_step) result(cost)
-
-        integer, intent(in) :: k, t_step
-        integer, parameter :: hot_stride = 3, hot_boost = 2
-        integer :: hot_cell
-
-        cost = 1
-        hot_cell = mod(t_step*hot_stride, m_glb + 1)
-        if (amr_region_lo_all(1, k) <= hot_cell .and. hot_cell <= amr_region_hi_all(1, k)) cost = cost + hot_boost
-
-    end function f_l0_tile_cost
-
-    !> Closed-loop static rebalancer (minimal, deterministic): estimate each tile's cost, then greedily move tiles from the heaviest
-    !! rank to the lightest (single best gap-reducing move per iteration, bounded) to level per-rank load, and realise the plan with
-    !! s_l0_migrate_tile. Detect (loads) -> decide (greedy target owners) -> act (P2P migrate) -> the load gap shrinks. Because every
-    !! migration is bit-preserving and the decision never touches field data, OUTPUT is byte-identical to a no-rebalance run - the loop
-    !! trades locality/cost, never correctness. All ranks run the identical decision on replicated metadata, then issue the same
-    !! migrations in ascending-tile order (matched P2P). No-op at np=1.
+    !> Closed-loop rebalancer driven by MEASURED per-tile compute time. Each rank accumulated amr_tile_cost for its OWN tiles since the
+    !! last rebalance; an allreduce(SUM) makes the full cost vector REPLICATED and bit-identical on every rank (each tile has exactly
+    !! one nonzero contributor, so the sum is exact) -> every rank runs the identical greedy and issues MATCHING P2P migrations. Greedy:
+    !! move the tile on the heaviest rank that most reduces the max-min load gap onto the lightest, bounded, with a small relative
+    !! deadband so timing noise does not cause churn. Because migration is bit-preserving and the decision touches no field data, OUTPUT
+    !! is byte-identical regardless of the (run-to-run nondeterministic) measured schedule - the decomposition-invariance proven for the
+    !! tile path is exactly what keeps a nondeterministic cost signal golden-safe. Costs reset after each rebalance. No-op at np=1.
     impure subroutine s_l0_rebalance(t_step)
 
         integer, intent(in) :: t_step
-        integer :: k, r, H, L, gap, ng, best_k, best_ng, move, gap0, gap1
-        integer :: cost(l0_ntiles_tot), newo(l0_ntiles_tot), load(0:num_procs - 1)
+        integer :: k, r, H, L, best_k, move, nmig, ierr
+        integer :: newo(l0_ntiles_tot)
+        real(wp) :: cost(l0_ntiles_tot), load(0:num_procs - 1), gap, ng, best_ng, gap0, gap1, mean, tol
 
-        if (num_procs < 2) return
+        if (num_procs < 2) then
+            amr_tile_cost = 0._wp  ! nothing to balance; still clear the window
+            return
+        end if
 
-        do k = 1, l0_ntiles_tot
-            cost(k) = f_l0_tile_cost(k, t_step)
-            newo(k) = amr_block_owner(k)
-        end do
-        load = 0
+        cost = amr_tile_cost  ! local: nonzero only for this rank's owned tiles
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(MPI_IN_PLACE, cost, l0_ntiles_tot, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)  ! -> replicated, bit-identical
+#endif
+        newo = amr_block_owner
+        load = 0._wp
         do k = 1, l0_ntiles_tot
             load(newo(k)) = load(newo(k)) + cost(k)
         end do
+        mean = sum(load)/real(num_procs, wp)
+        tol = 0.05_wp*mean  ! deadband: ignore imbalance below 5% of the mean load so measurement noise does not churn migrations
         gap0 = maxval(load) - minval(load)
 
         ! greedy: each step move the tile on the heaviest rank that most reduces the max-min load gap onto the lightest rank
@@ -4781,23 +4776,30 @@ contains
             H = 0; do r = 1, num_procs - 1; if (load(r) > load(H)) H = r; end do
             L = 0; do r = 1, num_procs - 1; if (load(r) < load(L)) L = r; end do
             gap = load(H) - load(L)
-            if (gap == 0) exit
+            if (gap <= tol) exit
             best_k = -1; best_ng = gap
             do k = 1, l0_ntiles_tot
                 if (newo(k) /= H) cycle
-                ng = abs(gap - 2*cost(k))  ! gap after moving cost(k) from H to L
+                ng = abs(gap - 2._wp*cost(k))  ! gap after moving cost(k) from H to L
                 if (ng < best_ng) then; best_ng = ng; best_k = k; end if
             end do
-            if (best_k < 0) exit  ! no move strictly reduces the gap
+            if (best_k < 0) exit  ! no single move strictly reduces the gap
             newo(best_k) = L
             load(H) = load(H) - cost(best_k); load(L) = load(L) + cost(best_k)
         end do
         gap1 = maxval(load) - minval(load)
-        if (proc_rank == 0) print '(A,I0,A,I0,A,I0)', ' [l0 rebalance] t_step=', t_step, ' load-gap ', gap0, ' -> ', gap1
 
+        nmig = 0
         do k = 1, l0_ntiles_tot
-            if (newo(k) /= amr_block_owner(k)) call s_l0_migrate_tile(k, newo(k))
+            if (newo(k) /= amr_block_owner(k)) then
+                call s_l0_migrate_tile(k, newo(k))
+                nmig = nmig + 1
+            end if
         end do
+        if (proc_rank == 0) print '(A,I0,A,ES10.3,A,ES10.3,A,I0,A)', ' [l0 rebalance] t_step=', t_step, &
+            & ' load-gap ', gap0, ' -> ', gap1, ' (', nmig, ' migrations)'
+
+        amr_tile_cost = 0._wp  ! reset the measurement window
 
     end subroutine s_l0_rebalance
 
@@ -4958,13 +4960,29 @@ contains
         real(stp), dimension(:, :, :, :, :), intent(inout) :: pb_in, mv_in
         real(wp), dimension(:, :, :, :, :), intent(inout) :: rhs_pb, rhs_mv
         integer :: islot
+        integer(8) :: tc0, tc1, crate
+        logical :: measure
+
+        ! measure per-tile compute time only when rebalancing is active (the GPU_WAIT bracketing serialises the GPU, so it is off by
+        ! default). GPU-synced wall time (cpu_time would capture only host launch overhead under offload); accumulated across stages,
+        ! reset at each rebalance. Timing is a pure side-channel - it never touches field data, so output stays bit-identical.
+        measure = (l0_rebalance_interval > 0)
 
         call s_l0_fill_edge_bc()
         call s_amr_fine_fine_halo()
         do islot = 1, l0_ntiles_tot
             if (amr_block_owner(islot) /= proc_rank) cycle  ! advance only owned tiles; remote tiles live on their owner rank
             call s_amr_select_slot(islot)
+            if (measure) then
+                $:GPU_WAIT()
+                call system_clock(tc0)
+            end if
             call s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+            if (measure) then
+                $:GPU_WAIT()
+                call system_clock(tc1, crate)
+                amr_tile_cost(islot) = amr_tile_cost(islot) + real(tc1 - tc0, wp)/real(crate, wp)
+            end if
         end do
         call s_amr_select_slot(1)
 
@@ -4985,7 +5003,7 @@ contains
         deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
         deallocate (amr_decomp, amr_slots)
         deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
-        deallocate (amr_block_owner, amr_tile_l0_owner, amr_block_level)
+        deallocate (amr_block_owner, amr_tile_l0_owner, amr_tile_cost, amr_block_level)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
         if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
         if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
