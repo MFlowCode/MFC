@@ -70,7 +70,7 @@ contains
             halo_size = -1 + buff_size*(v_size)
         end if
 
-       if bubbles_lagrange .or. particles_lagrange then
+       if (bubbles_lagrange .or. particles_lagrange) then
           beta_v_size = size(beta_vars)
           beta_comm_size_1 = m + 2*mapCells + 3
           beta_comm_size_2 = merge(n + 2*mapCells + 3, 1, n>0)
@@ -83,7 +83,7 @@ contains
                   beta_halo_size = 2*(mapCells + 1)*beta_v_size*max(beta_comm_size_2, beta_comm_size_1) - 1
               end if
           else
-              beta_helo_size = 2*(mapCells + 1)*beta_v_size - 1
+              beta_halo_size = 2*(mapCells + 1)*beta_v_size - 1
           end if
           halo_size = max(halo_size, beta_halo_size)
       end if
@@ -1190,8 +1190,8 @@ contains
                                 do j = comm_coords(1)%beg, comm_coords(1)%end
                                     r = (i - 1) + v_size*((j - comm_coords(1)%beg) + comm_size(1)*((k + mapcells + 1) &
                                          & + lb_size*(l - comm_coords(3)%beg)))
-                                    buff_send(r) = real(q_comm(vars_comm)%sf(j, k + pack_offset, l), &
-                                              & kind=wp) - real(kahan_comp(vars_comm)%sf(j, k + pack_offset, l), kind=wp)
+                                    buff_send(r) = real(q_comm(vars_comm(i))%sf(j, k + pack_offset, l), &
+                                              & kind=wp) - real(kahan_comp(vars_comm(i))%sf(j, k + pack_offset, l), kind=wp)
                                 end do
                             end do
                         end do
