@@ -70,7 +70,7 @@ contains
             halo_size = -1 + buff_size*(v_size)
         end if
 
-       if (bubbles_lagrange .or. particles_lagrange) then
+       if (bubbles_lagrange) then
           beta_v_size = size(beta_vars)
           beta_comm_size_1 = m + 2*mapCells + 3
           beta_comm_size_2 = merge(n + 2*mapCells + 3, 1, n>0)
