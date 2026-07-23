@@ -556,8 +556,11 @@ contains
                     ! advances)
                     if (l0_migrate_step > 0 .and. t_step == l0_migrate_step) call s_l0_forced_remap()
                     ! spike: closed-loop rebalance every l0_rebalance_interval steps (detect load imbalance -> migrate -> re-level)
-                    if (l0_rebalance_interval > 0 .and. t_step > 0 .and. mod(t_step, &
-                        & l0_rebalance_interval) == 0) call s_l0_rebalance(t_step)
+                    ! nested so mod() is never reached when l0_rebalance_interval == 0: Fortran does not short-circuit .and., and
+                    ! amdflang hoists the integer divide ahead of the guard -> SIGFPE (mod-by-zero) at the default interval of 0
+                    if (l0_rebalance_interval > 0 .and. t_step > 0) then
+                        if (mod(t_step, l0_rebalance_interval) == 0) call s_l0_rebalance(t_step)
+                    end if
                 end if
                 call s_l0_advance_stage(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
                 ! beta: tiles are the AUTHORITATIVE store (no per-stage L0 mirror). L0 is a fixed-decomposition I/O staging buffer,
