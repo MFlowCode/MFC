@@ -4640,13 +4640,13 @@ contains
     !! also its L0-storage owner writes locally (device kernel - the common case, and the ENTIRE no-migration path, so byte-identical
     !! to before). A MIGRATED tile (owner != l0_owner) has its interior sent by the compute owner to the L0-storage owner over MPI,
     !! which writes it into L0 - keeping the fixed L0 decomposition (hence output/restart) correct after migration. Ghosts are not
-    !! scattered (the tile path never reads L0 ghosts). The MPI branch is CPU-only for now (GPU migration is a later milestone; it is
-    !! dead code while l0_migrate_step == 0, so GPU runs without migration are unaffected).
+    !! scattered (the tile path never reads L0 ghosts). GPU-correct: the MPI branch device-packs/unpacks via s_l0_pack_unpack_block, so
+    !! the receiver writes L0 ON THE DEVICE - it survives the GPU_UPDATE(host) that s_save_data does before writing.
     impure subroutine s_l0_scatter_tiles_to_coarse(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, i, j, kk, ll, cnt, idx, ierr
-        real(stp), allocatable :: buf(:)
+        integer :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
+        real(wp), allocatable :: buf(:)
 
         do k = 1, l0_ntiles_tot
             bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
@@ -4660,29 +4660,20 @@ contains
                 cycle
             end if
             cnt = sys_size*(fm1 + 1)*(fm2 + 1)*(fm3 + 1)
-            if (proc_rank == bown) then  ! compute owner: pack owned tile interior, send to the L0 owner
-                allocate (buf(cnt)); idx = 0
-                do i = 1, sys_size
-                    do ll = 0, fm3; do kk = 0, fm2; do j = 0, fm1
-                        idx = idx + 1; buf(idx) = amr_slots(k)%q_cons(i)%sf(j, kk, ll)
-                    end do; end do; end do
-                end do
+            if (proc_rank == bown) then  ! compute owner: device-pack owned tile interior, send to the L0 owner
+                allocate (buf(cnt))
+                call s_l0_pack_unpack_block(amr_slots(k)%q_cons, 0, 0, 0, fm1, fm2, fm3, buf, .true.)
 #ifdef MFC_MPI
-                call MPI_SEND(buf, cnt, mpi_io_p, lown, k, MPI_COMM_WORLD, ierr)
+                call MPI_SEND(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, ierr)
 #endif
                 deallocate (buf)
-            else if (proc_rank == lown) then  ! L0 owner: recv the interior, write it into the local L0 chunk
-                call s_l0_tile_l0_offsets(k, o1, o2, o3)
+            else if (proc_rank == lown) then  ! L0 owner: recv, device-unpack into the local L0 chunk (device write -> survives the
+                call s_l0_tile_l0_offsets(k, o1, o2, o3)             ! GPU_UPDATE(host) s_save_data does before writing)
                 allocate (buf(cnt))
 #ifdef MFC_MPI
-                call MPI_RECV(buf, cnt, mpi_io_p, bown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call MPI_RECV(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
-                idx = 0
-                do i = 1, sys_size
-                    do ll = 0, fm3; do kk = 0, fm2; do j = 0, fm1
-                        idx = idx + 1; q_cons_vf(i)%sf(o1 + j, o2 + kk, o3 + ll) = buf(idx)
-                    end do; end do; end do
-                end do
+                call s_l0_pack_unpack_block(q_cons_vf, o1, o2, o3, fm1, fm2, fm3, buf, .false.)
                 deallocate (buf)
             end if
         end do
@@ -4693,12 +4684,12 @@ contains
     !! receiver, free it on the sender, and update the replicated owner map + seam topology. ALL ranks call with the same
     !! (k, new_owner). This is the load-balance MIGRATION primitive; the DECISION of which tile moves where is made by the caller
     !! (a forced remap in the spike; a cost-driven trigger later). Ghosts are not moved (refilled by edge-BC + fine-fine halo before
-    !! the next stage); interior is sent in stp (exact for the field kind). CPU-only for now (GPU migration is a later milestone).
+    !! the next stage). GPU-correct: interior is device-packed/unpacked via s_l0_pack_unpack_block (wp buffer, cast to/from stp).
     impure subroutine s_l0_migrate_tile(k, new_owner)
 
         integer, intent(in) :: k, new_owner
-        integer :: old_owner, i, j, kk, ll, ni, nj, nl, cnt, idx, ierr
-        real(stp), allocatable :: buf(:)
+        integer :: old_owner, ni, nj, nl, cnt, ierr
+        real(wp), allocatable :: buf(:)
 
         old_owner = amr_block_owner(k)
         if (old_owner == new_owner) return
@@ -4708,30 +4699,21 @@ contains
         nl = 0; if (p_glb > 0) nl = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
         cnt = sys_size*(ni + 1)*(nj + 1)*(nl + 1)
 
-        if (proc_rank == old_owner) then  ! pack + send the interior, then release the slot
-            allocate (buf(cnt)); idx = 0
-            do i = 1, sys_size
-                do ll = 0, nl; do kk = 0, nj; do j = 0, ni
-                    idx = idx + 1; buf(idx) = amr_slots(k)%q_cons(i)%sf(j, kk, ll)
-                end do; end do; end do
-            end do
+        if (proc_rank == old_owner) then  ! device-pack + send the interior, then release the slot
+            allocate (buf(cnt))
+            call s_l0_pack_unpack_block(amr_slots(k)%q_cons, 0, 0, 0, ni, nj, nl, buf, .true.)
 #ifdef MFC_MPI
-            call MPI_SEND(buf, cnt, mpi_io_p, new_owner, 4300, MPI_COMM_WORLD, ierr)
+            call MPI_SEND(buf, cnt, mpi_p, new_owner, 4300, MPI_COMM_WORLD, ierr)
 #endif
             deallocate (buf)
             call s_amr_free_slot(k)
-        else if (proc_rank == new_owner) then  ! build the slot, recv the interior into it
+        else if (proc_rank == new_owner) then  ! build the slot, recv + device-unpack the interior into it
             call s_l0_build_tile_slot(k)
             allocate (buf(cnt))
 #ifdef MFC_MPI
-            call MPI_RECV(buf, cnt, mpi_io_p, old_owner, 4300, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            call MPI_RECV(buf, cnt, mpi_p, old_owner, 4300, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
-            idx = 0
-            do i = 1, sys_size
-                do ll = 0, nl; do kk = 0, nj; do j = 0, ni
-                    idx = idx + 1; amr_slots(k)%q_cons(i)%sf(j, kk, ll) = buf(idx)
-                end do; end do; end do
-            end do
+            call s_l0_pack_unpack_block(amr_slots(k)%q_cons, 0, 0, 0, ni, nj, nl, buf, .false.)
             deallocate (buf)
         end if
 
@@ -4856,6 +4838,47 @@ contains
         end if
 
     end subroutine s_l0_copy_block
+
+    !> Device pack (to_buf=T) / unpack (F) of a field's interior block [o+0:o+fm] <-> the contiguous MPI buffer buf, for the P2P
+    !! migration + migrated-tile scatter. Follows s_amr_fine_slice: the pack/unpack runs ON THE DEVICE with copyout/copyin moving only
+    !! buf host<->device (no strided %sf section in a map clause - flang miscomputes those), and q is passed as a dummy so the kernel
+    !! reads the mapped %sf (indexing the module amr_slots%q_cons in a kernel is a null deref). buf index runs j fastest then k,l,i so a
+    !! matching pack/unpack aligns cell-for-cell. wp buffer, cast to/from stp (identity at double) - matches the fine-fine halo.
+    impure subroutine s_l0_pack_unpack_block(q, o1, o2, o3, fm1, fm2, fm3, buf, to_buf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        integer, intent(in) :: o1, o2, o3, fm1, fm2, fm3
+        real(wp), intent(inout), contiguous :: buf(:)
+        logical, intent(in) :: to_buf
+        integer :: i, j, k, l
+
+        if (to_buf) then
+            $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
+            do i = 1, sys_size
+                do l = 0, fm3
+                    do k = 0, fm2
+                        do j = 0, fm1
+                            buf(1 + j + (fm1 + 1)*(k + (fm2 + 1)*(l + (fm3 + 1)*(i - 1)))) = real(q(i)%sf(o1 + j, o2 + k, o3 + l), wp)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
+            do i = 1, sys_size
+                do l = 0, fm3
+                    do k = 0, fm2
+                        do j = 0, fm1
+                            q(i)%sf(o1 + j, o2 + k, o3 + l) = real(buf(1 + j + (fm1 + 1)*(k + (fm2 + 1)*(l + (fm3 + 1)*(i - 1)))), stp)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+    end subroutine s_l0_pack_unpack_block
 
     !> Fill each tile's DOMAIN-EDGE face ghosts with the physical BC (interior-seam faces are overwritten by s_amr_fine_fine_halo
     !! afterward). Milestone 1 supports extrapolation (bc <= BC_GHOST_EXTRAP); other codes abort. A face (d,side) is a domain edge
