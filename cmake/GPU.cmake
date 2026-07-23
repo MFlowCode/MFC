@@ -143,8 +143,18 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Mfprelaxed>
     )
+
+    # -Mfprelaxed enables relaxed-precision FP, including the a/sqrt(b) ->
+    # a*rsqrt(b) idiom. On NVHPC 24.5 that idiom can emit an AVX-512 reciprocal-
+    # sqrt node (X86ISD::RSQRT14S) that the non-AVX-512 GitHub Actions runner CPUs
+    # cannot select, crashing llc (signal 6) while building the release container
+    # images (e.g. s_read_stl_binary in m_model.fpp). Skip -Mfprelaxed for
+    # container builds only; cluster/normal builds are unaffected. The switch is
+    # set in .github/Dockerfile (MFC_CONTAINER_BUILD).
+    if (NOT DEFINED ENV{MFC_CONTAINER_BUILD})
+        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-Mfprelaxed>)
+    endif()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
