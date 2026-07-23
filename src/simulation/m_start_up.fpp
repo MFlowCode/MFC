@@ -58,7 +58,7 @@ module m_start_up
     use m_load_balance, only: s_load_balance_rebalance
     use m_sfc_partition
     use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib, &
-        & s_l0_tiles_init, s_l0_tiles_finalize
+        & s_l0_tiles_init, s_l0_tiles_finalize, s_l0_scatter_tiles_to_coarse
     use m_amr_regrid, only: s_amr_regrid, s_amr_check_active_box_containment
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
@@ -724,6 +724,10 @@ contains
         integer(kind=8)         :: i, j, k, l
         integer                 :: stor
         integer                 :: save_count
+
+        ! beta: tiles own the state; refresh the L0 I/O staging buffer from them just-in-time for output (MPI-aware for migrated
+        ! tiles). Safe: s_save_data always runs after >=1 s_perform_time_step, so tiles are seeded + advanced by now.
+        if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
 
         if (down_sample) then
             call s_populate_variables_buffers(bc_type, q_cons_ts(1)%vf)

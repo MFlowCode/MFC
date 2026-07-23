@@ -31,7 +31,7 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
         & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
-        & s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_forced_remap, s_l0_rebalance
+        & s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -558,7 +558,9 @@ contains
                         & call s_l0_rebalance(t_step)
                 end if
                 call s_l0_advance_stage(s, rk_coef(s, :), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
-                call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
+                ! beta: tiles are the AUTHORITATIVE store (no per-stage L0 mirror). L0 is a fixed-decomposition I/O staging buffer,
+                ! gathered from the tiles only at output (s_save_data). This is what "tiles own storage" means; it also removes the
+                ! per-stage scatter cost. (Requires no active post-op reads L0 for the l0 path - already true in the persistent model.)
             else
             if (ab_active) then
                 jlo = ab_x%beg; jhi = ab_x%end
