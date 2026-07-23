@@ -206,6 +206,8 @@ module m_amr
     !! full amr_slots/region/owner/seam machinery; the tiles ARE level-1 blocks with amr_ref_ratio 1. Off (l0_ntile=0) => no effect.
     integer :: l0_ntiles_tot = 0  !< total tiles = l0_ntile**num_dims (0 when off)
     integer :: l0_nt(3) = 1       !< tiles per dim (1 in collapsed dims)
+    ! Unification pool layout (amr_max_fine, l0_slot_off) lives in m_global_parameters beside amr_num_blocks/amr_max_blocks, so
+    ! m_amr_regrid (a separate module) sees it too.
     !> per-dim global periodicity, allreduced from periodic_bc in s_l0_tiles_init (periodic_bc is set on rank 0 only -
     !! s_read_input_file is rank-0-guarded - so it must be made consistent for the wrap-seam decision in f_amr_seam /
     !! s_l0_edge_bc_tile, which every rank must agree on)
@@ -237,6 +239,10 @@ contains
 
         amr_dt_fine = 0.5_wp*dt
 
+        ! Fine-block cap = the case amr_max_blocks; the total slot pool equals it until L0 tiles coexist (l0_slot_off > 0), when the
+        ! tile prefix is added below in s_l0_tiles_init. l0_slot_off stays 0 here (set when tiles are built).
+        amr_max_fine = amr_max_blocks
+
         ! fixed pool of amr_max_blocks slots; init activates exactly one (amr_cur = 1); regrid clusters into up to amr_max_blocks
         allocate (amr_slots(1:amr_max_blocks))
         allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
@@ -256,7 +262,7 @@ contains
         ! fine-level load balance is capped at min(num blocks, amr_max_blocks) ranks: the SFC map spreads whole blocks, so with
         ! fewer
         ! blocks than ranks some ranks own no fine work. Warn when the pool itself is the limit (raise amr_max_blocks).
-        if (proc_rank == 0 .and. num_procs > amr_max_blocks) then
+        if (proc_rank == 0 .and. num_procs > amr_max_fine) then
             print '(A,I0,A,I0,A)', ' [amr] WARNING: amr_max_blocks (', amr_max_blocks, ') < num_procs (', num_procs, &
                 & '): the fine level can occupy at most amr_max_blocks ranks - raise amr_max_blocks for better fine-level balance'
         end if
@@ -498,7 +504,7 @@ contains
             if (ib) then
                 nt = 1; tiled(1)%lo = blk_lo; tiled(1)%hi = blk_hi
             else
-                call s_amr_tile_box(blk_lo, blk_hi, tiled, nt, amr_max_blocks, capt)
+                call s_amr_tile_box(blk_lo, blk_hi, tiled, nt, amr_max_fine, capt)
             end if
             amr_num_blocks = nt
             ! set block regions FIRST so the owner assignment (reads amr_region_*_all) runs BEFORE the owner-dependent geometry -
@@ -1898,7 +1904,7 @@ contains
         ! the static hierarchy nests exactly one level-2 block; without pool room it would SILENTLY refine only to level 1 (an
         ! under-resolved but "successful" run). n1 (the level-1 tile count) is only known here, not at checker time, so abort at the
         ! point of failure. Replicated inputs -> every rank takes the same branch (collective-safe).
-        if (n1 + 1 > amr_max_blocks) call s_mpi_abort('amr static multi-level (amr_max_level > 1, amr_regrid_int = 0): ' &
+        if (n1 + 1 > amr_max_fine) call s_mpi_abort('amr static multi-level (amr_max_level > 1, amr_regrid_int = 0): ' &
             & // 'amr_max_blocks is too small to nest the level-2 block (need >= level-1 block count + 1); increase amr_max_blocks')
         L2 = n1 + 1
         inset = 0

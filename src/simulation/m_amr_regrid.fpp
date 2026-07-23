@@ -483,7 +483,7 @@ contains
         if (n_glb > 0) ng = n_glb
         if (p_glb > 0) pg = p_glb
 
-        cap = amr_max_blocks
+        cap = amr_max_fine
         allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
         allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in))
         ! working copy of the tag list, partitioned in place as the tree descends so each node scans only its tags
@@ -567,7 +567,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
         logical, allocatable                                   :: tag_grid(:,:,:)
         type(t_box), allocatable                               :: boxes(:)
-        integer                                                :: sidx(3), nboxes, box_level(amr_max_blocks)
+        integer                                                :: sidx(3), nboxes, box_level(amr_max_fine)
         integer                                                :: old_np
         integer                                                :: old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks)
         integer                                                :: old_level(amr_max_blocks)
@@ -735,7 +735,7 @@ contains
                 allocate (tiled(amr_max_blocks))
                 ntl = 0; capt = 0
                 do kk2 = 1, nboxes
-                    call s_amr_tile_box(boxes(kk2)%lo, boxes(kk2)%hi, tiled, ntl, amr_max_blocks, capt)
+                    call s_amr_tile_box(boxes(kk2)%lo, boxes(kk2)%hi, tiled, ntl, amr_max_fine, capt)
                 end do
                 if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', &
                     & amr_max_blocks
@@ -977,7 +977,7 @@ contains
 
                     ! Pass 2: process (no comm)
                     do kb = plo, phi
-                        if (nboxes + 1 > amr_max_blocks) exit  ! pool full - stop nesting
+                        if (nboxes + 1 > amr_max_fine) exit  ! pool full - stop nesting
                         mlo = mlo_all(:,kb); mhi = mhi_all(:,kb)
                         if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
                         if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
@@ -1019,7 +1019,7 @@ contains
                             call s_amr_cluster(ctags, nct, cboxes, ncb)
                             deallocate (ctags)
                             do kc = 1, ncb
-                                if (nboxes + 1 > amr_max_blocks) exit
+                                if (nboxes + 1 > amr_max_fine) exit
                                 clo = cboxes(kc)%lo; chi = cboxes(kc)%hi
                                 clo(1) = max(clo(1) - amr_buf, mlo(1)); chi(1) = min(chi(1) + amr_buf, mhi(1))
                                 if (n_glb > 0) then
@@ -1065,7 +1065,7 @@ contains
                                         nl2 = 0; cpd = 0
                                         call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, amr_maxc_fit/2)
                                         do it = 1, nl2
-                                            if (nboxes + 1 > amr_max_blocks) exit
+                                            if (nboxes + 1 > amr_max_fine) exit
                                             nboxes = nboxes + 1
                                             boxes(nboxes)%lo = l2t(it)%lo; boxes(nboxes)%hi = l2t(it)%hi
                                             box_level(nboxes) = lev
@@ -1093,7 +1093,7 @@ contains
                     plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
                     if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
                 end do
-                if (nboxes >= amr_max_blocks .and. proc_rank == 0) print '(A)', &
+                if (nboxes >= amr_max_fine .and. proc_rank == 0) print '(A)', &
                     & ' [amr] NOTE: block pool full during multi-level nesting; some boxes were not refined further'
             end block
         end if
