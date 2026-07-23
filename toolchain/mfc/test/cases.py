@@ -4340,6 +4340,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # L0-as-blocks dynamic load balancer: the base grid is tiled into migratable blocks (l0_ntile), and a FORCED
+        # cross-rank tile migration (l0_migrate_step) at np=2 exercises the device pack/unpack P2P path - the per-block
+        # device (de)allocation / present-table churn that historically breaks across CCE and AMD flang (the ab_int /
+        # lib-4425 class), and which NO other test runs because the l0 path is inert at the l0_ntile=0 default. Output is
+        # decomposition-invariant (migration is byte-preserving), so this golden fails iff a migration corrupts state on
+        # some backend. Reuses the 2D np=2 x-split grid; fixed dt + run_time_info off (l0>0 gates run-time-info/probes).
+        l0_base = {k: v for k, v in amr_2d_base.items() if not k.startswith("amr")}
+        stack.push(
+            "L0 tiles -> 2D -> forced cross-rank migration np=2",
+            {**l0_base, "run_time_info": "F", "l0_ntile": 1, "l0_migrate_step": 3},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
         # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
         # ADJACENT same-level sub-blocks across the x rank seam (one per rank) - but amr_subcycle=T. The subcycle
         # advances every level-1 block stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo interposed
