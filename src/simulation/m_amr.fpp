@@ -4372,11 +4372,12 @@ contains
     end function f_l0_lo
 
     !> True if a domain-face BC code is a PHYSICAL boundary the spike does not support. Extrapolation-family (bc <= BC_GHOST_EXTRAP)
-    !! is supported; MPI processor boundaries (bc >= 0, the neighbour rank MFC writes into bc_?%beg/end at np>1) are interior seams
-    !! handled by the fine-fine halo, not physical faces. So only bc in (BC_GHOST_EXTRAP, 0) - i.e. reflective/periodic - is rejected.
+    !! and reflective (BC_REFLECTIVE) are supported; MPI processor boundaries (bc >= 0, the neighbour rank MFC writes into
+    !! bc_?%beg/end at np>1) are interior seams handled by the fine-fine halo, not physical faces. Only periodic (BC_PERIODIC, a
+    !! domain wrap-seam, not a local face fill) is still rejected.
     pure logical function f_l0_bc_unsupported(bc)
         integer, intent(in) :: bc
-        f_l0_bc_unsupported = (bc < 0 .and. bc > BC_GHOST_EXTRAP)
+        f_l0_bc_unsupported = (bc == BC_PERIODIC)
     end function f_l0_bc_unsupported
 
     !> Build the base-grid tiling: allocate the slot/region/seam machinery for l0_ntiles_tot rr=1 tiles covering L0, set each tile's
@@ -4893,11 +4894,12 @@ contains
         do k = 1, l0_ntiles_tot
             if (amr_block_owner(k) /= proc_rank) cycle
             fm(1) = amr_slots(k)%m; fm(2) = amr_slots(k)%n; fm(3) = amr_slots(k)%p
-            call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(1, k), amr_region_hi_all(1, k), gcell(1), fm, 1)
+            call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(1, k), amr_region_hi_all(1, k), gcell(1), fm, 1, &
+                                   & bc_x%beg, bc_x%end)
             if (n_glb > 0) call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(2, k), amr_region_hi_all(2, k), gcell(2), &
-                                   & fm, 2)
+                                   & fm, 2, bc_y%beg, bc_y%end)
             if (p_glb > 0) call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(3, k), amr_region_hi_all(3, k), gcell(3), &
-                                   & fm, 3)
+                                   & fm, 3, bc_z%beg, bc_z%end)
         end do
 
     end subroutine s_l0_fill_edge_bc
@@ -4906,14 +4908,19 @@ contains
     !! the domain boundary (rlo==0 low / rhi==gcell high). Applied to q_cons; convert (identity-commuting for extrapolation) makes
     !! the prim ghost the monolithic path produces. The transverse loop spans the FACE interior only (dimension-split scheme reads
     !! no corner ghost).
-    impure subroutine s_l0_edge_bc_tile(q, rlo, rhi, gcell, fm, d)
+    impure subroutine s_l0_edge_bc_tile(q, rlo, rhi, gcell, fm, d, bcbeg, bcend)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q
-        integer, intent(in) :: rlo, rhi, gcell, fm(3), d
+        integer, intent(in) :: rlo, rhi, gcell, fm(3), d, bcbeg, bcend
 
-        ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces.
-        if (rlo == 0) call s_l0_extrap_one(q, d, -1, fm)
-        if (rhi == gcell) call s_l0_extrap_one(q, d, 1, fm)
+        ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces. Reflective mirrors the
+        ! near-edge interior with the normal momentum flipped; everything else in the supported set is 0th-order extrapolation.
+        if (rlo == 0) then
+            if (bcbeg == BC_REFLECTIVE) then; call s_l0_reflect_one(q, d, -1, fm); else; call s_l0_extrap_one(q, d, -1, fm); end if
+        end if
+        if (rhi == gcell) then
+            if (bcend == BC_REFLECTIVE) then; call s_l0_reflect_one(q, d, 1, fm); else; call s_l0_extrap_one(q, d, 1, fm); end if
+        end if
 
     end subroutine s_l0_edge_bc_tile
 
@@ -4947,6 +4954,41 @@ contains
         #:endfor
 
     end subroutine s_l0_extrap_one
+
+    !> Reflective (symmetry) tile face ghosts in dim d, side (-1 low / +1 high): ghost cell 1..buff_size MIRRORS the near-edge interior
+    !! (ghost -jg <- interior jg-1 low; md+jg <- md-(jg-1) high) with the NORMAL-direction momentum (eqn_idx%mom%beg + d - 1) negated,
+    !! all other conserved variables copied. Done on q_cons; negating conserved normal momentum commutes with the cons->prim convert
+    !! (velocity flips, rho and mom**2 - hence pressure - are unchanged), so this reproduces the monolithic prim-space s_symmetry
+    !! bit-for-bit. Transverse extent is the face interior only (dimension-split reads no corner ghost), matching s_l0_extrap_one.
+    impure subroutine s_l0_reflect_one(q, d, side, fm)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        integer, intent(in) :: d, side, fm(3)
+        integer :: i, jg, a, b, gc, sc, na, nb, md, nrm
+
+        #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+            #:set SIDX = {1: '(sc, a, b)', 2: '(a, sc, b)', 3: '(a, b, sc)'}[D]
+            #:set GIDX = {1: '(gc, a, b)', 2: '(a, gc, b)', 3: '(a, b, gc)'}[D]
+            if (d == ${D}$) then
+                na = fm(${TA}$); nb = fm(${TB}$); md = fm(${D}$)
+                nrm = eqn_idx%mom%beg + ${D}$ - 1
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[gc, sc]')
+                do i = 1, sys_size
+                    do b = 0, nb
+                        do a = 0, na
+                            do jg = 1, buff_size
+                                gc = merge(-jg, md + jg, side == -1)
+                                sc = merge(jg - 1, md - (jg - 1), side == -1)
+                                q(i)%sf${GIDX}$ = merge(-q(i)%sf${SIDX}$, q(i)%sf${SIDX}$, i == nrm)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_l0_reflect_one
 
     !> Advance every tile one RK stage: fill domain-edge BC ghosts (phase 1), overwrite interior-seam ghosts with neighbour interior
     !! (phase 2, fmul=1), then advance + RK-update each tile through the shared swap-based solver (phase 3). Mirrors the AMR
