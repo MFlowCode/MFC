@@ -41,7 +41,7 @@ module m_amr
         & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, &
         & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
         & s_l0_tiles_init, s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_tiles_finalize, &
-        & s_l0_forced_remap
+        & s_l0_forced_remap, s_l0_rebalance
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -4753,6 +4753,71 @@ contains
         if (amr_block_owner(k) /= 0) call s_l0_migrate_tile(k, 0)
 
     end subroutine s_l0_forced_remap
+
+    !> Deterministic SYNTHETIC per-tile work estimate for the closed-loop rebalance demo: a base cost of 1 per tile plus a boost for
+    !! the tile(s) the sweeping x-band "hotspot" currently overlaps. hot_cell is a pure function of t_step (integer arithmetic, no
+    !! measured wall time), so every rank computes identical costs -> the rebalance decision is deterministic and output stays
+    !! bit-reproducible. This stands in for a real hotspot/cost metric; wiring measured cost is the (deferred) full version.
+    pure integer function f_l0_tile_cost(k, t_step) result(cost)
+
+        integer, intent(in) :: k, t_step
+        integer, parameter :: hot_stride = 3, hot_boost = 2
+        integer :: hot_cell
+
+        cost = 1
+        hot_cell = mod(t_step*hot_stride, m_glb + 1)
+        if (amr_region_lo_all(1, k) <= hot_cell .and. hot_cell <= amr_region_hi_all(1, k)) cost = cost + hot_boost
+
+    end function f_l0_tile_cost
+
+    !> Closed-loop static rebalancer (minimal, deterministic): estimate each tile's cost, then greedily move tiles from the heaviest
+    !! rank to the lightest (single best gap-reducing move per iteration, bounded) to level per-rank load, and realise the plan with
+    !! s_l0_migrate_tile. Detect (loads) -> decide (greedy target owners) -> act (P2P migrate) -> the load gap shrinks. Because every
+    !! migration is bit-preserving and the decision never touches field data, OUTPUT is byte-identical to a no-rebalance run - the loop
+    !! trades locality/cost, never correctness. All ranks run the identical decision on replicated metadata, then issue the same
+    !! migrations in ascending-tile order (matched P2P). No-op at np=1.
+    impure subroutine s_l0_rebalance(t_step)
+
+        integer, intent(in) :: t_step
+        integer :: k, r, H, L, gap, ng, best_k, best_ng, move, gap0, gap1
+        integer :: cost(l0_ntiles_tot), newo(l0_ntiles_tot), load(0:num_procs - 1)
+
+        if (num_procs < 2) return
+
+        do k = 1, l0_ntiles_tot
+            cost(k) = f_l0_tile_cost(k, t_step)
+            newo(k) = amr_block_owner(k)
+        end do
+        load = 0
+        do k = 1, l0_ntiles_tot
+            load(newo(k)) = load(newo(k)) + cost(k)
+        end do
+        gap0 = maxval(load) - minval(load)
+
+        ! greedy: each step move the tile on the heaviest rank that most reduces the max-min load gap onto the lightest rank
+        do move = 1, l0_ntiles_tot
+            H = 0; do r = 1, num_procs - 1; if (load(r) > load(H)) H = r; end do
+            L = 0; do r = 1, num_procs - 1; if (load(r) < load(L)) L = r; end do
+            gap = load(H) - load(L)
+            if (gap == 0) exit
+            best_k = -1; best_ng = gap
+            do k = 1, l0_ntiles_tot
+                if (newo(k) /= H) cycle
+                ng = abs(gap - 2*cost(k))  ! gap after moving cost(k) from H to L
+                if (ng < best_ng) then; best_ng = ng; best_k = k; end if
+            end do
+            if (best_k < 0) exit  ! no move strictly reduces the gap
+            newo(best_k) = L
+            load(H) = load(H) - cost(best_k); load(L) = load(L) + cost(best_k)
+        end do
+        gap1 = maxval(load) - minval(load)
+        if (proc_rank == 0) print '(A,I0,A,I0,A,I0)', ' [l0 rebalance] t_step=', t_step, ' load-gap ', gap0, ' -> ', gap1
+
+        do k = 1, l0_ntiles_tot
+            if (newo(k) /= amr_block_owner(k)) call s_l0_migrate_tile(k, newo(k))
+        end do
+
+    end subroutine s_l0_rebalance
 
     !> Device copy between a tile interior [0:fm] and the L0 field [o+0:o+fm]. to_tile=T copies L0->tile, F copies tile->L0. The
     !! slot q_cons is a dummy so the kernel reads a valid mapped descriptor (indexing module amr_slots%q_cons in a kernel is a null

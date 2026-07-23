@@ -31,7 +31,7 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
         & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
-        & s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_forced_remap
+        & s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_forced_remap, s_l0_rebalance
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -553,6 +553,9 @@ contains
                     call s_l0_copy_coarse_to_tiles(q_cons_ts(1)%vf)
                     ! spike: force a cross-rank tile migration at the configured step (stage-complete state; before this stage advances)
                     if (l0_migrate_step > 0 .and. t_step == l0_migrate_step) call s_l0_forced_remap()
+                    ! spike: closed-loop rebalance every l0_rebalance_interval steps (detect load imbalance -> migrate -> re-level)
+                    if (l0_rebalance_interval > 0 .and. t_step > 0 .and. mod(t_step, l0_rebalance_interval) == 0) &
+                        & call s_l0_rebalance(t_step)
                 end if
                 call s_l0_advance_stage(s, rk_coef(s, :), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
                 call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
