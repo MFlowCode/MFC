@@ -215,6 +215,8 @@ module m_amr
     !!                                               compute-owner's interior back to this rank when a tile has MIGRATED (owner != l0_owner)
     real(wp), allocatable :: amr_tile_cost(:)  !< accumulated MEASURED compute time per owned tile since the last rebalance (GPU-synced
     !!                                            wall time); allreduced to a replicated cost vector that drives s_l0_rebalance, then reset
+    real(wp), allocatable :: amr_tile_cost_ema(:)  !< per-tile exponential moving average of the (replicated) measured cost, smoothed
+    !!                                                across rebalance windows so GPU launch-latency timing noise does not drive churn
 
 contains
 
@@ -4463,6 +4465,7 @@ contains
         allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
         allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
         allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
+        allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
         allocate (amr_block_level(amr_max_blocks)); amr_block_level = 1
         allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
         allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
@@ -4785,6 +4788,7 @@ contains
         integer :: k, r, H, L, best_k, move, nmig, ierr
         integer :: newo(l0_ntiles_tot)
         real(wp) :: cost(l0_ntiles_tot), load(0:num_procs - 1), gap, ng, best_ng, gap0, gap1, mean, tol
+        real(wp), parameter :: ema_hist = 0.5_wp  ! weight on the running estimate vs this window's measurement
 
         if (num_procs < 2) then
             amr_tile_cost = 0._wp  ! nothing to balance; still clear the window
@@ -4795,6 +4799,15 @@ contains
 #ifdef MFC_MPI
         call MPI_ALLREDUCE(MPI_IN_PLACE, cost, l0_ntiles_tot, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)  ! -> replicated, bit-identical
 #endif
+        ! smooth the (replicated) window cost with a per-tile EMA so GPU per-tile launch-latency noise does not drive spurious
+        ! migrations; seed on the first window (ema still all-zero) with the raw measurement to avoid a cold-start bias toward 0.
+        ! amr_tile_cost_ema is derived only from the replicated cost, so it stays bit-identical on every rank -> consistent decision.
+        if (all(amr_tile_cost_ema(1:l0_ntiles_tot) == 0._wp)) then
+            amr_tile_cost_ema(1:l0_ntiles_tot) = cost
+        else
+            amr_tile_cost_ema(1:l0_ntiles_tot) = ema_hist*amr_tile_cost_ema(1:l0_ntiles_tot) + (1._wp - ema_hist)*cost
+        end if
+        cost = amr_tile_cost_ema(1:l0_ntiles_tot)  ! decide on the smoothed cost
         newo = amr_block_owner
         load = 0._wp
         do k = 1, l0_ntiles_tot
@@ -5120,7 +5133,7 @@ contains
         deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
         deallocate (amr_decomp, amr_slots)
         deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
-        deallocate (amr_block_owner, amr_tile_l0_owner, amr_tile_cost, amr_block_level)
+        deallocate (amr_block_owner, amr_tile_l0_owner, amr_tile_cost, amr_tile_cost_ema, amr_block_level)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
         if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
         if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
