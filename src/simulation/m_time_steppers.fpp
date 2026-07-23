@@ -30,7 +30,8 @@ module m_time_steppers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
-        & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent
+        & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
+        & s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -475,8 +476,13 @@ contains
 
         do s = 1, nstage
             call system_clock(stage_t0)
-            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
-                               & t_step, s)
+            ! L0-tiles spike: the tiles run their own per-tile s_compute_rhs, so the monolithic L0 RHS is pure waste here (it only
+            ! populated the now-unused rhs_vf); skipping it makes the tiled path represent the real design and de-confounds timing.
+            ! The s==1 run-time-info / probe path (which reads the monolithic q_prim_vf) is gated off for l0_ntile>0 at init.
+            if (l0_ntile == 0) then
+                call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
+                                   & t_step, s)
+            end if
 
             if (s == 1) then
                 if (run_time_info) then
@@ -539,6 +545,14 @@ contains
             ! is mirrored by s_amr_fine_rk_update (q_cons) and s_amr_fine_rk_update_pbmv (pb/mv) in m_amr - change the algebra
             ! here and both must follow, else fine blocks integrate a different scheme.
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
+            ! L0-as-blocks spike: advance the base grid as rr=1 tiles (must be BYTE-IDENTICAL to the monolithic update below). Tiles
+            ! carry their own state across stages (copied in at stage 1); each stage is scattered back so the L0 field, run-time-info
+            ! and post-update ops stay consistent. rhs_vf from the L0 s_compute_rhs above is unused here.
+            if (l0_ntile > 0) then
+                if (s == 1) call s_l0_copy_coarse_to_tiles(q_cons_ts(1)%vf)
+                call s_l0_advance_stage(s, rk_coef(s, :), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+                call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
+            else
             if (ab_active) then
                 jlo = ab_x%beg; jhi = ab_x%end
                 klo = ab_y%beg; khi = ab_y%end
@@ -568,6 +582,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+            end if
             ! Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
                 $:GPU_PARALLEL_LOOP(collapse=5)
