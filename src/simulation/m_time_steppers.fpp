@@ -30,8 +30,8 @@ module m_time_steppers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
-        & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
-        & s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance
+        & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_advance_stage, &
+        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -546,51 +546,54 @@ contains
             ! here and both must follow, else fine blocks integrate a different scheme.
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
             ! L0-as-blocks spike: advance the base grid as rr=1 tiles (must be BYTE-IDENTICAL to the monolithic update below). Tiles
-            ! carry their own state across stages (copied in at stage 1); each stage is scattered back so the L0 field, run-time-info
+            ! carry their own state across stages (copied in at stage 1); each stage is scattered back so the L0 field,
+            ! run-time-info
             ! and post-update ops stay consistent. rhs_vf from the L0 s_compute_rhs above is unused here.
             if (l0_ntile > 0) then
                 if (s == 1) then
                     call s_l0_copy_coarse_to_tiles(q_cons_ts(1)%vf)
-                    ! spike: force a cross-rank tile migration at the configured step (stage-complete state; before this stage advances)
+                    ! spike: force a cross-rank tile migration at the configured step (stage-complete state; before this stage
+                    ! advances)
                     if (l0_migrate_step > 0 .and. t_step == l0_migrate_step) call s_l0_forced_remap()
                     ! spike: closed-loop rebalance every l0_rebalance_interval steps (detect load imbalance -> migrate -> re-level)
-                    if (l0_rebalance_interval > 0 .and. t_step > 0 .and. mod(t_step, l0_rebalance_interval) == 0) &
-                        & call s_l0_rebalance(t_step)
+                    if (l0_rebalance_interval > 0 .and. t_step > 0 .and. mod(t_step, &
+                        & l0_rebalance_interval) == 0) call s_l0_rebalance(t_step)
                 end if
-                call s_l0_advance_stage(s, rk_coef(s, :), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+                call s_l0_advance_stage(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
                 ! beta: tiles are the AUTHORITATIVE store (no per-stage L0 mirror). L0 is a fixed-decomposition I/O staging buffer,
                 ! gathered from the tiles only at output (s_save_data). This is what "tiles own storage" means; it also removes the
-                ! per-stage scatter cost. (Requires no active post-op reads L0 for the l0 path - already true in the persistent model.)
+                ! per-stage scatter cost. (Requires no active post-op reads L0 for the l0 path - already true in the persistent
+                ! model.)
             else
-            if (ab_active) then
-                jlo = ab_x%beg; jhi = ab_x%end
-                klo = ab_y%beg; khi = ab_y%end
-                llo = ab_z%beg; lhi = ab_z%end
-            else
-                jlo = 0; jhi = m; klo = 0; khi = n; llo = 0; lhi = p
-            end if
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = llo, lhi
-                    do k = klo, khi
-                        do j = jlo, jhi
-                            if (s == 1 .and. nstage > 1) then
-                                q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
-                            end if
-                            if (igr) then
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
-                                          & l))/rk_coef(s, 4)
-                            else
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, &
-                                          & l))/rk_coef(s, 4)
-                            end if
+                if (ab_active) then
+                    jlo = ab_x%beg; jhi = ab_x%end
+                    klo = ab_y%beg; khi = ab_y%end
+                    llo = ab_z%beg; lhi = ab_z%end
+                else
+                    jlo = 0; jhi = m; klo = 0; khi = n; llo = 0; lhi = p
+                end if
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = llo, lhi
+                        do k = klo, khi
+                            do j = jlo, jhi
+                                if (s == 1 .and. nstage > 1) then
+                                    q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
+                                end if
+                                if (igr) then
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
+                                              & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
+                                              & l))/rk_coef(s, 4)
+                                else
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
+                                              & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, &
+                                              & l))/rk_coef(s, 4)
+                                end if
+                            end do
                         end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
             end if
             ! Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then

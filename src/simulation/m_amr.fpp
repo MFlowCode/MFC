@@ -39,9 +39,8 @@ module m_amr
     public :: t_level, amr_maxc, amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_fine_stage_fill, s_amr_fine_stage_advance, &
         & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, &
-        & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
-        & s_l0_tiles_init, s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_tiles_finalize, &
-        & s_l0_forced_remap, s_l0_rebalance
+        & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, s_l0_copy_coarse_to_tiles, &
+        & s_l0_scatter_tiles_to_coarse, s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -205,18 +204,23 @@ module m_amr
     !! the AMR fine overlay uses, with tile-tile same-level seam halos (s_amr_fine_fine_halo, fmul=1) at interior faces and the
     !! physical BC at domain-edge faces. Correctness bar: l0_ntile>0 must be BYTE-IDENTICAL to l0_ntile=0 (monolithic). Reuses the
     !! full amr_slots/region/owner/seam machinery; the tiles ARE level-1 blocks with amr_ref_ratio 1. Off (l0_ntile=0) => no effect.
-    integer :: l0_ntiles_tot = 0     !< total tiles = l0_ntile**num_dims (0 when off)
-    integer :: l0_nt(3) = 1          !< tiles per dim (1 in collapsed dims)
-    logical :: l0_periodic(3) = .false.  !< per-dim global periodicity, allreduced from periodic_bc in s_l0_tiles_init (periodic_bc is
-    !!                                      set on rank 0 only - s_read_input_file is rank-0-guarded - so it must be made consistent for
-    !!                                      the wrap-seam decision in f_amr_seam / s_l0_edge_bc_tile, which every rank must agree on)
-    logical :: l0_tiles_need_fill = .false.  !< tiles are persistent: L0 seeds them ONCE (first timestep); set at init, cleared after fill
-    integer, allocatable :: amr_tile_l0_owner(:)  !< rank owning each tile's L0 STORAGE cells (fixed = init owner); scatter routes the
-    !!                                               compute-owner's interior back to this rank when a tile has MIGRATED (owner != l0_owner)
-    real(wp), allocatable :: amr_tile_cost(:)  !< accumulated MEASURED compute time per owned tile since the last rebalance (GPU-synced
-    !!                                            wall time); allreduced to a replicated cost vector that drives s_l0_rebalance, then reset
-    real(wp), allocatable :: amr_tile_cost_ema(:)  !< per-tile exponential moving average of the (replicated) measured cost, smoothed
-    !!                                                across rebalance windows so GPU launch-latency timing noise does not drive churn
+    integer :: l0_ntiles_tot = 0  !< total tiles = l0_ntile**num_dims (0 when off)
+    integer :: l0_nt(3) = 1       !< tiles per dim (1 in collapsed dims)
+    !> per-dim global periodicity, allreduced from periodic_bc in s_l0_tiles_init (periodic_bc is set on rank 0 only -
+    !! s_read_input_file is rank-0-guarded - so it must be made consistent for the wrap-seam decision in f_amr_seam /
+    !! s_l0_edge_bc_tile, which every rank must agree on)
+    logical :: l0_periodic(3) = .false.
+    !> tiles are persistent: L0 seeds them ONCE (first timestep); set at init, cleared after fill
+    logical :: l0_tiles_need_fill = .false.
+    !> rank owning each tile's L0 STORAGE cells (fixed = init owner); scatter routes the compute-owner's interior back to this rank
+    !! when a tile has MIGRATED (owner != l0_owner)
+    integer, allocatable :: amr_tile_l0_owner(:)
+    !> accumulated MEASURED compute time per owned tile since the last rebalance (GPU-synced wall time); allreduced to a replicated
+    !! cost vector that drives s_l0_rebalance, then reset
+    real(wp), allocatable :: amr_tile_cost(:)
+    !> per-tile exponential moving average of the (replicated) measured cost, smoothed across rebalance windows so GPU
+    !! launch-latency timing noise does not drive churn
+    real(wp), allocatable :: amr_tile_cost_ema(:)
 
 contains
 
@@ -3451,16 +3455,19 @@ contains
     !! itself is captured from the ORIGINAL bc before MFC folds periodicity into the MPI-cart topology, but only on rank 0, so the
     !! allreduced copy is the one that is consistent on every rank - required since f_amr_seam builds a replicated seam list.
     pure logical function f_l0_dim_periodic(d) result(per)
+
         integer, intent(in) :: d
+
         per = l0_periodic(d)
+
     end function f_l0_dim_periodic
 
     !> True iff sub-block yb sits immediately above sub-block xb on xb's HIGH face in dim d: yb's low coarse face is xb's high face
     !! + 1, and (tiling produces a regular grid) they share the transverse coarse extents exactly. Each fine-fine seam is exactly
-    !! one such ordered (xb, yb) pair (the lower block is xb). For an L0-tile periodic dim there is ALSO a wrap-seam: xb at the domain
-    !! HIGH face (region_hi == gcell) and yb at the domain LOW face (region_lo == 0) with matching transverse - the fine-fine halo then
-    !! fills xb's high ghost from yb's low interior and vice versa, exactly the periodic connection. Gated on l0_ntile>0 so the AMR
-    !! fine-block path (blocks never touch the domain edge) is byte-unchanged.
+    !! one such ordered (xb, yb) pair (the lower block is xb). For an L0-tile periodic dim there is ALSO a wrap-seam: xb at the
+    !! domain HIGH face (region_hi == gcell) and yb at the domain LOW face (region_lo == 0) with matching transverse - the fine-fine
+    !! halo then fills xb's high ghost from yb's low interior and vice versa, exactly the periodic connection. Gated on l0_ntile>0
+    !! so the AMR fine-block path (blocks never touch the domain edge) is byte-unchanged.
     pure logical function f_amr_seam(xb, yb, d) result(seam)
 
         integer, intent(in) :: xb, yb, d
@@ -4382,25 +4389,31 @@ contains
 
     end subroutine s_amr_reconcile_slots
 
-    ! === L0-AS-BLOCKS SPIKE (l0_ntile > 0) ==============================================================================
+    ! L0-AS-BLOCKS SPIKE (l0_ntile > 0):
     ! Base grid tiled into l0_ntiles_tot refinement-ratio-1 blocks advanced through the shared swap-based per-block solver; the
     ! bit-identity oracle is l0_ntile=0 (monolithic). See the l0_ntiles_tot declaration above for the design.
 
     !> Low global-cell index of tile `it` (0-based) when `ncell` cells split into `nt` balanced tiles: the first mod(ncell,nt) tiles
     !! get one extra cell. Tile `it` spans [f_l0_lo(it) : f_l0_lo(it+1)-1]; the widest tile is ceil(ncell/nt) cells.
     pure integer function f_l0_lo(ncell, nt, it)
+
         integer, intent(in) :: ncell, nt, it
+
         f_l0_lo = it*(ncell/nt) + min(it, mod(ncell, nt))
+
     end function f_l0_lo
 
     !> True if a domain-face BC code is a PHYSICAL boundary the spike does not support. Supported: extrapolation (BC_GHOST_EXTRAP),
-    !! reflective (BC_REFLECTIVE), and periodic (BC_PERIODIC) - each has a cons-space tile fill matching the monolithic prim-space BC.
-    !! The characteristic / slip-wall / dirichlet family (bc < BC_GHOST_EXTRAP) has no tile fill yet and is rejected. MPI processor
-    !! boundaries (bc >= 0, incl. a periodic wrap-neighbour rank at np>1) are interior seams handled by the fine-fine halo, never a
-    !! physical face here.
+    !! reflective (BC_REFLECTIVE), and periodic (BC_PERIODIC) - each has a cons-space tile fill matching the monolithic prim-space
+    !! BC. The characteristic / slip-wall / dirichlet family (bc < BC_GHOST_EXTRAP) has no tile fill yet and is rejected. MPI
+    !! processor boundaries (bc >= 0, incl. a periodic wrap-neighbour rank at np>1) are interior seams handled by the fine-fine
+    !! halo, never a physical face here.
     pure logical function f_l0_bc_unsupported(bc)
+
         integer, intent(in) :: bc
+
         f_l0_bc_unsupported = (bc < BC_GHOST_EXTRAP)
+
     end function f_l0_bc_unsupported
 
     !> Build the base-grid tiling: allocate the slot/region/seam machinery for l0_ntiles_tot rr=1 tiles covering L0, set each tile's
@@ -4414,21 +4427,26 @@ contains
 
         if (l0_ntile <= 0) return
 
-        ! periodic_bc is set on rank 0 only (s_read_input_file is rank-0-guarded), so make it globally consistent: every rank must build
-        ! the SAME wrap-seam list in f_amr_seam / apply the same periodic edge fill, else an unmatched MPI_SENDRECV deadlocks. MPI_LOR:
+        ! periodic_bc is set on rank 0 only (s_read_input_file is rank-0-guarded), so make it globally consistent: every rank must
+        ! build
+        ! the SAME wrap-seam list in f_amr_seam / apply the same periodic edge fill, else an unmatched MPI_SENDRECV deadlocks.
+        ! MPI_LOR:
         ! rank 0's .true. wins on all ranks (others hold the .false. default). No-op at np=1.
         l0_periodic = periodic_bc
 #ifdef MFC_MPI
         call MPI_ALLREDUCE(MPI_IN_PLACE, l0_periodic, 3, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
 #endif
 
-        ! Supported physical faces (any np): extrapolation (BC_GHOST_EXTRAP), reflective (BC_REFLECTIVE), periodic (BC_PERIODIC) - each
-        ! has a cons-space tile fill that commutes with the cons->prim convert so a tile matches the monolithic prim-space BC bit-for-
-        ! bit. The characteristic/slip/dirichlet family (bc < BC_GHOST_EXTRAP) is not yet handled. Validate once here (host), not per
+        ! Supported physical faces (any np): extrapolation (BC_GHOST_EXTRAP), reflective (BC_REFLECTIVE), periodic (BC_PERIODIC) -
+        ! each
+        ! has a cons-space tile fill that commutes with the cons->prim convert so a tile matches the monolithic prim-space BC
+        ! bit-for-
+        ! bit. The characteristic/slip/dirichlet family (bc < BC_GHOST_EXTRAP) is not yet handled. Validate once here (host), not
+        ! per
         ! stage.
-        if (f_l0_bc_unsupported(bc_x%beg) .or. f_l0_bc_unsupported(bc_x%end) &
-            & .or. (n_glb > 0 .and. (f_l0_bc_unsupported(bc_y%beg) .or. f_l0_bc_unsupported(bc_y%end))) &
-            & .or. (p_glb > 0 .and. (f_l0_bc_unsupported(bc_z%beg) .or. f_l0_bc_unsupported(bc_z%end)))) then
+        if (f_l0_bc_unsupported(bc_x%beg) .or. f_l0_bc_unsupported(bc_x%end) .or. (n_glb > 0 .and. (f_l0_bc_unsupported(bc_y%beg) &
+            & .or. f_l0_bc_unsupported(bc_y%end))) .or. (p_glb > 0 .and. (f_l0_bc_unsupported(bc_z%beg) &
+            & .or. f_l0_bc_unsupported(bc_z%end)))) then
             call s_mpi_abort('l0_ntile spike: unsupported physical BC (only extrapolation, reflective, periodic are handled)')
         end if
         ! the monolithic L0 RHS is skipped for l0_ntile>0, so the global q_prim_vf it populated is stale: run-time-info and probes
@@ -4441,9 +4459,11 @@ contains
         ! it via s_amr_alloc_slot. amr is off, so the amr_ref_ratio in {2,4} checker never runs.
         amr_ref_ratio = 1
 
-        ! Tiles are PER-RANK: each rank's local chunk is split into nt(:) pieces; the global tile table (region + owner) is the union
+        ! Tiles are PER-RANK: each rank's local chunk is split into nt(:) pieces; the global tile table (region + owner) is the
+        ! union
         ! over ranks, REPLICATED on every rank. Total = num_procs * nt(1)*nt(2)*nt(3). At np=1 this is identical to the old global
-        ! tiling. Each rank allocates slot DATA (fields + coords) only for its OWN tiles; the seam-pair scan and fine-fine halo see the
+        ! tiling. Each rank allocates slot DATA (fields + coords) only for its OWN tiles; the seam-pair scan and fine-fine halo see
+        ! the
         ! full table and exchange cross-rank seams over MPI.
         nt = 1
         nt(1) = l0_ntile
@@ -4472,9 +4492,10 @@ contains
         allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
         amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
 
-        ! replicated coarse-decomposition table (each rank's global origin + local extent) - built FIRST so the per-rank tile geometry
+        ! replicated coarse-decomposition table (each rank's global origin + local extent) - built FIRST so the per-rank tile
+        ! geometry
         ! and the max-tile-extent sizing below can read every rank's chunk. Seam-pair overlap-rank lists also read it.
-        allocate (amr_decomp(6, 0:num_procs - 1))
+        allocate (amr_decomp(6,0:num_procs - 1))
         block
             integer :: myrow(6), ierr
             myrow = 0
@@ -4484,11 +4505,12 @@ contains
 #ifdef MFC_MPI
             call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
 #else
-            amr_decomp(:, 0) = myrow
+            amr_decomp(:,0) = myrow
 #endif
         end block
 
-        ! max tile extent per dim over ALL ranks (= widest per-rank chunk split by nt); slots + seam buffers are sized to this global
+        ! max tile extent per dim over ALL ranks (= widest per-rank chunk split by nt); slots + seam buffers are sized to this
+        ! global
         ! max so every rank's buffers match. Chunk r has amr_decomp(3+d,r)+1 cells in dim d.
         max_f1 = 0; max_f2 = 0; max_f3 = 0
         do r = 0, num_procs - 1
@@ -4522,7 +4544,8 @@ contains
         amr_xchg_coarse_ghosts = .false.  ! tiles never prolong from a coarser level
 
         ! per-tile geometry: level-1 rr=1 blocks. Loop is rank-major then z,y,x (x fastest) so intra-rank neighbours are contiguous;
-        ! the global region scan finds cross-rank seams. A rank writes region+owner for EVERY tile but allocates slot data only for its
+        ! the global region scan finds cross-rank seams. A rank writes region+owner for EVERY tile but allocates slot data only for
+        ! its
         ! own (r == proc_rank). Domain-edge detection uses the global region indices (region_lo == 0 / region_hi == m_glb).
         k = 0
         do r = 0, num_procs - 1
@@ -4547,8 +4570,8 @@ contains
                         amr_block_owner(k) = r
                         amr_tile_l0_owner(k) = r  ! L0 storage owner = init owner; stays fixed under migration
                         amr_owns_all(k) = (r == proc_rank)
-                        amr_region_lo_all(:, k) = tlo; amr_region_hi_all(:, k) = thi
-                        amr_isect_lo_all(:, k) = tlo; amr_isect_hi_all(:, k) = thi  ! footprint = whole tile on the owner (rr=1)
+                        amr_region_lo_all(:,k) = tlo; amr_region_hi_all(:,k) = thi
+                        amr_isect_lo_all(:,k) = tlo; amr_isect_hi_all(:,k) = thi  ! footprint = whole tile on the owner (rr=1)
                         if (r /= proc_rank) cycle  ! remote tile: region+owner metadata only, no slot data / coords on this rank
                         call s_l0_build_tile_slot(k)  ! alloc slot + set extents/idwbuff/coords from the (global) region metadata
                     end do
@@ -4557,7 +4580,8 @@ contains
         end do
         call s_amr_select_slot(1)
         ! tiles are PERSISTENT: L0 seeds them once at the first timestep (s_l0_copy_coarse_to_tiles self-gates on this flag), then
-        ! they carry their own state across stages/timesteps. No init-time device copy (q_cons device state is not live at module init).
+        ! they carry their own state across stages/timesteps. No init-time device copy (q_cons device state is not live at module
+        ! init).
         l0_tiles_need_fill = .true.
 
     end subroutine s_l0_tiles_init
@@ -4593,15 +4617,16 @@ contains
 
     end subroutine s_l0_build_extended_global_cb
 
-    !> Build tile k's slot on THIS rank from its (already-set, replicated) region metadata: allocate the field/coord arrays and set the
-    !! local extents, idwbuff, and rr=1 cell coordinates sliced from the global amr_g?cb. Shared by s_l0_tiles_init (initial owned
-    !! tiles) and s_l0_migrate_tile (a tile arriving on its new owner). Requires amr_gxcb/gycb/gzcb + mbuf*/max_f* already set.
+    !> Build tile k's slot on THIS rank from its (already-set, replicated) region metadata: allocate the field/coord arrays and set
+    !! the local extents, idwbuff, and rr=1 cell coordinates sliced from the global amr_g?cb. Shared by s_l0_tiles_init (initial
+    !! owned tiles) and s_l0_migrate_tile (a tile arriving on its new owner). Requires amr_gxcb/gycb/gzcb + mbuf*/max_f* already
+    !! set.
     impure subroutine s_l0_build_tile_slot(k)
 
         integer, intent(in) :: k
-        integer :: j, tlo(3), thi(3)
+        integer             :: j, tlo(3), thi(3)
 
-        tlo = amr_region_lo_all(:, k); thi = amr_region_hi_all(:, k)
+        tlo = amr_region_lo_all(:,k); thi = amr_region_hi_all(:,k)
         call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio (= 1)
         amr_slots(k)%m = thi(1) - tlo(1); amr_slots(k)%n = 0; amr_slots(k)%p = 0
         if (n_glb > 0) amr_slots(k)%n = thi(2) - tlo(2)
@@ -4649,10 +4674,12 @@ contains
     impure subroutine s_l0_copy_coarse_to_tiles(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer :: k, o1, o2, o3, fm1, fm2, fm3
+        integer                                             :: k, o1, o2, o3, fm1, fm2, fm3
 
         ! Persistent tiles: seed from L0 exactly once. After the first fill the tiles are authoritative; re-copying would be an
-        ! identity round-trip (each stage scatters tile->L0, so L0 already mirrors the tile interior at the next timestep's stage 1).
+        ! identity round-trip (each stage scatters tile->L0, so L0 already mirrors the tile interior at the next timestep's stage
+        ! 1).
+
         if (.not. l0_tiles_need_fill) return
 
         do k = 1, l0_ntiles_tot
@@ -4668,24 +4695,28 @@ contains
     !> Local-index offset of tile k's global origin in the L0 field: o(d) = region_lo(d) - start_idx(d) for active dims, 0 for a
     !! collapsed dim (start_idx is sized num_dims, so start_idx(3) must not be touched in 2D).
     subroutine s_l0_tile_l0_offsets(k, o1, o2, o3)
+
         integer, intent(in)  :: k
         integer, intent(out) :: o1, o2, o3
+
         o1 = amr_region_lo_all(1, k) - start_idx(1)
         o2 = 0; if (n_glb > 0) o2 = amr_region_lo_all(2, k) - start_idx(2)
         o3 = 0; if (p_glb > 0) o3 = amr_region_lo_all(3, k) - start_idx(3)
+
     end subroutine s_l0_tile_l0_offsets
 
     !> Scatter every tile's interior back into the L0 field (tile-local cell j -> global cell tlo+j). A tile whose compute owner is
-    !! also its L0-storage owner writes locally (device kernel - the common case, and the ENTIRE no-migration path, so byte-identical
-    !! to before). A MIGRATED tile (owner != l0_owner) has its interior sent by the compute owner to the L0-storage owner over MPI,
-    !! which writes it into L0 - keeping the fixed L0 decomposition (hence output/restart) correct after migration. Ghosts are not
-    !! scattered (the tile path never reads L0 ghosts). GPU-correct: the MPI branch device-packs/unpacks via s_l0_pack_unpack_block, so
-    !! the receiver writes L0 ON THE DEVICE - it survives the GPU_UPDATE(host) that s_save_data does before writing.
+    !! also its L0-storage owner writes locally (device kernel - the common case, and the ENTIRE no-migration path, so
+    !! byte-identical to before). A MIGRATED tile (owner != l0_owner) has its interior sent by the compute owner to the L0-storage
+    !! owner over MPI, which writes it into L0 - keeping the fixed L0 decomposition (hence output/restart) correct after migration.
+    !! Ghosts are not scattered (the tile path never reads L0 ghosts). GPU-correct: the MPI branch device-packs/unpacks via
+    !! s_l0_pack_unpack_block, so the receiver writes L0 ON THE DEVICE - it survives the GPU_UPDATE(host) that s_save_data does
+    !! before writing.
     impure subroutine s_l0_scatter_tiles_to_coarse(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
-        real(wp), allocatable :: buf(:)
+        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
+        real(wp), allocatable                                  :: buf(:)
 
         do k = 1, l0_ntiles_tot
             bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
@@ -4707,7 +4738,7 @@ contains
 #endif
                 deallocate (buf)
             else if (proc_rank == lown) then  ! L0 owner: recv, device-unpack into the local L0 chunk (device write -> survives the
-                call s_l0_tile_l0_offsets(k, o1, o2, o3)             ! GPU_UPDATE(host) s_save_data does before writing)
+                call s_l0_tile_l0_offsets(k, o1, o2, o3)  ! GPU_UPDATE(host) s_save_data does before writing)
                 allocate (buf(cnt))
 #ifdef MFC_MPI
                 call MPI_RECV(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -4720,14 +4751,14 @@ contains
     end subroutine s_l0_scatter_tiles_to_coarse
 
     !> Migrate tile k from its current compute owner to new_owner: P2P-move the persistent interior state, (re)build the slot on the
-    !! receiver, free it on the sender, and update the replicated owner map + seam topology. ALL ranks call with the same
-    !! (k, new_owner). This is the load-balance MIGRATION primitive; the DECISION of which tile moves where is made by the caller
-    !! (a forced remap in the spike; a cost-driven trigger later). Ghosts are not moved (refilled by edge-BC + fine-fine halo before
+    !! receiver, free it on the sender, and update the replicated owner map + seam topology. ALL ranks call with the same (k,
+    !! new_owner). This is the load-balance MIGRATION primitive; the DECISION of which tile moves where is made by the caller (a
+    !! forced remap in the spike; a cost-driven trigger later). Ghosts are not moved (refilled by edge-BC + fine-fine halo before
     !! the next stage). GPU-correct: interior is device-packed/unpacked via s_l0_pack_unpack_block (wp buffer, cast to/from stp).
     impure subroutine s_l0_migrate_tile(k, new_owner)
 
-        integer, intent(in) :: k, new_owner
-        integer :: old_owner, ni, nj, nl, cnt, ierr
+        integer, intent(in)   :: k, new_owner
+        integer               :: old_owner, ni, nj, nl, cnt, ierr
         real(wp), allocatable :: buf(:)
 
         old_owner = amr_block_owner(k)
@@ -4775,19 +4806,20 @@ contains
 
     end subroutine s_l0_forced_remap
 
-    !> Closed-loop rebalancer driven by MEASURED per-tile compute time. Each rank accumulated amr_tile_cost for its OWN tiles since the
-    !! last rebalance; an allreduce(SUM) makes the full cost vector REPLICATED and bit-identical on every rank (each tile has exactly
-    !! one nonzero contributor, so the sum is exact) -> every rank runs the identical greedy and issues MATCHING P2P migrations. Greedy:
-    !! move the tile on the heaviest rank that most reduces the max-min load gap onto the lightest, bounded, with a small relative
-    !! deadband so timing noise does not cause churn. Because migration is bit-preserving and the decision touches no field data, OUTPUT
-    !! is byte-identical regardless of the (run-to-run nondeterministic) measured schedule - the decomposition-invariance proven for the
-    !! tile path is exactly what keeps a nondeterministic cost signal golden-safe. Costs reset after each rebalance. No-op at np=1.
+    !> Closed-loop rebalancer driven by MEASURED per-tile compute time. Each rank accumulated amr_tile_cost for its OWN tiles since
+    !! the last rebalance; an allreduce(SUM) makes the full cost vector REPLICATED and bit-identical on every rank (each tile has
+    !! exactly one nonzero contributor, so the sum is exact) -> every rank runs the identical greedy and issues MATCHING P2P
+    !! migrations. Greedy: move the tile on the heaviest rank that most reduces the max-min load gap onto the lightest, bounded,
+    !! with a small relative deadband so timing noise does not cause churn. Because migration is bit-preserving and the decision
+    !! touches no field data, OUTPUT is byte-identical regardless of the (run-to-run nondeterministic) measured schedule - the
+    !! decomposition-invariance proven for the tile path is exactly what keeps a nondeterministic cost signal golden-safe. Costs
+    !! reset after each rebalance. No-op at np=1.
     impure subroutine s_l0_rebalance(t_step)
 
         integer, intent(in) :: t_step
-        integer :: k, r, H, L, best_k, move, nmig, ierr
-        integer :: newo(l0_ntiles_tot)
-        real(wp) :: cost(l0_ntiles_tot), load(0:num_procs - 1), gap, ng, best_ng, gap0, gap1, mean, tol
+        integer             :: k, r, H, L, best_k, move, nmig, ierr
+        integer             :: newo(l0_ntiles_tot)
+        real(wp)            :: cost(l0_ntiles_tot), load(0:num_procs - 1), gap, ng, best_ng, gap0, gap1, mean, tol
         real(wp), parameter :: ema_hist = 0.5_wp  ! weight on the running estimate vs this window's measurement
 
         if (num_procs < 2) then
@@ -4801,7 +4833,8 @@ contains
 #endif
         ! smooth the (replicated) window cost with a per-tile EMA so GPU per-tile launch-latency noise does not drive spurious
         ! migrations; seed on the first window (ema still all-zero) with the raw measurement to avoid a cold-start bias toward 0.
-        ! amr_tile_cost_ema is derived only from the replicated cost, so it stays bit-identical on every rank -> consistent decision.
+        ! amr_tile_cost_ema is derived only from the replicated cost, so it stays bit-identical on every rank -> consistent
+        ! decision.
         if (all(amr_tile_cost_ema(1:l0_ntiles_tot) == 0._wp)) then
             amr_tile_cost_ema(1:l0_ntiles_tot) = cost
         else
@@ -4842,8 +4875,8 @@ contains
                 nmig = nmig + 1
             end if
         end do
-        if (proc_rank == 0) print '(A,I0,A,ES10.3,A,ES10.3,A,I0,A)', ' [l0 rebalance] t_step=', t_step, &
-            & ' load-gap ', gap0, ' -> ', gap1, ' (', nmig, ' migrations)'
+        if (proc_rank == 0) print '(A,I0,A,ES10.3,A,ES10.3,A,I0,A)', ' [l0 rebalance] t_step=', t_step, ' load-gap ', gap0, &
+            & ' -> ', gap1, ' (', nmig, ' migrations)'
 
         amr_tile_cost = 0._wp  ! reset the measurement window
 
@@ -4855,9 +4888,9 @@ contains
     impure subroutine s_l0_copy_block(q_tile, q_l0, o1, o2, o3, fm1, fm2, fm3, to_tile)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_tile, q_l0
-        integer, intent(in) :: o1, o2, o3, fm1, fm2, fm3
-        logical, intent(in) :: to_tile
-        integer :: i, j, k, l
+        integer, intent(in)                                    :: o1, o2, o3, fm1, fm2, fm3
+        logical, intent(in)                                    :: to_tile
+        integer                                                :: i, j, k, l
 
         if (to_tile) then
             $:GPU_PARALLEL_LOOP(collapse=4)
@@ -4888,17 +4921,18 @@ contains
     end subroutine s_l0_copy_block
 
     !> Device pack (to_buf=T) / unpack (F) of a field's interior block [o+0:o+fm] <-> the contiguous MPI buffer buf, for the P2P
-    !! migration + migrated-tile scatter. Follows s_amr_fine_slice: the pack/unpack runs ON THE DEVICE with copyout/copyin moving only
-    !! buf host<->device (no strided %sf section in a map clause - flang miscomputes those), and q is passed as a dummy so the kernel
-    !! reads the mapped %sf (indexing the module amr_slots%q_cons in a kernel is a null deref). buf index runs j fastest then k,l,i so a
-    !! matching pack/unpack aligns cell-for-cell. wp buffer, cast to/from stp (identity at double) - matches the fine-fine halo.
+    !! migration + migrated-tile scatter. Follows s_amr_fine_slice: the pack/unpack runs ON THE DEVICE with copyout/copyin moving
+    !! only buf host<->device (no strided %sf section in a map clause - flang miscomputes those), and q is passed as a dummy so the
+    !! kernel reads the mapped %sf (indexing the module amr_slots%q_cons in a kernel is a null deref). buf index runs j fastest then
+    !! k,l,i so a matching pack/unpack aligns cell-for-cell. wp buffer, cast to/from stp (identity at double) - matches the
+    !! fine-fine halo.
     impure subroutine s_l0_pack_unpack_block(q, o1, o2, o3, fm1, fm2, fm3, buf, to_buf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q
-        integer, intent(in) :: o1, o2, o3, fm1, fm2, fm3
-        real(wp), intent(inout), contiguous :: buf(:)
-        logical, intent(in) :: to_buf
-        integer :: i, j, k, l
+        integer, intent(in)                                    :: o1, o2, o3, fm1, fm2, fm3
+        real(wp), intent(inout), contiguous                    :: buf(:)
+        logical, intent(in)                                    :: to_buf
+        integer                                                :: i, j, k, l
 
         if (to_buf) then
             $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
@@ -4906,7 +4940,8 @@ contains
                 do l = 0, fm3
                     do k = 0, fm2
                         do j = 0, fm1
-                            buf(1 + j + (fm1 + 1)*(k + (fm2 + 1)*(l + (fm3 + 1)*(i - 1)))) = real(q(i)%sf(o1 + j, o2 + k, o3 + l), wp)
+                            buf(1 + j + (fm1 + 1)*(k + (fm2 + 1)*(l + (fm3 + 1)*(i - 1)))) = real(q(i)%sf(o1 + j, o2 + k, &
+                                & o3 + l), wp)
                         end do
                     end do
                 end do
@@ -4918,7 +4953,8 @@ contains
                 do l = 0, fm3
                     do k = 0, fm2
                         do j = 0, fm1
-                            q(i)%sf(o1 + j, o2 + k, o3 + l) = real(buf(1 + j + (fm1 + 1)*(k + (fm2 + 1)*(l + (fm3 + 1)*(i - 1)))), stp)
+                            q(i)%sf(o1 + j, o2 + k, &
+                              & o3 + l) = real(buf(1 + j + (fm1 + 1)*(k + (fm2 + 1)*(l + (fm3 + 1)*(i - 1)))), stp)
                         end do
                     end do
                 end do
@@ -4941,10 +4977,10 @@ contains
             fm(1) = amr_slots(k)%m; fm(2) = amr_slots(k)%n; fm(3) = amr_slots(k)%p
             call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(1, k), amr_region_hi_all(1, k), gcell(1), fm, 1, &
                                    & bc_x%beg, bc_x%end)
-            if (n_glb > 0) call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(2, k), amr_region_hi_all(2, k), gcell(2), &
-                                   & fm, 2, bc_y%beg, bc_y%end)
-            if (p_glb > 0) call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(3, k), amr_region_hi_all(3, k), gcell(3), &
-                                   & fm, 3, bc_z%beg, bc_z%end)
+            if (n_glb > 0) call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(2, k), amr_region_hi_all(2, k), &
+                & gcell(2), fm, 2, bc_y%beg, bc_y%end)
+            if (p_glb > 0) call s_l0_edge_bc_tile(amr_slots(k)%q_cons, amr_region_lo_all(3, k), amr_region_hi_all(3, k), &
+                & gcell(3), fm, 3, bc_z%beg, bc_z%end)
         end do
 
     end subroutine s_l0_fill_edge_bc
@@ -4956,13 +4992,16 @@ contains
     impure subroutine s_l0_edge_bc_tile(q, rlo, rhi, gcell, fm, d, bcbeg, bcend)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q
-        integer, intent(in) :: rlo, rhi, gcell, fm(3), d, bcbeg, bcend
+        integer, intent(in)                                    :: rlo, rhi, gcell, fm(3), d, bcbeg, bcend
 
-        ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces. Periodicity is read from
-        ! the global periodic_bc(d) (not bcbeg, which becomes a wrap-neighbour RANK at a decomposed periodic boundary): a periodic dim
+        ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces. Periodicity is read
+        ! from
+        ! the global periodic_bc(d) (not bcbeg, which becomes a wrap-neighbour RANK at a decomposed periodic boundary): a periodic
+        ! dim
         ! wraps - a tile that SPANS it (rlo==0 .and. rhi==gcell) self-wraps here, a partial tile's periodic faces are cross-tile
         ! wrap-seams filled by s_amr_fine_fine_halo (skipped here). A non-periodic domain-edge face gets reflective (mirror + normal
         ! momentum flip) or 0th-order extrapolation per its physical bc code.
+
         if (l0_periodic(d)) then
             if (rlo == 0 .and. rhi == gcell) call s_l0_wrap_one(q, d, fm)
             return
@@ -4981,8 +5020,8 @@ contains
     impure subroutine s_l0_extrap_one(q, d, side, fm)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q
-        integer, intent(in) :: d, side, fm(3)
-        integer :: i, jg, a, b, e, gc, na, nb, md
+        integer, intent(in)                                    :: d, side, fm(3)
+        integer                                                :: i, jg, a, b, e, gc, na, nb, md
 
         #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
             #:set SIDX = {1: '(e, a, b)', 2: '(a, e, b)', 3: '(a, b, e)'}[D]
@@ -5007,16 +5046,17 @@ contains
 
     end subroutine s_l0_extrap_one
 
-    !> Reflective (symmetry) tile face ghosts in dim d, side (-1 low / +1 high): ghost cell 1..buff_size MIRRORS the near-edge interior
-    !! (ghost -jg <- interior jg-1 low; md+jg <- md-(jg-1) high) with the NORMAL-direction momentum (eqn_idx%mom%beg + d - 1) negated,
-    !! all other conserved variables copied. Done on q_cons; negating conserved normal momentum commutes with the cons->prim convert
-    !! (velocity flips, rho and mom**2 - hence pressure - are unchanged), so this reproduces the monolithic prim-space s_symmetry
-    !! bit-for-bit. Transverse extent is the face interior only (dimension-split reads no corner ghost), matching s_l0_extrap_one.
+    !> Reflective (symmetry) tile face ghosts in dim d, side (-1 low / +1 high): ghost cell 1..buff_size MIRRORS the near-edge
+    !! interior (ghost -jg <- interior jg-1 low; md+jg <- md-(jg-1) high) with the NORMAL-direction momentum (eqn_idx%mom%beg + d -
+    !! 1) negated, all other conserved variables copied. Done on q_cons; negating conserved normal momentum commutes with the
+    !! cons->prim convert (velocity flips, rho and mom**2 - hence pressure - are unchanged), so this reproduces the monolithic
+    !! prim-space s_symmetry bit-for-bit. Transverse extent is the face interior only (dimension-split reads no corner ghost),
+    !! matching s_l0_extrap_one.
     impure subroutine s_l0_reflect_one(q, d, side, fm)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q
-        integer, intent(in) :: d, side, fm(3)
-        integer :: i, jg, a, b, gc, sc, na, nb, md, nrm
+        integer, intent(in)                                    :: d, side, fm(3)
+        integer                                                :: i, jg, a, b, gc, sc, na, nb, md, nrm
 
         #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
             #:set SIDX = {1: '(sc, a, b)', 2: '(a, sc, b)', 3: '(a, b, sc)'}[D]
@@ -5043,14 +5083,15 @@ contains
     end subroutine s_l0_reflect_one
 
     !> Periodic self-wrap for a tile that SPANS dim d (its low AND high faces are both the domain boundary, i.e. l0_ntile==1 in d):
-    !! fill both ghost shells from the opposite-end interior of the SAME tile - low ghost -jg <- interior md-(jg-1), high ghost md+jg
-    !! <- interior jg-1 (a pure copy, matching the monolithic prim-space s_periodic; copy commutes with cons->prim convert). Partial
-    !! tiles never reach here (their periodic faces are cross-tile wrap-seams handled by s_amr_fine_fine_halo). Face interior only.
+    !! fill both ghost shells from the opposite-end interior of the SAME tile - low ghost -jg <- interior md-(jg-1), high ghost
+    !! md+jg <- interior jg-1 (a pure copy, matching the monolithic prim-space s_periodic; copy commutes with cons->prim convert).
+    !! Partial tiles never reach here (their periodic faces are cross-tile wrap-seams handled by s_amr_fine_fine_halo). Face
+    !! interior only.
     impure subroutine s_l0_wrap_one(q, d, fm)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q
-        integer, intent(in) :: d, fm(3)
-        integer :: i, jg, a, b, glo, shi, ghi, slo, na, nb, md
+        integer, intent(in)                                    :: d, fm(3)
+        integer                                                :: i, jg, a, b, glo, shi, ghi, slo, na, nb, md
 
         #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
             #:set GLO = {1: '(glo, a, b)', 2: '(a, glo, b)', 3: '(a, b, glo)'}[D]
@@ -5083,19 +5124,21 @@ contains
     !! fine-block phase structure (m_time_steppers) with prolong/reflux dropped - a base-res tile has no coarser level.
     impure subroutine s_l0_advance_stage(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
-        integer, intent(in) :: s, t_step
-        real(wp), intent(in) :: coefs(4)
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        type(scalar_field), intent(inout) :: q_T_sf
-        real(stp), dimension(:, :, :, :, :), intent(inout) :: pb_in, mv_in
-        real(wp), dimension(:, :, :, :, :), intent(inout) :: rhs_pb, rhs_mv
-        integer :: islot
-        integer(8) :: tc0, tc1, crate
-        logical :: measure
+        integer, intent(in)                                        :: s, t_step
+        real(wp), intent(in)                                       :: coefs(4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+        integer                                                    :: islot
+        integer(8)                                                 :: tc0, tc1, crate
+        logical                                                    :: measure
 
         ! measure per-tile compute time only when rebalancing is active (the GPU_WAIT bracketing serialises the GPU, so it is off by
-        ! default). GPU-synced wall time (cpu_time would capture only host launch overhead under offload); accumulated across stages,
+        ! default). GPU-synced wall time (cpu_time would capture only host launch overhead under offload); accumulated across
+        ! stages,
         ! reset at each rebalance. Timing is a pure side-channel - it never touches field data, so output stays bit-identical.
+
         measure = (l0_rebalance_interval > 0)
 
         call s_l0_fill_edge_bc()

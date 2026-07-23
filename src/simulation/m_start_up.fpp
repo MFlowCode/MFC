@@ -727,6 +727,7 @@ contains
 
         ! beta: tiles own the state; refresh the L0 I/O staging buffer from them just-in-time for output (MPI-aware for migrated
         ! tiles). Safe: s_save_data always runs after >=1 s_perform_time_step, so tiles are seeded + advanced by now.
+
         if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
 
         if (down_sample) then

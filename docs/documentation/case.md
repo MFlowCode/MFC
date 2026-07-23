@@ -716,6 +716,9 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `amr_max_level`        | Integer | Maximum AMR refinement depth (number of refined levels above L0); must be >= 1 (default 1). Multi-level nesting (>= 2) is supported: static AMR (`amr_regrid_int = 0`) nests up to level 2, dynamic regrid (`amr_regrid_int > 0`) nests deeper (see @ref amr_multilevel) |
 | `amr_cluster_eff`       | Real    | Berger-Rigoutsos min tag efficiency a clustered block box reaches before splitting stops; must satisfy 0 < eff <= 1 (default 0.7) |
 | `amr_ref_ratio`             | Integer | AMR refinement ratio between coarse and fine levels; must be 2 or 4 (default 2). Only amr_ref_ratio = 2 is supported with multi-level AMR or subcycling (v1). |
+| `l0_ntile`              | Integer | L0-as-blocks spike: tiles per dimension per rank the base grid is split into (0 = off, monolithic base grid; experimental) |
+| `l0_migrate_step`       | Integer | L0-as-blocks spike: time step at which a forced test migration moves the last tile to rank 0 (0 = off; experimental) |
+| `l0_rebalance_interval` | Integer | L0-as-blocks spike: steps between measured-cost rebalance events that migrate tiles to level load (0 = off; experimental) |
 | `partition_tile_size`   | Integer | Tile side for the SFC partitioner (default 8) |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
