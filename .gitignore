@@ -55,6 +55,7 @@ docs/post_process/readme.md
 docs/api/readme.md
 
 examples/**/IC/*.dat
+examples/**/IC/.cache_key.json
 examples/*batch/*/
 examples/**/D/*
 examples/**/p*
