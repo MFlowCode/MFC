@@ -206,6 +206,7 @@ module m_amr
     !! full amr_slots/region/owner/seam machinery; the tiles ARE level-1 blocks with amr_ref_ratio 1. Off (l0_ntile=0) => no effect.
     integer :: l0_ntiles_tot = 0     !< total tiles = l0_ntile**num_dims (0 when off)
     integer :: l0_nt(3) = 1          !< tiles per dim (1 in collapsed dims)
+    logical :: l0_tiles_need_fill = .false.  !< tiles are persistent: L0 seeds them ONCE (first timestep); set at init, cleared after fill
 
 contains
 
@@ -4365,22 +4366,30 @@ contains
         f_l0_lo = it*(ncell/nt) + min(it, mod(ncell, nt))
     end function f_l0_lo
 
+    !> True if a domain-face BC code is a PHYSICAL boundary the spike does not support. Extrapolation-family (bc <= BC_GHOST_EXTRAP)
+    !! is supported; MPI processor boundaries (bc >= 0, the neighbour rank MFC writes into bc_?%beg/end at np>1) are interior seams
+    !! handled by the fine-fine halo, not physical faces. So only bc in (BC_GHOST_EXTRAP, 0) - i.e. reflective/periodic - is rejected.
+    pure logical function f_l0_bc_unsupported(bc)
+        integer, intent(in) :: bc
+        f_l0_bc_unsupported = (bc < 0 .and. bc > BC_GHOST_EXTRAP)
+    end function f_l0_bc_unsupported
+
     !> Build the base-grid tiling: allocate the slot/region/seam machinery for l0_ntiles_tot rr=1 tiles covering L0, set each tile's
     !! geometry (extent, L0-slice coords, whole-tile footprint, owner) and copy the current L0 state in. Standalone (does not call
     !! s_initialize_amr_module) so the spike lifts out cleanly. np=1 spike: rank 0 owns every tile.
     impure subroutine s_l0_tiles_init()
 
-        integer :: nt(3), ix, iy, iz, k, j, tcap
-        integer :: tlo(3), thi(3), gcell(3)
+        integer :: nt(3), ix, iy, iz, k, j, r, e, tcap
+        integer :: tlo(3), thi(3)
 
         if (l0_ntile <= 0) return
 
         ! Milestone 1 supports only extrapolation-family BC (bc <= BC_GHOST_EXTRAP), the family whose ghost fill commutes with the
         ! cons->prim convert so a tile matches the monolithic prim-space BC bit-for-bit. Validate once here (host), not per stage.
-        if (bc_x%beg > BC_GHOST_EXTRAP .or. bc_x%end > BC_GHOST_EXTRAP &
-            & .or. (n_glb > 0 .and. (bc_y%beg > BC_GHOST_EXTRAP .or. bc_y%end > BC_GHOST_EXTRAP)) &
-            & .or. (p_glb > 0 .and. (bc_z%beg > BC_GHOST_EXTRAP .or. bc_z%end > BC_GHOST_EXTRAP))) then
-            call s_mpi_abort('l0_ntile spike (milestone 1) supports only extrapolation BC (bc <= -3) on every domain face')
+        if (f_l0_bc_unsupported(bc_x%beg) .or. f_l0_bc_unsupported(bc_x%end) &
+            & .or. (n_glb > 0 .and. (f_l0_bc_unsupported(bc_y%beg) .or. f_l0_bc_unsupported(bc_y%end))) &
+            & .or. (p_glb > 0 .and. (f_l0_bc_unsupported(bc_z%beg) .or. f_l0_bc_unsupported(bc_z%end)))) then
+            call s_mpi_abort('l0_ntile spike (milestone 1) supports only extrapolation BC (bc <= -3) on every physical domain face')
         end if
         ! the monolithic L0 RHS is skipped for l0_ntile>0, so the global q_prim_vf it populated is stale: run-time-info and probes
         ! (which read it at stage 1) are not supported in the spike.
@@ -4392,13 +4401,16 @@ contains
         ! it via s_amr_alloc_slot. amr is off, so the amr_ref_ratio in {2,4} checker never runs.
         amr_ref_ratio = 1
 
+        ! Tiles are PER-RANK: each rank's local chunk is split into nt(:) pieces; the global tile table (region + owner) is the union
+        ! over ranks, REPLICATED on every rank. Total = num_procs * nt(1)*nt(2)*nt(3). At np=1 this is identical to the old global
+        ! tiling. Each rank allocates slot DATA (fields + coords) only for its OWN tiles; the seam-pair scan and fine-fine halo see the
+        ! full table and exchange cross-rank seams over MPI.
         nt = 1
         nt(1) = l0_ntile
         if (n_glb > 0) nt(2) = l0_ntile
         if (p_glb > 0) nt(3) = l0_ntile
         l0_nt = nt
-        l0_ntiles_tot = nt(1)*nt(2)*nt(3)
-        gcell(1) = m_glb + 1; gcell(2) = n_glb + 1; gcell(3) = p_glb + 1
+        l0_ntiles_tot = num_procs*nt(1)*nt(2)*nt(3)
 
         amr_max_blocks = l0_ntiles_tot
         amr_num_blocks = l0_ntiles_tot
@@ -4417,11 +4429,30 @@ contains
         allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
         amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
 
-        ! max tile extent per dim = widest tile cells - 1 = ceil(gcell/nt) - 1
-        max_f1 = (gcell(1) + nt(1) - 1)/nt(1) - 1
-        max_f2 = 0; max_f3 = 0
-        if (n_glb > 0) max_f2 = (gcell(2) + nt(2) - 1)/nt(2) - 1
-        if (p_glb > 0) max_f3 = (gcell(3) + nt(3) - 1)/nt(3) - 1
+        ! replicated coarse-decomposition table (each rank's global origin + local extent) - built FIRST so the per-rank tile geometry
+        ! and the max-tile-extent sizing below can read every rank's chunk. Seam-pair overlap-rank lists also read it.
+        allocate (amr_decomp(6, 0:num_procs - 1))
+        block
+            integer :: myrow(6), ierr
+            myrow = 0
+            myrow(1) = start_idx(1); myrow(4) = m
+            if (n_glb > 0) then; myrow(2) = start_idx(2); myrow(5) = n; end if
+            if (p_glb > 0) then; myrow(3) = start_idx(3); myrow(6) = p; end if
+#ifdef MFC_MPI
+            call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+#else
+            amr_decomp(:, 0) = myrow
+#endif
+        end block
+
+        ! max tile extent per dim over ALL ranks (= widest per-rank chunk split by nt); slots + seam buffers are sized to this global
+        ! max so every rank's buffers match. Chunk r has amr_decomp(3+d,r)+1 cells in dim d.
+        max_f1 = 0; max_f2 = 0; max_f3 = 0
+        do r = 0, num_procs - 1
+            e = (amr_decomp(4, r) + 1 + nt(1) - 1)/nt(1) - 1; max_f1 = max(max_f1, e)
+            if (n_glb > 0) then; e = (amr_decomp(5, r) + 1 + nt(2) - 1)/nt(2) - 1; max_f2 = max(max_f2, e); end if
+            if (p_glb > 0) then; e = (amr_decomp(6, r) + 1 + nt(3) - 1)/nt(3) - 1; max_f3 = max(max_f3, e); end if
+        end do
         mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
@@ -4447,83 +4478,83 @@ contains
         amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         amr_xchg_coarse_ghosts = .false.  ! tiles never prolong from a coarser level
 
-        ! replicated coarse-decomposition table (seam-pair overlap-rank lists read it)
-        allocate (amr_decomp(6, 0:num_procs - 1))
-        block
-            integer :: myrow(6), ierr
-            myrow = 0
-            myrow(1) = start_idx(1); myrow(4) = m
-            if (n_glb > 0) then; myrow(2) = start_idx(2); myrow(5) = n; end if
-            if (p_glb > 0) then; myrow(3) = start_idx(3); myrow(6) = p; end if
-#ifdef MFC_MPI
-            call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-#else
-            amr_decomp(:, 0) = myrow
-#endif
-        end block
-
-        ! per-tile geometry: level-1 rr=1 blocks covering L0, laid out x-fastest so f_amr_seam_dim finds adjacent pairs
+        ! per-tile geometry: level-1 rr=1 blocks. Loop is rank-major then z,y,x (x fastest) so intra-rank neighbours are contiguous;
+        ! the global region scan finds cross-rank seams. A rank writes region+owner for EVERY tile but allocates slot data only for its
+        ! own (r == proc_rank). Domain-edge detection uses the global region indices (region_lo == 0 / region_hi == m_glb).
         k = 0
-        do iz = 0, nt(3) - 1
-            do iy = 0, nt(2) - 1
-                do ix = 0, nt(1) - 1
-                    k = k + 1
-                    tlo(1) = f_l0_lo(gcell(1), nt(1), ix); thi(1) = f_l0_lo(gcell(1), nt(1), ix + 1) - 1
-                    tlo(2) = 0; thi(2) = 0
-                    if (n_glb > 0) then; tlo(2) = f_l0_lo(gcell(2), nt(2), iy); thi(2) = f_l0_lo(gcell(2), nt(2), iy + 1) - 1; end if
-                    tlo(3) = 0; thi(3) = 0
-                    if (p_glb > 0) then; tlo(3) = f_l0_lo(gcell(3), nt(3), iz); thi(3) = f_l0_lo(gcell(3), nt(3), iz + 1) - 1; end if
-                    amr_cur = k
-                    amr_block_owner(k) = 0
-                    amr_owns_all(k) = (amr_block_owner(k) == proc_rank)
-                    amr_region_lo_all(:, k) = tlo; amr_region_hi_all(:, k) = thi
-                    amr_isect_lo_all(:, k) = tlo; amr_isect_hi_all(:, k) = thi  ! footprint = whole tile on the owner (rr=1)
-                    call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio (= 1)
-                    amr_slots(k)%m = thi(1) - tlo(1); amr_slots(k)%n = 0; amr_slots(k)%p = 0
-                    if (n_glb > 0) amr_slots(k)%n = thi(2) - tlo(2)
-                    if (p_glb > 0) amr_slots(k)%p = thi(3) - tlo(3)
-                    amr_slots(k)%idwbuff(1)%beg = -buff_size; amr_slots(k)%idwbuff(1)%end = amr_slots(k)%m + buff_size
-                    amr_slots(k)%idwbuff(2)%beg = 0; amr_slots(k)%idwbuff(2)%end = 0
-                    amr_slots(k)%idwbuff(3)%beg = 0; amr_slots(k)%idwbuff(3)%end = 0
-                    if (n_glb > 0) then
-                        amr_slots(k)%idwbuff(2)%beg = -buff_size; amr_slots(k)%idwbuff(2)%end = amr_slots(k)%n + buff_size
-                    end if
-                    if (p_glb > 0) then
-                        amr_slots(k)%idwbuff(3)%beg = -buff_size; amr_slots(k)%idwbuff(3)%end = amr_slots(k)%p + buff_size
-                    end if
-                    ! rr=1: tile cell j (right boundary) IS the global L0 boundary amr_g?cb(tlo + j); interior coords only (the swap
-                    ! extends the ghost shell from amr_g?cb identically).
-                    do j = -1, amr_slots(k)%m
-                        amr_slots(k)%x_cb(j) = amr_gxcb(tlo(1) + j)
+        do r = 0, num_procs - 1
+            do iz = 0, nt(3) - 1
+                do iy = 0, nt(2) - 1
+                    do ix = 0, nt(1) - 1
+                        k = k + 1
+                        ! global cell range of tile (r, ix, iy, iz) = rank r's chunk split by f_l0_lo (identical split on every rank
+                        ! so seam transverse extents match across ranks for an even decomposition)
+                        tlo(1) = amr_decomp(1, r) + f_l0_lo(amr_decomp(4, r) + 1, nt(1), ix)
+                        thi(1) = amr_decomp(1, r) + f_l0_lo(amr_decomp(4, r) + 1, nt(1), ix + 1) - 1
+                        tlo(2) = 0; thi(2) = 0
+                        if (n_glb > 0) then
+                            tlo(2) = amr_decomp(2, r) + f_l0_lo(amr_decomp(5, r) + 1, nt(2), iy)
+                            thi(2) = amr_decomp(2, r) + f_l0_lo(amr_decomp(5, r) + 1, nt(2), iy + 1) - 1
+                        end if
+                        tlo(3) = 0; thi(3) = 0
+                        if (p_glb > 0) then
+                            tlo(3) = amr_decomp(3, r) + f_l0_lo(amr_decomp(6, r) + 1, nt(3), iz)
+                            thi(3) = amr_decomp(3, r) + f_l0_lo(amr_decomp(6, r) + 1, nt(3), iz + 1) - 1
+                        end if
+                        amr_block_owner(k) = r
+                        amr_owns_all(k) = (r == proc_rank)
+                        amr_region_lo_all(:, k) = tlo; amr_region_hi_all(:, k) = thi
+                        amr_isect_lo_all(:, k) = tlo; amr_isect_hi_all(:, k) = thi  ! footprint = whole tile on the owner (rr=1)
+                        if (r /= proc_rank) cycle  ! remote tile: region+owner metadata only, no slot data / coords on this rank
+                        amr_cur = k
+                        call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio (= 1)
+                        amr_slots(k)%m = thi(1) - tlo(1); amr_slots(k)%n = 0; amr_slots(k)%p = 0
+                        if (n_glb > 0) amr_slots(k)%n = thi(2) - tlo(2)
+                        if (p_glb > 0) amr_slots(k)%p = thi(3) - tlo(3)
+                        amr_slots(k)%idwbuff(1)%beg = -buff_size; amr_slots(k)%idwbuff(1)%end = amr_slots(k)%m + buff_size
+                        amr_slots(k)%idwbuff(2)%beg = 0; amr_slots(k)%idwbuff(2)%end = 0
+                        amr_slots(k)%idwbuff(3)%beg = 0; amr_slots(k)%idwbuff(3)%end = 0
+                        if (n_glb > 0) then
+                            amr_slots(k)%idwbuff(2)%beg = -buff_size; amr_slots(k)%idwbuff(2)%end = amr_slots(k)%n + buff_size
+                        end if
+                        if (p_glb > 0) then
+                            amr_slots(k)%idwbuff(3)%beg = -buff_size; amr_slots(k)%idwbuff(3)%end = amr_slots(k)%p + buff_size
+                        end if
+                        ! rr=1: tile cell j (right boundary) IS the global L0 boundary amr_g?cb(tlo + j); interior coords only (the swap
+                        ! extends the ghost shell from amr_g?cb identically).
+                        do j = -1, amr_slots(k)%m
+                            amr_slots(k)%x_cb(j) = amr_gxcb(tlo(1) + j)
+                        end do
+                        do j = 0, amr_slots(k)%m
+                            amr_slots(k)%dx(j) = amr_slots(k)%x_cb(j) - amr_slots(k)%x_cb(j - 1)
+                            amr_slots(k)%x_cc(j) = 0.5_wp*(amr_slots(k)%x_cb(j - 1) + amr_slots(k)%x_cb(j))
+                        end do
+                        if (n_glb > 0) then
+                            do j = -1, amr_slots(k)%n
+                                amr_slots(k)%y_cb(j) = amr_gycb(tlo(2) + j)
+                            end do
+                            do j = 0, amr_slots(k)%n
+                                amr_slots(k)%dy(j) = amr_slots(k)%y_cb(j) - amr_slots(k)%y_cb(j - 1)
+                                amr_slots(k)%y_cc(j) = 0.5_wp*(amr_slots(k)%y_cb(j - 1) + amr_slots(k)%y_cb(j))
+                            end do
+                        end if
+                        if (p_glb > 0) then
+                            do j = -1, amr_slots(k)%p
+                                amr_slots(k)%z_cb(j) = amr_gzcb(tlo(3) + j)
+                            end do
+                            do j = 0, amr_slots(k)%p
+                                amr_slots(k)%dz(j) = amr_slots(k)%z_cb(j) - amr_slots(k)%z_cb(j - 1)
+                                amr_slots(k)%z_cc(j) = 0.5_wp*(amr_slots(k)%z_cb(j - 1) + amr_slots(k)%z_cb(j))
+                            end do
+                        end if
                     end do
-                    do j = 0, amr_slots(k)%m
-                        amr_slots(k)%dx(j) = amr_slots(k)%x_cb(j) - amr_slots(k)%x_cb(j - 1)
-                        amr_slots(k)%x_cc(j) = 0.5_wp*(amr_slots(k)%x_cb(j - 1) + amr_slots(k)%x_cb(j))
-                    end do
-                    if (n_glb > 0) then
-                        do j = -1, amr_slots(k)%n
-                            amr_slots(k)%y_cb(j) = amr_gycb(tlo(2) + j)
-                        end do
-                        do j = 0, amr_slots(k)%n
-                            amr_slots(k)%dy(j) = amr_slots(k)%y_cb(j) - amr_slots(k)%y_cb(j - 1)
-                            amr_slots(k)%y_cc(j) = 0.5_wp*(amr_slots(k)%y_cb(j - 1) + amr_slots(k)%y_cb(j))
-                        end do
-                    end if
-                    if (p_glb > 0) then
-                        do j = -1, amr_slots(k)%p
-                            amr_slots(k)%z_cb(j) = amr_gzcb(tlo(3) + j)
-                        end do
-                        do j = 0, amr_slots(k)%p
-                            amr_slots(k)%dz(j) = amr_slots(k)%z_cb(j) - amr_slots(k)%z_cb(j - 1)
-                            amr_slots(k)%z_cc(j) = 0.5_wp*(amr_slots(k)%z_cb(j - 1) + amr_slots(k)%z_cb(j))
-                        end do
-                    end if
                 end do
             end do
         end do
         call s_amr_select_slot(1)
-        ! tile field arrays are filled from L0 at each timestep's first RK stage (s_l0_copy_coarse_to_tiles); no init-time device
-        ! copy here (q_cons device state is not guaranteed live at module init).
+        ! tiles are PERSISTENT: L0 seeds them once at the first timestep (s_l0_copy_coarse_to_tiles self-gates on this flag), then
+        ! they carry their own state across stages/timesteps. No init-time device copy (q_cons device state is not live at module init).
+        l0_tiles_need_fill = .true.
 
     end subroutine s_l0_tiles_init
 
@@ -4564,12 +4595,17 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer :: k, o1, o2, o3, fm1, fm2, fm3
 
+        ! Persistent tiles: seed from L0 exactly once. After the first fill the tiles are authoritative; re-copying would be an
+        ! identity round-trip (each stage scatters tile->L0, so L0 already mirrors the tile interior at the next timestep's stage 1).
+        if (.not. l0_tiles_need_fill) return
+
         do k = 1, l0_ntiles_tot
             if (amr_block_owner(k) /= proc_rank) cycle
             call s_l0_tile_l0_offsets(k, o1, o2, o3)
             fm1 = amr_slots(k)%m; fm2 = amr_slots(k)%n; fm3 = amr_slots(k)%p
             call s_l0_copy_block(amr_slots(k)%q_cons, q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .true.)
         end do
+        l0_tiles_need_fill = .false.
 
     end subroutine s_l0_copy_coarse_to_tiles
 
@@ -4718,6 +4754,7 @@ contains
         call s_l0_fill_edge_bc()
         call s_amr_fine_fine_halo()
         do islot = 1, l0_ntiles_tot
+            if (amr_block_owner(islot) /= proc_rank) cycle  ! advance only owned tiles; remote tiles live on their owner rank
             call s_amr_select_slot(islot)
             call s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
         end do
