@@ -561,6 +561,7 @@ contains
         amr_ref_ratio = 2
         l0_ntile = 0
         l0_migrate_step = 0
+        l0_rebalance_interval = 0
         partition_tile_size = 8
         many_ib_patch_parallelism = .false.
 
