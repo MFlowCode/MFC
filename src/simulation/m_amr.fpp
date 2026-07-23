@@ -40,7 +40,8 @@ module m_amr
         & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_fine_stage_fill, s_amr_fine_stage_advance, &
         & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, &
         & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
-        & s_l0_tiles_init, s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_tiles_finalize
+        & s_l0_tiles_init, s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_tiles_finalize, &
+        & s_l0_forced_remap
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -207,6 +208,8 @@ module m_amr
     integer :: l0_ntiles_tot = 0     !< total tiles = l0_ntile**num_dims (0 when off)
     integer :: l0_nt(3) = 1          !< tiles per dim (1 in collapsed dims)
     logical :: l0_tiles_need_fill = .false.  !< tiles are persistent: L0 seeds them ONCE (first timestep); set at init, cleared after fill
+    integer, allocatable :: amr_tile_l0_owner(:)  !< rank owning each tile's L0 STORAGE cells (fixed = init owner); scatter routes the
+    !!                                               compute-owner's interior back to this rank when a tile has MIGRATED (owner != l0_owner)
 
 contains
 
@@ -4423,6 +4426,7 @@ contains
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
         allocate (amr_owns_all(amr_max_blocks))
         allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
+        allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
         allocate (amr_block_level(amr_max_blocks)); amr_block_level = 1
         allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
         allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
@@ -4502,51 +4506,12 @@ contains
                             thi(3) = amr_decomp(3, r) + f_l0_lo(amr_decomp(6, r) + 1, nt(3), iz + 1) - 1
                         end if
                         amr_block_owner(k) = r
+                        amr_tile_l0_owner(k) = r  ! L0 storage owner = init owner; stays fixed under migration
                         amr_owns_all(k) = (r == proc_rank)
                         amr_region_lo_all(:, k) = tlo; amr_region_hi_all(:, k) = thi
                         amr_isect_lo_all(:, k) = tlo; amr_isect_hi_all(:, k) = thi  ! footprint = whole tile on the owner (rr=1)
                         if (r /= proc_rank) cycle  ! remote tile: region+owner metadata only, no slot data / coords on this rank
-                        amr_cur = k
-                        call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio (= 1)
-                        amr_slots(k)%m = thi(1) - tlo(1); amr_slots(k)%n = 0; amr_slots(k)%p = 0
-                        if (n_glb > 0) amr_slots(k)%n = thi(2) - tlo(2)
-                        if (p_glb > 0) amr_slots(k)%p = thi(3) - tlo(3)
-                        amr_slots(k)%idwbuff(1)%beg = -buff_size; amr_slots(k)%idwbuff(1)%end = amr_slots(k)%m + buff_size
-                        amr_slots(k)%idwbuff(2)%beg = 0; amr_slots(k)%idwbuff(2)%end = 0
-                        amr_slots(k)%idwbuff(3)%beg = 0; amr_slots(k)%idwbuff(3)%end = 0
-                        if (n_glb > 0) then
-                            amr_slots(k)%idwbuff(2)%beg = -buff_size; amr_slots(k)%idwbuff(2)%end = amr_slots(k)%n + buff_size
-                        end if
-                        if (p_glb > 0) then
-                            amr_slots(k)%idwbuff(3)%beg = -buff_size; amr_slots(k)%idwbuff(3)%end = amr_slots(k)%p + buff_size
-                        end if
-                        ! rr=1: tile cell j (right boundary) IS the global L0 boundary amr_g?cb(tlo + j); interior coords only (the swap
-                        ! extends the ghost shell from amr_g?cb identically).
-                        do j = -1, amr_slots(k)%m
-                            amr_slots(k)%x_cb(j) = amr_gxcb(tlo(1) + j)
-                        end do
-                        do j = 0, amr_slots(k)%m
-                            amr_slots(k)%dx(j) = amr_slots(k)%x_cb(j) - amr_slots(k)%x_cb(j - 1)
-                            amr_slots(k)%x_cc(j) = 0.5_wp*(amr_slots(k)%x_cb(j - 1) + amr_slots(k)%x_cb(j))
-                        end do
-                        if (n_glb > 0) then
-                            do j = -1, amr_slots(k)%n
-                                amr_slots(k)%y_cb(j) = amr_gycb(tlo(2) + j)
-                            end do
-                            do j = 0, amr_slots(k)%n
-                                amr_slots(k)%dy(j) = amr_slots(k)%y_cb(j) - amr_slots(k)%y_cb(j - 1)
-                                amr_slots(k)%y_cc(j) = 0.5_wp*(amr_slots(k)%y_cb(j - 1) + amr_slots(k)%y_cb(j))
-                            end do
-                        end if
-                        if (p_glb > 0) then
-                            do j = -1, amr_slots(k)%p
-                                amr_slots(k)%z_cb(j) = amr_gzcb(tlo(3) + j)
-                            end do
-                            do j = 0, amr_slots(k)%p
-                                amr_slots(k)%dz(j) = amr_slots(k)%z_cb(j) - amr_slots(k)%z_cb(j - 1)
-                                amr_slots(k)%z_cc(j) = 0.5_wp*(amr_slots(k)%z_cb(j - 1) + amr_slots(k)%z_cb(j))
-                            end do
-                        end if
+                        call s_l0_build_tile_slot(k)  ! alloc slot + set extents/idwbuff/coords from the (global) region metadata
                     end do
                 end do
             end do
@@ -4589,6 +4554,58 @@ contains
 
     end subroutine s_l0_build_extended_global_cb
 
+    !> Build tile k's slot on THIS rank from its (already-set, replicated) region metadata: allocate the field/coord arrays and set the
+    !! local extents, idwbuff, and rr=1 cell coordinates sliced from the global amr_g?cb. Shared by s_l0_tiles_init (initial owned
+    !! tiles) and s_l0_migrate_tile (a tile arriving on its new owner). Requires amr_gxcb/gycb/gzcb + mbuf*/max_f* already set.
+    impure subroutine s_l0_build_tile_slot(k)
+
+        integer, intent(in) :: k
+        integer :: j, tlo(3), thi(3)
+
+        tlo = amr_region_lo_all(:, k); thi = amr_region_hi_all(:, k)
+        call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio (= 1)
+        amr_slots(k)%m = thi(1) - tlo(1); amr_slots(k)%n = 0; amr_slots(k)%p = 0
+        if (n_glb > 0) amr_slots(k)%n = thi(2) - tlo(2)
+        if (p_glb > 0) amr_slots(k)%p = thi(3) - tlo(3)
+        amr_slots(k)%idwbuff(1)%beg = -buff_size; amr_slots(k)%idwbuff(1)%end = amr_slots(k)%m + buff_size
+        amr_slots(k)%idwbuff(2)%beg = 0; amr_slots(k)%idwbuff(2)%end = 0
+        amr_slots(k)%idwbuff(3)%beg = 0; amr_slots(k)%idwbuff(3)%end = 0
+        if (n_glb > 0) then
+            amr_slots(k)%idwbuff(2)%beg = -buff_size; amr_slots(k)%idwbuff(2)%end = amr_slots(k)%n + buff_size
+        end if
+        if (p_glb > 0) then
+            amr_slots(k)%idwbuff(3)%beg = -buff_size; amr_slots(k)%idwbuff(3)%end = amr_slots(k)%p + buff_size
+        end if
+        ! rr=1: tile cell j (right boundary) IS the global L0 boundary amr_g?cb(tlo + j); interior coords only (the swap extends the
+        ! ghost shell from amr_g?cb identically).
+        do j = -1, amr_slots(k)%m
+            amr_slots(k)%x_cb(j) = amr_gxcb(tlo(1) + j)
+        end do
+        do j = 0, amr_slots(k)%m
+            amr_slots(k)%dx(j) = amr_slots(k)%x_cb(j) - amr_slots(k)%x_cb(j - 1)
+            amr_slots(k)%x_cc(j) = 0.5_wp*(amr_slots(k)%x_cb(j - 1) + amr_slots(k)%x_cb(j))
+        end do
+        if (n_glb > 0) then
+            do j = -1, amr_slots(k)%n
+                amr_slots(k)%y_cb(j) = amr_gycb(tlo(2) + j)
+            end do
+            do j = 0, amr_slots(k)%n
+                amr_slots(k)%dy(j) = amr_slots(k)%y_cb(j) - amr_slots(k)%y_cb(j - 1)
+                amr_slots(k)%y_cc(j) = 0.5_wp*(amr_slots(k)%y_cb(j - 1) + amr_slots(k)%y_cb(j))
+            end do
+        end if
+        if (p_glb > 0) then
+            do j = -1, amr_slots(k)%p
+                amr_slots(k)%z_cb(j) = amr_gzcb(tlo(3) + j)
+            end do
+            do j = 0, amr_slots(k)%p
+                amr_slots(k)%dz(j) = amr_slots(k)%z_cb(j) - amr_slots(k)%z_cb(j - 1)
+                amr_slots(k)%z_cc(j) = 0.5_wp*(amr_slots(k)%z_cb(j - 1) + amr_slots(k)%z_cb(j))
+            end do
+        end if
+
+    end subroutine s_l0_build_tile_slot
+
     !> Copy the current L0 interior state into every owned tile's interior (global cell tlo+j -> tile-local cell j).
     impure subroutine s_l0_copy_coarse_to_tiles(q_cons_vf)
 
@@ -4619,20 +4636,123 @@ contains
         o3 = 0; if (p_glb > 0) o3 = amr_region_lo_all(3, k) - start_idx(3)
     end subroutine s_l0_tile_l0_offsets
 
-    !> Scatter every owned tile's interior back into the L0 field (tile-local cell j -> global cell tlo+j).
+    !> Scatter every tile's interior back into the L0 field (tile-local cell j -> global cell tlo+j). A tile whose compute owner is
+    !! also its L0-storage owner writes locally (device kernel - the common case, and the ENTIRE no-migration path, so byte-identical
+    !! to before). A MIGRATED tile (owner != l0_owner) has its interior sent by the compute owner to the L0-storage owner over MPI,
+    !! which writes it into L0 - keeping the fixed L0 decomposition (hence output/restart) correct after migration. Ghosts are not
+    !! scattered (the tile path never reads L0 ghosts). The MPI branch is CPU-only for now (GPU migration is a later milestone; it is
+    !! dead code while l0_migrate_step == 0, so GPU runs without migration are unaffected).
     impure subroutine s_l0_scatter_tiles_to_coarse(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer :: k, o1, o2, o3, fm1, fm2, fm3
+        integer :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, i, j, kk, ll, cnt, idx, ierr
+        real(stp), allocatable :: buf(:)
 
         do k = 1, l0_ntiles_tot
-            if (amr_block_owner(k) /= proc_rank) cycle
-            call s_l0_tile_l0_offsets(k, o1, o2, o3)
-            fm1 = amr_slots(k)%m; fm2 = amr_slots(k)%n; fm3 = amr_slots(k)%p
-            call s_l0_copy_block(amr_slots(k)%q_cons, q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .false.)
+            bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
+            fm1 = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
+            fm2 = 0; if (n_glb > 0) fm2 = amr_region_hi_all(2, k) - amr_region_lo_all(2, k)
+            fm3 = 0; if (p_glb > 0) fm3 = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
+            if (bown == lown) then  ! not migrated: local device copy (unchanged path)
+                if (bown /= proc_rank) cycle
+                call s_l0_tile_l0_offsets(k, o1, o2, o3)
+                call s_l0_copy_block(amr_slots(k)%q_cons, q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .false.)
+                cycle
+            end if
+            cnt = sys_size*(fm1 + 1)*(fm2 + 1)*(fm3 + 1)
+            if (proc_rank == bown) then  ! compute owner: pack owned tile interior, send to the L0 owner
+                allocate (buf(cnt)); idx = 0
+                do i = 1, sys_size
+                    do ll = 0, fm3; do kk = 0, fm2; do j = 0, fm1
+                        idx = idx + 1; buf(idx) = amr_slots(k)%q_cons(i)%sf(j, kk, ll)
+                    end do; end do; end do
+                end do
+#ifdef MFC_MPI
+                call MPI_SEND(buf, cnt, mpi_io_p, lown, k, MPI_COMM_WORLD, ierr)
+#endif
+                deallocate (buf)
+            else if (proc_rank == lown) then  ! L0 owner: recv the interior, write it into the local L0 chunk
+                call s_l0_tile_l0_offsets(k, o1, o2, o3)
+                allocate (buf(cnt))
+#ifdef MFC_MPI
+                call MPI_RECV(buf, cnt, mpi_io_p, bown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+                idx = 0
+                do i = 1, sys_size
+                    do ll = 0, fm3; do kk = 0, fm2; do j = 0, fm1
+                        idx = idx + 1; q_cons_vf(i)%sf(o1 + j, o2 + kk, o3 + ll) = buf(idx)
+                    end do; end do; end do
+                end do
+                deallocate (buf)
+            end if
         end do
 
     end subroutine s_l0_scatter_tiles_to_coarse
+
+    !> Migrate tile k from its current compute owner to new_owner: P2P-move the persistent interior state, (re)build the slot on the
+    !! receiver, free it on the sender, and update the replicated owner map + seam topology. ALL ranks call with the same
+    !! (k, new_owner). This is the load-balance MIGRATION primitive; the DECISION of which tile moves where is made by the caller
+    !! (a forced remap in the spike; a cost-driven trigger later). Ghosts are not moved (refilled by edge-BC + fine-fine halo before
+    !! the next stage); interior is sent in stp (exact for the field kind). CPU-only for now (GPU migration is a later milestone).
+    impure subroutine s_l0_migrate_tile(k, new_owner)
+
+        integer, intent(in) :: k, new_owner
+        integer :: old_owner, i, j, kk, ll, ni, nj, nl, cnt, idx, ierr
+        real(stp), allocatable :: buf(:)
+
+        old_owner = amr_block_owner(k)
+        if (old_owner == new_owner) return
+
+        ni = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
+        nj = 0; if (n_glb > 0) nj = amr_region_hi_all(2, k) - amr_region_lo_all(2, k)
+        nl = 0; if (p_glb > 0) nl = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
+        cnt = sys_size*(ni + 1)*(nj + 1)*(nl + 1)
+
+        if (proc_rank == old_owner) then  ! pack + send the interior, then release the slot
+            allocate (buf(cnt)); idx = 0
+            do i = 1, sys_size
+                do ll = 0, nl; do kk = 0, nj; do j = 0, ni
+                    idx = idx + 1; buf(idx) = amr_slots(k)%q_cons(i)%sf(j, kk, ll)
+                end do; end do; end do
+            end do
+#ifdef MFC_MPI
+            call MPI_SEND(buf, cnt, mpi_io_p, new_owner, 4300, MPI_COMM_WORLD, ierr)
+#endif
+            deallocate (buf)
+            call s_amr_free_slot(k)
+        else if (proc_rank == new_owner) then  ! build the slot, recv the interior into it
+            call s_l0_build_tile_slot(k)
+            allocate (buf(cnt))
+#ifdef MFC_MPI
+            call MPI_RECV(buf, cnt, mpi_io_p, old_owner, 4300, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+            idx = 0
+            do i = 1, sys_size
+                do ll = 0, nl; do kk = 0, nj; do j = 0, ni
+                    idx = idx + 1; amr_slots(k)%q_cons(i)%sf(j, kk, ll) = buf(idx)
+                end do; end do; end do
+            end do
+            deallocate (buf)
+        end if
+
+        ! replicated ownership update on EVERY rank; mark the seam topology dirty so the next halo rebuilds pair/overlap lists
+        amr_block_owner(k) = new_owner
+        amr_owns_all(k) = (new_owner == proc_rank)
+        amr_seam_pairs_dirty = .true.
+
+    end subroutine s_l0_migrate_tile
+
+    !> Spike test hook: at t_step == l0_migrate_step, force-migrate the LAST tile (initially owned by rank num_procs-1) to rank 0,
+    !! exercising the migration primitive + seam-topology rebuild. Output must stay byte-identical to the no-migration run. No-op at
+    !! np=1 (the last tile already lives on rank 0). ALL ranks call with identical arguments.
+    impure subroutine s_l0_forced_remap()
+
+        integer :: k
+
+        k = l0_ntiles_tot
+        if (amr_block_owner(k) /= 0) call s_l0_migrate_tile(k, 0)
+
+    end subroutine s_l0_forced_remap
 
     !> Device copy between a tile interior [0:fm] and the L0 field [o+0:o+fm]. to_tile=T copies L0->tile, F copies tile->L0. The
     !! slot q_cons is a dummy so the kernel reads a valid mapped descriptor (indexing module amr_slots%q_cons in a kernel is a null
@@ -4777,7 +4897,7 @@ contains
         deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
         deallocate (amr_decomp, amr_slots)
         deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
-        deallocate (amr_block_owner, amr_block_level)
+        deallocate (amr_block_owner, amr_tile_l0_owner, amr_block_level)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
         if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
         if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)

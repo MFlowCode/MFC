@@ -31,7 +31,7 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
         & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, &
-        & s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse
+        & s_l0_advance_stage, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_forced_remap
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -549,7 +549,11 @@ contains
             ! carry their own state across stages (copied in at stage 1); each stage is scattered back so the L0 field, run-time-info
             ! and post-update ops stay consistent. rhs_vf from the L0 s_compute_rhs above is unused here.
             if (l0_ntile > 0) then
-                if (s == 1) call s_l0_copy_coarse_to_tiles(q_cons_ts(1)%vf)
+                if (s == 1) then
+                    call s_l0_copy_coarse_to_tiles(q_cons_ts(1)%vf)
+                    ! spike: force a cross-rank tile migration at the configured step (stage-complete state; before this stage advances)
+                    if (l0_migrate_step > 0 .and. t_step == l0_migrate_step) call s_l0_forced_remap()
+                end if
                 call s_l0_advance_stage(s, rk_coef(s, :), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
                 call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
             else
