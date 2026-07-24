@@ -2055,6 +2055,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # No single golden is portable -- same class as the other flame examples above. The
                 # reactive_burn detonation golden tests remain portable (machine-zero across lanes).
                 "1D_propellant_flame",
+                # Same finite-rate-flame non-portability as 1D_propellant_flame above: the diffusion
+                # flame over the fuel slab is set by accumulated stiff-kinetics roundoff, so by step 50
+                # the transverse momentum drifts past the 1e-3 Example tolerance across compilers
+                # (nvhpc passes; Intel and CCE disagree by ~2e-3 absolute). No single golden is portable.
+                "2D_hybrid_slab",
             ]
             if path in casesToSkip:
                 continue
