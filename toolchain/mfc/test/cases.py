@@ -2386,6 +2386,30 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     reactive_burn_cases()
 
+    def ibm_burn_rate_cases():
+        """Vieille's-law pressure-coupled IB burn rate (patch_ib%burn_rate_exp/pref).
+
+        The ibm_burning_grain/ibm_flameholder Example goldens cover surface injection
+        (v_blow, inj_species) but both leave burn_rate_exp at 0, so the pressure-coupled
+        scaling v_blow*(p/pref)^n has no golden. This registers the same example with the
+        coupling on, at reduced resolution to stay cheap.
+        """
+        cases.append(
+            define_case_f(
+                "2D -> IBM -> Vieille Burn Rate",
+                "examples/2D_ibm_burning_grain/case.py",
+                ["--burn_exp", "0.5"],
+                mods={"m": 25, "n": 25, "t_step_stop": 50, "t_step_save": 50, "parallel_io": "F"},
+                # Same 1e-3 as the ibm_burning_grain Example golden this mirrors: a 50-step IBM +
+                # finite-rate-chemistry run accumulates cross-compiler roundoff well past the 1e-10
+                # the ib branch of compute_tolerance would otherwise pick. Turning the coupling on
+                # moves the solution by ~5e-3 relative, so the burn-rate path stays covered at 1e-3.
+                override_tol=1e-3,
+            )
+        )
+
+    ibm_burn_rate_cases()
+
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
 
