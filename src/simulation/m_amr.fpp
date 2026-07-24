@@ -269,8 +269,8 @@ contains
         amr_block_owner = 0
         amr_block_level = 1  ! init default (level-1); regrid re-tags each block's level for nesting
         amr_num_levels = 1
-        amr_num_blocks = 1
-        amr_cur = 1
+        amr_num_blocks = f_l0_slot(1)
+        amr_cur = f_l0_slot(1)
 
         ! fine-level load balance is capped at min(num blocks, amr_max_blocks) ranks: the SFC map spreads whole blocks, so with
         ! fewer
@@ -519,19 +519,19 @@ contains
             else
                 call s_amr_tile_box(blk_lo, blk_hi, tiled, nt, amr_max_fine, capt)
             end if
-            amr_num_blocks = nt
+            amr_num_blocks = f_l0_slot(nt)  ! fine blocks occupy [l0_slot_off+1 .. l0_slot_off+nt] in the shared pool
             ! set block regions FIRST so the owner assignment (reads amr_region_*_all) runs BEFORE the owner-dependent geometry -
             ! else s_set_amr_fine_geometry would size the whole-block owner from a stale (default) amr_block_owner
             do kk = 1, nt
-                amr_region_lo_all(:,kk) = tiled(kk)%lo; amr_region_hi_all(:,kk) = tiled(kk)%hi
+                amr_region_lo_all(:,f_l0_slot(kk)) = tiled(kk)%lo; amr_region_hi_all(:,f_l0_slot(kk)) = tiled(kk)%hi
             end do
             call s_amr_assign_block_owners()  ! assign each block's single owner rank (fine-dist map)
             call s_amr_reconcile_slots()  ! allocate this rank's owned initial blocks (owner-guarded geometry writes below)
             do kk = 1, nt
-                amr_cur = kk
+                amr_cur = f_l0_slot(kk)
                 call s_set_amr_fine_geometry(tiled(kk)%lo, tiled(kk)%hi)
             end do
-            call s_amr_select_slot(1)  ! refresh the per-block mirrors for slot 1 (geometry loop left them on the last tile)
+            call s_amr_select_slot(f_l0_slot(1))  ! refresh the per-block mirrors (geometry loop left them on the last tile)
             deallocate (tiled)
         end block
 
@@ -1883,7 +1883,7 @@ contains
         ! patch's inter-rank coarse cells from neighbour interiors, so no coarse-ghost halo exchange is needed; host q_cons_base
         ! holds
         ! the ICs here (this runs before s_initialize_gpu_vars). ALL ranks call the gather (P2P); only owners prolong.
-        do islot = 1, amr_num_blocks
+        do islot = f_l0_slot(1), amr_num_blocks
             call s_amr_select_slot(islot)
             call s_amr_gather_coarse_patch(q_cons_base, .false.)
             ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners prolong from it below)
@@ -1898,7 +1898,7 @@ contains
             end if
         end do
         if (amr_max_level >= 2) call s_amr_build_static_multilevel(q_cons_base)
-        call s_amr_select_slot(1)
+        call s_amr_select_slot(f_l0_slot(1))
 
     end subroutine s_populate_amr_fine
 
