@@ -124,6 +124,15 @@ PHYSICS_DOCS = {
         "category": "Bubble Physics",
         "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. Kahan summation not compatible with --mixed precision.",
     },
+    "check_reactive_burn": {
+        "title": "Condensed-Phase Reactive Burn",
+        "category": "Combustion",
+        "explanation": (
+            "Programmed pressure-driven burn converting a reactant fluid to a product fluid on the multi-fluid model. "
+            "Requires model_eqns = 2 and num_fluids = 2 (reactant, product) sharing the stiffened-gas EOS "
+            "(equal gamma, pi_inf) with qv_reactant > qv_product, and rburn_pref > 0."
+        ),
+    },
     # Numerical Schemes
     "check_weno": {
         "title": "WENO Reconstruction",
@@ -683,6 +692,13 @@ class CaseValidator:
                     True,
                     f"patch_ib({i})%model_id is set but geometry ({geometry}) is not an STL model (5 or 12)",
                 )
+            # Vieille's-law burn-rate exponent must be non-negative: a negative exponent makes
+            # v_blow ~ p^n diverge (Inf) as the surface pressure approaches zero.
+            burn_rate_exp = self.get(f"patch_ib({i})%burn_rate_exp", None)
+            self.prohibit(
+                burn_rate_exp is not None and burn_rate_exp < 0,
+                f"patch_ib({i})%burn_rate_exp must be >= 0 (Vieille's-law pressure exponent)",
+            )
         num_patches = self.get("num_patches", 0) or 0
         for i in range(1, num_patches + 1):
             geometry = self.get(f"patch_icpp({i})%geometry", None)
@@ -1560,6 +1576,16 @@ class CaseValidator:
                 if tw_out is not None and self._is_numeric(tw_out):
                     self.prohibit(tw_out <= 0.0, f"Wall temperature bc_{dir}%Twall_out must be strictly positive for thermodynamics (got {tw_out}).")
 
+    def check_reactive_burn(self):
+        """Checks condensed-phase reactive-burn constraints"""
+        reactive_burn = self.get("reactive_burn", "F") == "T"
+        if not reactive_burn:
+            return
+        model_eqns = self.get("model_eqns")
+        # The exact volume-fraction swap and single-pressure read assume the 5-equation
+        # pressure-equilibrium model; num_fluids = 2 alone also admits model_eqns = 3.
+        self.prohibit(model_eqns is not None and model_eqns != 2, "reactive_burn requires model_eqns = 2 (5-equation pressure-equilibrium model)")
+
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""
         mixlayer_vel_profile = self.get("mixlayer_vel_profile", "F") == "T"
@@ -2289,6 +2315,7 @@ class CaseValidator:
         self.check_surface_tension()
         self.check_mhd()
         self.check_chemistry()
+        self.check_reactive_burn()
 
     def validate_simulation(self):
         """Validate simulation-specific parameters"""

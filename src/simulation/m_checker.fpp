@@ -73,6 +73,8 @@ contains
                    & "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)")
         @:PROHIBIT(reactive_burn .and. rburn_pref <= 0._wp, &
                    & "reactive_burn requires rburn_pref > 0 (it normalizes the pressure drive (p - rburn_pign)/rburn_pref and is used as a divisor)")
+        @:PROHIBIT(reactive_burn .and. model_eqns /= 2, &
+                   & "reactive_burn requires model_eqns = 2 (the exact volume-fraction swap and single-pressure read assume the 5-equation pressure-equilibrium model)")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
