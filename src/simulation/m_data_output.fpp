@@ -20,6 +20,9 @@ module m_data_output
     use m_ibm
     use m_boundary_common
     use m_constants, only: model_eqns_5eq, model_eqns_4eq, precision_single
+    use m_load_weight, only: load_weight, s_compute_load_weight, s_report_load_imbalance
+    use m_rank_timing, only: s_report_rank_time
+    use m_sfc_partition, only: s_compute_sfc_partition, s_report_sfc_partition
 
     implicit none
 
@@ -53,6 +56,22 @@ contains
         integer, intent(in)                                         :: t_step
         type(scalar_field), intent(inout), optional                 :: beta
         type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+
+        ! One load-weight compute serves both writers (s_compute_sfc_partition reads the host copy).
+
+        if (load_weight_wrt .or. sfc_partition_wrt) then
+            call s_compute_load_weight()
+            $:GPU_UPDATE(host='[load_weight%sf]')
+        end if
+
+        if (load_weight_wrt) call s_report_load_imbalance
+
+        if (rank_time_wrt) call s_report_rank_time
+
+        if (sfc_partition_wrt) then
+            call s_compute_sfc_partition()
+            call s_report_sfc_partition
+        end if
 
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
@@ -467,6 +486,15 @@ contains
                     end do
                 end do
             end if
+
+            if (load_weight_wrt) then
+                write (file_path, '(A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/load_weight.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    write (2, FMT) x_cb(j), load_weight%sf(j, 0, 0)
+                end do
+                close (2)
+            end if
         end if
 
         if (precision == precision_single) then
@@ -550,6 +578,18 @@ contains
                     end do
                     close (2)
                 end do
+            end if
+
+            if (load_weight_wrt) then
+                write (file_path, '(A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/load_weight.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    do k = 0, n
+                        write (2, FMT) x_cb(j), y_cb(k), load_weight%sf(j, k, 0)
+                    end do
+                    write (2, *)
+                end do
+                close (2)
             end if
         end if
 
@@ -648,6 +688,21 @@ contains
                     end do
                     close (2)
                 end do
+            end if
+
+            if (load_weight_wrt) then
+                write (file_path, '(A,I2.2,A,I6.6,A)') trim(t_step_dir) // '/load_weight.', proc_rank, '.', t_step, '.dat'
+                open (2, FILE=trim(file_path))
+                do j = 0, m
+                    do k = 0, n
+                        do l = 0, p
+                            write (2, FMT) x_cb(j), y_cb(k), z_cb(l), load_weight%sf(j, k, l)
+                        end do
+                        write (2, *)
+                    end do
+                    write (2, *)
+                end do
+                close (2)
             end if
         end if
 

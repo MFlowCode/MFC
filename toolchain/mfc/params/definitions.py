@@ -654,8 +654,41 @@ def _load():
     # Output
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt"]:
+    for n in [
+        "parallel_io",
+        "file_per_process",
+        "run_time_info",
+        "prim_vars_wrt",
+        "cons_vars_wrt",
+        "fft_wrt",
+        "ib_state_wrt",
+    ]:
         _r(n, LOG, {"output"})
+
+    # Load balance and AMR (load_weight/sfc_partition/rank_time writers are diagnostics)
+    for n in [
+        "load_weight_wrt",
+        "sfc_partition_wrt",
+        "load_balance",
+        "rank_time_wrt",
+        "amr",
+    ]:
+        _r(n, LOG, {"output"})
+    for j in range(1, 4):
+        for a in ["amr_block_beg", "amr_block_end"]:
+            _r(f"{a}({j})", INT)
+    _r("amr_regrid_int", INT)
+    _r("amr_tag_eps", REAL)
+    _r("amr_buf", INT)
+    _r("amr_subcycle", LOG)
+    _r("amr_max_blocks", INT)
+    _r("amr_max_level", INT)
+    _r("amr_cluster_eff", REAL)
+    _r("amr_ref_ratio", INT)
+    _r("l0_ntile", INT)
+    _r("l0_migrate_step", INT)
+    _r("l0_rebalance_interval", INT)
+    _r("partition_tile_size", INT, {"output"})
     for n in [
         "schlieren_wrt",
         "alpha_wrt",
@@ -775,6 +808,7 @@ def _load():
         "igr_pres_lim",
         "nv_uvm_out_of_core",
         "nv_uvm_pref_gpu",
+        "active_box",
     ]:
         _r(n, LOG)
     _r("int_comp", INT)
@@ -1168,6 +1202,8 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "mom_wrt": "3",
     "omega_wrt": "3",
     "vel_wrt": "3",
+    "amr_block_beg": "3",
+    "amr_block_end": "3",
 }
 
 # Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
@@ -1266,6 +1302,11 @@ _nv(
     "cfl_target",
     "avg_state",
     "prim_vars_wrt",
+    "load_weight_wrt",
+    "sfc_partition_wrt",
+    "load_balance",
+    "rank_time_wrt",
+    "partition_tile_size",
     "alt_soundspeed",
     "mixture_err",
     "fd_order",
@@ -1358,6 +1399,21 @@ _nv(
     "cont_damage_s",
     "alpha_bar",
     "rdma_mpi",
+    "active_box",
+    "amr",
+    "amr_block_beg",
+    "amr_block_end",
+    "amr_regrid_int",
+    "amr_tag_eps",
+    "amr_buf",
+    "amr_subcycle",
+    "amr_max_blocks",
+    "amr_max_level",
+    "amr_cluster_eff",
+    "amr_ref_ratio",
+    "l0_ntile",
+    "l0_migrate_step",
+    "l0_rebalance_interval",
     "alf_factor",
     "num_igr_iters",
     "num_igr_warm_start_iters",
@@ -1367,6 +1423,9 @@ _nv(
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
 )
+# post_process reads the `amr` flag (only) to overlay the refined fine blocks on the coarse
+# mesh; the fine-block geometry is recovered from the AMR restart file, not from these params.
+_nv(_SIM_POST, "amr")
 _nv(
     _PRE,
     "x_domain",

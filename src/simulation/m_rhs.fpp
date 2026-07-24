@@ -11,6 +11,7 @@ module m_rhs
 
     use m_derived_types
     use m_global_parameters
+    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
@@ -36,6 +37,8 @@ module m_rhs
     use m_igr
     use m_thinc
     use m_pressure_relaxation
+    use m_active_box, only: ab_x, ab_y, ab_z, ab_active
+    use m_amr_registers, only: s_amr_capture_boundary_flux
 
     implicit none
 
@@ -97,6 +100,10 @@ module m_rhs
 
     type(int_bounds_info) :: is1, is2, is3
     !> @}
+
+    type(int_bounds_info) :: ab_int(1:3)  !< Active-box interior bounds for convert call (device-resident)
+    $:GPU_DECLARE(create='[ab_int]')
+    logical :: ab_prim_seeded = .false.  !< Active-box: whether q_prim_qp's frozen exterior has been seeded once (host-only)
     $:GPU_DECLARE(create='[is1, is2, is3]')
 
     !> @name Saved fluxes for testing
@@ -504,19 +511,58 @@ contains
         integer, intent(in) :: t_step
         integer, intent(in) :: stage
         integer :: id
-        integer(kind=8) :: i, j, k, l, q  !< Generic loop iterators
+        integer(kind=8) :: i, j, k, l, q                     !< Generic loop iterators
+        integer :: cbjlo, cbjhi, cbklo, cbkhi, cbllo, cblhi  !< Active-box + halo copy bounds
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
+        ! AMR NOTE: when amr_in_fine_advance is true, the grid globals (m/n/p, idwint/idwbuff, x_cb..dz) are SWAPPED to a fine
+        ! block's values (s_amr_swap_to_fine). Code reading a module-level array precomputed against the COARSE grid must guard on
+        ! .not. amr_in_fine_advance or read the swapped/refreshed state - see the ab_int GPU_UPDATE below and the swap contract in
+        ! m_amr.fpp. A physics hook here that indexes coarse-baked state is the ab_int/acoustic-source hazard.
+
         call nvtxStartRange("COMPUTE-RHS")
+
+        if (ab_active .and. ab_prim_seeded) then
+            cbjlo = max(idwbuff(1)%beg, ab_x%beg - buff_size)
+            cbjhi = min(idwbuff(1)%end, ab_x%end + buff_size)
+            cbklo = max(idwbuff(2)%beg, ab_y%beg - buff_size)
+            cbkhi = min(idwbuff(2)%end, ab_y%end + buff_size)
+            cbllo = max(idwbuff(3)%beg, ab_z%beg - buff_size)
+            cblhi = min(idwbuff(3)%end, ab_z%end + buff_size)
+            ! Convert over the same footprint as the copy (clamped to interior) so q_prim_qp
+            ! is valid for reconstruction stencils at the box boundary.
+            ab_int(1)%beg = max(0, ab_x%beg - buff_size); ab_int(1)%end = min(m, ab_x%end + buff_size)
+            ab_int(2)%beg = max(0, ab_y%beg - buff_size); ab_int(2)%end = min(n, ab_y%end + buff_size)
+            ab_int(3)%beg = max(0, ab_z%beg - buff_size); ab_int(3)%end = min(p, ab_z%end + buff_size)
+        else
+            ! Full-domain window: every non-active_box run, plus the ONE-TIME seeding pass on the first
+            ! active_box RHS call. active_box narrows the cons->prim producer to the box, but full-domain
+            ! consumers (ICFL/vCFL monitor, probes, IB) still read 0:m,0:n,0:p; an unconverted exterior
+            ! is uninitialized memory -> NaN (fatal on Cray, silently finite on some compilers). Seeding
+            ! q_prim_qp over the full domain once fills the frozen ambient exterior with valid primitives
+            ! that subsequent narrowed passes never overwrite.
+            cbjlo = idwbuff(1)%beg; cbjhi = idwbuff(1)%end
+            cbklo = idwbuff(2)%beg; cbkhi = idwbuff(2)%end
+            cbllo = idwbuff(3)%beg; cblhi = idwbuff(3)%end
+            ab_int = idwint
+        end if
+        if (ab_active) ab_prim_seeded = .true.
+
+        ! ab_int must be refreshed on device EVERY call: the AMR fine advance swaps idwint to the fine-block
+        ! bounds, and CCE OpenACC resolves the convert kernel's loop bounds through the present device copy of
+        ! this module variable - a seed-once guard left stale COARSE bounds on the swapped fine grid, giving
+        ! out-of-range device accesses and a spurious wave at every fine-block edge (CCE-acc only; NVHPC and
+        ! CCE-omp evaluate the bounds host-side and never saw it).
+        $:GPU_UPDATE(device='[ab_int]')
 
         if (.not. igr) then
             ! Association/Population of Working Variables
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
             do i = 1, sys_size
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                do l = cbllo, cblhi
+                    do k = cbklo, cbkhi
+                        do j = cbjlo, cbjhi
                             q_cons_qp%vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
                         end do
                     end do
@@ -555,7 +601,7 @@ contains
         end if
         if (.not. igr) then
             call nvtxStartRange("RHS-CONVERT")
-            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
+            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, ab_int)
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
@@ -572,6 +618,11 @@ contains
         else
             if (t_step == t_step_stop) return
         end if
+
+        ! Per-rank compute timing starts here: AFTER the halo exchange (s_populate_variables_buffers)
+        ! and the early-return guards, so it captures only the local compute (reconstruct/Riemann/
+        ! flux/source) and excludes the cross-rank halo wait that would otherwise mask compute imbalance.
+        if (rank_time_wrt) call s_rank_time_tic()
 
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
             & idwbuff(2), idwbuff(3))
@@ -734,6 +785,21 @@ contains
                 end if
                 irx%end = m; iry%end = n; irz%end = p
 
+                ! Restrict the Riemann face window to the active box: [box%beg, box%end] on the
+                ! transverse directions, [box%beg-1, box%end] on the normal direction (face j needs
+                ! cells j and j+1). s_riemann_solver pushes these to the device.
+                if (ab_active) then
+                    irx%beg = ab_x%beg; iry%beg = ab_y%beg; irz%beg = ab_z%beg
+                    irx%end = ab_x%end; iry%end = ab_y%end; irz%end = ab_z%end
+                    if (id == 1) then
+                        irx%beg = ab_x%beg - 1
+                    else if (id == 2) then
+                        iry%beg = ab_y%beg - 1
+                    else
+                        irz%beg = ab_z%beg - 1
+                    end if
+                end if
+
                 ! Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
                 call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
@@ -747,17 +813,25 @@ contains
                 call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))
                 call nvtxEndRange
 
-                ! RHS additions for hypoelasticity
-                call nvtxStartRange("RHS-HYPOELASTICITY")
-                if (hypoelasticity) call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
-                call nvtxEndRange
-
-                ! RHS for diffusion
+                ! RHS for chemistry species diffusion: writes species (and, when not viscous, energy) face
+                ! fluxes into flux_src_n. Runs before the AMR capture below so refluxing sees the total
+                ! advection+diffusion flux, mirroring the viscous flux_src the Riemann solver wrote.
                 if (chemistry .and. chem_params%diffusion) then
                     call nvtxStartRange("RHS-CHEM-DIFFUSION")
                     call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz, q_T_sf)
                     call nvtxEndRange
                 end if
+
+                ! AMR refluxing: record the c/f boundary-face fluxes exactly as the assembly above used
+                ! them (after s_cbc may have modified flux_n in the advection source call, and after all
+                ! flux_src contributions - viscous and species diffusion - are in place); must run before
+                ! the next direction's sweep reuses the aliased flux_n storage.
+                if (amr) call s_amr_capture_boundary_flux(id, flux_n(id), flux_src_n(id), stage)
+
+                ! RHS additions for hypoelasticity
+                call nvtxStartRange("RHS-HYPOELASTICITY")
+                if (hypoelasticity) call s_compute_hypoelastic_rhs(id, q_prim_qp%vf, rhs_vf)
+                call nvtxEndRange
 
                 ! Viscous stress contribution to RHS
                 if (viscous .or. surface_tension .or. chem_params%diffusion) then
@@ -830,7 +904,10 @@ contains
             call nvtxEndRange
         end if
 
-        if (bubbles_lagrange) then
+        ! Lagrangian bubbles couple on the coarse grid only (the cloud is excluded from fine blocks):
+        ! the EL hooks are skipped during the fine advance - a bubble's position would map to wrong
+        ! cell indices on the swapped block grid.
+        if (bubbles_lagrange .and. .not. amr_in_fine_advance) then
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
                 call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
@@ -872,6 +949,10 @@ contains
             end if
         end if
 
+        ! Per-rank compute timing ends here (brackets only the local compute above; excludes
+        ! the halo exchange near the top of the routine).
+        if (rank_time_wrt) call s_rank_time_toc()
+
         call nvtxEndRange
 
     end subroutine s_compute_rhs
@@ -884,11 +965,23 @@ contains
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
         type(vector_field), intent(inout) :: flux_src_n_vf
-        integer :: j, k, l, q              !< Loop iterators from original, meaning varies
-        integer :: k_loop, l_loop, q_loop  !< Standardized spatial loop iterators 0:m, 0:n, 0:p
+        integer :: j, k, l, q                                      !< Loop iterators from original, meaning varies
+        integer :: k_loop, l_loop, q_loop                          !< Standardized spatial loop iterators 0:m, 0:n, 0:p
         integer :: i_fluid_loop
+        integer :: abx_lo, abx_hi, aby_lo, aby_hi, abz_lo, abz_hi  !< Active-box flux-difference bounds
         real(wp) :: inv_ds, flux_face1, flux_face2
         real(wp) :: advected_qty_val, pressure_val, velocity_val
+
+        ! Only the box cells have a valid RHS divergence; restrict the flux-difference loops to the
+        ! box when engaged (in every loop here 0:p is z, 0:n is y, 0:m is x).
+
+        if (ab_active) then
+            abx_lo = ab_x%beg; abx_hi = ab_x%end
+            aby_lo = ab_y%beg; aby_hi = ab_y%end
+            abz_lo = ab_z%beg; abz_hi = ab_z%end
+        else
+            abx_lo = 0; abx_hi = m; aby_lo = 0; aby_hi = n; abz_lo = 0; abz_hi = p
+        end if
 
         if (alt_soundspeed) then
             $:GPU_PARALLEL_LOOP(private='[k_loop, l_loop, q_loop]', collapse=3)
@@ -928,9 +1021,9 @@ contains
 
             $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k_loop, l_loop, q_loop, inv_ds, flux_face1, flux_face2]')
             do j = 1, sys_size
-                do q_loop = 0, p
-                    do l_loop = 0, n
-                        do k_loop = 0, m
+                do q_loop = abz_lo, abz_hi
+                    do l_loop = aby_lo, aby_hi
+                        do k_loop = abx_lo, abx_hi
                             inv_ds = 1._wp/dx(k_loop)
                             flux_face1 = flux_n(1)%vf(j)%sf(k_loop - 1, l_loop, q_loop)
                             flux_face2 = flux_n(1)%vf(j)%sf(k_loop, l_loop, q_loop)
@@ -974,9 +1067,9 @@ contains
 
             $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1, flux_face2]')
             do j = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do q = 0, m
+                do l = abz_lo, abz_hi
+                    do k = aby_lo, aby_hi
+                        do q = abx_lo, abx_hi
                             inv_ds = 1._wp/dy(k)
                             flux_face1 = flux_n(2)%vf(j)%sf(q, k - 1, l)
                             flux_face2 = flux_n(2)%vf(j)%sf(q, k, l)
@@ -1071,9 +1164,9 @@ contains
             else
                 $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1, flux_face2]')
                 do j = 1, sys_size
-                    do k = 0, p
-                        do q = 0, n
-                            do l = 0, m
+                    do k = abz_lo, abz_hi
+                        do q = aby_lo, aby_hi
+                            do l = abx_lo, abx_hi
                                 inv_ds = 1._wp/dz(k)
                                 flux_face1 = flux_n(3)%vf(j)%sf(l, q, k - 1)
                                 flux_face2 = flux_n(3)%vf(j)%sf(l, q, k)
@@ -1153,7 +1246,7 @@ contains
                         if (bubbles_euler .neqv. .true.) then
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
                                                 & local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
-                            do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
+                            do q_idx = abz_lo, abz_hi; do l_idx = aby_lo, aby_hi; do k_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dx(k_idx)
                                 local_q_cons_val = q_cons_vf_arg%vf(eqn_idx%adv%end)%sf(k_idx, l_idx, q_idx)
                                 local_k_term_val = Kterm_arg(k_idx, l_idx, q_idx)  ! Access is safe due to outer alt_soundspeed check
@@ -1167,7 +1260,7 @@ contains
 
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
                                                 & local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
-                            do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
+                            do q_idx = abz_lo, abz_hi; do l_idx = aby_lo, aby_hi; do k_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dx(k_idx)
                                 local_q_cons_val = q_cons_vf_arg%vf(eqn_idx%adv%beg)%sf(k_idx, l_idx, q_idx)
                                 local_k_term_val = Kterm_arg(k_idx, l_idx, q_idx)  ! Access is safe
@@ -1183,7 +1276,7 @@ contains
                         $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
-                            do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
+                            do q_idx = abz_lo, abz_hi; do l_idx = aby_lo, aby_hi; do k_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dx(k_idx)
                                 local_term_coeff = q_cons_vf_arg%vf(j_adv)%sf(k_idx, l_idx, q_idx)
                                 local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(k_idx, l_idx, q_idx)
@@ -1221,7 +1314,7 @@ contains
                         if (bubbles_euler .neqv. .true.) then
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
                                                 & local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
-                            do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
+                            do l_idx = abz_lo, abz_hi; do k_idx = aby_lo, aby_hi; do q_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dy(k_idx)
                                 local_q_cons_val = q_cons_vf_arg%vf(eqn_idx%adv%end)%sf(q_idx, k_idx, l_idx)
                                 local_k_term_val = Kterm_arg(q_idx, k_idx, l_idx)  ! Access is safe
@@ -1239,7 +1332,7 @@ contains
 
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
                                                 & local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
-                            do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
+                            do l_idx = abz_lo, abz_hi; do k_idx = aby_lo, aby_hi; do q_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dy(k_idx)
                                 local_q_cons_val = q_cons_vf_arg%vf(eqn_idx%adv%beg)%sf(q_idx, k_idx, l_idx)
                                 local_k_term_val = Kterm_arg(q_idx, k_idx, l_idx)  ! Access is safe
@@ -1259,7 +1352,7 @@ contains
                         $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
-                            do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
+                            do l_idx = abz_lo, abz_hi; do k_idx = aby_lo, aby_hi; do q_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dy(k_idx)
                                 local_term_coeff = q_cons_vf_arg%vf(j_adv)%sf(q_idx, k_idx, l_idx)
                                 local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(q_idx, k_idx, l_idx)
@@ -1302,7 +1395,7 @@ contains
                         if (bubbles_euler .neqv. .true.) then
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
                                                 & local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
-                            do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
+                            do k_idx = abz_lo, abz_hi; do q_idx = aby_lo, aby_hi; do l_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dz(k_idx)
                                 local_q_cons_val = q_cons_vf_arg%vf(eqn_idx%adv%end)%sf(l_idx, q_idx, k_idx)
                                 local_k_term_val = Kterm_arg(l_idx, q_idx, k_idx)  ! Access is safe
@@ -1316,7 +1409,7 @@ contains
 
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_q_cons_val, &
                                                 & local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
-                            do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
+                            do k_idx = abz_lo, abz_hi; do q_idx = aby_lo, aby_hi; do l_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dz(k_idx)
                                 local_q_cons_val = q_cons_vf_arg%vf(eqn_idx%adv%beg)%sf(l_idx, q_idx, k_idx)
                                 local_k_term_val = Kterm_arg(l_idx, q_idx, k_idx)  ! Access is safe
@@ -1332,7 +1425,7 @@ contains
                         $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv, k_idx, l_idx, q_idx, local_inv_ds, local_term_coeff, &
                                             & local_flux1, local_flux2]')
                         do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
-                            do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
+                            do k_idx = abz_lo, abz_hi; do q_idx = aby_lo, aby_hi; do l_idx = abx_lo, abx_hi
                                 local_inv_ds = 1._wp/dz(k_idx)
                                 local_term_coeff = q_cons_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
                                 local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
@@ -1421,7 +1514,10 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
+            ! the axis-singularity stress treatment belongs to the PHYSICAL axis only: bc_y is not
+            ! swapped by the AMR fine advance, so without the guard a fine block would apply axis
+            ! handling at its own (interior) lower-y edge - the coarse pass owns the real axis
+            if (cyl_coord .and. (.not. amr_in_fine_advance) .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                 if (viscous) then
                     if (p > 0) then
                         call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, &
@@ -1629,6 +1725,27 @@ contains
                     is1 = idwbuff(3); is2 = idwbuff(2); is3 = idwbuff(1)
                     recon_dir = 3; is1%beg = is1%beg + ${SCHEME}$_polyn
                     is1%end = is1%end - ${SCHEME}$_polyn
+                end if
+
+                ! Restrict the reconstruction compute-window to the active box (arrays stay allocated
+                ! full-size). The normal direction (is1) extends buff_size beyond the box so
+                ! boundary-cell stencils read valid ambient neighbours; the transverse directions
+                ! (is2, is3) cover the box, intersected with the allocation-derived window above.
+                ! s_${SCHEME}$ pushes this window to the device.
+                if (ab_active) then
+                    if (norm_dir == 1) then
+                        is1%beg = max(is1%beg, ab_x%beg - buff_size); is1%end = min(is1%end, ab_x%end + buff_size)
+                        is2%beg = max(is2%beg, ab_y%beg); is2%end = min(is2%end, ab_y%end)
+                        is3%beg = max(is3%beg, ab_z%beg); is3%end = min(is3%end, ab_z%end)
+                    else if (norm_dir == 2) then
+                        is1%beg = max(is1%beg, ab_y%beg - buff_size); is1%end = min(is1%end, ab_y%end + buff_size)
+                        is2%beg = max(is2%beg, ab_x%beg); is2%end = min(is2%end, ab_x%end)
+                        is3%beg = max(is3%beg, ab_z%beg); is3%end = min(is3%end, ab_z%end)
+                    else
+                        is1%beg = max(is1%beg, ab_z%beg - buff_size); is1%end = min(is1%end, ab_z%end + buff_size)
+                        is2%beg = max(is2%beg, ab_y%beg); is2%end = min(is2%end, ab_y%end)
+                        is3%beg = max(is3%beg, ab_x%beg); is3%end = min(is3%end, ab_x%end)
+                    end if
                 end if
 
                 call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), recon_dir, is1, &

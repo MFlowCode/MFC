@@ -18,7 +18,7 @@ module m_igr
     implicit none
 
     private; public :: s_initialize_igr_module, s_igr_iterative_solve, s_igr_riemann_solver, s_igr_sigma_x, s_igr_flux_add, &
-        & s_finalize_igr_module
+        & s_finalize_igr_module, jac, jac_old
 
     !> @cond
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
@@ -300,7 +300,10 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            call s_populate_F_igr_buffers(bc_type, jac_sf)
+            ! AMR fine advance: the block's jac ghost shell holds frozen Dirichlet data prolonged
+            ! from the converged coarse sigma (seeded by s_amr_igr_swap_sigma); the physical-BC/halo
+            ! populate would write wrong (coarse-indexed) data on the swapped block grid
+            if (.not. amr_in_fine_advance) call s_populate_F_igr_buffers(bc_type, jac_sf)
 
             if (igr_iter_solver == 1) then  ! Jacobi iteration
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)

@@ -18,6 +18,7 @@ module m_mpi_common
     use ieee_arithmetic
     use m_nvtx
     use m_constants, only: recon_type_weno, format_silo
+    use m_box, only: t_box, f_equal_splits, f_box_from_splits
 
     implicit none
 
@@ -51,8 +52,13 @@ contains
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*nnode
+#ifdef MFC_SIMULATION
+        else if (chemistry .and. (chem_params%diffusion .or. amr)) then
+            v_size = sys_size + 1  ! +1 for the temperature ghost (diffusion flux, or AMR fine cons->prim Newton guess)
+#else
         else if (chemistry .and. chem_params%diffusion) then
-            v_size = sys_size + 1
+            v_size = sys_size + 1  ! +1 for the temperature ghost (diffusion flux)
+#endif
         else
             v_size = sys_size
         end if
@@ -425,6 +431,38 @@ contains
 
     end subroutine s_mpi_allreduce_integer_sum
 
+    !> Reduce a local integer value to its global minimum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_integer_min(var_loc, var_glb)
+
+        integer, intent(in)  :: var_loc
+        integer, intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_integer_min
+
+    !> Reduce a local integer value to its global maximum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_integer_max(var_loc, var_glb)
+
+        integer, intent(in)  :: var_loc
+        integer, intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_integer_max
+
     !> Reduce a local real value to its global minimum across all MPI ranks.
     impure subroutine s_mpi_allreduce_min(var_loc, var_glb)
 
@@ -452,6 +490,22 @@ contains
 #endif
 
     end subroutine s_mpi_allreduce_max
+
+    !> In-place elementwise max-reduction of a real array across all ranks. Assembles a rank-partitioned global array: each element
+    !! written (identically) by its owner(s), sentinel-low elsewhere, so MAX recovers the exact global array with no
+    !! double-counting.
+    impure subroutine s_mpi_allreduce_array_max(arr, arr_len)
+
+        integer, intent(in)                         :: arr_len
+        real(wp), dimension(arr_len), intent(inout) :: arr
+
+#ifdef MFC_MPI
+        integer :: ierr
+
+        call MPI_ALLREDUCE(MPI_IN_PLACE, arr, arr_len, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+#endif
+
+    end subroutine s_mpi_allreduce_array_max
 
     !> Reduce a local real value to its global minimum across all ranks
     impure subroutine s_mpi_reduce_min(var_loc)
@@ -554,7 +608,7 @@ contains
         type(int_bounds_info) :: boundary_conditions(1:3)
         integer :: beg_end(1:2), grid_dims(1:3)
         integer :: dst_proc, src_proc, recv_tag, send_tag
-        logical :: beg_end_geq_0, qbmm_comm, chem_diff_comm
+        logical :: beg_end_geq_0, qbmm_comm, chem_T_comm
         integer :: pack_offset, unpack_offset
         type(scalar_field), optional, intent(inout) :: q_T_sf
 
@@ -564,7 +618,7 @@ contains
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
         qbmm_comm = .false.
-        chem_diff_comm = .false.
+        chem_T_comm = .false.
 
         if (present(pb_in) .and. present(mv_in) .and. qbmm .and. .not. polytropic) then
             qbmm_comm = .true.
@@ -572,14 +626,16 @@ contains
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
 #ifdef MFC_SIMULATION
-        else if (present(q_T_sf) .and. chemistry .and. chem_params%diffusion) then
+        else if (present(q_T_sf) .and. chemistry .and. (chem_params%diffusion .or. amr)) then
+            ! diffusion reads the temperature ghost directly; AMR needs it as the cons->prim Newton guess when the
+            ! fine block's conversion widens over the ghost shell at a rank seam (else an uninitialized guess -> NaN)
 #else
         else if (present(q_T_sf) .and. chemistry) then
             ! post_process converts cons->prim over the ghost-inclusive bounds, so the temperature
             ! Newton guess must be valid at rank seams for EVERY chemistry run (not only diffusion):
             ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output
 #endif
-            chem_diff_comm = .true.
+            chem_T_comm = .true.
             v_size = nVar + 1
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
@@ -635,7 +691,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, n
@@ -693,7 +749,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, buff_size - 1
@@ -754,7 +810,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
@@ -866,7 +922,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, n
@@ -936,7 +992,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = -buff_size, -1
@@ -1009,7 +1065,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
@@ -1354,7 +1410,7 @@ contains
             recon_order = muscl_order
         end if
 
-        if (num_procs == 1 .and. parallel_io) then
+        if (num_procs == 1) then
             do i = 1, num_dims
                 start_idx(i) = 0
             end do
@@ -1527,14 +1583,7 @@ contains
                 end if
 #endif
 
-                ! Beginning and end sub-domain boundary locations
-                if (parallel_io) then
-                    if (proc_coords(3) < rem_cells) then
-                        start_idx(3) = (p + 1)*proc_coords(3)
-                    else
-                        start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
-                    end if
-                else
+                if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
                     if (old_grid .neqv. .true.) then
                         dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
@@ -1641,14 +1690,7 @@ contains
             end if
 #endif
 
-            ! Beginning and end sub-domain boundary locations
-            if (parallel_io) then
-                if (proc_coords(2) < rem_cells) then
-                    start_idx(2) = (n + 1)*proc_coords(2)
-                else
-                    start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
-                end if
-            else
+            if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
                 if (old_grid .neqv. .true.) then
                     dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
@@ -1677,20 +1719,34 @@ contains
             call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, proc_coords, ierr)
         end if
 
-        ! Global Parameters for x-direction
-
-        ! Number of remaining cells
-        rem_cells = mod(m + 1, num_procs_x)
-
-        ! Optimal number of cells per processor
-        m = (m + 1)/num_procs_x - 1
-
-        ! Distributing the remaining cells
-        do i = 1, rem_cells
-            if (proc_coords(1) == i - 1) then
-                m = m + 1; exit
+        ! Global Parameters for x-direction - equal split via the box layer (byte-identical with inline arithmetic)
+        block
+            integer, allocatable :: off_x(:), off_y(:), off_z(:)
+            integer              :: coords3(3)
+            type(t_box)          :: box
+            ! Explicit allocate before assignment (not allocate-on-assignment): Intel defaults to
+            ! -assume norealloc_lhs, under which assigning to an unallocated allocatable is undefined.
+            ! Guard collapsed dims: num_procs_y/z are uninitialized locals (pre/post) when n/p_glb==0.
+            allocate (off_x(0:num_procs_x)); off_x = f_equal_splits(m_glb + 1, num_procs_x)
+            if (n_glb > 0) then
+                allocate (off_y(0:num_procs_y)); off_y = f_equal_splits(n_glb + 1, num_procs_y)
+            else
+                allocate (off_y(0:1)); off_y = [integer::0,1]
             end if
-        end do
+            if (p_glb > 0) then
+                allocate (off_z(0:num_procs_z)); off_z = f_equal_splits(p_glb + 1, num_procs_z)
+            else
+                allocate (off_z(0:1)); off_z = [integer::0,1]
+            end if
+            coords3 = 0
+            coords3(1:num_dims) = proc_coords
+            box = f_box_from_splits(off_x, off_y, off_z, coords3)
+            rem_cells = mod(m_glb + 1, num_procs_x)
+            m = box%hi(1) - box%lo(1)
+            start_idx(1) = box%lo(1)
+            if (n_glb > 0) then; n = box%hi(2) - box%lo(2); start_idx(2) = box%lo(2); end if
+            if (p_glb > 0) then; p = box%hi(3) - box%lo(3); start_idx(3) = box%lo(3); end if
+        end block
 
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
@@ -1726,14 +1782,7 @@ contains
         end if
 #endif
 
-        ! Beginning and end sub-domain boundary locations
-        if (parallel_io) then
-            if (proc_coords(1) < rem_cells) then
-                start_idx(1) = (m + 1)*proc_coords(1)
-            else
-                start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
-            end if
-        else
+        if (.not. parallel_io) then
 #ifdef MFC_PRE_PROCESS
             if (old_grid .neqv. .true.) then
                 dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
@@ -1765,6 +1814,29 @@ contains
 #endif
 
     end subroutine s_mpi_decompose_computational_domain
+
+    !> Override this rank's local extents and starting indices from cumulative Cartesian split-plane offsets, leaving the MPI_CART
+    !! topology and BC neighbors (which stay proc_coords-derived) untouched. Each off_d is a cumulative cell-boundary array
+    !! (off_d(0)=0, off_d(num_procs_d)=G_d).
+    subroutine s_apply_weighted_offsets(off_x, off_y, off_z)
+
+        integer, dimension(0:), intent(in) :: off_x, off_y, off_z
+
+#ifdef MFC_MPI
+        m = off_x(proc_coords(1) + 1) - off_x(proc_coords(1)) - 1
+        start_idx(1) = off_x(proc_coords(1))
+        if (num_dims >= 2) then
+            n = off_y(proc_coords(2) + 1) - off_y(proc_coords(2)) - 1
+            start_idx(2) = off_y(proc_coords(2))
+        end if
+        if (num_dims >= 3) then
+            p = off_z(proc_coords(3) + 1) - off_z(proc_coords(3)) - 1
+            start_idx(3) = off_z(proc_coords(3))
+        end if
+        call s_update_cell_bounds(cells_bounds, m, n, p)
+#endif
+
+    end subroutine s_apply_weighted_offsets
 
     !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
     !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of

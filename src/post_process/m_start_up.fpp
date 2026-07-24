@@ -155,6 +155,8 @@ contains
 
         call s_read_data_files(t_step)
 
+        if (amr) call s_read_amr_data(t_step)
+
         ! seed the chemistry temperature over the INTERIOR only (mirrors the simulation,
         ! m_start_up): the ghost q_cons is unread at this point, so a ghost-inclusive sweep
         ! would Newton-iterate on garbage (NaN under NaN-init builds) at rank seams and
@@ -650,6 +652,8 @@ contains
         end if
 
         if (ib_state_wrt) call s_write_ib_bodies_to_formatted_database_file(t_step)
+
+        if (amr) call s_write_amr_to_formatted_database_file(t_step)
 
         if (sim_data .and. proc_rank == 0) then
             call s_close_intf_data_file()

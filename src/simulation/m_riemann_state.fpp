@@ -1086,6 +1086,7 @@ contains
         real(wp), intent(out)               :: G_L, G_R            !< Left and right mixture shear moduli
         real(wp), intent(inout)             :: E_L, E_R            !< Left and right state energies
         integer                             :: i                   !< Loop iterator
+        logical                             :: elastic_LR          !< Both sides retain elastic energy (not damage-collapsed)
 
         G_L = 0._wp; G_R = 0._wp
 
@@ -1100,10 +1101,19 @@ contains
             G_R = G_R*max((1._wp - damage_R), 0._wp)
         end if
 
+        ! Under continuum damage a heavily-damaged interface can drive G -> 0 while the reconstructed stress does
+        ! not relax with it, so tau^2/(4G) blows up. It stays finite (and negligible) on most backends but goes
+        ! NaN under macOS gfortran's libm. Gate on the damage variable itself - skip the elastic energy only
+        ! where damage has collapsed the modulus (the blow-up mechanism), treating > 99.9% damaged as failed.
+        ! Dimensionless, so soft/nondimensionalized materials (G <= O(1e3)) keep their energy term; pristine
+        ! states keep master's verysmall gate regardless of material stiffness.
+        elastic_LR = .true.
+        if (cont_damage) elastic_LR = (1._wp - damage_L > damage_energy_cutoff) .and. (1._wp - damage_R > damage_energy_cutoff)
+
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
             ! Elastic contribution to energy if G large enough
-            if ((G_L > verysmall) .and. (G_R > verysmall)) then
+            if ((G_L > verysmall) .and. (G_R > verysmall) .and. elastic_LR) then
                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 ! Double for shear stresses

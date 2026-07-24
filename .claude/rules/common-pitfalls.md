@@ -19,6 +19,31 @@ covered in `docs/documentation/contributing.md`.
   `contxb`/`momxb` shorthands are gone. Index positions depend on `model_eqns` and
   enabled features — changing either moves ALL indices; never hard-code one.
 
+## AMR levels (silent-index traps)
+
+- **A level-`l` block's fine extent is `amr_ref_ratio**l * (coarse-region width) - 1`, NOT
+  `amr_ref_ratio*width`.** The `amr_ref_ratio*width` form is correct only for the level-1 initial
+  block; nested boxes compound by `amr_ref_ratio` per level (`amr_ref_ratio**level`). Every
+  fine-extent computation uses `amr_ref_ratio**amr_block_level` — geometry
+  (`s_set_amr_fine_geometry`), the restart-reader extent check, load-weight, `fmul`.
+  Assuming `amr_ref_ratio*width` rejects level≥2 blocks as corrupt (the exact bug that bit the
+  multi-level restart reader).
+- **"coarse" in the AMR coupling routines means the block's PARENT level (`l-1`), not the
+  base grid (level 0).** For a level-1 block the parent IS L0; for level≥2 the block folds
+  to/from its parent block's fine array. `s_amr_gather_coarse_patch`,
+  `s_interpolate_coarse_to_fine`, and the restrict/reflux path all operate in the
+  parent-fine frame — assuming L0 silently corrupts level≥2 coupling.
+- **The fine advance SWAPS the coarse grid globals (`m/n/p`, `idwint/idwbuff`, coords,
+  `acoustic_source`, `ab_active`) to a fine block and restores them after — see the SWAP
+  CONTRACT block at the `sw_*` declarations in `m_amr.fpp`.** Any module-level variable
+  DERIVED from the grid that a kernel reads during the fine advance must be swapped there or
+  refreshed per fine call at its use site; if it is `GPU_DECLARE`'d, its DEVICE copy must be
+  refreshed too. A stale device copy of coarse bounds reads out of range on the fine grid
+  under **CCE OpenACC only** (NVHPC/CCE-omp evaluate bounds host-side) — this was the `ab_int`
+  regression, fixed by an unconditional `GPU_UPDATE` in `s_compute_rhs`. `amr_rvw` (cyl_coord
+  radius weights) is the next candidate, currently safe only via a `m_checker.fpp` gate.
+  A CPU-only or NVHPC-acc pass proves NOTHING here; this class is CCE-acc-specific.
+
 ## GPU
 
 - WARNING: do NOT wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops — `GPU_LOOP` emits

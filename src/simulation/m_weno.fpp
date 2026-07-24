@@ -16,7 +16,7 @@ module m_weno
     use m_thinc, only: s_thinc_compression
     use m_nvtx
 
-    private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr
+    private; public :: s_initialize_weno_module, s_finalize_weno_module, s_weno, s_pack_weno_input_arr, s_compute_weno_coefficients
 
     !> @name The cell-average variables that will be WENO-reconstructed unpacked into an array for performance
     !> @{
@@ -920,6 +920,11 @@ contains
         integer, intent(in)                                                                    :: weno_dir
         type(int_bounds_info), intent(in)                                                      :: is1_weno_d, is2_weno_d, is3_weno_d
 
+        ! Non-case-optimized amdflang path: weno_num_stencils is not a compile constant, so these are sized
+        ! to the max (0:4). Only 0:weno_num_stencils is meaningful - whole-array assignments (e.g. from the
+        ! 0:weno_num_stencils d_cbL/R) MUST slice the target to 0:weno_num_stencils, or amdflang's runtime
+        ! array-shape check aborts (Assign: mismatching element counts, to 5 from 3).
+
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(-3:2) :: dvd
             real(wp), dimension(0:4)  :: poly
@@ -1048,7 +1053,6 @@ contains
                                         end do
                                     end if
                                     omega = alpha/sum(alpha)
-
                                     vL_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
                                     ! reconstruct from right side
@@ -1076,7 +1080,6 @@ contains
                                         end do
                                     end if
                                     omega = alpha/sum(alpha)
-
                                     vR_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
                                 end do
                             end do
@@ -1169,7 +1172,8 @@ contains
                                             tau = abs(beta(2) - beta(0))
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = 1._wp + tau/beta(q)  ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                                ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
+                                                alpha(q) = 1._wp + tau/beta(q)
                                                 ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
                                                 alpha(q) = (alpha(q)**3._wp)**2._wp
                                             end do
@@ -1189,7 +1193,6 @@ contains
                                         omega(0) = alpha(0)/(alpha(0) + alpha(1) + alpha(2))
                                         omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
                                         omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
-
                                         vL_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
 
                                         ! reconstruct from right side
@@ -1230,7 +1233,6 @@ contains
                                         omega(0) = alpha(0)/(alpha(0) + alpha(1) + alpha(2))
                                         omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
                                         omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
-
                                         vR_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
                                     end do
                                 end do

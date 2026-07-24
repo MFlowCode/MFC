@@ -1269,16 +1269,20 @@ contains
         viscous_stress_tensor = 0._wp
         velocity_gradient_tensor = 0._wp
 
-        ! compute the velocity gradient tensor with the same fd_order-respecting stencil as the stress-divergence outer derivative
+        ! compute the velocity gradient tensor with the same fd_order-respecting stencil as the stress-divergence outer derivative.
+        ! The IB drag evaluates this at body-stencil cells that, for a body against a (e.g. periodic) boundary, land in the ghost
+        ! region; fd_coeff_{x,y,z} are only allocated over the interior (0:m/n/p), so clamp the coefficient's cell index to the
+        ! interior. This is exact on uniform grids (the coefficients are cell-independent) and a boundary approximation otherwise,
+        ! while the q_prim stencil itself still uses the populated ghost/periodic neighbours.
         do l = 1, num_dims
             do r = -fd_number, fd_number
-                velocity_gradient_tensor(l, 1) = velocity_gradient_tensor(l, 1) + fd_coeff_x(r, &
-                                         & i)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + r, j, k)
-                velocity_gradient_tensor(l, 2) = velocity_gradient_tensor(l, 2) + fd_coeff_y(r, &
-                                         & j)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + r, k)
+                velocity_gradient_tensor(l, 1) = velocity_gradient_tensor(l, 1) + fd_coeff_x(r, min(max(i, 0), &
+                                         & m))*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + r, j, k)
+                velocity_gradient_tensor(l, 2) = velocity_gradient_tensor(l, 2) + fd_coeff_y(r, min(max(j, 0), &
+                                         & n))*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + r, k)
                 if (num_dims == 3) then
-                    velocity_gradient_tensor(l, 3) = velocity_gradient_tensor(l, 3) + fd_coeff_z(r, &
-                                             & k)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k + r)
+                    velocity_gradient_tensor(l, 3) = velocity_gradient_tensor(l, 3) + fd_coeff_z(r, min(max(k, 0), &
+                                             & p))*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k + r)
                 end if
             end do
         end do

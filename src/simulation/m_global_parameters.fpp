@@ -313,7 +313,67 @@ module m_global_parameters
     !> @{!
     !> @}
 
+    logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
+    !> true on the current block's single owner rank: amr_block_owner(amr_cur) == proc_rank (always true at np=1); kept by
+    !! s_set_amr_fine_geometry
+    logical :: amr_rank_owns_block = .true.
+
+    !> Current AMR fine-block box in level-0 cell indices; mirrors amr_fine%region at all times (kept by s_set_amr_fine_geometry) so
+    !! m_amr_registers can read it without a use-cycle through m_amr.
+    integer :: amr_region_lo(3) = 0, amr_region_hi(3) = 0
+
+    !> The block's coarse footprint driving the coarse<->fine gather/scatter, per dim (kept by s_set_amr_fine_geometry; collapsed
+    !! dims 0:0). Under whole-block ownership it is the ENTIRE block on its owner and empty (lo > hi) on every other rank
+    !! (amr_rank_owns_block = nonempty in all active dims). Frame is level-dependent: a LEVEL-1 block records GLOBAL level-0 cell
+    !! indices; a LEVEL>=2 owner records its PARENT block's fine-cell frame, amr_ref_ratio*(region - parent_region_lo) with the
+    !! parent's amr_ref_ratio (a level-l block's coarse side is level l-1). Local fine index 0 maps to footprint cell amr_isect_lo;
+    !! the owner holds amr_ref_ratio*(footprint width) fine cells per dim.
+    integer :: amr_isect_lo(3) = 0, amr_isect_hi(3) = 0
+
+    !> Number of currently-active AMR fine-block slots (>= 1; grows with max_grid_size tiling, multi-block regrid, and nesting) and
+    !! the working slot index selecting which slot the per-block machinery (advance/reflux/restrict/regrid/IO) operates on. Read by
+    !! m_amr and m_amr_registers (mirrors, no use-cycle).
+    integer :: amr_num_blocks = 1, amr_cur = 1
+    !> Unification pool layout (L0 tiles + AMR fine blocks in one amr_slots pool). Tiles-PREFIX: level-0 L0 tiles in slots
+    !! [1:l0_slot_off], regrid-managed fine blocks in [l0_slot_off+1 : l0_slot_off+amr_max_fine]. amr_max_fine = fine-block cap
+    !! (regrid/nesting limit); amr_max_blocks = total pool. Uncombined: l0_slot_off=0, amr_max_fine=amr_max_blocks (today's
+    !! behavior).
+    integer :: amr_max_fine = 0, l0_slot_off = 0
+
+    !> Per-slot mirror storage (allocated 1:amr_max_blocks by the AMR module): the region box, the rank's intersection, and its
+    !! ownership flag for every active block. s_set_amr_fine_geometry writes the current slot's entry; s_amr_select_slot copies a
+    !! slot's entry back into the working mirrors above so the per-block advance and the single coarse flux-register capture can
+    !! visit each block in turn without a use-cycle through m_amr.
+    integer, allocatable :: amr_region_lo_all(:,:), amr_region_hi_all(:,:)
+    integer, allocatable :: amr_isect_lo_all(:,:), amr_isect_hi_all(:,:)
+    logical, allocatable :: amr_owns_all(:)
+    !> Multi-level nesting (amr_multilevel.md): the refinement level of each active block (1..amr_max_level). A level-l block
+    !! refines a covering level-(l-1) region, so its coupling coarse side is level l-1 (L0 when l==1). amr_num_levels is the deepest
+    !! level currently populated. The block region stays in L0 cell indices at every level (the fine extent per dim is
+    !! amr_ref_ratio**level * region-width - 1).
+    integer, allocatable :: amr_block_level(:)
+    integer              :: amr_num_levels = 1
+
+    !> Fine-level distribution map: SFC/work-balanced single-owner rank per active block. Governs ownership - amr_rank_owns_block =
+    !! (amr_block_owner(amr_cur) == proc_rank) - with point-to-point coarse<->fine gather/scatter between the owner and overlapping
+    !! ranks. See docs/documentation/amr_fine_distribution.md.
+    integer, allocatable :: amr_block_owner(:)
+
 contains
+
+    !> Make block slot islot the working slot: set amr_cur and copy its stored mirrors (region, intersection, ownership) into the
+    !! working globals the per-block machinery reads. Deterministic on all ranks (each holds the same slot metadata for the boxes it
+    !! intersects). No-op storage on ranks without a block (owns = F).
+    subroutine s_amr_select_slot(islot)
+
+        integer, intent(in) :: islot
+
+        amr_cur = islot
+        amr_region_lo = amr_region_lo_all(:,islot); amr_region_hi = amr_region_hi_all(:,islot)
+        amr_isect_lo = amr_isect_lo_all(:,islot); amr_isect_hi = amr_isect_hi_all(:,islot)
+        amr_rank_owns_block = amr_owns_all(islot)
+
+    end subroutine s_amr_select_slot
 
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
     !! parameters once they are read from the input file.
@@ -489,6 +549,25 @@ contains
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
+        load_weight_wrt = .false.
+        sfc_partition_wrt = .false.
+        load_balance = .false.
+        rank_time_wrt = .false.
+        amr = .false.
+        amr_block_beg(:) = 0
+        amr_block_end(:) = 0
+        amr_regrid_int = 0
+        amr_tag_eps = 0.1_wp
+        amr_buf = 3
+        amr_subcycle = .false.
+        amr_max_blocks = 4
+        amr_max_level = 1
+        amr_cluster_eff = 0.7_wp
+        amr_ref_ratio = 2
+        l0_ntile = 0
+        l0_migrate_step = 0
+        l0_rebalance_interval = 0
+        partition_tile_size = 8
         many_ib_patch_parallelism = .false.
 
         ! Bubble modeling (sim-specific)
@@ -502,6 +581,7 @@ contains
         #:endif
 
         adv_n = .false.
+        active_box = .false.
         adap_dt = .false.
         adap_dt_tol = dflt_adap_dt_tol
         adap_dt_max_iters = dflt_adap_dt_max_iters
