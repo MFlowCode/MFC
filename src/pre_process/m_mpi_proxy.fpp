@@ -125,14 +125,14 @@ contains
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid', &
-                & 'length_x', 'length_y', 'length_z', 'radius']
+                & 'length_x', 'length_y', 'length_z', 'radius', 'twall']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(patch_ib(i)%airfoil_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%slip, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%isothermal, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         end do
-
         ! manual: ib_airfoil (kept manual alongside patch_ib)
         do i = 1, num_ib_airfoils_max
             #:for VAR in ['c', 'p', 't', 'm']

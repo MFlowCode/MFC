@@ -2014,6 +2014,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
+                "2D_ibm_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
                 "2D_lagrange_rising_bubble",
                 "2D_lagrange_in_crossflow",
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
@@ -2247,6 +2248,74 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        stack.pop()
+
+        stack.push(
+            "2D -> Chemistry -> IBM Isothermal Wall",
+            {
+                "m": 49,
+                "n": 49,
+                "dt": 4.0e-08,
+                "num_patches": 1,
+                "num_fluids": 1,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 0.05,
+                "y_domain%beg": -0.005,
+                "y_domain%end": 0.05,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "weno_order": 5,
+                "weno_eps": 1e-16,
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "time_stepper": 3,
+                "chemistry": "T",
+                "chem_params%diffusion": "T",
+                "chem_params%reactions": "F",
+                "chem_wrt_T": "T",
+                "cantera_file": "h2o2.yaml",
+                "viscous": "T",
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%Re(1)": 100000,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%hcid": 291,
+                "patch_icpp(1)%x_centroid": 0.025,
+                "patch_icpp(1)%y_centroid": 0.025,
+                "patch_icpp(1)%length_x": 0.05,
+                "patch_icpp(1)%length_y": 0.10,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 101325.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(1)%Y(1)": 1.0,
+                "patch_ib(1)%geometry": 3,
+                "patch_ib(1)%x_centroid": 0.025,
+                "patch_ib(1)%y_centroid": -0.0025,
+                # length_x overhangs the domain (x_end=0.05) so the IB's vertical faces
+                # sit outside [0, x_end]. Inside the domain the only IB surface is the
+                # horizontal top at y=0 (normal +y), so every ghost point's image point
+                # reflects straight into fluid — no diagonal corner stencils reading
+                # solid/buffer cells (which otherwise diverge CPU vs GPU).
+                "patch_ib(1)%length_x": 0.06,
+                "patch_ib(1)%length_y": 0.005,
+                "patch_ib(1)%slip": "F",
+                "patch_ib(1)%isothermal": "T",
+                "patch_ib(1)%twall": 600.0,
+                "t_step_start": 0,
+                "t_step_stop": 50,
+                "t_step_save": 50,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-9)))
         stack.pop()
 
         stack.push(

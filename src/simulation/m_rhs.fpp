@@ -555,7 +555,8 @@ contains
         end if
         if (.not. igr) then
             call nvtxStartRange("RHS-CONVERT")
-            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
+            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint, t_step=t_step, &
+                & stage=stage)
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
@@ -741,7 +742,6 @@ contains
                                       & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
                                       & flux_gsrc_n(id)%vf, id, irx, iry, irz)
                 call nvtxEndRange
-
                 ! Additional physics and source terms RHS addition for advection source
                 call nvtxStartRange("RHS-ADVECTION-SRC")
                 call s_compute_advection_source_term(id, rhs_vf, q_cons_qp, q_prim_qp, flux_src_n(id))

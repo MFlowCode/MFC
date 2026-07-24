@@ -45,6 +45,14 @@ module m_variables_conversion
     $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
 #endif
 
+    ! Ghost-point bookkeeping for immersed boundaries with chemistry: a flag
+    ! marking cells that are IB ghost points and the pressure imposed there,
+    ! so the conservative-to-primitive conversion can re-impose it (see
+    ! s_convert_conservative_to_primitive_variables and m_ibm).
+    type(integer_field), public :: ghost_points_index
+    type(scalar_field), public  :: pressure_ghost_point
+    $:GPU_DECLARE(create='[ghost_points_index, pressure_ghost_point]')
+
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
     real(wp), allocatable, dimension(:,:) :: Res_vc
@@ -361,6 +369,30 @@ contains
 
             $:GPU_UPDATE(device='[Res_vc, Re_idx, Re_size]')
         end if
+
+        ! These fields back the IB ghost-point pressure re-imposition, which is only
+        ! read (and written) when chemistry is enabled - skip them for non-reacting IB.
+        if (ib .and. chemistry) then
+            if (p > 0) then
+                @:ALLOCATE(ghost_points_index%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
+                @:ALLOCATE(pressure_ghost_point%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
+            else if (n > 0) then
+                @:ALLOCATE(ghost_points_index%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
+                @:ALLOCATE(pressure_ghost_point%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
+            else  ! 1D
+                @:ALLOCATE(ghost_points_index%sf(-buff_size:m+buff_size, 0:0, 0:0))
+                @:ALLOCATE(pressure_ghost_point%sf(-buff_size:m+buff_size, 0:0, 0:0))
+            end if
+            ghost_points_index%sf = 0
+            pressure_ghost_point%sf = 0._wp
+
+            @:ACC_SETUP_SFs(ghost_points_index)
+            @:ACC_SETUP_SFs(pressure_ghost_point)
+            ! @:ALLOCATE only creates (uninitialized) device memory, so push the
+            ! host zeros to the device; otherwise the ghost-point flag is garbage
+            ! on the device and triggers spurious pressure overrides below.
+            $:GPU_UPDATE(device='[ghost_points_index%sf, pressure_ghost_point%sf]')
+        end if
 #endif
 
         if (bubbles_euler) then
@@ -468,12 +500,13 @@ contains
 
     !> Convert conserved variables (rho*alpha, rho*u, E, alpha) to primitives (rho, u, p, alpha). Conversion depends on model_eqns:
     !! each model has different variable sets and EOS.
-    subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, q_T_sf, qK_prim_vf, ibounds)
+    subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, q_T_sf, qK_prim_vf, ibounds, t_step, stage)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: qK_cons_vf
         type(scalar_field), intent(inout)                      :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: ibounds
+        integer, optional, intent(in)                          :: t_step, stage
 
         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
             real(wp), dimension(3) :: alpha_K, alpha_rho_K
@@ -501,6 +534,21 @@ contains
         real(wp)               :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
         real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
         integer                :: iter                     !< Newton-Raphson iteration counter
+        logical                :: apply_ib_ghost_pres      !< Re-impose stored IB ghost-point pressure (chemistry IBM)
+
+        ! For chemistry immersed boundaries the ghost-point energy encodes the wall
+        ! temperature, so the pressure recovered from the EOS is not the interpolated
+        ! image-point pressure. Re-impose the stored ghost-point pressure, except on
+        ! the very first stage of the first step when it has not been populated yet.
+        apply_ib_ghost_pres = .false.
+#ifdef MFC_SIMULATION
+        if (chemistry .and. ib .and. n > 0) then
+            apply_ib_ghost_pres = .true.
+            if (present(t_step) .and. present(stage)) then
+                if (t_step == 0 .and. stage == 1) apply_ib_ghost_pres = .false.
+            end if
+        end if
+#endif
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
                             & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
@@ -674,6 +722,14 @@ contains
 
                     call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), dyn_pres_K, &
                                             & pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+
+#ifdef MFC_SIMULATION
+                    if (apply_ib_ghost_pres) then
+                        if (ghost_points_index%sf(j, k, l) == 1) then
+                            pres = pressure_ghost_point%sf(j, k, l)
+                        end if
+                    end if
+#endif
 
                     qK_prim_vf(eqn_idx%E)%sf(j, k, l) = pres
 
@@ -1234,6 +1290,10 @@ contains
 
 #ifdef MFC_SIMULATION
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
+        if (ib .and. chemistry) then
+            @:DEALLOCATE(ghost_points_index%sf)
+            @:DEALLOCATE(pressure_ghost_point%sf)
+        end if
         if (bubbles_euler) then
             @:DEALLOCATE(bubrs_vc)
         end if
