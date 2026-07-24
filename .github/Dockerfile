@@ -51,6 +51,11 @@ RUN python3.12 -m venv /opt/MFC/build/venv && \
     /opt/MFC/build/venv/bin/pip install --upgrade pip && \
     /opt/MFC/build/venv/bin/pip install numpy
 
+# Disable -Mfprelaxed for container builds only: NVHPC 24.5 crashes (llc RSQRT14
+# ICE, see cmake/GPU.cmake) on the GitHub Actions runner CPUs used to build these
+# images. Cluster/normal builds are unaffected.
+ENV MFC_CONTAINER_BUILD=1
+
 RUN echo "TARGET=$TARGET CC=$CC_COMPILER FC=$FC_COMPILER" && \
     cd /opt/MFC && \
     if [ "$TARGET" = "gpu" ]; then \

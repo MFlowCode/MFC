@@ -1565,7 +1565,7 @@ class CaseValidator:
                 tw_out = self.get(f"bc_{dir}%Twall_out")
                 self.prohibit(tw_out is None, f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall temperature to be set (e.g., bc_{dir}%Twall_out).")
                 if tw_out is not None and self._is_numeric(tw_out):
-                    self.prohibit(tw_out <= 0.0, f"Wall temperature bc_{dir}%Tw_out must be strictly positive for thermodynamics (got {tw_out}).")
+                    self.prohibit(tw_out <= 0.0, f"Wall temperature bc_{dir}%Twall_out must be strictly positive for thermodynamics (got {tw_out}).")
 
         for patch_id in range(1, num_ibs + 1):
             isothermal = self.get(f"patch_ib({patch_id})%isothermal", "F") == "T"
