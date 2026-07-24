@@ -39,8 +39,9 @@ module m_amr
     public :: t_level, amr_maxc, amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_fine_stage_fill, s_amr_fine_stage_advance, &
         & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, &
-        & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, s_l0_copy_coarse_to_tiles, &
-        & s_l0_scatter_tiles_to_coarse, s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance
+        & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, s_l0_advance_stage_rhs, &
+        & s_l0_advance_stage_rk, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_add_reflux_to_tiles, &
+        & s_l0_restrict_to_tiles, s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -4603,22 +4604,36 @@ contains
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
 
-        ! fine-fine seam pack buffers (sys_size*buff_size * largest transverse fine face), reused per seam per stage
+        ! fine-fine seam pack buffers (sys_size*buff_size * largest transverse fine face), reused per seam per stage.
         tcap = 1
         if (n_glb > 0 .and. p_glb > 0) then
             tcap = max((max_f1 + 1)*(max_f2 + 1), (max_f2 + 1)*(max_f3 + 1), (max_f1 + 1)*(max_f3 + 1))
         else if (n_glb > 0) then
             tcap = max(max_f1, max_f2) + 1
         end if
-        allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
+        ! amr_seambuf is SHARED with s_initialize_amr_module (fine-block seams). Under coexist that routine already allocated it
+        ! sized for the FINE blocks; the fine-fine halo processes tile AND fine pairs from the same buffer, so it must fit the
+        ! LARGER of the two. Grow only if this tile sizing exceeds the existing buffer. A blind re-allocate is a fatal runtime
+        ! error on gfortran and, on flang (no alloc check), a SILENT re-allocate to the tile size that undersizes the fine seams
+        ! -> a heap overflow in the fine-fine halo that corrupts the c/f reflux at np>1 (the exact coexist-np>1 NaN this fixes).
+        if (.not. allocated(amr_seambuf_x)) then
+            allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
+        else if (size(amr_seambuf_x) < sys_size*buff_size*tcap) then
+            deallocate (amr_seambuf_x, amr_seambuf_y)
+            allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
+        end if
         amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1
 
-        ! swap bounce buffers (same bounds as the L0 global coord arrays) + persistent global L0 cell boundaries for the swap
-        allocate (sw_x_cb(-1 - buff_size:m + buff_size), sw_x_cc(-buff_size:m + buff_size), sw_dx(-buff_size:m + buff_size))
-        if (n_glb > 0) allocate (sw_y_cb(-1 - buff_size:n + buff_size), sw_y_cc(-buff_size:n + buff_size), &
-            & sw_dy(-buff_size:n + buff_size))
-        if (p_glb > 0) allocate (sw_z_cb(-1 - buff_size:p + buff_size), sw_z_cc(-buff_size:p + buff_size), &
-            & sw_dz(-buff_size:p + buff_size))
+        ! swap bounce buffers (same bounds as the L0 global coord arrays). SHARED with s_initialize_amr_module (identical m/n/p
+        ! sizing), so only allocate in l0-only mode to avoid a coexist double-allocate; under coexist the AMR init's buffers already
+        ! serve both the fine-block and the tile swaps.
+        if (.not. amr) then
+            allocate (sw_x_cb(-1 - buff_size:m + buff_size), sw_x_cc(-buff_size:m + buff_size), sw_dx(-buff_size:m + buff_size))
+            if (n_glb > 0) allocate (sw_y_cb(-1 - buff_size:n + buff_size), sw_y_cc(-buff_size:n + buff_size), &
+                & sw_dy(-buff_size:n + buff_size))
+            if (p_glb > 0) allocate (sw_z_cb(-1 - buff_size:p + buff_size), sw_z_cc(-buff_size:p + buff_size), &
+                & sw_dz(-buff_size:p + buff_size))
+        end if
         call s_l0_build_extended_global_cb()  ! global L0 boundaries EXTENDED into the domain ghost shell (edge tiles need it)
         amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         amr_xchg_coarse_ghosts = .false.  ! tiles never prolong from a coarser level
@@ -4675,12 +4690,20 @@ contains
         integer             :: j
         real(wp), parameter :: sentinel = -huge(1._wp)
 
+        ! Under coexist, s_amr_build_global_cb (called by s_initialize_amr_module) already allocated amr_g?cb at the NON-extended
+        ! bounds (-1:G) for the fine-block geometry. The tiles need the EXTENDED bounds (-1-buff:G+buff) since an edge tile reaches
+        ! into the domain ghost shell; the extended array is a value-consistent superset (same x_cb source over the overlap, and the
+        ! fine geometry already copied its coords into the slots), so replace it. Without this the second allocate is a fatal error
+        ! on gfortran and a silent double-allocate (leaked non-extended buffer) on flang.
+
+        if (allocated(amr_gxcb)) deallocate (amr_gxcb)
         allocate (amr_gxcb(-1 - buff_size:m_glb + buff_size)); amr_gxcb = sentinel
         do j = -1 - buff_size, m + buff_size
             amr_gxcb(start_idx(1) + j) = x_cb(j)
         end do
         call s_mpi_allreduce_array_max(amr_gxcb, m_glb + 2 + 2*buff_size)
         if (n_glb > 0) then
+            if (allocated(amr_gycb)) deallocate (amr_gycb)
             allocate (amr_gycb(-1 - buff_size:n_glb + buff_size)); amr_gycb = sentinel
             do j = -1 - buff_size, n + buff_size
                 amr_gycb(start_idx(2) + j) = y_cb(j)
@@ -4688,6 +4711,7 @@ contains
             call s_mpi_allreduce_array_max(amr_gycb, n_glb + 2 + 2*buff_size)
         end if
         if (p_glb > 0) then
+            if (allocated(amr_gzcb)) deallocate (amr_gzcb)
             allocate (amr_gzcb(-1 - buff_size:p_glb + buff_size)); amr_gzcb = sentinel
             do j = -1 - buff_size, p + buff_size
                 amr_gzcb(start_idx(3) + j) = z_cb(j)
@@ -4838,6 +4862,160 @@ contains
         end do
 
     end subroutine s_l0_scatter_tiles_to_coarse
+
+    !> Device ADD of an L0 block [o+0:o+fm] into a tile rhs interior [0:fm] (q_rhs += q_l0). Additive twin of s_l0_copy_block's
+    !! to_tile branch, in wp (the rhs is computed in wp, stored stp). Slot rhs is a dummy so the kernel reads a valid mapped
+    !! descriptor (indexing module amr_slots%rhs in a kernel is a null deref - see s_l0_copy_block / s_amr_fine_slice).
+    impure subroutine s_l0_add_block(q_rhs, q_l0, o1, o2, o3, fm1, fm2, fm3)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_rhs
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_l0
+        integer, intent(in)                                    :: o1, o2, o3, fm1, fm2, fm3
+        integer                                                :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, fm3
+                do k = 0, fm2
+                    do j = 0, fm1
+                        q_rhs(i)%sf(j, k, l) = real(real(q_rhs(i)%sf(j, k, l), wp) + real(q_l0(i)%sf(o1 + j, o2 + k, o3 + l), &
+                              & wp), stp)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_l0_add_block
+
+    !> Device ADD of the contiguous MPI buffer buf into a tile rhs interior [0:fm] (q_rhs += buf). Additive twin of
+    !! s_l0_pack_unpack_block's unpack branch (same j-fastest buf layout), in wp. Slot rhs passed as a dummy (GPU-safe).
+    impure subroutine s_l0_unpack_add_block(q_rhs, fm1, fm2, fm3, buf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_rhs
+        integer, intent(in)                                    :: fm1, fm2, fm3
+        real(wp), intent(inout), contiguous                    :: buf(:)
+        integer                                                :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
+        do i = 1, sys_size
+            do l = 0, fm3
+                do k = 0, fm2
+                    do j = 0, fm1
+                        q_rhs(i)%sf(j, k, l) = real(real(q_rhs(i)%sf(j, k, l), &
+                              & wp) + buf(1 + j + (fm1 + 1)*(k + (fm2 + 1)*(l + (fm3 + 1)*(i - 1)))), stp)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_l0_unpack_add_block
+
+    !> Coexist reflux copy-back: ADD the fixed-L0-frame Berger-Colella reflux delta into each tile's per-slot rhs on its (possibly
+    !! migrated) compute owner, so the tile RK update sees the same c/f-face correction the monolithic coarse update would. The
+    !! delta lives in rhs_delta (the L0 rhs, which s_tvd_rk zeroed before the fine loop so s_amr_apply_reflux filled it with the
+    !! PURE delta). Reverse of s_l0_scatter_tiles_to_coarse: source is the fixed L0-storage owner (amr_tile_l0_owner), dest is the
+    !! compute owner (amr_block_owner); local when they coincide, else P2P (L0-owner packs the tile's L0 region, compute-owner adds
+    !! it). Whole tile interior is routed - the delta is zero outside the c/f reflux shell, so the add is identity elsewhere.
+    impure subroutine s_l0_add_reflux_to_tiles(rhs_delta)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_delta
+        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
+        real(wp), allocatable                                  :: buf(:)
+
+        do k = 1, l0_ntiles_tot
+            bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
+            fm1 = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
+            fm2 = 0; if (n_glb > 0) fm2 = amr_region_hi_all(2, k) - amr_region_lo_all(2, k)
+            fm3 = 0; if (p_glb > 0) fm3 = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
+            if (bown == lown) then  ! not migrated: local device add
+                if (bown /= proc_rank) cycle
+                call s_l0_tile_l0_offsets(k, o1, o2, o3)
+                call s_l0_add_block(amr_slots(k)%rhs, rhs_delta, o1, o2, o3, fm1, fm2, fm3)
+                cycle
+            end if
+            cnt = sys_size*(fm1 + 1)*(fm2 + 1)*(fm3 + 1)
+            if (proc_rank == lown) then  ! L0 owner: device-pack the delta over this tile's L0 region, send to the compute owner
+                call s_l0_tile_l0_offsets(k, o1, o2, o3)
+                allocate (buf(cnt))
+                call s_l0_pack_unpack_block(rhs_delta, o1, o2, o3, fm1, fm2, fm3, buf, .true.)
+#ifdef MFC_MPI
+                call MPI_SEND(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, ierr)
+#endif
+                deallocate (buf)
+            else if (proc_rank == bown) then  ! compute owner: recv, device-ADD the delta into the tile rhs
+                allocate (buf(cnt))
+#ifdef MFC_MPI
+                call MPI_RECV(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+                call s_l0_unpack_add_block(amr_slots(k)%rhs, fm1, fm2, fm3, buf)
+                deallocate (buf)
+            end if
+        end do
+
+    end subroutine s_l0_add_reflux_to_tiles
+
+    !> Coexist restrict copy-back: after the fine blocks restrict their solution into the L0 covered cells (fixed-L0-frame q_cons),
+    !! OVERWRITE each covering tile's matching cells with those restricted values on the tile's (possibly migrated) compute owner -
+    !! the coexist twin of the monolithic level-0 covered-cell overwrite. Only the covered footprint moves (non-covered tile cells
+    !! keep their advanced state; disjoint from the reflux shell). Per (tile, level-1 block) footprint intersection in the L0 frame:
+    !! local when L0-owner == compute-owner (buffer roundtrip), else P2P (L0-owner packs the intersection, compute-owner unpacks).
+    !! Reuses s_l0_pack_unpack_block with per-side offsets (its offset arg is per-call, so src L0 and dst tile offsets differ).
+    impure subroutine s_l0_restrict_to_tiles(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        integer                                                :: k, b, d, bown, lown, cnt, ierr
+        integer                                                :: ilo(3), ihi(3), e1, e2, e3, lo1, lo2, lo3, to1, to2, to3
+        real(wp), allocatable                                  :: buf(:)
+        logical                                                :: nonempty
+
+        do k = 1, l0_ntiles_tot  ! tiles are the level-0 prefix
+            bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
+            do b = 1, amr_num_blocks
+                ! only level-1 fine blocks restrict into L0 covered cells (level>=2 fold to parent)
+                if (amr_block_level(b) /= 1) cycle
+                nonempty = .true.  ! L0-frame intersection of tile k's region and fine block b's footprint
+                do d = 1, 3
+                    ilo(d) = max(amr_region_lo_all(d, k), amr_region_lo_all(d, b))
+                    ihi(d) = min(amr_region_hi_all(d, k), amr_region_hi_all(d, b))
+                    if (ilo(d) > ihi(d)) nonempty = .false.
+                end do
+                if (.not. nonempty) cycle
+                e1 = ihi(1) - ilo(1)
+                e2 = 0; if (n_glb > 0) e2 = ihi(2) - ilo(2)
+                e3 = 0; if (p_glb > 0) e3 = ihi(3) - ilo(3)
+                lo1 = ilo(1) - start_idx(1); to1 = ilo(1) - amr_region_lo_all(1, k)  ! L0-local (src) vs tile-local (dst) offsets
+                lo2 = 0; to2 = 0
+                if (n_glb > 0) then; lo2 = ilo(2) - start_idx(2); to2 = ilo(2) - amr_region_lo_all(2, k); end if
+                lo3 = 0; to3 = 0
+                if (p_glb > 0) then; lo3 = ilo(3) - start_idx(3); to3 = ilo(3) - amr_region_lo_all(3, k); end if
+                cnt = sys_size*(e1 + 1)*(e2 + 1)*(e3 + 1)
+                if (bown == lown) then  ! not migrated: local device pack (L0 region) -> unpack (tile region), same rank
+                    if (bown /= proc_rank) cycle
+                    allocate (buf(cnt))
+                    call s_l0_pack_unpack_block(q_cons_vf, lo1, lo2, lo3, e1, e2, e3, buf, .true.)
+                    call s_l0_pack_unpack_block(amr_slots(k)%q_cons, to1, to2, to3, e1, e2, e3, buf, .false.)
+                    deallocate (buf)
+                else if (proc_rank == lown) then  ! L0 owner: device-pack the intersection, send to the compute owner
+                    allocate (buf(cnt))
+                    call s_l0_pack_unpack_block(q_cons_vf, lo1, lo2, lo3, e1, e2, e3, buf, .true.)
+#ifdef MFC_MPI
+                    call MPI_SEND(buf, cnt, mpi_p, bown, 4400 + k, MPI_COMM_WORLD, ierr)
+#endif
+                    deallocate (buf)
+                else if (proc_rank == bown) then  ! compute owner: recv, device-unpack (overwrite) into the tile covered cells
+                    allocate (buf(cnt))
+#ifdef MFC_MPI
+                    call MPI_RECV(buf, cnt, mpi_p, lown, 4400 + k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+                    call s_l0_pack_unpack_block(amr_slots(k)%q_cons, to1, to2, to3, e1, e2, e3, buf, .false.)
+                    deallocate (buf)
+                end if
+            end do
+        end do
+
+    end subroutine s_l0_restrict_to_tiles
 
     !> Migrate tile k from its current compute owner to new_owner: P2P-move the persistent interior state, (re)build the slot on the
     !! receiver, free it on the sender, and update the replicated owner map + seam topology. ALL ranks call with the same (k,
