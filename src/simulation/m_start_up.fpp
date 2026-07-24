@@ -1023,6 +1023,8 @@ contains
 
         $:GPU_UPDATE(device='[chem_params]')
 
+        $:GPU_UPDATE(device='[rburn]')
+
         $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
                      & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, &
                      & polytropic, polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, &

@@ -50,11 +50,48 @@ contains
                    & .and. chem_params%reaction_substeps_max < chem_params%reaction_substeps, &
                    & "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T")
 
+        ! Chemistry with Euler bubbles is not currently supported: the IBM image-point
+        ! interpolation selects the bubbles/QBMM branch before the chemistry branch, so the
+        ! species state (Ys_IP) is not carried when both are enabled. Disallow until implemented.
+        @:PROHIBIT(chemistry .and. (bubbles_euler .or. qbmm), &
+                   & "chemistry is not currently supported with Euler bubbles (bubbles_euler/qbmm)")
+
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         @:PROHIBIT(bf_spatial_support .and. (n == 0 .or. p /= 0), &
                    & "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
+
+        ! Condensed-phase reactive burn assumes exactly two fluids (reactant=1, product=2) that share the
+        ! stiffened-gas EOS and differ only in qv; violating these silently corrupts the mass/energy balance.
+        @:PROHIBIT(reactive_burn .and. num_fluids /= 2, "reactive_burn requires num_fluids = 2 (reactant then product)")
+        @:PROHIBIT(reactive_burn .and. .not. f_approx_equal(fluid_pp(1)%gamma, fluid_pp(2)%gamma), &
+                   & "reactive_burn requires fluid_pp(1)%gamma == fluid_pp(2)%gamma (reactant and product share the EOS)")
+        @:PROHIBIT(reactive_burn .and. .not. f_approx_equal(fluid_pp(1)%pi_inf, fluid_pp(2)%pi_inf), &
+                   & "reactive_burn requires fluid_pp(1)%pi_inf == fluid_pp(2)%pi_inf (reactant and product share the EOS)")
+        @:PROHIBIT(reactive_burn .and. fluid_pp(1)%qv <= fluid_pp(2)%qv, &
+                   & "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)")
+        @:PROHIBIT(reactive_burn .and. rburn%pref <= 0._wp, &
+                   & "reactive_burn requires rburn%pref > 0 (it normalizes the pressure drive (p - rburn%pign)/rburn%pref and is used as a divisor)")
+        ! The rate uses rburn%k, rburn%pign, rburn%n directly; each defaults to the sentinel dflt_real,
+        ! so an unset value silently produces spurious ignition (pign), NaN via drive**n (n), or a
+        ! backward reaction (k). Require each to be set to a physical value.
+        @:PROHIBIT(reactive_burn .and. rburn%k <= 0._wp, &
+                   & "reactive_burn requires rburn%k > 0 (rate coefficient [1/s]; unset defaults to a negative sentinel that runs the reaction backward)")
+        @:PROHIBIT(reactive_burn .and. f_is_default(rburn%pign), &
+                   & "reactive_burn requires rburn%pign to be set (ignition pressure threshold [Pa]; unset defaults to a negative sentinel, so the reactant ignites everywhere from t = 0)")
+        @:PROHIBIT(reactive_burn .and. rburn%n < 0._wp, &
+                   & "reactive_burn requires rburn%n >= 0 (pressure-drive exponent; unset defaults to a negative sentinel, so drive**n overflows to Inf and the field goes NaN)")
+        @:PROHIBIT(reactive_burn .and. model_eqns /= 2 .and. model_eqns /= 3, &
+                   & "reactive_burn requires model_eqns = 2 or 3 (the 5-equation pressure-equilibrium or 6-equation multi-fluid model)")
+        @:PROHIBIT(reactive_burn .and. rburn%ta < 0._wp, &
+                   & "reactive_burn requires rburn%ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
+        @:PROHIBIT(reactive_burn .and. rburn%ta > 0._wp .and. fluid_pp(1)%cv <= 0._wp, &
+                   & "reactive_burn with rburn%ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature T = (p + pi_inf)/((gamma - 1) cv rho) needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)")
+
+        if (ib .and. chemistry) then
+            call s_check_inputs_ib_injection
+        end if
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
@@ -131,6 +168,20 @@ contains
 #endif
 
     end subroutine s_check_inputs_nvidia_uvm
+
+    !> Validates that each burning immersed-boundary patch injects a species index within the mechanism. inj_species indexes the
+    !! image-point mass-fraction array Ys_IP(1:num_species) in m_ibm; an out-of-range value is an out-of-bounds write (silent
+    !! corruption). Only reachable with chemistry.
+    impure subroutine s_check_inputs_ib_injection
+
+        integer :: i
+
+        do i = 1, num_ibs
+            @:PROHIBIT(patch_ib(i)%inj_species > num_species, &
+                       & "patch_ib inj_species must be <= num_species (it indexes the image-point species mass fractions; an out-of-range value writes out of bounds)")
+        end do
+
+    end subroutine s_check_inputs_ib_injection
 
     !> Checks that each active particle cloud has a valid packing_method specified
     impure subroutine s_check_inputs_particle_clouds

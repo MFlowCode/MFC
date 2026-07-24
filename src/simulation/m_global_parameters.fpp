@@ -665,6 +665,10 @@ contains
             patch_ib(i)%airfoil_id = 0
             patch_ib(i)%model_id = 0
             patch_ib(i)%slip = .false.
+            patch_ib(i)%v_blow = 0._wp
+            patch_ib(i)%inj_species = 0
+            patch_ib(i)%burn_rate_exp = 0._wp
+            patch_ib(i)%burn_rate_pref = 0._wp
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
@@ -938,6 +942,8 @@ contains
         $:GPU_UPDATE(device='[Bx0]')
 
         $:GPU_UPDATE(device='[chem_params]')
+
+        $:GPU_UPDATE(device='[rburn]')
 
         $:GPU_UPDATE(device='[cont_damage, tau_star, cont_damage_s, alpha_bar]')
 
