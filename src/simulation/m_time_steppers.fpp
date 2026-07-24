@@ -31,6 +31,7 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
         & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_advance_stage, &
+        & s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
         & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
@@ -492,6 +493,24 @@ contains
                                    & t_step, s)
             end if
 
+            ! Coexist: the tiles carry their OWN rhs, so the L0 rhs above is not consumed by the coarse RK - repurpose it as the
+            ! Berger-Colella reflux-delta accumulator. Zero the interior so the per-fine-block s_amr_apply_reflux calls below fill
+            ! rhs_vf with the PURE delta (from zero), which s_l0_add_reflux_to_tiles then routes additively to each covering tile's
+            ! rhs (the delta is nonzero only in the thin coarse-cell shell just outside each c/f face).
+            if (amr .and. l0_ntile > 0) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(i)%sf(j, k, l) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
             if (s == 1) then
                 if (run_time_info) then
                     if (igr) then
@@ -572,7 +591,18 @@ contains
                         if (mod(t_step, l0_rebalance_interval) == 0) call s_l0_rebalance(t_step)
                     end if
                 end if
-                call s_l0_advance_stage(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+                if (amr) then
+                    ! Coexist: split the tile advance so the fixed-L0-frame reflux delta reaches each tile before its RK update.
+                    ! RHS pass (all owned tiles) -> add the c/f reflux delta captured in rhs_vf (routed L0-owner -> compute-owner)
+                    ! ->
+                    ! RK pass. Byte-identical to the monolithic coarse update once creg(L0) == the tile coarse flux (the Q3
+                    ! invariant).
+                    call s_l0_advance_stage_rhs(s, bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+                    call s_l0_add_reflux_to_tiles(rhs_vf)
+                    call s_l0_advance_stage_rk(s, rk_coef(s,:))
+                else
+                    call s_l0_advance_stage(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+                end if
                 ! beta: tiles are the AUTHORITATIVE store (no per-stage L0 mirror). L0 is a fixed-decomposition I/O staging buffer,
                 ! gathered from the tiles only at output (s_save_data). This is what "tiles own storage" means; it also removes the
                 ! per-stage scatter cost. (Requires no active post-op reads L0 for the l0 path - already true in the persistent
@@ -728,6 +758,10 @@ contains
                 if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
             end do
             call s_amr_select_slot(1)
+            ! Coexist: the restrict above wrote the fine-averaged solution into the L0 covered cells; route those covered cells back
+            ! to the covering tiles (the authoritative store) so they carry the finest data, mirroring the monolithic level-0
+            ! covered-cell overwrite. Only the footprint moves (non-covered tile cells keep their advanced state).
+            if (l0_ntile > 0) call s_l0_restrict_to_tiles(q_cons_ts(1)%vf)
         end if
 
 #ifdef MFC_DEBUG
