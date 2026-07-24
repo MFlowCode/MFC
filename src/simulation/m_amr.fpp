@@ -4770,6 +4770,12 @@ contains
         integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
         real(wp), allocatable                                  :: buf(:)
 
+        ! Precondition: tiles are the authoritative store. Before the first seed (s_l0_copy_coarse_to_tiles) the tile slots hold
+        ! uninitialized (zero) state and L0 still holds the initial condition, so there is nothing to refresh - scattering here
+        ! would overwrite the IC with zeros (zero density -> NaN once the coexist L0 coarse RHS consumes it). Skip until seeded.
+
+        if (l0_tiles_need_fill) return
+
         do k = 1, l0_ntiles_tot
             bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
             fm1 = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
