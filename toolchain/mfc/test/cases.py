@@ -2364,6 +2364,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("6eq", {"model_eqns": 3})
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
+        # Arrhenius temperature-driven rate: rburn_ta > 0 multiplies the rate by exp(-rburn_ta/T_r),
+        # with T_r the reactant phasic temperature (needs cv > 0). rburn_ta/cv are chosen so the
+        # factor is O(0.4) at the IC temperature -- exercises the branch instead of leaving it ~1.
+        stack.push("Arrhenius", {"rburn_ta": 500.0, "fluid_pp(1)%cv": 1500.0, "fluid_pp(2)%cv": 1500.0})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
     reactive_burn_cases()
