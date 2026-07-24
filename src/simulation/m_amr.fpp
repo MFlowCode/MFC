@@ -4487,8 +4487,10 @@ contains
         end if
 
         ! rr=1 makes the swap ghost-coord bisection and the fine-fine-halo fmul (=amr_ref_ratio**level) both identity; slots inherit
-        ! it via s_amr_alloc_slot. amr is off, so the amr_ref_ratio in {2,4} checker never runs.
-        amr_ref_ratio = 1
+        ! it via s_amr_alloc_slot. Only clobber the GLOBAL in pure-L0 (amr off): under coexist the global must stay the real 2/4 so
+        ! fine blocks size correctly (s_set_amr_fine_geometry etc.), and tiles get rr=1 via the per-slot override in
+        ! s_l0_build_tile_slot (Option 2: level-0 tiles are rr=1 regardless of the global).
+        if (.not. amr) amr_ref_ratio = 1
 
         ! Tiles are PER-RANK: each rank's local chunk is split into nt(:) pieces; the global tile table (region + owner) is the
         ! union
@@ -5217,9 +5219,14 @@ contains
         integer :: islot
 
         if (l0_ntile <= 0) return
-        do islot = 1, amr_max_blocks
-            call s_amr_free_slot(islot)
-        end do
+        ! Only free the shared slot pool in pure-L0 mode: under coexist (amr) s_finalize_amr_module runs FIRST (m_start_up call
+        ! order) and already freed every slot 1..amr_max_blocks AND deallocated amr_slot_live, so re-running s_amr_free_slot here
+        ! would read the deallocated amr_slot_live (use-after-free).
+        if (.not. amr) then
+            do islot = 1, amr_max_blocks
+                call s_amr_free_slot(islot)
+            end do
+        end if
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         ! amr_decomp, amr_slots, amr_region_*, amr_isect_*, amr_owns_all, amr_block_owner, amr_block_level, amr_ovl_*, and
