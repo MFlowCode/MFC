@@ -53,8 +53,8 @@ contains
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
-        @:PROHIBIT(l0_ntile > 0 .and. amr, &
-                   & "l0_ntile > 0 with amr = T (base-grid tiling together with AMR refinement) is not yet supported: the AMR fine blocks would read stale L0 coarse ghosts (the tiles-to-L0 per-stage coupling is unimplemented). Run L0 tiling and AMR separately.")
+        @:PROHIBIT(l0_ntile > 0 .and. amr .and. (amr_regrid_int > 0 .or. amr_subcycle .or. amr_max_level > 1), &
+                   & "l0_ntile > 0 with amr = T is supported only for static (amr_regrid_int = 0), single-level (amr_max_level = 1), non-subcycled runs; dynamic regrid, subcycle, and multi-level coexist are not yet implemented")
 
         if (active_box) then
             @:PROHIBIT(recon_type /= recon_type_weno, "active_box requires WENO reconstruction")
