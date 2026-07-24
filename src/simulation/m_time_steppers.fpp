@@ -31,7 +31,7 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
         & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_advance_stage, &
-        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance
+        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -476,6 +476,10 @@ contains
 
         do s = 1, nstage
             call system_clock(stage_t0)
+            ! coexist: tiles are the authoritative store, so refresh the L0 staging buffer from the current tile interiors before
+            ! the
+            ! L0 coarse RHS + the fine block's coarse-patch fill read it. Coexist-only (neutral for pure-AMR / pure-L0).
+            if (amr .and. l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
             ! L0-tiles spike: the tiles run their own per-tile s_compute_rhs, so the monolithic L0 RHS is pure waste here (it only
             ! populated the now-unused rhs_vf); skipping it makes the tiled path represent the real design and de-confounds timing.
             ! The s==1 run-time-info / probe path (which reads the monolithic q_prim_vf) is gated off for l0_ntile>0 at init.
