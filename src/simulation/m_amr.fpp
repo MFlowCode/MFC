@@ -4538,21 +4538,23 @@ contains
         ! replicated coarse-decomposition table (each rank's global origin + local extent) - built FIRST so the per-rank tile
         ! geometry
         ! and the max-tile-extent sizing below can read every rank's chunk. Seam-pair overlap-rank lists also read it.
-        ! NOTE(coexist): under amr=T this double-allocates amr_decomp against s_initialize_amr_module (unreachable today -
-        ! l0_ntile>0 .and. amr is @:PROHIBIT'd; Increment-3 must gate this with .not. amr).
-        allocate (amr_decomp(6,0:num_procs - 1))
-        block
-            integer :: myrow(6), ierr
-            myrow = 0
-            myrow(1) = start_idx(1); myrow(4) = m
-            if (n_glb > 0) then; myrow(2) = start_idx(2); myrow(5) = n; end if
-            if (p_glb > 0) then; myrow(3) = start_idx(3); myrow(6) = p; end if
+        ! amr_decomp is SHARED with s_initialize_amr_module: when amr, that routine already allocated+filled it identically
+        ! (same myrow/allgather), so only build it here in l0-only mode to avoid a coexist double-allocate.
+        if (.not. amr) then
+            allocate (amr_decomp(6,0:num_procs - 1))
+            block
+                integer :: myrow(6), ierr
+                myrow = 0
+                myrow(1) = start_idx(1); myrow(4) = m
+                if (n_glb > 0) then; myrow(2) = start_idx(2); myrow(5) = n; end if
+                if (p_glb > 0) then; myrow(3) = start_idx(3); myrow(6) = p; end if
 #ifdef MFC_MPI
-            call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
 #else
-            amr_decomp(:,0) = myrow
+                amr_decomp(:,0) = myrow
 #endif
-        end block
+            end block
+        end if
 
         ! max tile extent per dim over ALL ranks (= widest per-rank chunk split by nt); slots + seam buffers are sized to this
         ! global
@@ -5218,18 +5220,20 @@ contains
         do islot = 1, amr_max_blocks
             call s_amr_free_slot(islot)
         end do
-        deallocate (amr_slot_live)
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
-        deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
-        ! NOTE(coexist): under amr=T this double-frees the shared amr_decomp/amr_slots tables that s_finalize_amr_module also frees
-        ! (unreachable today - l0_ntile>0 .and. amr is @:PROHIBIT'd; Increment-3 must gate this with .not. amr). amr_slot_live
-        ! (deallocated above) is a THIRD coexist double-free hazard: it is allocated once by s_initialize_amr_module when amr=T
-        ! (not re-allocated here in the coexist branch of s_l0_tiles_init), so s_finalize_amr_module's later deallocate of it
-        ! double-frees too - Increment-3 must gate that deallocate here with .not. amr as well.
-        deallocate (amr_decomp, amr_slots)
-        deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
-        deallocate (amr_block_owner, amr_tile_l0_owner, amr_tile_cost, amr_tile_cost_ema, amr_block_level)
+        ! amr_decomp, amr_slots, amr_region_*, amr_isect_*, amr_owns_all, amr_block_owner, amr_block_level, amr_ovl_*, and
+        ! amr_slot_live are SHARED with s_initialize_amr_module/s_finalize_amr_module: when amr, that pair owns them, so only
+        ! free them here in l0-only mode to avoid a coexist double-free. amr_tile_l0_owner/amr_tile_cost/amr_tile_cost_ema are
+        ! TILE-ONLY and always freed here.
+        if (.not. amr) then
+            deallocate (amr_slot_live)
+            deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
+            deallocate (amr_decomp, amr_slots)
+            deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
+            deallocate (amr_block_owner, amr_block_level)
+        end if
+        deallocate (amr_tile_l0_owner, amr_tile_cost, amr_tile_cost_ema)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
         if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
         if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
