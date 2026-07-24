@@ -73,8 +73,12 @@ contains
                    & "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)")
         @:PROHIBIT(reactive_burn .and. rburn_pref <= 0._wp, &
                    & "reactive_burn requires rburn_pref > 0 (it normalizes the pressure drive (p - rburn_pign)/rburn_pref and is used as a divisor)")
-        @:PROHIBIT(reactive_burn .and. model_eqns /= 2, &
-                   & "reactive_burn requires model_eqns = 2 (the exact volume-fraction swap and single-pressure read assume the 5-equation pressure-equilibrium model)")
+        @:PROHIBIT(reactive_burn .and. model_eqns /= 2 .and. model_eqns /= 3, &
+                   & "reactive_burn requires model_eqns = 2 or 3 (the 5-equation pressure-equilibrium or 6-equation multi-fluid model)")
+        @:PROHIBIT(reactive_burn .and. rburn_ta < 0._wp, &
+                   & "reactive_burn requires rburn_ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
+        @:PROHIBIT(reactive_burn .and. rburn_ta > 0._wp .and. fluid_pp(1)%cv <= 0._wp, &
+                   & "reactive_burn with rburn_ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature T = (p + pi_inf)/((gamma - 1) cv rho) needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds

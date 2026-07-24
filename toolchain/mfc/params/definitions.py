@@ -632,7 +632,7 @@ def _load():
 
     # Condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)
     _r("reactive_burn", LOG, {"reactive_burn"})
-    for n in ["rburn_k", "rburn_pign", "rburn_pref", "rburn_n"]:
+    for n in ["rburn_k", "rburn_pign", "rburn_pref", "rburn_n", "rburn_ta"]:
         _r(n, REAL, {"reactive_burn"})
 
     # Acoustic
@@ -1286,7 +1286,7 @@ _nv(
     "pi_fac",
 )
 _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
-_nv(_ALL, "reactive_burn", "rburn_k", "rburn_pign", "rburn_pref", "rburn_n")
+_nv(_ALL, "reactive_burn", "rburn_k", "rburn_pign", "rburn_pref", "rburn_n", "rburn_ta")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
 _nv(

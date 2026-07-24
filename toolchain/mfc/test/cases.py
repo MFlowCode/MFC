@@ -2342,7 +2342,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(1)%geometry": 1,
                 "patch_icpp(1)%x_centroid": 0.0025,
                 "patch_icpp(1)%length_x": 0.005,
-                "patch_icpp(1)%vel(1)": 0.0,
+                # Uniform advection velocity: the field stays spatially uniform (sub-cell drift over
+                # 40 steps), so the source term is still isolated, but the momentum output is now a
+                # well-resolved O(1e5) quantity instead of near-zero roundoff -- otherwise the golden
+                # compares ~0 momentum at 1e-12 tolerance, which is not portable across recompiles/backends.
+                "patch_icpp(1)%vel(1)": 100.0,
                 "patch_icpp(1)%pres": 2.0e9,
                 "patch_icpp(1)%alpha_rho(1)": 1900.0 * 0.95,
                 "patch_icpp(1)%alpha_rho(2)": 1900.0 * 0.05,
@@ -2354,6 +2358,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # Same burn on the 6-equation model (model_eqns=3): the reactant->product qv release
+        # must manifest through the qv-consistent phasic-pressure relaxation. Guards that the
+        # 5-eq source term is correct on the 6-eq model and that the qv threading holds up.
+        stack.push("6eq", {"model_eqns": 3})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
         stack.pop()
 
     reactive_burn_cases()

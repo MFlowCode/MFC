@@ -109,6 +109,7 @@ DESCRIPTIONS = {
     "rburn_pign": "Reactive-burn ignition pressure threshold [Pa]",
     "rburn_pref": "Reactive-burn reference pressure for the pressure drive [Pa]",
     "rburn_n": "Reactive-burn pressure-drive exponent",
+    "rburn_ta": "Reactive-burn activation temperature [K] (0 = pure pressure-driven; >0 adds an Arrhenius exp(-rburn_ta/T) factor)",
     "mhd": "Enable magnetohydrodynamics",
     "hyper_cleaning": "Enable hyperbolic divergence cleaning for MHD",
     "hyper_cleaning_speed": "Wave speed for hyperbolic divergence cleaning",

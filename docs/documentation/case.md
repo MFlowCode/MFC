@@ -1134,10 +1134,11 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | `rburn_pign`      | Real    | Reactive-burn ignition pressure threshold [Pa]      |
 | `rburn_pref`      | Real    | Reactive-burn reference pressure for the drive [Pa] |
 | `rburn_n`         | Real    | Reactive-burn pressure-drive exponent               |
+| `rburn_ta`        | Real    | Reactive-burn activation temperature [K] (0 = off)  |
 
 - `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) (\cite Cao19).
 
-- `reactive_burn` converts a "reactant" fluid into a "product" fluid (`num_fluids >= 2`, ``chemistry = 'F'``) via a programmed pressure burn `dlambda/dt = rburn_k (1 - lambda) ((p - rburn_pign)/rburn_pref)^rburn_n`. The two fluids share the same `gamma`/`pi_inf` and differ only in `qv`, so the conversion releases `qv` through the mixture EOS — a reactive-Euler/ZND detonation model on the diffuse-interface framework.
+- `reactive_burn` converts a "reactant" fluid into a "product" fluid (`num_fluids >= 2`, ``chemistry = 'F'``) via a programmed pressure burn `dlambda/dt = rburn_k (1 - lambda) ((p - rburn_pign)/rburn_pref)^rburn_n`. The two fluids share the same `gamma`/`pi_inf` and differ only in `qv`, so the conversion releases `qv` through the mixture EOS — a reactive-Euler/ZND detonation model on the diffuse-interface framework. It runs on the 5-equation (`model_eqns = 2`) and 6-equation (`model_eqns = 3`) multi-fluid models. Setting `rburn_ta > 0` multiplies the rate by an Arrhenius factor `exp(-rburn_ta/T)`, where `T` is the reactant phasic temperature, giving temperature-driven ignition instead of a pure pressure switch.
 
 ### 16. Cylindrical Coordinates
 

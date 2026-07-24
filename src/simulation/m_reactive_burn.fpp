@@ -33,9 +33,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf, q_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: x, y, z
-        real(wp)                                               :: rho, pres, lambda, rate, mdot, drive
+        real(wp)                                               :: rho, pres, lambda, rate, mdot, drive, T_r
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[rho, pres, lambda, rate, mdot, drive]', copyin='[bounds]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[rho, pres, lambda, rate, mdot, drive, T_r]', copyin='[bounds]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -48,6 +48,16 @@ contains
                     drive = (pres - rburn_pign)/rburn_pref
                     if (drive > 0._wp .and. lambda < 1._wp) then
                         rate = rburn_k*(1._wp - lambda)*drive**rburn_n  ! dlambda/dt
+
+                        ! Optional Arrhenius temperature dependence: rate *= exp(-rburn_ta/T_r), with T_r the
+                        ! reactant phasic temperature from the stiffened-gas EOS T = (p + pi_inf)/((Gamma-1) rho cv).
+                        ! rburn_ta = 0 (default) leaves the pure pressure-driven rate unchanged.
+                        if (rburn_ta > 0._wp) then
+                            T_r = (pres + ps_inf(1))/((gs_min(1) - 1._wp)*cvs(1)*q_cons_vf(eqn_idx%cont%beg)%sf(x, y, &
+                                   & z)/q_prim_vf(eqn_idx%adv%beg)%sf(x, y, z))
+                            rate = rate*exp(-rburn_ta/T_r)
+                        end if
+
                         mdot = rho*rate  ! mass reactant -> product
 
                         ! continuity: reactant loses mass, product gains it

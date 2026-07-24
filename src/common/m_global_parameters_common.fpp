@@ -421,6 +421,7 @@ contains
         rburn_pign = dflt_real
         rburn_pref = dflt_real
         rburn_n = dflt_real
+        rburn_ta = 0._wp
 
         ! Case-optimization params: under case-opt these are compile-time constants in sim (skip assignment); in pre/post
         ! MFC_CASE_OPTIMIZATION is always False so the block always executes there.

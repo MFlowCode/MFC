@@ -16,7 +16,13 @@ parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help
 parser.add_argument("--res", type=float, default=1.0, help="Resolution multiplier: m=3000*res.")
 parser.add_argument("--tend", type=float, default=8.0e-6, help="Physical end time [s].")
 parser.add_argument("--frames", type=int, default=80, help="Number of saved output frames.")
+parser.add_argument("--model", type=int, choices=[2, 3], default=2, help="Multi-fluid model: 2 = 5-equation, 3 = 6-equation.")
 args = parser.parse_args()
+
+# 6-eq needs both phases present everywhere (its pressure-relaxation Newton solve is singular
+# on a zero-volume phase); seed a trace of product. 5-eq starts pure reactant.
+eps = 1.0e-6 if args.model == 3 else 0.0
+a1, a2 = 1.0 - eps, eps
 
 # --- Stiffened-gas EOS shared by reactant and product (mechanically identical) ---
 Gamma = 3.0  # physical adiabatic exponent
@@ -57,7 +63,7 @@ case = {
     "t_step_print": max(1, NT // 20),
     "parallel_io": "T",
     # Algorithm
-    "model_eqns": 2,
+    "model_eqns": args.model,
     "num_fluids": 2,
     "num_patches": 2,
     "mpp_lim": "T",
@@ -90,10 +96,10 @@ case = {
     "patch_icpp(1)%length_x": L,
     "patch_icpp(1)%vel(1)": 0.0,
     "patch_icpp(1)%pres": p0,
-    "patch_icpp(1)%alpha_rho(1)": rho0,
-    "patch_icpp(1)%alpha_rho(2)": 0.0,
-    "patch_icpp(1)%alpha(1)": 1.0,
-    "patch_icpp(1)%alpha(2)": 0.0,
+    "patch_icpp(1)%alpha_rho(1)": rho0 * a1,
+    "patch_icpp(1)%alpha_rho(2)": rho0 * a2,
+    "patch_icpp(1)%alpha(1)": a1,
+    "patch_icpp(1)%alpha(2)": a2,
     # Patch 2: high-pressure initiator (reactant), left end
     "patch_icpp(2)%geometry": 1,
     "patch_icpp(2)%alter_patch(1)": "T",
@@ -101,10 +107,10 @@ case = {
     "patch_icpp(2)%length_x": x_init,
     "patch_icpp(2)%vel(1)": 0.0,
     "patch_icpp(2)%pres": p_init,
-    "patch_icpp(2)%alpha_rho(1)": rho0,
-    "patch_icpp(2)%alpha_rho(2)": 0.0,
-    "patch_icpp(2)%alpha(1)": 1.0,
-    "patch_icpp(2)%alpha(2)": 0.0,
+    "patch_icpp(2)%alpha_rho(1)": rho0 * a1,
+    "patch_icpp(2)%alpha_rho(2)": rho0 * a2,
+    "patch_icpp(2)%alpha(1)": a1,
+    "patch_icpp(2)%alpha(2)": a2,
     # Fluid EOS: reactant (1) and product (2) share gamma/pi_inf, differ only in qv.
     "fluid_pp(1)%gamma": gamma_p,
     "fluid_pp(1)%pi_inf": pi_inf_p,

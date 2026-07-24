@@ -129,8 +129,9 @@ PHYSICS_DOCS = {
         "category": "Combustion",
         "explanation": (
             "Programmed pressure-driven burn converting a reactant fluid to a product fluid on the multi-fluid model. "
-            "Requires model_eqns = 2 and num_fluids = 2 (reactant, product) sharing the stiffened-gas EOS "
-            "(equal gamma, pi_inf) with qv_reactant > qv_product, and rburn_pref > 0."
+            "Requires model_eqns = 2 or 3 and num_fluids = 2 (reactant, product) sharing the stiffened-gas EOS "
+            "(equal gamma, pi_inf) with qv_reactant > qv_product, and rburn_pref > 0. "
+            "rburn_ta (activation temperature [K]) is optional and must be >= 0; >0 adds an Arrhenius exp(-rburn_ta/T) factor."
         ),
     },
     # Numerical Schemes
@@ -1582,9 +1583,15 @@ class CaseValidator:
         if not reactive_burn:
             return
         model_eqns = self.get("model_eqns")
-        # The exact volume-fraction swap and single-pressure read assume the 5-equation
-        # pressure-equilibrium model; num_fluids = 2 alone also admits model_eqns = 3.
-        self.prohibit(model_eqns is not None and model_eqns != 2, "reactive_burn requires model_eqns = 2 (5-equation pressure-equilibrium model)")
+        # Supported on the 5-equation (pressure-equilibrium) and 6-equation multi-fluid models.
+        self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "reactive_burn requires model_eqns = 2 or 3 (5- or 6-equation multi-fluid model)")
+        rburn_ta = self.get("rburn_ta")
+        self.prohibit(self._is_numeric(rburn_ta) and rburn_ta < 0, "reactive_burn requires rburn_ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
+        cv1 = self.get("fluid_pp(1)%cv")
+        self.prohibit(
+            self._is_numeric(rburn_ta) and rburn_ta > 0 and (not self._is_numeric(cv1) or cv1 <= 0),
+            "reactive_burn with rburn_ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)",
+        )
 
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""
