@@ -311,6 +311,10 @@ contains
         if (.not. amr) return
         if (igr) return  ! stage-1 IGR coupling is restriction-only: the fused IGR flux kernels do not expose face fluxes to capture
         if (amr_in_fine_advance .and. .not. amr_rank_owns_block) return
+        ! a level-0 L0 tile advancing through the fine path is COARSE, not a fine block: skip the freg self-capture and the
+        ! parent-of-level-1 child-creg loop (which would overwrite the real fine block's creg in the tile-swapped frame). Its creg
+        ! comes from the dedicated L0 coarse RHS (amr_in_fine_advance=F). Pure-AMR has no level-0 slots so this never fires.
+        if (amr_in_fine_advance .and. amr_block_level(amr_cur) == 0) return
         islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         ! flux data was just written by device kernels; the face reads below run as device kernels too
         if (amr_subcycle) then
