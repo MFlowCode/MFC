@@ -2376,6 +2376,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("Arrhenius", {"rburn%ta": 500.0, "fluid_pp(1)%cv": 1500.0, "fluid_pp(2)%cv": 1500.0})
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
+        # Same burn on 2 MPI ranks: the rburn parameters must be broadcast to non-root ranks, or
+        # rank 1's half of the domain burns with the sentinel default and diverges. The single-rank
+        # goldens cannot catch a broken rburn broadcast; this one does.
+        stack.push("2 ranks", {})
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
         stack.pop()
 
     reactive_burn_cases()
