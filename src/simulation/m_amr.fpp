@@ -4536,6 +4536,8 @@ contains
         ! replicated coarse-decomposition table (each rank's global origin + local extent) - built FIRST so the per-rank tile
         ! geometry
         ! and the max-tile-extent sizing below can read every rank's chunk. Seam-pair overlap-rank lists also read it.
+        ! NOTE(coexist): under amr=T this double-allocates amr_decomp against s_initialize_amr_module (unreachable today -
+        ! l0_ntile>0 .and. amr is @:PROHIBIT'd; Increment-3 must gate this with .not. amr).
         allocate (amr_decomp(6,0:num_procs - 1))
         block
             integer :: myrow(6), ierr
@@ -5218,6 +5220,8 @@ contains
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
+        ! NOTE(coexist): under amr=T this double-frees the shared amr_decomp/amr_slots tables that s_finalize_amr_module also frees
+        ! (unreachable today - l0_ntile>0 .and. amr is @:PROHIBIT'd; Increment-3 must gate this with .not. amr).
         deallocate (amr_decomp, amr_slots)
         deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
         deallocate (amr_block_owner, amr_tile_l0_owner, amr_tile_cost, amr_tile_cost_ema, amr_block_level)
