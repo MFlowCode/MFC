@@ -632,8 +632,8 @@ def _load():
 
     # Condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)
     _r("reactive_burn", LOG, {"reactive_burn"})
-    for n in ["rburn_k", "rburn_pign", "rburn_pref", "rburn_n", "rburn_ta"]:
-        _r(n, REAL, {"reactive_burn"})
+    for a in ["k", "pign", "pref", "n", "ta"]:
+        _r(f"rburn%{a}", REAL, {"reactive_burn"})
 
     # Acoustic
     _r("num_source", INT, {"acoustic"})
@@ -1194,6 +1194,7 @@ TYPED_DECLS: dict[str, tuple] = {
     "integral": ("type(integral_parameters)", "num_probes_max", False, None),
     "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
     "chem_params": ("type(chemistry_parameters)", None, True, None),
+    "rburn": ("type(reactive_burn_parameters)", None, True, "Condensed-phase reactive-burn (programmed detonation) parameters"),
     "lag_params": ("type(bubbles_lagrange_parameters)", None, True, "Lagrange bubbles' parameters"),
     "particle_cloud": ("type(particle_cloud_parameters)", "num_particle_clouds_max", False, "Particle bed specifications"),
     "simplex_params": ("type(simplex_noise_params)", None, False, None),
@@ -1286,7 +1287,7 @@ _nv(
     "pi_fac",
 )
 _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
-_nv(_ALL, "reactive_burn", "rburn_k", "rburn_pign", "rburn_pref", "rburn_n", "rburn_ta")
+_nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
 _nv(

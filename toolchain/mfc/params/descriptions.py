@@ -105,11 +105,6 @@ DESCRIPTIONS = {
     "surface_tension": "Enable surface tension effects",
     "chemistry": "Enable chemical reactions",
     "reactive_burn": "Enable condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)",
-    "rburn_k": "Reactive-burn rate coefficient [1/s]",
-    "rburn_pign": "Reactive-burn ignition pressure threshold [Pa]",
-    "rburn_pref": "Reactive-burn reference pressure for the pressure drive [Pa]",
-    "rburn_n": "Reactive-burn pressure-drive exponent",
-    "rburn_ta": "Reactive-burn activation temperature [K] (0 = pure pressure-driven; >0 adds an Arrhenius exp(-rburn_ta/T) factor)",
     "mhd": "Enable magnetohydrodynamics",
     "hyper_cleaning": "Enable hyperbolic divergence cleaning for MHD",
     "hyper_cleaning_speed": "Wave speed for hyperbolic divergence cleaning",
@@ -536,6 +531,13 @@ PATTERNS = [
     (r"chem_params%gamma_method", "Gamma calculation method (1=formulation, 2=cp/cv ratio)"),
     (r"chem_params%transport_model", "Transport model selection for chemistry"),
     (r"chem_params%(\w+)", "Chemistry parameter: {0}"),
+    # rburn (reactive-burn) patterns - specific fields first
+    (r"rburn%k", "Reactive-burn rate coefficient [1/s]"),
+    (r"rburn%pign", "Reactive-burn ignition pressure threshold [Pa]"),
+    (r"rburn%pref", "Reactive-burn reference pressure for the pressure drive [Pa]"),
+    (r"rburn%n", "Reactive-burn pressure-drive exponent"),
+    (r"rburn%ta", "Reactive-burn activation temperature [K] (0 = pure pressure-driven; >0 adds an Arrhenius exp(-ta/T) factor)"),
+    (r"rburn%(\w+)", "Reactive-burn parameter: {0}"),
     # fluid_rho patterns
     (r"fluid_rho\((\d+)\)", "Reference density for fluid {0}"),
 ]
@@ -572,6 +574,7 @@ def _infer_from_naming(param_name: str) -> str:
             "simplex_params": "Simplex noise",
             "lag_params": "Lagrangian tracking",
             "chem_params": "Chemistry",
+            "rburn": "Reactive burn",
             "bub_pp": "Bubble",
             "x_output": "X-direction output",
             "y_output": "Y-direction output",

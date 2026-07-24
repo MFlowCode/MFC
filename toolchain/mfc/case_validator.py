@@ -130,8 +130,9 @@ PHYSICS_DOCS = {
         "explanation": (
             "Programmed pressure-driven burn converting a reactant fluid to a product fluid on the multi-fluid model. "
             "Requires model_eqns = 2 or 3 and num_fluids = 2 (reactant, product) sharing the stiffened-gas EOS "
-            "(equal gamma, pi_inf) with qv_reactant > qv_product, and rburn_pref > 0. "
-            "rburn_ta (activation temperature [K]) is optional and must be >= 0; >0 adds an Arrhenius exp(-rburn_ta/T) factor."
+            "(equal gamma, pi_inf) with qv_reactant > qv_product. rburn%k (> 0), rburn%pign, rburn%pref (> 0), "
+            "and rburn%n (>= 0) must all be set. rburn%ta (activation temperature [K]) is optional and must be >= 0; "
+            ">0 adds an Arrhenius exp(-rburn%ta/T) factor and requires fluid_pp(1)%cv > 0."
         ),
     },
     # Numerical Schemes
@@ -1585,12 +1586,21 @@ class CaseValidator:
         model_eqns = self.get("model_eqns")
         # Supported on the 5-equation (pressure-equilibrium) and 6-equation multi-fluid models.
         self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "reactive_burn requires model_eqns = 2 or 3 (5- or 6-equation multi-fluid model)")
-        rburn_ta = self.get("rburn_ta")
-        self.prohibit(self._is_numeric(rburn_ta) and rburn_ta < 0, "reactive_burn requires rburn_ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
+        # The rate uses rburn%k, %pign, %pref, %n directly; an unset value defaults to a negative
+        # sentinel in the solver and silently corrupts the burn, so require each to be set.
+        rk = self.get("rburn%k")
+        self.prohibit(not self._is_numeric(rk) or rk <= 0, "reactive_burn requires rburn%k > 0 (rate coefficient [1/s])")
+        self.prohibit(self.get("rburn%pign") is None, "reactive_burn requires rburn%pign to be set (ignition pressure threshold [Pa])")
+        rpref = self.get("rburn%pref")
+        self.prohibit(not self._is_numeric(rpref) or rpref <= 0, "reactive_burn requires rburn%pref > 0 (it normalizes the pressure drive and is used as a divisor)")
+        rn = self.get("rburn%n")
+        self.prohibit(not self._is_numeric(rn) or rn < 0, "reactive_burn requires rburn%n >= 0 (pressure-drive exponent)")
+        rta = self.get("rburn%ta")
+        self.prohibit(self._is_numeric(rta) and rta < 0, "reactive_burn requires rburn%ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
         cv1 = self.get("fluid_pp(1)%cv")
         self.prohibit(
-            self._is_numeric(rburn_ta) and rburn_ta > 0 and (not self._is_numeric(cv1) or cv1 <= 0),
-            "reactive_burn with rburn_ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)",
+            self._is_numeric(rta) and rta > 0 and (not self._is_numeric(cv1) or cv1 <= 0),
+            "reactive_burn with rburn%ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)",
         )
 
     def check_misc_pre_process(self):

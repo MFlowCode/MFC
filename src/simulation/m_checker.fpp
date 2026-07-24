@@ -71,14 +71,27 @@ contains
                    & "reactive_burn requires fluid_pp(1)%pi_inf == fluid_pp(2)%pi_inf (reactant and product share the EOS)")
         @:PROHIBIT(reactive_burn .and. fluid_pp(1)%qv <= fluid_pp(2)%qv, &
                    & "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)")
-        @:PROHIBIT(reactive_burn .and. rburn_pref <= 0._wp, &
-                   & "reactive_burn requires rburn_pref > 0 (it normalizes the pressure drive (p - rburn_pign)/rburn_pref and is used as a divisor)")
+        @:PROHIBIT(reactive_burn .and. rburn%pref <= 0._wp, &
+                   & "reactive_burn requires rburn%pref > 0 (it normalizes the pressure drive (p - rburn%pign)/rburn%pref and is used as a divisor)")
+        ! The rate uses rburn%k, rburn%pign, rburn%n directly; each defaults to the sentinel dflt_real,
+        ! so an unset value silently produces spurious ignition (pign), NaN via drive**n (n), or a
+        ! backward reaction (k). Require each to be set to a physical value.
+        @:PROHIBIT(reactive_burn .and. rburn%k <= 0._wp, &
+                   & "reactive_burn requires rburn%k > 0 (rate coefficient [1/s]; unset defaults to a negative sentinel that runs the reaction backward)")
+        @:PROHIBIT(reactive_burn .and. f_is_default(rburn%pign), &
+                   & "reactive_burn requires rburn%pign to be set (ignition pressure threshold [Pa]; unset defaults to a negative sentinel, so the reactant ignites everywhere from t = 0)")
+        @:PROHIBIT(reactive_burn .and. rburn%n < 0._wp, &
+                   & "reactive_burn requires rburn%n >= 0 (pressure-drive exponent; unset defaults to a negative sentinel, so drive**n overflows to Inf and the field goes NaN)")
         @:PROHIBIT(reactive_burn .and. model_eqns /= 2 .and. model_eqns /= 3, &
                    & "reactive_burn requires model_eqns = 2 or 3 (the 5-equation pressure-equilibrium or 6-equation multi-fluid model)")
-        @:PROHIBIT(reactive_burn .and. rburn_ta < 0._wp, &
-                   & "reactive_burn requires rburn_ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
-        @:PROHIBIT(reactive_burn .and. rburn_ta > 0._wp .and. fluid_pp(1)%cv <= 0._wp, &
-                   & "reactive_burn with rburn_ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature T = (p + pi_inf)/((gamma - 1) cv rho) needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)")
+        @:PROHIBIT(reactive_burn .and. rburn%ta < 0._wp, &
+                   & "reactive_burn requires rburn%ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
+        @:PROHIBIT(reactive_burn .and. rburn%ta > 0._wp .and. fluid_pp(1)%cv <= 0._wp, &
+                   & "reactive_burn with rburn%ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature T = (p + pi_inf)/((gamma - 1) cv rho) needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)")
+
+        if (ib .and. chemistry) then
+            call s_check_inputs_ib_injection
+        end if
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds
@@ -155,6 +168,20 @@ contains
 #endif
 
     end subroutine s_check_inputs_nvidia_uvm
+
+    !> Validates that each burning immersed-boundary patch injects a species index within the mechanism. inj_species indexes the
+    !! image-point mass-fraction array Ys_IP(1:num_species) in m_ibm; an out-of-range value is an out-of-bounds write (silent
+    !! corruption). Only reachable with chemistry.
+    impure subroutine s_check_inputs_ib_injection
+
+        integer :: i
+
+        do i = 1, num_ibs
+            @:PROHIBIT(patch_ib(i)%inj_species > num_species, &
+                       & "patch_ib inj_species must be <= num_species (it indexes the image-point species mass fractions; an out-of-range value writes out of bounds)")
+        end do
+
+    end subroutine s_check_inputs_ib_injection
 
     !> Checks that each active particle cloud has a valid packing_method specified
     impure subroutine s_check_inputs_particle_clouds

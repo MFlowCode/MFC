@@ -2049,6 +2049,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # of where it is generated. The 2D bubble and all 18 phase-change unit tests remain
                 # portable and CPU/GPU machine-zero; only this stiff 3D collapse is non-portable.
                 "3D_phasechange_bubble",
+                # Finite-rate propellant flame: the flame-front position after 50 steps is set by
+                # accumulated stiff-kinetics roundoff, so it drifts past the 1e-3 Example tolerance
+                # across compilers (nvhpc 25.11 golden vs 24.3/GNU/Intel/CCE/AMD disagree by ~1-5e-3).
+                # No single golden is portable -- same class as the other flame examples above. The
+                # reactive_burn detonation golden tests remain portable (machine-zero across lanes).
+                "1D_propellant_flame",
             ]
             if path in casesToSkip:
                 continue
@@ -2329,10 +2335,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "avg_state": 2,
                 "time_stepper": 3,
                 "reactive_burn": "T",
-                "rburn_k": 1.0e7,
-                "rburn_pign": 1.0e9,
-                "rburn_pref": 2.0e9,
-                "rburn_n": 1.0,
+                "rburn%k": 1.0e7,
+                "rburn%pign": 1.0e9,
+                "rburn%pref": 2.0e9,
+                "rburn%n": 1.0,
                 "fluid_pp(1)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
                 "fluid_pp(1)%pi_inf": 9.0e8,
                 "fluid_pp(1)%qv": 4.0e6,
@@ -2364,10 +2370,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("6eq", {"model_eqns": 3})
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
-        # Arrhenius temperature-driven rate: rburn_ta > 0 multiplies the rate by exp(-rburn_ta/T_r),
-        # with T_r the reactant phasic temperature (needs cv > 0). rburn_ta/cv are chosen so the
+        # Arrhenius temperature-driven rate: rburn%ta > 0 multiplies the rate by exp(-rburn%ta/T_r),
+        # with T_r the reactant phasic temperature (needs cv > 0). rburn%ta/cv are chosen so the
         # factor is O(0.4) at the IC temperature -- exercises the branch instead of leaving it ~1.
-        stack.push("Arrhenius", {"rburn_ta": 500.0, "fluid_pp(1)%cv": 1500.0, "fluid_pp(2)%cv": 1500.0})
+        stack.push("Arrhenius", {"rburn%ta": 500.0, "fluid_pp(1)%cv": 1500.0, "fluid_pp(2)%cv": 1500.0})
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
         stack.pop()

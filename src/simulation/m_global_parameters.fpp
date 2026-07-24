@@ -943,6 +943,8 @@ contains
 
         $:GPU_UPDATE(device='[chem_params]')
 
+        $:GPU_UPDATE(device='[rburn]')
+
         $:GPU_UPDATE(device='[cont_damage, tau_star, cont_damage_s, alpha_bar]')
 
         $:GPU_UPDATE(device='[hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau]')

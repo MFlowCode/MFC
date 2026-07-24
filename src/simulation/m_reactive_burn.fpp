@@ -6,12 +6,12 @@
 #:include 'case.fpp'
 
 !> @brief Condensed-phase reactive burn: a pressure-driven programmed-burn source that converts a "reactant" fluid into a "product"
-!! fluid on the multi-fluid model (num_fluids>=2, chemistry='F'). The two fluids share the same stiffened-gas EOS (gamma, pi_inf)
-!! and differ only in their reference energy qv, so the reactant->product conversion releases (qv_reactant - qv_product) per unit
-!! mass through the mixture EOS with no explicit energy source. Because the two fluids are mechanically identical the
-!! volume-fraction swap is exact (the product volume fraction is the reaction progress), making this a reactive-Euler/ZND detonation
-!! model expressed through the diffuse-interface framework. A shock raises the pressure above rburn_pign, the reactant burns, and
-!! the energy release sustains the shock -- a self-propagating condensed-phase detonation.
+!! fluid on the multi-fluid model (num_fluids=2, chemistry='F'). The two fluids share the same stiffened-gas EOS (gamma, pi_inf) and
+!! differ only in their reference energy qv, so the reactant->product conversion releases (qv_reactant - qv_product) per unit mass
+!! through the mixture EOS with no explicit energy source. Because the two fluids are mechanically identical the volume-fraction
+!! swap is exact (the product volume fraction is the reaction progress), making this a reactive-Euler/ZND detonation model expressed
+!! through the diffuse-interface framework. A shock raises the pressure above rburn%pign, the reactant burns, and the energy release
+!! sustains the shock -- a self-propagating condensed-phase detonation.
 module m_reactive_burn
 
     use m_global_parameters
@@ -44,18 +44,18 @@ contains
                     pres = q_prim_vf(eqn_idx%E)%sf(x, y, z)
                     lambda = q_prim_vf(eqn_idx%adv%beg + 1)%sf(x, y, z)  ! reaction progress = product volume fraction
 
-                    ! pressure-driven programmed burn: fires only behind the shock (p > rburn_pign)
-                    drive = (pres - rburn_pign)/rburn_pref
+                    ! pressure-driven programmed burn: fires only behind the shock (p > rburn%pign)
+                    drive = (pres - rburn%pign)/rburn%pref
                     if (drive > 0._wp .and. lambda < 1._wp) then
-                        rate = rburn_k*(1._wp - lambda)*drive**rburn_n  ! dlambda/dt
+                        rate = rburn%k*(1._wp - lambda)*drive**rburn%n  ! dlambda/dt
 
-                        ! Optional Arrhenius temperature dependence: rate *= exp(-rburn_ta/T_r), with T_r the
+                        ! Optional Arrhenius temperature dependence: rate *= exp(-rburn%ta/T_r), with T_r the
                         ! reactant phasic temperature from the stiffened-gas EOS T = (p + pi_inf)/((Gamma-1) rho cv).
-                        ! rburn_ta = 0 (default) leaves the pure pressure-driven rate unchanged.
-                        if (rburn_ta > 0._wp) then
+                        ! rburn%ta = 0 (default) leaves the pure pressure-driven rate unchanged.
+                        if (rburn%ta > 0._wp) then
                             T_r = (pres + ps_inf(1))/((gs_min(1) - 1._wp)*cvs(1)*q_cons_vf(eqn_idx%cont%beg)%sf(x, y, &
                                    & z)/q_prim_vf(eqn_idx%adv%beg)%sf(x, y, z))
-                            rate = rate*exp(-rburn_ta/T_r)
+                            rate = rate*exp(-rburn%ta/T_r)
                         end if
 
                         mdot = rho*rate  ! mass reactant -> product

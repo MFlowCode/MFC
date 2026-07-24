@@ -1,12 +1,12 @@
-This file was created on 2026-07-24 10:07:46.767536.
+This file was created on 2026-07-24 13:02:20.636749.
 
 mfc.sh:
 
     Invocation: test --generate --only Reactive Burn --no-build -j 8
-    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        9f005e721958536551e21768cf1540895a57d993 on reactive-burn-6eq (dirty)
+    Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        d5972dab060de92334c1cd6d1387d028ed208623 on reactive-burn-6eq (dirty)
 
-post_process:
+syscheck:
 
     CMake Configuration:
     
@@ -17,13 +17,13 @@ post_process:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : OFF
+        OpenACC : ON
         OpenMP  : OFF
     
         Fypp    : /fastscratch/sbryngelson3/pelanti-6eq/build/venv/bin/fypp
@@ -33,9 +33,9 @@ post_process:
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -57,7 +57,7 @@ simulation:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : OFF
+        OpenACC : ON
         OpenMP  : OFF
     
         Fypp    : /fastscratch/sbryngelson3/pelanti-6eq/build/venv/bin/fypp
@@ -67,9 +67,9 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -91,7 +91,7 @@ pre_process:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : OFF
+        OpenACC : ON
         OpenMP  : OFF
     
         Fypp    : /fastscratch/sbryngelson3/pelanti-6eq/build/venv/bin/fypp
@@ -101,14 +101,14 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+post_process:
 
     CMake Configuration:
     
@@ -119,13 +119,13 @@ syscheck:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : OFF
+        OpenACC : ON
         OpenMP  : OFF
     
         Fypp    : /fastscratch/sbryngelson3/pelanti-6eq/build/venv/bin/fypp
@@ -135,9 +135,9 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      51%
+    CPU(s) scaling MHz:                      66%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00

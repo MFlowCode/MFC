@@ -4,7 +4,7 @@
 # the same mechanical EOS (gamma, pi_inf) but has a lower reference energy qv --
 # so reactant -> product releases (qv_reactant - qv_product) per unit mass through
 # the mixture EOS, with no explicit energy source. A high-pressure initiator at the
-# left end launches a shock; where the shock raises the pressure above rburn_pign
+# left end launches a shock; where the shock raises the pressure above rburn%pign
 # the reactant burns, and the energy release sustains a self-propagating detonation
 # (von Neumann spike + Taylor rarefaction, near-CJ speed). Multi-fluid model,
 # chemistry OFF -- this deliberately bypasses the Cantera num_fluids=1 lock.
@@ -82,10 +82,10 @@ case = {
     "bc_x%end": -3,
     # Condensed-phase reactive burn
     "reactive_burn": "T",
-    "rburn_k": 5.0e6,  # rate coefficient [1/s]
-    "rburn_pign": 5.0e8,  # ignition pressure threshold [Pa]
-    "rburn_pref": 1.0e9,  # reference pressure for the pressure drive [Pa]
-    "rburn_n": 1.0,  # pressure exponent
+    "rburn%k": 5.0e6,  # rate coefficient [1/s]
+    "rburn%pign": 5.0e8,  # ignition pressure threshold [Pa]
+    "rburn%pref": 1.0e9,  # reference pressure for the pressure drive [Pa]
+    "rburn%n": 1.0,  # pressure exponent
     # Output
     "format": "silo",
     "precision": "double",
