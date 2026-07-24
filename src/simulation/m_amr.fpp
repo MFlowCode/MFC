@@ -235,13 +235,26 @@ contains
         integer                         :: blk_lo(3), blk_hi(3)
         type(scalar_field), allocatable :: tmp_cg(:)
 
+        ! shared-pool layout: tiles are a fixed level-0 prefix; fine blocks follow. Both this init and s_l0_tiles_init read this, so
+        ! it runs before the amr early-return below (this routine always executes first, per m_start_up.fpp).
+
+        if (l0_ntile > 0) then
+            l0_nt = 1; l0_nt(1) = l0_ntile
+            if (n_glb > 0) l0_nt(2) = l0_ntile
+            if (p_glb > 0) l0_nt(3) = l0_ntile
+            l0_ntiles_tot = num_procs*l0_nt(1)*l0_nt(2)*l0_nt(3)
+            l0_slot_off = l0_ntiles_tot
+        end if
+
         if (.not. amr) return
 
         amr_dt_fine = 0.5_wp*dt
 
-        ! Fine-block cap = the case amr_max_blocks; the total slot pool equals it until L0 tiles coexist (l0_slot_off > 0), when the
-        ! tile prefix is added below in s_l0_tiles_init. l0_slot_off stays 0 here (set when tiles are built).
-        amr_max_fine = amr_max_blocks
+        ! Fine-block cap = the case amr_max_blocks; the shared pool adds the L0 tile prefix (l0_slot_off, 0 when l0_ntile=0) ahead
+        ! of
+        ! it, so both AMR fine blocks and any L0 tiles draw from one amr_slots allocation.
+        amr_max_fine = amr_max_blocks  ! fine/regrid cap = the case budget
+        amr_max_blocks = l0_slot_off + amr_max_fine  ! total shared pool (l0_slot_off=0 when no tiles -> unchanged)
 
         ! fixed pool of amr_max_blocks slots; init activates exactly one (amr_cur = 1); regrid clusters into up to amr_max_blocks
         allocate (amr_slots(1:amr_max_blocks))
@@ -4481,33 +4494,44 @@ contains
         ! tiling. Each rank allocates slot DATA (fields + coords) only for its OWN tiles; the seam-pair scan and fine-fine halo see
         ! the
         ! full table and exchange cross-rank seams over MPI.
-        nt = 1
-        nt(1) = l0_ntile
-        if (n_glb > 0) nt(2) = l0_ntile
-        if (p_glb > 0) nt(3) = l0_ntile
-        l0_nt = nt
-        l0_ntiles_tot = num_procs*nt(1)*nt(2)*nt(3)
+        ! l0_nt/l0_ntiles_tot/l0_slot_off are computed once by s_initialize_amr_module (which always runs first, per
+        ! m_start_up.fpp) so both inits agree on the shared-pool layout; just read them here.
+        nt = l0_nt
 
-        amr_max_blocks = l0_ntiles_tot
-        amr_num_blocks = l0_ntiles_tot
         amr_num_levels = 1
         amr_cur = 1
 
-        ! block-metadata pool (mirror of s_initialize_amr_module's allocation)
-        allocate (amr_slots(1:amr_max_blocks))
-        allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
-        allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
-        allocate (amr_owns_all(amr_max_blocks))
-        allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
-        allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
-        allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
-        allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
-        ! L0 tiles are the BASE level (Option 2: fine blocks become level>=1 on a tile)
-        allocate (amr_block_level(amr_max_blocks)); amr_block_level = 0
-        allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
-        allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
-        allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
-        amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
+        if (.not. amr) then
+            ! l0-only mode: this routine owns the pool exactly as before (fine budget = 0)
+            amr_max_fine = 0; l0_slot_off = l0_ntiles_tot
+            amr_max_blocks = l0_ntiles_tot
+            amr_num_blocks = l0_ntiles_tot
+
+            ! block-metadata pool (mirror of s_initialize_amr_module's allocation)
+            allocate (amr_slots(1:amr_max_blocks))
+            allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
+            allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
+            allocate (amr_owns_all(amr_max_blocks))
+            allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
+            allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
+            allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
+            allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
+            ! L0 tiles are the BASE level (Option 2: fine blocks become level>=1 on a tile)
+            allocate (amr_block_level(amr_max_blocks)); amr_block_level = 0
+            allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
+            allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
+            allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
+            amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
+        else
+            ! coexist mode: s_initialize_amr_module already allocated the shared pool sized l0_slot_off+amr_max_fine.
+            ! Only allocate the TILE-specific side tables here, and do NOT touch amr_slots / amr_region_* / amr_owns_all /
+            ! amr_block_owner / amr_ovl_* - those are shared with AMR and already sized/allocated.
+            allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
+            allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
+            allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
+            ! tiles are level 0 in slots [1..l0_ntiles_tot]; set that band without disturbing the fine slots
+            amr_block_level(1:l0_ntiles_tot) = 0
+        end if
 
         ! replicated coarse-decomposition table (each rank's global origin + local extent) - built FIRST so the per-rank tile
         ! geometry
