@@ -256,7 +256,8 @@ contains
         amr_max_fine = amr_max_blocks  ! fine/regrid cap = the case budget
         amr_max_blocks = l0_slot_off + amr_max_fine  ! total shared pool (l0_slot_off=0 when no tiles -> unchanged)
 
-        ! fixed pool of amr_max_blocks slots; init activates exactly one (amr_cur = 1); regrid clusters into up to amr_max_blocks
+        ! fixed pool of amr_max_blocks slots; init activates exactly one (amr_cur = f_l0_slot(1), the initial fine-block slot);
+        ! regrid clusters into up to amr_max_blocks
         allocate (amr_slots(1:amr_max_blocks))
         allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
@@ -503,7 +504,8 @@ contains
         ! IB pipeline can resolve the body on the block
         if (ib) call s_ibm_alloc_fine(amr_max_blocks, mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi)
 
-        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial block (amr_cur = 1). Under dynamic regrid with bodies
+        ! set geometry (region, m/n/p, idwbuff, coordinates) for the initial block (amr_cur = f_l0_slot(1), the initial fine-block
+        ! slot). Under dynamic regrid with bodies
         ! the initial block gets the same body-containment expansion regrid boxes get (the moving-body containment guard requires it
         ! from step 1); for a static block (amr_regrid_int = 0) the user's placement is authoritative. max_grid_size tiling: the
         ! initial block splits into <= amr_maxc_fit sub-blocks (at np=1 amr_maxc_fit == amr_maxc so a normal block stays a single
@@ -5221,7 +5223,10 @@ contains
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
         ! NOTE(coexist): under amr=T this double-frees the shared amr_decomp/amr_slots tables that s_finalize_amr_module also frees
-        ! (unreachable today - l0_ntile>0 .and. amr is @:PROHIBIT'd; Increment-3 must gate this with .not. amr).
+        ! (unreachable today - l0_ntile>0 .and. amr is @:PROHIBIT'd; Increment-3 must gate this with .not. amr). amr_slot_live
+        ! (deallocated above) is a THIRD coexist double-free hazard: it is allocated once by s_initialize_amr_module when amr=T
+        ! (not re-allocated here in the coexist branch of s_l0_tiles_init), so s_finalize_amr_module's later deallocate of it
+        ! double-frees too - Increment-3 must gate that deallocate here with .not. amr as well.
         deallocate (amr_decomp, amr_slots)
         deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
         deallocate (amr_block_owner, amr_tile_l0_owner, amr_tile_cost, amr_tile_cost_ema, amr_block_level)
