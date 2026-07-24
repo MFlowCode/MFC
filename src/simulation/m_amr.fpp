@@ -3762,10 +3762,29 @@ contains
 
     !> ADVANCE phase of a fine RK stage: fine RHS + RK update (+ QBMM/6eq/IB) for the current block. Owner-only. Reads the block's
     !! ghost shell (coarse prolong + fine-fine halo already applied by the fill + halo phases).
+    !> One fine-block RK stage = RHS pass then RK pass. Fused wrapper: the AMR fine blocks (m_time_steppers) call this so their
+    !! rhs+rk stay back-to-back (byte-identical). The coexist tile path (s_l0_advance_stage) instead calls the two passes directly
+    !! with the reflux-delta copy-back interposed between them, so the corrected coarse rhs reaches the tile before its RK update.
     impure subroutine s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
         integer, intent(in)                                        :: s, t_step
         real(wp), intent(in)                                       :: coefs(4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+
+        call s_amr_fine_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        call s_amr_fine_stage_rk(s, coefs)
+
+    end subroutine s_amr_fine_stage_advance
+
+    !> RHS pass of a fine-block RK stage: step-entry backup, swap grid globals to the block, s_compute_rhs (fills amr_slots%rhs +
+    !! captures the block's freg / its children's creg), restore coarse globals. Leaves the per-slot rhs ready for the RK pass (or,
+    !! under coexist, for the reflux-delta copy-back before the RK pass).
+    impure subroutine s_amr_fine_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+
+        integer, intent(in)                                        :: s, t_step
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         type(scalar_field), intent(inout)                          :: q_T_sf
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
@@ -3801,6 +3820,18 @@ contains
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
 
+    end subroutine s_amr_fine_stage_rhs
+
+    !> RK pass of a fine-block RK stage: SSP-RK combination consuming the per-slot rhs (already reflux-corrected under coexist),
+    !! then per-stage pressure relaxation / moving-IB / IB-state correction. Uses slot bounds (no grid swap needed).
+    impure subroutine s_amr_fine_stage_rk(s, coefs)
+
+        integer, intent(in)  :: s
+        real(wp), intent(in) :: coefs(4)
+
+        if (.not. amr .and. l0_ntile == 0) return
+        if (.not. amr_rank_owns_block) return
+
         ! RK stage update (device kernel; mirror of the coarse form - under IGR the rhs already embeds dt, matching the coarse igr
         ! update, so the dt factor is 1)
         call s_amr_fine_rk_update(amr_slots(amr_cur)%q_cons, amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
@@ -3816,7 +3847,7 @@ contains
         call s_amr_ib_correct_fine()
         if (rank_time_wrt) call s_rank_time_toc()
 
-    end subroutine s_amr_fine_stage_advance
+    end subroutine s_amr_fine_stage_rk
 
     !> Per-block SETUP for the transposed subcycle advance (amr_subcycle): exchange valid coarse ghosts, gather+prolong the selected
     !! block's two time-lerp ghost sources (parent t^n in q_ghost_a, t^{n+1} in q_ghost_b), and zero its flux registers. The
@@ -5180,10 +5211,28 @@ contains
     !> Advance every tile one RK stage: fill domain-edge BC ghosts (phase 1), overwrite interior-seam ghosts with neighbour interior
     !! (phase 2, fmul=1), then advance + RK-update each tile through the shared swap-based solver (phase 3). Mirrors the AMR
     !! fine-block phase structure (m_time_steppers) with prolong/reflux dropped - a base-res tile has no coarser level.
+    !> Advance every owned tile one RK stage. Fused wrapper (pure-L0): RHS pass then RK pass back-to-back = byte-identical to the
+    !! single-pass form. Under coexist (amr) s_tvd_rk instead calls the two passes directly with s_l0_add_reflux_to_tiles between
+    !! them, so each tile's coarse rhs is Berger-Colella corrected (from the fixed-L0-frame reflux) before its RK update.
     impure subroutine s_l0_advance_stage(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
         integer, intent(in)                                        :: s, t_step
         real(wp), intent(in)                                       :: coefs(4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+
+        call s_l0_advance_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        call s_l0_advance_stage_rk(s, coefs)
+
+    end subroutine s_l0_advance_stage
+
+    !> RHS pass for all owned tiles: fill domain-edge BC + interior-seam (fine-fine) halo, then s_compute_rhs each owned tile into
+    !! its per-slot rhs. Leaves amr_slots(k)%rhs ready for the RK pass (or, under coexist, for the reflux-delta copy-back first).
+    impure subroutine s_l0_advance_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+
+        integer, intent(in)                                        :: s, t_step
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         type(scalar_field), intent(inout)                          :: q_T_sf
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
@@ -5194,8 +5243,8 @@ contains
 
         ! measure per-tile compute time only when rebalancing is active (the GPU_WAIT bracketing serialises the GPU, so it is off by
         ! default). GPU-synced wall time (cpu_time would capture only host launch overhead under offload); accumulated across
-        ! stages,
-        ! reset at each rebalance. Timing is a pure side-channel - it never touches field data, so output stays bit-identical.
+        ! stages, reset at each rebalance. Timing is a pure side-channel - it never touches field data, so output stays
+        ! bit-identical.
 
         measure = (l0_rebalance_interval > 0)
 
@@ -5208,7 +5257,7 @@ contains
                 $:GPU_WAIT()
                 call system_clock(tc0)
             end if
-            call s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+            call s_amr_fine_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             if (measure) then
                 $:GPU_WAIT()
                 call system_clock(tc1, crate)
@@ -5217,7 +5266,23 @@ contains
         end do
         call s_amr_select_slot(1)
 
-    end subroutine s_l0_advance_stage
+    end subroutine s_l0_advance_stage_rhs
+
+    !> RK pass for all owned tiles: SSP-RK update consuming each tile's per-slot rhs (already reflux-corrected under coexist).
+    impure subroutine s_l0_advance_stage_rk(s, coefs)
+
+        integer, intent(in)  :: s
+        real(wp), intent(in) :: coefs(4)
+        integer              :: islot
+
+        do islot = 1, l0_ntiles_tot
+            if (amr_block_owner(islot) /= proc_rank) cycle
+            call s_amr_select_slot(islot)
+            call s_amr_fine_stage_rk(s, coefs)
+        end do
+        call s_amr_select_slot(1)
+
+    end subroutine s_l0_advance_stage_rk
 
     !> Free the base-grid tiling allocations (mirror of s_l0_tiles_init).
     impure subroutine s_l0_tiles_finalize()
