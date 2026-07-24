@@ -1397,9 +1397,8 @@ contains
                     idx = vars_comm(i)
                     do j = -mapCells - 1, mapCells
                         ! Kahan-compensated addition of ghost to interior
-                        y_kahan = real(q_beta(idx)%sf(m + j + 1, k, l), &
-                                       & kind=wp) + kahan_comp(idx)%sf(m + j + 1, k, l) - kahan_comp(idx)%sf(j, &
-                                       & k, l)
+                        y_kahan = real(q_beta(idx)%sf(m + j + 1, k, l), kind=wp) + kahan_comp(idx)%sf(m + j + 1, k, &
+                                       & l) - kahan_comp(idx)%sf(j, k, l)
                         t_kahan = real(q_beta(idx)%sf(j, k, l), kind=wp) + y_kahan
                         kahan_comp(idx)%sf(j, k, l) = (t_kahan - q_beta(idx)%sf(j, k, l)) - y_kahan
                         q_beta(idx)%sf(j, k, l) = t_kahan
@@ -1419,8 +1418,8 @@ contains
                 do i = 1, nvar
                     idx = vars_comm(i)
                     do j = -mapcells - 1, mapcells
-                        y_kahan = real(q_beta(idx)%sf(k, n + j + 1, l), kind=wp) + kahan_comp(idx)%sf(k, &
-                                       & n + j + 1, l) - kahan_comp(idx)%sf(k, j, l)
+                        y_kahan = real(q_beta(idx)%sf(k, n + j + 1, l), kind=wp) + kahan_comp(idx)%sf(k, n + j + 1, &
+                                       & l) - kahan_comp(idx)%sf(k, j, l)
                         t_kahan = real(q_beta(idx)%sf(k, j, l), kind=wp) + y_kahan
                         kahan_comp(idx)%sf(k, j, l) = (t_kahan - q_beta(idx)%sf(k, j, l)) - y_kahan
                         q_beta(idx)%sf(k, j, l) = t_kahan
@@ -1560,8 +1559,7 @@ contains
                         y_kahan = real(q_beta(idx)%sf(m + j, k, l), kind=wp) + kahan_comp(idx)%sf(m + j, k, &
                                        & l) - kahan_comp(idx)%sf(m - (j - 1), k, l)
                         t_kahan = real(q_beta(idx)%sf(m - (j - 1), k, l), kind=wp) + y_kahan
-                        kahan_comp(idx)%sf(m - (j - 1), k, l) = (t_kahan - q_beta(idx)%sf(m - (j - 1), k, &
-                                   & l)) - y_kahan
+                        kahan_comp(idx)%sf(m - (j - 1), k, l) = (t_kahan - q_beta(idx)%sf(m - (j - 1), k, l)) - y_kahan
                         q_beta(idx)%sf(m - (j - 1), k, l) = t_kahan
                     end do
                     do j = 1, mapCells + 1
@@ -1575,8 +1573,8 @@ contains
                 do i = 1, nvar
                     idx = vars_comm(i)
                     do j = 1, mapCells + 1
-                        y_kahan = real(q_beta(idx)%sf(k, -j, l), kind=wp) + kahan_comp(idx)%sf(k, -j, &
-                                       & l) - kahan_comp(idx)%sf(k, j - 1, l)
+                        y_kahan = real(q_beta(idx)%sf(k, -j, l), kind=wp) + kahan_comp(idx)%sf(k, -j, l) - kahan_comp(idx)%sf(k, &
+                                       & j - 1, l)
                         t_kahan = real(q_beta(idx)%sf(k, j - 1, l), kind=wp) + y_kahan
                         kahan_comp(idx)%sf(k, j - 1, l) = (t_kahan - q_beta(idx)%sf(k, j - 1, l)) - y_kahan
                         q_beta(idx)%sf(k, j - 1, l) = t_kahan
@@ -1593,8 +1591,7 @@ contains
                         y_kahan = real(q_beta(idx)%sf(k, n + j, l), kind=wp) + kahan_comp(idx)%sf(k, n + j, &
                                        & l) - kahan_comp(idx)%sf(k, n - (j - 1), l)
                         t_kahan = real(q_beta(idx)%sf(k, n - (j - 1), l), kind=wp) + y_kahan
-                        kahan_comp(idx)%sf(k, n - (j - 1), l) = (t_kahan - q_beta(idx)%sf(k, n - (j - 1), &
-                                   & l)) - y_kahan
+                        kahan_comp(idx)%sf(k, n - (j - 1), l) = (t_kahan - q_beta(idx)%sf(k, n - (j - 1), l)) - y_kahan
                         q_beta(idx)%sf(k, n - (j - 1), l) = t_kahan
                     end do
                     do j = 1, mapCells + 1
@@ -1608,8 +1605,8 @@ contains
                 do i = 1, nvar
                     idx = vars_comm(i)
                     do j = 1, mapCells + 1
-                        y_kahan = real(q_beta(idx)%sf(k, l, -j), kind=wp) + kahan_comp(idx)%sf(k, l, &
-                                       & -j) - kahan_comp(idx)%sf(k, l, j - 1)
+                        y_kahan = real(q_beta(idx)%sf(k, l, -j), kind=wp) + kahan_comp(idx)%sf(k, l, -j) - kahan_comp(idx)%sf(k, &
+                                       & l, j - 1)
                         t_kahan = real(q_beta(idx)%sf(k, l, j - 1), kind=wp) + y_kahan
                         kahan_comp(idx)%sf(k, l, j - 1) = (t_kahan - q_beta(idx)%sf(k, l, j - 1)) - y_kahan
                         q_beta(idx)%sf(k, l, j - 1) = t_kahan
@@ -1626,8 +1623,7 @@ contains
                         y_kahan = real(q_beta(idx)%sf(k, l, p + j), kind=wp) + kahan_comp(idx)%sf(k, l, &
                                        & p + j) - kahan_comp(idx)%sf(k, l, p - (j - 1))
                         t_kahan = real(q_beta(idx)%sf(k, l, p - (j - 1)), kind=wp) + y_kahan
-                        kahan_comp(idx)%sf(k, l, p - (j - 1)) = (t_kahan - q_beta(idx)%sf(k, l, &
-                                   & p - (j - 1))) - y_kahan
+                        kahan_comp(idx)%sf(k, l, p - (j - 1)) = (t_kahan - q_beta(idx)%sf(k, l, p - (j - 1))) - y_kahan
                         q_beta(idx)%sf(k, l, p - (j - 1)) = t_kahan
                     end do
                     do j = 1, mapCells + 1

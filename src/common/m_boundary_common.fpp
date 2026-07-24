@@ -462,7 +462,7 @@ contains
         type(scalar_field), dimension(:), intent(inout)            :: kahan_comp
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: nvar
-        integer, dimension(:), intent(in)                           :: vars_comm
+        integer, dimension(:), intent(in)                          :: vars_comm
 
         call s_populate_beta_bc_direction(1, -1, bc%x, bc_type(1, 1), q_beta, kahan_comp, nvar, vars_comm)
         call s_populate_beta_bc_direction(1, 1, bc%x, bc_type(1, 2), q_beta, kahan_comp, nvar, vars_comm)
@@ -493,7 +493,7 @@ contains
         type(scalar_field), dimension(:), intent(inout) :: kahan_comp
         integer, intent(in)                             :: nvar
         integer                                         :: bc_edge, k_beg, k_end, l_beg, l_end, k, l, bc_code
-        integer, dimension(:), intent(in)                :: vars_comm
+        integer, dimension(:), intent(in)               :: vars_comm
 
         if (bc_loc == -1) then
             bc_edge = bc_bounds%beg
