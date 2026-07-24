@@ -480,10 +480,14 @@ contains
             ! the
             ! L0 coarse RHS + the fine block's coarse-patch fill read it. Coexist-only (neutral for pure-AMR / pure-L0).
             if (amr .and. l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
-            ! L0-tiles spike: the tiles run their own per-tile s_compute_rhs, so the monolithic L0 RHS is pure waste here (it only
+            ! Pure-L0 (amr off): the tiles run their own per-tile s_compute_rhs, so the monolithic L0 RHS is pure waste here (it
+            ! only
             ! populated the now-unused rhs_vf); skipping it makes the tiled path represent the real design and de-confounds timing.
             ! The s==1 run-time-info / probe path (which reads the monolithic q_prim_vf) is gated off for l0_ntile>0 at init.
-            if (l0_ntile == 0) then
+            ! Coexist (amr .and. l0_ntile>0): the L0 coarse RHS IS needed - after the tiles->L0 scatter above it fills L0's BC+halo
+            ! (s_populate_variables_buffers), captures the c/f-face creg in the fixed L0 frame, and produces the L0 rhs the fine
+            ! reflux corrects; the cross-rank copy-back then routes that corrected rhs back to the tile compute-owners.
+            if (l0_ntile == 0 .or. amr) then
                 call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                    & t_step, s)
             end if
