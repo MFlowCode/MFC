@@ -50,6 +50,12 @@ contains
                    & .and. chem_params%reaction_substeps_max < chem_params%reaction_substeps, &
                    & "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T")
 
+        ! Chemistry with Euler bubbles is not currently supported: the IBM image-point
+        ! interpolation selects the bubbles/QBMM branch before the chemistry branch, so the
+        ! species state (Ys_IP) is not carried when both are enabled. Disallow until implemented.
+        @:PROHIBIT(chemistry .and. (bubbles_euler .or. qbmm), &
+                   & "chemistry is not currently supported with Euler bubbles (bubbles_euler/qbmm)")
+
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
@@ -65,6 +71,8 @@ contains
                    & "reactive_burn requires fluid_pp(1)%pi_inf == fluid_pp(2)%pi_inf (reactant and product share the EOS)")
         @:PROHIBIT(reactive_burn .and. fluid_pp(1)%qv <= fluid_pp(2)%qv, &
                    & "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)")
+        @:PROHIBIT(reactive_burn .and. rburn_pref <= 0._wp, &
+                   & "reactive_burn requires rburn_pref > 0 (it normalizes the pressure drive (p - rburn_pign)/rburn_pref and is used as a divisor)")
 
         if (num_particle_clouds > 0) then
             call s_check_inputs_particle_clouds

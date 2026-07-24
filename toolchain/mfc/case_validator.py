@@ -1517,6 +1517,14 @@ class CaseValidator:
         # inconsistent and the simulation NaNs. See MFlowCode/MFC#1470.
         self.prohibit(chemistry and num_fluids is not None and num_fluids != 1, "chemistry is only supported for single-component flows (num_fluids = 1)")
 
+        # Chemistry with Euler bubbles is not currently supported: the IBM image-point
+        # interpolation branch selects the bubbles/QBMM path before the chemistry path, so
+        # the species state is not carried when both are enabled. Disallow the combination
+        # until it is implemented.
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        qbmm = self.get("qbmm", "F") == "T"
+        self.prohibit(chemistry and (bubbles_euler or qbmm), "chemistry is not currently supported with Euler bubbles (bubbles_euler / qbmm)")
+
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
