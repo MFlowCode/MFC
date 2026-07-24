@@ -4422,6 +4422,16 @@ contains
 
     end function f_l0_bc_unsupported
 
+    !> Slot index of regrid-managed fine block k in the shared pool: tiles occupy [1..l0_slot_off], fine blocks [l0_slot_off+1..].
+    !! Identity (l0_slot_off=0) until L0 tiles + AMR coexist.
+    pure integer function f_l0_slot(k) result(s)
+
+        integer, intent(in) :: k
+
+        s = l0_slot_off + k
+
+    end function f_l0_slot
+
     !> Build the base-grid tiling: allocate the slot/region/seam machinery for l0_ntiles_tot rr=1 tiles covering L0, set each tile's
     !! geometry (extent, L0-slice coords, whole-tile footprint, owner) and copy the current L0 state in. Standalone (does not call
     !! s_initialize_amr_module) so the spike lifts out cleanly. np=1 spike: rank 0 owns every tile.
