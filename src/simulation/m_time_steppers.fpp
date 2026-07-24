@@ -517,6 +517,7 @@ contains
                 ! parent-before-child (L2 at higher slot), so slot order fills the parent's stage-entry state before the child reads
                 ! it.
                 do islot = 1, amr_num_blocks
+                    if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                     call s_amr_fine_stage_fill(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 end do
@@ -524,6 +525,7 @@ contains
                 call s_amr_fine_fine_halo()
                 ! Phase 3 - ADVANCE every block (RHS + RK update) + reflux at its c/f faces.
                 do islot = 1, amr_num_blocks
+                    if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)
                     call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                   & t_step)
@@ -700,6 +702,7 @@ contains
                                                      & t_step)
             end if
             do islot = amr_num_blocks, 1, -1
+                if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                 call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                 ! subcycle multi-level: a level>=2 block was advanced, restricted, AND Berger-Colella refluxed into its parent
                 ! INSIDE the parent's subcycle (s_amr_advance_children), so it is skipped here. Only level-1 blocks fold to L0.
