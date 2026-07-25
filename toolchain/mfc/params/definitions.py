@@ -129,6 +129,7 @@ TAG_DISPLAY_NAMES = {
     "surface_tension": "Surface tension",
     "acoustic": "Acoustic",
     "ib": "Immersed boundary",
+    "reactive_burn": "Reactive burn",
     "probes": "Probe/integral",
     "riemann": "Riemann solver",
     "relativity": "Relativity",
@@ -629,6 +630,11 @@ def _load():
     _r("cantera_file", STR, {"chemistry"})
     _r("chemistry", LOG, {"chemistry"})
 
+    # Condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)
+    _r("reactive_burn", LOG, {"reactive_burn"})
+    for a in ["k", "pign", "pref", "n", "ta"]:
+        _r(f"rburn%{a}", REAL, {"reactive_burn"})
+
     # Acoustic
     _r("num_source", INT, {"acoustic"})
     _r("acoustic_source", LOG, {"acoustic"})
@@ -926,9 +932,9 @@ def _load():
     # grow patch_ib beyond this at runtime, but those entries are never in the namelist.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
-    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id"]:
+    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -1188,6 +1194,7 @@ TYPED_DECLS: dict[str, tuple] = {
     "integral": ("type(integral_parameters)", "num_probes_max", False, None),
     "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
     "chem_params": ("type(chemistry_parameters)", None, True, None),
+    "rburn": ("type(reactive_burn_parameters)", None, True, "Condensed-phase reactive-burn (programmed detonation) parameters"),
     "lag_params": ("type(bubbles_lagrange_parameters)", None, True, "Lagrange bubbles' parameters"),
     "particle_cloud": ("type(particle_cloud_parameters)", "num_particle_clouds_max", False, "Particle bed specifications"),
     "simplex_params": ("type(simplex_noise_params)", None, False, None),
@@ -1280,6 +1287,7 @@ _nv(
     "pi_fac",
 )
 _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
+_nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
 _nv(

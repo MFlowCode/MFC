@@ -300,6 +300,17 @@ contains
         particle_cloud_ibs(ib_idx)%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
         particle_cloud_ibs(ib_idx)%slip = .false.
 
+        ! Particles are inert surfaces. These must be set explicitly: particle_cloud_ibs is
+        ! allocated (not default-initialized) and s_reduce_ib_patch_array copies the whole
+        ! struct into patch_ib, overwriting the defaults from
+        ! s_assign_default_values_to_user_inputs -- so anything left unset here reaches the
+        ! solver as uninitialized memory (a nonzero v_blow injects a garbage wall-normal
+        ! velocity and NaNs the field).
+        particle_cloud_ibs(ib_idx)%v_blow = 0._wp
+        particle_cloud_ibs(ib_idx)%inj_species = 0
+        particle_cloud_ibs(ib_idx)%burn_rate_exp = 0._wp
+        particle_cloud_ibs(ib_idx)%burn_rate_pref = 0._wp
+
     end subroutine s_add_cloud_particle
 
     !> Xorshift PRNG. Advances seed in-place and returns a value in [0, 1).

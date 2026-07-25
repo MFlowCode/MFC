@@ -124,6 +124,17 @@ PHYSICS_DOCS = {
         "category": "Bubble Physics",
         "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. Kahan summation not compatible with --mixed precision.",
     },
+    "check_reactive_burn": {
+        "title": "Condensed-Phase Reactive Burn",
+        "category": "Combustion",
+        "explanation": (
+            "Programmed pressure-driven burn converting a reactant fluid to a product fluid on the multi-fluid model. "
+            "Requires model_eqns = 2 or 3 and num_fluids = 2 (reactant, product) sharing the stiffened-gas EOS "
+            "(equal gamma, pi_inf) with qv_reactant > qv_product. rburn%k (> 0), rburn%pign, rburn%pref (> 0), "
+            "and rburn%n (>= 0) must all be set. rburn%ta (activation temperature [K]) is optional and must be >= 0; "
+            ">0 adds an Arrhenius exp(-rburn%ta/T) factor and requires fluid_pp(1)%cv > 0."
+        ),
+    },
     # Numerical Schemes
     "check_weno": {
         "title": "WENO Reconstruction",
@@ -683,6 +694,13 @@ class CaseValidator:
                     True,
                     f"patch_ib({i})%model_id is set but geometry ({geometry}) is not an STL model (5 or 12)",
                 )
+            # Vieille's-law burn-rate exponent must be non-negative: a negative exponent makes
+            # v_blow ~ p^n diverge (Inf) as the surface pressure approaches zero.
+            burn_rate_exp = self.get(f"patch_ib({i})%burn_rate_exp", None)
+            self.prohibit(
+                burn_rate_exp is not None and burn_rate_exp < 0,
+                f"patch_ib({i})%burn_rate_exp must be >= 0 (Vieille's-law pressure exponent)",
+            )
         num_patches = self.get("num_patches", 0) or 0
         for i in range(1, num_patches + 1):
             geometry = self.get(f"patch_icpp({i})%geometry", None)
@@ -1517,6 +1535,14 @@ class CaseValidator:
         # inconsistent and the simulation NaNs. See MFlowCode/MFC#1470.
         self.prohibit(chemistry and num_fluids is not None and num_fluids != 1, "chemistry is only supported for single-component flows (num_fluids = 1)")
 
+        # Chemistry with Euler bubbles is not currently supported: the IBM image-point
+        # interpolation branch selects the bubbles/QBMM path before the chemistry path, so
+        # the species state is not carried when both are enabled. Disallow the combination
+        # until it is implemented.
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        qbmm = self.get("qbmm", "F") == "T"
+        self.prohibit(chemistry and (bubbles_euler or qbmm), "chemistry is not currently supported with Euler bubbles (bubbles_euler / qbmm)")
+
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
@@ -1551,6 +1577,31 @@ class CaseValidator:
                 self.prohibit(tw_out is None, f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall temperature to be set (e.g., bc_{dir}%Twall_out).")
                 if tw_out is not None and self._is_numeric(tw_out):
                     self.prohibit(tw_out <= 0.0, f"Wall temperature bc_{dir}%Twall_out must be strictly positive for thermodynamics (got {tw_out}).")
+
+    def check_reactive_burn(self):
+        """Checks condensed-phase reactive-burn constraints"""
+        reactive_burn = self.get("reactive_burn", "F") == "T"
+        if not reactive_burn:
+            return
+        model_eqns = self.get("model_eqns")
+        # Supported on the 5-equation (pressure-equilibrium) and 6-equation multi-fluid models.
+        self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "reactive_burn requires model_eqns = 2 or 3 (5- or 6-equation multi-fluid model)")
+        # The rate uses rburn%k, %pign, %pref, %n directly; an unset value defaults to a negative
+        # sentinel in the solver and silently corrupts the burn, so require each to be set.
+        rk = self.get("rburn%k")
+        self.prohibit(not self._is_numeric(rk) or rk <= 0, "reactive_burn requires rburn%k > 0 (rate coefficient [1/s])")
+        self.prohibit(self.get("rburn%pign") is None, "reactive_burn requires rburn%pign to be set (ignition pressure threshold [Pa])")
+        rpref = self.get("rburn%pref")
+        self.prohibit(not self._is_numeric(rpref) or rpref <= 0, "reactive_burn requires rburn%pref > 0 (it normalizes the pressure drive and is used as a divisor)")
+        rn = self.get("rburn%n")
+        self.prohibit(not self._is_numeric(rn) or rn < 0, "reactive_burn requires rburn%n >= 0 (pressure-drive exponent)")
+        rta = self.get("rburn%ta")
+        self.prohibit(self._is_numeric(rta) and rta < 0, "reactive_burn requires rburn%ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
+        cv1 = self.get("fluid_pp(1)%cv")
+        self.prohibit(
+            self._is_numeric(rta) and rta > 0 and (not self._is_numeric(cv1) or cv1 <= 0),
+            "reactive_burn with rburn%ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)",
+        )
 
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""
@@ -2281,6 +2332,7 @@ class CaseValidator:
         self.check_surface_tension()
         self.check_mhd()
         self.check_chemistry()
+        self.check_reactive_burn()
 
     def validate_simulation(self):
         """Validate simulation-specific parameters"""
