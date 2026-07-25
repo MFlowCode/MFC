@@ -749,6 +749,13 @@ contains
                         end do
                     end if
 
+                    if (hyperelasticity) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%xi%beg, eqn_idx%xi%end
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                        end do
+                    end if
+
                     if (.not. igr .or. num_fluids > 1) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
@@ -991,6 +998,14 @@ contains
                                               & l)**2._wp)/(4._wp*G)
                                 end if
                             end if
+                        end do
+                    end if
+
+                    ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
+                    if (hyperelasticity) then
+                        ! Multiply \xi to \rho \xi
+                        do i = eqn_idx%xi%beg, eqn_idx%xi%end
+                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
                     end if
 

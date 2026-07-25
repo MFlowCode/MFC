@@ -44,8 +44,10 @@ module m_global_parameters_common
     !> @name Annotations of the structure of the state and flux vectors in terms of the size and configuration of the system of
     !! equations
     !> @{
-    integer            :: sys_size  !< Number of unknowns in system of equations
-    type(eqn_idx_info) :: eqn_idx   !< All conserved-variable equation index ranges and scalars
+    integer            :: sys_size     !< Number of unknowns in system of equations
+    type(eqn_idx_info) :: eqn_idx      !< All conserved-variable equation index ranges and scalars
+    integer            :: b_size       !< Number of elements in the symmetric b tensor, plus one
+    integer            :: tensor_size  !< Number of elements in the full tensor plus one
     !> @}
 
     !> @name Chemistry modeling (Fypp compile-time constant; same value in all targets)
@@ -63,7 +65,7 @@ module m_global_parameters_common
     !> @}
 
 #ifdef MFC_SIMULATION
-    $:GPU_DECLARE(create='[sys_size, eqn_idx]')
+    $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
     ! Device residency for namelist/case-opt state declared above via the generated
     ! includes: declare directives must live in the declaring module (Cray ftn rejects
@@ -75,7 +77,7 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[muscl_eps]')
     $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
-    $:GPU_DECLARE(create='[elasticity, low_Mach]')
+    $:GPU_DECLARE(create='[hyperelasticity, elasticity, low_Mach]')
     $:GPU_DECLARE(create='[cont_damage, hyper_cleaning]')
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
     $:GPU_DECLARE(create='[down_sample]')
@@ -123,8 +125,9 @@ module m_global_parameters_common
 
 contains
 
-    !> Initialize equation-index state (eqn_idx and sys_size) from the namelist parameters. This is the shared skeleton: it covers
-    !! the model_eqns dispatch, all eqn_idx field assignments, and the elasticity/surface-tension/chemistry extensions.
+    !> Initialize equation-index state (eqn_idx, sys_size, b_size, tensor_size) from the namelist parameters. This is the shared
+    !! skeleton: it covers the model_eqns dispatch, all eqn_idx field assignments, and the elasticity/surface-tension/chemistry
+    !! extensions.
     !!
     !! @param nmom_in  Number of carried moments per R0 location (per-target: pre/post pass an
     !!   integer variable; sim passes its integer parameter nmom = 6).  Used only in the 5eq
@@ -252,7 +255,7 @@ contains
         end if
 
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
-            if (hypoelasticity) then
+            if (hypoelasticity .or. hyperelasticity) then
                 elasticity = .true.
                 eqn_idx%stress%beg = sys_size + 1
                 eqn_idx%stress%end = sys_size + (num_dims*(num_dims + 1))/2
@@ -278,6 +281,16 @@ contains
                     shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
                     ! x-dir: flip tau_xy and tau_xz; y-dir: flip tau_xy and tau_yz; z-dir: flip tau_xz and tau_yz
                 end if
+            end if
+
+            if (hyperelasticity) then
+                ! number of entries in the symmetric b tensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+                eqn_idx%xi%beg = sys_size + 1
+                eqn_idx%xi%end = sys_size + num_dims
+                ! adding equations for the xi field and the elastic energy
+                sys_size = eqn_idx%xi%end + 1
             end if
 
             if (surface_tension) then
@@ -395,7 +408,10 @@ contains
         relax = .false.
         relax_model = dflt_int
         hypoelasticity = .false.
+        hyperelasticity = .false.
         elasticity = .false.
+        b_size = dflt_int
+        tensor_size = dflt_int
         cont_damage = .false.
         hyper_cleaning = .false.
 

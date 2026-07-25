@@ -619,7 +619,8 @@ def _load():
     _r("viscous", LOG, {"viscosity"})
 
     # Elasticity
-    _r("hypoelasticity", LOG, {"elasticity"})
+    for n in ["hypoelasticity", "hyperelasticity"]:
+        _r(n, LOG, {"elasticity"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
@@ -771,6 +772,7 @@ def _load():
         "mixlayer_perturb",
         "perturb_flow",
         "perturb_sph",
+        "pre_stress",
         "elliptic_smoothing",
         "simplex_perturb",
         "alt_soundspeed",
@@ -1248,6 +1250,7 @@ _nv(
     "sigma",
     "adv_n",
     "hypoelasticity",
+    "hyperelasticity",
     "surface_tension",
     "relativity",
     "ib",
@@ -1413,6 +1416,7 @@ _nv(
     "mixlayer_perturb",
     "mixlayer_perturb_nk",
     "mixlayer_perturb_k0",
+    "pre_stress",
     "elliptic_smoothing",
     "elliptic_smoothing_iters",
     "simplex_perturb",

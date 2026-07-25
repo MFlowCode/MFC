@@ -13,7 +13,7 @@ module m_global_parameters
 
     use m_derived_types  ! Definitions of the derived types
     use m_helper_basic  ! Functions to compare floating point numbers
-    ! Shared state: generated_decls, sys_size, eqn_idx, chemistry, elasticity, shear_*
+    ! Shared state: generated_decls, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*
     use m_global_parameters_common
 
     implicit none
@@ -43,7 +43,7 @@ module m_global_parameters
     type(bounds_info) :: x_domain_glb, y_domain_glb, z_domain_glb
 
     ! Simulation Algorithm Parameters
-    ! sys_size, eqn_idx, chemistry, elasticity, shear_*: in m_global_parameters_common
+    ! sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*: in m_global_parameters_common
     ! weno_polyn, muscl_polyn, num_dims, num_vels: in m_global_parameters_common
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings.
@@ -181,6 +181,8 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         igr_order = dflt_int
+        pre_stress = .false.
+
         precision = 2
         viscous = .false.
         mixlayer_vel_profile = .false.
@@ -447,7 +449,7 @@ contains
         ! (guards match the original site: 5-equation bubbles with 4-node qbmm)
         if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. qbmm .and. nnode == 4) nmom = 6
 
-        ! Populate eqn_idx, sys_size, elasticity, shear_* (shared logic)
+        ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom, nb)
 
         ! Per-target (pre_process): qbmm_idx allocations and fills

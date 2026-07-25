@@ -310,7 +310,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
 
     # Define major feature groups (excluding IGR)
     major_features = {
-        "Physics Models": ["mhd", "surface_tension", "hypoelasticity", "relax", "viscous", "acoustic_source"],
+        "Physics Models": ["mhd", "surface_tension", "hypoelasticity", "hyperelasticity", "relax", "viscous", "acoustic_source"],
         "Bubble Models": ["bubbles_euler", "bubbles_lagrange", "qbmm", "polydisperse", "adv_n"],
         "Numerics": ["riemann_solver", "weno_order", "muscl_order"],
         "Geometry": ["ib", "cyl_coord"],

@@ -15,7 +15,7 @@ module m_global_parameters
     use m_helper_basic
     use m_thermochem, only: species_names
     use m_constants, only: format_silo, precision_single
-    ! Shared state: generated_decls, num_dims, num_vels, sys_size, eqn_idx, chemistry, elasticity, shear_*
+    ! Shared state: generated_decls, num_dims, num_vels, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*
     use m_global_parameters_common
 
     implicit none
@@ -75,7 +75,7 @@ module m_global_parameters
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    ! sys_size, elasticity, chemistry, eqn_idx: in m_global_parameters_common
+    ! sys_size, elasticity, b_size, tensor_size, chemistry, eqn_idx: in m_global_parameters_common
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -331,7 +331,7 @@ contains
         ! (guard matches the original site: inside the 5-equation branch)
         if (model_eqns == model_eqns_5eq .and. qbmm) nmom = 6
 
-        ! Populate eqn_idx, sys_size, elasticity, shear_* (shared logic)
+        ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom, nb)
 
         ! post-only: 6eq alf is a dummy (no void fraction in 6eq)
