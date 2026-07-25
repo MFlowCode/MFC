@@ -194,12 +194,6 @@ module m_amr
     real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cg_pb, amr_cg_mv
     $:GPU_DECLARE(create='[amr_cg_pb, amr_cg_mv]')
 
-    !> Replicated coarse-decomposition table (fine-level distribution, point-to-point coupling): amr_decomp(1:3, r) = rank r's
-    !! coarse start_idx per dim, amr_decomp(4:6, r) = its coarse extent (m/n/p). Allgathered once at init (coarse decomposition
-    !! fixed for the run). Lets any rank compute which ranks own a given global coarse-cell range, so gather/scatter/reflux coupling
-    !! is owner <-> only the (SFC-local) coarse-owners - no global collective per block per stage.
-    integer, allocatable :: amr_decomp(:,:)  !< (1:6, 0:num_procs-1)
-
     !> L0-AS-BLOCKS SPIKE (l0_ntile > 0, amr off). Feasibility probe for AMReX-style dynamic load balancing: tile the base grid into
     !! l0_ntile**num_dims base-resolution (refinement-ratio-1) blocks and advance each through the SAME swap-based per-block solver
     !! the AMR fine overlay uses, with tile-tile same-level seam halos (s_amr_fine_fine_halo, fmul=1) at interior faces and the
@@ -485,21 +479,8 @@ contains
             amr_cg_pb = 0._stp; amr_cg_mv = 0._stp
         end if
 
-        ! replicated coarse-decomposition table for point-to-point coupling (see decl). Coarse decomposition is fixed for the run,
-        ! so allgathered once. Row r = [start_idx(1:3), m, n, p] for rank r (collapsed dims pinned to 0).
-        allocate (amr_decomp(6,0:num_procs - 1))
-        block
-            integer :: myrow(6), ierr
-            myrow = 0
-            myrow(1) = start_idx(1); myrow(4) = m
-            if (n_glb > 0) then; myrow(2) = start_idx(2); myrow(5) = n; end if
-            if (p_glb > 0) then; myrow(3) = start_idx(3); myrow(6) = p; end if
-#ifdef MFC_MPI
-            call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-#else
-            amr_decomp(:,0) = myrow
-#endif
-        end block
+        ! the coarse decomposition (each rank's coarse start_idx + local m/n/p) is a structured cartesian split, computed O(1) per
+        ! rank by s_amr_rank_decomp - no replicated table, no allgather. Validate the formula against this rank's actual values.
         call s_amr_validate_decomp()
 
         ! per-slot fine-grid IB marker fields (static-body AMR); sized to the same max buffered fine extents as q_cons so the fine
@@ -611,9 +592,9 @@ contains
     !! region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full reach of every prolongation/ghost-fill stencil) for all sys_size
     !! variables, stored in amr_cg in a block-LOCAL frame (cell 0 == global amr_cpat_off). POINT-TO-POINT: the owner receives the
     !! patch cells it does not hold from exactly the (SFC-local) coarse-owners that hold them - each rank's contribution is the
-    !! patch intersected with its contiguous owned coarse range (s_amr_rank_coarse_range, = the f_amr_own_coarse set), from the
-    !! replicated amr_decomp table. Non-participants send/recv nothing (no global collective). At np=1 the owner just copies its own
-    !! coarse over the patch, bit-for-bit. Runtime (pull_host) packs/unpacks the overlap boxes on the DEVICE (q_coarse
+    !! patch intersected with its contiguous owned coarse range (s_amr_rank_coarse_range, = the f_amr_own_coarse set, computed from
+    !! the cartesian decomposition). Non-participants send/recv nothing (no global collective). At np=1 the owner just copies its
+    !! own coarse over the patch, bit-for-bit. Runtime (pull_host) packs/unpacks the overlap boxes on the DEVICE (q_coarse
     !! device-current with valid ghosts); init/regrid fills from the host (host-current with valid ghosts). Packed data is wp, cast
     !! to stp into amr_cg (identity for stp coarse), device-current on exit. INVARIANT: "coarse" here means the block's PARENT level
     !! (level l-1), NOT the base grid (level 0). For a level-1 block the parent IS L0, but a level>=2 block folds to/from its parent
@@ -1078,26 +1059,26 @@ contains
 
     end subroutine s_amr_rank_decomp
 
-    !> Transitional (increments #1 Tasks 1-2): abort if the computed accessor disagrees with the built amr_decomp on ANY rank.
-    !! Always-on (runs in release golden tests), O(num_procs) - removed in Task 3 when amr_decomp goes.
+    !> Permanent guard: the computed accessor must reproduce THIS rank's actual decomposition. Every rank checks its own entry, so
+    !! collectively the formula is proven for all r; fires immediately if it ever drifts from s_mpi_decompose_computational_domain.
+    !! O(1), always-on.
     impure subroutine s_amr_validate_decomp()
 
-        integer :: r, sidx(3), ext(3)
+        integer :: sidx(3), ext(3)
 
-        do r = 0, num_procs - 1
-            call s_amr_rank_decomp(r, sidx, ext)
-            if (sidx(1) /= amr_decomp(1, r) .or. sidx(2) /= amr_decomp(2, r) .or. sidx(3) /= amr_decomp(3, &
-                & r) .or. ext(1) /= amr_decomp(4, r) .or. ext(2) /= amr_decomp(5, r) .or. ext(3) /= amr_decomp(6, r)) then
-                call s_mpi_abort('s_amr_rank_decomp disagrees with amr_decomp - the computed split does not match ' &
-                                 & // 's_mpi_decompose_computational_domain')
-            end if
-        end do
+        call s_amr_rank_decomp(proc_rank, sidx, ext)
+        if (sidx(1) /= start_idx(1) .or. ext(1) /= m .or. (n_glb > 0 .and. (sidx(2) /= start_idx(2) .or. ext(2) /= n)) &
+            & .or. (p_glb > 0 .and. (sidx(3) /= start_idx(3) .or. ext(3) /= p))) then
+            call s_mpi_abort('s_amr_rank_decomp does not reproduce this rank''s decomposition - computed split disagrees with ' &
+                             & // 's_mpi_decompose_computational_domain')
+        end if
 
     end subroutine s_amr_validate_decomp
 
-    !> Rank r's contiguous owned coarse-cell range per dim from the replicated amr_decomp table: interior [start:start+ext] plus its
-    !! physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal to the set where
-    !! f_amr_own_coarse is true, but as one contiguous span so box intersections identify contributors without a per-cell scan.
+    !> Rank r's contiguous owned coarse-cell range per dim from the computed decomposition (s_amr_rank_decomp): interior
+    !! [start:start+ext] plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal
+    !! to the set where f_amr_own_coarse is true, but as one contiguous span so box intersections identify contributors without a
+    !! per-cell scan.
     pure subroutine s_amr_rank_coarse_range(r, crlo, crhi)
 
         integer, intent(in)  :: r
@@ -1361,8 +1342,8 @@ contains
 
     !> True iff rank r is a reflux applier for the current block: it owns the coarse cell layer just OUTSIDE some block face AND its
     !! subdomain overlaps the block transversely. Mirrors s_amr_reflux_face_flags, but parameterized by r's subdomain from the
-    !! replicated amr_decomp table (so the block owner can decide which ranks to send freg to, and each rank agrees on whether it
-    !! receives). Uses amr_region_lo/hi (the current block, set on every rank by s_amr_select_slot).
+    !! computed decomposition (s_amr_rank_decomp, so the block owner can decide which ranks to send freg to, and each rank agrees on
+    !! whether it receives). Uses amr_region_lo/hi (the current block, set on every rank by s_amr_select_slot).
     pure logical function f_amr_reflux_participates(r) result(part)
 
         integer, intent(in) :: r
@@ -2224,8 +2205,8 @@ contains
 
     end subroutine s_amr_reflux_to_parent
 
-    !> Rank r's coarse INTERIOR box (global) from the replicated amr_decomp table (no ghosts). Covered coarse cells are in-domain,
-    !! so restriction targets are identified by interior overlap alone.
+    !> Rank r's coarse INTERIOR box (global) from the computed decomposition (s_amr_rank_decomp, no ghosts). Covered coarse cells
+    !! are in-domain, so restriction targets are identified by interior overlap alone.
     pure subroutine s_amr_rank_interior(r, ilo, ihi)
 
         integer, intent(in)  :: r
@@ -3635,7 +3616,8 @@ contains
     !! scan every RK stage (6x per fine step). Same (xb, yb) nested-loop order on all ranks (replicated region metadata) so the
     !! paired MPI_SENDRECVs in s_amr_fine_fine_halo stay matched. Count then fill for an exact-size list (no cap, no overflow). Also
     !! rebuilds the per-block gather/scatter overlap-rank lists (amr_ovl_gather/scatter): one O(nblocks*num_procs) scan of the
-    !! static amr_decomp table here in place of the same scan per block per RK stage in the P2P gather/scatter coupling.
+    !! computed per-rank decomposition (s_amr_rank_decomp) here in place of the same scan per block per RK stage in the P2P
+    !! gather/scatter coupling.
     impure subroutine s_amr_build_seam_pairs()
 
         integer :: xb, yb, d, np, k, r
@@ -4364,7 +4346,7 @@ contains
 
     !> Allocate slot islot's per-block field arrays (coords + the 6 device-resident field vectors + non-poly QBMM side-state), sized
     !! to the max buffered block. Idempotent (no-op if already live). The single QBMM RHS scratch amr_rhs_pb_f/mv_f and the global
-    !! amr_cg/amr_decomp are NOT per-slot and stay in init/finalize.
+    !! amr_cg are NOT per-slot and stay in init/finalize.
     impure subroutine s_amr_alloc_slot(islot)
 
         integer, intent(in) :: islot
@@ -4624,31 +4606,15 @@ contains
             amr_block_level(1:l0_ntiles_tot) = 0
         end if
 
-        ! replicated coarse-decomposition table (each rank's global origin + local extent) - built FIRST so the per-rank tile
-        ! geometry
-        ! and the max-tile-extent sizing below can read every rank's chunk. Seam-pair overlap-rank lists also read it.
-        ! amr_decomp is SHARED with s_initialize_amr_module: when amr, that routine already allocated+filled it identically
-        ! (same myrow/allgather), so only build it here in l0-only mode to avoid a coexist double-allocate.
-        if (.not. amr) then
-            allocate (amr_decomp(6,0:num_procs - 1))
-            block
-                integer :: myrow(6), ierr
-                myrow = 0
-                myrow(1) = start_idx(1); myrow(4) = m
-                if (n_glb > 0) then; myrow(2) = start_idx(2); myrow(5) = n; end if
-                if (p_glb > 0) then; myrow(3) = start_idx(3); myrow(6) = p; end if
-#ifdef MFC_MPI
-                call MPI_ALLGATHER(myrow, 6, MPI_INTEGER, amr_decomp, 6, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-#else
-                amr_decomp(:,0) = myrow
-#endif
-            end block
-            call s_amr_validate_decomp()
-        end if
+        ! the per-rank coarse decomposition (global origin + local extent) that the tile geometry and max-tile-extent sizing below
+        ! read for every rank is computed O(1) by s_amr_rank_decomp - no table, no allgather. In l0-only mode
+        ! s_initialize_amr_module
+        ! did not run, so validate the formula against this rank's actual decomposition here (coexist validates it in that routine).
+        if (.not. amr) call s_amr_validate_decomp()
 
         ! max tile extent per dim over ALL ranks (= widest per-rank chunk split by nt); slots + seam buffers are sized to this
         ! global
-        ! max so every rank's buffers match. Chunk r has amr_decomp(3+d,r)+1 cells in dim d.
+        ! max so every rank's buffers match. Chunk r has s_amr_rank_decomp ext(d)+1 cells in dim d.
         max_f1 = 0; max_f2 = 0; max_f3 = 0
         do r = 0, num_procs - 1
             call s_amr_rank_decomp(r, rsidx, rext)
@@ -5581,14 +5547,14 @@ contains
         end if
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
-        ! amr_decomp, amr_slots, amr_region_*, amr_isect_*, amr_owns_all, amr_block_owner, amr_block_level, amr_ovl_*, and
+        ! amr_slots, amr_region_*, amr_isect_*, amr_owns_all, amr_block_owner, amr_block_level, amr_ovl_*, and
         ! amr_slot_live are SHARED with s_initialize_amr_module/s_finalize_amr_module: when amr, that pair owns them, so only
         ! free them here in l0-only mode to avoid a coexist double-free. amr_tile_l0_owner/amr_tile_cost/amr_tile_cost_ema are
         ! TILE-ONLY and always freed here.
         if (.not. amr) then
             deallocate (amr_slot_live)
             deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
-            deallocate (amr_decomp, amr_slots)
+            deallocate (amr_slots)
             deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
             deallocate (amr_block_owner, amr_block_level)
         end if
@@ -5624,7 +5590,6 @@ contains
             @:DEALLOCATE(amr_cg(i)%sf)
         end do
         @:DEALLOCATE(amr_cg)
-        deallocate (amr_decomp)
         deallocate (amr_slots)
         deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
