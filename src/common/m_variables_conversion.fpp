@@ -751,7 +751,7 @@ contains
 
                     if (hyperelasticity) then
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%xi%beg, eqn_idx%xi%end
+                        do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                         end do
                     end if
@@ -1004,7 +1004,7 @@ contains
                     ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
                     if (hyperelasticity) then
                         ! Multiply \xi to \rho \xi
-                        do i = eqn_idx%xi%beg, eqn_idx%xi%end
+                        do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
                     end if

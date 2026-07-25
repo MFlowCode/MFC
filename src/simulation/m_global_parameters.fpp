@@ -67,7 +67,6 @@ module m_global_parameters
     logical :: cfl_dt
     ! Simulation Algorithm Parameters generated_case_opt_decls.fpp: now in m_global_parameters_common
 
-    integer :: hyper_model  !< hyperelasticity solver algorithm
     ! elasticity, chemistry: in m_global_parameters_common
     logical                :: shear_stress  !< Shear stresses
     logical                :: bulk_stress   !< Bulk stresses
@@ -92,7 +91,6 @@ module m_global_parameters
 
     integer :: cpu_start, cpu_end, cpu_rate
 
-    $:GPU_DECLARE(create='[hyper_model]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress]')
 
     logical               :: bc_io
@@ -391,7 +389,6 @@ contains
         int_comp = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
-        hyper_model = dflt_int
         rdma_mpi = .false.
         shear_stress = .false.
         bulk_stress = .false.

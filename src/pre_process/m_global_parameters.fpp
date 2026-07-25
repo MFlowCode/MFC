@@ -181,8 +181,6 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         igr_order = dflt_int
-        pre_stress = .false.
-
         precision = 2
         viscous = .false.
         mixlayer_vel_profile = .false.

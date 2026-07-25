@@ -106,6 +106,14 @@ contains
                     rho = max(rho, sgm_eps)
                     G_local = max(G_local, sgm_eps)
 
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, b_size - 1
+                        q_prim_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l) = 0._wp
+                        q_cons_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l) = 0._wp
+                    end do
+                    q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l) = 0._wp
+                    q_cons_vf(eqn_idx%xi%end + 1)%sf(j, k, l) = 0._wp
+
                     if (G_local > verysmall) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, tensor_size
@@ -153,13 +161,13 @@ contains
                             ! STEP 2d: computing the J = det(F) = 1/det(\grad{\xi})
                             tensorb(tensor_size) = 1._wp/tensorb(tensor_size)
 
-                            ! STEP 3: computing F transpose F
-                            tensorb(1) = tensora(1)**2 + tensora(2)**2 + tensora(3)**2
-                            tensorb(5) = tensora(4)**2 + tensora(5)**2 + tensora(6)**2
-                            tensorb(9) = tensora(7)**2 + tensora(8)**2 + tensora(9)**2
-                            tensorb(2) = tensora(1)*tensora(4) + tensora(2)*tensora(5) + tensora(3)*tensora(6)
-                            tensorb(3) = tensora(1)*tensora(7) + tensora(2)*tensora(8) + tensora(3)*tensora(9)
-                            tensorb(6) = tensora(4)*tensora(7) + tensora(5)*tensora(8) + tensora(6)*tensora(9)
+                            ! STEP 3: tensora stores F^T, so b = F F^T = transpose(tensora)*tensora
+                            tensorb(1) = tensora(1)**2 + tensora(4)**2 + tensora(7)**2
+                            tensorb(5) = tensora(2)**2 + tensora(5)**2 + tensora(8)**2
+                            tensorb(9) = tensora(3)**2 + tensora(6)**2 + tensora(9)**2
+                            tensorb(2) = tensora(1)*tensora(2) + tensora(4)*tensora(5) + tensora(7)*tensora(8)
+                            tensorb(3) = tensora(1)*tensora(3) + tensora(4)*tensora(6) + tensora(7)*tensora(9)
+                            tensorb(6) = tensora(2)*tensora(3) + tensora(5)*tensora(6) + tensora(8)*tensora(9)
                             ! STEP 4: update the btensor, this is consistent with Riemann solvers
                             #:for BIJ, TXY in [(1,1),(2,2),(3,5),(4,3),(5,6),(6,9)]
                                 btensor%vf(${BIJ}$)%sf(j, k, l) = tensorb(${TXY}$)
@@ -167,11 +175,7 @@ contains
                             ! store the determinant at the last entry of the btensor
                             btensor%vf(b_size)%sf(j, k, l) = tensorb(tensor_size)
                             ! STEP 5a: updating the Cauchy stress primitive scalar field
-                            if (hyper_model == 1) then
-                                call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G_local, j, k, l)
-                            else if (hyper_model == 2) then
-                                call s_Mooney_Rivlin_cauchy_solver(btensor%vf, q_prim_vf, G_local, j, k, l)
-                            end if
+                            call s_neoHookean_cauchy_solver(btensor%vf, q_prim_vf, G_local, j, k, l)
                             ! STEP 5b: updating the pressure field
                             q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
                                       & l) - G_local*q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l)/gamma
@@ -181,6 +185,7 @@ contains
                                 q_cons_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, &
                                           & l) = rho*q_prim_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l)
                             end do
+                            q_cons_vf(eqn_idx%xi%end + 1)%sf(j, k, l) = rho*q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l)
                         end if
                     end if
                 end do
@@ -217,35 +222,6 @@ contains
         q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
 
     end subroutine s_neoHookean_cauchy_solver
-
-    !> Compute the Mooney-Rivlin Cauchy stress from the left Cauchy-Green tensor
-    subroutine s_Mooney_Rivlin_cauchy_solver(btensor_in, q_prim_vf, G_param, j, k, l)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(scalar_field), dimension(b_size), intent(inout)   :: btensor_in
-        real(wp), intent(in)                                   :: G_param
-        integer, intent(in)                                    :: j, k, l
-        real(wp)                                               :: trace
-        real(wp), parameter                                    :: f13 = 1._wp/3._wp
-        integer                                                :: i  !< Generic loop iterators
-        ! TODO: Make 1D and 2D capable
-        trace = btensor_in(1)%sf(j, k, l) + btensor_in(3)%sf(j, k, l) + btensor_in(6)%sf(j, k, l)
-
-        ! Deviatoric left Cauchy-Green tensor: dev(b) = b - (tr(b)/3)*I
-        btensor_in(1)%sf(j, k, l) = btensor_in(1)%sf(j, k, l) - f13*trace
-        btensor_in(3)%sf(j, k, l) = btensor_in(3)%sf(j, k, l) - f13*trace
-        btensor_in(6)%sf(j, k, l) = btensor_in(6)%sf(j, k, l) - f13*trace
-
-        ! dividing by the jacobian for neo-Hookean model setting the tensor to the stresses for riemann solver
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, b_size - 1
-            q_prim_vf(eqn_idx%stress%beg + i - 1)%sf(j, k, l) = G_param*btensor_in(i)%sf(j, k, l)/btensor_in(b_size)%sf(j, k, l)
-        end do
-        ! First invariant strain energy: W = G/2 * (I1 - 3), neo-Hookean model
-        q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l) = 0.5_wp*(trace - 3.0_wp)/btensor_in(b_size)%sf(j, k, l)
-
-    end subroutine s_Mooney_Rivlin_cauchy_solver
 
     !> Finalize the hyperelastic module
     impure subroutine s_finalize_hyperelastic_module()

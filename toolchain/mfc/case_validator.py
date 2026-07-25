@@ -1392,17 +1392,23 @@ class CaseValidator:
     def check_hyperelasticity(self):
         """Checks hyperelasticity constraints"""
         hyperelasticity = self.get("hyperelasticity", "F") == "T"
-        pre_stress = self.get("pre_stress", "F") == "T"
-
-        self.prohibit(pre_stress and not hyperelasticity, "pre_stress requires hyperelasticity to be enabled")
 
         if not hyperelasticity:
             return
 
         model_eqns = self.get("model_eqns")
+        hyper_model = self.get("hyper_model")
+        riemann_solver = self.get("riemann_solver")
+        fd_order = self.get("fd_order")
+        p = self.get("p", 0)
+        cyl_coord = self.get("cyl_coord", "F") == "T"
 
-        self.prohibit(model_eqns == 1, "hyperelasticity is not supported for model_eqns = 1")
-        self.prohibit(model_eqns is not None and model_eqns > 3, "hyperelasticity is not supported for model_eqns > 3")
+        self.prohibit(model_eqns not in (2, 3), "hyperelasticity requires model_eqns = 2 or 3")
+        self.prohibit(hyper_model != 1, "hyperelasticity currently requires hyper_model = 1 (neo-Hookean)")
+        self.prohibit(riemann_solver != 2, "hyperelasticity currently requires the HLLC Riemann solver (riemann_solver = 2)")
+        self.prohibit(p <= 0, "hyperelasticity currently requires a 3D domain (p > 0)")
+        self.prohibit(cyl_coord, "hyperelasticity currently supports Cartesian coordinates only")
+        self.prohibit(fd_order is None or fd_order <= 0, "hyperelasticity requires fd_order > 0")
 
     # Pre-Process Specific Checks
 

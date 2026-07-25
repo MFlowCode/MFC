@@ -274,6 +274,7 @@ _CANARY_TRACES = frozenset(
         "2D -> Lagrange Bubbles -> One-way Coupling",  # m_bubbles_EL
         "1D -> MHD -> HLLD",  # m_mhd / m_riemann_solver_hlld
         "1D -> Hypoelasticity -> 1 Fluid(s)",  # m_hypoelastic
+        "3D -> Hyperelasticity -> neo-Hookean",  # m_hyperelastic
         "1D -> Chemistry -> Perfect Reactor",  # chemistry
         "2D -> 1 Fluid(s) -> IBM -> Circle -> slip",  # m_ibm
         "1D -> Phase Change model 5 -> 2 Fluid(s) -> model equation -> 3",  # m_pressure_relaxation (6-eq)
@@ -1308,6 +1309,40 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 for _ in range(2):
                     stack.pop()
 
+    def alter_hyperelasticity(dimInfo):
+        if len(dimInfo[0]) != 3:
+            return
+
+        cases.append(
+            define_case_d(
+                stack,
+                "Hyperelasticity -> neo-Hookean",
+                {
+                    "m": 7,
+                    "n": 7,
+                    "p": 7,
+                    "dt": 1.0e-4,
+                    "t_step_stop": 10,
+                    "t_step_save": 10,
+                    "weno_order": 1,
+                    "hyperelasticity": "T",
+                    "hyper_model": 1,
+                    "riemann_solver": 2,
+                    "fd_order": 2,
+                    "fluid_pp(1)%G": 0.1,
+                    "patch_icpp(1)%pres": 1.0,
+                    "patch_icpp(2)%pres": 1.0,
+                    "patch_icpp(3)%pres": 1.0,
+                    "patch_icpp(1)%alpha_rho(1)": 1.0,
+                    "patch_icpp(2)%alpha_rho(1)": 1.0,
+                    "patch_icpp(3)%alpha_rho(1)": 1.0,
+                    "patch_icpp(1)%vel(1)": 0.1,
+                    "patch_icpp(2)%vel(1)": -0.1,
+                    "patch_icpp(3)%vel(1)": 0.05,
+                },
+            )
+        )
+
     def alter_body_forces(dimInfo):
         ndims = len(dimInfo[0])
 
@@ -1943,6 +1978,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_acoustic_src(dimInfo)
             alter_bubbles(dimInfo)
             alter_hypoelasticity(dimInfo)
+            alter_hyperelasticity(dimInfo)
             alter_phasechange(dimInfo)
             alter_viscosity(dimInfo)
             alter_elliptic_smoothing()
