@@ -4354,6 +4354,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # AMR + L0 tiles COEXIST (amr = T .and. l0_ntile > 0): the base grid is tiled into migratable L0 tiles AND an AMR fine
+        # overlay runs on top, with the tiles advanced on their (migrated) compute-owner while the Berger-Colella c/f coupling
+        # stays in the fixed L0 decomposition and the reflux/restrict correction is routed L0-owner -> tile compute-owner. These
+        # are the ONLY goldens exercising the coexist path; both are byte-identical to the monolithic-AMR run (l0_ntile = 0) - the
+        # tiles are decomposition-invariant, so the golden fails iff the coexist coupling corrupts state. Reuse amr_2d_base
+        # (static single-level block); run_time_info off (l0 > 0 gates run-time-info/probes).
+        # NP1-G: np=1, one tile spanning L0 - the degenerate (local) coupling; proves the reflux/restrict copy-back assembles.
+        stack.push(
+            "AMR + L0 tiles -> 2D -> coexist static single-level np=1",
+            {**amr_2d_base, "amr_regrid_int": 0, "run_time_info": "F", "l0_ntile": 1},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=1))
+        stack.pop()
+        # NP2-MIG: np=2, two tiles, the covering tile FORCE-MIGRATED (l0_migrate_step) so its compute-owner != its L0-storage
+        # owner - the real distributed gate exercising the cross-rank L0-owner -> compute-owner reflux/restrict routing.
+        stack.push(
+            "AMR + L0 tiles -> 2D -> coexist force-migrated np=2",
+            {**amr_2d_base, "amr_regrid_int": 0, "run_time_info": "F", "l0_ntile": 2, "l0_migrate_step": 3},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
         # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
         # ADJACENT same-level sub-blocks across the x rank seam (one per rank) - but amr_subcycle=T. The subcycle
         # advances every level-1 block stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo interposed
