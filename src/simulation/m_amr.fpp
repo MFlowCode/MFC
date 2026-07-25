@@ -5392,6 +5392,42 @@ contains
 
     end subroutine s_l0_wrap_one
 
+    !> Fill a tile's MULTI-DIM ghost cells (>= 2 dims in the ghost region: 2D diagonal corners, 3D ghost edges + corners) from the
+    !! nearest INTERIOR cell (each index clamped to [0:m]/[0:n]/[0:p]). The dimension-split face fills only set single-ghost face
+    !! slabs (they are all the RHS stencil reads), leaving these unset; the cons->prim convert still visits them and an unset ghost
+    !! (void fractions 0 -> gamma 0) is a 0/0 (traps under -ffpe-trap, a stray NaN otherwise). The clamp source is always an
+    !! interior cell (valid, real data) and never a face ghost, so the RHS-relevant ghosts are untouched and output is
+    !! bit-unchanged. The slot q_cons is a dummy so the kernel reads a valid mapped descriptor (indexing module amr_slots%q_cons in
+    !! a kernel is a null deref).
+    impure subroutine s_l0_fill_ghost_corners(q, mx, ny, pz)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        integer, intent(in)                                    :: mx, ny, pz
+        integer                                                :: i, jb, kb, lb, jc, kc, lc, ng, lo2, hi2, lo3, hi3
+
+        lo2 = 0; hi2 = 0; if (n_glb > 0) then; lo2 = -buff_size; hi2 = ny + buff_size; end if
+        lo3 = 0; hi3 = 0; if (p_glb > 0) then; lo3 = -buff_size; hi3 = pz + buff_size; end if
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[jc, kc, lc, ng]')
+        do i = 1, sys_size
+            do lb = lo3, hi3
+                do kb = lo2, hi2
+                    do jb = -buff_size, mx + buff_size
+                        ng = 0
+                        if (jb < 0 .or. jb > mx) ng = ng + 1
+                        if (n_glb > 0) then; if (kb < 0 .or. kb > ny) ng = ng + 1; end if
+                        if (p_glb > 0) then; if (lb < 0 .or. lb > pz) ng = ng + 1; end if
+                        if (ng >= 2) then
+                            jc = min(max(jb, 0), mx); kc = min(max(kb, 0), ny); lc = min(max(lb, 0), pz)
+                            q(i)%sf(jb, kb, lb) = q(i)%sf(jc, kc, lc)
+                        end if
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_l0_fill_ghost_corners
+
     !> Advance every tile one RK stage: fill domain-edge BC ghosts (phase 1), overwrite interior-seam ghosts with neighbour interior
     !! (phase 2, fmul=1), then advance + RK-update each tile through the shared swap-based solver (phase 3). Mirrors the AMR
     !! fine-block phase structure (m_time_steppers) with prolong/reflux dropped - a base-res tile has no coarser level.
@@ -5434,6 +5470,15 @@ contains
 
         call s_l0_fill_edge_bc()
         call s_amr_fine_fine_halo()
+        ! Fill the multi-dim ghost cells (2D diagonal corners; 3D also the ghost edges) that the dimension-split face fills
+        ! (s_l0_fill_edge_bc + s_amr_fine_fine_halo) deliberately leave unset. The RHS never reads them, but the cons->prim
+        ! convert processes the whole buffered range, and an unset ghost (all void fractions 0 -> gamma 0) is a 0/0 that traps
+        ! under -ffpe-trap and is a stray NaN otherwise. Each is copied from the nearest INTERIOR cell (valid state; the face
+        ! ghosts the RHS reads are single-ghost and untouched, so output is unchanged).
+        do islot = 1, l0_ntiles_tot
+            if (amr_block_owner(islot) /= proc_rank) cycle
+            call s_l0_fill_ghost_corners(amr_slots(islot)%q_cons, amr_slots(islot)%m, amr_slots(islot)%n, amr_slots(islot)%p)
+        end do
         do islot = 1, l0_ntiles_tot
             if (amr_block_owner(islot) /= proc_rank) cycle  ! advance only owned tiles; remote tiles live on their owner rank
             call s_amr_select_slot(islot)
