@@ -128,11 +128,6 @@ contains
             E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
         end if
 
-        ! Adjust energy for hyperelasticity
-        if (hyperelasticity) then
-            E = E + G_local*q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l)
-        end if
-
         H = (E + pres)/rho
 
     end subroutine s_compute_enthalpy

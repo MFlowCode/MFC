@@ -452,15 +452,6 @@ contains
             end do
         end if
 
-        if (hyperelasticity) then
-            do i = 1, eqn_idx%xi%end - eqn_idx%xi%beg + 1
-                if (prim_vars_wrt) then
-                    write (varname, '(A,I0)') 'xi', i
-                    call s_write_field(varname, t_step, q_prim_vf(i - 1 + eqn_idx%xi%beg), x_beg, x_end, y_beg, y_end, z_beg, z_end)
-                end if
-            end do
-        end if
-
         if (cont_damage) then
             write (varname, '(A)') 'damage_state'
             call s_write_field(varname, t_step, q_cons_vf(eqn_idx%damage), x_beg, x_end, y_beg, y_end, z_beg, z_end)

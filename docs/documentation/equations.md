@@ -573,34 +573,6 @@ where \f$\mathbf{l} = \nabla \mathbf{u}\f$ is the velocity gradient and \f$\math
 
 This adds 6 additional transport equations in 3D (symmetric stress tensor: \f$\tau_{xx}^e, \tau_{xy}^e, \tau_{yy}^e, \tau_{xz}^e, \tau_{yz}^e, \tau_{zz}^e\f$).
 
-### 7.2 Hyperelastic Model (`hyperelasticity = .true.`) (\cite Kamrin12; \cite Wilfong26 Sec. 4.1.6)
-
-**Source:** `src/simulation/m_hyperelastic.fpp`
-
-**Reference map evolution:**
-
-\f[\frac{\partial (\rho\,\boldsymbol{\xi})}{\partial t} + \nabla \cdot (\rho\,\boldsymbol{\xi} \otimes \mathbf{u}) = 0\f]
-
-**Deformation gradient from reference map:**
-
-\f[\mathbf{F} = (\nabla \boldsymbol{\xi})^{-1}\f]
-
-**Left Cauchy-Green tensor:**
-
-\f[\mathbf{b} = \mathbf{F}\,\mathbf{F}^T\f]
-
-**Neo-Hookean Cauchy stress:**
-
-\f[\boldsymbol{\tau}^e = \frac{G}{J}\left(\mathbf{b} - \frac{\text{tr}(\mathbf{b})}{3}\,\mathbf{I}\right)\f]
-
-where \f$J = \det(\mathbf{F})\f$.
-
-**Hyperelastic energy:**
-
-\f[e^e = \frac{G}{2}\bigl(I_{\mathbf{b}} - 3\bigr), \qquad I_{\mathbf{b}} = \text{tr}(\mathbf{b})\f]
-
----
-
 ## 8. Phase Change (`relax = .true.`) (\cite Wilfong26 Sec. 4.1.3)
 
 **Source:** `src/common/m_phase_change.fpp`

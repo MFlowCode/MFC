@@ -1091,7 +1091,6 @@ class CaseValidator:
         acoustic_source = self.get("acoustic_source", "F") == "T"
         relax = self.get("relax", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
-        hyperelasticity = self.get("hyperelasticity", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
         probe_wrt = self.get("probe_wrt", "F") == "T"
         int_comp = self.get("int_comp", 0)
@@ -1110,7 +1109,6 @@ class CaseValidator:
         self.prohibit(acoustic_source, "IGR does not support acoustic sources")
         self.prohibit(relax, "IGR does not support phase change")
         self.prohibit(mhd, "IGR does not support magnetohydrodynamics")
-        self.prohibit(hyperelasticity, "IGR does not support hyperelasticity")
         self.prohibit(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt, "IGR does not support probe writes")
         self.prohibit(int_comp > 0, "IGR does not support int_comp > 0")
@@ -1388,21 +1386,6 @@ class CaseValidator:
         self.prohibit(probe_wrt and fd_order is None, "fd_order must be specified for probe_wrt")
         self.prohibit(integral_wrt and fd_order is None, "fd_order must be specified for integral_wrt")
         self.prohibit(integral_wrt and not bubbles_euler, "integral_wrt requires bubbles_euler to be enabled")
-
-    def check_hyperelasticity(self):
-        """Checks hyperelasticity constraints"""
-        hyperelasticity = self.get("hyperelasticity", "F") == "T"
-        pre_stress = self.get("pre_stress", "F") == "T"
-
-        self.prohibit(pre_stress and not hyperelasticity, "pre_stress requires hyperelasticity to be enabled")
-
-        if not hyperelasticity:
-            return
-
-        model_eqns = self.get("model_eqns")
-
-        self.prohibit(model_eqns == 1, "hyperelasticity is not supported for model_eqns = 1")
-        self.prohibit(model_eqns is not None and model_eqns > 3, "hyperelasticity is not supported for model_eqns > 3")
 
     # Pre-Process Specific Checks
 
@@ -2324,7 +2307,6 @@ class CaseValidator:
         self.check_qbmm_and_polydisperse()
         self.check_adv_n()
         self.check_hypoelasticity()
-        self.check_hyperelasticity()
         self.check_phase_change()
         self.check_ibm()
         self.check_stiffened_eos()
