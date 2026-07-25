@@ -1102,17 +1102,19 @@ contains
 
         integer, intent(in)  :: r
         integer, intent(out) :: crlo(3), crhi(3)
+        integer              :: sidx(3), ext(3)
 
+        call s_amr_rank_decomp(r, sidx, ext)
         crlo = 0; crhi = 0
-        crlo(1) = amr_decomp(1, r); if (amr_decomp(1, r) == 0) crlo(1) = -buff_size
-        crhi(1) = amr_decomp(1, r) + amr_decomp(4, r); if (crhi(1) == m_glb) crhi(1) = crhi(1) + buff_size
+        crlo(1) = sidx(1); if (sidx(1) == 0) crlo(1) = -buff_size
+        crhi(1) = sidx(1) + ext(1); if (crhi(1) == m_glb) crhi(1) = crhi(1) + buff_size
         if (n_glb > 0) then
-            crlo(2) = amr_decomp(2, r); if (amr_decomp(2, r) == 0) crlo(2) = -buff_size
-            crhi(2) = amr_decomp(2, r) + amr_decomp(5, r); if (crhi(2) == n_glb) crhi(2) = crhi(2) + buff_size
+            crlo(2) = sidx(2); if (sidx(2) == 0) crlo(2) = -buff_size
+            crhi(2) = sidx(2) + ext(2); if (crhi(2) == n_glb) crhi(2) = crhi(2) + buff_size
         end if
         if (p_glb > 0) then
-            crlo(3) = amr_decomp(3, r); if (amr_decomp(3, r) == 0) crlo(3) = -buff_size
-            crhi(3) = amr_decomp(3, r) + amr_decomp(6, r); if (crhi(3) == p_glb) crhi(3) = crhi(3) + buff_size
+            crlo(3) = sidx(3); if (sidx(3) == 0) crlo(3) = -buff_size
+            crhi(3) = sidx(3) + ext(3); if (crhi(3) == p_glb) crhi(3) = crhi(3) + buff_size
         end if
 
     end subroutine s_amr_rank_coarse_range
@@ -1367,10 +1369,7 @@ contains
         integer             :: sidx(3), ext(3), d, t
         logical             :: tv(3), tvd
 
-        sidx = 0; ext = 0
-        sidx(1) = amr_decomp(1, r); ext(1) = amr_decomp(4, r)
-        if (n_glb > 0) then; sidx(2) = amr_decomp(2, r); ext(2) = amr_decomp(5, r); end if
-        if (p_glb > 0) then; sidx(3) = amr_decomp(3, r); ext(3) = amr_decomp(6, r); end if
+        call s_amr_rank_decomp(r, sidx, ext)
         tv(1) = amr_region_lo(1) <= sidx(1) + ext(1) .and. amr_region_hi(1) >= sidx(1)
         tv(2) = (n_glb == 0) .or. (amr_region_lo(2) <= sidx(2) + ext(2) .and. amr_region_hi(2) >= sidx(2))
         tv(3) = (p_glb == 0) .or. (amr_region_lo(3) <= sidx(3) + ext(3) .and. amr_region_hi(3) >= sidx(3))
@@ -2231,11 +2230,13 @@ contains
 
         integer, intent(in)  :: r
         integer, intent(out) :: ilo(3), ihi(3)
+        integer              :: sidx(3), ext(3)
 
+        call s_amr_rank_decomp(r, sidx, ext)
         ilo = 0; ihi = 0
-        ilo(1) = amr_decomp(1, r); ihi(1) = amr_decomp(1, r) + amr_decomp(4, r)
-        if (n_glb > 0) then; ilo(2) = amr_decomp(2, r); ihi(2) = amr_decomp(2, r) + amr_decomp(5, r); end if
-        if (p_glb > 0) then; ilo(3) = amr_decomp(3, r); ihi(3) = amr_decomp(3, r) + amr_decomp(6, r); end if
+        ilo(1) = sidx(1); ihi(1) = sidx(1) + ext(1)
+        if (n_glb > 0) then; ilo(2) = sidx(2); ihi(2) = sidx(2) + ext(2); end if
+        if (p_glb > 0) then; ilo(3) = sidx(3); ihi(3) = sidx(3) + ext(3); end if
 
     end subroutine s_amr_rank_interior
 
@@ -4539,6 +4540,7 @@ contains
 
         integer :: nt(3), ix, iy, iz, k, j, r, e, tcap
         integer :: tlo(3), thi(3)
+        integer :: rsidx(3), rext(3)
         integer :: ierr
 
         if (l0_ntile <= 0) return
@@ -4649,9 +4651,10 @@ contains
         ! max so every rank's buffers match. Chunk r has amr_decomp(3+d,r)+1 cells in dim d.
         max_f1 = 0; max_f2 = 0; max_f3 = 0
         do r = 0, num_procs - 1
-            e = (amr_decomp(4, r) + 1 + nt(1) - 1)/nt(1) - 1; max_f1 = max(max_f1, e)
-            if (n_glb > 0) then; e = (amr_decomp(5, r) + 1 + nt(2) - 1)/nt(2) - 1; max_f2 = max(max_f2, e); end if
-            if (p_glb > 0) then; e = (amr_decomp(6, r) + 1 + nt(3) - 1)/nt(3) - 1; max_f3 = max(max_f3, e); end if
+            call s_amr_rank_decomp(r, rsidx, rext)
+            e = (rext(1) + 1 + nt(1) - 1)/nt(1) - 1; max_f1 = max(max_f1, e)
+            if (n_glb > 0) then; e = (rext(2) + 1 + nt(2) - 1)/nt(2) - 1; max_f2 = max(max_f2, e); end if
+            if (p_glb > 0) then; e = (rext(3) + 1 + nt(3) - 1)/nt(3) - 1; max_f3 = max(max_f3, e); end if
         end do
         mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
@@ -4698,23 +4701,24 @@ contains
         ! own (r == proc_rank). Domain-edge detection uses the global region indices (region_lo == 0 / region_hi == m_glb).
         k = 0
         do r = 0, num_procs - 1
+            call s_amr_rank_decomp(r, rsidx, rext)
             do iz = 0, nt(3) - 1
                 do iy = 0, nt(2) - 1
                     do ix = 0, nt(1) - 1
                         k = k + 1
                         ! global cell range of tile (r, ix, iy, iz) = rank r's chunk split by f_l0_lo (identical split on every rank
                         ! so seam transverse extents match across ranks for an even decomposition)
-                        tlo(1) = amr_decomp(1, r) + f_l0_lo(amr_decomp(4, r) + 1, nt(1), ix)
-                        thi(1) = amr_decomp(1, r) + f_l0_lo(amr_decomp(4, r) + 1, nt(1), ix + 1) - 1
+                        tlo(1) = rsidx(1) + f_l0_lo(rext(1) + 1, nt(1), ix)
+                        thi(1) = rsidx(1) + f_l0_lo(rext(1) + 1, nt(1), ix + 1) - 1
                         tlo(2) = 0; thi(2) = 0
                         if (n_glb > 0) then
-                            tlo(2) = amr_decomp(2, r) + f_l0_lo(amr_decomp(5, r) + 1, nt(2), iy)
-                            thi(2) = amr_decomp(2, r) + f_l0_lo(amr_decomp(5, r) + 1, nt(2), iy + 1) - 1
+                            tlo(2) = rsidx(2) + f_l0_lo(rext(2) + 1, nt(2), iy)
+                            thi(2) = rsidx(2) + f_l0_lo(rext(2) + 1, nt(2), iy + 1) - 1
                         end if
                         tlo(3) = 0; thi(3) = 0
                         if (p_glb > 0) then
-                            tlo(3) = amr_decomp(3, r) + f_l0_lo(amr_decomp(6, r) + 1, nt(3), iz)
-                            thi(3) = amr_decomp(3, r) + f_l0_lo(amr_decomp(6, r) + 1, nt(3), iz + 1) - 1
+                            tlo(3) = rsidx(3) + f_l0_lo(rext(3) + 1, nt(3), iz)
+                            thi(3) = rsidx(3) + f_l0_lo(rext(3) + 1, nt(3), iz + 1) - 1
                         end if
                         amr_block_owner(k) = r
                         amr_tile_l0_owner(k) = r  ! L0 storage owner = init owner; stays fixed under migration
