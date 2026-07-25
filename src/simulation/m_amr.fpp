@@ -500,6 +500,7 @@ contains
             amr_decomp(:,0) = myrow
 #endif
         end block
+        call s_amr_validate_decomp()
 
         ! per-slot fine-grid IB marker fields (static-body AMR); sized to the same max buffered fine extents as q_cons so the fine
         ! IB pipeline can resolve the body on the block
@@ -1047,6 +1048,52 @@ contains
         end if
 
     end subroutine s_amr_copy_parent_patch
+
+    !> Rank r's coarse-grid decomposition (start_idx + local extent m/n/p), computed O(1) from its cartesian coords instead of the
+    !! replicated amr_decomp table. The domain cart is MPI_CART_CREATE(reorder=.false., dims=[num_procs_x,num_procs_y,num_procs_z]),
+    !! so ranks keep MPI_COMM_WORLD order and r's coords are row-major in r. The per-dim split is the integer split-with-remainder
+    !! on CELL INDICES, identical to s_mpi_decompose_computational_domain (independent of grid stretching, which changes coords not
+    !! indices).
+    pure subroutine s_amr_rank_decomp(r, sidx, ext)
+
+        integer, intent(in)  :: r
+        integer, intent(out) :: sidx(3), ext(3)
+        integer              :: coords(3), gd(3), pd(3), base, rem, d
+
+        gd(1) = m_glb; gd(2) = n_glb; gd(3) = p_glb
+        pd(1) = num_procs_x; pd(2) = num_procs_y; pd(3) = num_procs_z
+        ! row-major: r = cx*(py*pz) + cy*pz + cz  (py=pz=1 when that dim is not decomposed)
+        coords(1) = r/(pd(2)*pd(3))
+        coords(2) = mod(r, pd(2)*pd(3))/pd(3)
+        coords(3) = mod(r, pd(3))
+        sidx = 0; ext = 0
+        do d = 1, 3
+            if (d == 2 .and. n_glb == 0) cycle
+            if (d == 3 .and. p_glb == 0) cycle
+            base = (gd(d) + 1)/pd(d)
+            rem = mod(gd(d) + 1, pd(d))
+            ext(d) = base - 1 + merge(1, 0, coords(d) < rem)
+            sidx(d) = coords(d)*base + min(coords(d), rem)
+        end do
+
+    end subroutine s_amr_rank_decomp
+
+    !> Transitional (increments #1 Tasks 1-2): abort if the computed accessor disagrees with the built amr_decomp on ANY rank.
+    !! Always-on (runs in release golden tests), O(num_procs) - removed in Task 3 when amr_decomp goes.
+    impure subroutine s_amr_validate_decomp()
+
+        integer :: r, sidx(3), ext(3)
+
+        do r = 0, num_procs - 1
+            call s_amr_rank_decomp(r, sidx, ext)
+            if (sidx(1) /= amr_decomp(1, r) .or. sidx(2) /= amr_decomp(2, r) .or. sidx(3) /= amr_decomp(3, &
+                & r) .or. ext(1) /= amr_decomp(4, r) .or. ext(2) /= amr_decomp(5, r) .or. ext(3) /= amr_decomp(6, r)) then
+                call s_mpi_abort('s_amr_rank_decomp disagrees with amr_decomp - the computed split does not match ' &
+                                 & // 's_mpi_decompose_computational_domain')
+            end if
+        end do
+
+    end subroutine s_amr_validate_decomp
 
     !> Rank r's contiguous owned coarse-cell range per dim from the replicated amr_decomp table: interior [start:start+ext] plus its
     !! physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal to the set where
@@ -4594,6 +4641,7 @@ contains
                 amr_decomp(:,0) = myrow
 #endif
             end block
+            call s_amr_validate_decomp()
         end if
 
         ! max tile extent per dim over ALL ranks (= widest per-rank chunk split by nt); slots + seam buffers are sized to this
