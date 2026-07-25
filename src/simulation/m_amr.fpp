@@ -4431,6 +4431,12 @@ contains
         logical :: needed
 
         do k = 1, amr_max_blocks
+            ! Skip the L0 tile prefix [1..l0_slot_off]: those slots are owned + sized by s_l0_tiles_init (rr=1 tile geometry), not
+            ! by the AMR fine-block reconcile. Without this, at coexist init the tile-prefix owner defaults to 0, so RANK 0 would
+            ! alloc these slots here with the FINE mbuf* sizing; s_amr_alloc_slot is idempotent, so s_l0_build_tile_slot could not
+            ! then resize them - a latent tile-undersizing landmine (benign only while fine mbuf* >= tile). l0_slot_off = 0 with no
+            ! tiles, so this is a no-op for pure AMR. (Audit IMP-3.)
+            if (k <= l0_slot_off) cycle
             needed = k <= amr_num_blocks
             if (needed) needed = amr_block_owner(k) == proc_rank
             if (needed) then
