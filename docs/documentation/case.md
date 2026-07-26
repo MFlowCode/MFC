@@ -538,7 +538,6 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `surface_tension`          | Logical | Activate surface tension |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
-| `pre_stress`               | Logical | Enable pre-stress initialization for hypoelasticity |
 | `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
@@ -892,7 +891,7 @@ kernels), free-stream preservation is exact, and `amr_subcycle` is gated under I
 AMR is incompatible with surface tension, 3D cylindrical
 coordinates (2D axisymmetric IS supported), 2D/3D MHD (measured: the coarse/fine seam is a
 continuous div(B) source that GLM cleaning cannot remove; 1D MHD/RMHD IS supported since
-div(B) = 0 by construction there), hyperelasticity, and Riemann-extrapolation
+div(B) = 0 by construction there), and Riemann-extrapolation
 boundaries (bc = -4). `active_box` is supported (single-rank): blocks must sit strictly inside the growing active window (init abort + regrid clamp), and the fine advance treats its whole block as active.Nonuniform grids ARE supported (grid stretching and the axisymmetric axis half-cell): the fine
 ghost-shell coordinates extend by exact parent-cell bisection and the spacing-dependent WENO
 coefficients are recomputed for the active grid on every block swap/restore, armed automatically
@@ -1336,7 +1335,6 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | Parameter         | Type    | Description                                         |
 | ---:              | :---:   | :---                                                |
 | `hypoelasticity`  | Logical | Enable hypoelasticity simulation                    |
-| `hyperelasticity` | Logical | Enable hyperelasticity simulation                   |
 | `cont_damage`     | Logical | Enable continuum damage model                       |
 | `tau_star`        | Real    | Threshold stress for continuum damage model         |
 | `cont_damage_s`   | Real    | Power `s` for continuum damage model                |

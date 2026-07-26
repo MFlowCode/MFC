@@ -96,7 +96,7 @@ contains
 
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
-        if (elasticity) then
+        if (hypoelasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs)
         else
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
@@ -126,11 +126,6 @@ contains
         else
             pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
             E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
-        end if
-
-        ! Adjust energy for hyperelasticity
-        if (hyperelasticity) then
-            E = E + G_local*q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l)
         end if
 
         H = (E + pres)/rho

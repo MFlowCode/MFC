@@ -659,7 +659,6 @@ FEATURE_META = {
     "alt_soundspeed": {"title": "Alternative Sound Speed", "category": "physics"},
     "surface_tension": {"title": "Surface Tension Model", "category": "physics"},
     "hypoelasticity": {"title": "Hypoelasticity", "category": "physics"},
-    "hyperelasticity": {"title": "Hyperelasticity", "category": "physics"},
     "relax": {"title": "Phase Change (Relaxation)", "category": "physics"},
     "viscous": {"title": "Viscosity", "category": "physics"},
     "acoustic_source": {"title": "Acoustic Sources", "category": "physics"},

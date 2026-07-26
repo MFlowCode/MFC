@@ -24,7 +24,6 @@ module m_rhs
     use m_bubbles_EL
     use m_qbmm
     use m_hypoelastic
-    use m_hyperelastic
     use m_acoustic_src
     use m_viscous
     use m_ibm
@@ -609,10 +608,6 @@ contains
             call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
             call nvtxEndRange
         end if
-
-        call nvtxStartRange("RHS-ELASTIC")
-        if (hyperelasticity) call s_hyperelastic_rmt_stress_update(q_cons_qp%vf, q_prim_qp%vf)
-        call nvtxEndRange
 
         if (cfl_dt) then
             if (mytime >= t_stop) return

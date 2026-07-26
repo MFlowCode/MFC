@@ -218,7 +218,7 @@ PHYSICS_DOCS = {
             "Also incompatible with viscous (diffusion has no finite domain of dependence), "
             "surface_tension (nonlocal curvature coupling), cyl_coord (geometric source terms "
             "are nonzero for uniform flow, so the exterior is not static), "
-            "hypoelasticity, hyperelasticity (stress source terms), "
+            "hypoelasticity (stress source terms), "
             "mhd (magnetic field source terms), and chemistry (reactive source terms)."
         ),
     },
@@ -271,7 +271,7 @@ PHYSICS_DOCS = {
             "cloud's padded bbox, and a per-stage guard aborts if the cloud reaches an active block. "
             "Incompatible with surface tension, "
             "3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
-            "per-cell WENO coefficients are recomputed for each block on swap), hyperelasticity, and "
+            "per-cell WENO coefficients are recomputed for each block on swap), and "
             "2D/3D MHD (measured: the coarse/fine seam is a continuous O(1) div(B) source that GLM "
             "cleaning spreads but cannot remove; divergence-preserving B prolongation/reflux is future "
             "work). 1D MHD/RMHD IS supported: div(B) = 0 by construction there (Bx is the uniform Bx0 "
@@ -1175,7 +1175,6 @@ class CaseValidator:
         acoustic_source = self.get("acoustic_source", "F") == "T"
         relax = self.get("relax", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
-        hyperelasticity = self.get("hyperelasticity", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
         probe_wrt = self.get("probe_wrt", "F") == "T"
         int_comp = self.get("int_comp", 0)
@@ -1194,7 +1193,6 @@ class CaseValidator:
         self.prohibit(acoustic_source, "IGR does not support acoustic sources")
         self.prohibit(relax, "IGR does not support phase change")
         self.prohibit(mhd, "IGR does not support magnetohydrodynamics")
-        self.prohibit(hyperelasticity, "IGR does not support hyperelasticity")
         self.prohibit(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt, "IGR does not support probe writes")
         self.prohibit(int_comp > 0, "IGR does not support int_comp > 0")
@@ -1372,7 +1370,6 @@ class CaseValidator:
         surface_tension = self.get("surface_tension", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
-        hyperelasticity = self.get("hyperelasticity", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
         chemistry = self.get("chemistry", "F") == "T"
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
@@ -1389,7 +1386,6 @@ class CaseValidator:
         self.prohibit(surface_tension, "active_box is incompatible with surface_tension (nonlocal curvature coupling violates the static-uniform-exterior assumption)")
         self.prohibit(cyl_coord, "active_box is incompatible with cyl_coord (geometric source terms are nonzero for uniform flow; exterior is not static)")
         self.prohibit(hypoelasticity, "active_box is incompatible with hypoelasticity (stress source terms violate the static-uniform-exterior assumption)")
-        self.prohibit(hyperelasticity, "active_box is incompatible with hyperelasticity (stress source terms violate the static-uniform-exterior assumption)")
         self.prohibit(mhd, "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
         self.prohibit(chemistry, "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
         self.prohibit(bubbles_euler, "active_box is incompatible with bubbles_euler (cell-local bubble sources in a non-equilibrium ambient violate the static-uniform-exterior assumption)")
@@ -1427,7 +1423,6 @@ class CaseValidator:
         model_eqns = self.get("model_eqns")
         num_fluids = self.get("num_fluids")
         surface_tension = self.get("surface_tension", "F") == "T"
-        hyperelasticity = self.get("hyperelasticity", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
         ib = self.get("ib", "F") == "T"
@@ -1466,8 +1461,8 @@ class CaseValidator:
             "Lagrangian bubbles are exempt (their alphas sum to the local liquid fraction)",
         )
         self.prohibit(
-            surface_tension or hyperelasticity,
-            "amr does not support surface-tension/hyperelasticity",
+            surface_tension,
+            "amr does not support surface_tension",
         )
         self.prohibit(
             mhd and (self.get("n", 0) or 0) > 0,
@@ -1682,21 +1677,6 @@ class CaseValidator:
         self.prohibit(probe_wrt and fd_order is None, "fd_order must be specified for probe_wrt")
         self.prohibit(integral_wrt and fd_order is None, "fd_order must be specified for integral_wrt")
         self.prohibit(integral_wrt and not bubbles_euler, "integral_wrt requires bubbles_euler to be enabled")
-
-    def check_hyperelasticity(self):
-        """Checks hyperelasticity constraints"""
-        hyperelasticity = self.get("hyperelasticity", "F") == "T"
-        pre_stress = self.get("pre_stress", "F") == "T"
-
-        self.prohibit(pre_stress and not hyperelasticity, "pre_stress requires hyperelasticity to be enabled")
-
-        if not hyperelasticity:
-            return
-
-        model_eqns = self.get("model_eqns")
-
-        self.prohibit(model_eqns == 1, "hyperelasticity is not supported for model_eqns = 1")
-        self.prohibit(model_eqns is not None and model_eqns > 3, "hyperelasticity is not supported for model_eqns > 3")
 
     # Pre-Process Specific Checks
 
@@ -2618,7 +2598,6 @@ class CaseValidator:
         self.check_qbmm_and_polydisperse()
         self.check_adv_n()
         self.check_hypoelasticity()
-        self.check_hyperelasticity()
         self.check_phase_change()
         self.check_ibm()
         self.check_stiffened_eos()

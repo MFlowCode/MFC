@@ -29,7 +29,6 @@
             "m_bubbles_EL",
             "m_bubbles_EL_kernels",
             "m_qbmm",
-            "m_hyperelastic",
             "m_hypoelastic",
             "m_phase_change",
             "m_chemistry",
