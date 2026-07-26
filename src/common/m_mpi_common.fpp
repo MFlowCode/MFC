@@ -1769,6 +1769,55 @@ contains
     !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
     !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of
     !! cell-boundary locations may be calculated directly from those of the cell-width distributions.
+    subroutine s_mpi_sendrecv_grid_variable_buffer(cell_boundaries, cell_centers, cell_widths, num_cells, bc_bounds, pbc_loc, &
+        & offset)
+
+        integer, intent(in)               :: num_cells, pbc_loc
+        type(int_bounds_info), intent(in) :: bc_bounds, offset
+        real(wp), intent(inout)           :: cell_boundaries(-1 - offset%beg:)
+        real(wp), intent(inout)           :: cell_centers(-buff_size:)
+        real(wp), intent(inout)           :: cell_widths(-buff_size:)
+
+#ifdef MFC_MPI
+        integer :: ierr
+        integer :: i
+
+        if (pbc_loc == -1) then
+            if (bc_bounds%end >= 0) then
+                call MPI_SENDRECV(cell_widths(num_cells - buff_size + 1), buff_size, mpi_p, bc_bounds%end, 0, &
+                                  & cell_widths(-buff_size), buff_size, mpi_p, bc_bounds%beg, 0, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+            else
+                call MPI_SENDRECV(cell_widths(0), buff_size, mpi_p, bc_bounds%beg, 1, cell_widths(-buff_size), buff_size, mpi_p, &
+                                  & bc_bounds%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            end if
+            do i = 1, offset%beg
+                cell_boundaries(-1 - i) = cell_boundaries(-i) - cell_widths(-i)
+            end do
+            do i = 1, buff_size
+                cell_centers(-i) = cell_centers(1 - i) - (cell_widths(1 - i) + cell_widths(-i))/2._wp
+            end do
+        else
+            if (bc_bounds%beg >= 0) then
+                call MPI_SENDRECV(cell_widths(0), buff_size, mpi_p, bc_bounds%beg, 1, cell_widths(num_cells + 1), buff_size, &
+                                  & mpi_p, bc_bounds%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            else
+                call MPI_SENDRECV(cell_widths(num_cells - buff_size + 1), buff_size, mpi_p, bc_bounds%end, 0, &
+                                  & cell_widths(num_cells + 1), buff_size, mpi_p, bc_bounds%end, 1, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+            end if
+            do i = 1, offset%end
+                cell_boundaries(num_cells + i) = cell_boundaries(num_cells + i - 1) + cell_widths(num_cells + i)
+            end do
+            do i = 1, buff_size
+                cell_centers(num_cells + i) = cell_centers(num_cells + i - 1) + (cell_widths(num_cells + i - 1) &
+                             & + cell_widths(num_cells + i))/2._wp
+            end do
+        end if
+#endif
+
+    end subroutine s_mpi_sendrecv_grid_variable_buffer
+
 #ifndef MFC_PRE_PROCESS
     subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc, offset)
 

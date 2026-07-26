@@ -870,7 +870,23 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
-        call s_populate_grid_variables_buffers()
+        block
+            type(int_bounds_info), dimension(3) :: grid_offsets
+
+            grid_offsets(:)%beg = buff_size
+            grid_offsets(:)%end = buff_size
+            if (n == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), &
+                                                       & global_bounds=glb_bounds)
+            else if (p == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), y_cb, &
+                                                       & y_cc, dy, global_bounds=glb_bounds)
+            else
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), y_cb, &
+                                                       & y_cc, dy, z_cb, z_cc, dz, glb_bounds)
+            end if
+        end block
+        $:GPU_UPDATE(device='[glb_bounds]')
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then

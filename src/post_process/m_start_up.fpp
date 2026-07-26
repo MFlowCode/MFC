@@ -162,7 +162,13 @@ contains
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         if (buff_size > 0) then
-            call s_populate_grid_variables_buffers()
+            if (n == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, offset_x, offset_y, offset_z)
+            else if (p == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, offset_x, offset_y, offset_z, y_cb, y_cc, dy)
+            else
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, offset_x, offset_y, offset_z, y_cb, y_cc, dy, z_cb, z_cc, dz)
+            end if
             call s_populate_variables_buffers(bc_type, q_cons_vf, q_T_sf=q_T_sf)
         end if
 
