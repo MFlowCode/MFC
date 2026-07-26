@@ -816,7 +816,7 @@ contains
         end if
         call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
-        call s_initialize_variables_conversion_module()
+        call s_initialize_variables_conversion_module(enforce_density_floor=.true., preserve_qbmm_number=.true.)
         if (grid_geometry == 3) call s_initialize_fftw_module()
 
         if (bubbles_euler) call s_initialize_bubbles_EE_module()

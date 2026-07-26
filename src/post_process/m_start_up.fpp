@@ -781,7 +781,7 @@ contains
             call s_initialize_mpi_common_module()
         end if
         call s_initialize_boundary_common_module()
-        call s_initialize_variables_conversion_module()
+        call s_initialize_variables_conversion_module(store_mixture_fields=.true., lagrange_beta_index=beta_idx)
         call s_initialize_data_input_module()
         call s_initialize_derived_variables_module()
         call s_initialize_data_output_module()

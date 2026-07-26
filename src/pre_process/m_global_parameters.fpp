@@ -184,7 +184,6 @@ contains
         pre_stress = .false.
 
         precision = 2
-        viscous = .false.
         mixlayer_vel_profile = .false.
         mixlayer_vel_coef = 1._wp
         mixlayer_perturb = .false.
@@ -318,7 +317,6 @@ contains
         Web = dflt_real
 
         nmom = 1
-        sigR = dflt_real
         sigV = dflt_real
         rhoRV = 0._wp
         dist_type = dflt_int

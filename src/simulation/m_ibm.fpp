@@ -296,10 +296,10 @@ contains
                 if (model_eqns /= model_eqns_4eq) then
                     ! If in simulation, use acc mixture subroutines
                     if (elasticity) then
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
-                            & G_K, Gs)
+                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, &
+                            & Re_K, G_K, Gs)
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
+                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                     end if
                 end if
 

@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List, Tuple
 
-from ..definitions import CASE_OPT_PARAMS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
+from ..definitions import CASE_OPT_PARAMS, DECLARATION_TARGETS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
 from ..registry import REGISTRY
 from ..schema import ParamDef, ParamType
 
@@ -59,6 +59,12 @@ def _vars_for_target(target: str) -> List[str]:
     return sorted(v for v, ts in NAMELIST_VARS.items() if target in ts)
 
 
+def _decl_vars_for_target(target: str) -> List[str]:
+    namelist_vars = {v for v, targets in NAMELIST_VARS.items() if target in targets}
+    common_module_vars = {v for v, targets in DECLARATION_TARGETS.items() if target in targets}
+    return sorted(namelist_vars | common_module_vars)
+
+
 def _pack_namelist(vars_list: List[str], first_prefix: str, cont_prefix: str, max_line: int) -> List[str]:
     """Pack variable names into Fortran continuation lines; all but last end with ', &'."""
     if not vars_list:
@@ -111,7 +117,7 @@ def generate_decls_fpp(target: str) -> str:
     """Return Fortran declarations (scalars + known arrays) for a target."""
     _check_target(target)
     lines = [_HEADER.rstrip()]
-    for name in _vars_for_target(target):
+    for name in _decl_vars_for_target(target):
         if not _is_simple_scalar(name):
             continue
         if target == "sim" and name in CASE_OPT_PARAMS:

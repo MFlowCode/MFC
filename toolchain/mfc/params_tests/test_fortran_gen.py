@@ -117,6 +117,31 @@ def test_decls_dt_for_sim():
     assert "real(wp)                :: dt" in generate_decls_fpp("sim")
 
 
+def test_common_module_decls_do_not_expand_namelists():
+    from mfc.params.definitions import NAMELIST_VARS
+    from mfc.params.generators.fortran_gen import generate_decls_fpp, generate_namelist_fpp
+
+    common_decls = ("avg_state", "alt_soundspeed", "mixture_err", "sigR", "riemann_solver")
+    for target in ("pre", "sim", "post"):
+        declarations = generate_decls_fpp(target)
+        for name in common_decls:
+            assert f":: {name}" in declarations
+
+    # Viscous is a case-optimization parameter, so simulation declares it in
+    # generated_case_opt_decls.fpp instead of generated_decls.fpp.
+    assert ":: viscous" in generate_decls_fpp("pre")
+    assert ":: viscous" in generate_decls_fpp("post")
+
+    assert "riemann_solver" not in generate_namelist_fpp("pre")
+    assert "riemann_solver" not in generate_namelist_fpp("post")
+    assert NAMELIST_VARS["avg_state"] == {"sim", "post"}
+    assert NAMELIST_VARS["alt_soundspeed"] == {"sim", "post"}
+    assert NAMELIST_VARS["mixture_err"] == {"sim", "post"}
+    assert NAMELIST_VARS["sigR"] == {"pre", "post"}
+    assert NAMELIST_VARS["viscous"] == {"pre", "sim"}
+    assert NAMELIST_VARS["riemann_solver"] == {"sim"}
+
+
 def test_decls_no_percent_vars():
     from mfc.params.generators.fortran_gen import generate_decls_fpp
 

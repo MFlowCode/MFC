@@ -64,6 +64,29 @@ module m_global_parameters_common
     integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
     !> @}
 
+    !> @name Material properties derived from fluid_pp
+    !> @{ One declaration is shared by all executables and initialized by m_variables_conversion after the case parameters have been
+    !! read.
+    real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
+    !> @}
+
+    !> @name Fluids participating in shear and bulk viscosity
+    !> @{
+    integer, dimension(2)                :: Re_size = 0
+    integer                              :: Re_size_max = 0
+    integer, allocatable, dimension(:,:) :: Re_idx
+    $:GPU_DECLARE(create='[Re_size, Re_size_max, Re_idx]')
+    !> @}
+
+    !> @name Working-direction index mapping
+    !> @{
+    integer, dimension(3)  :: dir_idx
+    real(wp), dimension(3) :: dir_flg
+    integer, dimension(3)  :: dir_idx_tau
+    $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
+    !> @}
+
 #ifdef MFC_SIMULATION
     $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
@@ -434,6 +457,8 @@ contains
             igr_order = dflt_int
             mhd = .false.
             relativity = .false.
+            viscous = .false.
+            riemann_solver = dflt_int
         #:endif
 
         ! Tait EOS
@@ -463,6 +488,12 @@ contains
         file_per_process = .false.
         down_sample = .false.
         fft_wrt = .false.
+
+        ! Mixture conversion and sound-speed behavior
+        avg_state = dflt_int
+        alt_soundspeed = .false.
+        mixture_err = .false.
+        sigR = dflt_real
 
     end subroutine s_assign_common_defaults
 

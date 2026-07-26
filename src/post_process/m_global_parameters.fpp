@@ -190,10 +190,6 @@ contains
         t_save = dflt_real
         t_stop = dflt_real
 
-        ! Simulation algorithm parameters (post-specific)
-        mixture_err = .false.
-        alt_soundspeed = .false.
-
         bc_io = .false.
         num_bc_patches = dflt_int
 
@@ -298,11 +294,9 @@ contains
         schlieren_alpha = dflt_real
 
         fd_order = dflt_int
-        avg_state = dflt_int
 
         ! Bubble modeling (post-specific)
         nb = dflt_int
-        sigR = dflt_real
 
         ! Output partial domain (post-specific)
         output_partial_domain = .false.
