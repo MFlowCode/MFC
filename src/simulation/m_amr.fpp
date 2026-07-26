@@ -1457,7 +1457,8 @@ contains
     impure subroutine s_amr_p2p_reflux_faces()
 
 #ifdef MFC_MPI
-        integer              :: owner, r, ierr, nreq, cnt
+        integer              :: owner, r, ierr, nreq, cnt, idx, ncand
+        integer              :: cand(num_procs), glo(3), ghi(3)
         integer, allocatable :: reqs(:)
 
         if (.not. amr) return
@@ -1469,20 +1470,20 @@ contains
                     $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
                 end if
             #:endfor
-            ! TRANSITIONAL (increment #3, removed in T3): the inversion candidate set (region grown by 1), filtered by the
-            ! UNCHANGED predicate, must reproduce the O(P) scan's owner-excluded participant COUNT (order preserved by
-            ! construction).
+            ! participating ranks by O(overlap) inversion (region grown by 1) filtered by the UNCHANGED predicate, in place of the
+            ! O(P) rank scan. Ascending (owner-excluded at use), so the ISENDs match the receivers exactly as the scan did.
+            glo = 0; ghi = 0
+            glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
+            if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
+            if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
+            call s_amr_ranks_overlapping(glo, ghi, cand, ncand)
+            ! TRANSITIONAL (increment #3, removed in T3): the candidate set (now authoritative) filtered by the predicate must
+            ! reproduce the O(P) scan's owner-excluded participant count.
             block
-                integer :: cand(num_procs), nc, glo(3), ghi(3), ii, rr, nchk, nscan
-                glo = 0; ghi = 0
-                glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
-                if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
-                if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
-                call s_amr_ranks_overlapping(glo, ghi, cand, nc)
+                integer :: rr, nchk, nscan
                 nchk = 0
-                do ii = 1, nc
-                    rr = cand(ii)
-                    if (rr /= owner .and. f_amr_reflux_participates(rr)) nchk = nchk + 1
+                do idx = 1, ncand
+                    if (cand(idx) /= owner .and. f_amr_reflux_participates(cand(idx))) nchk = nchk + 1
                 end do
                 nscan = 0
                 do rr = 0, num_procs - 1
@@ -1491,13 +1492,15 @@ contains
                 if (nchk /= nscan) call s_mpi_abort('increment #3: reflux candidate set misses a participant')
             end block
             nreq = 0
-            do r = 0, num_procs - 1
+            do idx = 1, ncand
+                r = cand(idx)
                 if (r /= owner .and. f_amr_reflux_participates(r)) nreq = nreq + 1
             end do
             if (nreq > 0) then
                 allocate (reqs(2*num_dims*nreq))
                 nreq = 0
-                do r = 0, num_procs - 1
+                do idx = 1, ncand
+                    r = cand(idx)
                     if (r == owner .or. .not. f_amr_reflux_participates(r)) cycle
                     #:for D in [1, 2, 3]
                         if (${D}$ <= num_dims) then
@@ -3725,8 +3728,8 @@ contains
     !! gather/scatter coupling.
     impure subroutine s_amr_build_seam_pairs()
 
-        integer :: xb, yb, d, np, k, r
-        integer :: plo(3), phi(3), rlo(3), rhi(3), clo(3), chi(3), bl(3), bh(3)
+        integer :: xb, yb, d, np, k
+        integer :: plo(3), phi(3), rlo(3), rhi(3)
 
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         np = 0
@@ -3747,9 +3750,9 @@ contains
                 end if
             end do
         end do
-        ! per-block P2P overlap-rank lists (gather: rank coarse range vs the amr_cpat_mar-padded patch box; scatter: rank coarse
-        ! interior vs the region box - the exact tests the consumers ran per call), rank-ascending so iterating a list preserves the
-        ! replaced 0..num_procs-1 scans' MPI send/recv order.
+        ! per-block P2P overlap-rank lists by O(overlap) inversion (gather: rank coarse range vs the amr_cpat_mar-padded patch box;
+        ! scatter: rank interior vs the region box), rank-ascending so iterating a list preserves the replaced 0..num_procs-1 scans'
+        ! MPI send/recv order. The clamped interior-frame coord range reproduces both frames (see s_amr_coord_range).
         do k = 1, amr_num_blocks
             plo = 0; phi = 0; rlo = 0; rhi = 0
             plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, k) + amr_cpat_mar
@@ -3762,26 +3765,13 @@ contains
                 plo(3) = amr_region_lo_all(3, k) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, k) + amr_cpat_mar
                 rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k)
             end if
-            amr_ovl_gather_n(k) = 0; amr_ovl_scatter_n(k) = 0
-            do r = 0, num_procs - 1
-                call s_amr_rank_coarse_range(r, clo, chi)
-                call s_amr_box_isect(plo, phi, clo, chi, bl, bh)
-                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
-                    amr_ovl_gather_n(k) = amr_ovl_gather_n(k) + 1
-                    amr_ovl_gather(amr_ovl_gather_n(k), k) = r
-                end if
-                call s_amr_rank_interior(r, clo, chi)
-                call s_amr_box_isect(rlo, rhi, clo, chi, bl, bh)
-                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
-                    amr_ovl_scatter_n(k) = amr_ovl_scatter_n(k) + 1
-                    amr_ovl_scatter(amr_ovl_scatter_n(k), k) = r
-                end if
-            end do
+            call s_amr_ranks_overlapping(plo, phi, amr_ovl_gather(:,k), amr_ovl_gather_n(k))
+            call s_amr_ranks_overlapping(rlo, rhi, amr_ovl_scatter(:,k), amr_ovl_scatter_n(k))
         end do
-        ! TRANSITIONAL (increment #3, removed in T3): verify the O(overlap) inversion reproduces the O(P) scan lists
-        ! element-for-element on every block. The scan above is authoritative here.
+        ! TRANSITIONAL (increment #3, removed in T3): recompute the O(P) scan into scratch and verify it reproduces the inversion
+        ! lists (now authoritative) element-for-element on every block.
         block
-            integer :: gchk(num_procs), schk(num_procs), ng, ns, kk, ii
+            integer :: gscan(num_procs), sscan(num_procs), ng, ns, kk, ii, rr, cl(3), ch(3), bl2(3), bh2(3)
             do kk = 1, amr_num_blocks
                 plo = 0; phi = 0; rlo = 0; rhi = 0
                 plo(1) = amr_region_lo_all(1, kk) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, kk) + amr_cpat_mar
@@ -3794,15 +3784,22 @@ contains
                     plo(3) = amr_region_lo_all(3, kk) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, kk) + amr_cpat_mar
                     rlo(3) = amr_region_lo_all(3, kk); rhi(3) = amr_region_hi_all(3, kk)
                 end if
-                call s_amr_ranks_overlapping(plo, phi, gchk, ng)
-                call s_amr_ranks_overlapping(rlo, rhi, schk, ns)
+                ng = 0; ns = 0
+                do rr = 0, num_procs - 1
+                    call s_amr_rank_coarse_range(rr, cl, ch)
+                    call s_amr_box_isect(plo, phi, cl, ch, bl2, bh2)
+                    if (bl2(1) <= bh2(1) .and. bl2(2) <= bh2(2) .and. bl2(3) <= bh2(3)) then; ng = ng + 1; gscan(ng) = rr; end if
+                    call s_amr_rank_interior(rr, cl, ch)
+                    call s_amr_box_isect(rlo, rhi, cl, ch, bl2, bh2)
+                    if (bl2(1) <= bh2(1) .and. bl2(2) <= bh2(2) .and. bl2(3) <= bh2(3)) then; ns = ns + 1; sscan(ns) = rr; end if
+                end do
                 if (ng /= amr_ovl_gather_n(kk) .or. ns /= amr_ovl_scatter_n(kk)) &
                     & call s_mpi_abort('increment #3: overlap inversion count mismatch vs scan')
                 do ii = 1, ng
-                    if (gchk(ii) /= amr_ovl_gather(ii, kk)) call s_mpi_abort('increment #3: gather inversion order mismatch')
+                    if (gscan(ii) /= amr_ovl_gather(ii, kk)) call s_mpi_abort('increment #3: gather inversion order mismatch')
                 end do
                 do ii = 1, ns
-                    if (schk(ii) /= amr_ovl_scatter(ii, kk)) call s_mpi_abort('increment #3: scatter inversion order mismatch')
+                    if (sscan(ii) /= amr_ovl_scatter(ii, kk)) call s_mpi_abort('increment #3: scatter inversion order mismatch')
                 end do
             end do
         end block
