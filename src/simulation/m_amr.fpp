@@ -1065,10 +1065,19 @@ contains
     impure subroutine s_amr_validate_decomp()
 
         integer :: sidx(3), ext(3)
+        logical :: ok
 
         call s_amr_rank_decomp(proc_rank, sidx, ext)
-        if (sidx(1) /= start_idx(1) .or. ext(1) /= m .or. (n_glb > 0 .and. (sidx(2) /= start_idx(2) .or. ext(2) /= n)) &
-            & .or. (p_glb > 0 .and. (sidx(3) /= start_idx(3) .or. ext(3) /= p))) then
+        ! nested guards, NOT a single .and./.or.: Fortran does not short-circuit, so start_idx(2)/start_idx(3) (start_idx is sized
+        ! num_dims) would be read out of bounds in 1D/2D even though the guard is false - a GNU-reldebug bounds abort.
+        ok = (sidx(1) == start_idx(1) .and. ext(1) == m)
+        if (n_glb > 0) then
+            if (sidx(2) /= start_idx(2) .or. ext(2) /= n) ok = .false.
+        end if
+        if (p_glb > 0) then
+            if (sidx(3) /= start_idx(3) .or. ext(3) /= p) ok = .false.
+        end if
+        if (.not. ok) then
             call s_mpi_abort('s_amr_rank_decomp does not reproduce this rank''s decomposition - computed split disagrees with ' &
                              & // 's_mpi_decompose_computational_domain')
         end if
