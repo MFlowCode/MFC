@@ -887,6 +887,9 @@ contains
             end if
         end block
         $:GPU_UPDATE(device='[glb_bounds]')
+        dx_min = minval(dx)
+        if (n > 0) dy_min = minval(dy)
+        if (p > 0) dz_min = minval(dz)
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then

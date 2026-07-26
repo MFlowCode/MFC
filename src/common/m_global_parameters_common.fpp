@@ -87,6 +87,9 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
     !> @}
 
+    !> Minimum cell widths. These are distinct from the per-cell width arrays named dx, dy, and dz in simulation and post-process.
+    real(wp) :: dx_min, dy_min, dz_min
+
 #ifdef MFC_SIMULATION
     $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
@@ -494,6 +497,9 @@ contains
         alt_soundspeed = .false.
         mixture_err = .false.
         sigR = dflt_real
+        dx_min = dflt_real
+        dy_min = dflt_real
+        dz_min = dflt_real
 
     end subroutine s_assign_common_defaults
 

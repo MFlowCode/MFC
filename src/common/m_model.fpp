@@ -858,7 +858,6 @@ contains
         ! Variables for IBM+STL
         integer                                 :: boundary_vertex_count, boundary_edge_count  !< Boundary vertex
         real(wp), allocatable, dimension(:,:,:) :: boundary_v                                  !< Boundary vertex buffer
-        real(wp)                                :: dx_local, dy_local, dz_local                !< Levelset distance buffer
         integer                                 :: i, j, k                                     !< Generic loop iterators
         integer                                 :: stl_id
         type(t_bbox)                            :: bbox, bbox_old
@@ -868,13 +867,6 @@ contains
         real(wp)                                :: grid_mm(1:3,1:2)
         real(wp), dimension(1:4,1:4)            :: transform, transform_n
 
-#ifdef MFC_SIMULATION
-        dx_local = minval(dx); dy_local = minval(dy)
-        if (p /= 0) dz_local = minval(dz)
-#else
-        dx_local = dx; dy_local = dy
-        if (p /= 0) dz_local = dz
-#endif
         if (num_stl_models == 0) return
 
         @:ALLOCATE(stl_bounding_boxes(num_stl_models,1:3,1:3))
@@ -924,11 +916,11 @@ contains
                 write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
                 write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
 
-                grid_mm(1,:) = (/minval(x_cc(0:m)) - 0.5_wp*dx_local, maxval(x_cc(0:m)) + 0.5_wp*dx_local/)
-                grid_mm(2,:) = (/minval(y_cc(0:n)) - 0.5_wp*dy_local, maxval(y_cc(0:n)) + 0.5_wp*dy_local/)
+                grid_mm(1,:) = (/minval(x_cc(0:m)) - 0.5_wp*dx_min, maxval(x_cc(0:m)) + 0.5_wp*dx_min/)
+                grid_mm(2,:) = (/minval(y_cc(0:n)) - 0.5_wp*dy_min, maxval(y_cc(0:n)) + 0.5_wp*dy_min/)
 
                 if (p > 0) then
-                    grid_mm(3,:) = (/minval(z_cc(0:p)) - 0.5_wp*dz_local, maxval(z_cc(0:p)) + 0.5_wp*dz_local/)
+                    grid_mm(3,:) = (/minval(z_cc(0:p)) - 0.5_wp*dz_min, maxval(z_cc(0:p)) + 0.5_wp*dz_min/)
                 else
                     grid_mm(3,:) = (/0._wp, 0._wp/)
                 end if

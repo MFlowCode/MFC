@@ -1537,15 +1537,15 @@ contains
                 else
 #ifdef MFC_PRE_PROCESS
                     if (old_grid .neqv. .true.) then
-                        dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
+                        dz_min = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
 
                         if (proc_coords(3) < rem_cells) then
-                            z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3))
-                            z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1) - (num_procs_z &
-                                                                  & - rem_cells))
+                            z_domain%beg = z_domain%beg + dz_min*real((p + 1)*proc_coords(3))
+                            z_domain%end = z_domain%end - dz_min*real((p + 1)*(num_procs_z - proc_coords(3) - 1) - (num_procs_z &
+                                & - rem_cells))
                         else
-                            z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3) + rem_cells)
-                            z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1))
+                            z_domain%beg = z_domain%beg + dz_min*real((p + 1)*proc_coords(3) + rem_cells)
+                            z_domain%end = z_domain%end - dz_min*real((p + 1)*(num_procs_z - proc_coords(3) - 1))
                         end if
                     end if
 #endif
@@ -1651,15 +1651,15 @@ contains
             else
 #ifdef MFC_PRE_PROCESS
                 if (old_grid .neqv. .true.) then
-                    dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
+                    dy_min = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
 
                     if (proc_coords(2) < rem_cells) then
-                        y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2))
-                        y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1) - (num_procs_y &
-                                                              & - rem_cells))
+                        y_domain%beg = y_domain%beg + dy_min*real((n + 1)*proc_coords(2))
+                        y_domain%end = y_domain%end - dy_min*real((n + 1)*(num_procs_y - proc_coords(2) - 1) - (num_procs_y &
+                            & - rem_cells))
                     else
-                        y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2) + rem_cells)
-                        y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1))
+                        y_domain%beg = y_domain%beg + dy_min*real((n + 1)*proc_coords(2) + rem_cells)
+                        y_domain%end = y_domain%end - dy_min*real((n + 1)*(num_procs_y - proc_coords(2) - 1))
                     end if
                 end if
 #endif
@@ -1736,14 +1736,15 @@ contains
         else
 #ifdef MFC_PRE_PROCESS
             if (old_grid .neqv. .true.) then
-                dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
+                dx_min = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
 
                 if (proc_coords(1) < rem_cells) then
-                    x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1))
-                    x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1) - (num_procs_x - rem_cells))
+                    x_domain%beg = x_domain%beg + dx_min*real((m + 1)*proc_coords(1))
+                    x_domain%end = x_domain%end - dx_min*real((m + 1)*(num_procs_x - proc_coords(1) - 1) - (num_procs_x &
+                        & - rem_cells))
                 else
-                    x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1) + rem_cells)
-                    x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1))
+                    x_domain%beg = x_domain%beg + dx_min*real((m + 1)*proc_coords(1) + rem_cells)
+                    x_domain%end = x_domain%end - dx_min*real((m + 1)*(num_procs_x - proc_coords(1) - 1))
                 end if
             end if
 #endif
@@ -1817,113 +1818,6 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_grid_variable_buffer
-
-#ifndef MFC_PRE_PROCESS
-    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc, offset)
-
-        integer, intent(in) :: mpi_dir
-        integer, intent(in) :: pbc_loc
-        !> Ghost layers for cell-boundary arrays (buff_size in simulation, module offset_* in post-process)
-        type(int_bounds_info), intent(in) :: offset
-
-#ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
-        integer :: i
-
-        if (mpi_dir == 1) then
-            if (pbc_loc == -1) then  ! PBC at the beginning
-                if (bc_x%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
-                                      & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%beg
-                    x_cb(-1 - i) = x_cb(-i) - dx(-i)
-                end do
-                do i = 1, buff_size
-                    x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
-                end do
-            else  ! PBC at the end
-                if (bc_x%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
-                                      & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%end
-                    x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-                end do
-                do i = 1, buff_size
-                    x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
-                end do
-            end if
-        else if (mpi_dir == 2) then
-            if (pbc_loc == -1) then  ! PBC at the beginning
-                if (bc_y%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
-                                      & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%beg
-                    y_cb(-1 - i) = y_cb(-i) - dy(-i)
-                end do
-                do i = 1, buff_size
-                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-                end do
-            else  ! PBC at the end
-                if (bc_y%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
-                                      & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%end
-                    y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-                end do
-                do i = 1, buff_size
-                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
-                end do
-            end if
-        else
-            if (pbc_loc == -1) then  ! PBC at the beginning
-                if (bc_z%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
-                                      & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%beg
-                    z_cb(-1 - i) = z_cb(-i) - dz(-i)
-                end do
-                do i = 1, buff_size
-                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
-                end do
-            else  ! PBC at the end
-                if (bc_z%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
-                                      & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%end
-                    z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-                end do
-                do i = 1, buff_size
-                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
-                end do
-            end if
-        end if
-#endif
-
-    end subroutine s_mpi_sendrecv_grid_variables_buffers
 
     !> Populate the local cell-boundary, cell-center, and cell-width arrays in one direction directly from the global cell-boundary
     !! array. This guarantees that every rank sees bitwise-identical values at any shared physical cell or boundary
@@ -2003,7 +1897,6 @@ contains
         end do
 
     end subroutine s_apply_grid_from_global_dim
-#endif
 
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_mpi_common_module

@@ -36,7 +36,6 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
-    real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> Global (pre-decomposition) domain bounds, needed by s_generate_serial_grid to stretch the grid using the full domain length
     !! rather than a local processor's sub-domain length
