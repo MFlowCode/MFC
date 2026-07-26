@@ -110,9 +110,10 @@ module m_amr
     !! cached per-block P2P overlap-rank lists (rebuilt with the seam list - same dirty flag): amr_ovl_gather(:,k) = ranks whose
     !! owned coarse range (s_amr_rank_coarse_range) intersects block k's amr_cpat_mar-padded patch box (gather contributors);
     !! amr_ovl_scatter(:,k) = ranks whose coarse interior (s_amr_rank_interior) intersects block k's region box (restrict-scatter
-    !! destinations). Rank-ASCENDING and NOT owner-excluded (consumers keep their owner skip), so iterating a list reproduces the
-    !! replaced per-call 0..num_procs-1 scan's MPI send/recv order exactly.
-    integer, allocatable :: amr_ovl_gather(:,:), amr_ovl_scatter(:,:)  !< (num_procs, amr_max_blocks)
+    !! destinations). Built by O(overlap) inversion (s_amr_ranks_overlapping), rank-ASCENDING and NOT owner-excluded (consumers keep
+    !! their owner skip), so iterating a list reproduces the replaced per-call 0..num_procs-1 scan's MPI send/recv order exactly.
+    !> (max-overlap, amr_max_blocks); sized in s_amr_build_seam_pairs
+    integer, allocatable :: amr_ovl_gather(:,:), amr_ovl_scatter(:,:)
     integer, allocatable :: amr_ovl_gather_n(:), amr_ovl_scatter_n(:)  !< per-block list lengths
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min-over-ranks
@@ -259,8 +260,9 @@ contains
         allocate (amr_owns_all(amr_max_blocks))
         allocate (amr_block_owner(amr_max_blocks))
         allocate (amr_block_level(amr_max_blocks))
-        allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
-        allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
+        ! amr_ovl_gather/scatter (the 2D rank lists) are allocated to the computed max overlap in s_amr_build_seam_pairs; only the
+        ! per-block counts are sized here.
+        allocate (amr_ovl_gather_n(amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
         amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
         amr_block_owner = 0
         amr_block_level = 1  ! init default (level-1); regrid re-tags each block's level for nesting
@@ -1477,20 +1479,6 @@ contains
             if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
             if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
             call s_amr_ranks_overlapping(glo, ghi, cand, ncand)
-            ! TRANSITIONAL (increment #3, removed in T3): the candidate set (now authoritative) filtered by the predicate must
-            ! reproduce the O(P) scan's owner-excluded participant count.
-            block
-                integer :: rr, nchk, nscan
-                nchk = 0
-                do idx = 1, ncand
-                    if (cand(idx) /= owner .and. f_amr_reflux_participates(cand(idx))) nchk = nchk + 1
-                end do
-                nscan = 0
-                do rr = 0, num_procs - 1
-                    if (rr /= owner .and. f_amr_reflux_participates(rr)) nscan = nscan + 1
-                end do
-                if (nchk /= nscan) call s_mpi_abort('increment #3: reflux candidate set misses a participant')
-            end block
             nreq = 0
             do idx = 1, ncand
                 r = cand(idx)
@@ -3723,12 +3711,11 @@ contains
     !> Rebuild the cached same-level seam-pair list (amr_seam_pairs): one O(nblocks^2) scan per regrid/restart in place of the same
     !! scan every RK stage (6x per fine step). Same (xb, yb) nested-loop order on all ranks (replicated region metadata) so the
     !! paired MPI_SENDRECVs in s_amr_fine_fine_halo stay matched. Count then fill for an exact-size list (no cap, no overflow). Also
-    !! rebuilds the per-block gather/scatter overlap-rank lists (amr_ovl_gather/scatter): one O(nblocks*num_procs) scan of the
-    !! computed per-rank decomposition (s_amr_rank_decomp) here in place of the same scan per block per RK stage in the P2P
-    !! gather/scatter coupling.
+    !! rebuilds the per-block gather/scatter overlap-rank lists (amr_ovl_gather/scatter) by O(overlap) inversion of the computed
+    !! decomposition (s_amr_ranks_overlapping), sized to the max overlap - no O(num_procs) scan or table.
     impure subroutine s_amr_build_seam_pairs()
 
-        integer :: xb, yb, d, np, k
+        integer :: xb, yb, d, np, k, mx
         integer :: plo(3), phi(3), rlo(3), rhi(3)
 
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
@@ -3752,7 +3739,28 @@ contains
         end do
         ! per-block P2P overlap-rank lists by O(overlap) inversion (gather: rank coarse range vs the amr_cpat_mar-padded patch box;
         ! scatter: rank interior vs the region box), rank-ascending so iterating a list preserves the replaced 0..num_procs-1 scans'
-        ! MPI send/recv order. The clamped interior-frame coord range reproduces both frames (see s_amr_coord_range).
+        ! MPI send/recv order. The clamped interior-frame coord range reproduces both frames (see s_amr_coord_range). Bounded first
+        ! dim = max overlap over all blocks (dealloc-realloc each build, like amr_seam_pairs above), NOT num_procs - a block spans
+        ! O(1) ranks, so this collapses the old O(num_procs*amr_max_blocks) table. Every consumer runs behind a build_seam_pairs
+        ! guard, so the arrays are always sized before they are read.
+        mx = 1
+        do k = 1, amr_num_blocks
+            plo = 0; phi = 0; rlo = 0; rhi = 0
+            plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, k) + amr_cpat_mar
+            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
+            if (n_glb > 0) then
+                plo(2) = amr_region_lo_all(2, k) - amr_cpat_mar; phi(2) = amr_region_hi_all(2, k) + amr_cpat_mar
+                rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k)
+            end if
+            if (p_glb > 0) then
+                plo(3) = amr_region_lo_all(3, k) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, k) + amr_cpat_mar
+                rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k)
+            end if
+            mx = max(mx, f_amr_overlap_count(plo, phi), f_amr_overlap_count(rlo, rhi))
+        end do
+        if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
+        if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
+        allocate (amr_ovl_gather(mx, amr_max_blocks), amr_ovl_scatter(mx, amr_max_blocks))
         do k = 1, amr_num_blocks
             plo = 0; phi = 0; rlo = 0; rhi = 0
             plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, k) + amr_cpat_mar
@@ -3768,41 +3776,6 @@ contains
             call s_amr_ranks_overlapping(plo, phi, amr_ovl_gather(:,k), amr_ovl_gather_n(k))
             call s_amr_ranks_overlapping(rlo, rhi, amr_ovl_scatter(:,k), amr_ovl_scatter_n(k))
         end do
-        ! TRANSITIONAL (increment #3, removed in T3): recompute the O(P) scan into scratch and verify it reproduces the inversion
-        ! lists (now authoritative) element-for-element on every block.
-        block
-            integer :: gscan(num_procs), sscan(num_procs), ng, ns, kk, ii, rr, cl(3), ch(3), bl2(3), bh2(3)
-            do kk = 1, amr_num_blocks
-                plo = 0; phi = 0; rlo = 0; rhi = 0
-                plo(1) = amr_region_lo_all(1, kk) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, kk) + amr_cpat_mar
-                rlo(1) = amr_region_lo_all(1, kk); rhi(1) = amr_region_hi_all(1, kk)
-                if (n_glb > 0) then
-                    plo(2) = amr_region_lo_all(2, kk) - amr_cpat_mar; phi(2) = amr_region_hi_all(2, kk) + amr_cpat_mar
-                    rlo(2) = amr_region_lo_all(2, kk); rhi(2) = amr_region_hi_all(2, kk)
-                end if
-                if (p_glb > 0) then
-                    plo(3) = amr_region_lo_all(3, kk) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, kk) + amr_cpat_mar
-                    rlo(3) = amr_region_lo_all(3, kk); rhi(3) = amr_region_hi_all(3, kk)
-                end if
-                ng = 0; ns = 0
-                do rr = 0, num_procs - 1
-                    call s_amr_rank_coarse_range(rr, cl, ch)
-                    call s_amr_box_isect(plo, phi, cl, ch, bl2, bh2)
-                    if (bl2(1) <= bh2(1) .and. bl2(2) <= bh2(2) .and. bl2(3) <= bh2(3)) then; ng = ng + 1; gscan(ng) = rr; end if
-                    call s_amr_rank_interior(rr, cl, ch)
-                    call s_amr_box_isect(rlo, rhi, cl, ch, bl2, bh2)
-                    if (bl2(1) <= bh2(1) .and. bl2(2) <= bh2(2) .and. bl2(3) <= bh2(3)) then; ns = ns + 1; sscan(ns) = rr; end if
-                end do
-                if (ng /= amr_ovl_gather_n(kk) .or. ns /= amr_ovl_scatter_n(kk)) &
-                    & call s_mpi_abort('increment #3: overlap inversion count mismatch vs scan')
-                do ii = 1, ng
-                    if (gscan(ii) /= amr_ovl_gather(ii, kk)) call s_mpi_abort('increment #3: gather inversion order mismatch')
-                end do
-                do ii = 1, ns
-                    if (sscan(ii) /= amr_ovl_scatter(ii, kk)) call s_mpi_abort('increment #3: scatter inversion order mismatch')
-                end do
-            end do
-        end block
         amr_seam_pairs_nblk = amr_num_blocks
         amr_seam_pairs_dirty = .false.
 
@@ -4721,8 +4694,8 @@ contains
             allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
             ! L0 tiles are the BASE level (Option 2: fine blocks become level>=1 on a tile)
             allocate (amr_block_level(amr_max_blocks)); amr_block_level = 0
-            allocate (amr_ovl_gather(num_procs, amr_max_blocks), amr_ovl_gather_n(amr_max_blocks))
-            allocate (amr_ovl_scatter(num_procs, amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
+            ! 2D rank lists sized to the computed max overlap in s_amr_build_seam_pairs; only the per-block counts are sized here.
+            allocate (amr_ovl_gather_n(amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
             allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
             amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
         else
@@ -5683,7 +5656,9 @@ contains
         ! TILE-ONLY and always freed here.
         if (.not. amr) then
             deallocate (amr_slot_live)
-            deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
+            if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
+            if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
+            deallocate (amr_ovl_gather_n, amr_ovl_scatter_n)
             deallocate (amr_slots)
             deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
             deallocate (amr_block_owner, amr_block_level)
@@ -5715,7 +5690,9 @@ contains
         deallocate (amr_slot_live)
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
-        deallocate (amr_ovl_gather, amr_ovl_gather_n, amr_ovl_scatter, amr_ovl_scatter_n)
+        if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
+        if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
+        deallocate (amr_ovl_gather_n, amr_ovl_scatter_n)
         do i = 1, sys_size
             @:DEALLOCATE(amr_cg(i)%sf)
         end do
