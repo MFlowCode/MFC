@@ -1084,6 +1084,81 @@ contains
 
     end subroutine s_amr_validate_decomp
 
+    !> Closed-form inverse of the per-dim split-with-remainder used by s_amr_rank_decomp: the cart coord owning global coarse cell
+    !! g. base=(gd+1)/pd, rem=mod(gd+1,pd). Exact for g in [0,gd]; callers clamp to [0,pd-1] for out-of-range g (ghost reach).
+    !! base==0 (more ranks than cells) => the g<rem*(base+1) branch always holds and c=g.
+    pure integer function f_amr_cell_coord(g, base, rem) result(c)
+
+        integer, intent(in) :: g, base, rem
+
+        if (g < rem*(base + 1)) then
+            c = g/(base + 1)
+        else
+            c = rem + (g - rem*(base + 1))/base
+        end if
+
+    end function f_amr_cell_coord
+
+    !> Per-dim contiguous rank-coord range [clo:chi] whose owned coarse slab intersects box [blo:bhi], clamped to [0,pd-1]. The
+    !! boundary coords' coarse_range is extended by buff_size exactly at the domain edge (s_amr_rank_coarse_range), so this clamped
+    !! interior-frame range reproduces BOTH the interior (scatter) and the coarse_range (gather) intersection sets: a box reaching
+    !! the ghost zone clamps to the boundary coord whose extended slab contains it, and there is no rank beyond that coord.
+    !! Collapsed dims (n_glb==0 / p_glb==0) contribute coord 0.
+    pure subroutine s_amr_coord_range(blo, bhi, clo, chi)
+
+        integer, intent(in)  :: blo(3), bhi(3)
+        integer, intent(out) :: clo(3), chi(3)
+        integer              :: gd(3), pd(3), base, rem, d
+
+        gd(1) = m_glb; gd(2) = n_glb; gd(3) = p_glb
+        pd(1) = num_procs_x; pd(2) = num_procs_y; pd(3) = num_procs_z
+        clo = 0; chi = 0
+        do d = 1, 3
+            if (d == 2 .and. n_glb == 0) cycle
+            if (d == 3 .and. p_glb == 0) cycle
+            base = (gd(d) + 1)/pd(d)
+            rem = mod(gd(d) + 1, pd(d))
+            clo(d) = min(max(f_amr_cell_coord(blo(d), base, rem), 0), pd(d) - 1)
+            chi(d) = min(max(f_amr_cell_coord(bhi(d), base, rem), 0), pd(d) - 1)
+        end do
+
+    end subroutine s_amr_coord_range
+
+    !> Ascending rank list overlapping coarse box [blo:bhi]. Enumerates the coord brick cx->cy->cz so r = cx*(Py*Pz)+cy*Pz+cz is
+    !! monotonic => ascending, reproducing the r=0..num_procs-1 scan order. Owner NOT excluded (consumers keep their own owner
+    !! skip). Caller sizes ranks(:) >= f_amr_overlap_count(blo,bhi).
+    pure subroutine s_amr_ranks_overlapping(blo, bhi, ranks, nr)
+
+        integer, intent(in)  :: blo(3), bhi(3)
+        integer, intent(out) :: ranks(:)
+        integer, intent(out) :: nr
+        integer              :: clo(3), chi(3), cx, cy, cz, pyz
+
+        call s_amr_coord_range(blo, bhi, clo, chi)
+        pyz = num_procs_y*num_procs_z
+        nr = 0
+        do cx = clo(1), chi(1)
+            do cy = clo(2), chi(2)
+                do cz = clo(3), chi(3)
+                    nr = nr + 1
+                    ranks(nr) = cx*pyz + cy*num_procs_z + cz
+                end do
+            end do
+        end do
+
+    end subroutine s_amr_ranks_overlapping
+
+    !> Overlap count only (allocation sizing), = product of the per-dim coord-range widths.
+    pure integer function f_amr_overlap_count(blo, bhi) result(nr)
+
+        integer, intent(in) :: blo(3), bhi(3)
+        integer             :: clo(3), chi(3)
+
+        call s_amr_coord_range(blo, bhi, clo, chi)
+        nr = (chi(1) - clo(1) + 1)*(chi(2) - clo(2) + 1)*(chi(3) - clo(3) + 1)
+
+    end function f_amr_overlap_count
+
     !> Rank r's contiguous owned coarse-cell range per dim from the computed decomposition (s_amr_rank_decomp): interior
     !! [start:start+ext] plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal
     !! to the set where f_amr_own_coarse is true, but as one contiguous span so box intersections identify contributors without a
@@ -1394,6 +1469,27 @@ contains
                     $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
                 end if
             #:endfor
+            ! TRANSITIONAL (increment #3, removed in T3): the inversion candidate set (region grown by 1), filtered by the
+            ! UNCHANGED predicate, must reproduce the O(P) scan's owner-excluded participant COUNT (order preserved by
+            ! construction).
+            block
+                integer :: cand(num_procs), nc, glo(3), ghi(3), ii, rr, nchk, nscan
+                glo = 0; ghi = 0
+                glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
+                if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
+                if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
+                call s_amr_ranks_overlapping(glo, ghi, cand, nc)
+                nchk = 0
+                do ii = 1, nc
+                    rr = cand(ii)
+                    if (rr /= owner .and. f_amr_reflux_participates(rr)) nchk = nchk + 1
+                end do
+                nscan = 0
+                do rr = 0, num_procs - 1
+                    if (rr /= owner .and. f_amr_reflux_participates(rr)) nscan = nscan + 1
+                end do
+                if (nchk /= nscan) call s_mpi_abort('increment #3: reflux candidate set misses a participant')
+            end block
             nreq = 0
             do r = 0, num_procs - 1
                 if (r /= owner .and. f_amr_reflux_participates(r)) nreq = nreq + 1
@@ -3682,6 +3778,34 @@ contains
                 end if
             end do
         end do
+        ! TRANSITIONAL (increment #3, removed in T3): verify the O(overlap) inversion reproduces the O(P) scan lists
+        ! element-for-element on every block. The scan above is authoritative here.
+        block
+            integer :: gchk(num_procs), schk(num_procs), ng, ns, kk, ii
+            do kk = 1, amr_num_blocks
+                plo = 0; phi = 0; rlo = 0; rhi = 0
+                plo(1) = amr_region_lo_all(1, kk) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, kk) + amr_cpat_mar
+                rlo(1) = amr_region_lo_all(1, kk); rhi(1) = amr_region_hi_all(1, kk)
+                if (n_glb > 0) then
+                    plo(2) = amr_region_lo_all(2, kk) - amr_cpat_mar; phi(2) = amr_region_hi_all(2, kk) + amr_cpat_mar
+                    rlo(2) = amr_region_lo_all(2, kk); rhi(2) = amr_region_hi_all(2, kk)
+                end if
+                if (p_glb > 0) then
+                    plo(3) = amr_region_lo_all(3, kk) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, kk) + amr_cpat_mar
+                    rlo(3) = amr_region_lo_all(3, kk); rhi(3) = amr_region_hi_all(3, kk)
+                end if
+                call s_amr_ranks_overlapping(plo, phi, gchk, ng)
+                call s_amr_ranks_overlapping(rlo, rhi, schk, ns)
+                if (ng /= amr_ovl_gather_n(kk) .or. ns /= amr_ovl_scatter_n(kk)) &
+                    & call s_mpi_abort('increment #3: overlap inversion count mismatch vs scan')
+                do ii = 1, ng
+                    if (gchk(ii) /= amr_ovl_gather(ii, kk)) call s_mpi_abort('increment #3: gather inversion order mismatch')
+                end do
+                do ii = 1, ns
+                    if (schk(ii) /= amr_ovl_scatter(ii, kk)) call s_mpi_abort('increment #3: scatter inversion order mismatch')
+                end do
+            end do
+        end block
         amr_seam_pairs_nblk = amr_num_blocks
         amr_seam_pairs_dirty = .false.
 
