@@ -1018,7 +1018,7 @@ contains
 
         call s_initialize_parallel_io()
 
-        call s_mpi_decompose_computational_domain()
+        call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=.false., adjust_local_domains=.false.)
 
         bc = bc_xyz_info(bc_x, bc_y, bc_z)
 

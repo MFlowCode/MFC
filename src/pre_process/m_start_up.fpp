@@ -608,6 +608,8 @@ contains
     !> Initialize MPI, read and validate user inputs on rank 0, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
 
+        type(bounds_info), dimension(3) :: local_domains
+
         call s_mpi_initialize()
 
         if (proc_rank == 0) then
@@ -628,7 +630,12 @@ contains
         y_domain_glb = y_domain
         z_domain_glb = z_domain
 
-        call s_mpi_decompose_computational_domain()
+        local_domains = (/x_domain, y_domain, z_domain/)
+        call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=.false., adjust_local_domains= .not. old_grid, &
+            & local_domains=local_domains)
+        x_domain = local_domains(1)
+        y_domain = local_domains(2)
+        z_domain = local_domains(3)
 
         bc = bc_xyz_info(bc_x, bc_y, bc_z)
 

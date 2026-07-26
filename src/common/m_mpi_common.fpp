@@ -17,9 +17,11 @@ module m_mpi_common
     use m_helper
     use ieee_arithmetic
     use m_nvtx
-    use m_constants, only: recon_type_weno, format_silo
+    use m_constants, only: recon_type_weno
 
     implicit none
+
+    private :: s_apply_decomposition_policies
 
     integer, private :: v_size
     $:GPU_DECLARE(create='[v_size]')
@@ -1314,7 +1316,12 @@ contains
     !> The purpose of this procedure is to optimally decompose the computational domain among the available processors. This is
     !! performed by attempting to award each processor, in each of the coordinate directions, approximately the same number of
     !! cells, and then recomputing the affected global parameters.
-    subroutine s_mpi_decompose_computational_domain
+    subroutine s_mpi_decompose_computational_domain(write_silo_ghost_offsets, adjust_local_domains, output_offsets, local_domains)
+
+        logical, intent(in)                                          :: write_silo_ghost_offsets
+        logical, intent(in)                                          :: adjust_local_domains
+        type(int_bounds_info), dimension(3), intent(inout), optional :: output_offsets
+        type(bounds_info), dimension(3), intent(inout), optional     :: local_domains
 
 #ifdef MFC_MPI
         !> Non-optimal number of processors in the x-, y- and z-directions
@@ -1322,12 +1329,15 @@ contains
         real(wp) :: fct_min        !< Processor factorization (fct) minimization parameter
         integer  :: MPI_COMM_CART  !< Cartesian processor topology communicator
         integer  :: rem_cells      !< Remaining cells after distribution among processors
+        integer  :: rem_cells_by_dim(3)
         integer  :: recon_order    !< WENO or MUSCL reconstruction order
         integer  :: i, j, k        !< Generic loop iterators
         integer  :: ierr           !< Generic flag used to identify and report MPI errors
 
         ! temp array to store neighbor rank coordinates
         integer, dimension(1:num_dims) :: neighbor_coords
+
+        rem_cells_by_dim = 0
 
         ! Zeroing out communication needs for moving EL bubbles/particles
         nidx(1)%beg = 0; nidx(1)%end = 0
@@ -1470,6 +1480,7 @@ contains
 
                 ! Number of remaining cells
                 rem_cells = mod(p + 1, num_procs_z)
+                rem_cells_by_dim(3) = rem_cells
 
                 ! Optimal number of cells per processor
                 p = (p + 1)/num_procs_z - 1
@@ -1497,22 +1508,6 @@ contains
                     nidx(3)%end = 1
                 end if
 
-#ifdef MFC_POST_PROCESS
-                ! Ghost zone at the beginning
-                if (proc_coords(3) > 0 .and. format == format_silo) then
-                    offset_z%beg = 2
-                else
-                    offset_z%beg = 0
-                end if
-
-                ! Ghost zone at the end
-                if (proc_coords(3) < num_procs_z - 1 .and. format == format_silo) then
-                    offset_z%end = 2
-                else
-                    offset_z%end = 0
-                end if
-#endif
-
                 ! Beginning and end sub-domain boundary locations
                 if (parallel_io) then
                     if (proc_coords(3) < rem_cells) then
@@ -1520,21 +1515,6 @@ contains
                     else
                         start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
                     end if
-                else
-#ifdef MFC_PRE_PROCESS
-                    if (old_grid .neqv. .true.) then
-                        dz_min = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
-
-                        if (proc_coords(3) < rem_cells) then
-                            z_domain%beg = z_domain%beg + dz_min*real((p + 1)*proc_coords(3))
-                            z_domain%end = z_domain%end - dz_min*real((p + 1)*(num_procs_z - proc_coords(3) - 1) - (num_procs_z &
-                                & - rem_cells))
-                        else
-                            z_domain%beg = z_domain%beg + dz_min*real((p + 1)*proc_coords(3) + rem_cells)
-                            z_domain%end = z_domain%end - dz_min*real((p + 1)*(num_procs_z - proc_coords(3) - 1))
-                        end if
-                    end if
-#endif
                 end if
 
                 ! 2D Cartesian Processor Topology
@@ -1584,6 +1564,7 @@ contains
 
             ! Number of remaining cells
             rem_cells = mod(n + 1, num_procs_y)
+            rem_cells_by_dim(2) = rem_cells
 
             ! Optimal number of cells per processor
             n = (n + 1)/num_procs_y - 1
@@ -1611,22 +1592,6 @@ contains
                 nidx(2)%end = 1
             end if
 
-#ifdef MFC_POST_PROCESS
-            ! Ghost zone at the beginning
-            if (proc_coords(2) > 0 .and. format == format_silo) then
-                offset_y%beg = 2
-            else
-                offset_y%beg = 0
-            end if
-
-            ! Ghost zone at the end
-            if (proc_coords(2) < num_procs_y - 1 .and. format == format_silo) then
-                offset_y%end = 2
-            else
-                offset_y%end = 0
-            end if
-#endif
-
             ! Beginning and end sub-domain boundary locations
             if (parallel_io) then
                 if (proc_coords(2) < rem_cells) then
@@ -1634,21 +1599,6 @@ contains
                 else
                     start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
                 end if
-            else
-#ifdef MFC_PRE_PROCESS
-                if (old_grid .neqv. .true.) then
-                    dy_min = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
-
-                    if (proc_coords(2) < rem_cells) then
-                        y_domain%beg = y_domain%beg + dy_min*real((n + 1)*proc_coords(2))
-                        y_domain%end = y_domain%end - dy_min*real((n + 1)*(num_procs_y - proc_coords(2) - 1) - (num_procs_y &
-                            & - rem_cells))
-                    else
-                        y_domain%beg = y_domain%beg + dy_min*real((n + 1)*proc_coords(2) + rem_cells)
-                        y_domain%end = y_domain%end - dy_min*real((n + 1)*(num_procs_y - proc_coords(2) - 1))
-                    end if
-                end if
-#endif
             end if
 
             ! 1D Cartesian Processor Topology
@@ -1667,6 +1617,7 @@ contains
 
         ! Number of remaining cells
         rem_cells = mod(m + 1, num_procs_x)
+        rem_cells_by_dim(1) = rem_cells
 
         ! Optimal number of cells per processor
         m = (m + 1)/num_procs_x - 1
@@ -1696,22 +1647,6 @@ contains
             nidx(1)%end = 1
         end if
 
-#ifdef MFC_POST_PROCESS
-        ! Ghost zone at the beginning
-        if (proc_coords(1) > 0 .and. format == format_silo) then
-            offset_x%beg = 2
-        else
-            offset_x%beg = 0
-        end if
-
-        ! Ghost zone at the end
-        if (proc_coords(1) < num_procs_x - 1 .and. format == format_silo) then
-            offset_x%end = 2
-        else
-            offset_x%end = 0
-        end if
-#endif
-
         ! Beginning and end sub-domain boundary locations
         if (parallel_io) then
             if (proc_coords(1) < rem_cells) then
@@ -1719,22 +1654,11 @@ contains
             else
                 start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
             end if
-        else
-#ifdef MFC_PRE_PROCESS
-            if (old_grid .neqv. .true.) then
-                dx_min = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
-
-                if (proc_coords(1) < rem_cells) then
-                    x_domain%beg = x_domain%beg + dx_min*real((m + 1)*proc_coords(1))
-                    x_domain%end = x_domain%end - dx_min*real((m + 1)*(num_procs_x - proc_coords(1) - 1) - (num_procs_x &
-                        & - rem_cells))
-                else
-                    x_domain%beg = x_domain%beg + dx_min*real((m + 1)*proc_coords(1) + rem_cells)
-                    x_domain%end = x_domain%end - dx_min*real((m + 1)*(num_procs_x - proc_coords(1) - 1))
-                end if
-            end if
-#endif
         end if
+
+        call s_apply_decomposition_policies((/num_procs_x, num_procs_y, num_procs_z/), rem_cells_by_dim, (/m, n, p/), (/m_glb, &
+                                            & n_glb, p_glb/), write_silo_ghost_offsets, &
+                                            & adjust_local_domains .and. (.not. parallel_io), output_offsets, local_domains)
 
         @:ALLOCATE(neighbor_ranks(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end))
         do k = nidx(3)%beg, nidx(3)%end
@@ -1752,6 +1676,68 @@ contains
 #endif
 
     end subroutine s_mpi_decompose_computational_domain
+
+    !> Apply executable-configured output and local-domain policies after the shared Cartesian decomposition.
+    subroutine s_apply_decomposition_policies(proc_counts, remainders, local_cells, global_cells, write_silo_ghost_offsets, &
+        & adjust_local_domains, output_offsets, local_domains)
+
+        integer, dimension(3), intent(in)                            :: proc_counts, remainders, local_cells, global_cells
+        logical, intent(in)                                          :: write_silo_ghost_offsets, adjust_local_domains
+        type(int_bounds_info), dimension(3), intent(inout), optional :: output_offsets
+        type(bounds_info), dimension(3), intent(inout), optional     :: local_domains
+        integer                                                      :: dim
+        real(wp)                                                     :: domain_beg, domain_end, spacing
+
+        if (write_silo_ghost_offsets .and. .not. present(output_offsets)) then
+            call s_mpi_abort('Silo ghost-offset policy requires output offset storage.')
+        end if
+        if (adjust_local_domains .and. .not. present(local_domains)) then
+            call s_mpi_abort('Local-domain adjustment policy requires domain storage.')
+        end if
+
+        if (present(output_offsets)) then
+            do dim = 1, 3
+                output_offsets(dim)%beg = 0
+                output_offsets(dim)%end = 0
+            end do
+
+            if (write_silo_ghost_offsets) then
+                do dim = 1, num_dims
+                    if (proc_coords(dim) > 0) output_offsets(dim)%beg = 2
+                    if (proc_coords(dim) < proc_counts(dim) - 1) output_offsets(dim)%end = 2
+                end do
+            end if
+        end if
+
+        if (adjust_local_domains) then
+            do dim = 1, num_dims
+                domain_beg = local_domains(dim)%beg
+                domain_end = local_domains(dim)%end
+                spacing = (domain_end - domain_beg)/real(global_cells(dim) + 1, wp)
+
+                select case (dim)
+                case (1)
+                    dx_min = spacing
+                case (2)
+                    dy_min = spacing
+                case (3)
+                    dz_min = spacing
+                end select
+
+                if (proc_coords(dim) < remainders(dim)) then
+                    local_domains(dim)%beg = domain_beg + spacing*real((local_cells(dim) + 1)*proc_coords(dim), wp)
+                    local_domains(dim)%end = domain_end - spacing*real((local_cells(dim) + 1)*(proc_counts(dim) - proc_coords(dim) &
+                                  & - 1) - (proc_counts(dim) - remainders(dim)), wp)
+                else
+                    local_domains(dim)%beg = domain_beg + spacing*real((local_cells(dim) + 1)*proc_coords(dim) + remainders(dim), &
+                                  & wp)
+                    local_domains(dim)%end = domain_end - spacing*real((local_cells(dim) + 1)*(proc_counts(dim) - proc_coords(dim) &
+                                  & - 1), wp)
+                end if
+            end do
+        end if
+
+    end subroutine s_apply_decomposition_policies
 
     !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
     !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of

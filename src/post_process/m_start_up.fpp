@@ -26,7 +26,7 @@ module m_start_up
     use m_checker
     use m_thermochem, only: num_species, species_names
     use m_finite_differences
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, format_silo
     use m_chemistry
 
 #ifdef MFC_MPI
@@ -932,6 +932,8 @@ contains
     !> Set up the MPI environment, read and broadcast user inputs, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
 
+        type(int_bounds_info), dimension(3) :: output_offsets
+
         num_dims = 1 + min(1, n) + min(1, p)
 
         call s_mpi_initialize()
@@ -946,7 +948,12 @@ contains
 
         call s_mpi_bcast_user_inputs()
         call s_initialize_parallel_io()
-        call s_mpi_decompose_computational_domain()
+        output_offsets = (/offset_x, offset_y, offset_z/)
+        call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=format == format_silo, adjust_local_domains=.false., &
+            & output_offsets=output_offsets)
+        offset_x = output_offsets(1)
+        offset_y = output_offsets(2)
+        offset_z = output_offsets(3)
         call s_check_inputs_fft()
 
         bc = bc_xyz_info(bc_x, bc_y, bc_z)
