@@ -323,6 +323,25 @@ def test_generate_case_opt_decls_fpp():
     assert "AUTO-GENERATED" in out
 
 
+def test_common_computed_scalars_are_declared_for_every_target():
+    from pathlib import Path
+
+    from mfc.params.generators.fortran_gen import get_generated_files
+
+    files = {path.parent.name: content for path, content in get_generated_files(Path("/build")) if path.name == "generated_case_opt_decls.fpp"}
+    for target in ("pre_process", "simulation", "post_process"):
+        for name in ("num_dims", "num_vels", "weno_polyn", "muscl_polyn"):
+            assert f":: {name}" in files[target]
+
+
+def test_simulation_generated_scalars_own_gpu_declarations():
+    from mfc.params.generators.fortran_gen import SIM_GPU_DECL_VARS, generate_case_opt_decls_fpp, generate_decls_fpp
+
+    generated = generate_decls_fpp("sim") + generate_case_opt_decls_fpp()
+    for name in SIM_GPU_DECL_VARS:
+        assert generated.count(f"$:GPU_DECLARE(create='[{name}]')") == 1
+
+
 # ── generate_bcast_fpp tests ──────────────────────────────────────────────────
 
 

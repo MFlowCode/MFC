@@ -27,20 +27,6 @@ module m_global_parameters_common
     ! num_dims, num_vels, weno_polyn, muscl_polyn, weno_num_stencils, wenojs, igr, etc.
     #:include 'generated_case_opt_decls.fpp'
 
-    ! For pre_process and post_process: num_dims and num_vels are declared manually here
-    ! (sim gets them from generated_case_opt_decls.fpp above)
-#ifndef MFC_SIMULATION
-    integer :: num_dims  !< Number of spatial dimensions
-    integer :: num_vels  !< Number of velocity components (different from num_dims for mhd)
-#endif
-
-    ! For pre_process: weno_polyn and muscl_polyn are declared manually here
-    ! (sim gets them from generated_case_opt_decls.fpp; post does not use them)
-#ifdef MFC_PRE_PROCESS
-    integer :: weno_polyn   !< Degree of the WENO polynomials
-    integer :: muscl_polyn  !< Degree of the MUSCL polynomials
-#endif
-
     !> @name Annotations of the structure of the state and flux vectors in terms of the size and configuration of the system of
     !! equations
     !> @{
@@ -90,49 +76,9 @@ module m_global_parameters_common
     !> Minimum cell widths. These are distinct from the per-cell width arrays named dx, dy, and dz in simulation and post-process.
     real(wp) :: dx_min, dy_min, dz_min
 
-#ifdef MFC_SIMULATION
     $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
-    ! Device residency for namelist/case-opt state declared above via the generated
-    ! includes: declare directives must live in the declaring module (Cray ftn rejects
-    ! declare-target on use-associated names), so these moved here from simulation.
-    $:GPU_DECLARE(create='[cyl_coord]')
-    $:GPU_DECLARE(create='[dt, m, n, p]')
-    $:GPU_DECLARE(create='[cfl_target]')
-    $:GPU_DECLARE(create='[int_comp, ic_eps, ic_beta]')
-    $:GPU_DECLARE(create='[muscl_eps]')
-    $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
-    $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
-    $:GPU_DECLARE(create='[hyperelasticity, elasticity, low_Mach]')
-    $:GPU_DECLARE(create='[cont_damage, hyper_cleaning]')
-    $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
-    $:GPU_DECLARE(create='[down_sample]')
-    $:GPU_DECLARE(create='[fd_order]')
-    $:GPU_DECLARE(create='[rhoref, pref]')
-    $:GPU_DECLARE(create='[ib, num_ibs]')
-    $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
-    $:GPU_DECLARE(create='[Ca, Web, Re_inv]')
-    $:GPU_DECLARE(create='[bubbles_euler, polytropic, polydisperse]')
-    $:GPU_DECLARE(create='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters]')
-    $:GPU_DECLARE(create='[bubble_model, thermal]')
-    $:GPU_DECLARE(create='[poly_sigma]')
-    $:GPU_DECLARE(create='[qbmm, pi_fac]')
-    $:GPU_DECLARE(create='[R0ref]')
-    $:GPU_DECLARE(create='[acoustic_source, num_source]')
-    $:GPU_DECLARE(create='[sigma, surface_tension]')
-    $:GPU_DECLARE(create='[bubbles_lagrange]')
-    $:GPU_DECLARE(create='[Bx0]')
-    $:GPU_DECLARE(create='[tau_star, cont_damage_s, alpha_bar]')
-    $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
-    $:GPU_DECLARE(create='[synthetic_turbulence, num_turbulent_sources, synth_U_inf]')
-    #:if not MFC_CASE_OPTIMIZATION
-        $:GPU_DECLARE(create='[num_dims, num_vels, weno_polyn, weno_order]')
-        $:GPU_DECLARE(create='[weno_num_stencils, num_fluids, wenojs]')
-        $:GPU_DECLARE(create='[mapped_weno, wenoz, teno, wenoz_q, mhd, relativity]')
-        $:GPU_DECLARE(create='[igr_iter_solver, igr_order, viscous, igr_pres_lim, igr]')
-        $:GPU_DECLARE(create='[recon_type, muscl_order, muscl_polyn, muscl_lim]')
-    #:endif
-#endif
+    $:GPU_DECLARE(create='[elasticity]')
 
     !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)
     !> @{
@@ -163,10 +109,11 @@ contains
     !!   - qbmm_idx allocations and fills (diverge between pre vs sim/post)
     !!   - sim-only: gam = bub_pp%gam_g, nmomsp/nmomtot, Re_idx allocation, GPU_UPDATE calls
     !!   - post-only: beta_idx increment (bubbles_lagrange path), offset/grid allocations
-    impure subroutine s_initialize_eqn_idx(nmom_in, nb_in)
+    impure subroutine s_initialize_eqn_idx(nmom_in, nb_in, six_eqn_alf_is_advected)
 
         integer, intent(in) :: nmom_in
         integer, intent(in) :: nb_in
+        logical, intent(in) :: six_eqn_alf_is_advected
 
         ! Gamma/Pi_inf Model
 
@@ -252,9 +199,7 @@ contains
             eqn_idx%E = eqn_idx%mom%end + 1
             eqn_idx%adv%beg = eqn_idx%E + 1
             eqn_idx%adv%end = eqn_idx%E + num_fluids
-#ifdef MFC_SIMULATION
-            eqn_idx%alf = eqn_idx%adv%end
-#endif
+            if (six_eqn_alf_is_advected) eqn_idx%alf = eqn_idx%adv%end
             eqn_idx%int_en%beg = eqn_idx%adv%end + 1
             eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
             sys_size = eqn_idx%int_en%end
@@ -352,7 +297,6 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 #endif
 
-#ifdef MFC_SIMULATION
         ! Under case-optimization, num_dims and num_vels are compile-time parameters; skip assignment.
         #:if not MFC_CASE_OPTIMIZATION
             num_dims = 1 + min(1, n) + min(1, p)
@@ -363,15 +307,6 @@ contains
                 num_vels = num_dims
             end if
         #:endif
-#else
-        num_dims = 1 + min(1, n) + min(1, p)
-
-        if (mhd) then
-            num_vels = 3
-        else
-            num_vels = num_dims
-        end if
-#endif
 
         allocate (proc_coords(1:num_dims))
 
