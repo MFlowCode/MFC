@@ -115,6 +115,9 @@ module m_amr
     !> (max-overlap, amr_max_blocks); sized in s_amr_build_seam_pairs
     integer, allocatable :: amr_ovl_gather(:,:), amr_ovl_scatter(:,:)
     integer, allocatable :: amr_ovl_gather_n(:), amr_ovl_scatter_n(:)  !< per-block list lengths
+    !> (0:num_procs-1) SFC Morton-key upper bound per rank from the cost-weighted split; owner = cut-search (f_amr_owner). The O(P)
+    !! computed replacement for the O(global_blocks) amr_block_owner table (validated against it during bring-up).
+    integer(kind=8), allocatable :: amr_owner_cut(:)
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min-over-ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
@@ -259,6 +262,7 @@ contains
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
         allocate (amr_owns_all(amr_max_blocks))
         allocate (amr_block_owner(amr_max_blocks))
+        allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
         allocate (amr_block_level(amr_max_blocks))
         ! amr_ovl_gather/scatter (the 2D rank lists) are allocated to the computed max overlap in s_amr_build_seam_pairs; only the
         ! per-block counts are sized here.
@@ -1648,13 +1652,20 @@ contains
         do k = 1, amr_num_blocks
             if (amr_block_level(k) == 1) total = total + twt(k)
         end do
+        amr_owner_cut = -1_8
         r = 0; cum = 0._wp
         do k = 1, amr_num_blocks
             if (amr_block_level(ord(k)) /= 1) cycle
             tgt = real(r + 1, wp)*total/real(num_procs, wp)
             if (cum >= tgt .and. r < num_procs - 1) r = r + 1
             amr_block_owner(ord(k)) = r
+            amr_owner_cut(r) = key(ord(k))  ! anchors visited in ascending Morton key => running upper bound for rank r
             cum = cum + twt(ord(k))
+        end do
+        ! ranks that received no anchor (or trail the last-assigned rank) get an empty range: inherit the predecessor's bound so the
+        ! search never lands on them. cut is thus non-decreasing and its top equals the global max key.
+        do r = 1, num_procs - 1
+            if (amr_owner_cut(r) < amr_owner_cut(r - 1)) amr_owner_cut(r) = amr_owner_cut(r - 1)
         end do
 
         ! descendants inherit their parent's owner (top-down, level by level - parents already assigned when their children run)
@@ -1665,7 +1676,48 @@ contains
             end do
         end do
 
+        call s_amr_validate_owner()
+
     end subroutine s_amr_assign_block_owners
+
+    !> Owner rank of block k from the O(num_procs) SFC cut-points: resolve k's level-1 tower anchor, then binary-search its Morton
+    !! key in amr_owner_cut (smallest r with key <= cut(r)). Reproduces s_amr_assign_block_owners' cost-weighted SFC split exactly.
+    pure integer function f_amr_owner(k) result(r)
+
+        integer, intent(in) :: k
+        integer(kind=8)     :: mk
+        integer             :: a, lo, hi, mid
+
+        a = k
+        do while (amr_block_level(a) > 1)
+            if (f_amr_parent_block(a) < 1) exit
+            a = f_amr_parent_block(a)
+        end do
+        mk = f_morton(amr_region_lo_all(1, a), amr_region_lo_all(2, a), amr_region_lo_all(3, a))
+        lo = 0; hi = num_procs - 1
+        do while (lo < hi)
+            mid = (lo + hi)/2
+            if (mk <= amr_owner_cut(mid)) then
+                hi = mid
+            else
+                lo = mid + 1
+            end if
+        end do
+        r = lo
+
+    end function f_amr_owner
+
+    !> TRANSITIONAL: the SFC cut-point accessor must reproduce the stored owner table exactly (removed once the table is deleted).
+    impure subroutine s_amr_validate_owner()
+
+        integer :: k
+
+        do k = 1, amr_num_blocks
+            if (f_amr_owner(k) /= amr_block_owner(k)) &
+                & call s_mpi_abort('SFC cut-point owner disagrees with amr_block_owner - cut capture or search is wrong')
+        end do
+
+    end subroutine s_amr_validate_owner
 
     impure subroutine s_amr_compute_isect(lo, hi)
 
@@ -4689,6 +4741,7 @@ contains
             allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
             allocate (amr_owns_all(amr_max_blocks))
             allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
+            allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
             allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
             allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
             allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
@@ -5662,6 +5715,7 @@ contains
             deallocate (amr_slots)
             deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
             deallocate (amr_block_owner, amr_block_level)
+            if (allocated(amr_owner_cut)) deallocate (amr_owner_cut)
         end if
         deallocate (amr_tile_l0_owner, amr_tile_cost, amr_tile_cost_ema)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
@@ -5703,6 +5757,7 @@ contains
         if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
         if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
         if (allocated(amr_block_owner)) deallocate (amr_block_owner)
+        if (allocated(amr_owner_cut)) deallocate (amr_owner_cut)
         if (allocated(amr_block_level)) deallocate (amr_block_level)
         if (allocated(amr_gxcb)) deallocate (amr_gxcb)
         if (allocated(amr_gycb)) deallocate (amr_gycb)
