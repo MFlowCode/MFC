@@ -845,7 +845,7 @@ contains
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
 
-        call s_initialize_boundary_common_module()
+        call s_initialize_boundary_common_module(use_dirichlet_buffers=.true.)
 
         if (down_sample) then
             m_ds = int((m + 1)/3) - 1

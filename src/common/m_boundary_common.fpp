@@ -34,9 +34,14 @@ module m_boundary_common
 contains
 
     !> Allocate and set up boundary condition buffer arrays for all coordinate directions.
-    impure subroutine s_initialize_boundary_common_module()
+    impure subroutine s_initialize_boundary_common_module(use_dirichlet_buffers)
 
-        integer :: i, j, sys_size_alloc
+        integer                       :: i, j, sys_size_alloc
+        logical, intent(in), optional :: use_dirichlet_buffers
+
+        dirichlet_from_buffers = .false.
+        if (present(use_dirichlet_buffers)) dirichlet_from_buffers = use_dirichlet_buffers
+        $:GPU_UPDATE(device='[dirichlet_from_buffers]')
 
         @:ALLOCATE(bc_buffers(1:3, 1:2))
 

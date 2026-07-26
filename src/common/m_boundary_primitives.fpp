@@ -18,6 +18,9 @@ module m_boundary_primitives
     type(scalar_field), dimension(:,:), allocatable :: bc_buffers
     $:GPU_DECLARE(create='[bc_buffers]')
 
+    logical :: dirichlet_from_buffers
+    $:GPU_DECLARE(create='[dirichlet_from_buffers]')
+
 contains
 
     !> Fill ghost cells by copying the nearest boundary cell value along the specified direction.
@@ -904,7 +907,11 @@ contains
         integer                                                :: j, i
         type(scalar_field), optional, intent(inout)            :: q_T_sf
 
-#ifdef MFC_SIMULATION
+        if (.not. dirichlet_from_buffers) then
+            call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+            return
+        end if
+
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, sys_size
@@ -982,9 +989,6 @@ contains
                 end if
             #:endif
         end if
-#else
-        call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
-#endif
 
     end subroutine s_dirichlet
 
