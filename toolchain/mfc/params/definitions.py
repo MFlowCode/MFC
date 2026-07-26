@@ -1223,7 +1223,19 @@ _SIM = {"sim"}
 _PRE = {"pre"}
 _POST = {"post"}
 
-_decl(_ALL, "avg_state", "alt_soundspeed", "mixture_err", "sigR", "viscous", "riemann_solver", "stl_models", "num_stl_models")
+_decl(
+    _ALL,
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
+    "sigR",
+    "viscous",
+    "riemann_solver",
+    "stl_models",
+    "num_stl_models",
+    "palpha_eps",
+    "ptgalpha_eps",
+)
 
 _nv(
     _ALL,

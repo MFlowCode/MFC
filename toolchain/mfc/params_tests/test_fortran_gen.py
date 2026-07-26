@@ -154,6 +154,17 @@ def test_stl_model_declarations_do_not_expand_post_namelist():
     assert "stl_models" not in post_namelist
 
 
+def test_phase_change_declarations_do_not_expand_post_namelist():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp, generate_namelist_fpp
+
+    post_declarations = generate_decls_fpp("post")
+    post_namelist = generate_namelist_fpp("post")
+
+    for name in ("palpha_eps", "ptgalpha_eps"):
+        assert f":: {name}" in post_declarations
+        assert name not in post_namelist
+
+
 def test_decls_no_percent_vars():
     from mfc.params.generators.fortran_gen import generate_decls_fpp
 
