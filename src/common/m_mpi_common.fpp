@@ -42,8 +42,8 @@ module m_mpi_common
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
-    logical, private :: exchange_all_chemistry_temperatures
-    logical, private :: use_rdma_transport
+    logical, private :: exchange_all_chemistry_temperatures = .false.
+    logical, private :: use_rdma_transport = .false.
 
 contains
 
@@ -1749,7 +1749,9 @@ contains
         type(int_bounds_info), intent(in) :: bc_bounds, offset
         real(wp), intent(inout)           :: cell_boundaries(-1 - offset%beg:)
         real(wp), intent(inout)           :: cell_centers(-buff_size:)
-        real(wp), intent(inout)           :: cell_widths(-buff_size:)
+        ! Contiguous so that passing an element to MPI is a plain address, with no descriptor
+        ! or copy-in/copy-out. Every actual argument is a whole module array.
+        real(wp), contiguous, intent(inout) :: cell_widths(-buff_size:)
 
 #ifdef MFC_MPI
         integer :: ierr

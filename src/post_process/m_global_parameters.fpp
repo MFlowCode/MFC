@@ -318,6 +318,10 @@ contains
 
         if (n == 0) m_root = m_glb
 
+        ! Declared for the common conversion kernel but not a post_process input, so it is neither
+        ! defaulted on non-root ranks nor broadcast. Post-process never carries viscous stresses.
+        viscous = .false.
+
         ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
 

@@ -376,8 +376,10 @@ contains
             mhd = .false.
             relativity = .false.
             viscous = .false.
-            riemann_solver = dflt_int
         #:endif
+
+        ! Not a case-optimization parameter, so it stays a runtime variable in every build.
+        riemann_solver = dflt_int
 
         ! Tait EOS
         rhoref = dflt_real

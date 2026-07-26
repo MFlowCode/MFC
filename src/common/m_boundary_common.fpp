@@ -350,13 +350,13 @@ contains
     subroutine s_populate_grid_variables_buffers(x_cb_in, x_cc_in, dx_in, x_offset, y_offset, z_offset, y_cb_in, y_cc_in, dy_in, &
         & z_cb_in, z_cc_in, dz_in, global_bounds)
 
-        type(int_bounds_info), intent(in)                      :: x_offset, y_offset, z_offset
-        real(wp), intent(inout)                                :: x_cb_in(-1 - x_offset%beg:)
-        real(wp), intent(inout)                                :: x_cc_in(-buff_size:), dx_in(-buff_size:)
-        real(wp), optional, intent(inout)                      :: y_cb_in(-1 - y_offset%beg:), z_cb_in(-1 - z_offset%beg:)
-        real(wp), optional, intent(inout)                      :: y_cc_in(-buff_size:), dy_in(-buff_size:)
-        real(wp), optional, intent(inout)                      :: z_cc_in(-buff_size:), dz_in(-buff_size:)
-        type(bounds_info), optional, dimension(3), intent(out) :: global_bounds
+        type(int_bounds_info), intent(in)                        :: x_offset, y_offset, z_offset
+        real(wp), intent(inout)                                  :: x_cb_in(-1 - x_offset%beg:)
+        real(wp), intent(inout)                                  :: x_cc_in(-buff_size:), dx_in(-buff_size:)
+        real(wp), optional, intent(inout)                        :: y_cb_in(-1 - y_offset%beg:), z_cb_in(-1 - z_offset%beg:)
+        real(wp), optional, intent(inout)                        :: y_cc_in(-buff_size:), dy_in(-buff_size:)
+        real(wp), optional, intent(inout)                        :: z_cc_in(-buff_size:), dz_in(-buff_size:)
+        type(bounds_info), optional, dimension(3), intent(inout) :: global_bounds
 
         if (present(global_bounds)) then
 #ifdef MFC_MPI
