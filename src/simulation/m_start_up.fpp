@@ -28,7 +28,6 @@ module m_start_up
     use m_qbmm
     use m_derived_variables
     use m_hypoelastic
-    use m_hyperelastic
     use m_phase_change
     use m_viscous
     use m_bubbles_EE
@@ -234,7 +233,7 @@ contains
             end if
         end do
 
-        if (bubbles_euler .or. elasticity) then
+        if (bubbles_euler .or. hypoelasticity) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
@@ -395,7 +394,7 @@ contains
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -458,7 +457,7 @@ contains
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -943,7 +942,6 @@ contains
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
-        if (hyperelasticity) call s_initialize_hyperelastic_module()
 
     end subroutine s_initialize_modules
 
@@ -1101,7 +1099,6 @@ contains
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
-        if (hyperelasticity) call s_finalize_hyperelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()

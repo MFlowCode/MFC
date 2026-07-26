@@ -1,0 +1,62 @@
+mfc: Starting...
+mfc: OK > Created a Python virtual environment (venv).
+mfc: OK > (venv) Entered the Python 3.12.3 virtual environment (>= 3.9).
+mfc: (venv) Installing Python packages...
+mfc: (venv) Installing uv package manager for fast installation...
+mfc: OK > (venv) Installed uv.
+mfc: (venv) Using uv for fast installation...
+Using Python 3.12.3 environment at: build/venv
+Resolved 96 packages in 2.90s
+   Building mfc @ file:///fastscratch/sbryngelson3/mfc-pr1679-merge/toolchain
+      Built mfc @ file:///fastscratch/sbryngelson3/mfc-pr1679-merge/toolchain
+Prepared 1 package in 464ms
+Installed 96 packages in 1.69s
+mfc: OK > (venv) Installation succeeded.
+mfc: OK > (venv) Applied fypp linemarker-resync patch.
+
+ Auto-regenerating completion scripts...
+ Tab completions updated. Run: source /nethome/sbryngelson3/.local/share/mfc/completions/mfc.bash
+      .=++*:          -+*+=.        | sbryngelson3@wingtip-gpu3.cc.gatech.edu [Linux]
+     :+   -*-        ==   =* .      | -----------------------------------------------
+   :*+      ==      ++    .+-       | 
+  :*##-.....:*+   .#%+++=--+=:::.   | --jobs 24
+  -=-++-======#=--**+++==+*++=::-:. | --mpi --no-gpu --no-debug --no-reldebug --no-gcov --no-unified --no-single --no-mixed --no-fastmath
+ .:++=----------====+*= ==..:%..... | --targets pre_process, simulation, and post_process
+  .:-=++++===--==+=-+=   +.  :=     | 
+  +#=::::::::=%=. -+:    =+   *:    | ------------------------------------------------------------------
+ .*=-=*=..    :=+*+:      -...--    | $ ./mfc.sh (build, run, test, clean, new, validate, params) --help
+
+ Build | syscheck, pre_process, simulation, and post_process
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Configuring syscheck...
+   ✓ Configured syscheck
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Building syscheck...
+   (build took 8.1s)
+   ✓ Built syscheck
+
+   Installing syscheck...
+   ✓ Installed syscheck
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Configuring pre_process...
+   ✓ Configured pre_process
+
+ Generating case.fpp.
+   Writing a (new) custom case.fpp file.
+   Building pre_process...
+   (build took 55.7s)
+   ✓ Built pre_process
+
+   Installing pre_process...
+   ✓ Installed pre_process
+
+   Configuring fftw...
+   ✓ Configured fftw
+
+   Building fftw...

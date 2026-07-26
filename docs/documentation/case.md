@@ -536,7 +536,6 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `surface_tension`          | Logical | Activate surface tension |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
-| `pre_stress`               | Logical | Enable pre-stress initialization for hypoelasticity |
 | `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
@@ -1124,7 +1123,6 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | Parameter         | Type    | Description                                         |
 | ---:              | :---:   | :---                                                |
 | `hypoelasticity`  | Logical | Enable hypoelasticity simulation                    |
-| `hyperelasticity` | Logical | Enable hyperelasticity simulation                   |
 | `cont_damage`     | Logical | Enable continuum damage model                       |
 | `tau_star`        | Real    | Threshold stress for continuum damage model         |
 | `cont_damage_s`   | Real    | Power `s` for continuum damage model                |

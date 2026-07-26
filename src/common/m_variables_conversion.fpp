@@ -481,7 +481,7 @@ contains
                     if (model_eqns /= model_eqns_4eq) then
 #ifdef MFC_GPU
                         ! Device regions call the device-compiled scalar kernel directly.
-                        if (elasticity) then
+                        if (hypoelasticity) then
                             call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                 & alpha_rho_K, Re_K, G_K, Gs_vc)
                         else
@@ -490,7 +490,7 @@ contains
                         end if
 #else
                         ! Host execution uses the wrapper, which also stores requested diagnostics.
-                        if (elasticity) then
+                        if (hypoelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, &
                                                                 & fluid_pp(:)%G)
                         else
@@ -689,7 +689,7 @@ contains
                         end do
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
@@ -710,13 +710,6 @@ contains
                                                & k, l)**2._wp)/(4._wp*G_K))/gamma_K
                                 end if
                             end if
-                        end do
-                    end if
-
-                    if (hyperelasticity) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%xi%beg, eqn_idx%xi%end
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
                         end do
                     end if
 
@@ -941,7 +934,7 @@ contains
                         end do
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         ! adding the elastic contribution Multiply \tau to \rho \tau
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
@@ -961,14 +954,6 @@ contains
                                               & l)**2._wp)/(4._wp*G)
                                 end if
                             end if
-                        end do
-                    end if
-
-                    ! using \rho xi as the conservative formulation stated in Kamrin et al. JFM 2022
-                    if (hyperelasticity) then
-                        ! Multiply \xi to \rho \xi
-                        do i = eqn_idx%xi%beg, eqn_idx%xi%end
-                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
                         end do
                     end if
 
@@ -1055,7 +1040,7 @@ contains
                     end do
 
                     pres_K = qK_prim_vf(j, k, l, eqn_idx%E)
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
                             & Re_K, G_K, Gs_vc)
                     else
