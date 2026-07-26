@@ -18,7 +18,7 @@ module m_boundary_primitives
     type(scalar_field), dimension(:,:), allocatable :: bc_buffers
     $:GPU_DECLARE(create='[bc_buffers]')
 
-    logical :: dirichlet_from_buffers
+    logical :: dirichlet_from_buffers = .false.
     $:GPU_DECLARE(create='[dirichlet_from_buffers]')
 
 contains

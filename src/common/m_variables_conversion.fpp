@@ -184,17 +184,8 @@ contains
         call s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
 
         ! Use the same scalar kernel on host and device so mixture semantics do not depend on the executable or accelerator backend.
-        if (present(G_K)) then
-            if (present(Re_K)) then
-                call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, Re_K, G_K, G)
-            else
-                call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, G_K=G_K, G=G)
-            end if
-        else if (present(Re_K)) then
-            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, Re_K)
-        else
-            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K)
-        end if
+        ! Absent optional dummies forward as absent, so the optional arguments need no dispatch here.
+        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, Re_K, G_K, G)
 
         ! Store derived mixture fields when requested during module initialization.
         if (allocated(rho_sf)) then

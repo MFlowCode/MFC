@@ -695,10 +695,19 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
         result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
         result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
+    sim_gpu_decls = ""
     for short, full in TARGETS:
         inc = build_dir / "include" / full
         content = generate_case_opt_decls_fpp() if short == "sim" else generate_common_extra_decls_fpp()
+        if short == "sim":
+            sim_gpu_decls = content
         result.append((inc / "generated_case_opt_decls.fpp", content))
+    # A name here that simulation never declares emits no GPU_DECLARE, so the variable
+    # silently loses device residency. Fail on the stale entry instead.
+    sim_gpu_decls += generate_decls_fpp("sim")
+    stale = sorted(n for n in SIM_GPU_DECL_VARS if f"$:GPU_DECLARE(create='[{n}]')" not in sim_gpu_decls)
+    if stale:
+        raise ValueError(f"SIM_GPU_DECL_VARS names that simulation does not declare: {', '.join(stale)}. Remove them or restore the parameter.")
     for short, full in TARGETS:
         inc = build_dir / "include" / full
         result.append((inc / "generated_bcast.fpp", generate_bcast_fpp(short)))
