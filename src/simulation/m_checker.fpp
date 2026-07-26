@@ -78,8 +78,6 @@ contains
                        & "active_box is incompatible with cyl_coord (geometric source terms are nonzero for uniform flow; exterior is not static)")
             @:PROHIBIT(hypoelasticity, &
                        & "active_box is incompatible with hypoelasticity (stress source terms violate the static-uniform-exterior assumption)")
-            @:PROHIBIT(hyperelasticity, &
-                       & "active_box is incompatible with hyperelasticity (stress source terms violate the static-uniform-exterior assumption)")
             @:PROHIBIT(mhd, &
                        & "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
             @:PROHIBIT(chemistry, &
@@ -120,7 +118,6 @@ contains
                        & "amr does not support surface_tension: the capillary force depends on the interface normal (grad-c direction), which the conservative-linearly-prolonged fine ghost color cannot reproduce consistently with the coarse solver across a 2:1 coarse/fine boundary - a growing spurious seam current results")
             ! hypoelasticity supported: stress components prolong via the generic conservative-linear
             ! path; the swap/restore recomputes the spacing-dependent FD coefficients per grid.
-            @:PROHIBIT(hyperelasticity, "amr does not support hyperelasticity")
             ! MHD gated ON MEASURED EVIDENCE: B/psi ride the generic conservative machinery, but the
             ! per-component prolongation/reflux is not divergence-preserving - on a magnetized 2D
             ! Brio-Wu the c/f seam is a continuous O(1) monopole source GLM cleaning spreads but

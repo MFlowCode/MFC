@@ -125,7 +125,7 @@ TAG_DISPLAY_NAMES = {
     "grid": "Grid",
     "weno": "WENO",
     "viscosity": "Viscosity",
-    "elasticity": "Elasticity",
+    "hypoelasticity": "Hypoelasticity",
     "surface_tension": "Surface tension",
     "acoustic": "Acoustic",
     "ib": "Immersed boundary",
@@ -618,9 +618,8 @@ def _load():
     # Viscosity
     _r("viscous", LOG, {"viscosity"})
 
-    # Elasticity
-    for n in ["hypoelasticity", "hyperelasticity"]:
-        _r(n, LOG, {"elasticity"})
+    # Hypoelasticity
+    _r("hypoelasticity", LOG, {"hypoelasticity"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
@@ -805,7 +804,6 @@ def _load():
         "mixlayer_perturb",
         "perturb_flow",
         "perturb_sph",
-        "pre_stress",
         "elliptic_smoothing",
         "simplex_perturb",
         "alt_soundspeed",
@@ -898,9 +896,9 @@ def _load():
         for f in range(1, NF + 1):
             _r(f"{px}alpha({f})", A_REAL, math=r"\f$\alpha_" + str(f) + r"\f$")
             _r(f"{px}alpha_rho({f})", A_REAL, math=r"\f$\alpha \rho\f$")
-        # Elasticity stress tensor
+        # Hypoelastic stress tensor
         for j in range(1, 7):
-            _r(f"{px}tau_e({j})", A_REAL, {"elasticity"}, math=r"\f$\tau_e\f$")
+            _r(f"{px}tau_e({j})", A_REAL, {"hypoelasticity"}, math=r"\f$\tau_e\f$")
         if i >= 2:
             for j in range(1, i):
                 _r(f"{px}alter_patch({j})", LOG)
@@ -924,7 +922,7 @@ def _load():
         px = f"fluid_pp({f})%"
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
-        _r(f"{px}G", REAL, {"elasticity"}, math=r"\f$G_k\f$")
+        _r(f"{px}G", REAL, {"hypoelasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
         _r(f"{px}non_newtonian", LOG, {"viscosity"}, math=r"\mathrm{non\text{-}Newtonian}_k")
@@ -1286,7 +1284,6 @@ _nv(
     "sigma",
     "adv_n",
     "hypoelasticity",
-    "hyperelasticity",
     "surface_tension",
     "relativity",
     "ib",
@@ -1475,7 +1472,6 @@ _nv(
     "mixlayer_perturb",
     "mixlayer_perturb_nk",
     "mixlayer_perturb_k0",
-    "pre_stress",
     "elliptic_smoothing",
     "elliptic_smoothing_iters",
     "simplex_perturb",

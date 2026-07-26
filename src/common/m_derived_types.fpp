@@ -140,7 +140,6 @@ module m_derived_types
         type(idx_bounds_info) :: adv      !< Volume fractions (advection equations)
         type(idx_bounds_info) :: bub      !< Bubble equation range (beg/end only)
         type(idx_bounds_info) :: stress   !< Stress tensor components
-        type(idx_bounds_info) :: xi       !< Reference map equations
         type(idx_bounds_info) :: B        !< Magnetic field components
         type(idx_bounds_info) :: int_en   !< Internal energy equations
         type(idx_bounds_info) :: species  !< Chemistry species equations
