@@ -144,7 +144,7 @@ contains
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
 
-        call s_check_inputs_common()
+        call s_check_inputs_common(check_total_cells=.false., n_global=0_8)
         call s_check_inputs()
 
     end subroutine s_check_input_file

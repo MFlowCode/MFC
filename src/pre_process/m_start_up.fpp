@@ -128,7 +128,7 @@ contains
             call s_mpi_abort('Unsupported choice for the value of case_dir.' // 'Exiting.')
         end if
 
-        call s_check_inputs_common()
+        call s_check_inputs_common(check_total_cells=.true., n_global=nGlobal)
         call s_check_inputs()
 
         call s_check_patches()
