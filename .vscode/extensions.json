@@ -1,6 +1,5 @@
 {
-    "recommendations": [],
-    "unwantedRecommendations": [
+    "recommendations": [
         "fortran-lang.linter-gfortran"
     ]
 }

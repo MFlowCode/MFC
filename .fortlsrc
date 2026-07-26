@@ -1,6 +1,5 @@
 {
     "source_dirs": [
-        "src/",
         "src/common/",
         "src/simulation/",
         "src/pre_process/",
@@ -25,10 +24,10 @@
     ],
     "pp_suffixes": [".fpp"],
     "pp_defs": {
-        "MFC": 1,
-        "MFC_SINGLE_PRECISION": 1,
-        "MFC_OPENACC": 1,
-        "MFC_MPI": 1
+        "MFC": "1",
+        "MFC_SINGLE_PRECISION": "1",
+        "MFC_OPENACC": "1",
+        "MFC_MPI": "1"
     },
     "lowercase_intrinsics": true,
     "debug_log": false,

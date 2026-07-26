@@ -12,7 +12,8 @@ dependencies = [
     "PyYAML",
     "argparse",
     "dataclasses",
-    "fastjsonschema",
+    "fastjsonschema<2.22; python_version < '3.10'",
+    "fastjsonschema; python_version >= '3.10'",
     "rapidfuzz",  # For "did you mean?" typo suggestions
 
     # Build System

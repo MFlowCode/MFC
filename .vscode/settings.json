@@ -21,53 +21,34 @@
         "*.fpp": "FortranFreeForm"
     },
 
-    // Disable the extension entirely at workspace level
-    "extensions.ignoreRecommendations": true,
-    "extensions.autoCheckUpdates": false,
-
     "fortran.preferredCase": "lowercase",
 
-    // Disable built-in linter completely but enable fortls
-    "fortran.disabled": false,
-    "fortran.linter.enabled": false,
-    "fortran.linter.gfortran.enabled": false,
-    "fortran.linter.compiler": "",
-    "fortran.linter.diagnostics": false,
-    "fortran.linter.gfortran.diagnostics": false,
-    "fortran.linter.modOutput": "",
-    "fortran.linter.includePaths": [],
-    "fortran.linter.extraArgs": [],
-    "fortran.provideDiagnostics": false,
-    "fortran.provideCompletion": false,
-    "fortran.provideHover": false,
-    "fortran.provideSymbols": false,
-    "fortran.validation.enabled": false,
-    "fortran.validation.diagnostics": false,
-    "fortran.symbols": false,
-    "fortran.hover": false,
-
-    // Enable ONLY fortls language server
-    "fortran.enableLanguageServer": true,
-    "fortran.languageServer": "fortls",
-    "fortran.fortls.disabled": true,
+    // Use fortls for definitions, references, hover, symbols, and completion.
+    "fortran.provide.autocomplete": "fortls",
+    "fortran.provide.hover": "fortls",
+    "fortran.provide.symbols": "fortls",
+    "fortran.fortls.disabled": false,
     "fortran.fortls.path": "fortls",
+    "fortran.fortls.configure": ".fortlsrc",
+    "fortran.fortls.notifyInit": true,
+    "fortran.fortls.disableAutoupdate": true,
+    "fortran.linter.compiler": "Disabled",
 
-    // Try to disable any built-in language features
-    "editor.semanticHighlighting.enabled": false,
-    "editor.suggest.showWords": false,
-    "editor.suggest.showSnippets": false,
+    // Navigation aids for a large source tree.
+    "breadcrumbs.enabled": true,
+    "editor.stickyScroll.enabled": true,
+    "editor.gotoLocation.multipleDefinitions": "peek",
+    "editor.gotoLocation.multipleReferences": "peek",
+    "workbench.editor.navigationScope": "editorGroup",
 
     "[fortran]": {
-        "editor.tabSize": 2,
-        "editor.semanticHighlighting.enabled": false
+        "editor.tabSize": 2
     },
     "[fortran-free]": {
-        "editor.tabSize": 2,
-        "editor.semanticHighlighting.enabled": false
+        "editor.tabSize": 2
     },
     "[FortranFreeForm]": {
-        "editor.tabSize": 2,
-        "editor.semanticHighlighting.enabled": false
+        "editor.tabSize": 2
     },
 
     // File exclusions - multiple layers of exclusion

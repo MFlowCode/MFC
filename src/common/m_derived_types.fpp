@@ -356,6 +356,10 @@ module m_derived_types
         real(wp) :: radius  !< Dimensions of the patch. radius.
         logical :: slip
         integer :: moving_ibm  !< 0 for no moving, 1 for moving, 2 for moving on forced path
+        real(wp) :: v_blow  !< Wall-normal surface blowing speed (burning/transpiring IB surface); 0 = impermeable
+        integer :: inj_species  !< Injected species index at a blowing surface (chemistry); 0 = mirror ambient
+        real(wp) :: burn_rate_exp  !< Pressure exponent n in v_blow*(p/p_ref)^n (Vieille's law); 0 = constant blowing
+        real(wp) :: burn_rate_pref  !< Reference pressure p_ref for the pressure-coupled burn rate; 0 = coupling off
         real(wp) :: mass, moment  !< mass and moment of inertia of object used to compute forces in 2-way coupling
         real(wp), dimension(1:3) :: force, torque  !< vectors for the computed force and torque values applied to an IB
         real(wp), dimension(1:3) :: vel
@@ -524,6 +528,16 @@ module m_derived_types
         logical :: adap_substeps
         integer :: reaction_substeps_max
     end type chemistry_parameters
+
+    !> Condensed-phase reactive-burn (programmed pressure detonation) parameters. The rate is
+    !> dlambda/dt = k (1 - lambda) ((p - pign)/pref)^n, optionally scaled by exp(-ta/T) when ta > 0.
+    type reactive_burn_parameters
+        real(wp) :: k     !< Rate coefficient [1/s]
+        real(wp) :: pign  !< Ignition pressure threshold [Pa]
+        real(wp) :: pref  !< Reference pressure for the pressure drive [Pa]
+        real(wp) :: n     !< Pressure-drive exponent
+        real(wp) :: ta    !< Activation temperature [K] (0 = pure pressure-driven; > 0 adds exp(-ta/T))
+    end type reactive_burn_parameters
 
     !> Lagrangian bubble parameters
     type bubbles_lagrange_parameters
