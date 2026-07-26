@@ -374,7 +374,7 @@ contains
             end if
         end if
 
-        if (elasticity) then
+        if (hypoelasticity) then
             do i = 1, (eqn_idx%stress%end - eqn_idx%stress%beg) + 1
                 q_prim_vf(i + eqn_idx%stress%beg - 1)%sf(j, k, &
                           & l) = (eta*patch_icpp(patch_id)%tau_e(i) + (1._wp - eta)*orig_prim_vf(i + eqn_idx%stress%beg - 1))

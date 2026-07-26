@@ -515,7 +515,7 @@ contains
                     if (model_eqns /= model_eqns_4eq) then
 #ifdef MFC_SIMULATION
                         ! If in simulation, use acc mixture subroutines
-                        if (elasticity) then
+                        if (hypoelasticity) then
                             call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
                                 & Re_K, G_K, Gs_vc)
                         else
@@ -524,7 +524,7 @@ contains
                         end if
 #else
                         ! If pre-processing, use non acc mixture subroutines
-                        if (elasticity) then
+                        if (hypoelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, &
                                                                 & fluid_pp(:)%G)
                         else
@@ -725,7 +725,7 @@ contains
                         end do
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
@@ -971,7 +971,7 @@ contains
                         end do
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         ! adding the elastic contribution Multiply \tau to \rho \tau
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
@@ -1083,7 +1083,7 @@ contains
                     end do
 
                     pres_K = qK_prim_vf(j, k, l, eqn_idx%E)
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
                             & Re_K, G_K, Gs_vc)
                     else

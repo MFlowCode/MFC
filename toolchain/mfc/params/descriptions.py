@@ -698,7 +698,7 @@ FEATURE_DESCRIPTIONS = {
     "time": "Time stepping and integration",
     "output": "Output and visualization",
     "chemistry": "Chemical reactions and species transport",
-    "elasticity": "Elastic materials",
+    "hypoelasticity": "Hypoelastic materials",
     "acoustic": "Acoustic sources and wave generation",
     "ib": "Immersed boundary method",
     "grid": "Computational grid and domain",

@@ -233,7 +233,7 @@ contains
             end if
         end do
 
-        if (bubbles_euler .or. elasticity) then
+        if (bubbles_euler .or. hypoelasticity) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
@@ -393,7 +393,7 @@ contains
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -455,7 +455,7 @@ contains
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)

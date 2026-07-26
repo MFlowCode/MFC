@@ -442,7 +442,7 @@ contains
             end do
         end if
 
-        if (elasticity) then
+        if (hypoelasticity) then
             do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
                 if (prim_vars_wrt) then
                     write (varname, '(A,I0)') 'tau', i

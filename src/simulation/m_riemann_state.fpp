@@ -107,7 +107,7 @@ contains
 
         $:GPU_UPDATE(device='[is1, is2, is3]')
 
-        if (elasticity) then
+        if (hypoelasticity) then
             if (norm_dir == 1) then
                 dir_idx_tau = (/1, 2, 4/)
             else if (norm_dir == 2) then

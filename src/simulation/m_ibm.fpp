@@ -295,7 +295,7 @@ contains
 
                 if (model_eqns /= model_eqns_4eq) then
                     ! If in simulation, use acc mixture subroutines
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
                             & G_K, Gs)
                     else

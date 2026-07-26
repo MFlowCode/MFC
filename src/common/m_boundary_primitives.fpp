@@ -135,7 +135,7 @@ contains
                         q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(1, i))%sf(-j, k, l) = -q_prim_vf(shear_BC_flip_indices(1, &
                                       & i))%sf(j - 1, k, l)
@@ -169,7 +169,7 @@ contains
                         q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(1, i))%sf(m + j, k, l) = -q_prim_vf(shear_BC_flip_indices(1, &
                                       & i))%sf(m - (j - 1), k, l)
@@ -204,7 +204,7 @@ contains
                         q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, -j, l) = -q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, &
                                       & j - 1, l)
@@ -238,7 +238,7 @@ contains
                         q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, n + j, l) = -q_prim_vf(shear_BC_flip_indices(2, &
                                       & i))%sf(k, n - (j - 1), l)
@@ -274,7 +274,7 @@ contains
                         q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, -j) = -q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, &
                                       & l, j - 1)
@@ -308,7 +308,7 @@ contains
                         q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
                     end if
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         do i = 1, shear_BC_flip_num
                             q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, p + j) = -q_prim_vf(shear_BC_flip_indices(3, &
                                       & i))%sf(k, l, p - (j - 1))

@@ -14,7 +14,7 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
-    ! Shared state: generated_decls, generated_case_opt_decls, sys_size, eqn_idx, chemistry, elasticity, shear_*
+    ! Shared state: generated_decls, generated_case_opt_decls, sys_size, eqn_idx, chemistry, shear_*
     use m_global_parameters_common
     ! $:USE_GPU_MODULE()
 
@@ -66,7 +66,7 @@ module m_global_parameters
     logical :: cfl_dt
     ! Simulation Algorithm Parameters generated_case_opt_decls.fpp: now in m_global_parameters_common
 
-    ! elasticity, chemistry: in m_global_parameters_common
+    ! chemistry: in m_global_parameters_common
     logical                :: shear_stress  !< Shear stresses
     logical                :: bulk_stress   !< Bulk stresses
     logical                :: bodyForces
@@ -318,7 +318,7 @@ contains
 
         integer :: i, j  !< Generic loop iterator
 
-        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, BC blocks,
         ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
         ! IB flags, parallel I/O flags, fft_wrt)
 
@@ -732,7 +732,7 @@ contains
         Re_size = 0
         Re_size_max = 0
 
-        ! Populate eqn_idx, sys_size, elasticity, shear_* (shared logic)
+        ! Populate eqn_idx, sys_size, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom, nb)
 
         ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
@@ -902,7 +902,7 @@ contains
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 
-        if (elasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+        if (hypoelasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             fd_number = max(1, fd_order/2)
         end if
 
@@ -930,8 +930,7 @@ contains
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
-                     & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
-                     & elasticity, low_Mach]')
+                     & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach]')
 
         $:GPU_UPDATE(device='[Bx0]')
 

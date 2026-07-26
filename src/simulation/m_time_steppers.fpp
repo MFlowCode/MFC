@@ -249,7 +249,7 @@ contains
                 end do
             end if
 
-            if (elasticity) then
+            if (hypoelasticity) then
                 do i = eqn_idx%stress%beg, eqn_idx%stress%end
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
@@ -977,7 +977,7 @@ contains
                 end do
             end if
 
-            if (elasticity) then
+            if (hypoelasticity) then
                 do i = eqn_idx%stress%beg, eqn_idx%stress%end
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do

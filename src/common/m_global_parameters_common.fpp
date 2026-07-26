@@ -53,9 +53,8 @@ module m_global_parameters_common
     logical, parameter :: chemistry = .${chemistry}$.
     !> @}
 
-    !> @name Elasticity and shear stress state (identical across all three executables)
+    !> @name Hypoelastic shear stress state (identical across all three executables)
     !> @{
-    logical                  :: elasticity             !< elasticity modeling, true for hyper or hypo
     integer                  :: shear_num              !< Number of shear stress components
     integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
     integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
@@ -75,7 +74,7 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[muscl_eps]')
     $:GPU_DECLARE(create='[mpp_lim, model_eqns, mixture_err, alt_soundspeed]')
     $:GPU_DECLARE(create='[avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity]')
-    $:GPU_DECLARE(create='[elasticity, low_Mach]')
+    $:GPU_DECLARE(create='[low_Mach]')
     $:GPU_DECLARE(create='[cont_damage, hyper_cleaning]')
     $:GPU_DECLARE(create='[relax, relax_model, palpha_eps, ptgalpha_eps]')
     $:GPU_DECLARE(create='[down_sample]')
@@ -124,7 +123,7 @@ module m_global_parameters_common
 contains
 
     !> Initialize equation-index state (eqn_idx and sys_size) from the namelist parameters. This is the shared skeleton: it covers
-    !! the model_eqns dispatch, all eqn_idx field assignments, and the elasticity/surface-tension/chemistry extensions.
+    !! the model_eqns dispatch, all eqn_idx field assignments, and the hypoelastic/surface-tension/chemistry extensions.
     !!
     !! @param nmom_in  Number of carried moments per R0 location (per-target: pre/post pass an
     !!   integer variable; sim passes its integer parameter nmom = 6).  Used only in the 5eq
@@ -253,7 +252,6 @@ contains
 
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
             if (hypoelasticity) then
-                elasticity = .true.
                 eqn_idx%stress%beg = sys_size + 1
                 eqn_idx%stress%end = sys_size + (num_dims*(num_dims + 1))/2
                 if (cyl_coord) eqn_idx%stress%end = eqn_idx%stress%end + 1
@@ -395,7 +393,6 @@ contains
         relax = .false.
         relax_model = dflt_int
         hypoelasticity = .false.
-        elasticity = .false.
         cont_damage = .false.
         hyper_cleaning = .false.
 
