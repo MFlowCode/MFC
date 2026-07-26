@@ -420,6 +420,18 @@ def _emit_chem_params(lines: List[str]) -> None:
     lines.append("        end if")
 
 
+def _emit_rburn(lines: List[str]) -> None:
+    """Emit the rburn member broadcast block (sim-only, under reactive_burn guard).
+
+    All rburn members are REAL, so they broadcast with mpi_p (extend the type split if other kinds appear).
+    """
+    rburn_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("rburn%"))
+    lines.append("        if (reactive_burn) then")
+    for mem in rburn_members:
+        lines.append(f"            call MPI_BCAST(rburn%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+    lines.append("        end if")
+
+
 def _emit_fortran_array_dims(lines: List[str], target: str) -> None:
     """Emit broadcasts for FORTRAN_ARRAY_DIMS entries belonging to this target.
 
@@ -525,6 +537,10 @@ def generate_bcast_fpp(target: str) -> str:
         if "chem_params" in NAMELIST_VARS and "sim" in NAMELIST_VARS["chem_params"]:
             lines.append("        ! chem_params members (under chemistry guard)")
             _emit_chem_params(lines)
+            lines.append("")
+        if "rburn" in NAMELIST_VARS and "sim" in NAMELIST_VARS["rburn"]:
+            lines.append("        ! rburn members (under reactive_burn guard)")
+            _emit_rburn(lines)
             lines.append("")
 
     return "\n".join(lines) + "\n"

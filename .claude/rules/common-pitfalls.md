@@ -84,6 +84,23 @@ covered in `docs/documentation/contributing.md`.
   Gotcha: ADDING a new file under `toolchain/mfc/params/` needs one reconfigure
   (the custom command's DEPENDS list is globbed at configure time). Under `--case-optimization` the baked-in constants are dropped from the
   namelist, so changing one needs a *rebuild*, not a case edit.
+- Derived-type params (`chem_params`, `lag_params`, `rburn`) are NOT auto-broadcast:
+  `generated_bcast.fpp` covers namelist *scalars* only. Each type needs a hand-written
+  `_emit_<name>` in `toolchain/mfc/params/generators/fortran_gen.py` plus its call site in
+  the `target == "sim"` block, and — if it is read on device — an explicit
+  `$:GPU_UPDATE(device='[name]')` in BOTH `m_global_parameters.fpp` and `m_start_up.fpp`
+  (`GPU_DECLARE` alone does not make it device-resident). Regrouping scalars into a derived
+  type silently drops their broadcast, so every non-root rank keeps the `dflt_real`
+  sentinel; single-rank goldens cannot see this, so pair such a change with a `ppn=2` test
+  and confirm it fails without the emitter.
+- A `patch_ib` member that any `m_ibm` ghost-point code reads must ALSO be set in
+  `s_add_cloud_particle` (`src/simulation/m_particle_cloud.fpp`): `particle_cloud_ibs` is
+  `allocate`d without default initialization, and `s_reduce_ib_patch_array` copies the whole
+  struct into `patch_ib`, overwriting the defaults from
+  `s_assign_default_values_to_user_inputs`. Anything left unset reaches the solver as
+  uninitialized memory, and only where the allocation is not already zero-filled — a
+  garbage `v_blow` failed Frontier AMD with `ICFL is NaN` while every NVIDIA lane and all
+  local CPU/GPU runs passed. A platform-only NaN is the signature of this class.
 - Shared-state pattern: namelist declarations (`#:include 'generated_decls.fpp'`), the
   `eqn_idx`/`sys_size`/`b_size`/`tensor_size` state variables, and the common defaults
   core all live in `src/common/m_global_parameters_common.fpp`. Each per-target
