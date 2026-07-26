@@ -341,6 +341,11 @@ def generate_case_opt_decls_fpp() -> str:
 
 def generate_common_extra_decls_fpp() -> str:
     """Return computed-scalar declarations needed by common pre/post code."""
+    # A name here that CASE_OPT_EXTRA_LINES does not define emits nothing, leaving pre/post
+    # without a declaration that common code references. Fail on the orphan instead.
+    orphans = sorted(COMMON_CASE_OPT_EXTRA_NAMES - {name for name, _, _ in CASE_OPT_EXTRA_LINES})
+    if orphans:
+        raise ValueError(f"COMMON_CASE_OPT_EXTRA_NAMES entries missing from CASE_OPT_EXTRA_LINES: {', '.join(orphans)}.")
     lines = [_HEADER.rstrip()]
     for name, ftype, _ in CASE_OPT_EXTRA_LINES:
         if name in COMMON_CASE_OPT_EXTRA_NAMES:
