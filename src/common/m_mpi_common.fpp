@@ -109,17 +109,25 @@ contains
     end subroutine s_mpi_initialize
 
     !> Set up MPI I/O data views and variable pointers for parallel file output.
-    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, beta)
+    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, ib_mpi_data, beta, qbmm_pb, qbmm_mv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(integer_field), optional, intent(in)           :: ib_markers
+        type(mpi_io_ib_var), optional, intent(inout)        :: ib_mpi_data
         type(scalar_field), intent(in), optional            :: beta
+        type(pres_field), intent(in), optional              :: qbmm_pb, qbmm_mv
         integer, dimension(num_dims)                        :: sizes_glb, sizes_loc
 
 #ifdef MFC_MPI
         integer :: i, j
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         integer :: alt_sys
+        logical :: bind_qbmm_fields
+
+        if (present(qbmm_pb) .neqv. present(qbmm_mv)) then
+            call s_mpi_abort('QBMM MPI I/O requires both pressure and moment fields.')
+        end if
+        bind_qbmm_fields = qbmm .and. .not. polytropic .and. present(qbmm_pb) .and. present(qbmm_mv)
 
         if (present(beta)) then
             alt_sys = sys_size + 1
@@ -136,16 +144,11 @@ contains
         end if
 
         ! Additional variables pb and mv for non-polytropic qbmm
-        if (qbmm .and. .not. polytropic) then
+        if (bind_qbmm_fields) then
             do i = 1, nb
                 do j = 1, nnode
-#ifdef MFC_PRE_PROCESS
-                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb%sf(0:m,0:n,0:p,j, i)
-                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv%sf(0:m,0:n,0:p,j, i)
-#elif defined (MFC_SIMULATION)
-                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb_ts(1)%sf(0:m,0:n,0:p,j, i)
-                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m,0:n,0:p,j, i)
-#endif
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => qbmm_pb%sf(0:m,0:n,0:p,j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => qbmm_mv%sf(0:m,0:n,0:p,j, i)
                 end do
             end do
         end if
@@ -166,56 +169,46 @@ contains
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 
-#ifndef MFC_POST_PROCESS
-        if (qbmm .and. .not. polytropic) then
+        if (bind_qbmm_fields) then
             do i = sys_size + 1, sys_size + 2*nb*nnode
                 call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, mpi_p, &
                                               & MPI_IO_DATA%view(i), ierr)
                 call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
             end do
         end if
-#endif
 
-#ifndef MFC_PRE_PROCESS
-        if (present(ib_markers)) then
-            MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m,0:n,0:p)
-
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, MPI_INTEGER, &
-                                          & MPI_IO_IB_DATA%view, ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
+        if (present(ib_markers) .neqv. present(ib_mpi_data)) then
+            call s_mpi_abort('Immersed-boundary MPI I/O requires both marker and descriptor fields.')
         end if
-#endif
+
+        if (present(ib_markers)) then
+            ib_mpi_data%var%sf => ib_markers%sf(0:m,0:n,0:p)
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, MPI_INTEGER, &
+                                          & ib_mpi_data%view, ierr)
+            call MPI_TYPE_COMMIT(ib_mpi_data%view, ierr)
+        end if
 #endif
 
     end subroutine s_initialize_mpi_data
 
     !> Set up MPI I/O data views for downsampled (coarsened) parallel file output.
-    subroutine s_initialize_mpi_data_ds(q_cons_vf)
+    subroutine s_initialize_mpi_data_ds(m_ds, n_ds, p_ds, q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer, dimension(num_dims)                        :: sizes_loc
-        integer, dimension(3)                               :: sf_start_idx
+        integer, intent(in)                                           :: m_ds, n_ds, p_ds
+        type(scalar_field), dimension(sys_size), intent(in), optional :: q_cons_vf
+        integer, dimension(num_dims)                                  :: sizes_loc
+        integer, dimension(3)                                         :: sf_start_idx
 
 #ifdef MFC_MPI
-        integer :: i, m_ds, n_ds, p_ds, ierr
+        integer :: i, ierr
 
         sf_start_idx = (/0, 0, 0/)
 
-#ifndef MFC_POST_PROCESS
-        m_ds = int((m + 1)/3) - 1
-        n_ds = int((n + 1)/3) - 1
-        p_ds = int((p + 1)/3) - 1
-#else
-        m_ds = m
-        n_ds = n
-        p_ds = p
-#endif
-
-#ifdef MFC_POST_PROCESS
-        do i = 1, sys_size
-            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds + 1,-1:n_ds + 1,-1:p_ds + 1)
-        end do
-#endif
+        if (present(q_cons_vf)) then
+            do i = 1, sys_size
+                MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds + 1,-1:n_ds + 1,-1:p_ds + 1)
+            end do
+        end if
         ! Define global(g) and local(l) sizes for flow variables
         sizes_loc(1) = m_ds + 3
         if (n > 0) then

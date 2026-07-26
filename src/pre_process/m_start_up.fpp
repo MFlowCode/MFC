@@ -424,7 +424,7 @@ contains
         if (file_exist) then
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-            call s_initialize_mpi_data(q_cons_vf_in)
+            call s_initialize_mpi_data(q_cons_vf_in, qbmm_pb=pb, qbmm_mv=mv)
 
             data_size = (m + 1)*(n + 1)*(p + 1)
 

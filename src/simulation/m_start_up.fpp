@@ -367,12 +367,13 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (down_sample) then
-                    call s_initialize_mpi_data_ds(q_cons_vf)
+                    call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
                 else
                     if (ib) then
-                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, &
+                                                   & qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                     else
-                        call s_initialize_mpi_data(q_cons_vf)
+                        call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                     end if
                 end if
 
@@ -443,9 +444,10 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                               & qbmm_mv=mv_ts(1))
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                 end if
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
