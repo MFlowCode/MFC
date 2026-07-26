@@ -476,7 +476,7 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module()
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=.false.)
         call s_initialize_data_output_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()

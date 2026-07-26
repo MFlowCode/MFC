@@ -40,10 +40,19 @@ module m_mpi_common
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
+    logical, private :: exchange_all_chemistry_temperatures
+    logical, private :: use_rdma_transport
+
 contains
 
     !> Initialize the module.
-    impure subroutine s_initialize_mpi_common_module
+    impure subroutine s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in, use_rdma_transport_in)
+
+        logical, intent(in) :: exchange_all_chemistry_temperatures_in
+        logical, intent(in) :: use_rdma_transport_in
+
+        exchange_all_chemistry_temperatures = exchange_all_chemistry_temperatures_in
+        use_rdma_transport = use_rdma_transport_in
 
 #ifdef MFC_MPI
         ! Allocating buff_send/recv and. Please note that for the sake of simplicity, both variables are provided sufficient storage
@@ -51,7 +60,7 @@ contains
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*nnode
-        else if (chemistry .and. chem_params%diffusion) then
+        else if (chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures)) then
             v_size = sys_size + 1
         else
             v_size = sys_size
@@ -311,7 +320,6 @@ contains
         Rc_min_glb = Rc_min_loc
         ccfl_max_glb = ccfl_max_loc
 
-#ifdef MFC_SIMULATION
 #ifdef MFC_MPI
         block
             integer :: ierr
@@ -346,7 +354,6 @@ contains
         end if
 
         if (bubbles_lagrange) bubs_glb = bubs_loc
-#endif
 #endif
 
     end subroutine s_mpi_reduce_stability_criteria_extrema
@@ -564,14 +571,10 @@ contains
             v_size = nVar + 2*nb*nnode
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
-#ifdef MFC_SIMULATION
-        else if (present(q_T_sf) .and. chemistry .and. chem_params%diffusion) then
-#else
-        else if (present(q_T_sf) .and. chemistry) then
-            ! post_process converts cons->prim over the ghost-inclusive bounds, so the temperature
-            ! Newton guess must be valid at rank seams for EVERY chemistry run (not only diffusion):
+        else if (present(q_T_sf) .and. chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures)) then
+            ! Consumers that convert over ghost-inclusive bounds request temperature exchange for every chemistry run.
+            ! The temperature Newton guess must be valid at rank seams even when diffusion is disabled:
             ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output
-#endif
             chem_diff_comm = .true.
             v_size = nVar + 1
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
@@ -800,9 +803,8 @@ contains
         call nvtxEndRange  ! Packbuf
 
         ! Send/Recv
-#ifdef MFC_SIMULATION
         #:for rdma_mpi in [False, True]
-            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+            if (use_rdma_transport .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
                     #:call GPU_HOST_DATA(use_device_addr='[buff_send, buff_recv]')
                         call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
@@ -830,10 +832,6 @@ contains
                 #:endif
             end if
         #:endfor
-#else
-        call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-                          & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
 
         ! Unpack Received Buffer
         call nvtxStartRange("RHS-COMM-UNPACKBUF")
@@ -1190,9 +1188,8 @@ contains
         call nvtxEndRange  ! Packbuf
 
         ! Send/Recv
-#ifdef MFC_SIMULATION
         #:for rdma_mpi in [False, True]
-            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+            if (use_rdma_transport .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
                     #:call GPU_HOST_DATA(use_device_addr='[buff_send, buff_recv]')
                         call nvtxStartRange("BETA-COMM-SENDRECV-RDMA")
@@ -1220,10 +1217,6 @@ contains
                 #:endif
             end if
         #:endfor
-#else
-        call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-                          & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
 
         ! Unpack Received Buffer (skip if no source rank)
         call nvtxStartRange("BETA-COMM-UNPACKBUF")
