@@ -142,6 +142,18 @@ def test_common_module_decls_do_not_expand_namelists():
     assert NAMELIST_VARS["riemann_solver"] == {"sim"}
 
 
+def test_stl_model_declarations_do_not_expand_post_namelist():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp, generate_namelist_fpp
+
+    post_declarations = generate_decls_fpp("post")
+    post_namelist = generate_namelist_fpp("post")
+
+    assert ":: num_stl_models" in post_declarations
+    assert ":: stl_models" in post_declarations
+    assert "num_stl_models" not in post_namelist
+    assert "stl_models" not in post_namelist
+
+
 def test_decls_no_percent_vars():
     from mfc.params.generators.fortran_gen import generate_decls_fpp
 

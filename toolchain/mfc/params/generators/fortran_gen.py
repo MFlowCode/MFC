@@ -234,7 +234,8 @@ def generate_decls_fpp(target: str) -> str:
         lines.append(f"{fortran_type_decl(param).ljust(_DECL_COL)}:: {name}")
         declared_names.add(name)
     for name, (ftype, dim, gpu, desc) in TYPED_DECLS.items():
-        if name not in NAMELIST_VARS or target not in NAMELIST_VARS[name]:
+        declaration_targets = NAMELIST_VARS.get(name, set()) | DECLARATION_TARGETS.get(name, set())
+        if target not in declaration_targets:
             continue
         decl = f"{ftype}, dimension({dim})" if dim else ftype
         padded = decl.ljust(_ARRAY_DECL_COL)

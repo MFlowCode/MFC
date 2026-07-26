@@ -24,9 +24,7 @@ module m_model
     public :: s_check_boundary, s_register_edge, f_model_is_inside, s_distance_normals_3D, s_distance_normals_2D, &
         & s_pack_model_for_gpu
 
-#ifndef MFC_POST_PROCESS
     public :: s_instantiate_STL_models
-#endif
 
     type(t_model_array), allocatable, target  :: models(:)    !< STL/OBJ models for IB markers and levelset
     integer, allocatable                      :: gpu_ntrs(:)  !< GPU-friendly flat arrays for STL model data
@@ -851,7 +849,6 @@ contains
 
     end subroutine s_distance_normals_2D
 
-#ifndef MFC_POST_PROCESS
     !> Load, transform, and register STL/OBJ immersed-boundary models onto the simulation grid.
     subroutine s_instantiate_STL_models()
 
@@ -1002,7 +999,6 @@ contains
         end block
 
     end subroutine s_instantiate_STL_models
-#endif
 
     !> Pack triangle vertices and normals from a model into flat arrays for GPU transfer.
     subroutine s_pack_model_for_gpu(ma)
