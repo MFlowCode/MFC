@@ -59,8 +59,22 @@ contains
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
-        @:PROHIBIT(l0_ntile > 0 .and. amr .and. (amr_regrid_int > 0 .or. amr_subcycle .or. amr_max_level > 1), &
-                   & "l0_ntile > 0 with amr = T is supported only for static (amr_regrid_int = 0), single-level (amr_max_level = 1), non-subcycled runs; dynamic regrid, subcycle, and multi-level coexist are not yet implemented")
+        ! Coexist (l0_ntile > 0 .and. amr) gates, one per unimplemented feature. Split from a single combined PROHIBIT so each
+        ! lifts independently and names the failure it prevents; each was measured with the gate disabled (2D 64x32, np=2, AMD
+        ! OMP offload) against the l0_ntile = 0 arm of the same case, which passes in all three modes.
+        @:PROHIBIT(l0_ntile > 0 .and. amr .and. amr_regrid_int > 0, &
+                   & "dynamic regrid (amr_regrid_int > 0) is not implemented with l0_ntile > 0: s_amr_regrid indexes the block " &
+                   & // "pool from slot 1 and sets amr_num_blocks = nboxes, which overruns the level-0 tile prefix that coexist " &
+                   & // "keeps in slots [1..l0_slot_off] - the run deadlocks in the first regrid's collectives")
+        @:PROHIBIT(l0_ntile > 0 .and. amr .and. amr_subcycle, &
+                   & "amr_subcycle is not implemented with l0_ntile > 0: the subcycled fine advance applies its Berger-Colella " &
+                   & // "correction as a STATE reflux into the L0 field (s_amr_apply_reflux_state) and nothing routes it to the " &
+                   & // "tile compute-owners, unlike the lock-step rhs reflux (s_l0_add_reflux_to_tiles) - the tiles keep " &
+                   & // "uncorrected state and the run NaNs")
+        @:PROHIBIT(l0_ntile > 0 .and. amr .and. amr_max_level > 1, &
+                   & "multi-level (amr_max_level > 1) is not implemented with l0_ntile > 0: the nested level-2 block does not " &
+                   & // "fit the per-rank scratch cap (amr_maxc), which exists because the fine advance borrows the base " &
+                   & // "subdomain solver scratch - lifting this needs the per-block working set of @ref amr_block_batching")
 
         if (active_box) then
             @:PROHIBIT(recon_type /= recon_type_weno, "active_box requires WENO reconstruction")
