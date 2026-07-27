@@ -94,6 +94,29 @@ static multi-level does not tile the level-2 block`. So the coexist gate and thi
 redesign are blocked on the same single-working-slot architecture, not on independent work.
 Sequencing the batching arc *after* the unification arc therefore risks reworking it.
 
+## Strong-scaling baseline (the "before" curve)
+
+Track 3's evidence artifact is a strong-scaling curve. The baseline, measured on the same
+machine, 2D 256^2, static single-level AMR, 20 steps:
+
+| np | compact block (32x32 coarse) | wide block (128x32 coarse) |
+|---|---|---|
+| 1 | 0.1009 s (1.00x) | 0.1009 s (1.00x) |
+| 2 | 0.0980 s (1.03x) | 0.1190 s (0.85x) |
+| 4 | 0.0983 s (1.03x) | 0.1267 s (**0.80x**) |
+
+**AMR does not strong-scale, and wide blocks anti-scale.** Both cases hold exactly one fine
+block (a static block cannot exceed `amr_maxc`, so tiling never triggers), and single-owner
+distribution puts all of its work on one rank whatever `np` is. The compact case is
+therefore flat: extra ranks only split the coarse grid, which is not the bottleneck. The
+wide case is worse than flat because the block spans more ranks' coarse subdomains, so each
+added rank buys more coarse<->fine P2P gather/scatter with no fine parallelism to offset it.
+
+Caveat: this measures the single-block regime. It does not test multi-block distribution —
+reaching several blocks needs dynamic regrid, since a static block is capped at `amr_maxc`.
+The multi-block curve is the one that should move when batching lands, and it still needs to
+be measured; the numbers above are the floor it has to beat.
+
 ## Swap topology (and what blocks the obvious optimization)
 
 The hot path has exactly **one `s_amr_swap_to_fine` / `s_amr_restore_coarse` pair per block
