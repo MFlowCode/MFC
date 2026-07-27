@@ -14,8 +14,7 @@ module m_global_parameters
 
     use m_derived_types
     use m_helper_basic
-    ! Shared state: generated_decls, generated_case_opt_decls, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity,
-    ! shear_*
+    ! Shared state: generated_decls, generated_case_opt_decls, sys_size, eqn_idx, chemistry, shear_*
     use m_global_parameters_common
     ! $:USE_GPU_MODULE()
 
@@ -67,8 +66,7 @@ module m_global_parameters
     logical :: cfl_dt
     ! Simulation Algorithm Parameters generated_case_opt_decls.fpp: now in m_global_parameters_common
 
-    integer :: hyper_model  !< hyperelasticity solver algorithm
-    ! elasticity, chemistry: in m_global_parameters_common
+    ! chemistry: in m_global_parameters_common
     logical                :: shear_stress  !< Shear stresses
     logical                :: bulk_stress   !< Bulk stresses
     logical                :: bodyForces
@@ -92,7 +90,6 @@ module m_global_parameters
 
     integer :: cpu_start, cpu_end, cpu_rate
 
-    $:GPU_DECLARE(create='[hyper_model]')
     $:GPU_DECLARE(create='[shear_stress, bulk_stress]')
 
     logical               :: bc_io
@@ -138,7 +135,7 @@ module m_global_parameters
     type(mpi_io_levelset_norm_var), public        :: MPI_IO_levelsetnorm_DATA
     real(wp), allocatable, dimension(:,:), public :: MPI_IO_DATA_lag_bubbles
 
-    ! sys_size, eqn_idx, b_size, tensor_size: in m_global_parameters_common (GPU_DECLARE there too)
+    ! sys_size and eqn_idx: in m_global_parameters_common (GPU_DECLARE there too)
     type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings (allocatable; GPU-managed separately).
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With INTerior".
@@ -321,7 +318,7 @@ contains
 
         integer :: i, j  !< Generic loop iterator
 
-        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, BC blocks,
         ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
         ! IB flags, parallel I/O flags, fft_wrt)
 
@@ -391,7 +388,6 @@ contains
         int_comp = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
-        hyper_model = dflt_int
         rdma_mpi = .false.
         shear_stress = .false.
         bulk_stress = .false.
@@ -665,6 +661,10 @@ contains
             patch_ib(i)%airfoil_id = 0
             patch_ib(i)%model_id = 0
             patch_ib(i)%slip = .false.
+            patch_ib(i)%v_blow = 0._wp
+            patch_ib(i)%inj_species = 0
+            patch_ib(i)%burn_rate_exp = 0._wp
+            patch_ib(i)%burn_rate_pref = 0._wp
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
@@ -732,12 +732,12 @@ contains
         Re_size = 0
         Re_size_max = 0
 
-        ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
+        ! Populate eqn_idx, sys_size, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom, nb)
 
         ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
-            if (hypoelasticity .or. hyperelasticity) then
+            if (hypoelasticity) then
                 $:GPU_UPDATE(device='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
             end if
         end if
@@ -902,7 +902,7 @@ contains
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 
-        if (elasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+        if (hypoelasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             fd_number = max(1, fd_order/2)
         end if
 
@@ -926,18 +926,17 @@ contains
         end if
 
         $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
-        $:GPU_UPDATE(device='[b_size, tensor_size]')
-
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
         $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
-                     & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, &
-                     & hyperelasticity, hyper_model, elasticity, low_Mach]')
+                     & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach]')
 
         $:GPU_UPDATE(device='[Bx0]')
 
         $:GPU_UPDATE(device='[chem_params]')
+
+        $:GPU_UPDATE(device='[rburn]')
 
         $:GPU_UPDATE(device='[cont_damage, tau_star, cont_damage_s, alpha_bar]')
 
