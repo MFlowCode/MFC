@@ -49,9 +49,18 @@ pifx-cpu MPICC=mpiicc MPICXX=mpiicpc MPIFC=mpiifort
 pifx-cpu I_MPI_CC=icx I_MPI_CXX=icpx I_MPI_F90=ifx I_MPI_F77=ifx
 
 f     OLCF Frontier
-f-all cpe/25.03 rocm/6.3.1
+# cpe/26.03 defaults to cce/21.0.0; pin 21.0.2. rocprofiler-compute is not listed:
+# its modulefile reloads darshan-runtime, which cpe/26.03 deactivates, and rocm/7
+# already provides rocprof, rocprof-compute, and rocprofv3.
+f-all cpe/26.03 cce/21.0.2 rocm/7.2.0
 f-all cray-fftw cray-hdf5 python cmake
-f-gpu python craype-accel-amd-gfx90a rocprofiler-compute/3.0.0
+f-gpu craype-accel-amd-gfx90a
+# CCE 21 aborts linking simulation in the AMDGPU "Rewrite AGPR-Copy-MFMA" pass
+# (SlotIndexes.h "Attempt to compare reserved index") on the s_compute_bubble_EE_source
+# kernel. The pass runs even though every gfx90a function CCE emits carries
+# amdgpu-agpr-alloc="0" and MFC contains no v_mfma instructions, so dropping the MAI
+# subtarget feature makes it bail out with no effect on generated code.
+f-gpu CRAY_CCE_LLD_ARGS=-plugin-opt=-mattr=-mai-insts
 
 famd    OLCF Frontier AMD
 famd-all python cmake
