@@ -161,11 +161,34 @@ restoring once per phase — has **two** blockers, not one.
    OpenMP-offload pass does not validate this area, and it is the reason the Frontier acc
    lane is the real gate for anything that changes how this routine nests.
 
-With all three resolved, hoisting the restore is a change to `m_time_steppers` alone: open a
-swap frame across the phase-3 loop (saving the coarse state without installing a slot), let
-each block's inner swap install its own slot, and restore once after the loop. The swap's
-recomputes (`s_amr_recompute_weno_coefs`, `s_hypoelastic_update_fd_coeffs`) need no guard —
-they are idempotent for whichever grid is installed.
+With all three resolved, hoisting the restore became a small change, and it was **built,
+measured, and abandoned**. Record of that, so it is not retried:
+
+A `s_amr_swap_hold` entry point (save the coarse state without installing a slot) was added
+and the per-tile RHS loop in `s_l0_advance_stage_rhs` was bracketed with it, so consecutive
+tiles went fine->fine with one coarse restore after the loop instead of one per tile. Output
+stayed byte-identical. The `l0_ntile` sweep, 2D 256^2, np=1:
+
+| `l0_ntile` | tiles | with hoist | without |
+|---|---|---|---|
+| 0 | monolithic | 1.00x | 1.00x |
+| 1 | 1 | 1.01x | 1.01x |
+| 2 | 4 | 4.32x | 4.40x |
+| 4 | 16 | **16.87x** | **16.75x** |
+
+**No effect.** The coarse round trip between blocks — its `sw_*` copies, its device sync, its
+WENO/FD coefficient rebuild — is not a measurable share of the per-block cost, even at 16
+blocks where the total penalty is ~17x. The change was reverted rather than carried as
+unused machinery.
+
+This sharpens the conclusion above: the per-block cost really is **kernel launch count**
+inside `s_compute_rhs`, not swap traffic. Reducing swap traffic in any form (per-slot
+coefficient tables, per-slot device grid state, hoisted restores) should be expected to do
+nothing on its own. Only increment 3 — one launch over a block list instead of one launch
+set per block — addresses the measured cost.
+
+The three prerequisites remain resolved in the code, so a future batching attempt does not
+have to redo them; note they currently have no caller and are unused generality.
 
 Note the SWAP CONTRACT warning in `.claude/rules/common-pitfalls.md`: a stale device copy of
 coarse bounds reads out of range on the fine grid under **CCE OpenACC only**. A CPU-only or
