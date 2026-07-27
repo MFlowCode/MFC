@@ -3324,16 +3324,21 @@ contains
         ox = start_idx(1); oy = 0; oz = 0
         if (n_glb > 0) oy = start_idx(2)
         if (p_glb > 0) oz = start_idx(3)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = cb3, ce3
-            do k = cb2, ce2
-                do j = cb1, ce1
-                    sw_jac(j, k, l) = jac(j, k, l)
-                    sw_jac_old(j, k, l) = jac_old(j, k, l)
+        ! SAVE the coarse sigma - outermost swap only. A nested swap must not re-save, or sw_jac would take FINE state and both the
+        ! seed below and s_amr_igr_restore_sigma would work from it. The seed that follows is NOT guarded: it reads sw_jac, which
+        ! still holds the coarse state, so every nested block seeds from the correct parent.
+        if (amr_swap_depth == 1) then
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+            do l = cb3, ce3
+                do k = cb2, ce2
+                    do j = cb1, ce1
+                        sw_jac(j, k, l) = jac(j, k, l)
+                        sw_jac_old(j, k, l) = jac_old(j, k, l)
+                    end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]')
         do l = fb3, fe3
             do k = fb2, fe2
