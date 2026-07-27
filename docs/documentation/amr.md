@@ -51,11 +51,11 @@ where `N_i` is the global cell count in direction `i`. This ensures the fine scr
 (which is sized to the base grid) is never overflowed. A level-`l` block's fine extent
 grows as `amr_ref_ratio**l`, so the nested boxes are sized accordingly.
 
-**Fixed-slot storage.** All block slots are pre-allocated at init to the maximum possible
-block size (half the per-rank subdomain in each dimension). Setting `amr_max_blocks = N`
-requires roughly `N` times the device memory of one max-size block. Regrid reuses the
-existing allocations by adjusting the active geometry metadata; no re-allocation occurs
-at run time.
+**Slot storage.** Block slots are sized to the maximum possible block size (half the
+per-rank subdomain in each dimension), but their field arrays are allocated lazily and only
+for the blocks a rank actually owns, so a rank's fine memory tracks its share of the pool
+(roughly `1/num_procs` of it) rather than all `amr_max_blocks` slots. Regrid reuses the
+existing allocations by adjusting the active geometry metadata.
 
 ---
 
@@ -204,10 +204,17 @@ footprint (base cell cost, plus IB-marked cells and, when a load-weight diagnost
 writer is on, phase-change iteration counts), so blocks concentrating expensive physics
 weigh more than equal-size quiescent ones at every regrid.
 
-The coarse split itself is static after startup. Because `s_load_balance_rebalance`
-runs at every startup from the restart file, a long run can be **rebalanced by
-checkpoint-and-restart**: stop, then restart with `load_balance = T` — the split planes
-are recomputed from the saved state at the point of restart.
+The weighted Cartesian split itself is static after startup. Because
+`s_load_balance_rebalance` runs at every startup from the restart file, a long run can be
+**rebalanced by checkpoint-and-restart**: stop, then restart with `load_balance = T` — the
+split planes are recomputed from the saved state at the point of restart.
+
+For in-run rebalancing of the base grid there is a separate, opt-in mechanism: `l0_ntile`
+tiles the base grid into `l0_ntile**num_dims` refinement-ratio-1 blocks advanced through the
+same per-block solver as the fine overlay (byte-identical to the untiled run), and
+`l0_rebalance_interval > 0` periodically recomputes the SFC cut from measured per-tile cost
+and migrates tiles whose owner changed. Tiling composes with `amr` only for static,
+single-level, non-subcycled runs today; the checker names the unsupported combinations.
 
 ### GPU {#amr-gpu}
 
@@ -332,8 +339,10 @@ For multi-fluid (5-equation), additionally set:
 
 ## Limitations and Notes {#amr-limitations}
 
-- **Fixed-slot memory.** All `amr_max_blocks` slots are allocated at init at maximum size.
-  More blocks = more device memory. Compact per-block memory pools are future work.
+- **Slot memory.** Slots are sized to the maximum block extent, but field arrays are
+  allocated lazily and only for the blocks a rank owns (`amr_slot_live`), so a rank's fine
+  memory is roughly `1/num_procs` of the pool rather than the whole of it. Right-sized
+  per-block pools (rather than max-extent slots) are still future work.
 - **Restart across rank counts.** `parallel_io` restart repartitions the fine blocks
   across any `num_procs` (each block is one contiguous region under whole-block ownership).
   The serial (per-rank-file) restart path requires the same `num_procs` and aborts with a
@@ -343,14 +352,15 @@ For multi-fluid (5-equation), additionally set:
 - **Multi-level constraints.** Recursive multi-level nesting (`amr_max_level > 1`) requires
   `amr_ref_ratio = 2`; with immersed boundaries it is single-rank only, and a moving body is
   not yet supported. `amr_ref_ratio = 4` is single-level only.
-- **Level-0 output only.** Standard visualization output (HDF5/SILO) is written at
-  level-0 resolution; the restricted fine solution is already folded into the coarse
-  fields over the block region, so existing visualization workflows are unchanged.
-  Fine-resolution output is future work.
+- **Output resolution.** Standard visualization output (HDF5/SILO) is written at level-0
+  resolution; the restricted fine solution is already folded into the coarse fields over the
+  block region, so existing visualization workflows are unchanged. Setting `amr = T` in the
+  post-process input additionally overlays the refined fine blocks as separate SILO domains
+  (default off), giving fine-resolution visualization where blocks are active.
 - **Unsupported physics.** See the [physics matrix](#amr-physics) above. The restrictions
   are enforced by the checker and reflect the validation state at the time of writing.
 
-<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-07-04</div>
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-07-27</div>
 
 ## Design notes {#amr-design-notes}
 
@@ -358,3 +368,4 @@ Internal design / implementation records (how the code works, not how to configu
 
 - @subpage amr_multilevel — multi-level nesting design and reflux
 - @subpage amr_fine_distribution — fine-block distribution across MPI ranks
+- @subpage amr_block_batching — measured per-block swap cost and the batching design it implies
