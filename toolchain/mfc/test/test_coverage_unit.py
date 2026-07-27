@@ -3,7 +3,7 @@ import types as _types
 from pathlib import Path
 from unittest.mock import patch
 
-from mfc.test.coverage import format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
+from mfc.test.coverage import canonicalize_param_paths, entries_equal, format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
 
 
 def test_param_hash_is_order_independent():
@@ -359,3 +359,84 @@ def test_empty_map_with_fpp_change_runs_all_rung4():
     cases = _cases("a", "b")
     run, skip, reason = select_tests(cases, {}, {"src/simulation/m_rhs.fpp"})
     assert len(run) == 2 and reason.startswith("rung4")
+
+
+# --- Map churn: a rebuilt map must be byte-comparable when nothing really changed ---
+
+
+def test_coverage_key_is_independent_of_checkout_location():
+    """The same test built from two checkouts must hash identically.
+
+    to_case() absolutizes file-valued params, so the STL cases carry the runner's
+    checkout path. Hashing that gave every runner a different key for the same test.
+    """
+    runner_a = "/home/runner/work/MFC/MFC"
+    runner_b = "/storage/scratch/job1234/MFC"
+    a = param_hash(canonicalize_param_paths({"m": 100, "stl_models(1)%model_filepath": f"{runner_a}/examples/2D_ibm_stl/model.stl"}, runner_a))
+    b = param_hash(canonicalize_param_paths({"m": 100, "stl_models(1)%model_filepath": f"{runner_b}/examples/2D_ibm_stl/model.stl"}, runner_b))
+    assert a == b
+
+
+def test_canonicalize_preserves_paths_outside_the_repo():
+    params = {"f": "/opt/shared/meshes/mesh.stl"}
+    assert canonicalize_param_paths(params, "/home/runner/MFC") == params
+
+
+def test_canonicalize_leaves_non_path_values_untouched():
+    params = {"m": 100, "weno_order": 5, "bubbles_euler": "T"}
+    assert canonicalize_param_paths(params, "/home/runner/MFC") == params
+
+
+def test_canonicalized_key_still_distinguishes_different_files():
+    root = "/home/runner/MFC"
+    a = param_hash(canonicalize_param_paths({"f": f"{root}/examples/a/model.stl"}, root))
+    b = param_hash(canonicalize_param_paths({"f": f"{root}/examples/b/model.stl"}, root))
+    assert a != b
+
+
+def test_save_map_writes_a_deterministic_gzip_header():
+    """gzip stamps mtime + source filename by default, so identical maps differed on disk."""
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "m.json.gz"
+        save_map(p, {"abc": ["src/simulation/m_rhs.fpp"]}, n_tests=1, git_sha="deadbee", gfortran_version="13")
+        raw = p.read_bytes()
+        assert raw[4:8] == b"\x00\x00\x00\x00", "gzip MTIME field must be zeroed"
+        assert not raw[3] & 0x08, "gzip FNAME flag must be clear"
+
+
+def test_entries_equal_ignores_coverage_list_order():
+    assert entries_equal({"a": ["y.fpp", "x.fpp"]}, {"a": ["x.fpp", "y.fpp"]})
+
+
+def test_entries_equal_detects_real_differences():
+    assert not entries_equal({"a": ["x.fpp"]}, {"a": ["x.fpp", "y.fpp"]})
+    assert not entries_equal({"a": ["x.fpp"]}, {"b": ["x.fpp"]})
+    assert not entries_equal(None, {"a": ["x.fpp"]})
+
+
+def test_health_quiet_repo_is_not_stale_when_map_is_current():
+    """An old map is fine if nothing coverage-relevant landed since it was built."""
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-01T00:00:00+00:00", "n_tests": 600},
+        current_keys={"a"},
+        mapped_keys={"a"},
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+        built_after_last_change=True,
+    )
+    assert ok, msg
+
+
+def test_health_fails_immediately_when_map_predates_last_source_change():
+    """Detects a dead refresh on the next relevant push, not 10 days later."""
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-28T00:00:00+00:00", "n_tests": 600},
+        current_keys={"a"},
+        mapped_keys={"a"},
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+        built_after_last_change=False,
+    )
+    assert not ok and "stale" in msg.lower()

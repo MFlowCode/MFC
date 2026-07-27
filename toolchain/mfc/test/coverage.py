@@ -8,9 +8,46 @@ import datetime
 import gzip
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
+
+
+def canonicalize_param_paths(params: dict, root: str) -> dict:
+    """Rewrite absolute in-repo paths to repo-relative ones, for hashing only.
+
+    TestCaseBuilder.to_case() absolutizes file-valued params (e.g. the STL cases'
+    stl_models(1)%model_filepath) so a test runs from any cwd. Those absolutes embed the
+    checkout location, which differs between the map-building runner and PR runners.
+    Hashing them gave the same test a different key on every machine, which churned ~8
+    entries out of the map on every refresh and left those tests permanently unmapped
+    (rung 5 -> always run). Hash the repo-relative form so the key names the test, not
+    the machine. Paths outside the repo are left alone -- they are genuinely part of the
+    test's identity.
+    """
+    root = os.path.abspath(root)
+    out = {}
+    for key, value in params.items():
+        canonical = value
+        if isinstance(value, str) and os.path.isabs(value):
+            try:
+                rel = os.path.relpath(value, root)
+            except ValueError:  # different drive on Windows -> not in-repo
+                rel = None
+            if rel is not None and not rel.startswith(os.pardir):
+                canonical = rel.replace(os.sep, "/")
+        out[key] = canonical
+    return out
+
+
+def entries_equal(a: Optional[dict], b: Optional[dict]) -> bool:
+    """True if two maps describe the same coverage, ignoring per-test list order."""
+    if a is None or b is None:
+        return False
+    if set(a) != set(b):
+        return False
+    return all(sorted(a[k]) == sorted(b[k]) for k in a)
 
 
 def param_hash(params: dict) -> str:
@@ -35,8 +72,14 @@ def save_map(path: Path, entries: dict, *, n_tests: int, git_sha: str, gfortran_
         "n_tests": n_tests,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(path, "wt", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, sort_keys=True)
+    body = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+    # mtime=0 and an empty filename keep the gzip header byte-identical across builds.
+    # gzip.open() stamps the current time and the source filename into the header, so two
+    # runs producing the same map still wrote different bytes -- which defeated the
+    # "only commit if the file changed" guard in coverage-refresh.yml.
+    with open(path, "wb") as raw:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as f:
+            f.write(body)
 
 
 # Test-definition file: changing it adds/modifies tests, but only the tests it touches
@@ -223,12 +266,22 @@ def format_summary(*, ran, total, reason, meta, now) -> str:
     return f"Coverage selection: ran {ran}/{total} tests · {age} · {reason}"
 
 
-def map_health(*, meta, current_keys, mapped_keys, now, max_age_days, min_fraction):
-    """Return (ok, message). Loud anti-rot check used by the health workflow."""
+def map_health(*, meta, current_keys, mapped_keys, now, max_age_days, min_fraction, built_after_last_change=None):
+    """Return (ok, message). Loud anti-rot check used by the health workflow.
+
+    `built_after_last_change` is the caller's git verdict on whether the map was built at
+    or after the most recent coverage-relevant commit: True (provably current), False
+    (provably behind), or None (undeterminable -> fall back to the wall-clock rule).
+    A map only decays when the sources or test list it was built from move, so wall-clock
+    age is a poor proxy: it cries STALE over a quiet weekend and stays silent for 10 days
+    after a refresh actually breaks.
+    """
     if not meta or not meta.get("built_at"):
         return False, "Coverage map has no build metadata."
     age = (datetime.datetime.fromisoformat(now) - datetime.datetime.fromisoformat(meta["built_at"])).days
-    if age > max_age_days:
+    if built_after_last_change is False:
+        return False, "Coverage map is STALE: built before the most recent coverage-relevant commit. Refresh workflow may be broken."
+    if built_after_last_change is None and age > max_age_days:
         return False, f"Coverage map is STALE: {age}d old (max {max_age_days}d). Refresh workflow may be broken."
     if current_keys:
         frac = len(current_keys & mapped_keys) / len(current_keys)
