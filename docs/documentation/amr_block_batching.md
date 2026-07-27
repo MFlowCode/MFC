@@ -150,13 +150,22 @@ restoring once per phase — has **two** blockers, not one.
    ends with `if (igr) call s_amr_igr_swap_sigma()`, which BOTH saves the coarse
    `jac`/`jac_old` into `sw_jac`/`sw_jac_old` AND seeds the block's sigma from the parent —
    and it reads `sw_idwbuff` for the coarse extent. Once nesting is actually used, an inner
-   swap would re-run it and overwrite `sw_jac` with fine state. It has to be split into a
-   depth-guarded save and a per-block seed before the restore can be hoisted.
+   swap would re-run it and overwrite `sw_jac` with fine state.
+   **Resolved:** the save loop is depth-guarded, the seed loop is not. The seed reads
+   `sw_jac`, which still holds the coarse state, so every nested block seeds from the correct
+   parent — guarding only the save is both necessary and sufficient.
 
    Note this routine already caused an OpenACC-only crash (its own comment: the `sw_*`
    host-only module state "makes OpenACC's present lookup fail (OpenMP's implicit map(to)
    tolerates it, which is why only acc lanes crashed)"). It is a worked example of why an
-   OpenMP-offload pass does not validate this area.
+   OpenMP-offload pass does not validate this area, and it is the reason the Frontier acc
+   lane is the real gate for anything that changes how this routine nests.
+
+With all three resolved, hoisting the restore is a change to `m_time_steppers` alone: open a
+swap frame across the phase-3 loop (saving the coarse state without installing a slot), let
+each block's inner swap install its own slot, and restore once after the loop. The swap's
+recomputes (`s_amr_recompute_weno_coefs`, `s_hypoelastic_update_fd_coeffs`) need no guard —
+they are idempotent for whichever grid is installed.
 
 Note the SWAP CONTRACT warning in `.claude/rules/common-pitfalls.md`: a stale device copy of
 coarse bounds reads out of range on the fine grid under **CCE OpenACC only**. A CPU-only or
