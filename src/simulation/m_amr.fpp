@@ -5268,9 +5268,9 @@ contains
     impure subroutine s_l0_rebalance(t_step)
 
         integer, intent(in) :: t_step
-        integer             :: k, r, H, L, best_k, move, nmig, ierr
+        integer             :: k, nmig, ierr
         integer             :: newo(l0_ntiles_tot)
-        real(wp)            :: cost(l0_ntiles_tot), load(0:num_procs - 1), gap, ng, best_ng, gap0, gap1, mean, tol
+        real(wp)            :: cost(l0_ntiles_tot), load(0:num_procs - 1), gap0, gap1, mean, tol
         real(wp), parameter :: ema_hist = 0.5_wp  ! weight on the running estimate vs this window's measurement
 
         if (num_procs < 2) then
@@ -5301,21 +5301,40 @@ contains
         tol = 0.05_wp*mean  ! deadband: ignore imbalance below 5% of the mean load so measurement noise does not churn migrations
         gap0 = maxval(load) - minval(load)
 
-        ! greedy: each step move the tile on the heaviest rank that most reduces the max-min load gap onto the lightest rank
-        do move = 1, l0_ntiles_tot
-            H = 0; do r = 1, num_procs - 1; if (load(r) > load(H)) H = r; end do
-            L = 0; do r = 1, num_procs - 1; if (load(r) < load(L)) L = r; end do
-            gap = load(H) - load(L)
-            if (gap <= tol) exit
-            best_k = -1; best_ng = gap
-            do k = 1, l0_ntiles_tot
-                if (newo(k) /= H) cycle
-                ng = abs(gap - 2._wp*cost(k))  ! gap after moving cost(k) from H to L
-                if (ng < best_ng) then; best_ng = ng; best_k = k; end if
-            end do
-            if (best_k < 0) exit  ! no single move strictly reduces the gap
-            newo(best_k) = L
-            load(H) = load(H) - cost(best_k); load(L) = load(L) + cost(best_k)
+        ! SFC weighted re-cut (replaces the greedy min-max mover): Morton-sort the tiles, then cumulative-split the smoothed cost
+        ! into num_procs contiguous SFC ranges - identical partition logic to s_amr_assign_block_owners' cut. Ownership stays
+        ! SFC-contiguous and O(num_procs) cut-derivable (the precondition for retiring the amr_block_owner table), and locality is
+        ! preserved. Deadband kept: skip the re-cut while the load gap is already within tol (no churn on sub-5% imbalance).
+        if (gap0 > tol) then
+            block
+                integer         :: ord(l0_ntiles_tot), kk, rr, tmpo
+                integer(kind=8) :: tkey(l0_ntiles_tot), tmpk
+                real(wp)        :: total, cum, tgt
+                do k = 1, l0_ntiles_tot
+                    tkey(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
+                    ord(k) = k
+                end do
+                do k = 2, l0_ntiles_tot  ! insertion sort by Morton key (l0_ntiles_tot small)
+                    tmpk = tkey(ord(k)); tmpo = ord(k); kk = k - 1
+                    do while (kk >= 1)
+                        if (tkey(ord(kk)) <= tmpk) exit
+                        ord(kk + 1) = ord(kk); kk = kk - 1
+                    end do
+                    ord(kk + 1) = tmpo
+                end do
+                total = sum(cost(1:l0_ntiles_tot))
+                rr = 0; cum = 0._wp
+                do k = 1, l0_ntiles_tot
+                    tgt = real(rr + 1, wp)*total/real(num_procs, wp)
+                    if (cum >= tgt .and. rr < num_procs - 1) rr = rr + 1
+                    newo(ord(k)) = rr
+                    cum = cum + cost(ord(k))
+                end do
+            end block
+        end if
+        load = 0._wp
+        do k = 1, l0_ntiles_tot
+            load(newo(k)) = load(newo(k)) + cost(k)
         end do
         gap1 = maxval(load) - minval(load)
 
