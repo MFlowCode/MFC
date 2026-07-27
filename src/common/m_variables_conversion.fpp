@@ -1009,7 +1009,7 @@ contains
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyinReadOnly='[dir_idx_in, dir_flg_in]')
+                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, dir_flg_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
