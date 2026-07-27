@@ -4904,8 +4904,8 @@ contains
                         amr_owns_all(k) = (r == proc_rank)
                         amr_region_lo_all(:,k) = tlo; amr_region_hi_all(:,k) = thi
                         amr_isect_lo_all(:,k) = tlo; amr_isect_hi_all(:,k) = thi  ! footprint = whole tile on the owner (rr=1)
-                        if (r /= proc_rank) cycle  ! remote tile: region+owner metadata only, no slot data / coords on this rank
-                        call s_l0_build_tile_slot(k)  ! alloc slot + set extents/idwbuff/coords from the (global) region metadata
+                        ! slot data is NOT allocated here: it must follow the SFC COMPUTE owner assigned below, which need not be
+                        ! this cartesian owner r. Every rank writes region+owner metadata for every tile.
                     end do
                 end do
             end do
@@ -4914,11 +4914,11 @@ contains
         ! COMPUTE owner = SFC cost-split over the tiles (fills the O(num_procs) amr_owner_cut), superseding the cartesian owner set
         ! in
         ! the loop above; amr_tile_l0_owner keeps the cartesian STORAGE assignment (where the L0 field data physically lives). Init
-        ! cost is geometric (whole-tile cell count), uniform on a uniform grid. PRECONDITION (asserted): the SFC compute owner
-        ! equals
-        ! the cartesian storage owner - the first fill (s_l0_copy_coarse_to_tiles) is a LOCAL L0->tile copy that needs
-        ! compute==storage. A decomposition whose Morton order splits tiles across ranks differently than the cartesian rank-major
-        ! order would need a routed initial fill (deferred); the rebalancer's routed migration already handles post-init divergence.
+        ! cost is geometric (whole-tile cell count), uniform on a uniform grid. The SFC compute owner may differ from the cartesian
+        ! storage owner - whether it does depends on how the cartesian split direction lines up with Morton order, so it is a
+        ! property of the grid SHAPE (a 2:1 grid at np=2 splits in y and agrees; a square grid tie-breaks to x and diverges).
+        ! s_l0_copy_coarse_to_tiles routes the initial fill storage-owner -> compute-owner when they differ, so no precondition is
+        ! asserted here; the rebalancer's routed migration already handles post-init divergence.
         block
             integer         :: sfco(l0_ntiles_tot), kk
             integer(kind=8) :: tkey(l0_ntiles_tot)
@@ -4930,10 +4930,14 @@ contains
             end do
             call s_amr_sfc_cut(tkey, twt, l0_ntiles_tot, amr_owner_cut, sfco)
             do kk = 1, l0_ntiles_tot
-                if (sfco(kk) /= amr_tile_l0_owner(kk)) call s_mpi_abort('L0 tile SFC compute-owner diverges from cartesian ' &
-                    & // 'storage owner at init; routed initial fill not implemented for this decomposition')
                 amr_block_owner(kk) = sfco(kk)
                 amr_owns_all(kk) = (sfco(kk) == proc_rank)
+            end do
+            ! allocate slot data for the tiles this rank COMPUTES (deferred from the cartesian loop above). s_l0_build_tile_slot
+            ! reads only replicated region metadata and the global amr_g?cb, so it is valid for any tile on any rank. When the SFC
+            ! cut agrees with the cartesian order this allocates exactly the same set as before, just later.
+            do kk = 1, l0_ntiles_tot
+                if (amr_block_owner(kk) == proc_rank) call s_l0_build_tile_slot(kk)
             end do
         end block
         ! validate the full picture now that tiles exist: tiles vs amr_owner_cut (tile cut, just built), fine blocks vs amr_fine_cut
@@ -5044,12 +5048,18 @@ contains
 
     end subroutine s_l0_build_tile_slot
 
-    !> Copy the current L0 interior state into every owned tile's interior (global cell tlo+j -> tile-local cell j).
+    !> Copy the current L0 interior state into every owned tile's interior (global cell tlo+j -> tile-local cell j). A tile whose
+    !! compute owner is also its L0-storage owner is seeded by a local device copy (the common case, and the ENTIRE path when the
+    !! SFC cut agrees with the cartesian order, so byte-identical to before). When the SFC compute owner differs from the cartesian
+    !! storage owner the seed is ROUTED: the L0-storage owner device-packs its chunk and sends it to the compute owner, which
+    !! unpacks into its tile slot. Exact reverse of s_l0_scatter_tiles_to_coarse, and sound because a tile is built by subdividing
+    !! ONE rank's cartesian chunk (s_l0_tiles_init), so it never spans two L0-storage ranks.
     impure subroutine s_l0_copy_coarse_to_tiles(q_cons_vf)
 
         ! inout (not in): passed as the bidirectional s_l0_copy_block q_l0 dummy (intent(inout)); read-only here (L0 -> tile)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3
+        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
+        real(wp), allocatable                                  :: buf(:)
 
         ! Persistent tiles: seed from L0 exactly once. After the first fill the tiles are authoritative; re-copying would be an
         ! identity round-trip (each stage scatters tile->L0, so L0 already mirrors the tile interior at the next timestep's stage
@@ -5058,10 +5068,35 @@ contains
         if (.not. l0_tiles_need_fill) return
 
         do k = 1, l0_ntiles_tot
-            if (amr_block_owner(k) /= proc_rank) cycle
-            call s_l0_tile_l0_offsets(k, o1, o2, o3)
-            fm1 = amr_slots(k)%m; fm2 = amr_slots(k)%n; fm3 = amr_slots(k)%p
-            call s_l0_copy_block(amr_slots(k)%q_cons, q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .true.)
+            bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
+            if (bown == lown) then  ! compute owner holds the L0 cells: local device copy (unchanged path)
+                if (bown /= proc_rank) cycle
+                call s_l0_tile_l0_offsets(k, o1, o2, o3)
+                fm1 = amr_slots(k)%m; fm2 = amr_slots(k)%n; fm3 = amr_slots(k)%p
+                call s_l0_copy_block(amr_slots(k)%q_cons, q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .true.)
+                cycle
+            end if
+            ! routed seed: extents come from the REPLICATED region (the L0 owner has no slot for this tile)
+            fm1 = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
+            fm2 = 0; if (n_glb > 0) fm2 = amr_region_hi_all(2, k) - amr_region_lo_all(2, k)
+            fm3 = 0; if (p_glb > 0) fm3 = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
+            cnt = sys_size*(fm1 + 1)*(fm2 + 1)*(fm3 + 1)
+            if (proc_rank == lown) then  ! L0-storage owner: device-pack the tile's L0 chunk, send to the compute owner
+                call s_l0_tile_l0_offsets(k, o1, o2, o3)
+                allocate (buf(cnt))
+                call s_l0_pack_unpack_block(q_cons_vf, o1, o2, o3, fm1, fm2, fm3, buf, .true.)
+#ifdef MFC_MPI
+                call MPI_SEND(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, ierr)
+#endif
+                deallocate (buf)
+            else if (proc_rank == bown) then  ! compute owner: recv, device-unpack into the tile interior
+                allocate (buf(cnt))
+#ifdef MFC_MPI
+                call MPI_RECV(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+                call s_l0_pack_unpack_block(amr_slots(k)%q_cons, 0, 0, 0, fm1, fm2, fm3, buf, .false.)
+                deallocate (buf)
+            end if
         end do
         l0_tiles_need_fill = .false.
 

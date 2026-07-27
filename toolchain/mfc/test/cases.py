@@ -4480,6 +4480,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # SQUARE grid (n = m): whether the SFC compute owner agrees with the cartesian L0-STORAGE owner at init depends on how the
+        # cartesian split direction lines up with Morton order, so it is a property of the grid SHAPE. Every other L0 golden uses a
+        # 2:1 grid (n=31), where np=2 splits in y and Morton's low-y-row-first grouping agrees - so none of them exercise the
+        # divergent case. On a square grid np=2 tie-breaks to an x split and diverges, which needs the ROUTED initial fill
+        # (s_l0_copy_coarse_to_tiles: L0-storage owner packs its chunk -> compute owner unpacks) and slot allocation keyed to the
+        # compute owner. Before both, this aborted at startup with "routed initial fill not implemented for this decomposition".
+        # Byte-identical to the monolithic (l0_ntile=0) run, like the other tile goldens.
+        stack.push(
+            "L0 tiles -> 2D -> square grid routed initial fill np=2",
+            {**l0_base, "n": 63, "run_time_info": "F", "l0_ntile": 2},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
         # AMR + L0 tiles COEXIST (amr = T .and. l0_ntile > 0): the base grid is tiled into migratable L0 tiles AND an AMR fine
         # overlay runs on top, with the tiles advanced on their (migrated) compute-owner while the Berger-Colella c/f coupling
         # stays in the fixed L0 decomposition and the reflux/restrict correction is routed L0-owner -> tile compute-owner. These
