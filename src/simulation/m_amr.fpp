@@ -136,7 +136,7 @@ module m_amr
     !! m/n/p/idwint/idwbuff/coords that a kernel reads on the fine grid must be swapped here OR refreshed on every fine call at its
     !! use site - and if GPU_DECLARE'd, its DEVICE copy too. A stale device copy of coarse bounds reads out of range on the fine
     !! grid under CCE OpenACC (the ab_int regression, fixed by a per-call GPU_UPDATE in s_compute_rhs; see m_rhs.fpp and
-    !! .claude/rules/common-pitfalls.md). amr_swapped guards against a nested/unpaired swap.
+    !! .claude/rules/common-pitfalls.md). amr_swap_depth makes the swap re-entrant and guards against an unpaired restore.
     !> Saved coarse-level global state for swap/restore
     integer               :: sw_m, sw_n, sw_p
     type(int_bounds_info) :: sw_idwint(3), sw_idwbuff(3)
@@ -165,7 +165,12 @@ module m_amr
     real(wp), allocatable :: amr_rhs_pb_f(:,:,:,:,:), amr_rhs_mv_f(:,:,:,:,:)
     $:GPU_DECLARE(create='[amr_rhs_pb_f, amr_rhs_mv_f]')
 
-    logical :: amr_swapped = .false.  !< paired-swap guard: a nested swap would corrupt the bounce buffers silently
+    !> Swap nesting depth. Only the OUTERMOST swap saves the coarse state into the sw_* bounce buffers, and only its matching
+    !! restore puts it back; an inner swap re-installs and an inner restore is a no-op. Every nested swap site swaps to the same
+    !! slot (amr_cur), so the enclosing frame's view is unchanged either way. Replaces the old paired-swap logical, whose assert
+    !! forbade nesting outright - the nested sites in the RK pass are what block hoisting the restore across blocks (see
+    !! docs/documentation/amr_block_batching.md).
+    integer :: amr_swap_depth = 0
     !> True when the coarse grid is nonuniform (stretched grids, or 2D-axisymmetric's half-width axis cell): the spacing-dependent
     !! WENO coefficients are then recomputed for the ACTIVE grid on every block swap (the fine block's grid is itself nonuniform
     !! under stretching) and restored after. False on fully uniform grids - the recompute is skipped, behavior bit-identical.
@@ -3103,21 +3108,25 @@ contains
     !> Swap the global grid state to the fine block. MUST be paired with s_amr_restore_coarse.
     impure subroutine s_amr_swap_to_fine()
 
-        ! a nested swap would overwrite the sw_* bounce buffers with FINE state, and the eventual restore would install fine extents
-        ! as the coarse grid - silent corruption of everything after
-        @:ASSERT(.not. amr_swapped, "nested s_amr_swap_to_fine (swap/restore must pair)")
-        amr_swapped = .true.
-        sw_m = m; sw_n = n; sw_p = p
-        sw_idwint = idwint; sw_idwbuff = idwbuff
+        ! Saving on a NESTED swap would overwrite the sw_* bounce buffers with FINE state, and the eventual restore would install
+        ! fine extents as the coarse grid - silent corruption of everything after. Hence every save below is depth-guarded; the
+        ! installs are not, since re-installing the same slot is idempotent.
+        amr_swap_depth = amr_swap_depth + 1
+        if (amr_swap_depth == 1) then
+            sw_m = m; sw_n = n; sw_p = p
+            sw_idwint = idwint; sw_idwbuff = idwbuff
+        end if
         ! the acoustic source's precomputed spatials are coarse-grid cell indices: applying them on the fine block would inject at
         ! wrong cells (or out of bounds). The support is guaranteed not to overlap the block (checked at startup), so the fine RHS
         ! correctly skips the source.
-        sw_acoustic_source = acoustic_source; acoustic_source = .false.
+        if (amr_swap_depth == 1) sw_acoustic_source = acoustic_source
+        acoustic_source = .false.
         ! active-box windows are COARSE cell indices: applying them on the swapped fine grid would window the wrong cells. Blocks
         ! are
         ! contained in the active window (init check + regrid clamp), so the fine advance legitimately treats its whole block as
         ! active.
-        sw_ab_active = ab_active; ab_active = .false.
+        if (amr_swap_depth == 1) sw_ab_active = ab_active
+        ab_active = .false.
         $:GPU_UPDATE(device='[ab_active]')
         m = amr_slots(amr_cur)%m; n = amr_slots(amr_cur)%n; p = amr_slots(amr_cur)%p
         idwint(1)%beg = 0; idwint(1)%end = m
@@ -3125,9 +3134,11 @@ contains
         idwint(3)%beg = 0; idwint(3)%end = p
         idwbuff = amr_slots(amr_cur)%idwbuff
         ! save coarse coords to bounce buffers, then copy fine coords into global arrays
-        sw_x_cb = x_cb; sw_x_cc = x_cc; sw_dx = dx
-        if (n_glb > 0) then; sw_y_cb = y_cb; sw_y_cc = y_cc; sw_dy = dy; end if
-        if (p_glb > 0) then; sw_z_cb = z_cb; sw_z_cc = z_cc; sw_dz = dz; end if
+        if (amr_swap_depth == 1) then
+            sw_x_cb = x_cb; sw_x_cc = x_cc; sw_dx = dx
+            if (n_glb > 0) then; sw_y_cb = y_cb; sw_y_cc = y_cc; sw_dy = dy; end if
+            if (p_glb > 0) then; sw_z_cb = z_cb; sw_z_cc = z_cc; sw_dz = dz; end if
+        end if
         x_cb(-1:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%x_cb(-1:amr_slots(amr_cur)%m)
         x_cc(0:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%x_cc(0:amr_slots(amr_cur)%m)
         dx(0:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%dx(0:amr_slots(amr_cur)%m)
@@ -3270,8 +3281,10 @@ contains
     !> Restore the global grid state saved by s_amr_swap_to_fine.
     impure subroutine s_amr_restore_coarse()
 
-        @:ASSERT(amr_swapped, "s_amr_restore_coarse without a matching s_amr_swap_to_fine")
-        amr_swapped = .false.
+        @:ASSERT(amr_swap_depth > 0, "s_amr_restore_coarse without a matching s_amr_swap_to_fine")
+        amr_swap_depth = amr_swap_depth - 1
+        ! inner restore: the enclosing swap frame still wants its slot installed, and the sw_* buffers still hold the coarse state
+        if (amr_swap_depth > 0) return
         m = sw_m; n = sw_n; p = sw_p
         idwint = sw_idwint; idwbuff = sw_idwbuff
         acoustic_source = sw_acoustic_source
