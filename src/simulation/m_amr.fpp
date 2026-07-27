@@ -1748,10 +1748,10 @@ contains
         integer :: k
 
         do k = 1, amr_num_blocks
-            ! level-0 tiles are owned via the cartesian s_l0_tiles_init path and are NOT in the level-1 anchor cut; f_amr_owner
-            ! gains
-            ! tile support only with the ownership unification, so validate only the level>=1 blocks it currently reproduces.
-            if (amr_block_level(k) == 0) cycle
+            ! pure-L0 (amr off): amr_owner_cut is the TILE cut, so tiles ARE validated. Coexist (amr on): the fine-regrid assigner
+            ! overwrites amr_owner_cut with the level-1 anchor cut, which does not represent tiles yet (unified in the next
+            ! increment), so skip level-0 there.
+            if (amr_block_level(k) == 0 .and. amr) cycle
             if (f_amr_owner(k) /= amr_block_owner(k)) &
                 & call s_mpi_abort('SFC cut-point owner disagrees with amr_block_owner - cut capture or search is wrong')
         end do
@@ -4892,6 +4892,34 @@ contains
                 end do
             end do
         end do
+
+        ! COMPUTE owner = SFC cost-split over the tiles (fills the O(num_procs) amr_owner_cut), superseding the cartesian owner set
+        ! in
+        ! the loop above; amr_tile_l0_owner keeps the cartesian STORAGE assignment (where the L0 field data physically lives). Init
+        ! cost is geometric (whole-tile cell count), uniform on a uniform grid. PRECONDITION (asserted): the SFC compute owner
+        ! equals
+        ! the cartesian storage owner - the first fill (s_l0_copy_coarse_to_tiles) is a LOCAL L0->tile copy that needs
+        ! compute==storage. A decomposition whose Morton order splits tiles across ranks differently than the cartesian rank-major
+        ! order would need a routed initial fill (deferred); the rebalancer's routed migration already handles post-init divergence.
+        block
+            integer         :: sfco(l0_ntiles_tot), kk
+            integer(kind=8) :: tkey(l0_ntiles_tot)
+            real(wp)        :: twt(l0_ntiles_tot)
+            do kk = 1, l0_ntiles_tot
+                tkey(kk) = f_morton(amr_region_lo_all(1, kk), amr_region_lo_all(2, kk), amr_region_lo_all(3, kk))
+                twt(kk) = real(amr_region_hi_all(1, kk) - amr_region_lo_all(1, kk) + 1, wp)*real(amr_region_hi_all(2, &
+                    & kk) - amr_region_lo_all(2, kk) + 1, wp)*real(amr_region_hi_all(3, kk) - amr_region_lo_all(3, kk) + 1, wp)
+            end do
+            call s_amr_sfc_cut(tkey, twt, l0_ntiles_tot, amr_owner_cut, sfco)
+            do kk = 1, l0_ntiles_tot
+                if (sfco(kk) /= amr_tile_l0_owner(kk)) call s_mpi_abort('L0 tile SFC compute-owner diverges from cartesian ' &
+                    & // 'storage owner at init; routed initial fill not implemented for this decomposition')
+                amr_block_owner(kk) = sfco(kk)
+                amr_owns_all(kk) = (sfco(kk) == proc_rank)
+            end do
+        end block
+        if (.not. amr) call s_amr_validate_owner()  ! pure-L0: amr_owner_cut is the tile cut here, so f_amr_owner must reproduce it
+
         call s_amr_select_slot(1)
         ! tiles are PERSISTENT: L0 seeds them once at the first timestep (s_l0_copy_coarse_to_tiles self-gates on this flag), then
         ! they carry their own state across stages/timesteps. No init-time device copy (q_cons device state is not live at module
@@ -5342,29 +5370,14 @@ contains
         ! preserved. Deadband kept: skip the re-cut while the load gap is already within tol (no churn on sub-5% imbalance).
         if (gap0 > tol) then
             block
-                integer         :: ord(l0_ntiles_tot), kk, rr, tmpo
-                integer(kind=8) :: tkey(l0_ntiles_tot), tmpk
-                real(wp)        :: total, cum, tgt
+                integer(kind=8) :: tkey(l0_ntiles_tot)
                 do k = 1, l0_ntiles_tot
                     tkey(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
-                    ord(k) = k
                 end do
-                do k = 2, l0_ntiles_tot  ! insertion sort by Morton key (l0_ntiles_tot small)
-                    tmpk = tkey(ord(k)); tmpo = ord(k); kk = k - 1
-                    do while (kk >= 1)
-                        if (tkey(ord(kk)) <= tmpk) exit
-                        ord(kk + 1) = ord(kk); kk = kk - 1
-                    end do
-                    ord(kk + 1) = tmpo
-                end do
-                total = sum(cost(1:l0_ntiles_tot))
-                rr = 0; cum = 0._wp
-                do k = 1, l0_ntiles_tot
-                    tgt = real(rr + 1, wp)*total/real(num_procs, wp)
-                    if (cum >= tgt .and. rr < num_procs - 1) rr = rr + 1
-                    newo(ord(k)) = rr
-                    cum = cum + cost(ord(k))
-                end do
+                ! shared SFC cut: cumulative-split the smoothed cost into num_procs contiguous Morton ranges and REFRESH
+                ! amr_owner_cut
+                ! so f_amr_owner keeps reproducing the tile owner after a re-cut (same partition as s_l0_tiles_init / the assigner).
+                call s_amr_sfc_cut(tkey, cost, l0_ntiles_tot, amr_owner_cut, newo)
             end block
         end if
         load = 0._wp
