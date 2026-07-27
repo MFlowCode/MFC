@@ -983,6 +983,7 @@ contains
         real(wp), dimension(1:3,1:3) :: viscous_stress
         real(wp), dimension(1:3)     :: local_force_contribution, radial_vector, local_torque_contribution
         real(wp)                     :: cell_volume, dynamic_viscosity
+        real(wp)                     :: t_start, t_end
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: dynamic_viscosities

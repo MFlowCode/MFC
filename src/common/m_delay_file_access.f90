@@ -11,14 +11,14 @@ module m_delay_file_access
 
     private
 
-    public :: DelayFileAccess
+    public :: s_delay_file_access
 
     integer, private, parameter :: N_PROCESSES_FILE_ACCESS = 128, FILE_ACCESS_DELAY_UNIT = 10000
 
 contains
 
     !> Introduce a rank-dependent busy-wait delay to stagger parallel file access and reduce I/O contention.
-    impure subroutine DelayFileAccess(ProcessRank)
+    impure subroutine s_delay_file_access(ProcessRank)
 
         integer, intent(in) :: ProcessRank
         integer             :: iDelay, nFileAccessDelayIterations
@@ -31,6 +31,6 @@ contains
             Dummy = Number*Number
         end do
 
-    end subroutine DelayFileAccess
+    end subroutine s_delay_file_access
 
 end module m_delay_file_access

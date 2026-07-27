@@ -454,7 +454,7 @@ contains
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
-            call DelayFileAccess(proc_rank)
+            call s_delay_file_access(proc_rank)
 
             if (down_sample) then
                 call s_initialize_mpi_data_ds(q_cons_temp)

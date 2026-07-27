@@ -796,8 +796,9 @@ contains
     !> Initialize all simulation sub-modules in the required dependency order
     impure subroutine s_initialize_modules
 
-        integer :: m_ds, n_ds, p_ds
-        integer :: i
+        integer  :: m_ds, n_ds, p_ds
+        integer  :: i
+        real(wp) :: t_start, t_end
 
         call s_initialize_global_parameters_module()
         #:if USING_AMD
@@ -813,9 +814,14 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
+        if (proc_rank == 0) print *, "Starting s_initialize_mpi_common_module"
+        call cpu_time(t_start)
         call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
+        call cpu_time(t_end)
+        if (proc_rank == 0) print *, "s_initialize_mpi_common_module finished in ", t_end - t_start
+
         if (grid_geometry == 3) call s_initialize_fftw_module()
 
         if (bubbles_euler) call s_initialize_bubbles_EE_module()
@@ -838,9 +844,13 @@ contains
 
         if (relax) call s_initialize_phasechange_module()
 
+        if (proc_rank == 0) print *, "Starting s_initialize_data_output_module"
+        call cpu_time(t_start)
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
+        call cpu_time(t_end)
+        if (proc_rank == 0) print *, "s_initialize_data_output_module finished in ", t_end - t_start
 
         call s_initialize_boundary_common_module()
 
@@ -866,7 +876,11 @@ contains
             end do
             deallocate (q_cons_temp)
         else
+            if (proc_rank == 0) print *, "Starting s_read_data_files"
+            call cpu_time(t_start)
             call s_read_data_files(q_cons_ts(1)%vf)
+            call cpu_time(t_end)
+            if (proc_rank == 0) print *, "s_read_data_files finished in ", t_end - t_start
         end if
 
         call s_populate_grid_variables_buffers()
@@ -877,7 +891,11 @@ contains
                 type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
                 integer                                :: num_particle_cloud_ibs
 
+                if (proc_rank == 0) print *, "Starting get_neighbor_bounds"
+                call cpu_time(t_start)
                 call get_neighbor_bounds()
+                call cpu_time(t_end)
+                if (proc_rank == 0) print *, "get_neighbor_bounds finished in ", t_end - t_start
 
                 if (cfl_dt .and. n_start > 0) then
                     call s_read_ib_restart_data(n_start)
@@ -888,14 +906,23 @@ contains
                     allocate (particle_cloud_ibs(0))
                     num_particle_cloud_ibs = 0
                 else
+                    if (proc_rank == 0) print *, "Starting s_generate_particle_clouds"
                     call s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
                 end if
                 call s_instantiate_STL_models()
                 call s_initialize_ib_airfoils()
+                if (proc_rank == 0) print *, "Starting s_reduce_ib_patch_array"
+                call cpu_time(t_start)
                 call s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
+                call cpu_time(t_end)
+                if (proc_rank == 0) print *, "s_reduce_ib_patch_array finished in ", t_end - t_start
                 deallocate (particle_cloud_ibs)
             end block
+            if (proc_rank == 0) print *, "Starting s_ibm_setup"
+            call cpu_time(t_start)
             call s_ibm_setup()
+            call cpu_time(t_end)
+            if (proc_rank == 0) print *, "s_ibm_setup finished in ", t_end - t_start
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
                 call s_write_ib_data_file(0)
                 call s_write_ib_state_file(0)
@@ -927,12 +954,15 @@ contains
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
 
+        if (proc_rank == 0) print *, "exiting s_initialize_modules"
+
     end subroutine s_initialize_modules
 
     !> Set up the MPI execution environment, bind GPUs, and decompose the computational domain
     impure subroutine s_initialize_mpi_domain
 
-        integer :: ierr
+        integer  :: ierr
+        real(wp) :: t_start, t_end
 
 #ifdef MFC_GPU
         real(wp) :: starttime, endtime
@@ -991,7 +1021,11 @@ contains
 #endif
         end if
 
+        if (proc_rank == 0) print *, "Starting s_mpi_bcast_user_inputs"
+        call cpu_time(t_start)
         call s_mpi_bcast_user_inputs()
+        call cpu_time(t_end)
+        if (proc_rank == 0) print *, "s_mpi_bcast_user_inputs finished in ", t_end - t_start
 
         ! Save original BCs before decomposition overwrites them with MPI neighbor ranks
         ib_bc_x = bc_x
