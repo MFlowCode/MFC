@@ -165,6 +165,19 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[wa_flg]')
 
+    !> @name The coordinate direction indexes and flags (flg), respectively, for which the configurations will be determined with
+    !! respect to a working direction and that will be used to isolate the contributions, in that direction, in the dimensionally
+    !! split system of equations. Declared here rather than in m_global_parameters_common so the hot dimensionally-split kernels
+    !! (Riemann solvers) read them from their own module: use-associating them from common costs ~18 kB/work-item of register spill
+    !! on AMD OpenMP offload. Common code takes the mapping as explicit arguments instead.
+    !> @{
+    integer, dimension(3)  :: dir_idx
+    real(wp), dimension(3) :: dir_flg
+    integer, dimension(3)  :: dir_idx_tau  !< used for hypoelasticity=true
+    !> @}
+
+    $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
+
     integer :: buff_size  !< Number of ghost cells for boundary condition storage
     $:GPU_DECLARE(create='[buff_size]')
 

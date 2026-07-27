@@ -62,14 +62,6 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[Re_size, Re_size_max, Re_idx]')
     !> @}
 
-    !> @name Working-direction index mapping
-    !> @{
-    integer, dimension(3)  :: dir_idx
-    real(wp), dimension(3) :: dir_flg
-    integer, dimension(3)  :: dir_idx_tau
-    $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau]')
-    !> @}
-
     !> Minimum cell widths. These are distinct from the per-cell width arrays named dx, dy, and dz in simulation and post-process.
     real(wp) :: dx_min, dy_min, dz_min
 

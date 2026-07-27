@@ -962,9 +962,13 @@ contains
     end subroutine s_convert_primitive_to_conservative_variables
 
     !> Convert primitive variables to Eulerian flux variables.
-    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b)
+    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b, dir_idx_in, dir_flg_in)
 
-        integer, intent(in)                                                                     :: s2b, s3b
+        integer, intent(in) :: s2b, s3b
+        !> Working-direction mapping, passed explicitly: it is simulation state (m_global_parameters), and use-associating it into
+        !! this common kernel spills registers on AMD OpenMP offload.
+        integer, dimension(3), intent(in)                                                       :: dir_idx_in
+        real(wp), dimension(3), intent(in)                                                      :: dir_flg_in
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in)                  :: qK_prim_vf
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout)               :: FK_vf
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,eqn_idx%adv%beg:), intent(inout) :: FK_src_vf
@@ -1005,7 +1009,7 @@ contains
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]')
+                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyinReadOnly='[dir_idx_in, dir_flg_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1060,24 +1064,24 @@ contains
                     ! mass flux, this should be \alpha_i \rho_i u_i
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, eqn_idx%cont%end
-                        FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(dir_idx(1))
+                        FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(dir_idx_in(1))
                     end do
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_vels
                         FK_vf(j, k, l, &
-                              & eqn_idx%cont%end + dir_idx(i)) = rho_K*vel_K(dir_idx(1))*vel_K(dir_idx(i)) &
-                              & + pres_K*dir_flg(dir_idx(i))
+                              & eqn_idx%cont%end + dir_idx_in(i)) = rho_K*vel_K(dir_idx_in(1))*vel_K(dir_idx_in(i)) &
+                              & + pres_K*dir_flg_in(dir_idx_in(i))
                     end do
 
                     ! energy flux, u(E+p)
-                    FK_vf(j, k, l, eqn_idx%E) = vel_K(dir_idx(1))*(E_K + pres_K)
+                    FK_vf(j, k, l, eqn_idx%E) = vel_K(dir_idx_in(1))*(E_K + pres_K)
 
                     ! Species advection Flux, \rho*u*Y
                     if (chemistry) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_species
-                            FK_vf(j, k, l, i - 1 + eqn_idx%species%beg) = vel_K(dir_idx(1))*(rho_K*Y_K(i))
+                            FK_vf(j, k, l, i - 1 + eqn_idx%species%beg) = vel_K(dir_idx_in(1))*(rho_K*Y_K(i))
                         end do
                     end if
 
@@ -1091,12 +1095,12 @@ contains
                         ! Could be bubbles_euler!
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            FK_vf(j, k, l, i) = vel_K(dir_idx(1))*alpha_K(i - eqn_idx%E)
+                            FK_vf(j, k, l, i) = vel_K(dir_idx_in(1))*alpha_K(i - eqn_idx%E)
                         end do
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            FK_src_vf(j, k, l, i) = vel_K(dir_idx(1))
+                            FK_src_vf(j, k, l, i) = vel_K(dir_idx_in(1))
                         end do
                     end if
                 end do
