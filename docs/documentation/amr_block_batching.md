@@ -53,6 +53,22 @@ penalty is still 15x at 512^2.
 per RK stage, not work — dominated by per-block kernel launch count plus the per-swap device
 syncs, none of which shrink as blocks shrink.
 
+## Direct confirmation: the cost is kernel launch count
+
+Counted with `rocprofv3 --kernel-trace` (2D 128^2, 6 steps, np=1, under `srun`):
+
+| | monolithic | 16 blocks (`l0_ntile=4`) | ratio |
+|---|---|---|---|
+| GPU kernel launches | 381 | 7619 | **20.0x** |
+| wall time (256^2 sweep) | — | — | 16.75x |
+
+Launch count scales 20x with block count while wall time scales 16.75x, so the per-block
+cost tracks launches directly. This is measured, not inferred: combined with the refuted
+hoist below (removing swap traffic changed nothing), it closes the argument that the fixed
+per-block cost IS the launch count. Note each tile advance issues ~450 launches against the
+monolithic step's 381 — the per-block path adds its own ghost fills and halo work on top of
+the same RHS kernel sequence.
+
 ## What this rules out
 
 @ref amr says "per-slot state instead of the global swap" is the lever. That is necessary but
