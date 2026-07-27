@@ -1713,6 +1713,10 @@ contains
         integer :: k
 
         do k = 1, amr_num_blocks
+            ! level-0 tiles are owned via the cartesian s_l0_tiles_init path and are NOT in the level-1 anchor cut; f_amr_owner
+            ! gains
+            ! tile support only with the ownership unification, so validate only the level>=1 blocks it currently reproduces.
+            if (amr_block_level(k) == 0) cycle
             if (f_amr_owner(k) /= amr_block_owner(k)) &
                 & call s_mpi_abort('SFC cut-point owner disagrees with amr_block_owner - cut capture or search is wrong')
         end do
