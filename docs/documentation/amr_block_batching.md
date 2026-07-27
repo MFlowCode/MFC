@@ -142,11 +142,21 @@ restoring once per phase — has **two** blockers, not one.
    deferred they would swap while already swapped and trip
    `@:ASSERT(.not. amr_swapped, "nested s_amr_swap_to_fine (swap/restore must pair)")`.
 
-   So hoisting the restore requires first making the swap re-entrant — "install slot k;
-   save the coarse state only on the first swap; restore only on the outermost restore" —
-   or making those three routines swap-aware so they no-op when already on their own slot.
-   There are five swap/restore sites in `m_amr.fpp` total; three of them nest inside the RK
-   pass, which is why this is a contract change rather than a call-site change.
+   **Resolved:** the swap is now depth-counted and re-entrant — only the outermost swap
+   saves into the `sw_*` bounce buffers, only the outermost restore puts them back, and an
+   inner swap re-installs the same slot idempotently. No nesting occurs yet, so depth never
+   exceeds 1 and behavior is unchanged.
+3. *The IGR sigma bounce is save-and-seed in one routine.* Still open. `s_amr_swap_to_fine`
+   ends with `if (igr) call s_amr_igr_swap_sigma()`, which BOTH saves the coarse
+   `jac`/`jac_old` into `sw_jac`/`sw_jac_old` AND seeds the block's sigma from the parent —
+   and it reads `sw_idwbuff` for the coarse extent. Once nesting is actually used, an inner
+   swap would re-run it and overwrite `sw_jac` with fine state. It has to be split into a
+   depth-guarded save and a per-block seed before the restore can be hoisted.
+
+   Note this routine already caused an OpenACC-only crash (its own comment: the `sw_*`
+   host-only module state "makes OpenACC's present lookup fail (OpenMP's implicit map(to)
+   tolerates it, which is why only acc lanes crashed)"). It is a worked example of why an
+   OpenMP-offload pass does not validate this area.
 
 Note the SWAP CONTRACT warning in `.claude/rules/common-pitfalls.md`: a stale device copy of
 coarse bounds reads out of range on the fine grid under **CCE OpenACC only**. A CPU-only or
