@@ -63,51 +63,26 @@
                                       & extraAccArgs=extraAccArgs)
     #:set omp_directive = OMP_ROUTINE(function_name=function_name, nohost=nohost, extraOmpArgs=extraOmpArgs)
 
-    #:if cray_noinline == True
+    #! The caller asks for a Cray inlining decision per routine, so honour it on every
+    #! Cray build — CPU and GPU alike. The !DIR$ line is a Cray-only directive, and it
+    #! accompanies the offload directive rather than replacing it. Note the named
+    #! never-inline directive is INLINENEVER; !DIR$ NOINLINE is a separate, nameless,
+    #! call-site directive that ftn rejects when given a routine name (ftn-790).
+    #:if cray_inline or cray_noinline
         #:if not isinstance(function_name, str)
-            #:stop "When using cray_noinline, function name must be given and given as a string"
+            #:stop "When using cray_inline/cray_noinline, function name must be given and given as a string"
         #:endif
-        #:set cray_noinline_directive = ('!DIR$ NOINLINE ' + function_name).strip('\n')
+        #:set cray_keyword = 'INLINEALWAYS' if cray_inline else 'INLINENEVER'
+        #:set cray_directive = ('!DIR$ ' + cray_keyword + ' ' + function_name).strip('\n')
 #ifdef _CRAYFTN
-#if MFC_OpenACC
-        $:acc_directive
-#elif MFC_OpenMP
-        $:omp_directive
-#else
-        $:cray_noinline_directive
-#endif
-        #! On non-Cray CPU builds (no _CRAYFTN, no MFC_OpenACC, no MFC_OpenMP), nothing is
-        #! emitted — intentional, since !DIR$ NOINLINE is a Cray-specific directive.
-#elif MFC_OpenACC
-        $:acc_directive
-#elif MFC_OpenMP
-        $:omp_directive
-#endif
-    #:elif cray_inline == True
-        #:if not isinstance(function_name, str)
-            #:stop "When inlining for Cray Compiler, function name must be given and given as a string"
-        #:endif
-        #:set cray_directive = ('!DIR$ INLINEALWAYS ' + function_name).strip('\n')
-#ifdef _CRAYFTN
-#if MFC_OpenACC
-        $:acc_directive
-#elif MFC_OpenMP
-        $:omp_directive
-#else
         $:cray_directive
 #endif
-#elif MFC_OpenACC
-        $:acc_directive
-#elif MFC_OpenMP
-        $:omp_directive
-#endif
-    #:else
-#if MFC_OpenACC
-        $:acc_directive
-#elif MFC_OpenMP
-        $:omp_directive
-#endif
     #:endif
+#if MFC_OpenACC
+    $:acc_directive
+#elif MFC_OpenMP
+    $:omp_directive
+#endif
 #:enddef
 
 ! Declare device-resident data
