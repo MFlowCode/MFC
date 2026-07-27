@@ -118,6 +118,11 @@ module m_amr
     !> (0:num_procs-1) SFC Morton-key upper bound per rank from the cost-weighted split; owner = cut-search (f_amr_owner). The O(P)
     !! computed replacement for the O(global_blocks) amr_block_owner table (validated against it during bring-up).
     integer(kind=8), allocatable :: amr_owner_cut(:)
+    !> (0:num_procs-1) companion cut for FINE-block (level>=1) owners: the level-1 anchor cut. In no-tile AMR the fine owner IS
+    !! amr_owner_cut, but in coexist amr_owner_cut is overwritten by the TILE cut, so the level-1 cut is kept here so f_amr_owner
+    !! can reproduce fine owners (which straddle tiles and so cannot be derived from the tile cut) alongside tile owners. One cut
+    !! per authority, both O(num_procs).
+    integer(kind=8), allocatable :: amr_fine_cut(:)
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min-over-ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
@@ -263,6 +268,7 @@ contains
         allocate (amr_owns_all(amr_max_blocks))
         allocate (amr_block_owner(amr_max_blocks))
         allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
+        allocate (amr_fine_cut(0:num_procs - 1)); amr_fine_cut = -1_8
         allocate (amr_block_level(amr_max_blocks))
         ! amr_ovl_gather/scatter (the 2D rank lists) are allocated to the computed max overlap in s_amr_build_seam_pairs; only the
         ! per-block counts are sized here.
@@ -1702,6 +1708,10 @@ contains
         do a = 1, na
             amr_block_owner(aidx(a)) = aown(a)
         end do
+        ! this IS the fine (level>=1) owner cut. Keep a companion copy: in coexist s_l0_tiles_init overwrites amr_owner_cut with the
+        ! TILE cut, and fine blocks straddle tiles so their owner is not tile-cut-derivable - f_amr_owner reads amr_fine_cut for
+        ! them.
+        amr_fine_cut = amr_owner_cut
 
         ! descendants inherit their parent's owner (top-down, level by level - parents already assigned when their children run)
         maxlev = maxval(amr_block_level(1:amr_num_blocks))
@@ -1716,23 +1726,30 @@ contains
     end subroutine s_amr_assign_block_owners
 
     !> Owner rank of block k from the O(num_procs) SFC cut-points: resolve k's level-1 tower anchor, then binary-search its Morton
-    !! key in amr_owner_cut (smallest r with key <= cut(r)). Reproduces s_amr_assign_block_owners' cost-weighted SFC split exactly.
+    !! key in the owning authority's cut. A level-0 TILE resolves against amr_owner_cut (the tile cut in tiled modes); a FINE block
+    !! (level>=1) resolves its level-1 tower anchor against amr_fine_cut (== amr_owner_cut in no-tile AMR). Reproduces
+    !! s_amr_assign_block_owners' / the tile split's cost-weighted SFC assignment exactly.
     pure integer function f_amr_owner(k) result(r)
 
         integer, intent(in) :: k
-        integer(kind=8)     :: mk
+        integer(kind=8)     :: mk, cut(0:num_procs - 1)
         integer             :: a, lo, hi, mid
 
         a = k
-        do while (amr_block_level(a) > 1)
-            if (f_amr_parent_block(a) < 1) exit
-            a = f_amr_parent_block(a)
-        end do
+        if (amr_block_level(k) == 0) then
+            cut = amr_owner_cut  ! tile: own Morton key vs the tile cut
+        else
+            do while (amr_block_level(a) > 1)  ! fine: resolve to the level-1 tower anchor
+                if (f_amr_parent_block(a) < 1) exit
+                a = f_amr_parent_block(a)
+            end do
+            cut = amr_fine_cut
+        end if
         mk = f_morton(amr_region_lo_all(1, a), amr_region_lo_all(2, a), amr_region_lo_all(3, a))
         lo = 0; hi = num_procs - 1
         do while (lo < hi)
             mid = (lo + hi)/2
-            if (mk <= amr_owner_cut(mid)) then
+            if (mk <= cut(mid)) then
                 hi = mid
             else
                 lo = mid + 1
@@ -1748,10 +1765,10 @@ contains
         integer :: k
 
         do k = 1, amr_num_blocks
-            ! pure-L0 (amr off): amr_owner_cut is the TILE cut, so tiles ARE validated. Coexist (amr on): the fine-regrid assigner
-            ! overwrites amr_owner_cut with the level-1 anchor cut, which does not represent tiles yet (unified in the next
-            ! increment), so skip level-0 there.
-            if (amr_block_level(k) == 0 .and. amr) cycle
+            ! every block resolves: tiles (level 0) via amr_owner_cut (tile cut), fine blocks (level>=1) via amr_fine_cut. The
+            ! caller
+            ! guarantees the relevant cut is populated for the blocks present at each call site (assigner: fine cut; tile init:
+            ! both).
             if (f_amr_owner(k) /= amr_block_owner(k)) &
                 & call s_mpi_abort('SFC cut-point owner disagrees with amr_block_owner - cut capture or search is wrong')
         end do
@@ -4781,6 +4798,7 @@ contains
             allocate (amr_owns_all(amr_max_blocks))
             allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
             allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
+            allocate (amr_fine_cut(0:num_procs - 1)); amr_fine_cut = -1_8
             allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
             allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
             allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
@@ -4918,7 +4936,10 @@ contains
                 amr_owns_all(kk) = (sfco(kk) == proc_rank)
             end do
         end block
-        if (.not. amr) call s_amr_validate_owner()  ! pure-L0: amr_owner_cut is the tile cut here, so f_amr_owner must reproduce it
+        ! validate the full picture now that tiles exist: tiles vs amr_owner_cut (tile cut, just built), fine blocks vs amr_fine_cut
+        ! (the level-1 cut the assigner saved at init). Runs in coexist too (amr_fine_cut is populated by the earlier assigner
+        ! call).
+        call s_amr_validate_owner()
 
         call s_amr_select_slot(1)
         ! tiles are PERSISTENT: L0 seeds them once at the first timestep (s_l0_copy_coarse_to_tiles self-gates on this flag), then
@@ -5787,6 +5808,7 @@ contains
             deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
             deallocate (amr_block_owner, amr_block_level)
             if (allocated(amr_owner_cut)) deallocate (amr_owner_cut)
+            if (allocated(amr_fine_cut)) deallocate (amr_fine_cut)
         end if
         deallocate (amr_tile_l0_owner, amr_tile_cost, amr_tile_cost_ema)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
@@ -5829,6 +5851,7 @@ contains
         if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
         if (allocated(amr_block_owner)) deallocate (amr_block_owner)
         if (allocated(amr_owner_cut)) deallocate (amr_owner_cut)
+        if (allocated(amr_fine_cut)) deallocate (amr_fine_cut)
         if (allocated(amr_block_level)) deallocate (amr_block_level)
         if (allocated(amr_gxcb)) deallocate (amr_gxcb)
         if (allocated(amr_gycb)) deallocate (amr_gycb)
