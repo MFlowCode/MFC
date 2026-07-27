@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import tempfile
 import types as _types
 from pathlib import Path
@@ -387,6 +389,18 @@ def test_canonicalize_leaves_non_path_values_untouched():
     assert canonicalize_param_paths(params, "/home/runner/MFC") == params
 
 
+def test_canonicalize_relativizes_in_repo_name_that_starts_with_dots():
+    """`..foo` is a leading-dots filename, not a parent-directory escape."""
+    root = "/home/runner/MFC"
+    assert canonicalize_param_paths({"f": f"{root}/..cache/model.stl"}, root) == {"f": "..cache/model.stl"}
+
+
+def test_canonicalize_preserves_sibling_directory_sharing_a_prefix():
+    """The near miss: relpath yields a genuine leading `..`, so the path stays absolute."""
+    params = {"f": "/home/runner/MFC-scratch/model.stl"}
+    assert canonicalize_param_paths(params, "/home/runner/MFC") == params
+
+
 def test_canonicalized_key_still_distinguishes_different_files():
     root = "/home/runner/MFC"
     a = param_hash(canonicalize_param_paths({"f": f"{root}/examples/a/model.stl"}, root))
@@ -440,3 +454,55 @@ def test_health_fails_immediately_when_map_predates_last_source_change():
         built_after_last_change=False,
     )
     assert not ok and "stale" in msg.lower()
+
+
+# --- coverage_map_changed.py: the commit guard the refresh workflow branches on ---
+
+CHANGED_SCRIPT = Path(__file__).resolve().parents[3] / ".github" / "scripts" / "coverage_map_changed.py"
+
+
+def _repo_with_committed_map(d, entries):
+    """A throwaway git repo whose HEAD holds `entries` as the coverage map."""
+    repo = Path(d)
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
+    subprocess.run([*git, "init", "-q"], check=True)
+    save_map(repo / "tests" / "coverage_map.json.gz", entries, n_tests=len(entries), git_sha="aaa", gfortran_version="13")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "map"], check=True)
+    return repo
+
+
+def _run_guard(repo):
+    return subprocess.run([sys.executable, str(CHANGED_SCRIPT)], cwd=repo, capture_output=True, text=True, check=False).returncode
+
+
+def test_guard_reports_unchanged_with_a_code_that_is_not_the_crash_code():
+    """A rebuild differing only in _meta must skip -- but never via exit 1.
+
+    An uncaught exception exits 1, so if "unchanged" were 1 the workflow could not tell a
+    no-op refresh from a broken comparison, and a dead guard would run permanently green.
+    """
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
+        # Same entries, fresh _meta -- exactly what every no-op refresh produces.
+        save_map(repo / "tests" / "coverage_map.json.gz", {"k1": ["src/simulation/m_rhs.fpp"]}, n_tests=1, git_sha="bbb", gfortran_version="13")
+        rc = _run_guard(repo)
+    assert rc == 10
+    assert rc not in (0, 1)
+
+
+def test_guard_reports_changed_when_coverage_actually_moves():
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
+        save_map(repo / "tests" / "coverage_map.json.gz", {"k1": ["src/simulation/m_rhs.fpp"], "k2": ["src/common/m_eos.fpp"]}, n_tests=2, git_sha="bbb", gfortran_version="13")
+        assert _run_guard(repo) == 0
+
+
+def test_guard_errors_when_the_rebuilt_map_is_missing():
+    """The SLURM job died before writing a map: fail the job, do not read it as unchanged."""
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
+        (repo / "tests" / "coverage_map.json.gz").unlink()
+        rc = _run_guard(repo)
+    assert rc == 2
+    assert rc != 10

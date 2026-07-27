@@ -37,7 +37,7 @@ jobs:
         run: |
           # Compare coverage ENTRIES, not file bytes: _meta (built_at, git_sha) moves on
           # every rebuild, so `git diff` on the .gz always reported a change and the bot
-          # pushed a no-op commit nearly every run. rc 0 = changed, 1 = unchanged, 2 = error.
+          # pushed a no-op commit nearly every run. rc 0 = changed, 10 = unchanged.
           # The comparison script is stdlib-only, so the system interpreter is a fine
           # fallback if the SLURM job never got far enough to create build/venv.
           PY=build/venv/bin/python3
@@ -46,10 +46,13 @@ jobs:
           "$PY" .github/scripts/coverage_map_changed.py
           changed=$?
           set -e
-          if [ "$changed" -eq 2 ]; then
-            echo "::error::Coverage map comparison failed."
-            exit 1
-          fi
+          # Every other code is a hard error, never a silent skip: an uncaught Python
+          # exception exits 1 and a missing interpreter exits 127, and treating either as
+          # "unchanged" would let a permanently broken comparison run permanently green.
+          case "$changed" in
+          0|10) ;;
+          *)    echo "::error::Coverage map comparison failed (rc=$changed)."; exit 1 ;;
+          esac
           if [ "$changed" -eq 0 ]; then
             git config user.name  "mfc-bot"
             git config user.email "mfc-bot@users.noreply.github.com"

@@ -34,8 +34,11 @@ def canonicalize_param_paths(params: dict, root: str) -> dict:
             try:
                 rel = os.path.relpath(value, root)
             except ValueError:  # different drive on Windows -> not in-repo
-                rel = None
-            if rel is not None and not rel.startswith(os.pardir):
+                rel = os.pardir
+            # Only a leading `..` COMPONENT means "outside the repo". Testing the string
+            # prefix alone would also reject an in-repo name that merely starts with dots
+            # (`..foo`), leaving it absolute -- the churn this function exists to remove.
+            if rel != os.pardir and not rel.startswith(os.pardir + os.sep):
                 canonical = rel.replace(os.sep, "/")
         out[key] = canonical
     return out
