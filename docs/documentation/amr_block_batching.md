@@ -94,7 +94,7 @@ static multi-level does not tile the level-2 block`. So the coexist gate and thi
 redesign are blocked on the same single-working-slot architecture, not on independent work.
 Sequencing the batching arc *after* the unification arc therefore risks reworking it.
 
-## Swap topology (and one optimization that does not work)
+## Swap topology (and what blocks the obvious optimization)
 
 The hot path has exactly **one `s_amr_swap_to_fine` / `s_amr_restore_coarse` pair per block
 per RK stage**, wrapping `s_compute_rhs` in `s_amr_fine_stage_rhs` (and its subcycle twin).
@@ -104,11 +104,31 @@ So a timestep costs `3 * nblocks` swap round-trips, each carrying
 `s_amr_sync_grid_state_to_device` plus, on nonuniform grids, `s_amr_recompute_weno_coefs`.
 
 The obvious cheap win — hoist the restore, letting consecutive blocks swap fine->fine and
-restoring once per phase — **does not work as the driver stands**: `m_time_steppers` calls
-`s_amr_p2p_reflux_faces` and `s_amr_apply_reflux` between blocks inside the advance loop,
-and both operate on the coarse `rhs_vf` in the coarse frame. Hoisting the restore would run
-them against fine globals. Any batching design must either move the reflux out of the
-per-block loop or make it frame-independent first.
+restoring once per phase — has **two** blockers, not one.
+
+1. *Reflux in the coarse frame.* `m_time_steppers` called `s_amr_p2p_reflux_faces` and
+   `s_amr_apply_reflux` between blocks inside the advance loop, both operating on the coarse
+   `rhs_vf` at coarse indices. **Resolved:** the advance and reflux loops are now split
+   (phase 3 advances all blocks, phase 4 refluxes), so the reflux runs in the coarse frame
+   after the advances rather than interleaved with them.
+2. *Nested swap sites inside the RK pass.* Still open, and the larger of the two.
+   `s_amr_fine_stage_rk` reads no grid globals itself (slot arrays plus `dt` and feature
+   flags), but it calls `s_amr_pressure_relax_fine`, `s_amr_ib_correct_fine`, and
+   `s_amr_update_mib_fine`, and **each opens its own `s_amr_swap_to_fine` /
+   `s_amr_restore_coarse` pair**. They assume the coarse frame on entry. With the restore
+   deferred they would swap while already swapped and trip
+   `@:ASSERT(.not. amr_swapped, "nested s_amr_swap_to_fine (swap/restore must pair)")`.
+
+   So hoisting the restore requires first making the swap re-entrant — "install slot k;
+   save the coarse state only on the first swap; restore only on the outermost restore" —
+   or making those three routines swap-aware so they no-op when already on their own slot.
+   There are five swap/restore sites in `m_amr.fpp` total; three of them nest inside the RK
+   pass, which is why this is a contract change rather than a call-site change.
+
+Note the SWAP CONTRACT warning in `.claude/rules/common-pitfalls.md`: a stale device copy of
+coarse bounds reads out of range on the fine grid under **CCE OpenACC only**. A CPU-only or
+NVHPC-acc pass proves nothing for this class, so any swap-contract change needs a Cray GPU
+run before it can be trusted.
 
 ## Increments
 
