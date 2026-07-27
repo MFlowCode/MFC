@@ -251,9 +251,9 @@ class TestCase(case.Case):
         return trace_to_uuid(self.trace)
 
     def coverage_key(self) -> str:
-        from .coverage import param_hash
+        from .coverage import canonicalize_param_paths, param_hash
 
-        return param_hash(self.params)
+        return param_hash(canonicalize_param_paths(self.params, common.MFC_ROOT_DIR))
 
     def get_dirpath(self):
         return os.path.join(common.MFC_TEST_DIR, self.get_uuid())
