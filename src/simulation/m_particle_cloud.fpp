@@ -75,12 +75,10 @@ contains
         integer                                                :: n_placed, geom, seed
         integer(8)                                             :: n_attempts, max_attempts
         real(wp)                                               :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp)                                               :: rx, ry, rz, dist
-        logical                                                :: overlaps
+        real(wp)                                               :: rx, ry, rz
         real(wp), allocatable                                  :: placed(:,:)
         integer                                                :: hash_size, slot
-        integer                                                :: bx, by, bz, nbx, nby, nbz
-        integer                                                :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        integer                                                :: bx, by, bz
         integer, allocatable                                   :: hash_head(:), chain_next(:)
 
         xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
@@ -92,14 +90,10 @@ contains
 
         min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
 
-        if (p == 0) then
+        if (num_dims < 3) then
             geom = 2  ! circle for 2D
-            dz_lo = 0
-            dz_hi = 0
         else
             geom = 8  ! sphere for 3D
-            dz_lo = -1
-            dz_hi = 1
         end if
 
         max_attempts = int(particle_cloud(cloud_idx)%num_particles, 8)*1000_8
@@ -123,50 +117,20 @@ contains
 
             rx = xmin + f_xorshift(seed)*(xmax - xmin)
             ry = ymin + f_xorshift(seed)*(ymax - ymin)
-            if (p == 0) then
+            if (num_dims < 3) then
                 rz = particle_cloud(cloud_idx)%z_centroid
             else
                 rz = zmin + f_xorshift(seed)*(zmax - zmin)
             end if
 
-            bx = int(floor(rx/min_dist))
-            by = int(floor(ry/min_dist))
-            bz = 0
-            if (p /= 0) bz = int(floor(rz/min_dist))
-
-            ! Check 3x3(x3) neighboring bins - O(1) average via hash lookup
-            overlaps = .false.
-            outer: do dx_b = -1, 1
-                do dy_b = -1, 1
-                    do dz_b = dz_lo, dz_hi
-                        nbx = bx + dx_b
-                        nby = by + dy_b
-                        nbz = bz + dz_b
-                        slot = f_bin_hash(nbx, nby, nbz, hash_size)
-                        j = hash_head(slot)
-                        do while (j > 0)
-                            if (p == 0) then
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2)
-                            else
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2 + (rz - placed(3, j))**2)
-                            end if
-                            if (dist < min_dist) then
-                                overlaps = .true.
-                                exit outer
-                            end if
-                            j = chain_next(j)
-                        end do
-                    end do
-                end do
-            end do outer
-
-            if (.not. overlaps) then
+            if (.not. f_cloud_particle_overlaps(rx, ry, rz, placed, hash_head, chain_next, hash_size, min_dist)) then
                 n_placed = n_placed + 1
                 placed(1, n_placed) = rx
                 placed(2, n_placed) = ry
                 placed(3, n_placed) = rz
 
                 ! Insert into hash grid as head of bucket chain
+                call s_get_cloud_bin(rx, ry, rz, min_dist, bx, by, bz)
                 slot = f_bin_hash(bx, by, bz, hash_size)
                 chain_next(n_placed) = hash_head(slot)
                 hash_head(slot) = n_placed
@@ -192,13 +156,11 @@ contains
         integer                                                :: n_placed, geom, seed
         integer(8)                                             :: n_attempts, max_attempts
         real(wp)                                               :: min_dist
-        real(wp)                                               :: rx, ry, rz, dist, theta, phi, r_shell, rho, u
+        real(wp)                                               :: rx, ry, rz, theta, phi, r_shell, rho, u
         real(wp)                                               :: r_inner, r_outer, zdir
-        logical                                                :: overlaps
         real(wp), allocatable                                  :: placed(:,:)
         integer                                                :: hash_size, slot
-        integer                                                :: bx, by, bz, nbx, nby, nbz
-        integer                                                :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        integer                                                :: bx, by, bz
         integer, allocatable                                   :: hash_head(:), chain_next(:)
 
         r_inner = particle_cloud(cloud_idx)%shell_inner_radius + particle_cloud(cloud_idx)%radius
@@ -211,12 +173,8 @@ contains
 
         if (num_dims < 3) then
             geom = 2
-            dz_lo = 0
-            dz_hi = 0
         else
             geom = 8
-            dz_lo = -1
-            dz_hi = 1
         end if
 
         max_attempts = int(particle_cloud(cloud_idx)%num_particles, 8)*1000_8
@@ -260,42 +218,13 @@ contains
                 if (rz < particle_cloud(cloud_idx)%z_centroid + particle_cloud(cloud_idx)%radius) cycle
             end if
 
-            bx = int(floor(rx/min_dist))
-            by = int(floor(ry/min_dist))
-            bz = 0
-            if (num_dims == 3) bz = int(floor(rz/min_dist))
-
-            overlaps = .false.
-            outer: do dx_b = -1, 1
-                do dy_b = -1, 1
-                    do dz_b = dz_lo, dz_hi
-                        nbx = bx + dx_b
-                        nby = by + dy_b
-                        nbz = bz + dz_b
-                        slot = f_bin_hash(nbx, nby, nbz, hash_size)
-                        j = hash_head(slot)
-                        do while (j > 0)
-                            if (num_dims < 3) then
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2)
-                            else
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2 + (rz - placed(3, j))**2)
-                            end if
-                            if (dist < min_dist) then
-                                overlaps = .true.
-                                exit outer
-                            end if
-                            j = chain_next(j)
-                        end do
-                    end do
-                end do
-            end do outer
-
-            if (.not. overlaps) then
+            if (.not. f_cloud_particle_overlaps(rx, ry, rz, placed, hash_head, chain_next, hash_size, min_dist)) then
                 n_placed = n_placed + 1
                 placed(1, n_placed) = rx
                 placed(2, n_placed) = ry
                 placed(3, n_placed) = rz
 
+                call s_get_cloud_bin(rx, ry, rz, min_dist, bx, by, bz)
                 slot = f_bin_hash(bx, by, bz, hash_size)
                 chain_next(n_placed) = hash_head(slot)
                 hash_head(slot) = n_placed
@@ -440,6 +369,69 @@ contains
         particle_cloud_ibs(ib_idx)%slip = .false.
 
     end subroutine s_add_cloud_particle
+
+    !> Convert a candidate particle centre to spatial-hash bin coordinates.
+    subroutine s_get_cloud_bin(px, py, pz, min_dist, bx, by, bz)
+
+        real(wp), intent(in) :: px, py, pz, min_dist
+        integer, intent(out) :: bx, by, bz
+
+        bx = int(floor(px/min_dist))
+        by = int(floor(py/min_dist))
+        bz = 0
+        if (num_dims == 3) bz = int(floor(pz/min_dist))
+
+    end subroutine s_get_cloud_bin
+
+    !> Check whether a candidate particle centre overlaps any already-placed particle in neighbouring spatial-hash bins.
+    function f_cloud_particle_overlaps(px, py, pz, placed, hash_head, chain_next, hash_size, min_dist) result(overlaps)
+
+        real(wp), intent(in)                 :: px, py, pz, min_dist
+        real(wp), intent(in), dimension(:,:) :: placed
+        integer, intent(in), dimension(:)    :: hash_head, chain_next
+        integer, intent(in)                  :: hash_size
+        logical                              :: overlaps
+        integer                              :: bx, by, bz, nbx, nby, nbz, slot
+        integer                              :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        real(wp)                             :: dist_sq, min_dist_sq
+
+        call s_get_cloud_bin(px, py, pz, min_dist, bx, by, bz)
+
+        dz_lo = -1
+        dz_hi = 1
+        if (num_dims < 3) then
+            dz_lo = 0
+            dz_hi = 0
+        end if
+
+        min_dist_sq = min_dist**2._wp
+        overlaps = .false.
+
+        do dx_b = -1, 1
+            do dy_b = -1, 1
+                do dz_b = dz_lo, dz_hi
+                    nbx = bx + dx_b
+                    nby = by + dy_b
+                    nbz = bz + dz_b
+                    slot = f_bin_hash(nbx, nby, nbz, hash_size)
+                    j = hash_head(slot)
+                    do while (j > 0)
+                        if (num_dims < 3) then
+                            dist_sq = (px - placed(1, j))**2._wp + (py - placed(2, j))**2._wp
+                        else
+                            dist_sq = (px - placed(1, j))**2._wp + (py - placed(2, j))**2._wp + (pz - placed(3, j))**2._wp
+                        end if
+                        if (dist_sq < min_dist_sq) then
+                            overlaps = .true.
+                            return
+                        end if
+                        j = chain_next(j)
+                    end do
+                end do
+            end do
+        end do
+
+    end function f_cloud_particle_overlaps
 
     !> Xorshift PRNG. Advances seed in-place and returns a value in [0, 1).
     function f_xorshift(seed) result(rval)

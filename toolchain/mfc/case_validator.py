@@ -644,9 +644,14 @@ class CaseValidator:
             )
             shell_outer_radius = self.get(f"particle_cloud({i})%shell_outer_radius", None)
             shell_inner_radius = self.get(f"particle_cloud({i})%shell_inner_radius", None)
+            radius = self.get(f"particle_cloud({i})%radius", None)
             self.prohibit(
-                geometry == 2 and (shell_outer_radius is None or shell_inner_radius is None or shell_outer_radius <= shell_inner_radius),
-                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius",
+                geometry == 2 and (shell_inner_radius is None or shell_inner_radius < 0),
+                f"particle_cloud({i}) hemisphere shell requires shell_inner_radius >= 0",
+            )
+            self.prohibit(
+                geometry == 2 and (shell_outer_radius is None or radius is None or shell_inner_radius is None or shell_outer_radius <= shell_inner_radius + 2 * radius),
+                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
             )
             self.prohibit(
                 geometry == 2 and packing_method == 2,

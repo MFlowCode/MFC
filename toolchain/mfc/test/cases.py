@@ -1008,6 +1008,34 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Hemisphere Shell",
+                    {
+                        "ib": "T",
+                        "num_ibs": 0,
+                        "num_particle_clouds": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "particle_cloud(1)%geometry": 2,
+                        "particle_cloud(1)%packing_method": 1,
+                        "particle_cloud(1)%x_centroid": 0.5,
+                        "particle_cloud(1)%y_centroid": 0.0,
+                        "particle_cloud(1)%num_particles": 4,
+                        "particle_cloud(1)%radius": 0.02,
+                        "particle_cloud(1)%mass": 1.0,
+                        "particle_cloud(1)%min_spacing": 0.005,
+                        "particle_cloud(1)%shell_inner_radius": 0.1,
+                        "particle_cloud(1)%shell_outer_radius": 0.3,
+                        "particle_cloud(1)%moving_ibm": 0,
+                        "particle_cloud(1)%seed": 12345,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
 
     def ibm_stl():
         common_mods = {
