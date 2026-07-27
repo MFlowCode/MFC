@@ -1435,68 +1435,6 @@ contains
 
     end subroutine s_beta_periodic
 
-    subroutine s_beta_extrapolation(q_beta, bc_dir, bc_loc, k, l, nvar, vars_comm)
-
-        $:GPU_ROUTINE(function_name='s_beta_extrapolation', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
-        integer, intent(in)                                        :: bc_dir, bc_loc
-        integer, intent(in)                                        :: k, l
-        integer, intent(in)                                        :: nvar
-        integer, dimension(:), intent(in)                          :: vars_comm
-        integer                                                    :: j, i, idx
-
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  ! bc%x%beg
-                do i = 1, nvar
-                    idx = vars_comm(i)
-                    do j = 1, buff_size
-                        q_beta(idx)%sf(-j, k, l) = 0._wp
-                    end do
-                end do
-            else
-                do i = 1, nvar
-                    idx = vars_comm(i)
-                    do j = 1, buff_size
-                        q_beta(idx)%sf(m + j, k, l) = 0._wp
-                    end do
-                end do
-            end if
-        else if (bc_dir == 2) then  !< y-direction
-            if (bc_loc == -1) then  !< bc%y%beg
-                do i = 1, nvar
-                    idx = vars_comm(i)
-                    do j = 1, buff_size
-                        q_beta(idx)%sf(k, -j, l) = 0._wp
-                    end do
-                end do
-            else
-                do i = 1, nvar
-                    idx = vars_comm(i)
-                    do j = 1, buff_size
-                        q_beta(idx)%sf(k, n + j, l) = 0._wp
-                    end do
-                end do
-            end if
-        else if (bc_dir == 3) then  !< z-direction
-            if (bc_loc == -1) then  !< bc%z%beg
-                do i = 1, nvar
-                    idx = vars_comm(i)
-                    do j = 1, buff_size
-                        q_beta(idx)%sf(k, l, -j) = 0._wp
-                    end do
-                end do
-            else  !< bc%z%end
-                do i = 1, nvar
-                    idx = vars_comm(i)
-                    do j = 1, buff_size
-                        q_beta(idx)%sf(k, l, p + j) = 0._wp
-                    end do
-                end do
-            end if
-        end if
-
-    end subroutine s_beta_extrapolation
-
     subroutine s_beta_reflective(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar, vars_comm)
 
         $:GPU_ROUTINE(function_name='s_beta_reflective', parallelism='[seq]', cray_inline=True)
