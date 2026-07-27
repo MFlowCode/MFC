@@ -22,7 +22,7 @@ module m_amr_regrid
         & s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, &
         & s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
         & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
-        & s_interpolate_coarse_to_fine, s_amr_setup_ib
+        & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -328,6 +328,8 @@ contains
 
         if ((.not. amr) .or. (.not. ab_active)) return
         do k = 1, amr_num_blocks
+            ! L0 tiles span the base grid by construction; the containment rule is for fine blocks
+            if (amr_block_level(k) == 0) cycle
             ok = amr_region_lo_all(1, k) > ab_x%beg .and. amr_region_hi_all(1, k) < ab_x%end
             if (n_glb > 0) ok = ok .and. amr_region_lo_all(2, k) > ab_y%beg .and. amr_region_hi_all(2, k) < ab_y%end
             if (p_glb > 0) ok = ok .and. amr_region_lo_all(3, k) > ab_z%beg .and. amr_region_hi_all(3, k) < ab_z%end
@@ -844,6 +846,7 @@ contains
                 ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads amr_slots(ob)%q_cons on the
                 ! host, but the step-5 stash's GPU_UPDATE(host) runs AFTER this nesting - so the host copy is stale here
                 do ob = 1, amr_num_blocks
+                    if (amr_block_level(ob) == 0) cycle  ! L0 tiles are not regrid-managed and carry no fine sensor
                     if (.not. amr_owns_all(ob)) cycle  ! np>1: only the owner holds this old block's fine q_cons
                     do obi = eqn_idx%cont%beg, eqn_idx%cont%end
                         $:GPU_UPDATE(host='[amr_slots(ob)%q_cons(obi)%sf]')
@@ -1108,14 +1111,18 @@ contains
         type(t_box), intent(in) :: boxes(:)
         integer, intent(in)     :: nboxes, box_level(:)
         logical, intent(out)    :: same
-        integer                 :: k
+        integer                 :: k, ks
+
+        ! regrid manages only the FINE band [l0_slot_off+1 ..] of the shared pool; the level-0 L0-tile prefix (coexist) is not
+        ! part of the box set, so compare against the fine block count and index slots through f_l0_slot.
 
         same = .false.
-        if (nboxes == amr_num_blocks) then
+        if (nboxes == amr_num_blocks - l0_slot_off) then
             same = .true.
             do k = 1, nboxes
-                if (any(boxes(k)%lo /= amr_slots(k)%region%lo) .or. any(boxes(k)%hi /= amr_slots(k)%region%hi) .or. box_level(k) &
-                    & /= amr_block_level(k)) same = .false.
+                ks = f_l0_slot(k)
+                if (any(boxes(k)%lo /= amr_slots(ks)%region%lo) .or. any(boxes(k)%hi /= amr_slots(ks)%region%hi) .or. box_level(k) &
+                    & /= amr_block_level(ks)) same = .false.
             end do
         end if
 
@@ -1131,46 +1138,50 @@ contains
         integer, intent(out)    :: old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(out)    :: old_owns(:)
         integer                 :: old_chi(3, amr_max_blocks), old_owner(amr_max_blocks)
-        integer                 :: k, i
+        integer                 :: k, i, ks
         integer                 :: np_l  !< local mirror of old_np: an INTENT(OUT) dummy is not allowed in the
         !                                   BLOCK specification expressions below (F2018 restricted expressions)
 
         ! 5) stash every live slot's fine interior (dead-between-steps q_cons_stor bounce), keeping its old intersection origin
 
-        old_np = amr_num_blocks
+        ! old_* are indexed in the regrid's own dense FINE-block space [1..old_np], which maps to shared-pool slot f_l0_slot(k);
+        ! under coexist the level-0 L0-tile prefix [1..l0_slot_off] is not regrid-managed and must not be stashed or migrated.
+
+        old_np = amr_num_blocks - l0_slot_off
         np_l = old_np
         do k = 1, old_np
+            ks = f_l0_slot(k)
             ! GLOBAL block origin + extents (replicated, valid on every rank - not the owner-only isect), so the cross-rank
             ! migration below and the overlap-copy's index shift are correct even where this rank did not own the old block
-            old_ilo(:,k) = amr_region_lo_all(:,k)
-            old_chi(:,k) = amr_region_hi_all(:,k)  ! old COARSE hi (for the P2P migration overlap test below)
+            old_ilo(:,k) = amr_region_lo_all(:,ks)
+            old_chi(:,k) = amr_region_hi_all(:,ks)  ! old COARSE hi (for the P2P migration overlap test below)
             ! fine extent = (2**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating it with the
             ! level-1 factor (2x) truncates half its fine cells. Level-1 blocks (2**1 = 2) are byte-identical to before.
-            old_ext(1, k) = (amr_ref_ratio**amr_block_level(k))*(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1) - 1
-            old_ext(2, k) = merge((amr_ref_ratio**amr_block_level(k))*(amr_region_hi_all(2, k) - amr_region_lo_all(2, &
-                    & k) + 1) - 1, 0, n_glb > 0)
-            old_ext(3, k) = merge((amr_ref_ratio**amr_block_level(k))*(amr_region_hi_all(3, k) - amr_region_lo_all(3, &
-                    & k) + 1) - 1, 0, p_glb > 0)
-            old_owner(k) = amr_block_owner(k)
+            old_ext(1, k) = (amr_ref_ratio**amr_block_level(ks))*(amr_region_hi_all(1, ks) - amr_region_lo_all(1, ks) + 1) - 1
+            old_ext(2, k) = merge((amr_ref_ratio**amr_block_level(ks))*(amr_region_hi_all(2, ks) - amr_region_lo_all(2, &
+                    & ks) + 1) - 1, 0, n_glb > 0)
+            old_ext(3, k) = merge((amr_ref_ratio**amr_block_level(ks))*(amr_region_hi_all(3, ks) - amr_region_lo_all(3, &
+                    & ks) + 1) - 1, 0, p_glb > 0)
+            old_owner(k) = amr_block_owner(ks)
             ! overlap-copy must match levels: an old L2's stash is in the 4x parent-fine frame
-            old_level(k) = amr_block_level(k)
-            old_owns(k) = amr_owns_all(k)
+            old_level(k) = amr_block_level(ks)
+            old_owns(k) = amr_owns_all(ks)
             if (old_owns(k)) then
                 do i = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_slots(k)%q_cons(i)%sf]')
+                    $:GPU_UPDATE(host='[amr_slots(ks)%q_cons(i)%sf]')
                 end do
                 do i = 1, sys_size
-                    amr_slots(k)%q_cons_stor(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, &
-                              & k)) = amr_slots(k)%q_cons(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k))
+                    amr_slots(ks)%q_cons_stor(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, &
+                              & k)) = amr_slots(ks)%q_cons(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k))
                 end do
                 ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like q_cons (both stors are dead between
                 ! steps)
                 if (qbmm .and. .not. polytropic) then
-                    $:GPU_UPDATE(host='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f%sf]')
-                    amr_slots(k)%pb_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
-                              & :) = amr_slots(k)%pb_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
-                    amr_slots(k)%mv_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
-                              & :) = amr_slots(k)%mv_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
+                    $:GPU_UPDATE(host='[amr_slots(ks)%pb_f%sf, amr_slots(ks)%mv_f%sf]')
+                    amr_slots(ks)%pb_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
+                              & :) = amr_slots(ks)%pb_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
+                    amr_slots(ks)%mv_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
+                              & :) = amr_slots(ks)%mv_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
                 end if
             end if
         end do
@@ -1181,12 +1192,15 @@ contains
 
         ! set the regions + assign owners BEFORE the migration (P2P needs the new owners) and before the owner-dependent
         ! geometry (else s_set_amr_fine_geometry sizes the whole-block owner from a stale amr_block_owner)
-        amr_num_blocks = nboxes
+        ! the fine band ends at f_l0_slot(nboxes); the level-0 tile prefix below it keeps its regions, levels and owners (a plain
+        ! nboxes here is what overran the prefix and deadlocked the first regrid under coexist)
+        amr_num_blocks = f_l0_slot(nboxes)
         do k = 1, nboxes
-            amr_region_lo_all(:,k) = boxes(k)%lo; amr_region_hi_all(:,k) = boxes(k)%hi
+            ks = f_l0_slot(k)
+            amr_region_lo_all(:,ks) = boxes(k)%lo; amr_region_hi_all(:,ks) = boxes(k)%hi
             ! box_level(k) is the refinement level assigned during the hierarchical nesting above (1 for L0->L1 boxes, l for a
             ! box nested at level l). Setting it every regrid resets a stale level when a slot is reused across levels.
-            amr_block_level(k) = box_level(k)
+            amr_block_level(ks) = box_level(k)
         end do
         ! block set changed: dirty the cached seam-pair AND overlap-rank lists NOW - the rebuild's per-block P2P gathers
         ! (s_amr_regrid_rebuild_slots) consume the overlap lists with the NEW boxes, so flagging after them would be too late
@@ -1233,8 +1247,8 @@ contains
                     getk(kk) = .false.
                     if (.not. old_owns(kk)) then
                         do k2 = 1, nboxes
-                            if (amr_block_owner(k2) == proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:, &
-                                & kk), old_chi(:,kk))) then
+                            if (amr_block_owner(f_l0_slot(k2)) == proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, &
+                                & old_ilo(:,kk), old_chi(:,kk))) then
                                 getk(kk) = .true.; exit
                             end if
                         end do
@@ -1242,7 +1256,7 @@ contains
                 end do
                 ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the reconcile below)
                 do kk = 1, old_np
-                    if (getk(kk)) call s_amr_alloc_slot(kk)
+                    if (getk(kk)) call s_amr_alloc_slot(f_l0_slot(kk))
                 end do
                 allocate (rq(old_np*num_procs), spack(max(maxcnt, 1), old_np), rpack(max(maxcnt, 1), old_np))
                 nrq = 0
@@ -1255,7 +1269,7 @@ contains
                     if (.not. old_owns(kk)) cycle
                     isdest = .false.
                     do k2 = 1, nboxes
-                        rr = amr_block_owner(k2)
+                        rr = amr_block_owner(f_l0_slot(k2))
                         if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:, &
                             & kk))) isdest(rr) = .true.
                     end do
@@ -1266,7 +1280,7 @@ contains
                             do gj = 0, old_ext(2, kk)
                                 do gi = 0, old_ext(1, kk)
                                     idx2 = idx2 + 1
-                                    spack(idx2, kk) = real(amr_slots(kk)%q_cons_stor(ii)%sf(gi, gj, gk), wp)
+                                    spack(idx2, kk) = real(amr_slots(f_l0_slot(kk))%q_cons_stor(ii)%sf(gi, gj, gk), wp)
                                 end do
                             end do
                         end do
@@ -1286,7 +1300,7 @@ contains
                             do gj = 0, old_ext(2, kk)
                                 do gi = 0, old_ext(1, kk)
                                     idx2 = idx2 + 1
-                                    amr_slots(kk)%q_cons_stor(ii)%sf(gi, gj, gk) = real(rpack(idx2, kk), stp)
+                                    amr_slots(f_l0_slot(kk))%q_cons_stor(ii)%sf(gi, gj, gk) = real(rpack(idx2, kk), stp)
                                 end do
                             end do
                         end do
@@ -1307,16 +1321,18 @@ contains
         type(t_box), intent(in)                                :: boxes(:)
         integer, intent(in)                                    :: nboxes, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(in)                                    :: old_owns(:)
-        integer                                                :: sh(3), k, kk, i, fi, fj, fk, ofi, ofj, ofk
+        integer                                                :: sh(3), k, kk, i, fi, fj, fk, ofi, ofj, ofk, ks, kks
         logical                                                :: any_xchg
 
         ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
+        ! box k lives in shared-pool slot ks = f_l0_slot(k) (identity without L0 tiles); old block kk in slot kks
 
         any_xchg = .false.
         do k = 1, nboxes
-            amr_cur = k
+            ks = f_l0_slot(k)
+            amr_cur = ks
             ! owned slot needs its arrays before geometry/prolong
-            if (amr_block_owner(k) == proc_rank) call s_amr_alloc_slot(k)
+            if (amr_block_owner(ks) == proc_rank) call s_amr_alloc_slot(ks)
             call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
             any_xchg = any_xchg .or. amr_xchg_coarse_ghosts
             ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
@@ -1336,19 +1352,20 @@ contains
                 do kk = 1, old_np
                     ! same-level overlap only (a child's stash is 4x-framed)
                     if (old_level(kk) /= amr_block_level(amr_cur)) cycle
+                    kks = f_l0_slot(kk)
                     ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
                     sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
                     do i = 1, sys_size
-                        do fk = 0, amr_slots(k)%p
+                        do fk = 0, amr_slots(ks)%p
                             ofk = fk + sh(3)
                             if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
-                            do fj = 0, amr_slots(k)%n
+                            do fj = 0, amr_slots(ks)%n
                                 ofj = fj + sh(2)
                                 if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
-                                do fi = 0, amr_slots(k)%m
+                                do fi = 0, amr_slots(ks)%m
                                     ofi = fi + sh(1)
                                     if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                    amr_slots(k)%q_cons(i)%sf(fi, fj, fk) = amr_slots(kk)%q_cons_stor(i)%sf(ofi, ofj, ofk)
+                                    amr_slots(ks)%q_cons(i)%sf(fi, fj, fk) = amr_slots(kks)%q_cons_stor(i)%sf(ofi, ofj, ofk)
                                 end do
                             end do
                         end do
@@ -1356,7 +1373,7 @@ contains
                 end do
             end if
             do i = 1, sys_size
-                $:GPU_UPDATE(device='[amr_slots(k)%q_cons(i)%sf]')
+                $:GPU_UPDATE(device='[amr_slots(ks)%q_cons(i)%sf]')
             end do
             ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant), then overwrite the overlap with the
             ! old blocks' fine data (same index shift)
@@ -1367,24 +1384,25 @@ contains
                     do kk = 1, old_np
                         if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
                         if (.not. old_owns(kk)) cycle
+                        kks = f_l0_slot(kk)
                         sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
-                        do fk = 0, amr_slots(k)%p
+                        do fk = 0, amr_slots(ks)%p
                             ofk = fk + sh(3)
                             if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
-                            do fj = 0, amr_slots(k)%n
+                            do fj = 0, amr_slots(ks)%n
                                 ofj = fj + sh(2)
                                 if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
-                                do fi = 0, amr_slots(k)%m
+                                do fi = 0, amr_slots(ks)%m
                                     ofi = fi + sh(1)
                                     if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                    amr_slots(k)%pb_f%sf(fi, fj, fk,:,:) = amr_slots(kk)%pb_stor%sf(ofi, ofj, ofk,:,:)
-                                    amr_slots(k)%mv_f%sf(fi, fj, fk,:,:) = amr_slots(kk)%mv_stor%sf(ofi, ofj, ofk,:,:)
+                                    amr_slots(ks)%pb_f%sf(fi, fj, fk,:,:) = amr_slots(kks)%pb_stor%sf(ofi, ofj, ofk,:,:)
+                                    amr_slots(ks)%mv_f%sf(fi, fj, fk,:,:) = amr_slots(kks)%mv_stor%sf(ofi, ofj, ofk,:,:)
                                 end do
                             end do
                         end do
                     end do
                 end if
-                $:GPU_UPDATE(device='[amr_slots(k)%pb_f%sf, amr_slots(k)%mv_f%sf]')
+                $:GPU_UPDATE(device='[amr_slots(ks)%pb_f%sf, amr_slots(ks)%mv_f%sf]')
             end if
             ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
         end do

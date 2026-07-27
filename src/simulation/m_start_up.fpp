@@ -649,7 +649,14 @@ contains
         t_step = t_step + 1
 
         if (amr .and. amr_regrid_int > 0) then
-            if (mod(t_step, amr_regrid_int) == 0) call s_amr_regrid(q_cons_ts(1)%vf)
+            if (mod(t_step, amr_regrid_int) == 0) then
+                ! Coexist: tiles own the state, and the stage loop refreshes L0 only at the TOP of each stage - so here L0 holds
+                ! the second-to-last stage's tile interiors (plus fine-restricted covered cells), one stage stale. s_amr_regrid
+                ! BOTH tags off L0 and prolongs each new block's seed from it, so a stale L0 moves the boxes and seeds them wrong.
+                ! Same just-in-time refresh s_save_data does before it consumes L0; no-op without tiles.
+                if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
+                call s_amr_regrid(q_cons_ts(1)%vf)
+            end if
         end if
 
     end subroutine s_perform_time_step
