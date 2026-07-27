@@ -1592,6 +1592,62 @@ contains
 
     end subroutine s_amr_block_cost
 
+    !> Cost-weighted SFC partition of n items into num_procs contiguous Morton-key ranges. Sorts item indices by ascending Morton
+    !! key (insertion sort - n is small), walks them accumulating wt, and advances the owner rank when the running weight crosses
+    !! the next even share of the total. Writes owner(1:n) (rank per item) and cut(0:num_procs-1) (running Morton upper bound per
+    !! rank; ranks that receive no item inherit the predecessor's bound so cut is non-decreasing, its top the global max key).
+    !! Shared by the fine-block anchor split and the L0-tile split so the two owner maps cannot drift.
+    subroutine s_amr_sfc_cut(keys, wt, n, cut, owner)
+
+        integer, intent(in)          :: n
+        integer(kind=8), intent(in)  :: keys(n)
+        real(wp), intent(in)         :: wt(n)
+        integer(kind=8), intent(out) :: cut(0:num_procs - 1)
+        integer, intent(out)         :: owner(n)
+        integer                      :: ord(n), k, kk, r, tmpo
+        integer(kind=8)              :: tmpk
+        real(wp)                     :: total, cum, tgt
+
+        cut = -1_8
+        if (n < 1) return
+
+        ! sort item indices by Morton key (insertion sort - n small; stable in original order for equal keys)
+        do k = 1, n
+            ord(k) = k
+        end do
+        do k = 2, n
+            tmpk = keys(ord(k)); tmpo = ord(k); kk = k - 1
+            do while (kk >= 1)
+                if (keys(ord(kk)) <= tmpk) exit
+                ord(kk + 1) = ord(kk); kk = kk - 1
+            end do
+            ord(kk + 1) = tmpo
+        end do
+
+        total = 0._wp
+        do k = 1, n
+            total = total + wt(k)
+        end do
+
+        ! chains-on-chains over the items in SFC order; advance the owner rank when the cumulative weight crosses the next even
+        ! share.
+        ! All-real arithmetic on replicated weights in a fixed order, so every rank computes the identical assignment.
+        r = 0; cum = 0._wp
+        do k = 1, n
+            tgt = real(r + 1, wp)*total/real(num_procs, wp)
+            if (cum >= tgt .and. r < num_procs - 1) r = r + 1
+            owner(ord(k)) = r
+            cut(r) = keys(ord(k))  ! items visited in ascending Morton key => running upper bound for rank r
+            cum = cum + wt(ord(k))
+        end do
+        ! ranks that received no item (or trail the last-assigned rank) inherit the predecessor's bound so the search never lands on
+        ! them: cut is non-decreasing and its top equals the global max key.
+        do r = 1, num_procs - 1
+            if (cut(r) < cut(r - 1)) cut(r) = cut(r - 1)
+        end do
+
+    end subroutine s_amr_sfc_cut
+
     !> Fine-level distribution map: assigns each active block a single owner rank by chains-on-chains balancing of fine-work weight
     !! in Morton order of the block's low corner - the same SFC idea m_sfc_partition uses for the base grid, at block granularity.
     !! Fine work = measured coarse-footprint cost (s_amr_block_cost) x the level's refinement factor per active dim, so blocks
@@ -1600,10 +1656,9 @@ contains
     !! s_set_amr_fine_geometry applies it as amr_rank_owns_block = (amr_block_owner(amr_cur) == proc_rank).
     impure subroutine s_amr_assign_block_owners()
 
-        integer         :: k, kk, r, a, lev, maxlev, ord(amr_num_blocks)
-        integer(kind=8) :: key(amr_num_blocks), tmpk
-        real(wp)        :: wt(amr_num_blocks), twt(amr_num_blocks), cost(amr_num_blocks), cum, tgt, total
-        integer         :: tmpo
+        integer         :: k, a, lev, maxlev, na, aidx(amr_num_blocks), aown(amr_num_blocks)
+        integer(kind=8) :: key(amr_num_blocks), akey(amr_num_blocks)
+        real(wp)        :: wt(amr_num_blocks), twt(amr_num_blocks), cost(amr_num_blocks), awt(amr_num_blocks)
 
         if (amr_num_blocks < 1) return
 
@@ -1617,7 +1672,6 @@ contains
             if (n_glb > 0) wt(k) = wt(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
             if (p_glb > 0) wt(k) = wt(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
             key(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
-            ord(k) = k
         end do
 
         ! CO-LOCATE refinement towers: a level-1 block and all its nested descendants are owned WHOLE by one rank so every
@@ -1634,38 +1688,19 @@ contains
             twt(a) = twt(a) + wt(k)
         end do
 
-        ! sort block indices by Morton key (insertion sort - amr_num_blocks is small, <= amr_max_blocks)
-        do k = 2, amr_num_blocks
-            tmpk = key(ord(k)); tmpo = ord(k); kk = k - 1
-            do while (kk >= 1)
-                if (key(ord(kk)) <= tmpk) exit
-                ord(kk + 1) = ord(kk); kk = kk - 1
-            end do
-            ord(kk + 1) = tmpo
-        end do
-
-        ! chains-on-chains over the level-1 anchors in SFC order, weighted by whole-tower work; advance the owner rank when the
-        ! cumulative tower weight crosses the next even share. All-real arithmetic on the replicated (allreduced) weights, fixed
-        ! loop
-        ! order, so every rank computes the identical assignment.
-        total = 0._wp
+        ! gather the level-1 anchors in block-index order, then SFC-split them by whole-tower weight into num_procs contiguous
+        ! Morton-key ranges. The shared cut helper fills amr_owner_cut and the per-anchor owner (anchor-only sort is byte-identical
+        ! to the all-block sort skipping non-anchors: insertion sort is stable on equal keys, so the anchors keep the same relative
+        ! order, and total/cum still sum in block-index order).
+        na = 0
         do k = 1, amr_num_blocks
-            if (amr_block_level(k) == 1) total = total + twt(k)
+            if (amr_block_level(k) /= 1) cycle
+            na = na + 1
+            akey(na) = key(k); awt(na) = twt(k); aidx(na) = k
         end do
-        amr_owner_cut = -1_8
-        r = 0; cum = 0._wp
-        do k = 1, amr_num_blocks
-            if (amr_block_level(ord(k)) /= 1) cycle
-            tgt = real(r + 1, wp)*total/real(num_procs, wp)
-            if (cum >= tgt .and. r < num_procs - 1) r = r + 1
-            amr_block_owner(ord(k)) = r
-            amr_owner_cut(r) = key(ord(k))  ! anchors visited in ascending Morton key => running upper bound for rank r
-            cum = cum + twt(ord(k))
-        end do
-        ! ranks that received no anchor (or trail the last-assigned rank) get an empty range: inherit the predecessor's bound so the
-        ! search never lands on them. cut is thus non-decreasing and its top equals the global max key.
-        do r = 1, num_procs - 1
-            if (amr_owner_cut(r) < amr_owner_cut(r - 1)) amr_owner_cut(r) = amr_owner_cut(r - 1)
+        call s_amr_sfc_cut(akey, awt, na, amr_owner_cut, aown)
+        do a = 1, na
+            amr_block_owner(aidx(a)) = aown(a)
         end do
 
         ! descendants inherit their parent's owner (top-down, level by level - parents already assigned when their children run)
