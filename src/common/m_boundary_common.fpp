@@ -351,11 +351,11 @@ contains
         & z_cb_in, z_cc_in, dz_in, global_bounds)
 
         type(int_bounds_info), intent(in)                        :: x_offset, y_offset, z_offset
-        real(wp), intent(inout)                                  :: x_cb_in(-1 - x_offset%beg:)
-        real(wp), intent(inout)                                  :: x_cc_in(-buff_size:), dx_in(-buff_size:)
-        real(wp), optional, intent(inout)                        :: y_cb_in(-1 - y_offset%beg:), z_cb_in(-1 - z_offset%beg:)
-        real(wp), optional, intent(inout)                        :: y_cc_in(-buff_size:), dy_in(-buff_size:)
-        real(wp), optional, intent(inout)                        :: z_cc_in(-buff_size:), dz_in(-buff_size:)
+        real(wp), contiguous, intent(inout)                      :: x_cb_in(-1 - x_offset%beg:)
+        real(wp), contiguous, intent(inout)                      :: x_cc_in(-buff_size:), dx_in(-buff_size:)
+        real(wp), optional, contiguous, intent(inout)            :: y_cb_in(-1 - y_offset%beg:), z_cb_in(-1 - z_offset%beg:)
+        real(wp), optional, contiguous, intent(inout)            :: y_cc_in(-buff_size:), dy_in(-buff_size:)
+        real(wp), optional, contiguous, intent(inout)            :: z_cc_in(-buff_size:), dz_in(-buff_size:)
         type(bounds_info), optional, dimension(3), intent(inout) :: global_bounds
 
         if (present(global_bounds)) then
@@ -404,11 +404,11 @@ contains
     subroutine s_populate_grid_bc_direction(cell_boundaries, cell_centers, cell_widths, num_cells, bc_dir, bc_loc, bc_bounds, &
                                             & offset)
 
-        integer, intent(in)               :: num_cells, bc_dir, bc_loc
-        type(int_bounds_info), intent(in) :: bc_bounds, offset
-        real(wp), intent(inout)           :: cell_boundaries(-1 - offset%beg:)
-        real(wp), intent(inout)           :: cell_centers(-buff_size:), cell_widths(-buff_size:)
-        integer                           :: bc_edge, i, source_index
+        integer, intent(in)                 :: num_cells, bc_dir, bc_loc
+        type(int_bounds_info), intent(in)   :: bc_bounds, offset
+        real(wp), contiguous, intent(inout) :: cell_boundaries(-1 - offset%beg:)
+        real(wp), contiguous, intent(inout) :: cell_centers(-buff_size:), cell_widths(-buff_size:)
+        integer                             :: bc_edge, i, source_index
 
         if (bc_loc == -1) then
             bc_edge = bc_bounds%beg

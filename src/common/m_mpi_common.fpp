@@ -1747,10 +1747,12 @@ contains
 
         integer, intent(in)               :: num_cells, pbc_loc
         type(int_bounds_info), intent(in) :: bc_bounds, offset
-        real(wp), intent(inout)           :: cell_boundaries(-1 - offset%beg:)
-        real(wp), intent(inout)           :: cell_centers(-buff_size:)
         ! Contiguous so that passing an element to MPI is a plain address, with no descriptor
-        ! or copy-in/copy-out. Every actual argument is a whole module array.
+        ! or copy-in/copy-out. Every actual argument is a whole module array. The attribute must
+        ! be on ALL THREE, and on every frame that forwards them: CCE 19 IPA drops the stores to
+        ! the non-contiguous dummies when one call mixes contiguous and non-contiguous arrays.
+        real(wp), contiguous, intent(inout) :: cell_boundaries(-1 - offset%beg:)
+        real(wp), contiguous, intent(inout) :: cell_centers(-buff_size:)
         real(wp), contiguous, intent(inout) :: cell_widths(-buff_size:)
 
 #ifdef MFC_MPI
