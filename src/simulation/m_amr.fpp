@@ -49,7 +49,7 @@ module m_amr
     public :: amr_slots, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reconcile_slots, &
         & s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
         & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap
+        & f_amr_seam_dim, f_amr_boxes_overlap, f_l0_slot
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -1709,14 +1709,16 @@ contains
             na = na + 1
             akey(na) = key(k); awt(na) = twt(k); aidx(na) = k
         end do
-        call s_amr_sfc_cut(akey, awt, na, amr_owner_cut, aown)
+        ! this IS the fine (level>=1) owner cut, so cut straight into amr_fine_cut: fine blocks straddle tiles, so their owner is
+        ! not tile-cut-derivable and f_amr_owner reads amr_fine_cut for them. amr_owner_cut mirrors it ONLY without tiles, where
+        ! the two are the same authority. Under coexist amr_owner_cut holds the TILE cut that s_l0_tiles_init built; cutting into
+        ! it here (as this did) is harmless at init - the assigner runs before s_l0_tiles_init - but at REGRID time it clobbers
+        ! the tile cut, and every level-0 tile then resolves f_amr_owner against the fine cut.
+        call s_amr_sfc_cut(akey, awt, na, amr_fine_cut, aown)
         do a = 1, na
             amr_block_owner(aidx(a)) = aown(a)
         end do
-        ! this IS the fine (level>=1) owner cut. Keep a companion copy: in coexist s_l0_tiles_init overwrites amr_owner_cut with the
-        ! TILE cut, and fine blocks straddle tiles so their owner is not tile-cut-derivable - f_amr_owner reads amr_fine_cut for
-        ! them.
-        amr_fine_cut = amr_owner_cut
+        if (l0_slot_off == 0) amr_owner_cut = amr_fine_cut
 
         ! descendants inherit their parent's owner (top-down, level by level - parents already assigned when their children run)
         maxlev = maxval(amr_block_level(1:amr_num_blocks))
@@ -4846,7 +4848,14 @@ contains
         ! max tile extent per dim over ALL ranks (= widest per-rank chunk split by nt); slots + seam buffers are sized to this
         ! global
         ! max so every rank's buffers match. Chunk r has s_amr_rank_decomp ext(d)+1 cells in dim d.
-        max_f1 = 0; max_f2 = 0; max_f3 = 0
+        ! Coexist: the FINE sizing s_initialize_amr_module just computed must SURVIVE - these are module-level and are what
+        ! s_amr_alloc_slot reads, so zeroing them here leaves the shared pool sized to the tile extent. The static block's slot
+        ! is allocated before this routine and so escapes, but every slot a REGRID allocates afterwards is a fine block cut to
+        ! tile size, which then writes past its own bounds (an out-of-range device write, not a host abort). Accumulate the max
+        ! of both instead. l0-only (.not. amr): s_initialize_amr_module returned early, so no fine sizing exists - start at 0.
+        if (.not. amr) then
+            max_f1 = 0; max_f2 = 0; max_f3 = 0
+        end if
         do r = 0, num_procs - 1
             call s_amr_rank_decomp(r, rsidx, rext)
             e = (rext(1) + 1 + nt(1) - 1)/nt(1) - 1; max_f1 = max(max_f1, e)

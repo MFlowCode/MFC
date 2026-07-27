@@ -136,16 +136,21 @@ contains
                 ddisp = disp0 + int((amr_restart_blk_hdr_ints + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
                 allocate (buf(max(cnt, 1)))
                 idx = 0
-                do i = 1, sys_size
-                    do fk = 0, amr_slots(k)%p
-                        do fj = 0, amr_slots(k)%n
-                            do fi = 0, amr_slots(k)%m
-                                idx = idx + 1
-                                buf(idx) = amr_slots(k)%q_cons(i)%sf(fi, fj, fk)
+                ! cnt == 0 on a non-owning rank, where buf is the 1-element placeholder and this slot's q_cons is not allocated
+                ! (lazy owned-only sizing) while its m/n/p metadata IS replicated - so packing would run the full extent loop over
+                ! an unallocated slot and overrun buf. The collective WRITE_AT_ALL below still runs on every rank, with cnt = 0.
+                if (cnt > 0) then
+                    do i = 1, sys_size
+                        do fk = 0, amr_slots(k)%p
+                            do fj = 0, amr_slots(k)%n
+                                do fi = 0, amr_slots(k)%m
+                                    idx = idx + 1
+                                    buf(idx) = amr_slots(k)%q_cons(i)%sf(fi, fj, fk)
+                                end do
                             end do
                         end do
                     end do
-                end do
+                end if
                 call MPI_FILE_WRITE_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                            & status, ierr)
                 if (ierr /= MPI_SUCCESS) &

@@ -4515,6 +4515,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
+        # NP1-REGRID: coexist with DYNAMIC regrid (np=1; np>=2 is still checker-gated). Regrid rebuilds the fine band of the
+        # shared slot pool while the level-0 tile prefix [1..l0_slot_off] must survive untouched, and it allocates NEW fine
+        # slots through s_amr_alloc_slot - the two things no other golden exercises together, since the coexist goldens above
+        # are all static and every dynamic-regrid golden runs without tiles. Byte-identical to the monolithic (l0_ntile = 0)
+        # run at 4 regrids over 6 steps.
+        stack.push(
+            "AMR + L0 tiles -> 2D -> coexist dynamic regrid np=1",
+            {**amr_2d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "run_time_info": "F", "l0_ntile": 2},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=1))
+        stack.pop()
 
         # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
         # ADJACENT same-level sub-blocks across the x rank seam (one per rank) - but amr_subcycle=T. The subcycle
