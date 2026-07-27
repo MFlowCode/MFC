@@ -94,6 +94,22 @@ static multi-level does not tile the level-2 block`. So the coexist gate and thi
 redesign are blocked on the same single-working-slot architecture, not on independent work.
 Sequencing the batching arc *after* the unification arc therefore risks reworking it.
 
+## Swap topology (and one optimization that does not work)
+
+The hot path has exactly **one `s_amr_swap_to_fine` / `s_amr_restore_coarse` pair per block
+per RK stage**, wrapping `s_compute_rhs` in `s_amr_fine_stage_rhs` (and its subcycle twin).
+The RK pass (`s_amr_fine_stage_rk`) does not swap — it works on slot arrays at slot extents.
+The fill phase does not swap either; it reads the gathered patch `amr_cg` and slot arrays.
+So a timestep costs `3 * nblocks` swap round-trips, each carrying
+`s_amr_sync_grid_state_to_device` plus, on nonuniform grids, `s_amr_recompute_weno_coefs`.
+
+The obvious cheap win — hoist the restore, letting consecutive blocks swap fine->fine and
+restoring once per phase — **does not work as the driver stands**: `m_time_steppers` calls
+`s_amr_p2p_reflux_faces` and `s_amr_apply_reflux` between blocks inside the advance loop,
+and both operate on the coarse `rhs_vf` in the coarse frame. Hoisting the restore would run
+them against fine globals. Any batching design must either move the reflux out of the
+per-block loop or make it frame-independent first.
+
 ## Increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
