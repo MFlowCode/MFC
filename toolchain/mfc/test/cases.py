@@ -4468,6 +4468,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
+        # L0 SFC re-cut rebalancer (l0_rebalance_interval>0, distinct from the forced l0_migrate_step above): the periodic
+        # s_l0_rebalance recomputes the O(num_procs) SFC cut from measured tile costs and migrates tiles whose owner changed. With
+        # 4 tiles (l0_ntile=2) at np=2 the Morton (SFC) partition differs from the initial cartesian owner, so the re-cut migrates -
+        # exercising the re-cut decision AND the byte-preserving migration path. Output is decomposition-invariant, so this golden is
+        # byte-identical to the monolithic (l0_ntile=0) run (verified at generation time).
+        stack.push(
+            "L0 tiles -> 2D -> SFC re-cut rebalance np=2",
+            {**l0_base, "run_time_info": "F", "l0_ntile": 2, "l0_rebalance_interval": 3},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
 
         # AMR + L0 tiles COEXIST (amr = T .and. l0_ntile > 0): the base grid is tiled into migratable L0 tiles AND an AMR fine
         # overlay runs on top, with the tiles advanced on their (migrated) compute-owner while the Berger-Colella c/f coupling
