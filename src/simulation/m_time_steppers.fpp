@@ -541,19 +541,26 @@ contains
                 end do
                 ! Phase 2 - block-to-block fine-fine halo: overwrite adjacent-sub-block seam ghosts with neighbour fine interior.
                 call s_amr_fine_fine_halo()
-                ! Phase 3 - ADVANCE every block (RHS + RK update) + reflux at its c/f faces.
+                ! Phase 3 - ADVANCE every block (RHS + RK update). Runs with the block's grid globals swapped in.
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)
                     call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                   & t_step)
-                    ! reflux into "the coarse". A level-1 block corrects the L0 rhs (rhs form; L0 updates after the stage loop). A
-                    ! level>=2 block's coarse side is its PARENT (level l-1): its Berger-Colella correction needs the parent's flux
-                    ! at
-                    ! the footprint faces (creg captured during the parent's advance) and applies as a STATE reflux into the parent
-                    ! via
-                    ! s_amr_reflux_to_parent after the stage loop, NOT into L0 - so level>=2 blocks skip L0 reflux here.
-                    if (amr_block_level(amr_cur) >= 2) cycle
+                end do
+                ! Phase 4 - reflux into "the coarse", in the COARSE frame. A level-1 block corrects the L0 rhs (rhs form; L0
+                ! updates after the stage loop). A level>=2 block's coarse side is its PARENT (level l-1): its Berger-Colella
+                ! correction needs the parent's flux at the footprint faces (creg captured during the parent's advance) and
+                ! applies as a STATE reflux into the parent via s_amr_reflux_to_parent after the stage loop, NOT into L0 - so
+                ! level>=2 blocks skip L0 reflux here.
+                ! Split out of the advance loop above (byte-identical: no block's advance reads rhs_vf, and the merge invariant
+                ! keeps blocks >= buff_size apart so their c/f corrections are disjoint; every rank still visits the same slots
+                ! in the same order, preserving the collective ordering of s_amr_p2p_reflux_faces). Interleaving the two forces
+                ! a swap/restore round trip per block, which is what blocks batching the advances - see @ref amr_block_batching.
+                do islot = 1, amr_num_blocks
+                    if (amr_block_level(islot) == 0) cycle
+                    if (amr_block_level(islot) >= 2) cycle
+                    call s_amr_select_slot(islot)
                     ! freg slices of the block faces move to the coarse-outside-owners (ALL ranks call; no-op at np=1)
                     call s_amr_p2p_reflux_faces()
                     call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
