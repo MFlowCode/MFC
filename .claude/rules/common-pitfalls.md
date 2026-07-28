@@ -61,6 +61,15 @@ covered in `docs/documentation/contributing.md`.
 - `@:ACC_SETUP_VFs(...)`/`@:ACC_SETUP_SFs(...)` GPU pointer setup compiles only under
   Cray. Around MPI: `GPU_UPDATE(host=...)` before send, `GPU_UPDATE(device=...)` after
   receive.
+- **Never `GPU_UPDATE` a NON-CONTIGUOUS array section.** `GPU_UPDATE(device='[q%sf(a:b,
+  c:d, e:f)]')` on a sub-box emits correct OpenMP, but AMD flang copies it as
+  `size(section)` CONTIGUOUS elements starting at the first: only the leading run lands
+  where it is named and the rest overwrites neighbouring cells with stale data — no error,
+  no warning. A leading section (`arr(1:n)`, or a fixed trailing index like
+  `freg(d)%lo(:,:,:,k)`) IS contiguous and safe; anything that strides is not. To move a
+  sub-box, pack/unpack it with a device kernel (`s_l0_pack_unpack_block`,
+  `s_amr_restrict_pack_device`) — that is why those exist. Measured: 10 of 60 covered
+  cells delivered in the AMR cross-rank restrict, mass off 1.4e-5 per regrid.
 
 ## Parameters
 
