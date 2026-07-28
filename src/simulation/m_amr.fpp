@@ -3472,7 +3472,8 @@ contains
         integer                                                :: rr, lo1, lo2, lo3
         integer                                                :: advb, adve, bbeg, bend, bstride
         integer                                                :: s, ns, l1, u1, l2, u2, l3, u3
-        integer, dimension(6)                                  :: sb1, se1, sb2, se2, sb3, se3
+        integer                                                :: ss, g, r, n1, n2, stot
+        integer, dimension(6)                                  :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
         logical                                                :: d2, d3, multi, shx, shy, shz, bubEE
         real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
 
@@ -3488,55 +3489,68 @@ contains
         bubEE = bubbles_euler; bbeg = eqn_idx%bub%beg; bend = eqn_idx%bub%end
         bstride = 1; if (bubEE) bstride = (bend - bbeg + 1)/nb
         call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
+        ! ONE kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their union
+        ! is exactly the ghost shell (s_amr_build_ghost_slabs), so every ghost cell is still written exactly once and the result is
+        ! byte-identical however the flat index is ordered. NOT the padded-hull form of s_amr_capture_creg_dense_batch: the x slabs
+        ! span the full transverse extent, so a hull over all slabs is the whole buffered volume and masking it would throw away the
+        ! O(surface) decomposition this routine exists to get.
+        soff(1) = 0
         do s = 1, ns
-            l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-            $:GPU_PARALLEL_LOOP(collapse=4, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
-            do i = 1, sys_size
-                do fk = l3, u3
-                    do fj = l2, u2
-                        do fi = l1, u1
-                            ! the slabs cover exactly the ghost shell; multi-fluid, skip the volume fractions (closure kernel below)
-                            if (.not. (multi .and. i >= advb .and. i <= adve)) then
-                                ck = 0; xiz = 0._wp
-                                if (d3) then
-                                    ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                                    xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                                end if
-                                cj = 0; xiy = 0._wp
-                                if (d2) then
-                                    cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                                    xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                                end if
-                                ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                                xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                                sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, &
-                                            & ck), wp))
-                                sy = 0._wp
-                                if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
-                                    & cj - 1, ck), wp))
-                                sz = 0._wp
-                                if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
-                                    & cj, ck - 1), wp))
-                                ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the coarse cell's
-                                ! realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component minmod slopes would break
-                                ! that joint constraint). Non-QBMM Euler-Euler bubbles instead floor their positive moments (nR /
-                                ! npb / nmv); the signed velocity moment nV (offset 1) is skipped.
-                                if (qbmm .and. i >= bbeg .and. i <= bend) then
-                                    sx = 0._wp; sy = 0._wp; sz = 0._wp
-                                end if
-                                q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
-                                if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
-                                    if (mod(i - bbeg, bstride) /= 1) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, &
-                                        & fk), wp), bub_pos_frac*u0)
-                                end if
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
+            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
         end do
+        stot = soff(ns) + scnt(ns)
+        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, fj, &
+                            & fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
+        do i = 1, sys_size
+            do g = 0, stot - 1
+                s = 1  ! decode the flat index: ns <= 6, so a scan beats storing a per-cell slab map
+                do ss = 2, ns
+                    if (g >= soff(ss)) s = ss
+                end do
+                r = g - soff(s)
+                n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
+                fi = sb1(s) + mod(r, n1)
+                fj = sb2(s) + mod(r/n1, n2)
+                fk = sb3(s) + r/(n1*n2)
+                ! the slabs cover exactly the ghost shell; multi-fluid, skip the volume fractions (closure kernel below)
+                if (.not. (multi .and. i >= advb .and. i <= adve)) then
+                    ck = 0; xiz = 0._wp
+                    if (d3) then
+                        ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                        xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                    end if
+                    cj = 0; xiy = 0._wp
+                    if (d2) then
+                        cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                        xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                    end if
+                    ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                    xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                    sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
+                    sy = 0._wp
+                    if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
+                        & wp))
+                    sz = 0._wp
+                    if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
+                        & wp))
+                    ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the coarse cell's
+                    ! realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component minmod slopes would break
+                    ! that joint constraint). Non-QBMM Euler-Euler bubbles instead floor their positive moments (nR /
+                    ! npb / nmv); the signed velocity moment nV (offset 1) is skipped.
+                    if (qbmm .and. i >= bbeg .and. i <= bend) then
+                        sx = 0._wp; sy = 0._wp; sz = 0._wp
+                    end if
+                    q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
+                    if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
+                        if (mod(i - bbeg, bstride) /= 1) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, fk), wp), &
+                            & bub_pos_frac*u0)
+                    end if
+                end if
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (shared limiter switch over all
         ! fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
