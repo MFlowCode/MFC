@@ -2150,7 +2150,7 @@ contains
     impure subroutine s_amr_build_static_multilevel(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-        integer                                                :: L2, n1, i, inset(3)
+        integer                                                :: L2, n1, i, par, inset(3)
 
         if (amr_max_level < 2) return  ! np>=2: the L2 is co-located with block 1
         n1 = amr_num_blocks
@@ -2158,15 +2158,20 @@ contains
         ! the static hierarchy nests exactly one level-2 block; without pool room it would SILENTLY refine only to level 1 (an
         ! under-resolved but "successful" run). n1 (the level-1 tile count) is only known here, not at checker time, so abort at the
         ! point of failure. Replicated inputs -> every rank takes the same branch (collective-safe).
-        if (n1 + 1 > amr_max_fine) call s_mpi_abort('amr static multi-level (amr_max_level > 1, amr_regrid_int = 0): ' &
-            & // 'amr_max_blocks is too small to nest the level-2 block (need >= level-1 block count + 1); increase amr_max_blocks')
+        if (n1 + 1 > l0_slot_off + amr_max_fine) call s_mpi_abort('amr static multi-level (amr_max_level > 1, ' &
+            & // 'amr_regrid_int = 0): amr_max_blocks is too small to nest the level-2 block (need >= level-1 block count + 1); ' &
+            & // 'increase amr_max_blocks')
         L2 = n1 + 1
+        ! PARENT is the first FINE block, f_l0_slot(1) - NOT slot 1, which under coexist is the first level-0 TILE. Insetting a
+        ! tile instead put the level-2 box in the wrong place and sized it off the tile: with one tile (the whole base grid) that
+        ! tripped the amr_maxc_fit cap below, and with two it produced a plausible-looking box that silently corrupted the run.
+        par = f_l0_slot(1)
         inset = 0
-        inset(1) = max((amr_region_hi_all(1, 1) - amr_region_lo_all(1, 1) + 1)/4, amr_cpat_mar)
-        if (n_glb > 0) inset(2) = max((amr_region_hi_all(2, 1) - amr_region_lo_all(2, 1) + 1)/4, amr_cpat_mar)
-        if (p_glb > 0) inset(3) = max((amr_region_hi_all(3, 1) - amr_region_lo_all(3, 1) + 1)/4, amr_cpat_mar)
-        amr_region_lo_all(:,L2) = amr_region_lo_all(:,1) + inset
-        amr_region_hi_all(:,L2) = amr_region_hi_all(:,1) - inset
+        inset(1) = max((amr_region_hi_all(1, par) - amr_region_lo_all(1, par) + 1)/4, amr_cpat_mar)
+        if (n_glb > 0) inset(2) = max((amr_region_hi_all(2, par) - amr_region_lo_all(2, par) + 1)/4, amr_cpat_mar)
+        if (p_glb > 0) inset(3) = max((amr_region_hi_all(3, par) - amr_region_lo_all(3, par) + 1)/4, amr_cpat_mar)
+        amr_region_lo_all(:,L2) = amr_region_lo_all(:,par) + inset
+        amr_region_hi_all(:,L2) = amr_region_hi_all(:,par) - inset
         ! Guard the fixed-inset box against configs this single-block static builder cannot represent - the dynamic regrid path has
         ! the analogous checks (proper-nesting skip + amr_maxc_fit/2 clamp), but the static path bypasses them. Replicated inputs ->
         ! every rank takes the same branch (collective-safe). (a) a level-1 block smaller than 2*inset inverts the box; (b) a
@@ -2185,7 +2190,7 @@ contains
             & // '(2*L0-extent > amr_maxc_fit); static multi-level does not tile the level-2 block - use a smaller base amr ' &
             & // 'block or the dynamic regrid path (amr_regrid_int > 0)')
         amr_block_level(L2) = 2
-        amr_block_owner(L2) = amr_block_owner(1)
+        amr_block_owner(L2) = amr_block_owner(par)
         amr_num_blocks = L2; amr_num_levels = 2
         call s_amr_reconcile_slots()
         amr_cur = L2
