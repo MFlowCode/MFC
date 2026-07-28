@@ -371,17 +371,34 @@ class MFCTarget:
         # cache alone does not mean the target is ready to build: a configure that
         # was interrupted leaves the cache behind with no Makefile, and skipping
         # configure on that basis fails later with "No rule to make target".
-        # Require the generator's build file too.
+        # Require the generator's build file too, asking the cache which generator
+        # it is rather than guessing. An unrecognized generator falls back to the
+        # cache alone, so this is never stricter than the old behaviour.
         staging_dirpath = self.get_staging_dirpath(case)
-        if not os.path.isfile(os.sep.join([staging_dirpath, "CMakeCache.txt"])):
+        cache_filepath = os.sep.join([staging_dirpath, "CMakeCache.txt"])
+        if not os.path.isfile(cache_filepath):
             return False
 
-        return any(os.path.isfile(os.sep.join([staging_dirpath, f])) for f in ("build.ninja", "Makefile"))
+        generator = ""
+        with open(cache_filepath, "r") as f:
+            for line in f:
+                if line.startswith("CMAKE_GENERATOR:"):
+                    generator = line.split("=", 1)[-1].strip()
+                    break
+
+        if "Ninja" in generator:
+            return os.path.isfile(os.sep.join([staging_dirpath, "build.ninja"]))
+        if "Makefiles" in generator:
+            return os.path.isfile(os.sep.join([staging_dirpath, "Makefile"]))
+
+        return True
 
     def is_installed(self, case: Case) -> bool:
-        # CMake writes install_manifest.txt only after a successful install, so
-        # unlike CMakeCache.txt it is not left behind by a build that crashed.
-        return os.path.isfile(os.sep.join([self.get_staging_dirpath(case), "install_manifest.txt"]))
+        # CMake writes an install manifest only after a successful install, so unlike
+        # CMakeCache.txt it is not left behind by a build that crashed. Multi-config
+        # generators name it install_manifest_<config>.txt, so match either form.
+        staging_dirpath = self.get_staging_dirpath(case)
+        return any(name.startswith("install_manifest") and name.endswith(".txt") for name in os.listdir(staging_dirpath)) if os.path.isdir(staging_dirpath) else False
 
     def get_configuration_txt(self, case: Case) -> typing.Optional[dict]:
         if not self.is_configured(case):
