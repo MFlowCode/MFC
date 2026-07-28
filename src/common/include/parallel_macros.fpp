@@ -104,7 +104,7 @@
         $:cray_directive
 #elif defined(MFC_OpenACC)
         $:acc_directive
-#elif MFC_OpenMP
+#elif defined(MFC_OpenMP)
         $:omp_directive
 #endif
     #:else
