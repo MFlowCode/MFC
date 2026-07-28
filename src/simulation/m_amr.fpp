@@ -4012,9 +4012,12 @@ contains
     !! (coarse-prolonged seam ghosts would be non-conservative). For each seam pair (xb below, yb above, dim d) the two owners
     !! exchange the buff_size-deep near-seam interior (MPI_Sendrecv, or a local copy when one rank owns both). Buffer is wp, cast to
     !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (any untiled case, any np).
-    impure subroutine s_amr_fine_fine_halo()
+    impure subroutine s_amr_fine_fine_halo(lev_only)
 
-        integer :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul, idx
+        !> level to exchange, or 0 for ALL levels. The subcycled level-2 child advance needs to reconcile ONLY its own level's
+        !! seams: it runs inside one of the parent's substeps, when the level-1 blocks are mid-substep and must not be touched.
+        integer, intent(in) :: lev_only
+        integer             :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul, idx
 
         if (.not. amr .and. l0_ntile == 0) return
         if (amr_num_blocks < 2) return
@@ -4028,6 +4031,7 @@ contains
         ! pack/unpack touches (not the whole block) - a large PCIe saving since this runs per stage (6x per fine step)
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
+            if (lev_only > 0 .and. amr_block_level(xb) /= lev_only) cycle  ! pairs are same-level, so xb's level is the pair's
             rX = amr_block_owner(xb); rY = amr_block_owner(yb)
             if (proc_rank /= rX .and. proc_rank /= rY) cycle
             ! fine extents from the REPLICATED region metadata (not amr_slots%m/n/p: at np>1 this rank may own only one of the pair,
@@ -4296,7 +4300,7 @@ contains
                 ! even at np=1), so the halo runs unconditionally - it self-no-ops when there are no seam pairs, keeping every
                 ! untiled
                 ! case byte-identical.
-                call s_amr_fine_fine_halo()
+                call s_amr_fine_fine_halo(0)
                 ! RHS + RK update every block from the reconciled ghost shell
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) /= 1) cycle
@@ -5901,7 +5905,7 @@ contains
         measure = (l0_rebalance_interval > 0)
 
         call s_l0_fill_edge_bc()
-        call s_amr_fine_fine_halo()
+        call s_amr_fine_fine_halo(0)
         ! Fill the multi-dim ghost cells (2D diagonal corners; 3D also the ghost edges) that the dimension-split face fills
         ! (s_l0_fill_edge_bc + s_amr_fine_fine_halo) deliberately leave unset. The RHS never reads them, but the cons->prim
         ! convert processes the whole buffered range, and an unset ghost (all void fractions 0 -> gamma 0) is a 0/0 that traps
