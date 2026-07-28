@@ -55,12 +55,23 @@ f     OLCF Frontier
 f-all cpe/26.03 cce/21.0.2 rocm/7.2.0
 f-all cray-fftw cray-hdf5 python cmake
 f-gpu craype-accel-amd-gfx90a
-# CCE 21 aborts linking simulation in the AMDGPU "Rewrite AGPR-Copy-MFMA" pass
-# (SlotIndexes.h "Attempt to compare reserved index") on the s_compute_bubble_EE_source
-# kernel. The pass runs even though every gfx90a function CCE emits carries
-# amdgpu-agpr-alloc="0" and MFC contains no v_mfma instructions, so dropping the MAI
-# subtarget feature makes it bail out with no effect on generated code.
-f-gpu CRAY_CCE_LLD_ARGS=-plugin-opt=-mattr=-mai-insts
+# Two CCE 21 device-codegen workarounds. Keep the value quoted: modules.sh runs
+# eval "export $line", so an unquoted multi-word value exports only the first
+# -plugin-opt and reports the rest to stderr, which is routinely discarded.
+#
+# -mattr=-mai-insts: CCE 21 aborts linking simulation in the AMDGPU
+#   "Rewrite AGPR-Copy-MFMA" pass (SlotIndexes.h "Attempt to compare reserved
+#   index") on the s_compute_bubble_EE_source kernel. Dropping the MAI subtarget
+#   feature makes the pass bail out. Not codegen-neutral -- it costs the AGPR half
+#   of the unified register file, so pressure moves into scratch.
+#
+# -disable-promote-alloca-to-vector: AMDGPUPromoteAllocaToVector silently DISCARDS
+#   a dynamically-indexed store into a 1-based local array. For arr(v) CCE 21
+#   canonicalizes the element index as v + 0x3FFFFFFF, which is harmless in
+#   wrapping address arithmetic but not once the array is registerized and the
+#   index becomes an equality comparison. Wrong answers, no diagnostic. The three
+#   sites we found are also fixed in source; this covers the ones we have not.
+f-gpu CRAY_CCE_LLD_ARGS="-plugin-opt=-mattr=-mai-insts -plugin-opt=-disable-promote-alloca-to-vector"
 
 famd    OLCF Frontier AMD
 famd-all python cmake
