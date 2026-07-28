@@ -4402,46 +4402,9 @@ contains
 
     end subroutine s_amr_subtree_stage_advance
 
-    !> Advance the currently-selected fine block (amr_cur) through its subcycle: two amr_dt_fine SSP-RK3 substeps whose ghost shell
-    !! is the two-source time-lerp of the block's q_ghost_a (parent t^n) / q_ghost_b (parent t^{n+1}) sources, filled by the caller
-    !! before this call. Fine flux registers are zeroed here and accumulate over all six stages so the end-of-step reflux sees the
-    !! time-averaged effective fine flux. RECURSIVE: after each of this block's substeps, its level+1 children subcycle within that
-    !! substep (s_amr_advance_children) at dt_sub/amr_ref_ratio, so per-level dt falls out of the recursion. With no children this
-    !! is exactly the single-level L0<->L1 advance. Used for level>=2 children (per-block); level-1 blocks run the transposed,
-    !! seam-halo'd s_amr_advance_fine_subcycle_all instead.
-    recursive subroutine s_amr_advance_subtree(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
-
-        real(wp), intent(in) :: dt_sub                 !< this block's substep dt (parent step / amr_ref_ratio)
-        real(wp), dimension(:,:), intent(in) :: coefs  !< rk_coef(1:3, 1:4)
-        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        type(scalar_field), intent(inout) :: q_T_sf
-        real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
-        real(wp), dimension(:,:,:,:,:), intent(inout) :: rhs_pb, rhs_mv
-        integer, intent(in) :: t_step
-        real(wp), parameter :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
-        integer :: sub, s
-        real(wp) :: th
-
-        call s_amr_zero_fine_registers()
-        do sub = 1, 2
-            do s = 1, 3
-                th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
-                call s_amr_subtree_stage_lerp(s, th)
-                call s_amr_subtree_stage_advance(dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s, th)
-            end do
-            ! multi-level: this block is now at t_b (q_cons) with t_a preserved in q_cons_stor. Each level+1 child subcycles WITHIN
-            ! this substep - gathering its two ghost-lerp sources from those two snapshots - then folds back (restrict +
-            ! Berger-Colella
-            ! reflux) into this block over dt_sub. No-op when this block has no children (single-level / finest).
-            if (amr_max_level >= 2) call s_amr_advance_children(amr_cur, dt_sub, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, &
-                & rhs_mv, t_step)
-        end do
-
-    end subroutine s_amr_advance_subtree
-
     !> Recursively subcycle every level+1 child of parent slot pslot within ONE of the parent's substeps [t_a, t_b] (duration
     !! dt_sub). The parent has just finished that substep: q_cons = parent @ t_b, q_cons_stor = parent @ t_a. For each child: gather
-    !! its two ghost-lerp sources from those two parent snapshots (parent-fine frame), recurse s_amr_advance_subtree at dt_sub/2
+    !! its two ghost-lerp sources from those two parent snapshots (parent-fine frame), recurse into its own children at dt_sub/2
     !! (the child takes amr_ref_ratio substeps covering [t_a, t_b]), then fold the child back into the parent - restrict the covered
     !! cells and apply the Berger-Colella C/F flux correction (s_amr_reflux_to_parent over dt_sub, consuming the child's freg + the
     !! parent-side creg captured during THIS substep). The registers already carry the matching per-substep time weights (freg
@@ -4457,26 +4420,70 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
         integer, intent(in)                                        :: t_step
-        integer                                                    :: kc, pslot_l
+        real(wp), parameter                                        :: c_abs(3) = [0._wp, 1._wp, 0.5_wp]
+        integer                                                    :: kc, pslot_l, clev, sub, s
+        real(wp)                                                   :: th
 
         ! pslot is argument-associated with the module variable amr_cur (the caller passes amr_cur as pslot); the
         ! s_amr_select_slot(kc) below reassigns amr_cur and would silently corrupt pslot. Copy it to a local read before any slot
         ! switch.
 
         pslot_l = pslot
+        clev = amr_block_level(pslot_l) + 1
+        ! SETUP each child: its two ghost-lerp sources from the parent's substep endpoints (parent-fine frame) + zeroed registers
         do kc = 1, amr_num_blocks
-            if (amr_block_level(kc) /= amr_block_level(pslot_l) + 1) cycle
+            if (amr_block_level(kc) /= clev) cycle
             if (f_amr_parent_block(kc) /= pslot_l) cycle
             call s_amr_select_slot(kc)  ! amr_cur = kc; mirrors (isect already parent-fine)
             if (.not. amr_rank_owns_block) cycle  ! np>=2: child on another rank - future work (#27)
-            ! two ghost-lerp sources from the parent's substep endpoints (parent-fine frame)
             call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons_stor, .false.)  ! parent @ t_a (device C/F fill)
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_a)
             call s_amr_gather_from_parent_field(pslot_l, amr_slots(pslot_l)%q_cons, .false.)  ! parent @ t_b (device C/F fill)
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_b)
-            ! recurse: the child subcycles its amr_ref_ratio substeps (and its own children) over [t_a, t_b]
-            call s_amr_advance_subtree(dt_sub*0.5_wp, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
-            ! fold the child back into the parent (relax the fine phase first, matching the driver's relax -> restrict order)
+            call s_amr_zero_fine_registers()
+        end do
+        ! ADVANCE the siblings TRANSPOSED - all of them through each substep together, with the level-clev seam halo interposed -
+        ! exactly as s_amr_advance_fine_subcycle_all does at level 1. Advancing each child's whole subtree in turn (the previous
+        ! shape) left adjacent siblings unable to see each other, so their shared face carried mismatched fluxes; that is why the
+        ! regrid clamped subcycle to ONE capped child per box. The halo is level-filtered because this runs INSIDE one of the
+        ! parent's substeps, when the parent's own level is mid-substep and must not be touched.
+        do sub = 1, 2
+            do s = 1, 3
+                th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
+                do kc = 1, amr_num_blocks
+                    if (amr_block_level(kc) /= clev) cycle
+                    if (f_amr_parent_block(kc) /= pslot_l) cycle
+                    call s_amr_select_slot(kc)
+                    if (.not. amr_rank_owns_block) cycle
+                    call s_amr_subtree_stage_lerp(s, th)
+                end do
+                call s_amr_fine_fine_halo(clev)
+                do kc = 1, amr_num_blocks
+                    if (amr_block_level(kc) /= clev) cycle
+                    if (f_amr_parent_block(kc) /= pslot_l) cycle
+                    call s_amr_select_slot(kc)
+                    if (.not. amr_rank_owns_block) cycle
+                    call s_amr_subtree_stage_advance(dt_sub*0.5_wp, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, &
+                                                     & s, th)
+                end do
+            end do
+            ! each child is now at its own t_b with t_a in q_cons_stor: recurse into ITS children within this substep
+            if (amr_max_level >= clev + 1) then
+                do kc = 1, amr_num_blocks
+                    if (amr_block_level(kc) /= clev) cycle
+                    if (f_amr_parent_block(kc) /= pslot_l) cycle
+                    call s_amr_select_slot(kc)
+                    if (.not. amr_rank_owns_block) cycle
+                    call s_amr_advance_children(kc, dt_sub*0.5_wp, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+                end do
+            end if
+        end do
+        ! FOLD each child back into the parent (relax the fine phase first, matching the driver's relax -> restrict order)
+        do kc = 1, amr_num_blocks
+            if (amr_block_level(kc) /= clev) cycle
+            if (f_amr_parent_block(kc) /= pslot_l) cycle
+            call s_amr_select_slot(kc)
+            if (.not. amr_rank_owns_block) cycle
             if (relax) call s_amr_relax_fine()
             call s_amr_restrict_to_parent()
             call s_amr_reflux_to_parent(dt_sub)
