@@ -52,6 +52,7 @@ f     OLCF Frontier
 f-all cpe/26.03 cce/21.0.2 rocm/7.2.0
 f-all cray-fftw cray-hdf5 python cmake
 f-gpu python craype-accel-amd-gfx90a
+f-gpu CRAY_CCE_LLD_ARGS="-plugin-opt=-mattr=-mai-insts -plugin-opt=-disable-promote-alloca-to-vector"
 
 famd    OLCF Frontier AMD
 famd-all python cmake
