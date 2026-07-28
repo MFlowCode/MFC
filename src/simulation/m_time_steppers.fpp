@@ -31,7 +31,7 @@ module m_time_steppers
     use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
         & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_advance_stage, &
         & s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
-        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse
+        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -472,6 +472,23 @@ contains
             ! the
             ! L0 coarse RHS + the fine block's coarse-patch fill read it. Coexist-only (neutral for pure-AMR / pure-L0).
             if (amr .and. l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
+            ! Coexist + subcycle: the subcycled fine advance time-lerps its C/F ghosts between the coarse t^n and t^{n+1} states in
+            ! the L0 frame, and q_cons_ts(stor) - its t^n bracket - is written ONLY by the monolithic RK below, which l0_ntile > 0
+            ! skips (the tiles keep their own per-slot backup instead). Take the L0-frame backup here: at stage 1 the scatter above
+            ! has just made L0 an exact mirror of the tiles at t^n. Without it the fine ghosts lerp against an unwritten array.
+            if (amr .and. l0_ntile > 0 .and. amr_subcycle .and. s == 1) then
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
             ! Pure-L0 (amr off): the tiles run their own per-tile s_compute_rhs, so the monolithic L0 RHS is pure waste here (it
             ! only
             ! populated the now-unused rhs_vf); skipping it makes the tiled path represent the real design and de-confounds timing.
@@ -733,6 +750,9 @@ contains
             ! block's level-2 children subcycle within it (s_amr_advance_children). The restrict + reflux fold below is a
             ! separate per-block pass (footprints disjoint, order-independent).
             if (amr_subcycle) then
+                ! Coexist: the stage loop refreshes L0 only at the TOP of each stage, so L0 currently holds the stage-3 ENTRY
+                ! state, not t^{n+1}. The subcycle's q_new bracket must be t^{n+1}, so re-scatter the (now advanced) tiles first.
+                if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
                 call s_amr_advance_fine_subcycle_all(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, &
                                                      & pb_ts(stor)%sf, mv_ts(stor)%sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                      & t_step)
@@ -759,7 +779,18 @@ contains
             ! Coexist: the restrict above wrote the fine-averaged solution into the L0 covered cells; route those covered cells back
             ! to the covering tiles (the authoritative store) so they carry the finest data, mirroring the monolithic level-0
             ! covered-cell overwrite. Only the footprint moves (non-covered tile cells keep their advanced state).
-            if (l0_ntile > 0) call s_l0_restrict_to_tiles(q_cons_ts(1)%vf)
+            ! SUBCYCLE takes the whole-interior route instead: its Berger-Colella correction lands as a STATE reflux on the coarse
+            ! cells just OUTSIDE each block (s_amr_apply_reflux_state), which the covered-footprint copy above does not carry. The
+            ! tiles were scattered to L0 at t^{n+1} before the fine advance, so L0 now equals the tiles everywhere except the cells
+            ! the fold deliberately changed - refilling every tile from L0 delivers the restrict AND the reflux shell in one pass,
+            ! and is an exact copy round-trip (no arithmetic) on every cell neither touched.
+            if (l0_ntile > 0) then
+                if (amr_subcycle) then
+                    call s_l0_fill_tiles_from_coarse(q_cons_ts(1)%vf)
+                else
+                    call s_l0_restrict_to_tiles(q_cons_ts(1)%vf)
+                end if
+            end if
         end if
 
 #ifdef MFC_DEBUG

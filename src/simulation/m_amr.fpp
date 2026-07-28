@@ -41,7 +41,7 @@ module m_amr
         & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, s_amr_relax_fine, s_amr_setup_ib, &
         & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, s_l0_advance_stage_rhs, &
         & s_l0_advance_stage_rk, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_add_reflux_to_tiles, &
-        & s_l0_restrict_to_tiles, s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance
+        & s_l0_restrict_to_tiles, s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance, s_l0_fill_tiles_from_coarse
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -5088,14 +5088,26 @@ contains
 
         ! inout (not in): passed as the bidirectional s_l0_copy_block q_l0 dummy (intent(inout)); read-only here (L0 -> tile)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
-        real(wp), allocatable                                  :: buf(:)
 
         ! Persistent tiles: seed from L0 exactly once. After the first fill the tiles are authoritative; re-copying would be an
         ! identity round-trip (each stage scatters tile->L0, so L0 already mirrors the tile interior at the next timestep's stage
         ! 1).
 
         if (.not. l0_tiles_need_fill) return
+
+        call s_l0_fill_tiles_from_coarse(q_cons_vf)
+        l0_tiles_need_fill = .false.
+
+    end subroutine s_l0_copy_coarse_to_tiles
+
+    !> The fill itself, without the seed gate: overwrite every owned tile interior from the L0 field. Separate from
+    !! s_l0_copy_coarse_to_tiles because the coexist SUBCYCLE path round-trips through L0 every step (tiles -> L0, fine fold writes
+    !! L0, L0 -> tiles), so it needs this unconditionally, while the seed must still happen exactly once.
+    impure subroutine s_l0_fill_tiles_from_coarse(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
+        real(wp), allocatable                                  :: buf(:)
 
         do k = 1, l0_ntiles_tot
             bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
@@ -5128,9 +5140,8 @@ contains
                 deallocate (buf)
             end if
         end do
-        l0_tiles_need_fill = .false.
 
-    end subroutine s_l0_copy_coarse_to_tiles
+    end subroutine s_l0_fill_tiles_from_coarse
 
     !> Local-index offset of tile k's global origin in the L0 field: o(d) = region_lo(d) - start_idx(d) for active dims, 0 for a
     !! collapsed dim (start_idx is sized num_dims, so start_idx(3) must not be touched in 2D).
