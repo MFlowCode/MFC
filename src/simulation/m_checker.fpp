@@ -59,12 +59,6 @@ contains
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
-        ! Last remaining coexist (l0_ntile > 0 .and. amr) gate. Dynamic regrid and amr_subcycle both lifted once measured against
-        ! the l0_ntile = 0 arm of the same case (2D 64x32, AMD OMP offload), as was multi-level for l0_ntile >= 2; what is left is
-        ! one unexplained configuration, kept gated rather than shipped on a guess.
-        @:PROHIBIT(l0_ntile == 1 .and. amr .and. amr_max_level > 1, &
-                   & "multi-level (amr_max_level > 1) with l0_ntile = 1 corrupts the heap during initialization and has not been " // "diagnosed. l0_ntile >= 2 is byte-identical to the monolithic (l0_ntile = 0) run at np = 1 and np = 2; " // "the single-tile case fails at any rank count, pool size and block size, so it is not the scratch cap " // "(amr_maxc) that gated this before - use l0_ntile >= 2")
-
         if (active_box) then
             @:PROHIBIT(recon_type /= recon_type_weno, "active_box requires WENO reconstruction")
             @:PROHIBIT(ib, "active_box is incompatible with immersed boundaries")

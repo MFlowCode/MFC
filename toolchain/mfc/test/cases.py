@@ -4574,6 +4574,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "np=1", {}, ppn=1))
         cases.append(define_case_d(stack, "np=2", {}, ppn=2))
+        # l0_ntile = 1 is the case the slot-1 confusion actually killed: ONE tile spanning the base grid leaves the grid globals
+        # describing the whole subdomain, so the wrong-slot restore was invisible to every multi-tile configuration.
+        cases.append(define_case_d(stack, "single tile", {"l0_ntile": 1}, ppn=1))
         stack.pop()
 
         # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
