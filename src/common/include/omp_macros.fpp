@@ -35,10 +35,14 @@
                 #! present:allocatable and present:pointer reproduces it on its own.
                 #! This is what made every IBM case fail under -homp: ib_markers read as
                 #! empty, so the ghost-point count came back 0.
-                #! Related: present:aggregate was tried and reverted earlier. It aborts
-                #! with "find_in_present_table failed for 'length(:)'" at
-                #! m_ib_patches.fpp:145 -- a genuine second residency bug that the tofrom
-                #! default had been masking, worth fixing separately.
+                #! Related: present:aggregate was tried and reverted. It aborts with
+                #! "find_in_present_table failed for 'length(:)'" at m_ib_patches.fpp:145.
+                #! That is NOT an MFC residency bug -- `length` is real(wp) :: length(3),
+                #! explicitly listed in that loop's private() clause, so nothing should
+                #! ever look for it in the present table. Measured on a 20-line standalone:
+                #! an explicitly-private local array passes with no defaultmap and aborts
+                #! the same way with defaultmap(present:aggregate). Same defect as above,
+                #! overriding `private` instead of `map` or present-table residency.
                 #:set default_val = ''
             #:elif MFC_COMPILER == AMD_COMPILER_ID
                 #:set default_val = ''
