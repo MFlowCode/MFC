@@ -2218,7 +2218,7 @@ contains
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
-        integer :: i, ci, cj, ck, nchild, rr, dj_hi, dk_hi, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
+        integer :: nchild, rr, dj_hi, dk_hi, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
         integer :: rlo(3), rhi(3), ilo(3), ihi(3), bl(3), bh(3)
         real(wp), allocatable :: sbuf(:,:), rbuf(:)
         integer, allocatable :: reqs(:), drank(:)
@@ -2323,23 +2323,16 @@ contains
 #ifdef MFC_MPI
                 call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
-                idx = 0
-                do i = 1, sys_size
-                    do ck = bl(3), bh(3)
-                        do cj = bl(2), bh(2)
-                            do ci = bl(1), bh(1)
-                                idx = idx + 1
-                                coarse_tgt(i)%sf(ci - o1, cj - o2, ck - o3) = real(rbuf(idx), stp)
-                            end do
-                        end do
-                    end do
-                end do
+                ! DEVICE unpack of the covered box, writing only those cells (a whole-array push would clobber the device-advanced
+                ! non-covered coarse cells with this rank's stale host copy - the GPU-only bug fixed at np=1). This must NOT be a
+                ! host unpack followed by a strided GPU_UPDATE(device=) of the box: a non-contiguous 3-D array section in an OpenMP
+                ! target update is copied by AMD flang as size(section) CONTIGUOUS elements, so only the first row lands on the
+                ! cells it names and the remainder overwrites neighbouring cells with stale host data - silently, and only at
+                ! np >= 2 with a block whose owner holds none of its covered cells. The wire layout (ci fastest, then cj, ck, i)
+                ! is exactly s_l0_pack_unpack_block's, so it unpacks s_amr_restrict_pack_device's buffer as-is.
+                call s_l0_pack_unpack_block(coarse_tgt, bl(1) - o1, bl(2) - o2, bl(3) - o3, bh(1) - bl(1), bh(2) - bl(2), &
+                                            & bh(3) - bl(3), rbuf, .false.)
                 deallocate (rbuf)
-                ! push ONLY the covered cells to the device - a whole-array update would clobber the device-advanced non-covered
-                ! coarse cells with this rank's stale host copy (the same GPU-only bug fixed at np=1)
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[coarse_tgt(i)%sf(bl(1) - o1:bh(1) - o1, bl(2) - o2:bh(2) - o2, bl(3) - o3:bh(3) - o3)]')
-                end do
             end if
         end if
 
@@ -2997,6 +2990,41 @@ contains
 
     end subroutine s_amr_restrict_pbmv_pack_device
 
+    !> Device unpack of a received pb/mv covered slice into the coarse fields - exact inverse of s_amr_restrict_pbmv_pack_device's
+    !! wire layout (ci fastest, then cj, ck, q, ib_, all of pb followed by all of mv). Unpacking on the DEVICE is required, not a
+    !! convenience: a host unpack plus a strided GPU_UPDATE(device=) of the covered box is miscopied as a contiguous run - see the
+    !! note at the q_cons unpack in s_restrict_fine_to_coarse, of which this is the pb/mv twin.
+    impure subroutine s_amr_restrict_pbmv_unpack_device(pb_c, mv_c, bl, bh, o1, o2, o3, buf)
+
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_c, mv_c
+        integer, intent(in) :: bl(3), bh(3), o1, o2, o3
+        real(wp), intent(inout), contiguous :: buf(:)
+        integer :: ci, cj, ck, q, ib_, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, half
+
+        bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
+        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
+        half = n1*n2*n3*nnode*nb
+        $:GPU_PARALLEL_LOOP(collapse=5, copyin='[buf]')
+        do ib_ = 1, nb
+            do q = 1, nnode
+                do ck = bl3, bh3
+                    do cj = bl2, bh2
+                        do ci = bl1, bh1
+                            pb_c(ci - o1, cj - o2, ck - o3, q, &
+                                 & ib_) = real(buf(1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*((q - 1) + nnode*(ib_ &
+                                 & - 1))))), stp)
+                            mv_c(ci - o1, cj - o2, ck - o3, q, &
+                                 & ib_) = real(buf(half + 1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*((q - 1) &
+                                 & + nnode*(ib_ - 1))))), stp)
+                        end do
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_restrict_pbmv_unpack_device
+
     !> Non-polytropic QBMM: distributed fine->coarse fold-back of the block's pb/mv onto the coarse side-state pb_ts/mv_ts,
     !! mirroring the q_cons scatter in s_restrict_fine_to_coarse. The owner restricts the covered cells it holds (device, owned box)
     !! and SENDS each other coarse-owner its covered pb/mv slice (device-packed averages, pb block then mv block); that owner
@@ -3008,10 +3036,10 @@ contains
 
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pb_fin, mv_fin
-        integer :: ci, cj, ck, q, ib_, nchild, rr, dj_hi, dk_hi, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr, cellsz
-        integer :: rlo(3), rhi(3), ilo(3), ihi(3), bl(3), bh(3)
+        integer               :: nchild, rr, dj_hi, dk_hi, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr, cellsz
+        integer               :: rlo(3), rhi(3), ilo(3), ihi(3), bl(3), bh(3)
         real(wp), allocatable :: sbuf(:,:), rbuf(:)
-        integer, allocatable :: reqs(:), drank(:)
+        integer, allocatable  :: reqs(:), drank(:)
 
         rr = amr_slots(amr_cur)%amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
@@ -3073,35 +3101,10 @@ contains
 #ifdef MFC_MPI
                 call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
-                idx = 0
-                do ib_ = 1, nb
-                    do q = 1, nnode
-                        do ck = bl(3), bh(3)
-                            do cj = bl(2), bh(2)
-                                do ci = bl(1), bh(1)
-                                    idx = idx + 1
-                                    pb_ts(1)%sf(ci - o1, cj - o2, ck - o3, q, ib_) = real(rbuf(idx), stp)
-                                end do
-                            end do
-                        end do
-                    end do
-                end do
-                do ib_ = 1, nb
-                    do q = 1, nnode
-                        do ck = bl(3), bh(3)
-                            do cj = bl(2), bh(2)
-                                do ci = bl(1), bh(1)
-                                    idx = idx + 1
-                                    mv_ts(1)%sf(ci - o1, cj - o2, ck - o3, q, ib_) = real(rbuf(idx), stp)
-                                end do
-                            end do
-                        end do
-                    end do
-                end do
+                ! DEVICE unpack, writing only the covered cells (a whole-array push would clobber device-advanced non-covered
+                ! coarse cells with this rank's stale host copy)
+                call s_amr_restrict_pbmv_unpack_device(pb_ts(1)%sf, mv_ts(1)%sf, bl, bh, o1, o2, o3, rbuf)
                 deallocate (rbuf)
-                ! push ONLY the covered cells to the device (a whole-array update would clobber device-advanced non-covered coarse)
-                $:GPU_UPDATE(device='[pb_ts(1)%sf(bl(1) - o1:bh(1) - o1, bl(2) - o2:bh(2) - o2, bl(3) - o3:bh(3) - o3, :, :)]')
-                $:GPU_UPDATE(device='[mv_ts(1)%sf(bl(1) - o1:bh(1) - o1, bl(2) - o2:bh(2) - o2, bl(3) - o3:bh(3) - o3, :, :)]')
             end if
         end if
 

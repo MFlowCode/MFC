@@ -4455,6 +4455,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # 2D dynamic regrid at np=2: the ONLY golden where a level-1 block's owner holds NONE of its covered coarse cells, so
+        # s_restrict_fine_to_coarse must scatter the whole fold-back over MPI and the receiver writes covered cells it did not
+        # restrict. Regrid is what creates that configuration - every static block here is owned by a rank that overlaps it, and
+        # the existing np=2 regrid golden is 1D, where the covered box is a single contiguous row. It has to be >= 2D at np >= 2:
+        # the receiver used to unpack on the host and push the covered box back with a strided GPU_UPDATE, which AMD flang copies
+        # as size(box) CONTIGUOUS elements - only the first row landed and the rest overwrote neighbouring cells, silently losing
+        # mass (1.4e-5 over 4 regrids here).
+        stack.push(
+            "AMR -> 2D -> dynamic regrid np=2",
+            {**amr_2d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
         # L0-as-blocks dynamic load balancer: the base grid is tiled into migratable blocks (l0_ntile), and a FORCED
         # cross-rank tile migration (l0_migrate_step) at np=2 exercises the device pack/unpack P2P path - the per-block
         # device (de)allocation / present-table churn that historically breaks across CCE and AMD flang (the ab_int /
@@ -4515,16 +4529,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
-        # NP1-REGRID: coexist with DYNAMIC regrid (np=1; np>=2 is still checker-gated). Regrid rebuilds the fine band of the
-        # shared slot pool while the level-0 tile prefix [1..l0_slot_off] must survive untouched, and it allocates NEW fine
-        # slots through s_amr_alloc_slot - the two things no other golden exercises together, since the coexist goldens above
-        # are all static and every dynamic-regrid golden runs without tiles. Byte-identical to the monolithic (l0_ntile = 0)
-        # run at 4 regrids over 6 steps.
+        # NP1-REGRID: coexist with DYNAMIC regrid. Regrid rebuilds the fine band of the shared slot pool while the level-0 tile
+        # prefix [1..l0_slot_off] must survive untouched, and it allocates NEW fine slots through s_amr_alloc_slot - the two
+        # things no other golden exercises together, since the coexist goldens above are all static and every dynamic-regrid
+        # golden runs without tiles. Byte-identical to the monolithic (l0_ntile = 0) run at 4 regrids over 6 steps.
         stack.push(
             "AMR + L0 tiles -> 2D -> coexist dynamic regrid np=1",
             {**amr_2d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "run_time_info": "F", "l0_ntile": 2},
         )
         cases.append(define_case_d(stack, "", {}, ppn=1))
+        stack.pop()
+        # NP2-REGRID: the same at np=2, where the regrid additionally hands one fine block to a rank holding none of its covered
+        # cells. That composes all three routings in one step - fine-owner -> L0-owner (restrict scatter), L0-owner -> tile
+        # compute-owner (s_l0_restrict_to_tiles), and the reflux delta along the same path - which nothing else covers, since the
+        # np=2 coexist golden above is static and the regrid golden above is np=1.
+        stack.push(
+            "AMR + L0 tiles -> 2D -> coexist dynamic regrid np=2",
+            {**amr_2d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "run_time_info": "F", "l0_ntile": 2},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
         # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
