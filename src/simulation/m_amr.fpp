@@ -2756,8 +2756,8 @@ contains
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_t, mv_t
         integer               :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
-        integer               :: s, ns, l1, u1, l2, u2, l3, u3
-        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3
+        integer               :: s, ns, l1, u1, l2, u2, l3, u3, ss, g, r, n1, n2, stot
+        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
         logical               :: d2, d3
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
@@ -2765,28 +2765,38 @@ contains
         rr = amr_slots(amr_cur)%amr_ref_ratio
         lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
         call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
+        ! flat index over the concatenated DISJOINT slabs - one kernel instead of ns; see s_amr_fill_fine_ghosts
+        soff(1) = 0
         do s = 1, ns
-            l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-            $:GPU_PARALLEL_LOOP(collapse=5, private='[ci, cj, ck]')
-            do ib_ = 1, nb
-                do q = 1, nnode
-                    do fk = l3, u3
-                        do fj = l2, u2
-                            do fi = l1, u1
-                                ck = 0
-                                if (d3) ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                                cj = 0
-                                if (d2) cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                                ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                                pb_t(fi, fj, fk, q, ib_) = pb_c(ci, cj, ck, q, ib_)
-                                mv_t(fi, fj, fk, q, ib_) = mv_c(ci, cj, ck, q, ib_)
-                            end do
-                        end do
+            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
+            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
+        end do
+        stot = soff(ns) + scnt(ns)
+        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, fj, &
+                            & fk, ci, cj, ck]')
+        do ib_ = 1, nb
+            do q = 1, nnode
+                do g = 0, stot - 1
+                    s = 1
+                    do ss = 2, ns
+                        if (g >= soff(ss)) s = ss
                     end do
+                    r = g - soff(s)
+                    n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
+                    fi = sb1(s) + mod(r, n1)
+                    fj = sb2(s) + mod(r/n1, n2)
+                    fk = sb3(s) + r/(n1*n2)
+                    ck = 0
+                    if (d3) ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                    cj = 0
+                    if (d2) cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                    ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                    pb_t(fi, fj, fk, q, ib_) = pb_c(ci, cj, ck, q, ib_)
+                    mv_t(fi, fj, fk, q, ib_) = mv_c(ci, cj, ck, q, ib_)
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_fill_fine_ghosts_pbmv
 
@@ -3627,24 +3637,35 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_tgt
         real(wp), intent(in)                                   :: th
         integer                                                :: i, fi, fj, fk, s, ns, l1, u1, l2, u2, l3, u3
+        integer                                                :: ss, g, r, n1, n2, stot
+        integer, dimension(6)                                  :: soff, scnt
         integer, dimension(6)                                  :: sb1, se1, sb2, se2, sb3, se3
 
         call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
+        ! flat index over the concatenated DISJOINT slabs - one kernel instead of ns; see s_amr_fill_fine_ghosts
+        soff(1) = 0
         do s = 1, ns
-            l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do fk = l3, u3
-                    do fj = l2, u2
-                        do fi = l1, u1
-                            q_tgt(i)%sf(fi, fj, fk) = (1._wp - th)*real(q_a(i)%sf(fi, fj, fk), wp) + th*real(q_b(i)%sf(fi, fj, &
-                                  & fk), wp)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
+            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
         end do
+        stot = soff(ns) + scnt(ns)
+        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', &
+                            & private='[s, ss, r, n1, n2, fi, fj, fk]')
+        do i = 1, sys_size
+            do g = 0, stot - 1
+                s = 1
+                do ss = 2, ns
+                    if (g >= soff(ss)) s = ss
+                end do
+                r = g - soff(s)
+                n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
+                fi = sb1(s) + mod(r, n1)
+                fj = sb2(s) + mod(r/n1, n2)
+                fk = sb3(s) + r/(n1*n2)
+                q_tgt(i)%sf(fi, fj, fk) = (1._wp - th)*real(q_a(i)%sf(fi, fj, fk), wp) + th*real(q_b(i)%sf(fi, fj, fk), wp)
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_lerp_fine_ghosts
 
@@ -3659,29 +3680,37 @@ contains
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pga, mga, pgb, mgb
         real(wp), intent(in)  :: th
-        integer               :: fi, fj, fk, q, ib_, s, ns, l1, u1, l2, u2, l3, u3
-        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3
+        integer               :: fi, fj, fk, q, ib_, s, ns, l1, u1, l2, u2, l3, u3, ss, g, r, n1, n2, stot
+        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
 
         call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
+        ! flat index over the concatenated DISJOINT slabs - one kernel instead of ns; see s_amr_fill_fine_ghosts
+        soff(1) = 0
         do s = 1, ns
-            l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do ib_ = 1, nb
-                do q = 1, nnode
-                    do fk = l3, u3
-                        do fj = l2, u2
-                            do fi = l1, u1
-                                pb_t(fi, fj, fk, q, ib_) = (1._wp - th)*real(pga(fi, fj, fk, q, ib_), wp) + th*real(pgb(fi, fj, &
-                                     & fk, q, ib_), wp)
-                                mv_t(fi, fj, fk, q, ib_) = (1._wp - th)*real(mga(fi, fj, fk, q, ib_), wp) + th*real(mgb(fi, fj, &
-                                     & fk, q, ib_), wp)
-                            end do
-                        end do
+            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
+            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
+        end do
+        stot = soff(ns) + scnt(ns)
+        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', &
+                            & private='[s, ss, r, n1, n2, fi, fj, fk]')
+        do ib_ = 1, nb
+            do q = 1, nnode
+                do g = 0, stot - 1
+                    s = 1
+                    do ss = 2, ns
+                        if (g >= soff(ss)) s = ss
                     end do
+                    r = g - soff(s)
+                    n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
+                    fi = sb1(s) + mod(r, n1)
+                    fj = sb2(s) + mod(r/n1, n2)
+                    fk = sb3(s) + r/(n1*n2)
+                    pb_t(fi, fj, fk, q, ib_) = (1._wp - th)*real(pga(fi, fj, fk, q, ib_), wp) + th*real(pgb(fi, fj, fk, q, ib_), wp)
+                    mv_t(fi, fj, fk, q, ib_) = (1._wp - th)*real(mga(fi, fj, fk, q, ib_), wp) + th*real(mgb(fi, fj, fk, q, ib_), wp)
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_lerp_fine_ghosts_pbmv
 
