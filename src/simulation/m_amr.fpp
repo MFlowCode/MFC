@@ -3555,62 +3555,66 @@ contains
         ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (shared limiter switch over all
         ! fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
         if (multi) then
-            do s = 1, ns
-                l1 = sb1(s); u1 = se1(s); l2 = sb2(s); u2 = se2(s); l3 = sb3(s); u3 = se3(s)
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
-                do fk = l3, u3
-                    do fj = l2, u2
-                        do fi = l1, u1
-                            ck = 0; xiz = 0._wp
-                            if (d3) then
-                                ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                                xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                            end if
-                            cj = 0; xiy = 0._wp
-                            if (d2) then
-                                cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                                xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                            end if
-                            ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                            xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                            shx = .true.; shy = d2; shz = d3
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = advb, adve
-                                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                                if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
-                                    & wp)) <= 0._wp) shx = .false.
-                                if (d2) then
-                                    if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, &
-                                        & ck), wp)) <= 0._wp) shy = .false.
-                                end if
-                                if (d3) then
-                                    if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, &
-                                        & ck - 1), wp)) <= 0._wp) shz = .false.
-                                end if
-                            end do
-                            asum = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = advb, adve - 1
-                                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                                sx = 0._wp
-                                if (shx) sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, &
-                                    & u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
-                                sy = 0._wp
-                                if (shy) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
-                                    & cj - 1, ck), wp))
-                                sz = 0._wp
-                                if (shz) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, &
-                                    & cj, ck - 1), wp))
-                                av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
-                                q_fine(i)%sf(fi, fj, fk) = av
-                                asum = asum + av
-                            end do
-                            q_fine(adve)%sf(fi, fj, fk) = 1._wp - asum
-                        end do
-                    end do
+            ! same flat-index fusion as the prolongation loop above, over the same disjoint slabs
+            $:GPU_PARALLEL_LOOP(copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, fj, fk, i, &
+                                & ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
+            do g = 0, stot - 1
+                s = 1
+                do ss = 2, ns
+                    if (g >= soff(ss)) s = ss
                 end do
-                $:END_GPU_PARALLEL_LOOP()
+                r = g - soff(s)
+                n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
+                fi = sb1(s) + mod(r, n1)
+                fj = sb2(s) + mod(r/n1, n2)
+                fk = sb3(s) + r/(n1*n2)
+                ck = 0; xiz = 0._wp
+                if (d3) then
+                    ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                    xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                end if
+                cj = 0; xiy = 0._wp
+                if (d2) then
+                    cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                    xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                end if
+                ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                shx = .true.; shy = d2; shz = d3
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = advb, adve
+                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                    if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
+                        & wp)) <= 0._wp) shx = .false.
+                    if (d2) then
+                        if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
+                            & wp)) <= 0._wp) shy = .false.
+                    end if
+                    if (d3) then
+                        if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
+                            & wp)) <= 0._wp) shz = .false.
+                    end if
+                end do
+                asum = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = advb, adve - 1
+                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                    sx = 0._wp
+                    if (shx) sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
+                        & wp))
+                    sy = 0._wp
+                    if (shy) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
+                        & wp))
+                    sz = 0._wp
+                    if (shz) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
+                        & wp))
+                    av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
+                    q_fine(i)%sf(fi, fj, fk) = av
+                    asum = asum + av
+                end do
+                q_fine(adve)%sf(fi, fj, fk) = 1._wp - asum
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_amr_fill_fine_ghosts
