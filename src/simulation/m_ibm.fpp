@@ -144,7 +144,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         integer :: i, j, k, l, q, r                                          !< Iterator variables
         integer :: patch_id, patch_id_temp                                   !< Patch ID of ghost point
         real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables

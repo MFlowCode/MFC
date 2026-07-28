@@ -550,11 +550,10 @@ contains
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
-                if (qbmm .and. .not. polytropic) then
-                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-                else
-                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-                end if
+                ! pb_ts/mv_ts are always allocated (zero-sized when unused), so pass
+                ! them unconditionally: an absent optional array reaches the OpenACC
+                ! data environment as a null dope vector, which CCE 21 dereferences.
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
