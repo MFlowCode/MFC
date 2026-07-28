@@ -4563,6 +4563,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "np=2", {}, ppn=2))
         stack.pop()
 
+        # NP1/NP2-MULTILEVEL: coexist with a nested level-2 block. s_amr_build_static_multilevel derives the level-2 box by
+        # insetting its PARENT, and it read slot 1 - which under coexist is the first level-0 TILE, not the level-1 block. That
+        # put the box in the wrong place and sized it off the tile: with l0_ntile = 1 (a tile spanning the base grid) it tripped
+        # the amr_maxc_fit cap, and with l0_ntile = 2 it produced a plausible box that silently corrupted the run. These pin the
+        # f_l0_slot(1) parent lookup at both rank counts.
+        stack.push(
+            "AMR + L0 tiles -> 2D -> coexist multi-level",
+            {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16, "run_time_info": "F", "l0_ntile": 2},
+        )
+        cases.append(define_case_d(stack, "np=1", {}, ppn=1))
+        cases.append(define_case_d(stack, "np=2", {}, ppn=2))
+        stack.pop()
+
         # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
         # ADJACENT same-level sub-blocks across the x rank seam (one per rank) - but amr_subcycle=T. The subcycle
         # advances every level-1 block stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo interposed
