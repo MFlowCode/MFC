@@ -3831,6 +3831,46 @@ contains
 
     end subroutine s_amr_fine_slice
 
+    !> Same-rank seam exchange for ONE pair, both directions in ONE device kernel: xb's high near-seam interior -> yb's low seam
+    !! ghost, and yb's low interior -> xb's high ghost. Replaces the four s_amr_fine_slice calls the local branch used to make -
+    !! that path routed a purely LOCAL copy through amr_seambuf_*, a buffer that exists only to cross MPI, costing four kernels and
+    !! four blocking device<->host round trips per pair per stage. Byte-identical to it: the same cells in the same order, and its
+    !! wp buffer only widened and re-narrowed the stp values. Fusing the two directions is safe because all four slabs are disjoint
+    !! - a block's seam GHOST lies outside its own interior, and the two reads are from different slots than the two writes - so
+    !! neither direction can observe the other's store. Batching further, across PAIRS, is NOT possible without a flat per-slot
+    !! backing array: each slot's q_cons(i)%sf is an independent allocation and amr_slots is not GPU_DECLARE'd, so a runtime slot
+    !! index inside a kernel is a null deref (see s_amr_fine_slice). A pair has only two slots, which is why they can be dummies
+    !! here. Index order matches s_amr_fine_slice.
+    impure subroutine s_amr_fine_seam_exchange(q_x, q_y, d, xhi, ndep, fm)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_x, q_y  ! dummies so the kernel reads the mapped %sf
+        integer, intent(in)                                    :: d, xhi, ndep, fm(3)
+        integer                                                :: i, a, b, t, na, nb
+
+        #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+            #:set XI = {1: '(xhi - ndep + 1 + t, a, b)', 2: '(a, xhi - ndep + 1 + t, b)', 3: '(a, b, xhi - ndep + 1 + t)'}[D]
+            #:set YG = {1: '(-ndep + t, a, b)', 2: '(a, -ndep + t, b)', 3: '(a, b, -ndep + t)'}[D]
+            #:set YI = {1: '(t, a, b)', 2: '(a, t, b)', 3: '(a, b, t)'}[D]
+            #:set XG = {1: '(xhi + 1 + t, a, b)', 2: '(a, xhi + 1 + t, b)', 3: '(a, b, xhi + 1 + t)'}[D]
+            if (d == ${D}$) then
+                na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1  ! scalars, not fm(..), inside the kernel - see s_amr_fine_slice
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do t = 0, ndep - 1
+                        do b = 0, nb - 1
+                            do a = 0, na - 1
+                                q_y(i)%sf${YG}$ = q_x(i)%sf${XI}$
+                                q_x(i)%sf${XG}$ = q_y(i)%sf${YI}$
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_amr_fine_seam_exchange
+
     !> Seam dimension of the ordered pair (xb, yb): the dim d in which yb is the immediate high-face neighbour of xb at matched
     !! resolution (same level), or 0 if not a same-level fine-fine seam. Face adjacency requires transverse overlap, so a pair is
     !! adjacent in at most one dim; the last-true assignment reproduces the original inline scan in s_amr_fine_fine_halo.
@@ -3961,13 +4001,8 @@ contains
             if (d /= 2 .and. n_glb > 0) tsz = tsz*(xm(2) + 1)
             if (d /= 3 .and. p_glb > 0) tsz = tsz*(xm(3) + 1)
             cnt = sys_size*buff_size*tsz
-            if (rX == rY) then  ! same rank owns both: pack each near-seam interior, unpack into the other's seam ghost
-                ! xb high interior
-                call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
-                call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)  ! yb low interior
-                call s_amr_fine_slice(yb, amr_slots(yb)%q_cons, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)  ! -> yb low ghost
-                ! -> xb high ghost
-                call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) + 1, xm(d) + buff_size, amr_seambuf_y(1:cnt), -1)
+            if (rX == rY) then  ! same rank owns both: exchange both directions in ONE device kernel, no host buffer
+                call s_amr_fine_seam_exchange(amr_slots(xb)%q_cons, amr_slots(yb)%q_cons, d, xm(d), buff_size, xm)
             else if (proc_rank == rX) then
                 ! send xb high interior
                 call s_amr_fine_slice(xb, amr_slots(xb)%q_cons, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
