@@ -59,14 +59,9 @@ contains
         @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
-        ! Coexist (l0_ntile > 0 .and. amr) gates, one per unimplemented feature. Split from a single combined PROHIBIT so each
-        ! lifts independently and names the failure it prevents; each was measured with the gate disabled (2D 64x32, np=2, AMD
-        ! OMP offload) against the l0_ntile = 0 arm of the same case, which passes in all three modes.
-        @:PROHIBIT(l0_ntile > 0 .and. amr .and. amr_subcycle, &
-                   & "amr_subcycle is not implemented with l0_ntile > 0: the subcycled fine advance applies its Berger-Colella " &
-                   & // "correction as a STATE reflux into the L0 field (s_amr_apply_reflux_state) and nothing routes it to the " &
-                   & // "tile compute-owners, unlike the lock-step rhs reflux (s_l0_add_reflux_to_tiles) - the tiles keep " &
-                   & // "uncorrected state and the run NaNs")
+        ! Last remaining coexist (l0_ntile > 0 .and. amr) gate. Dynamic regrid and amr_subcycle both lifted once measured against
+        ! the l0_ntile = 0 arm of the same case (2D 64x32, AMD OMP offload); this one is a scratch-capacity limit, not a coupling
+        ! gap, so it cannot be lifted without the per-block working set.
         @:PROHIBIT(l0_ntile > 0 .and. amr .and. amr_max_level > 1, &
                    & "multi-level (amr_max_level > 1) is not implemented with l0_ntile > 0: the nested level-2 block does not " &
                    & // "fit the per-rank scratch cap (amr_maxc), which exists because the fine advance borrows the base " &

@@ -4550,6 +4550,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # NP1/NP2-SUBCYCLE: coexist with amr_subcycle. The subcycled fine advance time-lerps its C/F ghosts between the coarse
+        # t^n and t^{n+1} states in the L0 frame, neither of which coexist used to maintain - q_cons_ts(stor) is written only by
+        # the monolithic RK that l0_ntile > 0 skips, and L0 is refreshed only at stage tops - and its Berger-Colella correction
+        # lands as a STATE reflux on the cells just OUTSIDE each block, which the covered-footprint copy-back does not carry.
+        # These pin the L0-frame brackets and the whole-interior round-trip that deliver all three.
+        stack.push(
+            "AMR + L0 tiles -> 2D -> coexist subcycle",
+            {**amr_2d_base, "amr_regrid_int": 0, "amr_subcycle": "T", "amr_max_blocks": 16, "run_time_info": "F", "l0_ntile": 2},
+        )
+        cases.append(define_case_d(stack, "np=1", {}, ppn=1))
+        cases.append(define_case_d(stack, "np=2", {}, ppn=2))
+        stack.pop()
+
         # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
         # ADJACENT same-level sub-blocks across the x rank seam (one per rank) - but amr_subcycle=T. The subcycle
         # advances every level-1 block stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo interposed
