@@ -26,7 +26,20 @@
             #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer) '
             #:elif MFC_COMPILER == CCE_COMPILER_ID
-                #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer) '
+                #! Emit no defaultmap at all on CCE. MEASURED on 21.0.2: the presence of
+                #! ANY defaultmap clause makes a resident (declare target + enter data)
+                #! array read as ZERO inside the target region. A 60-line reproducer with
+                #! a pointer component, an allocatable component and a bare module array
+                #! reads all three correctly with a bare directive and gets 0 from all
+                #! three with defaultmap added -- and each of tofrom:aggregate,
+                #! present:allocatable and present:pointer reproduces it on its own.
+                #! This is what made every IBM case fail under -homp: ib_markers read as
+                #! empty, so the ghost-point count came back 0.
+                #! Related: present:aggregate was tried and reverted earlier. It aborts
+                #! with "find_in_present_table failed for 'length(:)'" at
+                #! m_ib_patches.fpp:145 -- a genuine second residency bug that the tofrom
+                #! default had been masking, worth fixing separately.
+                #:set default_val = ''
             #:elif MFC_COMPILER == AMD_COMPILER_ID
                 #:set default_val = ''
             #:else
@@ -179,7 +192,12 @@
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
     #:elif MFC_COMPILER == CCE_COMPILER_ID
-        #:set omp_start_directive = '!$omp target teams distribute parallel do defaultmap(firstprivate:scalar) '
+        #! No defaultmap(firstprivate:scalar) here: it only restates the OpenMP 5.0
+        #! default for scalars in a target region, and CCE 21 lets it override an
+        #! explicit map(to:) on a scalar. A scalar that is atomically incremented to
+        #! hand out array slots then becomes per-thread, so every thread gets the
+        #! same index -- this broke every immersed-boundary case under -homp.
+        #:set omp_start_directive = '!$omp target teams distribute parallel do '
     #:elif MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams distribute parallel do '
     #:else
