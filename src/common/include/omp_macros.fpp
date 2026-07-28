@@ -26,7 +26,10 @@
             #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer) '
             #:elif MFC_COMPILER == CCE_COMPILER_ID
-                #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer) '
+                #! CCE 21: ANY defaultmap clause makes an already-resident array read as
+                #! zero inside the target region, so a resident array silently appears
+                #! empty. Emit nothing, as is already done for AMD above.
+                #:set default_val = ''
             #:elif MFC_COMPILER == AMD_COMPILER_ID
                 #:set default_val = ''
             #:else
@@ -179,7 +182,9 @@
     #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
     #:elif MFC_COMPILER == CCE_COMPILER_ID
-        #:set omp_start_directive = '!$omp target teams distribute parallel do defaultmap(firstprivate:scalar) '
+        #! CCE 21: defaultmap(firstprivate:scalar) overrides an explicit map(to:) on a
+        #! scalar, so an atomic-updated counter reads back its initial value.
+        #:set omp_start_directive = '!$omp target teams distribute parallel do '
     #:elif MFC_COMPILER == AMD_COMPILER_ID
         #:set omp_start_directive = '!$omp target teams distribute parallel do '
     #:else
