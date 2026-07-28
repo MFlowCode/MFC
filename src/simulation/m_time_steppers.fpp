@@ -557,7 +557,7 @@ contains
                     call s_amr_fine_stage_fill(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 end do
                 ! Phase 2 - block-to-block fine-fine halo: overwrite adjacent-sub-block seam ghosts with neighbour fine interior.
-                call s_amr_fine_fine_halo()
+                call s_amr_fine_fine_halo(0)  ! all levels: the lock-step driver advances every level together
                 ! Phase 3 - ADVANCE every block (RHS + RK update). Runs with the block's grid globals swapped in.
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
