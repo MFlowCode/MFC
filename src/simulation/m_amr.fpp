@@ -2208,9 +2208,12 @@ contains
         end if
         ! persistent L2 block: KEEP the level-2 block in the active set (amr_num_blocks = L2, amr_num_levels = 2) so the advance
         ! driver steps it across timesteps; no free/revert.
-        ! restore amr_cg + the patch frame (amr_cpat_off) to block 1: the L2 gather above overwrote them with the parent-fine frame,
-        ! and the normal single-block conservation check that follows reads block 1's frame.
-        call s_amr_select_slot(1)
+        ! restore amr_cg + the patch frame (amr_cpat_off) to the first FINE block: the L2 gather above overwrote them with the
+        ! parent-fine frame, and the normal single-block conservation check that follows reads that block's frame. f_l0_slot(1),
+        ! not slot 1 - under coexist slot 1 is a level-0 TILE, and selecting it here left the grid globals describing tile
+        ! geometry for the rest of init, so s_initialize_weno_module (m_start_up, called after this) sized its device-mapped
+        ! coefficient tables off the wrong bounds and faulted in __tgt_target_data_begin_mapper.
+        call s_amr_select_slot(f_l0_slot(1))
         call s_amr_gather_coarse_patch(q_cons_base, .false.)
 
     end subroutine s_amr_build_static_multilevel
