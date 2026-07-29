@@ -49,7 +49,7 @@ pifx-cpu MPICC=mpiicc MPICXX=mpiicpc MPIFC=mpiifort
 pifx-cpu I_MPI_CC=icx I_MPI_CXX=icpx I_MPI_F90=ifx I_MPI_F77=ifx
 
 f     OLCF Frontier
-f-all cpe/26.03 cce/21.0.2 rocm/7.2.0
+f-all cpe/26.03 cce/21.0.2 rocm/7.0.2
 f-all cray-fftw cray-hdf5 python cmake
 f-gpu python craype-accel-amd-gfx90a
 f-gpu CRAY_CCE_LLD_ARGS="-plugin-opt=-mattr=-mai-insts -plugin-opt=-disable-promote-alloca-to-vector -plugin-opt=-enable-load-in-loop-pre=false"
@@ -58,10 +58,10 @@ famd    OLCF Frontier AMD
 famd-all python cmake
 famd-all cpe/25.09
 famd-all PrgEnv-amd
-famd-all amd/7.2.0 rocm/7.2.0
+famd-all amd/7.2.0 rocm/7.0.2
 
 amdfund    AMD HPCFund
-amdfund-all gnu12 openmpi4/4.1.8 cmake rocm/7.2.0
+amdfund-all gnu12 openmpi4/4.1.8 cmake rocm/7.0.2
 
 tuo     OLCF Tuolumne
 tuo-all cpe/25.03 rocm/6.3.1
