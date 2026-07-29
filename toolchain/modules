@@ -58,10 +58,10 @@ famd    OLCF Frontier AMD
 famd-all python cmake
 famd-all cpe/25.09
 famd-all PrgEnv-amd
-famd-all amd/7.2.0 rocm/7.0.2
+famd-all amd/7.2.0 rocm/7.2.0
 
 amdfund    AMD HPCFund
-amdfund-all gnu12 openmpi4/4.1.8 cmake rocm/7.0.2
+amdfund-all gnu12 openmpi4/4.1.8 cmake rocm/7.2.0
 
 tuo     OLCF Tuolumne
 tuo-all cpe/25.03 rocm/6.3.1
