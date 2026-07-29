@@ -286,7 +286,10 @@ PHYSICS_DOCS = {
             "incompatible with cfl_dt. "
             "Under MPI the patch may span ranks (each rank holds the fine cells covering its "
             "own subdomain) but may cover at most about half of any rank's subdomain per "
-            "dimension."
+            "dimension. amr_max_grid_size caps a block at an absolute number of coarse cells "
+            "per dimension (0, the default, derives the cap from the decomposition instead). "
+            "Setting it makes the box set identical at every rank count, at the cost of "
+            "aborting if the cap exceeds half a subdomain."
         ),
     },
     # Acoustic Sources
@@ -1431,11 +1434,20 @@ class CaseValidator:
         amr_tag_eps = self.get("amr_tag_eps")
         amr_buf = self.get("amr_buf")
         amr_max_blocks = self.get("amr_max_blocks")
+        amr_max_grid_size = self.get("amr_max_grid_size")
         amr_cluster_eff = self.get("amr_cluster_eff")
         amr_max_level = self.get("amr_max_level")
         amr_ref_ratio = self.get("amr_ref_ratio")
 
         self.prohibit(amr_max_blocks is not None and amr_max_blocks < 1, "amr_max_blocks must be >= 1")
+        self.prohibit(
+            amr_max_grid_size is not None and amr_max_grid_size < 0,
+            "amr_max_grid_size must be >= 0 (0 derives the block size cap from the decomposition)",
+        )
+        self.prohibit(
+            amr_max_grid_size is not None and 0 < amr_max_grid_size < 2,
+            "amr_max_grid_size must be >= 2 coarse cells when set (a block must admit a refinement stencil)",
+        )
         self.prohibit(amr_max_level is not None and amr_max_level < 1, "amr_max_level must be >= 1")
         self.prohibit(
             amr_max_level is not None and amr_max_level > 1 and amr_max_blocks is not None and amr_max_blocks < 2,
