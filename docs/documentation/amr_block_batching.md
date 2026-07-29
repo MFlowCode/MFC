@@ -101,21 +101,52 @@ contradicting it: transfers are not independently expensive, they are the mechan
 launch count costs time. Cutting `s_compute_rhs` calls cuts launches and their copy traffic
 together.
 
-### Regrid is a separate, comparable cost
+### Regrid is 7-10% of runtime, not half
 
-Batching addresses the block advance only. Holding everything else fixed and varying
-`amr_regrid_int` (2048x1024, 20 steps):
+An earlier revision of this note inferred "regrid costs about half the runtime, roughly one
+time step per regrid" from an A/B on `amr_regrid_int` (0.2974 s -> 0.1525 s per step at np=4
+going from every-2-steps to every-10). **That inference is wrong and is retracted.** Varying
+`amr_regrid_int` does not hold the block set fixed: regridding less often leaves staler,
+generally smaller boxes, so the A/B prices the blocks a regrid *produces* together with the
+regrid itself. Per-phase `system_clock` instrumentation inside `s_amr_regrid` measures the
+cost directly (2048x1024, 20 steps, `amr_regrid_int=2`, so 10 regrid calls):
 
-| `amr_regrid_int` | np=4 | np=8 |
-|---|---|---|
-| 2 | 0.2974 s | 0.3720 s |
-| 10 | 0.1525 s | 0.1722 s |
+| | np=1 | np=4 | np=8 |
+|---|---|---|---|
+| full rebuilds / early-outs | 2 / 8 | 2 / 8 | 2 / 8 |
+| total regrid time | 0.955 s | 0.459 s | 0.602 s |
+| total run time | 13.0 s | 5.8 s | 6.2 s |
+| **regrid share of runtime** | **7.3%** | **7.9%** | **9.7%** |
 
-Regridding every 2 steps instead of every 10 nearly doubles per-step cost — roughly 0.37 s
-per regrid, about the cost of a whole time step. At `amr_regrid_int=2` regrid is therefore
-comparable in magnitude to the entire block-advance cost this note targets, and no increment
-here touches it. The np=8 turnover survives both settings, so it is not purely a
-regrid-collective effect.
+Most regrid calls are cheap: 8 of 10 find the box set unchanged and return after tagging
+(~0.028 s at np=1, ~0.007 s at np=8), so only the two full rebuilds cost anything. Regrid is
+therefore **not** comparable to the block advance, and the packed super-grid remains the
+dominant lever rather than one of two equal halves.
+
+Where a full rebuild's time actually goes differs with rank count:
+
+- **np=1** is the host round trip of fine block state: pulling each old block to the host and
+  bouncing it through `q_cons_stor` (0.159 s), the host-side `s_interpolate_coarse_to_fine`
+  (0.042-0.091 s) and overlap copy (0.066 s), and pushing the new state back (0.043-0.146 s).
+  All of it is serial host work on data that is already resident on the device.
+- **np>=4** is dominated by *per-box synchronization*, not by any collective's own cost. The
+  per-box `MPI_ALLREDUCE` at the end of `s_set_amr_fine_geometry` measures 7.4 ms (np=4) to
+  13 ms (np=8) per call, ~700x a real one-integer allreduce — because it is absorbing the
+  spread in the owner-only `s_amr_alloc_slot` work that precedes it. Inserting an
+  `MPI_BARRIER` at the top of the rebuild loop collapses that phase from 0.089 s to 0.0011 s
+  (np=4) and 0.119 s to 0.0001 s (np=8), with the barrier picking up the difference.
+  **Batching those allreduces into one would therefore buy nothing**; the rebuild loop would
+  have to stop synchronizing per box at all.
+
+### The box set is not rank-invariant
+
+Same case, same steps, varying only rank count: the regrid produces 14 boxes at np=1, 2, and
+4, but **21 at np=8**. `amr_maxc_fit` is the min over ranks of the local half-extent, so more
+ranks shrink the cap until boxes that fit at np<=4 must be tiled. Total boxes rise 50% while
+per-rank boxes fall only 25% (3.5 -> 2.6), and every per-box collective in the rebuild loop
+runs over *all* boxes on *all* ranks. This is a concrete, previously unattributed mechanism
+for the np=8 turnover, and it ties that turnover to the same base-subdomain scratch cap the
+packed super-grid has to address — not to MPI collective volume.
 
 ## What this rules out
 
