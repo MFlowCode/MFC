@@ -127,11 +127,12 @@ contains
         end if
 
         do i = 1, q_beta_idx
-            @:ALLOCATE(q_beta(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(q_beta(i)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             @:ACC_SETUP_SFs(q_beta(i))
             if (lag_params%kahan_summation) then
-                @:ALLOCATE(kahan_comp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(kahan_comp(i)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                           & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 @:ACC_SETUP_SFs(kahan_comp(i))
             end if
         end do
