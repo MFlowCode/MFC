@@ -69,6 +69,54 @@ per-block cost IS the launch count. Note each tile advance issues ~450 launches 
 monolithic step's 381 — the per-block path adds its own ghost fills and halo work on top of
 the same RHS kernel sequence.
 
+### Where the launches go, and what rides on them
+
+Repeated at 2048x1024 with dynamic regrid (6 steps, np=1), tracing memory copies as well —
+note `--kernel-trace` **alone leaves the copy table empty**, so pass `--memory-copy-trace`
+too or the transfers below are invisible:
+
+| | uniform | AMR | ratio |
+|---|---|---|---|
+| kernel launches | 381 | 4619 | 12.1x |
+| device-to-device copies | 7,094 | 88,667 | 12.5x |
+| kernel busy time | 297 ms | 601 ms | 2.0x |
+| wall span | 716 ms | 4264 ms | **10.9x** |
+
+Wall time tracks launches (12.1x vs 10.9x), not kernel work (2.0x): about 86% of the AMR span
+is GPU idle between kernels. Splitting AMR's launches by whether the kernel also appears in
+the uniform run:
+
+- **shared-solver kernels** — the per-block `s_compute_rhs` re-invocation — **3165 launches,
+  565 ms: 69% of launches and 94% of kernel time**;
+- AMR-only kernels (ghost fills, seam halo, RK update, flux capture, reflux): 1454 launches
+  but only 36 ms, **6%** of kernel time.
+
+So further fusion of the AMR-side kernels is worth much less than its launch share suggests.
+The lever is reducing `s_compute_rhs` invocations.
+
+The ~89k copies are **not** a separable AMR inefficiency: normalised per launch they are 18.6
+(uniform) and 19.2 (AMR) — kernel-argument marshalling that the uniform solver pays too.
+There is nothing to batch there. This reconciles the refuted hoist below rather than
+contradicting it: transfers are not independently expensive, they are the mechanism by which
+launch count costs time. Cutting `s_compute_rhs` calls cuts launches and their copy traffic
+together.
+
+### Regrid is a separate, comparable cost
+
+Batching addresses the block advance only. Holding everything else fixed and varying
+`amr_regrid_int` (2048x1024, 20 steps):
+
+| `amr_regrid_int` | np=4 | np=8 |
+|---|---|---|
+| 2 | 0.2974 s | 0.3720 s |
+| 10 | 0.1525 s | 0.1722 s |
+
+Regridding every 2 steps instead of every 10 nearly doubles per-step cost — roughly 0.37 s
+per regrid, about the cost of a whole time step. At `amr_regrid_int=2` regrid is therefore
+comparable in magnitude to the entire block-advance cost this note targets, and no increment
+here touches it. The np=8 turnover survives both settings, so it is not purely a
+regrid-collective effect.
+
 ## What this rules out
 
 @ref amr says "per-slot state instead of the global swap" is the lever. That is necessary but
@@ -96,10 +144,15 @@ QBMM side-state). What is still global, and must be indexed by block for a batch
 | Solver geometry (the SWAP CONTRACT) | `m/n/p`, `idwint`, `idwbuff`, nine coordinate arrays, `acoustic_source`, `ab_active` |
 | Derived per-grid tables | WENO coefficients (`poly_coef_*`, `d_cb*`, `beta_coef_*`), hypoelastic FD coefficients, IGR `jac`/`jac_old` (bounced via `sw_jac`) |
 | Scratch justified by sequential advance | `amr_cg` + `amr_cpat_off/hi`, `amr_rvw`, `amr_rhs_pb_f`/`amr_rhs_mv_f` (the last is explicitly commented "shared across slots (slots advance sequentially)") |
-| RHS working set | 24 module allocatables across `m_weno` (16), `m_rhs` (5), `m_riemann_solvers` (2), `m_viscous` (1), sized to the base subdomain |
+| RHS working set | module allocatables across `m_weno`, `m_rhs` (including its `vector_field` set, which dominates), and `m_riemann_solvers`, all sized to the base subdomain. `m_viscous` holds no volumetric scratch and does not contribute. |
 
-The RHS working set being base-subdomain-sized is also why `amr_maxc` caps a block at about
-half the subdomain per dimension: the fine advance borrows the rank-local solver scratch.
+The RHS working set being base-subdomain-sized is also why a block is capped at about half the
+subdomain per dimension: the fine advance borrows the rank-local solver scratch. The enforced
+cap is `amr_maxc_fit` (min over ranks of the local half-extent), **not** `amr_maxc` — the
+latter is the global half and is read nowhere outside its own computation. For non-IB a box
+exceeding the cap is **tiled**, not rejected; that tiling is one of the ways the many-blocks
+regime this note addresses is produced. Only IB, which must own a body's block whole and
+un-tiled, aborts.
 
 ## Why this gates the other arcs
 
@@ -122,16 +175,42 @@ machine, 2D 256^2, static single-level AMR, 20 steps:
 | 4 | 0.0983 s (1.03x) | 0.1267 s (**0.80x**) |
 
 **AMR does not strong-scale, and wide blocks anti-scale.** Both cases hold exactly one fine
-block (a static block cannot exceed `amr_maxc`, so tiling never triggers), and single-owner
+block (a static block cannot exceed `amr_maxc_fit`, so tiling never triggers), and single-owner
 distribution puts all of its work on one rank whatever `np` is. The compact case is
 therefore flat: extra ranks only split the coarse grid, which is not the bottleneck. The
 wide case is worse than flat because the block spans more ranks' coarse subdomains, so each
 added rank buys more coarse<->fine P2P gather/scatter with no fine parallelism to offset it.
 
 Caveat: this measures the single-block regime. It does not test multi-block distribution —
-reaching several blocks needs dynamic regrid, since a static block is capped at `amr_maxc`.
-The multi-block curve is the one that should move when batching lands, and it still needs to
-be measured; the numbers above are the floor it has to beat.
+reaching several blocks needs dynamic regrid, since a static block is capped at
+`amr_maxc_fit`.
+
+### The multi-block curve
+
+Measured with dynamic regrid and many disjoint tag clusters, 2D 2048x1024, 20 steps, median
+of the solver's steady `Time/step` (**not** `Time Avg`, which is a running mean still
+carrying startup and therefore a function of run length):
+
+| np | AMR | speedup | uniform control | speedup |
+|---|---|---|---|---|
+| 1 | 0.6634 s | 1.00x | 0.0611 s | 1.00x |
+| 2 | 0.3971 s | 1.67x (84%) | 0.0509 s | 1.20x (60%) |
+| 4 | 0.2974 s | 2.23x (56%) | 0.0463 s | 1.32x (33%) |
+| 8 | 0.3720 s | 1.78x (22%) | 0.0427 s | 1.43x (18%) |
+
+This **supersedes the single-block conclusion above**: with several blocks to distribute, AMR
+does strong-scale, and scales better than the uniform control through np=4. It then turns
+over at np=8, a 25% regression the uniform arm does not show.
+
+The number batching must move is the np=1 column: **AMR costs 10.9x the uniform solver on the
+same grid**, and the ratio grows with problem size (5.7x at 256x128). That is the per-block
+serial advance.
+
+Two cautions for anyone repeating this. Run the **uniform control** arm — without it a rising
+AMR curve cannot be told apart from a problem too small to scale, and at 256x128 AMR appears
+to *anti*-scale (+65% from np=1 to np=8) purely because fixed per-step overhead dominates a
+32k-cell workload. And measure at a realistic size: the small case gives a qualitatively
+wrong answer.
 
 ## Swap topology (and what blocks the obvious optimization)
 
