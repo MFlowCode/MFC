@@ -42,12 +42,11 @@ module m_amr_regrid
 contains
 
     !> Abort on same-level seam topologies no halo reconciles (silent conservation leaks otherwise). Run whenever the block set
-    !! changes (regrid, restart); O(nblocks^2) on the replicated region metadata, identical on every rank. Three cases: (a)
-    !! adjacency WITHOUT the exact transverse match f_amr_seam requires - reachable only via IB body-bbox expansion (clustering
-    !! merges any too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair; (b) an exact seam pair at
-    !! level >= 2 under amr_subcycle, whose per-block child advance has no L2 halo (reachable via a restart mode-switch from a
-    !! lockstep layout; the subcycle regrid keeps one child per box); (c) same-level box INTERSECTION - reachable only via CHILD IB
-    !! body-bbox expansion, which unlike the L1 path has no overlap-merge pass - double-restricting/refluxing the shared cells.
+    !! changes (regrid, restart); O(nblocks^2) on the replicated region metadata, identical on every rank. Two cases: (a) adjacency
+    !! WITHOUT the exact transverse match f_amr_seam requires - reachable only via IB body-bbox expansion (clustering merges any
+    !! too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair; (b) same-level box INTERSECTION -
+    !! reachable only via CHILD IB body-bbox expansion, which unlike the L1 path has no overlap-merge pass -
+    !! double-restricting/refluxing the shared cells.
     impure subroutine s_amr_check_seam_topology()
 
         integer :: xb, yb, d, t
@@ -65,10 +64,6 @@ contains
                                      & // "produce this - it has no overlap-merge pass): the overlapping cells would be " &
                                      & // "restricted and refluxed twice, silently breaking conservation. Adjust the body/" &
                                      & // "regrid inputs so body-expanded child boxes merge or separate.")
-                end if
-                if (amr_subcycle .and. amr_block_level(xb) >= 2 .and. f_amr_seam_dim(xb, yb) > 0) then
-                    call s_mpi_abort("AMR: adjacent level-2+ blocks under amr_subcycle (e.g. a lockstep-written restart " &
-                                     & // "resumed with amr_subcycle = T): the per-block child advance has no L2 seam halo, so the " // "shared-face flux would silently leak. Resume with amr_subcycle = F (lockstep).")
                 end if
                 do d = 1, num_dims
                     ! relaxed adjacency: touching faces in dim d with ANY transverse overlap
@@ -1048,33 +1043,24 @@ contains
                                     if (p_glb > 0) then; clo(3) = max(clo(3), mlo(3)); chi(3) = min(chi(3), mhi(3)); end if
                                 end if
                                 ! slot cap: a level>=2 block's fine grid spans 4*(its L0 extent) cells while the slot holds
-                                ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. LOCK-STEP tiles a
-                                ! wider feature into adjacent <= amr_maxc_fit/2 sub-blocks (like the L1 tiling): the per-stage
-                                ! fine-fine halo (s_amr_fine_fine_halo, level-aware) matches the shared seam flux and the L2->L1
-                                ! reflux skips those fine-fine faces. SUBCYCLE advances level-2 children per-block
-                                ! (s_amr_advance_children) with no L2-L2 halo, so it keeps ONE capped child (adjacent tiles would
-                                ! leak at their seam - transposing that path is future work); a wide feature is under-refined rather
-                                ! than non-conservative.
-                                if (amr_subcycle) then
-                                    chi(1) = min(chi(1), clo(1) + amr_maxc_fit(1)/2 - 1)
-                                    if (n_glb > 0) chi(2) = min(chi(2), clo(2) + amr_maxc_fit(2)/2 - 1)
-                                    if (p_glb > 0) chi(3) = min(chi(3), clo(3) + amr_maxc_fit(3)/2 - 1)
-                                    nboxes = nboxes + 1
-                                    boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
-                                else
-                                    block
-                                        type(t_box) :: l2t(amr_max_blocks)
-                                        integer     :: nl2, cpd, it
-                                        nl2 = 0; cpd = 0
-                                        call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, amr_maxc_fit/2)
-                                        do it = 1, nl2
-                                            if (nboxes + 1 > amr_max_fine) exit
-                                            nboxes = nboxes + 1
-                                            boxes(nboxes)%lo = l2t(it)%lo; boxes(nboxes)%hi = l2t(it)%hi
-                                            box_level(nboxes) = lev
-                                        end do
-                                    end block
-                                end if
+                                ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. TILE a wider feature
+                                ! into adjacent <= amr_maxc_fit/2 sub-blocks (like the L1 tiling): the per-stage fine-fine halo
+                                ! (s_amr_fine_fine_halo, level-aware) matches the shared seam flux and the L2->L1 reflux skips those
+                                ! fine-fine faces. Subcycle used to keep ONE capped child instead - under-refining a wide feature -
+                                ! because s_amr_advance_children advanced children per-block with no L2-L2 halo; it now advances
+                                ! siblings transposed with the level-filtered halo interposed, so both drivers tile alike.
+                                block
+                                    type(t_box) :: l2t(amr_max_blocks)
+                                    integer     :: nl2, cpd, it
+                                    nl2 = 0; cpd = 0
+                                    call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, amr_maxc_fit/2)
+                                    do it = 1, nl2
+                                        if (nboxes + 1 > amr_max_fine) exit
+                                        nboxes = nboxes + 1
+                                        boxes(nboxes)%lo = l2t(it)%lo; boxes(nboxes)%hi = l2t(it)%hi
+                                        box_level(nboxes) = lev
+                                    end do
+                                end block
                             end do
                             if (allocated(cboxes)) deallocate (cboxes)
                         else
