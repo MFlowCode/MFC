@@ -557,6 +557,7 @@ contains
         amr_buf = 3
         amr_subcycle = .false.
         amr_max_blocks = 4
+        amr_max_grid_size = 0  ! 0 = derive the cap from the decomposition (rank-dependent, the historical behaviour)
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
         amr_ref_ratio = 2

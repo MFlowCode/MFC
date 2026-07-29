@@ -687,6 +687,7 @@ def _load():
     _r("amr_buf", INT)
     _r("amr_subcycle", LOG)
     _r("amr_max_blocks", INT)
+    _r("amr_max_grid_size", INT)
     _r("amr_max_level", INT)
     _r("amr_cluster_eff", REAL)
     _r("amr_ref_ratio", INT)
@@ -1413,6 +1414,7 @@ _nv(
     "amr_buf",
     "amr_subcycle",
     "amr_max_blocks",
+    "amr_max_grid_size",
     "amr_max_level",
     "amr_cluster_eff",
     "amr_ref_ratio",

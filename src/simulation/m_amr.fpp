@@ -349,12 +349,28 @@ contains
         if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/amr_ref_ratio
         if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/amr_ref_ratio
 
-        ! regrid size cap: min over ranks of the local half-extent (see the declaration; = amr_maxc at np=1), so any clamped box
-        ! satisfies every rank's scratch constraint and can move freely across ranks
+        ! regrid size cap. Default (amr_max_grid_size == 0): min over ranks of the local half-extent (= amr_maxc at np=1), so any
+        ! clamped box satisfies every rank's scratch constraint and can move freely across ranks. That cap SHRINKS as ranks are
+        ! added, which tiles a fixed feature into more and more blocks the further you scale - and per-block cost is ~fixed
+        ! regardless of block size, so the block count is what costs. It also makes the box set (and so the answer, within
+        ! tolerance) depend on the rank count. Setting amr_max_grid_size > 0 pins the cap to an absolute number of coarse cells
+        ! instead, exactly like AMReX's max_grid_size: the box set is then IDENTICAL at every rank count.
         amr_maxc_fit = amr_maxc
         do d = 1, num_dims
             call s_mpi_allreduce_integer_min((ext(d) + 1)/amr_ref_ratio, fit_d)
-            amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
+            if (amr_max_grid_size > 0) then
+                ! rank-independent cap. The fine advance still borrows this rank's solver scratch, so a block must fit it; the
+                ! scratch is sized to the local grid, hence the fit_d guard. Raising the cap past that needs the solver working
+                ! set sized to the cap rather than to the subdomain - a separate increment, so fail closed with the number.
+                if (amr_max_grid_size > fit_d) then
+                    call s_mpi_abort('amr_max_grid_size exceeds what a rank can hold: the fine advance borrows the ' &
+                                     & // 'rank-local solver scratch, so a block is limited to half a subdomain per ' &
+                                     & // 'dimension. Lower amr_max_grid_size or use fewer ranks.')
+                end if
+                amr_maxc_fit(d) = min(amr_maxc(d), amr_max_grid_size)
+            else
+                amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
+            end if
         end do
 
         ! preallocation cap for MY fine arrays: a block is owned WHOLE, so any rank must hold an entire block - but the
