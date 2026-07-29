@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import tempfile
@@ -461,19 +462,47 @@ def test_health_fails_immediately_when_map_predates_last_source_change():
 CHANGED_SCRIPT = Path(__file__).resolve().parents[3] / ".github" / "scripts" / "coverage_map_changed.py"
 
 
+def _env_without_git():
+    """The environment minus every GIT_* variable.
+
+    `git -C <dir>` changes directory but does NOT override an inherited GIT_DIR or
+    GIT_INDEX_FILE. Git exports both when it runs a hook, and MFC's pre-commit hook runs
+    precheck, which runs this suite -- so without this scrub the commits below are made
+    against the real repository instead of the throwaway one.
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _repo_with_committed_map(d, entries):
     """A throwaway git repo whose HEAD holds `entries` as the coverage map."""
     repo = Path(d)
+    env = _env_without_git()
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
-    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "init", "-q"], check=True, env=env)
     save_map(repo / "tests" / "coverage_map.json.gz", entries, n_tests=len(entries), git_sha="aaa", gfortran_version="13")
-    subprocess.run([*git, "add", "-A"], check=True)
-    subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "map"], check=True)
+    subprocess.run([*git, "add", "-A"], check=True, env=env)
+    subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "map"], check=True, env=env)
     return repo
 
 
 def _run_guard(repo):
-    return subprocess.run([sys.executable, str(CHANGED_SCRIPT)], cwd=repo, capture_output=True, text=True, check=False).returncode
+    return subprocess.run([sys.executable, str(CHANGED_SCRIPT)], cwd=repo, capture_output=True, text=True, check=False, env=_env_without_git()).returncode
+
+
+def test_throwaway_repos_are_isolated_from_an_inherited_git_dir():
+    """The helper above must not commit into whatever repo GIT_DIR names.
+
+    Precheck runs this suite from the pre-commit hook, where git exports GIT_DIR and
+    GIT_INDEX_FILE. Without the scrub, `git -C tmpdir commit` rewrites the developer's
+    checked-out branch -- silently, while every test still reports as passing.
+    """
+    with patch.dict(os.environ, {"GIT_DIR": "/nonexistent.git", "GIT_INDEX_FILE": "/nonexistent.index"}):
+        assert not [k for k in _env_without_git() if k.startswith("GIT_")]
+        with tempfile.TemporaryDirectory() as d:
+            repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
+            # The commit is in the throwaway repo, so it went nowhere near GIT_DIR.
+            log = subprocess.run(["git", "-C", str(repo), "log", "--oneline"], capture_output=True, text=True, check=True, env=_env_without_git())
+            assert log.stdout.strip().endswith("map")
 
 
 def test_guard_reports_unchanged_with_a_code_that_is_not_the_crash_code():
