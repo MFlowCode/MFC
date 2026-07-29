@@ -4336,6 +4336,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # WIDE L2: amr_buf = 12 (not a looser eps - the BUFFER is what widens the box) grows the level-2 region
+        # past amr_maxc_fit/2 = 16 coarse cells, so regrid TILES it into ADJACENT level-2 siblings. Subcycle used
+        # to clamp to one capped child instead, under-refining a wide feature, because s_amr_advance_children
+        # advanced children per-block with no L2-L2 seam halo. This is the ONLY golden where two adjacent level-2
+        # blocks subcycle together, so it is what protects the transposed sibling advance and the level-filtered
+        # halo. VERIFIED to fail without the change: restoring the clamp moves the answer (a6e3ad6d -> 5c9d3118).
+        cases.append(define_case_d(stack, "wide L2 tiles", {"amr_tag_eps": 0.01, "amr_buf": 12, "amr_max_blocks": 16}))
         stack.pop()
 
         # (l) multi-level at np=2: same STATIC 2-level hierarchy as (h) but run on TWO ranks. Multi-level was
