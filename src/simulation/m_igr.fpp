@@ -105,11 +105,13 @@ contains
         end if
 
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
-        @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        @:ALLOCATE(jac(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                   & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
 
         if (igr_iter_solver == 1) then  ! Jacobi iteration
-            @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(jac_old(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         end if
 #else
         ! create map
@@ -117,7 +119,8 @@ contains
         nv_uvm_temp_on_gpu(1:nv_uvm_igr_temps_on_gpu) = 1
 
         if (nv_uvm_temp_on_gpu(1) == 1) then
-            @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(jac(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             @:PREFER_GPU(jac)
         else
             allocate (jac_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
@@ -135,7 +138,8 @@ contains
 
         if (igr_iter_solver == 1) then  ! Jacobi iteration
             if (nv_uvm_temp_on_gpu(3) == 1) then
-                @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(jac_old(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                           & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 @:PREFER_GPU(jac_old)
             else
                 allocate (jac_old_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))

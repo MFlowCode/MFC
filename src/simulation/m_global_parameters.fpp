@@ -146,6 +146,13 @@ module m_global_parameters
     ! idwint are the same otherwise. Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
     $:GPU_DECLARE(create='[idwbuff]')
+    !> ALLOCATION bounds for the solver working set, as distinct from the RUNTIME bounds in idwbuff. The AMR fine advance points the
+    !! solver at a block (s_amr_swap_to_fine rewrites m/idwint/idwbuff), but the arrays stay as allocated - so every array the fine
+    !! advance touches must be sized to the LARGEST grid it will ever see, which is the coarse subdomain or a refined block,
+    !! whichever is bigger. Conflating the two is what forces the block size cap to shrink with rank count (see
+    !! @ref amr_block_batching and amr_max_grid_size). Equal to idwbuff unless amr_max_grid_size pins a cap larger than the
+    !! subdomain, so this is a no-op for every non-AMR run.
+    type(int_bounds_info) :: idwbuff_alloc(1:3)
 
     !> @name The number of fluids, along with their identifying indexes, respectively, for which viscous effects, e.g. the shear
     !! and/or the volume Reynolds (Re) numbers, will be non-negligible.
@@ -991,9 +998,20 @@ contains
                                            & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
+        ! Allocation bounds: the coarse subdomain, widened to hold a refined block when amr_max_grid_size pins one larger than it.
+        ! A pinned cap of C coarse cells is amr_ref_ratio*C - 1 fine cells plus the same ghost shell. Identical to idwbuff whenever
+        ! the cap is derived (amr_max_grid_size = 0) or fits the subdomain, which is every run today.
+        idwbuff_alloc = idwbuff
+        if (amr .and. amr_max_grid_size > 0) then
+            do i = 1, num_dims
+                idwbuff_alloc(i)%end = max(idwbuff(i)%end, amr_ref_ratio*amr_max_grid_size - 1 - idwbuff(i)%beg)
+            end do
+        end if
+
         ! Configuring Coordinate Direction Indexes
         if (bubbles_euler) then
-            @:ALLOCATE(ptil( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(ptil( idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         end if
 
         $:GPU_UPDATE(device='[fd_order, fd_number]')

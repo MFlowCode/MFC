@@ -52,7 +52,8 @@ contains
         $:GPU_UPDATE(device='[rs, vs]')
         $:GPU_UPDATE(device='[ps, ms]')
 
-        @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        @:ALLOCATE(divu%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                   & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         @:ACC_SETUP_SFs(divu)
 
         @:ALLOCATE(bub_adv_src(0:m, 0:n, 0:p))
