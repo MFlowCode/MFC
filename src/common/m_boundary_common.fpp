@@ -34,9 +34,14 @@ module m_boundary_common
 contains
 
     !> Allocate and set up boundary condition buffer arrays for all coordinate directions.
-    impure subroutine s_initialize_boundary_common_module()
+    impure subroutine s_initialize_boundary_common_module(use_dirichlet_buffers)
 
-        integer :: i, j, sys_size_alloc
+        integer                       :: i, j, sys_size_alloc
+        logical, intent(in), optional :: use_dirichlet_buffers
+
+        dirichlet_from_buffers = .false.
+        if (present(use_dirichlet_buffers)) dirichlet_from_buffers = use_dirichlet_buffers
+        $:GPU_UPDATE(device='[dirichlet_from_buffers]')
 
         @:ALLOCATE(bc_buffers(1:3, 1:2))
 
@@ -346,70 +351,68 @@ contains
 
     !> Populate the buffers of the grid variables, which are constituted of the cell-boundary locations and cell-width
     !! distributions, based on the boundary conditions.
-    subroutine s_populate_grid_variables_buffers
+    subroutine s_populate_grid_variables_buffers(x_cb_in, x_cc_in, dx_in, x_offset, y_offset, z_offset, y_cb_in, y_cc_in, dy_in, &
+        & z_cb_in, z_cc_in, dz_in, global_bounds)
 
-#ifdef MFC_SIMULATION
-        ! Simulation allocates the cell-boundary arrays with buff_size ghost layers, so the
-        ! ghost extrapolation extends over the full buffer. In post-process the module-level
-        ! offset_x/y/z (which the x_cb/y_cb/z_cb allocations are sized to) are used instead.
-        type(int_bounds_info) :: offset_x, offset_y, offset_z
+        type(int_bounds_info), intent(in)                        :: x_offset, y_offset, z_offset
+        real(wp), contiguous, intent(inout)                      :: x_cb_in(-1 - x_offset%beg:)
+        real(wp), contiguous, intent(inout)                      :: x_cc_in(-buff_size:), dx_in(-buff_size:)
+        real(wp), optional, contiguous, intent(inout)            :: y_cb_in(-1 - y_offset%beg:), z_cb_in(-1 - z_offset%beg:)
+        real(wp), optional, contiguous, intent(inout)            :: y_cc_in(-buff_size:), dy_in(-buff_size:)
+        real(wp), optional, contiguous, intent(inout)            :: z_cc_in(-buff_size:), dz_in(-buff_size:)
+        type(bounds_info), optional, dimension(3), intent(inout) :: global_bounds
 
-        offset_x%beg = buff_size; offset_x%end = buff_size
-        offset_y%beg = buff_size; offset_y%end = buff_size
-        offset_z%beg = buff_size; offset_z%end = buff_size
-
-        ! Global domain bounds
+        if (present(global_bounds)) then
 #ifdef MFC_MPI
-        call s_mpi_allreduce_min(x_cb(-1), glb_bounds(1)%beg)
-        call s_mpi_allreduce_max(x_cb(m), glb_bounds(1)%end)
-        if (n > 0) then
-            call s_mpi_allreduce_min(y_cb(-1), glb_bounds(2)%beg)
-            call s_mpi_allreduce_max(y_cb(n), glb_bounds(2)%end)
-            if (p > 0) then
-                call s_mpi_allreduce_min(z_cb(-1), glb_bounds(3)%beg)
-                call s_mpi_allreduce_max(z_cb(p), glb_bounds(3)%end)
+            call s_mpi_allreduce_min(x_cb_in(-1), global_bounds(1)%beg)
+            call s_mpi_allreduce_max(x_cb_in(m), global_bounds(1)%end)
+            if (n > 0) then
+                call s_mpi_allreduce_min(y_cb_in(-1), global_bounds(2)%beg)
+                call s_mpi_allreduce_max(y_cb_in(n), global_bounds(2)%end)
+                if (p > 0) then
+                    call s_mpi_allreduce_min(z_cb_in(-1), global_bounds(3)%beg)
+                    call s_mpi_allreduce_max(z_cb_in(p), global_bounds(3)%end)
+                end if
             end if
-        end if
 #else
-        glb_bounds(1)%beg = x_cb(-1); glb_bounds(1)%end = x_cb(m)
-        if (n > 0) then
-            glb_bounds(2)%beg = y_cb(-1); glb_bounds(2)%end = y_cb(n)
-            if (p > 0) then
-                glb_bounds(3)%beg = z_cb(-1); glb_bounds(3)%end = z_cb(p)
+            global_bounds(1)%beg = x_cb_in(-1); global_bounds(1)%end = x_cb_in(m)
+            if (n > 0) then
+                global_bounds(2)%beg = y_cb_in(-1); global_bounds(2)%end = y_cb_in(n)
+                if (p > 0) then
+                    global_bounds(3)%beg = z_cb_in(-1); global_bounds(3)%end = z_cb_in(p)
+                end if
             end if
+#endif
         end if
-#endif
-        $:GPU_UPDATE(device='[glb_bounds]')
-#endif
 
-#ifndef MFC_PRE_PROCESS
-        call s_populate_grid_bc_direction(1, -1, bc_x, offset_x)
-        call s_populate_grid_bc_direction(1, 1, bc_x, offset_x)
+        call s_populate_grid_bc_direction(x_cb_in, x_cc_in, dx_in, m, 1, -1, bc_x, x_offset)
+        call s_populate_grid_bc_direction(x_cb_in, x_cc_in, dx_in, m, 1, 1, bc_x, x_offset)
 
         if (n == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            call s_populate_grid_bc_direction(2, -1, bc_y, offset_y)
-            call s_populate_grid_bc_direction(2, 1, bc_y, offset_y)
+            call s_populate_grid_bc_direction(y_cb_in, y_cc_in, dy_in, n, 2, -1, bc_y, y_offset)
+            call s_populate_grid_bc_direction(y_cb_in, y_cc_in, dy_in, n, 2, 1, bc_y, y_offset)
         #:endif
 
         if (p == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            call s_populate_grid_bc_direction(3, -1, bc_z, offset_z)
-            call s_populate_grid_bc_direction(3, 1, bc_z, offset_z)
+            call s_populate_grid_bc_direction(z_cb_in, z_cc_in, dz_in, p, 3, -1, bc_z, z_offset)
+            call s_populate_grid_bc_direction(z_cb_in, z_cc_in, dz_in, p, 3, 1, bc_z, z_offset)
         #:endif
-#endif
 
     end subroutine s_populate_grid_variables_buffers
 
-#ifndef MFC_PRE_PROCESS
-    !> Populate grid variable buffers (cell widths and centers) for one direction and location.
-    subroutine s_populate_grid_bc_direction(bc_dir, bc_loc, bc_bounds, offset_dir)
+    !> Populate cell-boundary, cell-center, and cell-width buffers for one coordinate direction.
+    subroutine s_populate_grid_bc_direction(cell_boundaries, cell_centers, cell_widths, num_cells, bc_dir, bc_loc, bc_bounds, &
+                                            & offset)
 
-        integer, intent(in)               :: bc_dir, bc_loc
-        type(int_bounds_info), intent(in) :: bc_bounds, offset_dir
-        integer                           :: bc_edge
+        integer, intent(in)                 :: num_cells, bc_dir, bc_loc
+        type(int_bounds_info), intent(in)   :: bc_bounds, offset
+        real(wp), contiguous, intent(inout) :: cell_boundaries(-1 - offset%beg:)
+        real(wp), contiguous, intent(inout) :: cell_centers(-buff_size:), cell_widths(-buff_size:)
+        integer                             :: bc_edge, i, source_index
 
         if (bc_loc == -1) then
             bc_edge = bc_bounds%beg
@@ -418,23 +421,55 @@ contains
         end if
 
         if (bc_edge >= 0) then
-            call s_mpi_sendrecv_grid_variables_buffers(bc_dir, bc_loc, offset_dir)
+            call s_mpi_sendrecv_grid_variable_buffer(cell_boundaries, cell_centers, cell_widths, num_cells, bc_bounds, bc_loc, &
+                & offset)
             return
         end if
 
-        select case (bc_edge)
-        case (BC_PERIODIC)
-            call s_grid_periodic_bc(bc_dir, bc_loc, offset_dir)
-        case (BC_REFLECTIVE)
-            call s_grid_reflective_bc(bc_dir, bc_loc, offset_dir)
-        case (BC_AXIS)
-            if (bc_dir == 2) call s_grid_axis_bc(bc_loc, offset_dir)
-        case default
-            call s_grid_ghost_cell_extrapolation_bc(bc_dir, bc_loc, offset_dir)
-        end select
+        if (bc_edge == BC_AXIS .and. (bc_dir /= 2 .or. bc_loc == 1)) return
+
+        do i = 1, buff_size
+            if (bc_loc == -1) then
+                select case (bc_edge)
+                case (BC_PERIODIC)
+                    source_index = num_cells - i + 1
+                case (BC_REFLECTIVE, BC_AXIS)
+                    source_index = i - 1
+                case default
+                    source_index = 0
+                end select
+                cell_widths(-i) = cell_widths(source_index)
+            else
+                select case (bc_edge)
+                case (BC_PERIODIC)
+                    source_index = i - 1
+                case (BC_REFLECTIVE)
+                    source_index = num_cells - i + 1
+                case default
+                    source_index = num_cells
+                end select
+                cell_widths(num_cells + i) = cell_widths(source_index)
+            end if
+        end do
+
+        if (bc_loc == -1) then
+            do i = 1, offset%beg
+                cell_boundaries(-1 - i) = cell_boundaries(-i) - cell_widths(-i)
+            end do
+            do i = 1, buff_size
+                cell_centers(-i) = cell_centers(1 - i) - (cell_widths(1 - i) + cell_widths(-i))/2._wp
+            end do
+        else
+            do i = 1, offset%end
+                cell_boundaries(num_cells + i) = cell_boundaries(num_cells + i - 1) + cell_widths(num_cells + i)
+            end do
+            do i = 1, buff_size
+                cell_centers(num_cells + i) = cell_centers(num_cells + i - 1) + (cell_widths(num_cells + i - 1) &
+                             & + cell_widths(num_cells + i))/2._wp
+            end do
+        end if
 
     end subroutine s_populate_grid_bc_direction
-#endif
 
     !> Deallocate boundary condition buffer arrays allocated during module initialization.
     subroutine s_finalize_boundary_common_module()

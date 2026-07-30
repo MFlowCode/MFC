@@ -9,7 +9,10 @@ jobs:
     if: github.repository == 'MFlowCode/MFC'
     runs-on: ubuntu-latest
     steps:
+      # Full history: the freshness check asks whether the map's git_sha contains the last
+      # commit touching src/**/*.fpp or cases.py, which a shallow clone cannot answer.
       - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
       - uses: actions/setup-python@v6
         with: { python-version: '3.12' }
       - name: Initialize MFC

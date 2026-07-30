@@ -84,7 +84,7 @@ class MFCPlot(PlotextPlot):
     ALLOW_SELECT = False
 
     class Clicked(Message):
-        """Posted when the user clicks a heatmap cell (Feature 5)."""
+        """Posted when the user clicks a heatmap cell."""
 
         def __init__(self, x_val: float, y_val: float, val: float) -> None:
             self.x_val = x_val
@@ -123,7 +123,7 @@ class MFCPlot(PlotextPlot):
         self._last_ix: Optional[np.ndarray] = None
         self._last_iy: Optional[np.ndarray] = None
 
-    # Zoom helpers (Feature 6)
+    # Zoom helpers
 
     def reset_zoom(self) -> None:
         """Reset to full view."""
@@ -150,7 +150,7 @@ class MFCPlot(PlotextPlot):
             return
         self._zoom = (new_x0, new_x1, new_y0, new_y1)
 
-    # Mouse scroll handlers — zoom (Feature 6)
+    # Mouse scroll handlers — zoom
 
     def _scroll_zoom(self, event, factor: float) -> None:
         """Zoom by *factor* centred on the scroll cursor position."""
@@ -176,7 +176,7 @@ class MFCPlot(PlotextPlot):
         self._scroll_zoom(event, factor=1.0 / 0.75)
 
     def on_mouse_up(self, event) -> None:
-        """Feature 5 — post Clicked message with the data value at the heatmap cell."""
+        """Post Clicked message with the data value at the heatmap cell."""
         if event.button != 1:
             return
         if self._data is None or self._ndim != 2:
@@ -266,7 +266,7 @@ class MFCPlot(PlotextPlot):
             h_plot = max(int(round(w_map_avail / char_ratio)), 4)
             w_map = w_map_avail
 
-        # Apply zoom window to data index ranges (Feature 6).
+        # Apply zoom window to data index ranges.
         x0_f, x1_f, y0_f, y1_f = self._zoom
         x0_i = int(x0_f * (data.shape[0] - 1))
         x1_i = max(x0_i + 1, int(x1_f * (data.shape[0] - 1)))
@@ -275,7 +275,7 @@ class MFCPlot(PlotextPlot):
         ix = np.linspace(x0_i, x1_i, w_map, dtype=int)
         iy = np.linspace(y0_i, y1_i, h_plot, dtype=int)
 
-        # Cache for click/scroll coordinate mapping (Features 5 & 6).
+        # Cache for click/scroll coordinate mapping.
         self._last_w_map = w_map
         self._last_h_plot = h_plot
         self._last_ix = ix
@@ -514,14 +514,14 @@ class MFCTuiApp(App):
             self._play_timer.stop()
             self._play_timer = None
 
-    # MFCPlot.Clicked handler — update status bar (Feature 5)
+    # MFCPlot.Clicked handler — update status bar
 
     def on_mfcplot_clicked(self, event: MFCPlot.Clicked) -> None:
         """Receive the heatmap click message and update the status bar."""
         self._click_info = f"  │  x={event.x_val:.4f}  y={event.y_val:.4f}  val={event.val:.6g}"
         self.query_one("#status", Static).update(self._status_text())
 
-    # Background data loading (Feature 4)
+    # Background data loading
 
     @work(exclusive=True, thread=True)
     def _push_data(self) -> None:
@@ -598,7 +598,7 @@ class MFCTuiApp(App):
             plot._vmax = None
         plot.refresh()
 
-        # Update step counter (Feature 2).
+        # Update step counter.
         self.query_one("#step-counter", Digits).update(str(step))
 
         self.query_one("#status", Static).update(self._status_text())
@@ -653,7 +653,7 @@ class MFCTuiApp(App):
         self.playing = not self.playing
 
     def action_reset_zoom(self) -> None:
-        """Feature 6 — reset 2D zoom to full view."""
+        """Reset 2D zoom to full view."""
         self.query_one("#plot", MFCPlot).reset_zoom()
 
     def _auto_advance(self) -> None:

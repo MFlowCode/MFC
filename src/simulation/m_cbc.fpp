@@ -528,7 +528,7 @@ contains
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
                 if (weno_order == 3) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
-                        & is3, idwbuff(2)%beg, idwbuff(3)%beg)
+                        & is3, idwbuff(2)%beg, idwbuff(3)%beg, dir_idx, dir_flg)
 
                     $:GPU_PARALLEL_LOOP(private='[i, r, k]', collapse=3)
                     do i = 1, flux_cbc_index
@@ -556,7 +556,7 @@ contains
                 ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
                 if (weno_order == 5) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
-                        & is3, idwbuff(2)%beg, idwbuff(3)%beg)
+                        & is3, idwbuff(2)%beg, idwbuff(3)%beg, dir_idx, dir_flg)
 
                     $:GPU_PARALLEL_LOOP(private='[i, j, r, k]', collapse=4)
                     do i = 1, flux_cbc_index
@@ -624,7 +624,7 @@ contains
                             adv_local(i) = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E + i)
                         end do
 
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
+                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, eqn_idx%cont%end

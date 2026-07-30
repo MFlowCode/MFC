@@ -193,10 +193,6 @@ contains
         ! AMR: post_process overlays the refined fine blocks when this is on (default off)
         amr = .false.
 
-        ! Simulation algorithm parameters (post-specific)
-        mixture_err = .false.
-        alt_soundspeed = .false.
-
         bc_io = .false.
         num_bc_patches = dflt_int
 
@@ -301,11 +297,9 @@ contains
         schlieren_alpha = dflt_real
 
         fd_order = dflt_int
-        avg_state = dflt_int
 
         ! Bubble modeling (post-specific)
         nb = dflt_int
-        sigR = dflt_real
 
         ! Output partial domain (post-specific)
         output_partial_domain = .false.
@@ -327,6 +321,10 @@ contains
 
         if (n == 0) m_root = m_glb
 
+        ! Declared for the common conversion kernel but not a post_process input, so it is neither
+        ! defaulted on non-root ranks nor broadcast. Post-process never carries viscous stresses.
+        viscous = .false.
+
         ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
 
@@ -335,7 +333,7 @@ contains
         if (model_eqns == model_eqns_5eq .and. qbmm) nmom = 6
 
         ! Populate eqn_idx, sys_size, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom, nb)
+        call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.false.)
 
         ! post-only: 6eq alf is a dummy (no void fraction in 6eq)
         if (model_eqns == model_eqns_6eq) eqn_idx%alf = 1

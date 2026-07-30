@@ -97,9 +97,9 @@ contains
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
         if (hypoelasticity) then
-            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs)
+            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs)
         else
-            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
+            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
         if (igr) then

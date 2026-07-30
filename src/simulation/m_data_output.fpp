@@ -749,12 +749,13 @@ contains
             call s_int_to_str(t_step, t_step_string)
 
             if (down_sample) then
-                call s_initialize_mpi_data_ds(q_cons_temp_ds)
+                call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
             else
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                               & qbmm_mv=mv_ts(1))
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                 end if
             end if
 
@@ -769,7 +770,7 @@ contains
             call s_mpi_barrier()
             call DelayFileAccess(proc_rank)
 
-            call s_initialize_mpi_data(q_cons_vf)
+            call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
 
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
@@ -835,11 +836,12 @@ contains
             end if
         else
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                           & qbmm_mv=mv_ts(1))
             else if (present(beta)) then
-                call s_initialize_mpi_data(q_cons_vf, beta=beta)
+                call s_initialize_mpi_data(q_cons_vf, beta=beta, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
             end if
 
             write (file_loc, '(I0,A)') t_step, '.dat'

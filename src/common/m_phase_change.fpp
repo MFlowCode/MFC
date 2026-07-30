@@ -8,7 +8,6 @@
 !> @brief Phase transition relaxation solvers for liquid-vapor flows with cavitation and boiling
 module m_phase_change
 
-#ifndef MFC_POST_PROCESS
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
@@ -509,5 +508,5 @@ contains
         end if
 
     end subroutine s_finalize_relaxation_solver_module
-#endif
+
 end module m_phase_change

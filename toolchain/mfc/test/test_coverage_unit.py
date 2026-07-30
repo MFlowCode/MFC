@@ -1,9 +1,12 @@
+import os
+import subprocess
+import sys
 import tempfile
 import types as _types
 from pathlib import Path
 from unittest.mock import patch
 
-from mfc.test.coverage import format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
+from mfc.test.coverage import canonicalize_param_paths, entries_equal, format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
 
 
 def test_param_hash_is_order_independent():
@@ -359,3 +362,176 @@ def test_empty_map_with_fpp_change_runs_all_rung4():
     cases = _cases("a", "b")
     run, skip, reason = select_tests(cases, {}, {"src/simulation/m_rhs.fpp"})
     assert len(run) == 2 and reason.startswith("rung4")
+
+
+# --- Map churn: a rebuilt map must be byte-comparable when nothing really changed ---
+
+
+def test_coverage_key_is_independent_of_checkout_location():
+    """The same test built from two checkouts must hash identically.
+
+    to_case() absolutizes file-valued params, so the STL cases carry the runner's
+    checkout path. Hashing that gave every runner a different key for the same test.
+    """
+    runner_a = "/home/runner/work/MFC/MFC"
+    runner_b = "/storage/scratch/job1234/MFC"
+    a = param_hash(canonicalize_param_paths({"m": 100, "stl_models(1)%model_filepath": f"{runner_a}/examples/2D_ibm_stl/model.stl"}, runner_a))
+    b = param_hash(canonicalize_param_paths({"m": 100, "stl_models(1)%model_filepath": f"{runner_b}/examples/2D_ibm_stl/model.stl"}, runner_b))
+    assert a == b
+
+
+def test_canonicalize_preserves_paths_outside_the_repo():
+    params = {"f": "/opt/shared/meshes/mesh.stl"}
+    assert canonicalize_param_paths(params, "/home/runner/MFC") == params
+
+
+def test_canonicalize_leaves_non_path_values_untouched():
+    params = {"m": 100, "weno_order": 5, "bubbles_euler": "T"}
+    assert canonicalize_param_paths(params, "/home/runner/MFC") == params
+
+
+def test_canonicalize_relativizes_in_repo_name_that_starts_with_dots():
+    """`..foo` is a leading-dots filename, not a parent-directory escape."""
+    root = "/home/runner/MFC"
+    assert canonicalize_param_paths({"f": f"{root}/..cache/model.stl"}, root) == {"f": "..cache/model.stl"}
+
+
+def test_canonicalize_preserves_sibling_directory_sharing_a_prefix():
+    """The near miss: relpath yields a genuine leading `..`, so the path stays absolute."""
+    params = {"f": "/home/runner/MFC-scratch/model.stl"}
+    assert canonicalize_param_paths(params, "/home/runner/MFC") == params
+
+
+def test_canonicalized_key_still_distinguishes_different_files():
+    root = "/home/runner/MFC"
+    a = param_hash(canonicalize_param_paths({"f": f"{root}/examples/a/model.stl"}, root))
+    b = param_hash(canonicalize_param_paths({"f": f"{root}/examples/b/model.stl"}, root))
+    assert a != b
+
+
+def test_save_map_writes_a_deterministic_gzip_header():
+    """gzip stamps mtime + source filename by default, so identical maps differed on disk."""
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "m.json.gz"
+        save_map(p, {"abc": ["src/simulation/m_rhs.fpp"]}, n_tests=1, git_sha="deadbee", gfortran_version="13")
+        raw = p.read_bytes()
+        assert raw[4:8] == b"\x00\x00\x00\x00", "gzip MTIME field must be zeroed"
+        assert not raw[3] & 0x08, "gzip FNAME flag must be clear"
+
+
+def test_entries_equal_ignores_coverage_list_order():
+    assert entries_equal({"a": ["y.fpp", "x.fpp"]}, {"a": ["x.fpp", "y.fpp"]})
+
+
+def test_entries_equal_detects_real_differences():
+    assert not entries_equal({"a": ["x.fpp"]}, {"a": ["x.fpp", "y.fpp"]})
+    assert not entries_equal({"a": ["x.fpp"]}, {"b": ["x.fpp"]})
+    assert not entries_equal(None, {"a": ["x.fpp"]})
+
+
+def test_health_quiet_repo_is_not_stale_when_map_is_current():
+    """An old map is fine if nothing coverage-relevant landed since it was built."""
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-01T00:00:00+00:00", "n_tests": 600},
+        current_keys={"a"},
+        mapped_keys={"a"},
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+        built_after_last_change=True,
+    )
+    assert ok, msg
+
+
+def test_health_fails_immediately_when_map_predates_last_source_change():
+    """Detects a dead refresh on the next relevant push, not 10 days later."""
+    ok, msg = map_health(
+        meta={"built_at": "2026-05-28T00:00:00+00:00", "n_tests": 600},
+        current_keys={"a"},
+        mapped_keys={"a"},
+        now="2026-05-29T00:00:00+00:00",
+        max_age_days=10,
+        min_fraction=0.8,
+        built_after_last_change=False,
+    )
+    assert not ok and "stale" in msg.lower()
+
+
+# --- coverage_map_changed.py: the commit guard the refresh workflow branches on ---
+
+CHANGED_SCRIPT = Path(__file__).resolve().parents[3] / ".github" / "scripts" / "coverage_map_changed.py"
+
+
+def _env_without_git():
+    """The environment minus every GIT_* variable.
+
+    `git -C <dir>` changes directory but does NOT override an inherited GIT_DIR or
+    GIT_INDEX_FILE. Git exports both when it runs a hook, and MFC's pre-commit hook runs
+    precheck, which runs this suite -- so without this scrub the commits below are made
+    against the real repository instead of the throwaway one.
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
+def _repo_with_committed_map(d, entries):
+    """A throwaway git repo whose HEAD holds `entries` as the coverage map."""
+    repo = Path(d)
+    env = _env_without_git()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
+    subprocess.run([*git, "init", "-q"], check=True, env=env)
+    save_map(repo / "tests" / "coverage_map.json.gz", entries, n_tests=len(entries), git_sha="aaa", gfortran_version="13")
+    subprocess.run([*git, "add", "-A"], check=True, env=env)
+    subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "map"], check=True, env=env)
+    return repo
+
+
+def _run_guard(repo):
+    return subprocess.run([sys.executable, str(CHANGED_SCRIPT)], cwd=repo, capture_output=True, text=True, check=False, env=_env_without_git()).returncode
+
+
+def test_throwaway_repos_are_isolated_from_an_inherited_git_dir():
+    """The helper above must not commit into whatever repo GIT_DIR names.
+
+    Precheck runs this suite from the pre-commit hook, where git exports GIT_DIR and
+    GIT_INDEX_FILE. Without the scrub, `git -C tmpdir commit` rewrites the developer's
+    checked-out branch -- silently, while every test still reports as passing.
+    """
+    with patch.dict(os.environ, {"GIT_DIR": "/nonexistent.git", "GIT_INDEX_FILE": "/nonexistent.index"}):
+        assert not [k for k in _env_without_git() if k.startswith("GIT_")]
+        with tempfile.TemporaryDirectory() as d:
+            repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
+            # The commit is in the throwaway repo, so it went nowhere near GIT_DIR.
+            log = subprocess.run(["git", "-C", str(repo), "log", "--oneline"], capture_output=True, text=True, check=True, env=_env_without_git())
+            assert log.stdout.strip().endswith("map")
+
+
+def test_guard_reports_unchanged_with_a_code_that_is_not_the_crash_code():
+    """A rebuild differing only in _meta must skip -- but never via exit 1.
+
+    An uncaught exception exits 1, so if "unchanged" were 1 the workflow could not tell a
+    no-op refresh from a broken comparison, and a dead guard would run permanently green.
+    """
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
+        # Same entries, fresh _meta -- exactly what every no-op refresh produces.
+        save_map(repo / "tests" / "coverage_map.json.gz", {"k1": ["src/simulation/m_rhs.fpp"]}, n_tests=1, git_sha="bbb", gfortran_version="13")
+        rc = _run_guard(repo)
+    assert rc == 10
+    assert rc not in (0, 1)
+
+
+def test_guard_reports_changed_when_coverage_actually_moves():
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
+        save_map(repo / "tests" / "coverage_map.json.gz", {"k1": ["src/simulation/m_rhs.fpp"], "k2": ["src/common/m_eos.fpp"]}, n_tests=2, git_sha="bbb", gfortran_version="13")
+        assert _run_guard(repo) == 0
+
+
+def test_guard_errors_when_the_rebuilt_map_is_missing():
+    """The SLURM job died before writing a map: fail the job, do not read it as unchanged."""
+    with tempfile.TemporaryDirectory() as d:
+        repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
+        (repo / "tests" / "coverage_map.json.gz").unlink()
+        rc = _run_guard(repo)
+    assert rc == 2
+    assert rc != 10

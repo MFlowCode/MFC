@@ -16,7 +16,6 @@
 ! rank. That's because for both cudaMemAdvise (preferred location) and cudaMemPrefetchAsync we use location = device_id = 0. For an
 ! example see misc/nvidia_uvm/bind.sh.
 #:def PREFER_GPU(*args)
-#ifdef MFC_SIMULATION
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     block
         ! NVIDIA CUDA Fortran 25.3+: uses submodules (cuda_runtime_api, gpu_reductions, sort) See
@@ -51,7 +50,6 @@
             #:endfor
         end if
     end block
-#endif
 #endif
 #:enddef
 

@@ -26,7 +26,7 @@ module m_start_up
     use m_checker
     use m_thermochem, only: num_species, species_names
     use m_finite_differences
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, format_silo
     use m_chemistry
 
 #ifdef MFC_MPI
@@ -120,7 +120,7 @@ contains
             call s_mpi_abort('Unsupported choice for the value of ' // 'case_dir. Exiting.')
         end if
 
-        call s_check_inputs_common()
+        call s_check_inputs_common(check_total_cells=.true., n_global=nGlobal)
         call s_check_inputs()
 
     end subroutine s_check_input_file
@@ -164,7 +164,13 @@ contains
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
 
         if (buff_size > 0) then
-            call s_populate_grid_variables_buffers()
+            if (n == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, offset_x, offset_y, offset_z)
+            else if (p == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, offset_x, offset_y, offset_z, y_cb, y_cc, dy)
+            else
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, offset_x, offset_y, offset_z, y_cb, y_cc, dy, z_cb, z_cc, dz)
+            end if
             call s_populate_variables_buffers(bc_type, q_cons_vf, q_T_sf=q_T_sf)
         end if
 
@@ -773,10 +779,10 @@ contains
         end if
         if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()
-            call s_initialize_mpi_common_module()
+            call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.true., use_rdma_transport_in=.false.)
         end if
         call s_initialize_boundary_common_module()
-        call s_initialize_variables_conversion_module()
+        call s_initialize_variables_conversion_module(store_mixture_fields=.true., lagrange_beta_index=beta_idx)
         call s_initialize_data_input_module()
         call s_initialize_derived_variables_module()
         call s_initialize_data_output_module()
@@ -921,6 +927,8 @@ contains
     !> Set up the MPI environment, read and broadcast user inputs, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
 
+        type(int_bounds_info), dimension(3) :: output_offsets
+
         num_dims = 1 + min(1, n) + min(1, p)
 
         call s_mpi_initialize()
@@ -935,7 +943,12 @@ contains
 
         call s_mpi_bcast_user_inputs()
         call s_initialize_parallel_io()
-        call s_mpi_decompose_computational_domain()
+        output_offsets = (/offset_x, offset_y, offset_z/)
+        call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=format == format_silo, adjust_local_domains=.false., &
+            & output_offsets=output_offsets)
+        offset_x = output_offsets(1)
+        offset_y = output_offsets(2)
+        offset_z = output_offsets(3)
         call s_check_inputs_fft()
 
         bc = bc_xyz_info(bc_x, bc_y, bc_z)

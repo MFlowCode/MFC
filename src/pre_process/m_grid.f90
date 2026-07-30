@@ -36,13 +36,13 @@ contains
         ! Generic loop iterator
         integer  :: i, j    !< generic loop operators
         real(wp) :: length  !< domain lengths
-        ! Uniform grid: dx = (x_end - x_beg) / (m + 1)
+        ! Uniform grid: dx_min = (x_end - x_beg) / (m + 1)
 
-        dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
+        dx_min = (x_domain%end - x_domain%beg)/real(m + 1, wp)
 
         do i = 0, m
-            x_cc(i) = x_domain%beg + 5.e-1_wp*dx*real(2*i + 1, wp)
-            x_cb(i - 1) = x_domain%beg + dx*real(i, wp)
+            x_cc(i) = x_domain%beg + 5.e-1_wp*dx_min*real(2*i + 1, wp)
+            x_cb(i - 1) = x_domain%beg + dx_min*real(i, wp)
         end do
 
         x_cb(m) = x_domain%end
@@ -64,9 +64,9 @@ contains
 
             x_cc(0:m) = (x_cb(0:m) + x_cb(-1:m - 1))/2._wp
 
-            dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
+            dx_min = minval(x_cb(0:m) - x_cb(-1:m - 1))
             print *, 'Stretched grid: min/max x grid: ', minval(x_cc(:)), maxval(x_cc(:))
-            if (num_procs > 1) call s_mpi_reduce_min(dx)
+            if (num_procs > 1) call s_mpi_reduce_min(dx_min)
         end if
 
         ! Grid Generation in the y-direction
@@ -74,21 +74,21 @@ contains
 
         ! Axisymmetric cylindrical grid (r, z): half-cell offset at r=0 axis
         if (grid_geometry == 2 .and. f_approx_equal(y_domain%beg, 0.0_wp)) then
-            dy = (y_domain%end - y_domain%beg)/real(2*n + 1, wp)
+            dy_min = (y_domain%end - y_domain%beg)/real(2*n + 1, wp)
 
-            y_cc(0) = y_domain%beg + 5.e-1_wp*dy
+            y_cc(0) = y_domain%beg + 5.e-1_wp*dy_min
             y_cb(-1) = y_domain%beg
 
             do i = 1, n
-                y_cc(i) = y_domain%beg + 2._wp*dy*real(i, wp)
-                y_cb(i - 1) = y_domain%beg + dy*real(2*i - 1, wp)
+                y_cc(i) = y_domain%beg + 2._wp*dy_min*real(i, wp)
+                y_cb(i - 1) = y_domain%beg + dy_min*real(2*i - 1, wp)
             end do
         else
-            dy = (y_domain%end - y_domain%beg)/real(n + 1, wp)
+            dy_min = (y_domain%end - y_domain%beg)/real(n + 1, wp)
 
             do i = 0, n
-                y_cc(i) = y_domain%beg + 5.e-1_wp*dy*real(2*i + 1, wp)
-                y_cb(i - 1) = y_domain%beg + dy*real(i, wp)
+                y_cc(i) = y_domain%beg + 5.e-1_wp*dy_min*real(2*i + 1, wp)
+                y_cb(i - 1) = y_domain%beg + dy_min*real(i, wp)
             end do
         end if
 
@@ -111,19 +111,19 @@ contains
             y_cb = y_cb*length
             y_cc(0:n) = (y_cb(0:n) + y_cb(-1:n - 1))/2._wp
 
-            dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
+            dy_min = minval(y_cb(0:n) - y_cb(-1:n - 1))
 
-            if (num_procs > 1) call s_mpi_reduce_min(dy)
+            if (num_procs > 1) call s_mpi_reduce_min(dy_min)
         end if
 
         ! Grid Generation in the z-direction
         if (p == 0) return
 
-        dz = (z_domain%end - z_domain%beg)/real(p + 1, wp)
+        dz_min = (z_domain%end - z_domain%beg)/real(p + 1, wp)
 
         do i = 0, p
-            z_cc(i) = z_domain%beg + 5.e-1_wp*dz*real(2*i + 1, wp)
-            z_cb(i - 1) = z_domain%beg + dz*real(i, wp)
+            z_cc(i) = z_domain%beg + 5.e-1_wp*dz_min*real(2*i + 1, wp)
+            z_cb(i - 1) = z_domain%beg + dz_min*real(i, wp)
         end do
 
         z_cb(p) = z_domain%end
@@ -145,9 +145,9 @@ contains
             z_cb = z_cb*length
             z_cc(0:p) = (z_cb(0:p) + z_cb(-1:p - 1))/2._wp
 
-            dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
+            dz_min = minval(z_cb(0:p) - z_cb(-1:p - 1))
 
-            if (num_procs > 1) call s_mpi_reduce_min(dz)
+            if (num_procs > 1) call s_mpi_reduce_min(dz_min)
         end if
 
     end subroutine s_generate_serial_grid
@@ -168,10 +168,10 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
-        ! Uniform grid: dx = (x_end - x_beg) / (m_glb + 1)
-        dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
+        ! Uniform grid: dx_min = (x_end - x_beg) / (m_glb + 1)
+        dx_min = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
         do i = 0, m_glb
-            x_cb_glb(i - 1) = x_domain%beg + dx*real(i, wp)
+            x_cb_glb(i - 1) = x_domain%beg + dx_min*real(i, wp)
         end do
         x_cb_glb(m_glb) = x_domain%end
         ! Hyperbolic tangent grid stretching in x-direction (parallel version)
@@ -197,15 +197,15 @@ contains
         if (n_glb > 0) then
             ! Axisymmetric cylindrical grid (r, z): half-cell offset at r=0 axis
             if (grid_geometry == 2 .and. f_approx_equal(y_domain%beg, 0.0_wp)) then
-                dy = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, wp)
+                dy_min = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, wp)
                 y_cb_glb(-1) = y_domain%beg
                 do i = 1, n_glb
-                    y_cb_glb(i - 1) = y_domain%beg + dy*real(2*i - 1, wp)
+                    y_cb_glb(i - 1) = y_domain%beg + dy_min*real(2*i - 1, wp)
                 end do
             else
-                dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
+                dy_min = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
                 do i = 0, n_glb
-                    y_cb_glb(i - 1) = y_domain%beg + dy*real(i, wp)
+                    y_cb_glb(i - 1) = y_domain%beg + dy_min*real(i, wp)
                 end do
             end if
             y_cb_glb(n_glb) = y_domain%end
@@ -229,9 +229,9 @@ contains
 
             ! Grid generation in the z-direction
             if (p_glb > 0) then
-                dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
+                dz_min = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
                 do i = 0, p_glb
-                    z_cb_glb(i - 1) = z_domain%beg + dz*real(i, wp)
+                    z_cb_glb(i - 1) = z_domain%beg + dz_min*real(i, wp)
                 end do
                 z_cb_glb(p_glb) = z_domain%end
                 if (stretch_z) then

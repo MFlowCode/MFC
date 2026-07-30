@@ -11,7 +11,6 @@ Based on the constraints enforced in:
 - src/simulation/m_checker.fpp
 - src/post_process/m_checker.fpp
 """
-# Justification: Comprehensive validator covering all MFC parameter constraints
 
 import re
 from functools import lru_cache

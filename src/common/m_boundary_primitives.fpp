@@ -18,6 +18,9 @@ module m_boundary_primitives
     type(scalar_field), dimension(:,:), allocatable :: bc_buffers
     $:GPU_DECLARE(create='[bc_buffers]')
 
+    logical :: dirichlet_from_buffers = .false.
+    $:GPU_DECLARE(create='[dirichlet_from_buffers]')
+
 contains
 
     !> Fill ghost cells by copying the nearest boundary cell value along the specified direction.
@@ -880,7 +883,11 @@ contains
         integer                                                :: j, i
         type(scalar_field), optional, intent(inout)            :: q_T_sf
 
-#ifdef MFC_SIMULATION
+        if (.not. dirichlet_from_buffers) then
+            call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+            return
+        end if
+
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, sys_size
@@ -958,9 +965,6 @@ contains
                 end if
             #:endif
         end if
-#else
-        call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
-#endif
 
     end subroutine s_dirichlet
 
@@ -1595,257 +1599,4 @@ contains
 
     end subroutine s_beta_reflective
 
-#ifndef MFC_PRE_PROCESS
-    !> Apply periodic boundary conditions to grid variables by copying cell widths from opposite domain boundary.
-    subroutine s_grid_periodic_bc(bc_dir, bc_loc, offset_dir)
-
-        integer, intent(in)               :: bc_dir, bc_loc
-        type(int_bounds_info), intent(in) :: offset_dir
-        integer                           :: i
-
-        if (bc_dir == 1) then
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dx(-i) = dx(m - (i - 1))
-                end do
-                do i = 1, offset_dir%beg
-                    x_cb(-1 - i) = x_cb(-i) - dx(-i)
-                end do
-                do i = 1, buff_size
-                    x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dx(m + i) = dx(i - 1)
-                end do
-                do i = 1, offset_dir%end
-                    x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-                end do
-                do i = 1, buff_size
-                    x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
-                end do
-            end if
-        else if (bc_dir == 2) then
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dy(-i) = dy(n - (i - 1))
-                end do
-                do i = 1, offset_dir%beg
-                    y_cb(-1 - i) = y_cb(-i) - dy(-i)
-                end do
-                do i = 1, buff_size
-                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dy(n + i) = dy(i - 1)
-                end do
-                do i = 1, offset_dir%end
-                    y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-                end do
-                do i = 1, buff_size
-                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
-                end do
-            end if
-        else
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dz(-i) = dz(p - (i - 1))
-                end do
-                do i = 1, offset_dir%beg
-                    z_cb(-1 - i) = z_cb(-i) - dz(-i)
-                end do
-                do i = 1, buff_size
-                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dz(p + i) = dz(i - 1)
-                end do
-                do i = 1, offset_dir%end
-                    z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-                end do
-                do i = 1, buff_size
-                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
-                end do
-            end if
-        end if
-
-    end subroutine s_grid_periodic_bc
-
-    !> Apply reflective boundary conditions to grid variables by mirroring cell widths across the boundary.
-    subroutine s_grid_reflective_bc(bc_dir, bc_loc, offset_dir)
-
-        integer, intent(in)               :: bc_dir, bc_loc
-        type(int_bounds_info), intent(in) :: offset_dir
-        integer                           :: i
-
-        if (bc_dir == 1) then
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dx(-i) = dx(i - 1)
-                end do
-                do i = 1, offset_dir%beg
-                    x_cb(-1 - i) = x_cb(-i) - dx(-i)
-                end do
-                do i = 1, buff_size
-                    x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dx(m + i) = dx(m - (i - 1))
-                end do
-                do i = 1, offset_dir%end
-                    x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-                end do
-                do i = 1, buff_size
-                    x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
-                end do
-            end if
-        else if (bc_dir == 2) then
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dy(-i) = dy(i - 1)
-                end do
-                do i = 1, offset_dir%beg
-                    y_cb(-1 - i) = y_cb(-i) - dy(-i)
-                end do
-                do i = 1, buff_size
-                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dy(n + i) = dy(n - (i - 1))
-                end do
-                do i = 1, offset_dir%end
-                    y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-                end do
-                do i = 1, buff_size
-                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
-                end do
-            end if
-        else
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dz(-i) = dz(i - 1)
-                end do
-                do i = 1, offset_dir%beg
-                    z_cb(-1 - i) = z_cb(-i) - dz(-i)
-                end do
-                do i = 1, buff_size
-                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dz(p + i) = dz(p - (i - 1))
-                end do
-                do i = 1, offset_dir%end
-                    z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-                end do
-                do i = 1, buff_size
-                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
-                end do
-            end if
-        end if
-
-    end subroutine s_grid_reflective_bc
-
-    !> Extrapolate grid variables by copying boundary cell width into ghost cells.
-    subroutine s_grid_ghost_cell_extrapolation_bc(bc_dir, bc_loc, offset_dir)
-
-        integer, intent(in)               :: bc_dir, bc_loc
-        type(int_bounds_info), intent(in) :: offset_dir
-        integer                           :: i
-
-        if (bc_dir == 1) then
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dx(-i) = dx(0)
-                end do
-                do i = 1, offset_dir%beg
-                    x_cb(-1 - i) = x_cb(-i) - dx(-i)
-                end do
-                do i = 1, buff_size
-                    x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dx(m + i) = dx(m)
-                end do
-                do i = 1, offset_dir%end
-                    x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-                end do
-                do i = 1, buff_size
-                    x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
-                end do
-            end if
-        else if (bc_dir == 2) then
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dy(-i) = dy(0)
-                end do
-                do i = 1, offset_dir%beg
-                    y_cb(-1 - i) = y_cb(-i) - dy(-i)
-                end do
-                do i = 1, buff_size
-                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dy(n + i) = dy(n)
-                end do
-                do i = 1, offset_dir%end
-                    y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-                end do
-                do i = 1, buff_size
-                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
-                end do
-            end if
-        else
-            if (bc_loc == -1) then
-                do i = 1, buff_size
-                    dz(-i) = dz(0)
-                end do
-                do i = 1, offset_dir%beg
-                    z_cb(-1 - i) = z_cb(-i) - dz(-i)
-                end do
-                do i = 1, buff_size
-                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
-                end do
-            else
-                do i = 1, buff_size
-                    dz(p + i) = dz(p)
-                end do
-                do i = 1, offset_dir%end
-                    z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-                end do
-                do i = 1, buff_size
-                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
-                end do
-            end if
-        end if
-
-    end subroutine s_grid_ghost_cell_extrapolation_bc
-
-    !> Apply axis boundary conditions to grid variables for cylindrical coordinates.
-    subroutine s_grid_axis_bc(bc_loc, offset_dir)
-
-        integer, intent(in)               :: bc_loc
-        type(int_bounds_info), intent(in) :: offset_dir
-        integer                           :: i
-
-        if (bc_loc == -1) then
-            do i = 1, buff_size
-                dy(-i) = dy(i - 1)
-            end do
-            do i = 1, offset_dir%beg
-                y_cb(-1 - i) = y_cb(-i) - dy(-i)
-            end do
-            do i = 1, buff_size
-                y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-            end do
-        end if
-
-    end subroutine s_grid_axis_bc
-#endif
 end module m_boundary_primitives

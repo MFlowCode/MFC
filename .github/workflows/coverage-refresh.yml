@@ -35,7 +35,25 @@ jobs:
         env:
           CACHE_PUSH_TOKEN: ${{ secrets.CACHE_PUSH_TOKEN }}
         run: |
-          if ! git diff --quiet tests/coverage_map.json.gz; then
+          # Compare coverage ENTRIES, not file bytes: _meta (built_at, git_sha) moves on
+          # every rebuild, so `git diff` on the .gz always reported a change and the bot
+          # pushed a no-op commit nearly every run. rc 0 = changed, 10 = unchanged.
+          # The comparison script is stdlib-only, so the system interpreter is a fine
+          # fallback if the SLURM job never got far enough to create build/venv.
+          PY=build/venv/bin/python3
+          [ -x "$PY" ] || PY=python3
+          set +e
+          "$PY" .github/scripts/coverage_map_changed.py
+          changed=$?
+          set -e
+          # Every other code is a hard error, never a silent skip: an uncaught Python
+          # exception exits 1 and a missing interpreter exits 127, and treating either as
+          # "unchanged" would let a permanently broken comparison run permanently green.
+          case "$changed" in
+          0|10) ;;
+          *)    echo "::error::Coverage map comparison failed (rc=$changed)."; exit 1 ;;
+          esac
+          if [ "$changed" -eq 0 ]; then
             git config user.name  "mfc-bot"
             git config user.email "mfc-bot@users.noreply.github.com"
             git add tests/coverage_map.json.gz
@@ -50,5 +68,6 @@ jobs:
             # ensures this token is actually used for the push.
             git push "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git" HEAD:master
           else
-            echo "Coverage map unchanged."
+            # Discard the rebuilt file so the runner's working tree matches master.
+            git checkout -- tests/coverage_map.json.gz
           fi

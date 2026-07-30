@@ -161,7 +161,7 @@ contains
         ! Populate eqn_idx so s_probe_field_marginals can pick eqn_idx%adv%beg. s_initialize_eqn_idx
         ! is pure index arithmetic (no allocations); safe to call here and again at its normal site
         ! in s_initialize_global_parameters_module.
-        call s_initialize_eqn_idx(nmom, nb)
+        call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.true.)
 
         if (recon_type == recon_type_weno) then
             recon_order = weno_order
