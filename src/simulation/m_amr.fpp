@@ -994,12 +994,18 @@ contains
 
         pblk = f_amr_parent_block(amr_cur)
         ! lock-step fill: gather from the parent's CURRENT fine state. pull_host stays in the signature for the level-1 path.
-        ! Owner-guard at the CALL SITE: on a non-owner rank the parent slot is unallocated (co-located tower - owner holds both
-        ! block
-        ! and parent), and passing amr_slots(pblk)%q_cons would dereference it before the callee's internal early-return. to_host =
-        ! .not. pull_host: init/regrid (pull_host=F) feed the host prolong/self-test; runtime (pull_host=T) reads amr_cg on the
-        ! device in the C/F ghost-fill, so skip the device->host copy.
-        if (amr_rank_owns_block) call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons, .not. pull_host)
+        ! Owner-guard at the CALL SITE: the parent slot is allocated only on ITS owner, and passing amr_slots(pblk)%q_cons on any
+        ! other rank would dereference an unallocated slot. So both participants enter - the parent's owner to pack and send, the
+        ! block's owner to receive - and every other rank stays out. When the two coincide (np=1, or a co-located tower) this is the
+        ! old local-copy path unchanged. to_host = .not. pull_host: init/regrid (pull_host=F) feed the host prolong/self-test;
+        ! runtime (pull_host=T) reads amr_cg on the device in the C/F ghost-fill, so skip the device->host copy.
+        if (amr_block_owner(pblk) == proc_rank) then
+            ! parent owner: local device copy when it also owns the block, otherwise pack and send.
+            call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons, .not. pull_host)
+        else if (amr_rank_owns_block) then
+            ! block owner only: receive. Deliberately does NOT take the parent field - amr_slots(pblk) is unallocated here.
+            call s_amr_recv_parent_patch(pblk, .not. pull_host)
+        end if
 
     end subroutine s_amr_gather_from_parent
 
@@ -1013,22 +1019,147 @@ contains
         integer, intent(in)                                 :: pblk
         type(scalar_field), dimension(sys_size), intent(in) :: qp
         logical, intent(in)                                 :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
-        integer                                             :: w1, w2, w3
+        integer                                             :: w1, w2, w3, powner, cowner, boxsz, ierr
+        real(wp), allocatable                               :: xbuf(:)
+        integer                                             :: plo(3), phi(3)
 
+        ! Patch box in the PARENT-FINE frame. Both the child owner and the parent owner must agree on it, so derive it from
+        ! REPLICATED metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the empty
+        ! footprint on a non-owner of this block. On the child owner the two agree by construction (s_set_amr_fine_geometry).
+
+        call s_amr_parent_foot(amr_cur, pblk, plo, phi)
         amr_cpat_off = 0
-        amr_cpat_off(1) = amr_isect_lo(1) - amr_cpat_mar
-        if (n_glb > 0) amr_cpat_off(2) = amr_isect_lo(2) - amr_cpat_mar
-        if (p_glb > 0) amr_cpat_off(3) = amr_isect_lo(3) - amr_cpat_mar
-        w1 = (amr_isect_hi(1) - amr_isect_lo(1)) + 2*amr_cpat_mar
+        amr_cpat_off(1) = plo(1) - amr_cpat_mar
+        if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
+        if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
+        w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
         w2 = 0; w3 = 0
-        if (n_glb > 0) w2 = (amr_isect_hi(2) - amr_isect_lo(2)) + 2*amr_cpat_mar
-        if (p_glb > 0) w3 = (amr_isect_hi(3) - amr_isect_lo(3)) + 2*amr_cpat_mar
-        if (.not. amr_rank_owns_block) return  ! np=1: the owner holds both this block and its parent
-        ! copy the parent's fine patch into amr_cg with a DEVICE kernel (qp passed as an argument, present-table safe like
-        ! s_amr_restrict_overwrite_device). np>=2 P2P is future work.
-        call s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
+        if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
+        if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
+
+        cowner = amr_block_owner(amr_cur); powner = amr_block_owner(pblk)
+        if (powner == cowner) then
+            ! co-located (always true at np=1, and under tower co-location): straight device copy, bit-for-bit as before.
+            call s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
+            return
+        end if
+
+#ifdef MFC_MPI
+        ! Split ownership, parent side: exactly one destination (the block's owner) and one box, so a blocking pair suffices - no
+        ! overlap map and no collective, matching the L0<->L1 gather's "non-participants send/recv nothing" property.
+        boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
+        allocate (xbuf(boxsz))
+        call s_amr_pack_parent_patch_device(qp, w1, w2, w3, xbuf)
+        call MPI_SEND(xbuf, boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, ierr)
+        deallocate (xbuf)
+#endif
 
     end subroutine s_amr_gather_from_parent_field
+
+    !> Receive side of the split-ownership parent gather: fill amr_cg from the parent's owner. Takes only pblk - the parent slot is
+    !! NOT allocated on this rank, so the parent field must not appear in the signature. Recomputes the patch box from the same
+    !! replicated metadata the sender uses, so the two agree without a handshake.
+    impure subroutine s_amr_recv_parent_patch(pblk, to_host)
+
+        integer, intent(in)   :: pblk
+        logical, intent(in)   :: to_host
+        integer               :: w1, w2, w3, powner, boxsz, ierr, plo(3), phi(3)
+        real(wp), allocatable :: xbuf(:)
+
+        call s_amr_parent_foot(amr_cur, pblk, plo, phi)
+        amr_cpat_off = 0
+        amr_cpat_off(1) = plo(1) - amr_cpat_mar
+        if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
+        if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
+        w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
+        w2 = 0; w3 = 0
+        if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
+        if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
+
+#ifdef MFC_MPI
+        powner = amr_block_owner(pblk)
+        boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
+        allocate (xbuf(boxsz))
+        call MPI_RECV(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        call s_amr_unpack_parent_patch_device(w1, w2, w3, xbuf, to_host)
+        deallocate (xbuf)
+#endif
+
+    end subroutine s_amr_recv_parent_patch
+
+    !> Parent-fine footprint of block k inside its parent pblk, from REPLICATED metadata only, so every rank computes the same box
+    !! (the parent owner needs it to pack, and its own amr_isect_lo/hi for k is the empty non-owner footprint). Mirrors the level>=2
+    !! branch of s_set_amr_fine_geometry exactly; rr is the global amr_ref_ratio because a level>=2 block's parent is never an L0
+    !! tile (the only slot with a per-slot ratio of 1).
+    pure subroutine s_amr_parent_foot(k, pblk, plo, phi)
+
+        integer, intent(in)  :: k, pblk
+        integer, intent(out) :: plo(3), phi(3)
+        integer              :: d, rr
+
+        rr = amr_ref_ratio
+        do d = 1, 3
+            plo(d) = rr*(amr_region_lo_all(d, k) - amr_region_lo_all(d, pblk))
+            phi(d) = rr*(amr_region_hi_all(d, k) - amr_region_lo_all(d, pblk)) + (rr - 1)
+        end do
+        if (n_glb == 0) then; plo(2) = 0; phi(2) = 0; end if
+        if (p_glb == 0) then; plo(3) = 0; phi(3) = 0; end if
+
+    end subroutine s_amr_parent_foot
+
+    !> DEVICE pack of the parent's fine patch into a flat buffer. Same index map as s_amr_copy_parent_patch, writing the send buffer
+    !! instead of amr_cg, so the two sides of the P2P gather cannot drift apart.
+    impure subroutine s_amr_pack_parent_patch_device(qp, w1, w2, w3, buf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: qp
+        integer, intent(in)                                 :: w1, w2, w3
+        real(wp), intent(inout), contiguous                 :: buf(:)
+        integer                                             :: i, g1, g2, g3, o1, o2, o3, n1, n2, n3
+
+        o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
+        n1 = w1 + 1; n2 = w2 + 1; n3 = w3 + 1
+        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
+        do i = 1, sys_size
+            do g3 = 0, w3
+                do g2 = 0, w2
+                    do g1 = 0, w1
+                        buf(1 + g1 + n1*(g2 + n2*(g3 + n3*(i - 1)))) = real(qp(i)%sf(g1 + o1, g2 + o2, g3 + o3), wp)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_pack_parent_patch_device
+
+    !> DEVICE unpack of a received parent patch into amr_cg. Inverse of s_amr_pack_parent_patch_device; to_host mirrors
+    !! s_amr_copy_parent_patch (init/regrid host consumers need the host copy, runtime reads amr_cg on the device).
+    impure subroutine s_amr_unpack_parent_patch_device(w1, w2, w3, buf, to_host)
+
+        integer, intent(in)              :: w1, w2, w3
+        real(wp), intent(in), contiguous :: buf(:)
+        logical, intent(in)              :: to_host
+        integer                          :: i, g1, g2, g3, n1, n2, n3
+
+        n1 = w1 + 1; n2 = w2 + 1; n3 = w3 + 1
+        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
+        do i = 1, sys_size
+            do g3 = 0, w3
+                do g2 = 0, w2
+                    do g1 = 0, w1
+                        amr_cg(i)%sf(g1, g2, g3) = buf(1 + g1 + n1*(g2 + n2*(g3 + n3*(i - 1))))
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        if (to_host) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_cg(i)%sf]')
+            end do
+        end if
+
+    end subroutine s_amr_unpack_parent_patch_device
 
     !> Device kernel for s_amr_gather_from_parent: copy the parent block's fine patch into amr_cg over [amr_cpat_off : + w]. The
     !! parent q_cons is passed as the qp ARGUMENT (not indexed as amr_slots(pblk) inside the kernel) so its deep %sf attach resolves
@@ -2251,10 +2382,12 @@ contains
         if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_tic()
 
         ! multi-level: a level>=2 block folds back into its PARENT block's fine array (the coarse side of level l is level l-1), not
-        ! the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. Co-located towers keep a
-        ! level>=2 block and its parent on the same rank, so the restrict is always local (no cross-rank P2P needed).
+        ! the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. When child and parent sit on
+        ! different ranks the fold is a P2P pair, so BOTH participants must enter or the receiver never posts.
         if (amr_block_level(amr_cur) >= 2) then
-            if (amr_rank_owns_block) call s_amr_restrict_to_parent()
+            if (amr_rank_owns_block .or. amr_block_owner(f_amr_parent_block(amr_cur)) == proc_rank) then
+                call s_amr_restrict_to_parent()
+            end if
             if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
             return
         end if
@@ -2375,18 +2508,50 @@ contains
     !! parent-fine; offset 0 = the parent's local fine indexing). np=1 local; the np>=2 P2P scatter is future work.
     impure subroutine s_amr_restrict_to_parent()
 
-        integer :: pblk, rr, nchild, dj_hi, dk_hi
+        integer               :: pblk, rr, nchild, dj_hi, dk_hi, cowner, powner, boxsz, ierr
+        integer               :: plo(3), phi(3)
+        real(wp), allocatable :: xbuf(:)
 
-        if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner folds locally
         ! NOTE: reads amr_rvw's device copy without a GPU_UPDATE - safe only while cyl_coord + amr_max_level > 1 is checker-gated
         ! (this path never runs under cyl_coord). If that gate lifts, refresh amr_rvw here first (see its declaration).
+
         pblk = f_amr_parent_block(amr_cur)
-        rr = amr_slots(amr_cur)%amr_ref_ratio
+        cowner = amr_block_owner(amr_cur); powner = amr_block_owner(pblk)
+        if (proc_rank /= cowner .and. proc_rank /= powner) return  ! not a participant
+
+        ! Same replicated-metadata box as the gather, so the folding child and the receiving parent agree without a handshake.
+        call s_amr_parent_foot(amr_cur, pblk, plo, phi)
+        if (plo(1) > phi(1) .or. plo(2) > phi(2) .or. plo(3) > phi(3)) return  ! empty footprint
+
+        rr = amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
-        if (amr_isect_lo(1) <= amr_isect_hi(1) .and. amr_isect_lo(2) <= amr_isect_hi(2) .and. amr_isect_lo(3) <= amr_isect_hi(3)) &
-            & call s_amr_restrict_overwrite_device(amr_slots(pblk)%q_cons, amr_slots(amr_cur)%q_cons, amr_isect_lo, amr_isect_hi, &
-            & 0, 0, 0, amr_isect_lo, rr, dj_hi, dk_hi, nchild)
+
+        if (powner == cowner) then
+            ! co-located (np=1, or a co-located tower): fold straight into the parent, bit-for-bit as before.
+            call s_amr_restrict_overwrite_device(amr_slots(pblk)%q_cons, amr_slots(amr_cur)%q_cons, plo, phi, 0, 0, 0, plo, rr, &
+                                                 & dj_hi, dk_hi, nchild)
+            return
+        end if
+
+#ifdef MFC_MPI
+        ! Split ownership: the CHILD restricts locally and ships COARSE cells - rr**num_dims fewer values than shipping its fine
+        ! block - which restriction being an overwrite (not an accumulate) makes correct. Reuses the L0<->L1 scatter's pack and
+        ! unpack verbatim; their wire layout (ci fastest, then cj, ck, i) is already documented as compatible.
+        boxsz = sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1)
+        allocate (xbuf(boxsz))
+        if (proc_rank == cowner) then
+            call s_amr_restrict_pack_device(amr_slots(amr_cur)%q_cons, plo, phi, plo, rr, dj_hi, dk_hi, nchild, xbuf)
+            call MPI_SEND(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, ierr)
+        else
+            call MPI_RECV(xbuf, boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            ! DEVICE unpack of just the covered box - never a host unpack plus a strided GPU_UPDATE (see the L0 scatter's note: AMD
+            ! flang copies a non-contiguous 3-D section as contiguous elements and silently corrupts neighbouring cells).
+            call s_l0_pack_unpack_block(amr_slots(pblk)%q_cons, plo(1), plo(2), plo(3), phi(1) - plo(1), phi(2) - plo(2), &
+                                        & phi(3) - plo(3), xbuf, .false.)
+        end if
+        deallocate (xbuf)
+#endif
 
     end subroutine s_amr_restrict_to_parent
 
@@ -4500,10 +4665,13 @@ contains
             if (amr_block_level(kc) /= clev) cycle
             if (f_amr_parent_block(kc) /= pslot_l) cycle
             call s_amr_select_slot(kc)
-            if (.not. amr_rank_owns_block) cycle
-            if (relax) call s_amr_relax_fine()
-            call s_amr_restrict_to_parent()
-            call s_amr_reflux_to_parent(dt_sub)
+            ! The restrict is a P2P pair when child and parent are on different ranks, so BOTH participants must reach it or the
+            ! receiver never posts and the pair deadlocks. Owner-only work (relax, reflux) stays behind the owner guard.
+            if (amr_rank_owns_block) then
+                if (relax) call s_amr_relax_fine()
+            end if
+            if (amr_rank_owns_block .or. amr_block_owner(f_amr_parent_block(kc)) == proc_rank) call s_amr_restrict_to_parent()
+            if (amr_rank_owns_block) call s_amr_reflux_to_parent(dt_sub)
         end do
         call s_amr_select_slot(pslot_l)  ! restore the parent's mirrors for its next substep
 

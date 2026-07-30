@@ -51,10 +51,9 @@ contains
         integer                                             :: ib, ie, jb, je, kb, ke
         logical                                             :: deviates
 
-        if (.not. active_box .or. num_procs /= 1) then
-            if (active_box .and. proc_rank == 0) then
-                print '(A)', ' [active_box] WARNING: active_box supports a single MPI rank only; disabled (full-domain compute).'
-            end if
+        ! num_procs > 1 is rejected in s_check_inputs (m_checker), so only the plain off-switch is left here.
+
+        if (.not. active_box) then
             ab_active = .false.
             $:GPU_UPDATE(device='[ab_active]')
             return
