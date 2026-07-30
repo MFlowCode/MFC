@@ -184,7 +184,7 @@ contains
         adap_dt_stop_sum = 0
         $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, &
                             & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, adap_dt_stop, chi_vw_l, k_mw_l, &
-                            & rho_mw_l]', collapse=3, copy='[adap_dt_stop_sum]', extraAccArgs='vector_length(512)', extraOmpArgs='thread_limit(512)')
+                            & rho_mw_l]', collapse=3, copy='[adap_dt_stop_sum]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
