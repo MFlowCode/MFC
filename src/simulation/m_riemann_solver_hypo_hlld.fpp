@@ -620,8 +620,12 @@ contains
                                         tau_nt2_star = 5e-1_wp*(tau_nt2_L + tau_nt2_R)
                                     else
                                         sqrtC_NC = sqrt(C_NC)
-                                        S_Lstar = S_M - sqrtC_NC/rhoL_star
-                                        S_Rstar = S_M + sqrtC_NC/rhoR_star
+                                        ! C_NC carries the anchor-cell shear impedance while rhoL_star/rhoR_star come from
+                                        ! the reconstructed face states, so an anchor/face material mismatch (e.g. at a
+                                        ! one-cell interface) can place an inner wave outside the outer fan and invert the
+                                        ! five-wave ordering; clamp the inner speeds into [S_L, S_R].
+                                        S_Lstar = max(S_M - sqrtC_NC/rhoL_star, S_L)
+                                        S_Rstar = min(S_M + sqrtC_NC/rhoR_star, S_R)
                                         u_t_star = 5e-1_wp*((tau_nt_R - tau_nt_L)/sqrtC_NC + (u_t_R + u_t_L))
                                         tau_nt_star = 5e-1_wp*((u_t_R - u_t_L)*sqrtC_NC + (tau_nt_R + tau_nt_L))
                                         u_t2_star = 5e-1_wp*((tau_nt2_R - tau_nt2_L)/sqrtC_NC + (u_t2_R + u_t2_L))
