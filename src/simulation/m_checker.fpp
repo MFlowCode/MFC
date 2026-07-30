@@ -60,6 +60,14 @@ contains
         @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         if (active_box) then
+            ! Declared limitation rather than a silent runtime downgrade: the active box is a single global region, so under
+            ! decomposition the ranks whose subdomain it misses would idle while the covering ranks do all the work. Making it
+            ! multi-rank is a load-balance problem, not a geometry one, and is deferred. Fail closed so a production multi-rank
+            ! run cannot quietly get full-domain compute plus a warning line.
+            @:PROHIBIT(num_procs > 1, &
+                       & "active_box supports a single MPI rank only: a single global active region leaves the " &
+                       & // "ranks it does not cover idle, so multi-rank support needs load balancing and is not yet " &
+                       & // "implemented. Unset active_box or run on one rank.")
             @:PROHIBIT(recon_type /= recon_type_weno, "active_box requires WENO reconstruction")
             @:PROHIBIT(ib, "active_box is incompatible with immersed boundaries")
             @:PROHIBIT(acoustic_source, "active_box is incompatible with acoustic sources")
