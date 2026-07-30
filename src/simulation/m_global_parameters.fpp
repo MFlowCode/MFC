@@ -154,16 +154,6 @@ module m_global_parameters
     !! subdomain, so this is a no-op for every non-AMR run.
     type(int_bounds_info) :: idwbuff_alloc(1:3)
 
-    !> @name The number of fluids, along with their identifying indexes, respectively, for which viscous effects, e.g. the shear
-    !! and/or the volume Reynolds (Re) numbers, will be non-negligible.
-    !> @{
-    integer, dimension(2)                :: Re_size
-    integer                              :: Re_size_max
-    integer, allocatable, dimension(:,:) :: Re_idx
-    !> @}
-
-    $:GPU_DECLARE(create='[Re_size, Re_size_max, Re_idx]')
-
     !> @name Herschel-Bulkley non-Newtonian viscosity: per-fluid flags and parameter arrays.
     !> @{
     logical                             :: any_non_newtonian  !< .true. if any fluid is non-Newtonian
@@ -184,7 +174,9 @@ module m_global_parameters
 
     !> @name The coordinate direction indexes and flags (flg), respectively, for which the configurations will be determined with
     !! respect to a working direction and that will be used to isolate the contributions, in that direction, in the dimensionally
-    !! split system of equations.
+    !! split system of equations. Declared here rather than in m_global_parameters_common so the hot dimensionally-split kernels
+    !! (Riemann solvers) read them from their own module: use-associating them from common costs ~18 kB/work-item of register spill
+    !! on AMD OpenMP offload. Common code takes the mapping as explicit arguments instead.
     !> @{
     integer, dimension(3)  :: dir_idx
     real(wp), dimension(3) :: dir_flg
@@ -283,9 +275,6 @@ module m_global_parameters
     !> @name Surface tension parameters
     !> @{
     !> @}
-
-    real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
 
     real(wp)                                    :: mytime     !< Current simulation time
     real(wp)                                    :: finaltime  !< Final simulation time
@@ -442,13 +431,9 @@ contains
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
-        riemann_solver = dflt_int
         low_Mach = 0
         wave_speeds = dflt_int
-        avg_state = dflt_int
-        alt_soundspeed = .false.
         null_weights = .false.
-        mixture_err = .false.
         precision = 2
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
@@ -470,7 +455,6 @@ contains
             wenoz_q = dflt_real
             igr_order = dflt_int
             igr_pres_lim = .false.
-            viscous = .false.
             igr_iter_solver = 1
         #:endif
 
@@ -821,7 +805,7 @@ contains
         Re_size_max = 0
 
         ! Populate eqn_idx, sys_size, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom, nb)
+        call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.true.)
 
         ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
