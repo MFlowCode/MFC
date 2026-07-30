@@ -287,8 +287,9 @@ PHYSICS_DOCS = {
             "own subdomain) but may cover at most about half of any rank's subdomain per "
             "dimension. amr_max_grid_size caps a block at an absolute number of coarse cells "
             "per dimension (0, the default, derives the cap from the decomposition instead). "
-            "Setting it makes the box set identical at every rank count, at the cost of "
-            "aborting if the cap exceeds half a subdomain."
+            "Setting it makes the box set identical at every rank count, and may exceed half a "
+            "subdomain: the solver scratch is then sized to the cap instead of the subdomain, "
+            "costing per-rank memory that grows as the cap raised to the dimension count."
         ),
     },
     # Acoustic Sources

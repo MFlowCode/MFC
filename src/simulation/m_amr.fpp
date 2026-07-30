@@ -359,25 +359,25 @@ contains
         do d = 1, num_dims
             call s_mpi_allreduce_integer_min((ext(d) + 1)/amr_ref_ratio, fit_d)
             if (amr_max_grid_size > 0) then
-                ! rank-independent cap. The fine advance still borrows this rank's solver scratch, so a block must fit it; the
-                ! scratch is sized to the local grid, hence the fit_d guard. Raising the cap past that needs the solver working
-                ! set sized to the cap rather than to the subdomain - a separate increment, so fail closed with the number.
-                if (amr_max_grid_size > fit_d) then
-                    call s_mpi_abort('amr_max_grid_size exceeds what a rank can hold: the fine advance borrows the ' &
-                                     & // 'rank-local solver scratch, so a block is limited to half a subdomain per ' &
-                                     & // 'dimension. Lower amr_max_grid_size or use fewer ranks.')
-                end if
+                ! Rank-independent cap, INDEPENDENT of fit_d. The fine advance still borrows this rank's solver scratch, but that
+                ! scratch is now sized to the cap rather than to the subdomain (idwbuff_alloc and m/n/p_alloc in
+                ! m_global_parameters give it amr_ref_ratio*amr_max_grid_size - 1 fine cells plus the ghost shell), so a block at
+                ! the cap fits however small the subdomain becomes. This is what decouples the box set from the rank count:
+                ! without it the cap could only ever shrink as ranks grow, which is backwards for strong scaling.
+                ! Cost: per-rank scratch is O(cap**num_dims), constant in rank count - bounded by choosing the cap, which is
+                ! precisely what this parameter is for.
                 amr_maxc_fit(d) = min(amr_maxc(d), amr_max_grid_size)
             else
                 amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
             end if
         end do
 
-        ! preallocation cap for MY fine arrays: a block is owned WHOLE, so any rank must hold an entire block - but the
-        ! scratch-constraint abort above (allreduced over every rank's local half-extent) guarantees no block exceeds amr_maxc_fit =
-        ! min-over-ranks local-half, and regrid clamps boxes to it. So amr_maxc_fit (NOT the global-half amr_maxc) is the true max
-        ! block a rank can own; sizing to it right-sizes the fine/coord arrays (~1/num_procs the memory of global-half at scale). At
-        ! np=1 amr_maxc_fit == amr_maxc, so the sizing (and everything) is unchanged.
+        ! preallocation cap for MY fine arrays: a block is owned WHOLE, so any rank must hold an entire block. regrid clamps every
+        ! box to amr_maxc_fit, so amr_maxc_fit (NOT the global-half amr_maxc) is the true max block a rank can own; sizing to it
+        ! right-sizes the fine/coord arrays. At np=1 amr_maxc_fit == amr_maxc, so the sizing (and everything) is unchanged.
+        ! NOTE amr_maxc_fit is no longer bounded by the local half-extent when amr_max_grid_size > 0: the solver scratch is sized to
+        ! the cap instead (see above), so a rank can own a block LARGER than half its own subdomain. Derived-cap runs
+        ! (amr_max_grid_size = 0) still take the min-over-ranks local-half and are unaffected.
         maxc_loc = amr_maxc_fit
 
         ! max fine extents and buffered bounds for preallocation
