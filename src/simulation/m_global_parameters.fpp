@@ -154,6 +154,11 @@ module m_global_parameters
     !! subdomain, so this is a no-op for every non-AMR run.
     type(int_bounds_info) :: idwbuff_alloc(1:3)
 
+    !> Interior allocation extents, the m/n/p counterpart of idwbuff_alloc above. For the scratch that sizes on bare m/n/p instead
+    !! of idwbuff: m_riemann_solvers, m_weno, and the x/y/z_cb grid-coordinate family. Equal to m/n/p unless amr_max_grid_size pins
+    !! a cap larger than the subdomain, so this is a no-op for every non-AMR run.
+    integer :: m_alloc, n_alloc, p_alloc
+
     !> @name Herschel-Bulkley non-Newtonian viscosity: per-fluid flags and parameter arrays.
     !> @{
     logical                             :: any_non_newtonian  !< .true. if any fluid is non-Newtonian
@@ -992,6 +997,12 @@ contains
             end do
         end if
 
+        ! Inverts idwbuff's definition (end = m - beg, m_helper_basic.fpp): recovers the interior extent the allocation bound
+        ! implies. Identically m/n/p whenever idwbuff_alloc == idwbuff, and 0 for a collapsed dim (beg = end = 0).
+        m_alloc = idwbuff_alloc(1)%end + idwbuff_alloc(1)%beg
+        n_alloc = idwbuff_alloc(2)%end + idwbuff_alloc(2)%beg
+        p_alloc = idwbuff_alloc(3)%end + idwbuff_alloc(3)%beg
+
         ! Configuring Coordinate Direction Indexes
         if (bubbles_euler) then
             @:ALLOCATE(ptil( idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
@@ -1046,26 +1057,28 @@ contains
             $:GPU_UPDATE(device='[turb_pos, synth_L]')
         end if
 
-        ! Allocating grid variables for the x-, y- and z-directions
-        @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
-        @:ALLOCATE(x_cc(-buff_size:m + buff_size))
-        @:ALLOCATE(dx(-buff_size:m + buff_size))
+        ! Allocating grid variables for the x-, y- and z-directions. Sized on *_alloc, not m/n/p: s_amr_swap_to_fine writes a
+        ! block's own coordinates into these arrays out to slot%m + buff_size, so they must hold the largest block, not just the
+        ! coarse subdomain.
+        @:ALLOCATE(x_cb(-1 - buff_size:m_alloc + buff_size))
+        @:ALLOCATE(x_cc(-buff_size:m_alloc + buff_size))
+        @:ALLOCATE(dx(-buff_size:m_alloc + buff_size))
         @:PREFER_GPU(x_cb)
         @:PREFER_GPU(x_cc)
         @:PREFER_GPU(dx)
 
         if (n == 0) return
-        @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
-        @:ALLOCATE(y_cc(-buff_size:n + buff_size))
-        @:ALLOCATE(dy(-buff_size:n + buff_size))
+        @:ALLOCATE(y_cb(-1 - buff_size:n_alloc + buff_size))
+        @:ALLOCATE(y_cc(-buff_size:n_alloc + buff_size))
+        @:ALLOCATE(dy(-buff_size:n_alloc + buff_size))
         @:PREFER_GPU(y_cb)
         @:PREFER_GPU(y_cc)
         @:PREFER_GPU(dy)
 
         if (p == 0) return
-        @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
-        @:ALLOCATE(z_cc(-buff_size:p + buff_size))
-        @:ALLOCATE(dz(-buff_size:p + buff_size))
+        @:ALLOCATE(z_cb(-1 - buff_size:p_alloc + buff_size))
+        @:ALLOCATE(z_cc(-buff_size:p_alloc + buff_size))
+        @:ALLOCATE(dz(-buff_size:p_alloc + buff_size))
         @:PREFER_GPU(z_cb)
         @:PREFER_GPU(z_cc)
         @:PREFER_GPU(dz)

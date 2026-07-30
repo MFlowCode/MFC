@@ -462,8 +462,8 @@ contains
                        & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         end if
         if (alt_soundspeed) then
-            @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, &
-                       & 0:n, 0:p))
+            @:ALLOCATE(blkmod1(0:m_alloc, 0:n_alloc, 0:p_alloc), blkmod2(0:m_alloc, 0:n_alloc, 0:p_alloc), &
+                       & alpha1(0:m_alloc, 0:n_alloc, 0:p_alloc), alpha2(0:m_alloc, 0:n_alloc, 0:p_alloc), Kterm(0:m_alloc, 0:n_alloc, 0:p_alloc))
         end if
 
         call s_initialize_pressure_relaxation_module
@@ -475,15 +475,17 @@ contains
         if (bf_spatial_support) then
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
-                    @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
+                    @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, &
+                               & -buff_size:buff_size + p_alloc))
+                    @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, &
+                               & -buff_size:buff_size + p_alloc))
                 else
-                    @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
-                    @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
+                    @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, 0:0))
+                    @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, 0:0))
                 end if
             else
-                @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, 0:0, 0:0))
-                @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, 0:0, 0:0))
+                @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m_alloc, 0:0, 0:0))
+                @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m_alloc, 0:0, 0:0))
             end if
             @:PREFER_GPU(spbf_source_x)
             @:PREFER_GPU(spbf_source_y)

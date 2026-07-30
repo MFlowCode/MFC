@@ -56,11 +56,11 @@ contains
                    & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         @:ACC_SETUP_SFs(divu)
 
-        @:ALLOCATE(bub_adv_src(0:m, 0:n, 0:p))
-        @:ALLOCATE(bub_r_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_v_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_p_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_adv_src(0:m_alloc, 0:n_alloc, 0:p_alloc))
+        @:ALLOCATE(bub_r_src(0:m_alloc, 0:n_alloc, 0:p_alloc, 1:nb))
+        @:ALLOCATE(bub_v_src(0:m_alloc, 0:n_alloc, 0:p_alloc, 1:nb))
+        @:ALLOCATE(bub_p_src(0:m_alloc, 0:n_alloc, 0:p_alloc, 1:nb))
+        @:ALLOCATE(bub_m_src(0:m_alloc, 0:n_alloc, 0:p_alloc, 1:nb))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
