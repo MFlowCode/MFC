@@ -22,18 +22,20 @@ module m_particle_cloud
 
 contains
 
-    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Particles outside
-    !! this rank's IB neighborhood (get_neighbor_bounds() must already have been called) are discarded as they are generated, so
-    !! particle_cloud_ibs is allocated to a worst-case capacity of num_ib_patches_max_namelist entries (the same neighborhood-sized
-    !! cap patch_ib is bound by in s_reduce_ib_patch_array) regardless of the global particle count, but only the first
-    !! num_particle_cloud_ibs of them are actually written - callers must use that count, not size(particle_cloud_ibs), since the
-    !! remainder of the array is left uninitialized. Each entry's gbl_patch_id is already the final, absolute global patch id
-    !! (namelist patches occupy 1..num_ibs, so the running index here starts at num_ibs) - s_reduce_ib_patch_array copies it as-is.
+    !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Each packing
+    !! method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice / s_particle_cloud_random_box) and
+    !! hands back only the entries that fall within this rank's IB neighborhood (get_neighbor_bounds() must already have been
+    !! called); those are copied here into particle_cloud_ibs, allocated once to a worst-case capacity of
+    !! min(num_ib_patches_max_namelist, total particles requested across all clouds). Only the first num_particle_cloud_ibs of them
+    !! are actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is left
+    !! uninitialized. Each entry's gbl_patch_id is already the final, absolute global patch id (namelist patches occupy 1..num_ibs,
+    !! so the running index here starts at num_ibs) - s_reduce_ib_patch_array copies it as-is.
     impure subroutine s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
         integer, intent(out)                                              :: num_particle_cloud_ibs
-        integer                                                           :: cloud_idx, ib_idx, glbl_idx, n_total_particles
+        type(ib_patch_parameters), allocatable                            :: cloud_ibs(:)
+        integer                                                           :: cloud_idx, glbl_idx, num_cloud_ibs, n_total_particles
         real(wp)                                                          :: t_start, t_end
 
         if (num_particle_clouds == 0) then
@@ -50,18 +52,23 @@ contains
         end do
         allocate (particle_cloud_ibs(min(num_ib_patches_max_namelist, n_total_particles)))
 
-        ib_idx = 0  ! index into particle_cloud_ibs
+        num_particle_cloud_ibs = 0
         glbl_idx = num_ibs
 
         do cloud_idx = 1, num_particle_clouds
             select case (particle_cloud(cloud_idx)%packing_method)
             case (1)  ! random box packing method
-                call s_particle_cloud_random_box(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
+                call s_particle_cloud_random_box(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
             case (2)  ! lattice packing method
-                call s_particle_cloud_lattice(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
+                call s_particle_cloud_lattice(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
             end select
+
+            @:PROHIBIT(num_particle_cloud_ibs + num_cloud_ibs > num_ib_patches_max_namelist, &
+                       & "Too many particle-cloud IBs in one rank's neighborhood. Modify case file or increase num_ib_patches_max_namelist.")
+            particle_cloud_ibs(num_particle_cloud_ibs + 1:num_particle_cloud_ibs + num_cloud_ibs) = cloud_ibs(1:num_cloud_ibs)
+            num_particle_cloud_ibs = num_particle_cloud_ibs + num_cloud_ibs
+            deallocate (cloud_ibs)
         end do
-        num_particle_cloud_ibs = ib_idx
 
         call cpu_time(t_end)
         if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', glbl_idx - num_ibs, ' particles in ', &
@@ -69,22 +76,33 @@ contains
 
     end subroutine s_generate_particle_clouds
 
-    !> Generates a random distributions of particles in a box with a minimum spacing
-    subroutine s_particle_cloud_random_box(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
+    !> Generates a random distributions of particles in a box with a minimum spacing. Rejection sampling needs every placed particle
+    !! tracked (regardless of which rank's neighborhood it falls in) to detect overlaps deterministically, so cloud_ibs is allocated
+    !! here to the cloud's full requested particle count and only pared down to this rank's neighborhood afterwards, via
+    !! s_reduce_particle_cloud_ibs.
+    subroutine s_particle_cloud_random_box(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
 
-        integer, intent(in)                                    :: cloud_idx
-        integer, intent(inout)                                 :: ib_idx, glbl_idx
-        type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
-        integer                                                :: n_placed, geom, seed
-        integer(8)                                             :: n_attempts, max_attempts
-        real(wp)                                               :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp)                                               :: rx, ry, rz, dist
-        logical                                                :: overlaps
-        real(wp), allocatable                                  :: placed(:,:)
-        integer                                                :: hash_size, slot
-        integer                                                :: bx, by, bz, nbx, nby, nbz
-        integer                                                :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
-        integer, allocatable                                   :: hash_head(:), chain_next(:)
+        integer, intent(in)                                               :: cloud_idx
+        integer, intent(inout)                                            :: glbl_idx
+        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: cloud_ibs
+        integer, intent(out)                                              :: num_cloud_ibs
+        integer                                                           :: ib_idx, n_placed, geom, seed, alloc_stat
+        integer(8)                                                        :: n_attempts, max_attempts
+        real(wp)                                                          :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
+        real(wp)                                                          :: rx, ry, rz, dist
+        logical                                                           :: overlaps
+        real(wp), allocatable                                             :: placed(:,:)
+        integer                                                           :: hash_size, slot
+        integer                                                           :: bx, by, bz, nbx, nby, nbz
+        integer                                                           :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        integer, allocatable                                              :: hash_head(:), chain_next(:)
+
+        allocate (cloud_ibs(particle_cloud(cloud_idx)%num_particles), stat=alloc_stat)
+        if (alloc_stat /= 0) then
+            call s_mpi_abort("Error :: Ran out of CPU memory trying to allocate particle cloud IB array. " &
+                             & // "Current system resources cannot perform rejection packing with the specified number of particles.")
+        end if
+        ib_idx = 0
 
         xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
         xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
@@ -174,7 +192,8 @@ contains
                 chain_next(n_placed) = hash_head(slot)
                 hash_head(slot) = n_placed
 
-                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, rx, ry, rz, particle_cloud_ibs)
+                glbl_idx = glbl_idx + 1
+                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, rx, ry, rz, cloud_ibs)
             end if
         end do
 
@@ -184,22 +203,32 @@ contains
 
         deallocate (placed, hash_head, chain_next)
 
+        call s_reduce_particle_cloud_ibs(cloud_ibs, ib_idx)
+        num_cloud_ibs = ib_idx
+
     end subroutine s_particle_cloud_random_box
 
     !> Places particles on the optimally dense lattice for the cloud region: a triangular lattice in 2D, a face-centered cubic
     !! lattice in 3D. The lattice spacing is set by the particle density (num_particles over the region area/volume); if that
     !! spacing falls below the required centre-to-centre distance (2*radius + min_spacing), the region is too dense and the run is
-    !! aborted.
-    subroutine s_particle_cloud_lattice(cloud_idx, ib_idx, glbl_idx, particle_cloud_ibs)
+    !! aborted. No two lattice sites can overlap, so unlike rejection packing each site's IB neighborhood membership
+    !! (get_neighbor_bounds() must already have run) is checked as it is generated and only in-neighborhood sites are stored;
+    !! cloud_ibs is therefore allocated to the neighborhood-sized cap rather than the cloud's full particle count.
+    subroutine s_particle_cloud_lattice(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
 
-        integer, intent(in)                                    :: cloud_idx
-        integer, intent(inout)                                 :: ib_idx, glbl_idx
-        type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
-        integer                                                :: n_placed, n_target, geom
-        integer                                                :: row, col, ncx, ncy, ix, jy, kz, b
-        real(wp)                                               :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp)                                               :: spacing, row_dy, cell, x0, px, py
-        real(wp), dimension(4)                                 :: bx_off, by_off, bz_off
+        integer, intent(in)                                               :: cloud_idx
+        integer, intent(inout)                                            :: glbl_idx
+        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: cloud_ibs
+        integer, intent(out)                                              :: num_cloud_ibs
+        integer                                                           :: ib_idx, n_placed, n_target, geom
+        integer                                                           :: row, col, ncx, ncy, ix, jy, kz, b
+        real(wp)                                                          :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
+        real(wp)                                                          :: spacing, row_dy, cell, x0, px, py
+        real(wp), dimension(4)                                            :: bx_off, by_off, bz_off
+        real(wp), dimension(3)                                            :: centroid
+
+        allocate (cloud_ibs(min(num_ib_patches_max_namelist, particle_cloud(cloud_idx)%num_particles)))
+        ib_idx = 0
 
         xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
         xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
@@ -238,8 +267,12 @@ contains
                 col = 0
                 px = x0
                 do while (px <= xmax .and. n_placed < n_target)
-                    call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, px, py, particle_cloud(cloud_idx)%z_centroid, &
-                                              & particle_cloud_ibs)
+                    glbl_idx = glbl_idx + 1
+                    centroid = [px, py, particle_cloud(cloud_idx)%z_centroid]
+                    if (f_neighborhood_ranks_own_location(centroid)) then
+                        call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, centroid(1), centroid(2), centroid(3), &
+                                                  & cloud_ibs)
+                    end if
                     n_placed = n_placed + 1
                     col = col + 1
                     px = x0 + real(col, wp)*spacing
@@ -260,9 +293,13 @@ contains
                     do ix = 0, ncx - 1
                         do b = 1, 4
                             if (n_placed >= n_target) exit
-                            call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, xmin + real(ix, wp)*cell + bx_off(b), &
-                                                      & ymin + real(jy, wp)*cell + by_off(b), zmin + real(kz, &
-                                                      & wp)*cell + bz_off(b), particle_cloud_ibs)
+                            centroid = [xmin + real(ix, wp)*cell + bx_off(b), ymin + real(jy, wp)*cell + by_off(b), &
+                                                    & zmin + real(kz, wp)*cell + bz_off(b)]
+                            glbl_idx = glbl_idx + 1
+                            if (f_neighborhood_ranks_own_location(centroid)) then
+                                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, centroid(1), centroid(2), &
+                                                          & centroid(3), cloud_ibs)
+                            end if
                             n_placed = n_placed + 1
                         end do
                     end do
@@ -271,29 +308,24 @@ contains
             end do
         end if
 
+        num_cloud_ibs = ib_idx
+
     end subroutine s_particle_cloud_lattice
 
-    !> Writes a single placed particle into particle_cloud_ibs at the next free slot if it falls within this rank's IB neighborhood
-    !! (get_neighbor_bounds() must already have run), advancing ib_idx; particles outside the neighborhood are discarded here rather
-    !! than stored. glbl_idx always advances (starting from num_ibs, see s_generate_particle_clouds) so gbl_patch_id is already the
-    !! particle's final, absolute global patch id - s_reduce_ib_patch_array copies it as-is. Shared by all packing methods so the
-    !! per-particle ib_patch_parameters setup stays in one place.
+    !> Writes a single placed particle into particle_cloud_ibs at the next free slot, advancing ib_idx. The caller decides whether
+    !! this particle belongs in the array (neighborhood membership, for lattice packing, or unconditionally for rejection packing -
+    !! see s_particle_cloud_lattice / s_particle_cloud_random_box) and supplies its already-assigned, absolute global patch id via
+    !! glbl_idx - s_reduce_ib_patch_array copies gbl_patch_id as-is. Shared by all packing methods so the per-particle
+    !! ib_patch_parameters setup stays in one place.
     subroutine s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, px, py, pz, particle_cloud_ibs)
 
-        integer, intent(in)                                    :: cloud_idx, geom
-        integer, intent(inout)                                 :: ib_idx, glbl_idx
+        integer, intent(in)                                    :: cloud_idx, glbl_idx, geom
+        integer, intent(inout)                                 :: ib_idx
         real(wp), intent(in)                                   :: px, py, pz
         type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
-        real(wp), dimension(3)                                 :: centroid
-
-        glbl_idx = glbl_idx + 1
-
-        centroid = [px, py, 0._wp]
-        if (num_dims == 3) centroid(3) = pz
-        if (.not. f_neighborhood_ranks_own_location(centroid)) return
 
         ib_idx = ib_idx + 1
-        @:PROHIBIT(ib_idx > num_ib_patches_max_namelist, &
+        @:PROHIBIT(ib_idx > size(particle_cloud_ibs), &
                    & "Too many particle-cloud IBs in one rank's neighborhood. Modify case file or increase num_ib_patches_max_namelist.")
 
         particle_cloud_ibs(ib_idx)%gbl_patch_id = glbl_idx
@@ -336,6 +368,29 @@ contains
         particle_cloud_ibs(ib_idx)%burn_rate_pref = 0._wp
 
     end subroutine s_add_cloud_particle
+
+    !> Compacts cloud_ibs(1:num_ibs) in place, discarding entries outside this rank's IB neighborhood (get_neighbor_bounds() must
+    !! already have run) and updating num_ibs to the retained count. Used by rejection packing, which cannot filter as it places
+    !! particles (see s_particle_cloud_random_box), to pare its full, unfiltered placement down to this rank's neighborhood.
+    subroutine s_reduce_particle_cloud_ibs(cloud_ibs, num_ibs)
+
+        type(ib_patch_parameters), intent(inout), dimension(:) :: cloud_ibs
+        integer, intent(inout)                                 :: num_ibs
+        integer                                                :: i, write_idx
+        real(wp), dimension(3)                                 :: centroid
+
+        write_idx = 0
+        do i = 1, num_ibs
+            centroid = [cloud_ibs(i)%x_centroid, cloud_ibs(i)%y_centroid, 0._wp]
+            if (num_dims == 3) centroid(3) = cloud_ibs(i)%z_centroid
+            if (f_neighborhood_ranks_own_location(centroid)) then
+                write_idx = write_idx + 1
+                if (write_idx /= i) cloud_ibs(write_idx) = cloud_ibs(i)
+            end if
+        end do
+        num_ibs = write_idx
+
+    end subroutine s_reduce_particle_cloud_ibs
 
     !> Xorshift PRNG. Advances seed in-place and returns a value in [0, 1).
     function f_xorshift(seed) result(rval)
