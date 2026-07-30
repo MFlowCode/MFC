@@ -107,7 +107,7 @@ contains
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         @:ALLOCATE(jac(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
                    & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
-        @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
+        @:ALLOCATE(jac_rhs(-1:m_alloc,-1:n_alloc,-1:p_alloc))
 
         if (igr_iter_solver == 1) then  ! Jacobi iteration
             @:ALLOCATE(jac_old(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
@@ -129,7 +129,7 @@ contains
         end if
 
         if (nv_uvm_temp_on_gpu(2) == 1) then
-            @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
+            @:ALLOCATE(jac_rhs(-1:m_alloc,-1:n_alloc,-1:p_alloc))
             @:PREFER_GPU(jac_rhs)
         else
             allocate (jac_rhs_host(-1:m,-1:n,-1:p))

@@ -402,19 +402,20 @@ contains
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
 
-        ! bounce buffers for copy-based coord swap (GPU-safe; same bounds as the base-level global arrays)
-        allocate (sw_x_cb(-1 - buff_size:m + buff_size))
-        allocate (sw_x_cc(-buff_size:m + buff_size))
-        allocate (sw_dx(-buff_size:m + buff_size))
+        ! bounce buffers for copy-based coord swap (GPU-safe; same bounds as the base-level global arrays, which are sized on
+        ! *_alloc - these are whole-array assigned to/from x_cb etc., so the shapes must agree)
+        allocate (sw_x_cb(-1 - buff_size:m_alloc + buff_size))
+        allocate (sw_x_cc(-buff_size:m_alloc + buff_size))
+        allocate (sw_dx(-buff_size:m_alloc + buff_size))
         if (n_glb > 0) then
-            allocate (sw_y_cb(-1 - buff_size:n + buff_size))
-            allocate (sw_y_cc(-buff_size:n + buff_size))
-            allocate (sw_dy(-buff_size:n + buff_size))
+            allocate (sw_y_cb(-1 - buff_size:n_alloc + buff_size))
+            allocate (sw_y_cc(-buff_size:n_alloc + buff_size))
+            allocate (sw_dy(-buff_size:n_alloc + buff_size))
         end if
         if (p_glb > 0) then
-            allocate (sw_z_cb(-1 - buff_size:p + buff_size))
-            allocate (sw_z_cc(-buff_size:p + buff_size))
-            allocate (sw_dz(-buff_size:p + buff_size))
+            allocate (sw_z_cb(-1 - buff_size:p_alloc + buff_size))
+            allocate (sw_z_cc(-buff_size:p_alloc + buff_size))
+            allocate (sw_dz(-buff_size:p_alloc + buff_size))
         end if
         if (igr) then
             @:ALLOCATE(sw_jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -5011,11 +5012,12 @@ contains
         ! sizing), so only allocate in l0-only mode to avoid a coexist double-allocate; under coexist the AMR init's buffers already
         ! serve both the fine-block and the tile swaps.
         if (.not. amr) then
-            allocate (sw_x_cb(-1 - buff_size:m + buff_size), sw_x_cc(-buff_size:m + buff_size), sw_dx(-buff_size:m + buff_size))
-            if (n_glb > 0) allocate (sw_y_cb(-1 - buff_size:n + buff_size), sw_y_cc(-buff_size:n + buff_size), &
-                & sw_dy(-buff_size:n + buff_size))
-            if (p_glb > 0) allocate (sw_z_cb(-1 - buff_size:p + buff_size), sw_z_cc(-buff_size:p + buff_size), &
-                & sw_dz(-buff_size:p + buff_size))
+            allocate (sw_x_cb(-1 - buff_size:m_alloc + buff_size), sw_x_cc(-buff_size:m_alloc + buff_size), &
+                      & sw_dx(-buff_size:m_alloc + buff_size))
+            if (n_glb > 0) allocate (sw_y_cb(-1 - buff_size:n_alloc + buff_size), sw_y_cc(-buff_size:n_alloc + buff_size), &
+                & sw_dy(-buff_size:n_alloc + buff_size))
+            if (p_glb > 0) allocate (sw_z_cb(-1 - buff_size:p_alloc + buff_size), sw_z_cc(-buff_size:p_alloc + buff_size), &
+                & sw_dz(-buff_size:p_alloc + buff_size))
         end if
         call s_l0_build_extended_global_cb()  ! global L0 boundaries EXTENDED into the domain ghost shell (edge tiles need it)
         amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1

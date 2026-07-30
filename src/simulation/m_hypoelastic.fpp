@@ -41,13 +41,15 @@ contains
         integer :: i
 
         @:ALLOCATE(Gs_hypo(1:num_fluids))
-        @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
-        @:ALLOCATE(du_dx_hypo(0:m,0:n,0:p))
+        @:ALLOCATE(rho_K_field(0:m_alloc,0:n_alloc,0:p_alloc), G_K_field(0:m_alloc,0:n_alloc,0:p_alloc))
+        @:ALLOCATE(du_dx_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
         if (n > 0) then
-            @:ALLOCATE(du_dy_hypo(0:m,0:n,0:p), dv_dx_hypo(0:m,0:n,0:p), dv_dy_hypo(0:m,0:n,0:p))
+            @:ALLOCATE(du_dy_hypo(0:m_alloc,0:n_alloc,0:p_alloc), dv_dx_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
+            @:ALLOCATE(dv_dy_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
             if (p > 0) then
-                @:ALLOCATE(du_dz_hypo(0:m,0:n,0:p), dv_dz_hypo(0:m,0:n,0:p))
-                @:ALLOCATE(dw_dx_hypo(0:m,0:n,0:p), dw_dy_hypo(0:m,0:n,0:p), dw_dz_hypo(0:m,0:n,0:p))
+                @:ALLOCATE(du_dz_hypo(0:m_alloc,0:n_alloc,0:p_alloc), dv_dz_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
+                @:ALLOCATE(dw_dx_hypo(0:m_alloc,0:n_alloc,0:p_alloc), dw_dy_hypo(0:m_alloc,0:n_alloc,0:p_alloc), &
+                           & dw_dz_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
             end if
         end if
 
@@ -56,12 +58,12 @@ contains
         end do
         $:GPU_UPDATE(device='[Gs_hypo]')
 
-        @:ALLOCATE(fd_coeff_x_hypo(-fd_number:fd_number, 0:m))
+        @:ALLOCATE(fd_coeff_x_hypo(-fd_number:fd_number, 0:m_alloc))
         if (n > 0) then
-            @:ALLOCATE(fd_coeff_y_hypo(-fd_number:fd_number, 0:n))
+            @:ALLOCATE(fd_coeff_y_hypo(-fd_number:fd_number, 0:n_alloc))
         end if
         if (p > 0) then
-            @:ALLOCATE(fd_coeff_z_hypo(-fd_number:fd_number, 0:p))
+            @:ALLOCATE(fd_coeff_z_hypo(-fd_number:fd_number, 0:p_alloc))
         end if
 
         ! Computing centered finite difference coefficients

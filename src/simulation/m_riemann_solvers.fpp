@@ -82,16 +82,16 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        @:ALLOCATE(flux_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
-        @:ALLOCATE(flux_gsrc_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
-        @:ALLOCATE(flux_src_rsx_vf(-1:m, -1:n, -1:p, eqn_idx%adv%beg:sys_size))
-        @:ALLOCATE(vel_src_rsx_vf(-1:m, -1:n, -1:p, 1:num_vels))
+        @:ALLOCATE(flux_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
+        @:ALLOCATE(flux_gsrc_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
+        @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, eqn_idx%adv%beg:sys_size))
+        @:ALLOCATE(vel_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_vels))
         if (qbmm) then
-            @:ALLOCATE(mom_sp_rsx_vf(-1:m+1, -1:n+1, -1:p+1, 1:4))
+            @:ALLOCATE(mom_sp_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:4))
         end if
 
         if (viscous) then
-            @:ALLOCATE(Re_avg_rsx_vf(-1:m, -1:n, -1:p, 1:2))
+            @:ALLOCATE(Re_avg_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:2))
         end if
 
     end subroutine s_initialize_riemann_solvers_module

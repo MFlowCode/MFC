@@ -75,6 +75,13 @@ module m_weno
     !> @name Indical bounds in the s1-, s2- and s3-directions
     !> @{
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
+
+    !> Allocation-only counterparts of is1/is2/is3_weno, derived from m/n/p_alloc so the coefficient and reconstruction arrays can
+    !! hold the largest refined block rather than just the coarse subdomain (s_amr_recompute_weno_coefs indexes them over a block's
+    !! bounds). Used ONLY in the @:ALLOCATE statements below: s_compute_weno_coefficients is still called with the true is*_weno, so
+    !! the inflated tail is never computed from cell-boundary coordinates that do not exist yet - AMR fills it per block. Identical
+    !! to is*_weno unless amr_max_grid_size pins a cap larger than the subdomain.
+    type(int_bounds_info) :: is1_weno_a, is2_weno_a, is3_weno_a
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[is1_weno, is2_weno, is3_weno]')
 #endif
@@ -90,6 +97,7 @@ contains
 
         ! Allocating/Computing WENO Coefficients in x-direction
         is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
+        is1_weno_a%beg = is1_weno%beg; is1_weno_a%end = m_alloc - is1_weno%beg
         if (n == 0) then
             is2_weno%beg = 0
         else
@@ -97,6 +105,7 @@ contains
         end if
 
         is2_weno%end = n - is2_weno%beg
+        is2_weno_a%beg = is2_weno%beg; is2_weno_a%end = n_alloc - is2_weno%beg
 
         if (p == 0) then
             is3_weno%beg = 0
@@ -105,27 +114,31 @@ contains
         end if
 
         is3_weno%end = p - is3_weno%beg
+        is3_weno_a%beg = is3_weno%beg; is3_weno_a%end = p_alloc - is3_weno%beg
 
-        @:ALLOCATE(poly_coef_cbL_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
-        @:ALLOCATE(poly_coef_cbR_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
+        @:ALLOCATE(poly_coef_cbL_x(is1_weno_a%beg + weno_polyn:is1_weno_a%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
+        @:ALLOCATE(poly_coef_cbR_x(is1_weno_a%beg + weno_polyn:is1_weno_a%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
 
-        @:ALLOCATE(d_cbL_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
-        @:ALLOCATE(d_cbR_x(0:weno_num_stencils, is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_x(0:weno_num_stencils, is1_weno_a%beg + weno_polyn:is1_weno_a%end - weno_polyn))
+        @:ALLOCATE(d_cbR_x(0:weno_num_stencils, is1_weno_a%beg + weno_polyn:is1_weno_a%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_x(is1_weno_a%beg + weno_polyn:is1_weno_a%end - weno_polyn, 0:weno_polyn, &
                    & 0:weno_polyn*(weno_polyn + 1)/2 - 1))
         ! Number of cross terms for dvd = (k-1)(k-1+1)/2, where weno_polyn = k-1 Note: k-1 not k because we are using value
         ! differences (dvd) not the values themselves
 
         call s_compute_weno_coefficients(1, is1_weno)
 
-        @:ALLOCATE(v_rs_weno(is1_weno%beg:is1_weno%end, is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
+        @:ALLOCATE(v_rs_weno(is1_weno_a%beg:is1_weno_a%end, is2_weno_a%beg:is2_weno_a%end, is3_weno_a%beg:is3_weno_a%end, &
+                   & 1:sys_size))
 
         ! Allocating/Computing WENO Coefficients in y-direction
         if (n == 0) return
 
         is2_weno%beg = -buff_size; is2_weno%end = n - is2_weno%beg
+        is2_weno_a%beg = is2_weno%beg; is2_weno_a%end = n_alloc - is2_weno%beg
         is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
+        is1_weno_a%beg = is1_weno%beg; is1_weno_a%end = m_alloc - is1_weno%beg
 
         if (p == 0) then
             is3_weno%beg = 0
@@ -135,13 +148,13 @@ contains
 
         is3_weno%end = p - is3_weno%beg
 
-        @:ALLOCATE(poly_coef_cbL_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
-        @:ALLOCATE(poly_coef_cbR_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
+        @:ALLOCATE(poly_coef_cbL_y(is2_weno_a%beg + weno_polyn:is2_weno_a%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
+        @:ALLOCATE(poly_coef_cbR_y(is2_weno_a%beg + weno_polyn:is2_weno_a%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
 
-        @:ALLOCATE(d_cbL_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
-        @:ALLOCATE(d_cbR_y(0:weno_num_stencils, is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_y(0:weno_num_stencils, is2_weno_a%beg + weno_polyn:is2_weno_a%end - weno_polyn))
+        @:ALLOCATE(d_cbR_y(0:weno_num_stencils, is2_weno_a%beg + weno_polyn:is2_weno_a%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_y(is2_weno%beg + weno_polyn:is2_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_y(is2_weno_a%beg + weno_polyn:is2_weno_a%end - weno_polyn, 0:weno_polyn, &
                    & 0:weno_polyn*(weno_polyn + 1)/2 - 1))
 
         call s_compute_weno_coefficients(2, is2_weno)
@@ -150,16 +163,19 @@ contains
         if (p == 0) return
 
         is2_weno%beg = -buff_size; is2_weno%end = n - is2_weno%beg
+        is2_weno_a%beg = is2_weno%beg; is2_weno_a%end = n_alloc - is2_weno%beg
         is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
+        is1_weno_a%beg = is1_weno%beg; is1_weno_a%end = m_alloc - is1_weno%beg
         is3_weno%beg = -buff_size; is3_weno%end = p - is3_weno%beg
+        is3_weno_a%beg = is3_weno%beg; is3_weno_a%end = p_alloc - is3_weno%beg
 
-        @:ALLOCATE(poly_coef_cbL_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
-        @:ALLOCATE(poly_coef_cbR_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
+        @:ALLOCATE(poly_coef_cbL_z(is3_weno_a%beg + weno_polyn:is3_weno_a%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
+        @:ALLOCATE(poly_coef_cbR_z(is3_weno_a%beg + weno_polyn:is3_weno_a%end - weno_polyn, 0:weno_polyn, 0:weno_polyn - 1))
 
-        @:ALLOCATE(d_cbL_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
-        @:ALLOCATE(d_cbR_z(0:weno_num_stencils, is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn))
+        @:ALLOCATE(d_cbL_z(0:weno_num_stencils, is3_weno_a%beg + weno_polyn:is3_weno_a%end - weno_polyn))
+        @:ALLOCATE(d_cbR_z(0:weno_num_stencils, is3_weno_a%beg + weno_polyn:is3_weno_a%end - weno_polyn))
 
-        @:ALLOCATE(beta_coef_z(is3_weno%beg + weno_polyn:is3_weno%end - weno_polyn, 0:weno_polyn, &
+        @:ALLOCATE(beta_coef_z(is3_weno_a%beg + weno_polyn:is3_weno_a%end - weno_polyn, 0:weno_polyn, &
                    & 0:weno_polyn*(weno_polyn + 1)/2 - 1))
 
         call s_compute_weno_coefficients(3, is3_weno)
