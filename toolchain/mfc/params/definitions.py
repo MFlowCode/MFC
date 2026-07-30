@@ -995,7 +995,7 @@ def _load():
     _pb_attrs["shell_outer_radius"] = (REAL, _pb_tags)
     _pb_attrs["moving_ibm"] = (INT, _pb_tags)
     _pb_attrs["seed"] = (INT, _pb_tags)
-    _pb_attrs["geometry"] = (INT, _pb_tags)
+    _pb_attrs["cloud_geometry"] = (INT, _pb_tags)
     _pb_attrs["packing_method"] = (INT, _pb_tags)
     REGISTRY.register_family(
         IndexedFamily(

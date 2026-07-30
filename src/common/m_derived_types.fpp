@@ -378,7 +378,7 @@ module m_derived_types
         real(wp) :: shell_outer_radius  !< Outer radius for shell packing
         integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer  :: seed  !< Random seed for reproducible placement
-        integer  :: geometry  !< Cloud geometry: 1=box, 2=hemisphere shell
+        integer  :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell
         integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
     end type particle_cloud_parameters
 

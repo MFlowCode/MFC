@@ -1,10 +1,10 @@
-This file was created on 2026-07-26 14:14:18.646282.
+This file was created on 2026-07-29 11:48:03.167255.
 
 mfc.sh:
 
     Invocation: test --only Particle Cloud --generate -j 1
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        4aff083b73aa8f1cef0647a56deb8ea73d0874a9 on feature/particle-cloud-hemi-shell (dirty)
+    Git:        2cbc7b939197e06da80283b774858e6f2963f73e on feature/particle-cloud-hemi-shell (dirty)
 
 simulation:
 
@@ -40,7 +40,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
@@ -49,9 +49,9 @@ post_process:
         C       : AppleClang v17.0.0.17000013 (/usr/bin/cc)
         Fortran : GNU v16.1.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -74,7 +74,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
@@ -83,9 +83,9 @@ pre_process:
         C       : AppleClang v17.0.0.17000013 (/usr/bin/cc)
         Fortran : GNU v16.1.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
