@@ -23,6 +23,15 @@ module m_riemann_solver_hypo_hlld
 
     implicit none
 
+    !> Degeneracy floor for the shear-subfan impedance C_NC = rho_hat*(G_hat + tau_nn_hat), local to this solver.
+    !! Numerical-singularity guard only: the HLLD inner (shear) waves are kept whenever the subfan is numerically evaluable; at or
+    !! below the floor - including inadmissible C_NC <= 0, i.e. loss of the assumed shear-hyperbolic state - the inner waves
+    !! collapse to the HLLC limiting state, which is the finite C_NC -> 0 limit of the subfan. This is NOT a physical fluid-limit or
+    !! shear-to-acoustic-scale cutoff: soft-but-valid materials (small positive C_NC with stresses consistent with G) keep the full
+    !! HLLD subfan. The value sits far below any admissible state's shear-impedance scale in both double and single precision, so it
+    !! acts only on exact or inadmissible degeneracy plus a small margin.
+    real(wp), parameter :: C_NC_degen_floor = 1.e-12_wp
+
 contains
 
     !> Classify the position of the interface (xi = 0) in the five-wave HLLD fan: 0 left of S_L, 1..4 for the four inner wedges, 5
@@ -610,7 +619,7 @@ contains
                                 else
                                     C_NC = rho_hat*(G_hat + tau_nn_hat)
 
-                                    if (C_NC < verysmall) then
+                                    if (C_NC < C_NC_degen_floor) then
                                         ! Degenerate shear impedance: collapse inner waves to HLLC
                                         S_Lstar = S_M
                                         S_Rstar = S_M
@@ -645,7 +654,7 @@ contains
                                         #:endfor
                                     #:endfor
 
-                                    if (C_NC < verysmall) then
+                                    if (C_NC < C_NC_degen_floor) then
                                         ! Degenerate: no inner wave correction
                                         tau_tt_L_starstar = tau_tt_L_star
                                         tau_tt_R_starstar = tau_tt_R_star
