@@ -143,7 +143,7 @@ contains
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
 
-        call s_check_inputs_common()
+        call s_check_inputs_common(check_total_cells=.false., n_global=0_8)
         call s_check_inputs()
 
     end subroutine s_check_input_file
@@ -366,12 +366,13 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (down_sample) then
-                    call s_initialize_mpi_data_ds(q_cons_vf)
+                    call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
                 else
                     if (ib) then
-                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, &
+                                                   & qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                     else
-                        call s_initialize_mpi_data(q_cons_vf)
+                        call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                     end if
                 end if
 
@@ -442,9 +443,10 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                               & qbmm_mv=mv_ts(1))
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                 end if
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -813,9 +815,9 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module()
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi)
         call s_initialize_mpi_proxy_module()
-        call s_initialize_variables_conversion_module()
+        call s_initialize_variables_conversion_module(enforce_density_floor=.true., preserve_qbmm_number=.true.)
         if (grid_geometry == 3) call s_initialize_fftw_module()
 
         if (bubbles_euler) call s_initialize_bubbles_EE_module()
@@ -842,7 +844,7 @@ contains
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
 
-        call s_initialize_boundary_common_module()
+        call s_initialize_boundary_common_module(use_dirichlet_buffers=.true.)
 
         if (down_sample) then
             m_ds = int((m + 1)/3) - 1
@@ -869,7 +871,26 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
-        call s_populate_grid_variables_buffers()
+        block
+            type(int_bounds_info), dimension(3) :: grid_offsets
+
+            grid_offsets(:)%beg = buff_size
+            grid_offsets(:)%end = buff_size
+            if (n == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), &
+                                                       & global_bounds=glb_bounds)
+            else if (p == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), y_cb, &
+                                                       & y_cc, dy, global_bounds=glb_bounds)
+            else
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), y_cb, &
+                                                       & y_cc, dy, z_cb, z_cc, dz, glb_bounds)
+            end if
+        end block
+        $:GPU_UPDATE(device='[glb_bounds]')
+        dx_min = minval(dx)
+        if (n > 0) dy_min = minval(dy)
+        if (p > 0) dz_min = minval(dz)
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
@@ -995,7 +1016,7 @@ contains
 
         call s_initialize_parallel_io()
 
-        call s_mpi_decompose_computational_domain()
+        call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=.false., adjust_local_domains=.false.)
 
         bc = bc_xyz_info(bc_x, bc_y, bc_z)
 

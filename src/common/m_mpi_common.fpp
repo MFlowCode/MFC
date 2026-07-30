@@ -17,9 +17,11 @@ module m_mpi_common
     use m_helper
     use ieee_arithmetic
     use m_nvtx
-    use m_constants, only: recon_type_weno, format_silo
+    use m_constants, only: recon_type_weno
 
     implicit none
+
+    private :: s_apply_decomposition_policies
 
     integer, private :: v_size
     $:GPU_DECLARE(create='[v_size]')
@@ -40,10 +42,19 @@ module m_mpi_common
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
+    logical, private :: exchange_all_chemistry_temperatures = .false.
+    logical, private :: use_rdma_transport = .false.
+
 contains
 
     !> Initialize the module.
-    impure subroutine s_initialize_mpi_common_module
+    impure subroutine s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in, use_rdma_transport_in)
+
+        logical, intent(in) :: exchange_all_chemistry_temperatures_in
+        logical, intent(in) :: use_rdma_transport_in
+
+        exchange_all_chemistry_temperatures = exchange_all_chemistry_temperatures_in
+        use_rdma_transport = use_rdma_transport_in
 
         integer :: beta_v_size, beta_comm_size_1, beta_comm_size_2, beta_comm_size_3, beta_halo_size
 
@@ -53,7 +64,7 @@ contains
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*nnode
-        else if (chemistry .and. chem_params%diffusion) then
+        else if (chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures)) then
             v_size = sys_size + 1
         else
             v_size = sys_size
@@ -129,17 +140,25 @@ contains
     end subroutine s_mpi_initialize
 
     !> Set up MPI I/O data views and variable pointers for parallel file output.
-    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, beta)
+    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, ib_mpi_data, beta, qbmm_pb, qbmm_mv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(integer_field), optional, intent(in)           :: ib_markers
+        type(mpi_io_ib_var), optional, intent(inout)        :: ib_mpi_data
         type(scalar_field), intent(in), optional            :: beta
+        type(pres_field), intent(in), optional              :: qbmm_pb, qbmm_mv
         integer, dimension(num_dims)                        :: sizes_glb, sizes_loc
 
 #ifdef MFC_MPI
         integer :: i, j
         integer :: ierr  !< Generic flag used to identify and report MPI errors
         integer :: alt_sys
+        logical :: bind_qbmm_fields
+
+        if (present(qbmm_pb) .neqv. present(qbmm_mv)) then
+            call s_mpi_abort('QBMM MPI I/O requires both pressure and moment fields.')
+        end if
+        bind_qbmm_fields = qbmm .and. .not. polytropic .and. present(qbmm_pb) .and. present(qbmm_mv)
 
         if (present(beta)) then
             alt_sys = sys_size + 1
@@ -156,16 +175,11 @@ contains
         end if
 
         ! Additional variables pb and mv for non-polytropic qbmm
-        if (qbmm .and. .not. polytropic) then
+        if (bind_qbmm_fields) then
             do i = 1, nb
                 do j = 1, nnode
-#ifdef MFC_PRE_PROCESS
-                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb%sf(0:m,0:n,0:p,j, i)
-                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv%sf(0:m,0:n,0:p,j, i)
-#elif defined (MFC_SIMULATION)
-                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => pb_ts(1)%sf(0:m,0:n,0:p,j, i)
-                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => mv_ts(1)%sf(0:m,0:n,0:p,j, i)
-#endif
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j)%sf => qbmm_pb%sf(0:m,0:n,0:p,j, i)
+                    MPI_IO_DATA%var(sys_size + (i - 1)*nnode + j + nb*nnode)%sf => qbmm_mv%sf(0:m,0:n,0:p,j, i)
                 end do
             end do
         end if
@@ -186,56 +200,46 @@ contains
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 
-#ifndef MFC_POST_PROCESS
-        if (qbmm .and. .not. polytropic) then
+        if (bind_qbmm_fields) then
             do i = sys_size + 1, sys_size + 2*nb*nnode
                 call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, mpi_p, &
                                               & MPI_IO_DATA%view(i), ierr)
                 call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
             end do
         end if
-#endif
 
-#ifndef MFC_PRE_PROCESS
-        if (present(ib_markers)) then
-            MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m,0:n,0:p)
-
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, MPI_INTEGER, &
-                                          & MPI_IO_IB_DATA%view, ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
+        if (present(ib_markers) .neqv. present(ib_mpi_data)) then
+            call s_mpi_abort('Immersed-boundary MPI I/O requires both marker and descriptor fields.')
         end if
-#endif
+
+        if (present(ib_markers)) then
+            ib_mpi_data%var%sf => ib_markers%sf(0:m,0:n,0:p)
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, MPI_INTEGER, &
+                                          & ib_mpi_data%view, ierr)
+            call MPI_TYPE_COMMIT(ib_mpi_data%view, ierr)
+        end if
 #endif
 
     end subroutine s_initialize_mpi_data
 
     !> Set up MPI I/O data views for downsampled (coarsened) parallel file output.
-    subroutine s_initialize_mpi_data_ds(q_cons_vf)
+    subroutine s_initialize_mpi_data_ds(m_ds, n_ds, p_ds, q_cons_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer, dimension(num_dims)                        :: sizes_loc
-        integer, dimension(3)                               :: sf_start_idx
+        integer, intent(in)                                           :: m_ds, n_ds, p_ds
+        type(scalar_field), dimension(sys_size), intent(in), optional :: q_cons_vf
+        integer, dimension(num_dims)                                  :: sizes_loc
+        integer, dimension(3)                                         :: sf_start_idx
 
 #ifdef MFC_MPI
-        integer :: i, m_ds, n_ds, p_ds, ierr
+        integer :: i, ierr
 
         sf_start_idx = (/0, 0, 0/)
 
-#ifndef MFC_POST_PROCESS
-        m_ds = int((m + 1)/3) - 1
-        n_ds = int((n + 1)/3) - 1
-        p_ds = int((p + 1)/3) - 1
-#else
-        m_ds = m
-        n_ds = n
-        p_ds = p
-#endif
-
-#ifdef MFC_POST_PROCESS
-        do i = 1, sys_size
-            MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds + 1,-1:n_ds + 1,-1:p_ds + 1)
-        end do
-#endif
+        if (present(q_cons_vf)) then
+            do i = 1, sys_size
+                MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds + 1,-1:n_ds + 1,-1:p_ds + 1)
+            end do
+        end if
         ! Define global(g) and local(l) sizes for flow variables
         sizes_loc(1) = m_ds + 3
         if (n > 0) then
@@ -338,7 +342,6 @@ contains
         Rc_min_glb = Rc_min_loc
         ccfl_max_glb = ccfl_max_loc
 
-#ifdef MFC_SIMULATION
 #ifdef MFC_MPI
         block
             integer :: ierr
@@ -373,7 +376,6 @@ contains
         end if
 
         if (bubbles_lagrange) bubs_glb = bubs_loc
-#endif
 #endif
 
     end subroutine s_mpi_reduce_stability_criteria_extrema
@@ -591,14 +593,10 @@ contains
             v_size = nVar + 2*nb*nnode
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
-#ifdef MFC_SIMULATION
-        else if (present(q_T_sf) .and. chemistry .and. chem_params%diffusion) then
-#else
-        else if (present(q_T_sf) .and. chemistry) then
-            ! post_process converts cons->prim over the ghost-inclusive bounds, so the temperature
-            ! Newton guess must be valid at rank seams for EVERY chemistry run (not only diffusion):
+        else if (present(q_T_sf) .and. chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures)) then
+            ! Consumers that convert over ghost-inclusive bounds request temperature exchange for every chemistry run.
+            ! The temperature Newton guess must be valid at rank seams even when diffusion is disabled:
             ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output
-#endif
             chem_diff_comm = .true.
             v_size = nVar + 1
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
@@ -827,9 +825,8 @@ contains
         call nvtxEndRange  ! Packbuf
 
         ! Send/Recv
-#ifdef MFC_SIMULATION
         #:for rdma_mpi in [False, True]
-            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+            if (use_rdma_transport .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
                     #:call GPU_HOST_DATA(use_device_addr='[buff_send, buff_recv]')
                         call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
@@ -857,10 +854,6 @@ contains
                 #:endif
             end if
         #:endfor
-#else
-        call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-                          & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
 
         ! Unpack Received Buffer
         call nvtxStartRange("RHS-COMM-UNPACKBUF")
@@ -1218,9 +1211,8 @@ contains
         call nvtxEndRange  ! Packbuf
 
         ! Send/Recv
-#ifdef MFC_SIMULATION
         #:for rdma_mpi in [False, True]
-            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+            if (use_rdma_transport .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
                     #:call GPU_HOST_DATA(use_device_addr='[buff_send, buff_recv]')
                         call nvtxStartRange("BETA-COMM-SENDRECV-RDMA")
@@ -1248,10 +1240,6 @@ contains
                 #:endif
             end if
         #:endfor
-#else
-        call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
-                          & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
 
         ! Unpack Received Buffer (skip if no source rank)
         call nvtxStartRange("BETA-COMM-UNPACKBUF")
@@ -1349,7 +1337,12 @@ contains
     !> The purpose of this procedure is to optimally decompose the computational domain among the available processors. This is
     !! performed by attempting to award each processor, in each of the coordinate directions, approximately the same number of
     !! cells, and then recomputing the affected global parameters.
-    subroutine s_mpi_decompose_computational_domain
+    subroutine s_mpi_decompose_computational_domain(write_silo_ghost_offsets, adjust_local_domains, output_offsets, local_domains)
+
+        logical, intent(in)                                          :: write_silo_ghost_offsets
+        logical, intent(in)                                          :: adjust_local_domains
+        type(int_bounds_info), dimension(3), intent(inout), optional :: output_offsets
+        type(bounds_info), dimension(3), intent(inout), optional     :: local_domains
 
 #ifdef MFC_MPI
         !> Non-optimal number of processors in the x-, y- and z-directions
@@ -1357,12 +1350,15 @@ contains
         real(wp) :: fct_min        !< Processor factorization (fct) minimization parameter
         integer  :: MPI_COMM_CART  !< Cartesian processor topology communicator
         integer  :: rem_cells      !< Remaining cells after distribution among processors
+        integer  :: rem_cells_by_dim(3)
         integer  :: recon_order    !< WENO or MUSCL reconstruction order
         integer  :: i, j, k        !< Generic loop iterators
         integer  :: ierr           !< Generic flag used to identify and report MPI errors
 
         ! temp array to store neighbor rank coordinates
         integer, dimension(1:num_dims) :: neighbor_coords
+
+        rem_cells_by_dim = 0
 
         ! Zeroing out communication needs for moving EL bubbles/particles
         nidx(1)%beg = 0; nidx(1)%end = 0
@@ -1505,6 +1501,7 @@ contains
 
                 ! Number of remaining cells
                 rem_cells = mod(p + 1, num_procs_z)
+                rem_cells_by_dim(3) = rem_cells
 
                 ! Optimal number of cells per processor
                 p = (p + 1)/num_procs_z - 1
@@ -1532,22 +1529,6 @@ contains
                     nidx(3)%end = 1
                 end if
 
-#ifdef MFC_POST_PROCESS
-                ! Ghost zone at the beginning
-                if (proc_coords(3) > 0 .and. format == format_silo) then
-                    offset_z%beg = 2
-                else
-                    offset_z%beg = 0
-                end if
-
-                ! Ghost zone at the end
-                if (proc_coords(3) < num_procs_z - 1 .and. format == format_silo) then
-                    offset_z%end = 2
-                else
-                    offset_z%end = 0
-                end if
-#endif
-
                 ! Beginning and end sub-domain boundary locations
                 if (parallel_io) then
                     if (proc_coords(3) < rem_cells) then
@@ -1555,21 +1536,6 @@ contains
                     else
                         start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
                     end if
-                else
-#ifdef MFC_PRE_PROCESS
-                    if (old_grid .neqv. .true.) then
-                        dz = (z_domain%end - z_domain%beg)/real(p_glb + 1, wp)
-
-                        if (proc_coords(3) < rem_cells) then
-                            z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3))
-                            z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1) - (num_procs_z &
-                                                                  & - rem_cells))
-                        else
-                            z_domain%beg = z_domain%beg + dz*real((p + 1)*proc_coords(3) + rem_cells)
-                            z_domain%end = z_domain%end - dz*real((p + 1)*(num_procs_z - proc_coords(3) - 1))
-                        end if
-                    end if
-#endif
                 end if
 
                 ! 2D Cartesian Processor Topology
@@ -1619,6 +1585,7 @@ contains
 
             ! Number of remaining cells
             rem_cells = mod(n + 1, num_procs_y)
+            rem_cells_by_dim(2) = rem_cells
 
             ! Optimal number of cells per processor
             n = (n + 1)/num_procs_y - 1
@@ -1646,22 +1613,6 @@ contains
                 nidx(2)%end = 1
             end if
 
-#ifdef MFC_POST_PROCESS
-            ! Ghost zone at the beginning
-            if (proc_coords(2) > 0 .and. format == format_silo) then
-                offset_y%beg = 2
-            else
-                offset_y%beg = 0
-            end if
-
-            ! Ghost zone at the end
-            if (proc_coords(2) < num_procs_y - 1 .and. format == format_silo) then
-                offset_y%end = 2
-            else
-                offset_y%end = 0
-            end if
-#endif
-
             ! Beginning and end sub-domain boundary locations
             if (parallel_io) then
                 if (proc_coords(2) < rem_cells) then
@@ -1669,21 +1620,6 @@ contains
                 else
                     start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
                 end if
-            else
-#ifdef MFC_PRE_PROCESS
-                if (old_grid .neqv. .true.) then
-                    dy = (y_domain%end - y_domain%beg)/real(n_glb + 1, wp)
-
-                    if (proc_coords(2) < rem_cells) then
-                        y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2))
-                        y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1) - (num_procs_y &
-                                                              & - rem_cells))
-                    else
-                        y_domain%beg = y_domain%beg + dy*real((n + 1)*proc_coords(2) + rem_cells)
-                        y_domain%end = y_domain%end - dy*real((n + 1)*(num_procs_y - proc_coords(2) - 1))
-                    end if
-                end if
-#endif
             end if
 
             ! 1D Cartesian Processor Topology
@@ -1702,6 +1638,7 @@ contains
 
         ! Number of remaining cells
         rem_cells = mod(m + 1, num_procs_x)
+        rem_cells_by_dim(1) = rem_cells
 
         ! Optimal number of cells per processor
         m = (m + 1)/num_procs_x - 1
@@ -1731,22 +1668,6 @@ contains
             nidx(1)%end = 1
         end if
 
-#ifdef MFC_POST_PROCESS
-        ! Ghost zone at the beginning
-        if (proc_coords(1) > 0 .and. format == format_silo) then
-            offset_x%beg = 2
-        else
-            offset_x%beg = 0
-        end if
-
-        ! Ghost zone at the end
-        if (proc_coords(1) < num_procs_x - 1 .and. format == format_silo) then
-            offset_x%end = 2
-        else
-            offset_x%end = 0
-        end if
-#endif
-
         ! Beginning and end sub-domain boundary locations
         if (parallel_io) then
             if (proc_coords(1) < rem_cells) then
@@ -1754,21 +1675,11 @@ contains
             else
                 start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
             end if
-        else
-#ifdef MFC_PRE_PROCESS
-            if (old_grid .neqv. .true.) then
-                dx = (x_domain%end - x_domain%beg)/real(m_glb + 1, wp)
-
-                if (proc_coords(1) < rem_cells) then
-                    x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1))
-                    x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1) - (num_procs_x - rem_cells))
-                else
-                    x_domain%beg = x_domain%beg + dx*real((m + 1)*proc_coords(1) + rem_cells)
-                    x_domain%end = x_domain%end - dx*real((m + 1)*(num_procs_x - proc_coords(1) - 1))
-                end if
-            end if
-#endif
         end if
+
+        call s_apply_decomposition_policies((/num_procs_x, num_procs_y, num_procs_z/), rem_cells_by_dim, (/m, n, p/), (/m_glb, &
+                                            & n_glb, p_glb/), write_silo_ghost_offsets, &
+                                            & adjust_local_domains .and. (.not. parallel_io), output_offsets, local_domains)
 
         @:ALLOCATE(neighbor_ranks(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end))
         do k = nidx(3)%beg, nidx(3)%end
@@ -1787,115 +1698,123 @@ contains
 
     end subroutine s_mpi_decompose_computational_domain
 
-    !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
-    !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of
-    !! cell-boundary locations may be calculated directly from those of the cell-width distributions.
-#ifndef MFC_PRE_PROCESS
-    subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc, offset)
+    !> Apply executable-configured output and local-domain policies after the shared Cartesian decomposition.
+    subroutine s_apply_decomposition_policies(proc_counts, remainders, local_cells, global_cells, write_silo_ghost_offsets, &
+        & adjust_local_domains, output_offsets, local_domains)
 
-        integer, intent(in) :: mpi_dir
-        integer, intent(in) :: pbc_loc
-        !> Ghost layers for cell-boundary arrays (buff_size in simulation, module offset_* in post-process)
-        type(int_bounds_info), intent(in) :: offset
+        integer, dimension(3), intent(in)                            :: proc_counts, remainders, local_cells, global_cells
+        logical, intent(in)                                          :: write_silo_ghost_offsets, adjust_local_domains
+        type(int_bounds_info), dimension(3), intent(inout), optional :: output_offsets
+        type(bounds_info), dimension(3), intent(inout), optional     :: local_domains
+        integer                                                      :: dim
+        real(wp)                                                     :: domain_beg, domain_end, spacing
 
-#ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
-        integer :: i
+        if (write_silo_ghost_offsets .and. .not. present(output_offsets)) then
+            call s_mpi_abort('Silo ghost-offset policy requires output offset storage.')
+        end if
+        if (adjust_local_domains .and. .not. present(local_domains)) then
+            call s_mpi_abort('Local-domain adjustment policy requires domain storage.')
+        end if
 
-        if (mpi_dir == 1) then
-            if (pbc_loc == -1) then  ! PBC at the beginning
-                if (bc_x%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(-buff_size), buff_size, mpi_p, &
-                                      & bc_x%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(-buff_size), buff_size, mpi_p, bc_x%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%beg
-                    x_cb(-1 - i) = x_cb(-i) - dx(-i)
-                end do
-                do i = 1, buff_size
-                    x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
-                end do
-            else  ! PBC at the end
-                if (bc_x%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dx(0), buff_size, mpi_p, bc_x%beg, 1, dx(m + 1), buff_size, mpi_p, bc_x%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dx(m - buff_size + 1), buff_size, mpi_p, bc_x%end, 0, dx(m + 1), buff_size, mpi_p, &
-                                      & bc_x%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%end
-                    x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
-                end do
-                do i = 1, buff_size
-                    x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
-                end do
-            end if
-        else if (mpi_dir == 2) then
-            if (pbc_loc == -1) then  ! PBC at the beginning
-                if (bc_y%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(-buff_size), buff_size, mpi_p, &
-                                      & bc_y%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(-buff_size), buff_size, mpi_p, bc_y%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%beg
-                    y_cb(-1 - i) = y_cb(-i) - dy(-i)
-                end do
-                do i = 1, buff_size
-                    y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
-                end do
-            else  ! PBC at the end
-                if (bc_y%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dy(0), buff_size, mpi_p, bc_y%beg, 1, dy(n + 1), buff_size, mpi_p, bc_y%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dy(n - buff_size + 1), buff_size, mpi_p, bc_y%end, 0, dy(n + 1), buff_size, mpi_p, &
-                                      & bc_y%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%end
-                    y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
-                end do
-                do i = 1, buff_size
-                    y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
-                end do
-            end if
-        else
-            if (pbc_loc == -1) then  ! PBC at the beginning
-                if (bc_z%end >= 0) then  ! PBC at the beginning and end
-                    call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(-buff_size), buff_size, mpi_p, &
-                                      & bc_z%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the beginning only
-                    call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(-buff_size), buff_size, mpi_p, bc_z%beg, 0, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%beg
-                    z_cb(-1 - i) = z_cb(-i) - dz(-i)
-                end do
-                do i = 1, buff_size
-                    z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
-                end do
-            else  ! PBC at the end
-                if (bc_z%beg >= 0) then  ! PBC at the end and beginning
-                    call MPI_SENDRECV(dz(0), buff_size, mpi_p, bc_z%beg, 1, dz(p + 1), buff_size, mpi_p, bc_z%end, 1, &
-                                      & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                else  ! PBC at the end only
-                    call MPI_SENDRECV(dz(p - buff_size + 1), buff_size, mpi_p, bc_z%end, 0, dz(p + 1), buff_size, mpi_p, &
-                                      & bc_z%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                end if
-                do i = 1, offset%end
-                    z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
-                end do
-                do i = 1, buff_size
-                    z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
+        if (present(output_offsets)) then
+            do dim = 1, 3
+                output_offsets(dim)%beg = 0
+                output_offsets(dim)%end = 0
+            end do
+
+            if (write_silo_ghost_offsets) then
+                do dim = 1, num_dims
+                    if (proc_coords(dim) > 0) output_offsets(dim)%beg = 2
+                    if (proc_coords(dim) < proc_counts(dim) - 1) output_offsets(dim)%end = 2
                 end do
             end if
         end if
+
+        if (adjust_local_domains) then
+            do dim = 1, num_dims
+                domain_beg = local_domains(dim)%beg
+                domain_end = local_domains(dim)%end
+                spacing = (domain_end - domain_beg)/real(global_cells(dim) + 1, wp)
+
+                select case (dim)
+                case (1)
+                    dx_min = spacing
+                case (2)
+                    dy_min = spacing
+                case (3)
+                    dz_min = spacing
+                end select
+
+                if (proc_coords(dim) < remainders(dim)) then
+                    local_domains(dim)%beg = domain_beg + spacing*real((local_cells(dim) + 1)*proc_coords(dim), wp)
+                    local_domains(dim)%end = domain_end - spacing*real((local_cells(dim) + 1)*(proc_counts(dim) - proc_coords(dim) &
+                                  & - 1) - (proc_counts(dim) - remainders(dim)), wp)
+                else
+                    local_domains(dim)%beg = domain_beg + spacing*real((local_cells(dim) + 1)*proc_coords(dim) + remainders(dim), &
+                                  & wp)
+                    local_domains(dim)%end = domain_end - spacing*real((local_cells(dim) + 1)*(proc_counts(dim) - proc_coords(dim) &
+                                  & - 1), wp)
+                end if
+            end do
+        end if
+
+    end subroutine s_apply_decomposition_policies
+
+    !> The goal of this procedure is to populate the buffers of the grid variables by communicating with the neighboring processors.
+    !! Note that only the buffers of the cell-width distributions are handled in such a way. This is because the buffers of
+    !! cell-boundary locations may be calculated directly from those of the cell-width distributions.
+    subroutine s_mpi_sendrecv_grid_variable_buffer(cell_boundaries, cell_centers, cell_widths, num_cells, bc_bounds, pbc_loc, &
+        & offset)
+
+        integer, intent(in)               :: num_cells, pbc_loc
+        type(int_bounds_info), intent(in) :: bc_bounds, offset
+        ! Contiguous so that passing an element to MPI is a plain address, with no descriptor
+        ! or copy-in/copy-out. Every actual argument is a whole module array. The attribute must
+        ! be on ALL THREE, and on every frame that forwards them: CCE 19 IPA drops the stores to
+        ! the non-contiguous dummies when one call mixes contiguous and non-contiguous arrays.
+        real(wp), contiguous, intent(inout) :: cell_boundaries(-1 - offset%beg:)
+        real(wp), contiguous, intent(inout) :: cell_centers(-buff_size:)
+        real(wp), contiguous, intent(inout) :: cell_widths(-buff_size:)
+
+#ifdef MFC_MPI
+        integer :: ierr
+        integer :: i
+
+        if (pbc_loc == -1) then
+            if (bc_bounds%end >= 0) then
+                call MPI_SENDRECV(cell_widths(num_cells - buff_size + 1), buff_size, mpi_p, bc_bounds%end, 0, &
+                                  & cell_widths(-buff_size), buff_size, mpi_p, bc_bounds%beg, 0, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+            else
+                call MPI_SENDRECV(cell_widths(0), buff_size, mpi_p, bc_bounds%beg, 1, cell_widths(-buff_size), buff_size, mpi_p, &
+                                  & bc_bounds%beg, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            end if
+            do i = 1, offset%beg
+                cell_boundaries(-1 - i) = cell_boundaries(-i) - cell_widths(-i)
+            end do
+            do i = 1, buff_size
+                cell_centers(-i) = cell_centers(1 - i) - (cell_widths(1 - i) + cell_widths(-i))/2._wp
+            end do
+        else
+            if (bc_bounds%beg >= 0) then
+                call MPI_SENDRECV(cell_widths(0), buff_size, mpi_p, bc_bounds%beg, 1, cell_widths(num_cells + 1), buff_size, &
+                                  & mpi_p, bc_bounds%end, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            else
+                call MPI_SENDRECV(cell_widths(num_cells - buff_size + 1), buff_size, mpi_p, bc_bounds%end, 0, &
+                                  & cell_widths(num_cells + 1), buff_size, mpi_p, bc_bounds%end, 1, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+            end if
+            do i = 1, offset%end
+                cell_boundaries(num_cells + i) = cell_boundaries(num_cells + i - 1) + cell_widths(num_cells + i)
+            end do
+            do i = 1, buff_size
+                cell_centers(num_cells + i) = cell_centers(num_cells + i - 1) + (cell_widths(num_cells + i - 1) &
+                             & + cell_widths(num_cells + i))/2._wp
+            end do
+        end if
 #endif
 
-    end subroutine s_mpi_sendrecv_grid_variables_buffers
+    end subroutine s_mpi_sendrecv_grid_variable_buffer
 
     !> Populate the local cell-boundary, cell-center, and cell-width arrays in one direction directly from the global cell-boundary
     !! array. This guarantees that every rank sees bitwise-identical values at any shared physical cell or boundary
@@ -1975,7 +1894,6 @@ contains
         end do
 
     end subroutine s_apply_grid_from_global_dim
-#endif
 
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_mpi_common_module

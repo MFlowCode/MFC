@@ -161,7 +161,7 @@
         ! Smoothening function to smooth out sharp discontinuity in the interface
         if (x_cc(i) <= 0.7_wp*lam) then
             d = x_cc(i) - lam*(0.4_wp - 0.1_wp*sin(2.0_wp*pi*(y_cc(j)/lam + 0.25_wp)))
-            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx*dy))))
+            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx_min*dy_min))))
             alpha_air = eps + (1.0_wp - 2.0_wp*eps)*fsm
             alpha_sf6 = 1.0_wp - alpha_air
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alpha_sf6*5.04_wp
