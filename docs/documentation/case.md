@@ -117,7 +117,7 @@ is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's
 | `n_start_old`    | Integer        | Starting index from previous simulation   |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
-- `active_box` enables the causal-envelope active-box optimization, restricting the RHS compute window to the region where the solution deviates from a uniform ambient state. Single-rank only: with more than one MPI rank the optimization disables itself with a warning (full-domain compute). Requires WENO reconstruction (`recon_type = 1`) and SSP-RK3 time stepping (`time_stepper = 3`). Incompatible with immersed boundaries, acoustic sources, body forces, Euler-Euler and Lagrangian bubbles, phase change, and the IGR solver.
+- `active_box` enables the causal-envelope active-box optimization, restricting the RHS compute window to the region where the solution deviates from a uniform ambient state. Single-rank only: more than one MPI rank is rejected at input check. A single global active region would leave the ranks it does not cover idle, so multi-rank support is a load-balancing problem and is deferred. Requires WENO reconstruction (`recon_type = 1`) and SSP-RK3 time stepping (`time_stepper = 3`). Incompatible with immersed boundaries, acoustic sources, body forces, Euler-Euler and Lagrangian bubbles, phase change, and the IGR solver.
 - `rdma_mpi` optimizes data transfers between GPUs using Remote Direct Memory Access (RDMA).
 The underlying MPI implementation and communication infrastructure must support this
 feature, detecting GPU pointers and performing RDMA accordingly.
