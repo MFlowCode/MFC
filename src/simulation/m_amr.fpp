@@ -23,7 +23,7 @@ module m_amr
         & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
-    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, freg, creg
+    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps, ib_markers
@@ -1086,26 +1086,6 @@ contains
 #endif
 
     end subroutine s_amr_recv_parent_patch
-
-    !> Parent-fine footprint of block k inside its parent pblk, from REPLICATED metadata only, so every rank computes the same box
-    !! (the parent owner needs it to pack, and its own amr_isect_lo/hi for k is the empty non-owner footprint). Mirrors the level>=2
-    !! branch of s_set_amr_fine_geometry exactly; rr is the global amr_ref_ratio because a level>=2 block's parent is never an L0
-    !! tile (the only slot with a per-slot ratio of 1).
-    pure subroutine s_amr_parent_foot(k, pblk, plo, phi)
-
-        integer, intent(in)  :: k, pblk
-        integer, intent(out) :: plo(3), phi(3)
-        integer              :: d, rr
-
-        rr = amr_ref_ratio
-        do d = 1, 3
-            plo(d) = rr*(amr_region_lo_all(d, k) - amr_region_lo_all(d, pblk))
-            phi(d) = rr*(amr_region_hi_all(d, k) - amr_region_lo_all(d, pblk)) + (rr - 1)
-        end do
-        if (n_glb == 0) then; plo(2) = 0; phi(2) = 0; end if
-        if (p_glb == 0) then; plo(3) = 0; phi(3) = 0; end if
-
-    end subroutine s_amr_parent_foot
 
     !> DEVICE pack of the parent's fine patch into a flat buffer. Same index map as s_amr_copy_parent_patch, writing the send buffer
     !! instead of amr_cg, so the two sides of the P2P gather cannot drift apart.
@@ -2555,19 +2535,69 @@ contains
 
     end subroutine s_amr_restrict_to_parent
 
+    !> Deliver the current level>=2 block's fine flux registers to its PARENT block's owner, which holds the matching creg and
+    !! applies the correction. One blocking send/recv pair per dimension, mirroring s_amr_p2p_reflux_faces:
+    !! freg(d)%lo/hi(:,:,:,slot) is CONTIGUOUS (trailing slot index fixed, leading dims full), so it goes on the wire with no pack
+    !! and its GPU_UPDATE is a contiguous transfer. Several remote children of one parent reuse these tags, which is safe because
+    !! MPI does not overtake between a fixed (source, tag, comm) triple and both owners walk the sibling loop in the same replicated
+    !! block order. Tag base is disjoint from s_amr_p2p_reflux_faces so an L0/L1 delivery can never be mistaken for a parent
+    !! delivery.
+    impure subroutine s_amr_p2p_freg_to_parent(pblk)
+
+        integer, intent(in) :: pblk
+
+#ifdef MFC_MPI
+        integer :: cowner, powner, cnt, ierr
+
+        cowner = amr_block_owner(amr_cur)
+        powner = amr_block_owner(pblk)
+        if (proc_rank == cowner) then
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    call MPI_SEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, powner, ${40 + 2*D}$, MPI_COMM_WORLD, ierr)
+                    call MPI_SEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, powner, ${41 + 2*D}$, MPI_COMM_WORLD, ierr)
+                end if
+            #:endfor
+        else
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, cowner, ${40 + 2*D}$, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+                    call MPI_RECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, cowner, ${41 + 2*D}$, MPI_COMM_WORLD, &
+                                  & MPI_STATUS_IGNORE, ierr)
+                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                end if
+            #:endfor
+        end if
+#endif
+
+    end subroutine s_amr_p2p_freg_to_parent
+
     !> Multi-level reflux: apply the Berger-Colella C/F flux correction from the current level>=2 block into its PARENT block's
     !! cells just OUTSIDE the block footprint, in the parent-fine frame (mirror of the L0 s_amr_apply_reflux targeted at the parent
     !! - "the coarse" is level l-1). State form: q_parent(outside) += dt*(F_coarse - Fbar_fine)/dxf on the low face and +=
     !! dt*(Fbar_fine - F_coarse)/dxf on the high face, where Fbar_fine is the child-averaged fine register. creg/freg key off this
-    !! block's slot. np=1 local; the np>=2 P2P freg delivery is future work. Per-face parent-fine dx (stretched-grid safe).
+    !! block's slot. Per-face parent-fine dx (stretched-grid safe).
+    !!
+    !! The PARENT's owner applies: it holds the parent field and the parent-side creg (captured over its own advance). Only freg
+    !! crosses the wire, and only when the two owners differ - under tower co-location they never do, so this is byte-identical to
+    !! the previous owner-local form. BOTH participants must reach this routine or the P2P pair deadlocks (cf. the restrict).
     impure subroutine s_amr_reflux_to_parent(dt_reflux)
 
         real(wp), intent(in) :: dt_reflux
-        integer              :: pblk, d, y, olo(3), ohi(3), glo(3), ghi(3), woff(3)
+        integer              :: pblk, d, y, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
         real(wp)             :: w_lo(3), w_hi(3), mlo(3), mhi(3)
+        logical              :: own_child, own_parent
 
-        if (.not. amr_rank_owns_block) return  ! np>=2: child+parent co-located; only the owner refluxes locally
         pblk = f_amr_parent_block(amr_cur)
+        own_child = amr_rank_owns_block
+        own_parent = (amr_block_owner(pblk) == proc_rank)
+        if (.not. (own_child .or. own_parent)) return
+        if (own_child .neqv. own_parent) call s_amr_p2p_freg_to_parent(pblk)
+        if (.not. own_parent) return
         ! max_grid_size tiling of a level>=2 feature: a face shared with an ADJACENT sibling tile (same parent) is fine-fine, not a
         ! c/f boundary - its "outside" parent cell is covered by the sibling's restrict, so refluxing there double-writes and leaks.
         ! Skip those faces (weight 0); the fine-fine halo already matched the shared seam flux. No siblings -> all weights 1
@@ -2585,17 +2615,22 @@ contains
         ! transverse write at the isect origin. Per-face parent-fine cell widths - dx at the low/high OUTSIDE cell (olo/ohi),
         ! mirroring the L0/L1 s_amr_apply_reflux_state so a stretched parent grid corrects each C/F face with its own width (on a
         ! uniform grid dx is constant, so this is byte-identical to the previous single-dxf form).
+        ! Footprint from REPLICATED metadata (s_amr_parent_foot), not amr_isect_lo/hi: on the parent's owner the child's own isect
+        ! is
+        ! the empty non-owner sentinel whenever the two differ. Identical box while co-located. rr likewise comes from the global
+        ! amr_ref_ratio rather than amr_slots(amr_cur), whose slot need not be allocated on this rank.
+        call s_amr_parent_foot(amr_cur, pblk, plo, phi)
         olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; mlo = 1._wp; mhi = 1._wp
         do d = 1, num_dims
-            olo(d) = amr_isect_lo(d) - 1; ohi(d) = amr_isect_hi(d) + 1
-            ghi(d) = amr_isect_hi(d) - amr_isect_lo(d)
-            woff(d) = amr_isect_lo(d)
+            olo(d) = plo(d) - 1; ohi(d) = phi(d) + 1
+            ghi(d) = phi(d) - plo(d)
+            woff(d) = plo(d)
         end do
         mlo(1) = amr_slots(pblk)%dx(olo(1)); mhi(1) = amr_slots(pblk)%dx(ohi(1))
         if (n_glb > 0) then; mlo(2) = amr_slots(pblk)%dy(olo(2)); mhi(2) = amr_slots(pblk)%dy(ohi(2)); end if
         if (p_glb > 0) then; mlo(3) = amr_slots(pblk)%dz(olo(3)); mhi(3) = amr_slots(pblk)%dz(ohi(3)); end if
-        call s_amr_reflux_apply_faces(amr_slots(pblk)%q_cons, amr_cur, amr_slots(amr_cur)%amr_ref_ratio, dt_reflux, olo, ohi, &
-                                      & glo, ghi, woff, w_lo, w_hi, mlo, mhi)
+        call s_amr_reflux_apply_faces(amr_slots(pblk)%q_cons, amr_cur, amr_ref_ratio, dt_reflux, olo, ohi, glo, ghi, woff, w_lo, &
+                                      & w_hi, mlo, mhi)
 
     end subroutine s_amr_reflux_to_parent
 
@@ -4665,13 +4700,15 @@ contains
             if (amr_block_level(kc) /= clev) cycle
             if (f_amr_parent_block(kc) /= pslot_l) cycle
             call s_amr_select_slot(kc)
-            ! The restrict is a P2P pair when child and parent are on different ranks, so BOTH participants must reach it or the
-            ! receiver never posts and the pair deadlocks. Owner-only work (relax, reflux) stays behind the owner guard.
+            ! The restrict and the reflux are each a P2P pair when child and parent are on different ranks, so BOTH participants
+            ! must reach them or the receiver never posts and the pair deadlocks. Owner-only work (relax) stays behind the guard.
             if (amr_rank_owns_block) then
                 if (relax) call s_amr_relax_fine()
             end if
-            if (amr_rank_owns_block .or. amr_block_owner(f_amr_parent_block(kc)) == proc_rank) call s_amr_restrict_to_parent()
-            if (amr_rank_owns_block) call s_amr_reflux_to_parent(dt_sub)
+            if (amr_rank_owns_block .or. amr_block_owner(f_amr_parent_block(kc)) == proc_rank) then
+                call s_amr_restrict_to_parent()
+                call s_amr_reflux_to_parent(dt_sub)
+            end if
         end do
         call s_amr_select_slot(pslot_l)  ! restore the parent's mirrors for its next substep
 

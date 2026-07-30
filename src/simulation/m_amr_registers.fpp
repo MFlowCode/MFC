@@ -39,7 +39,8 @@ module m_amr_registers
     implicit none
 
     private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_amr_zero_fine_registers, &
-        & s_amr_apply_reflux_state, s_finalize_amr_registers, s_amr_reflux_face_flags, s_amr_reflux_apply_faces, freg, creg
+        & s_amr_apply_reflux_state, s_finalize_amr_registers, s_amr_reflux_face_flags, s_amr_reflux_apply_faces, &
+        & s_amr_parent_foot, freg, creg
 
     !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
@@ -180,6 +181,27 @@ contains
 
     end subroutine s_initialize_amr_registers
 
+    !> Parent-fine footprint of block k inside its parent pblk, from REPLICATED metadata only, so every rank computes the same box
+    !! (a rank needs it for a block it does NOT own, whose own amr_isect_lo/hi is the empty non-owner footprint). Mirrors the
+    !! level>=2 branch of s_set_amr_fine_geometry exactly; rr is the global amr_ref_ratio because a level>=2 block's parent is never
+    !! an L0 tile (the only slot with a per-slot ratio of 1). Lives here rather than in m_amr so the child-creg capture below and
+    !! m_amr's P2P gather/restrict/reflux share one copy of the formula ("use m_amr" would cycle).
+    pure subroutine s_amr_parent_foot(k, pblk, plo, phi)
+
+        integer, intent(in)  :: k, pblk
+        integer, intent(out) :: plo(3), phi(3)
+        integer              :: d, rr
+
+        rr = amr_ref_ratio
+        do d = 1, 3
+            plo(d) = rr*(amr_region_lo_all(d, k) - amr_region_lo_all(d, pblk))
+            phi(d) = rr*(amr_region_hi_all(d, k) - amr_region_lo_all(d, pblk)) + (rr - 1)
+        end do
+        if (n_glb == 0) then; plo(2) = 0; phi(2) = 0; end if
+        if (p_glb == 0) then; plo(3) = 0; phi(3) = 0; end if
+
+    end subroutine s_amr_parent_foot
+
     !> Shared creg boundary-flux capture (dense eq range), BATCHED over the slot dimension: for each active slot in [1:nb],
     !! creg(id)%lo/hi(eq, t1, t2, slot) [+=/=] cf * flux(face, bo1(slot)+t1, bo2(slot)+t2) for eq in [eqb:eqe], over the per-slot
     !! transverse window [bt1lo:bt1hi] x [bt2lo:bt2hi]. acc=.true. accumulates, .false. overwrites (the merge picks the old value or
@@ -303,7 +325,7 @@ contains
         type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
         integer                        :: eq, t1, t2, jlo, jhi, t1_lo, t1_hi, t2_lo, t2_hi, o1, o2, islot, save_cur
-        integer                        :: sidx(3), ext(3), tlo(3), thi(3), kc, dch, maxt1, maxt2
+        integer                        :: sidx(3), ext(3), tlo(3), thi(3), cflo(3), cfhi(3), kc, dch, maxt1, maxt2
         logical                        :: own_lo(3), own_hi(3), cap_lo, cap_hi
         real(wp)                       :: coef, ccoef
         logical                        :: accum, cacc, is_child
@@ -468,30 +490,34 @@ contains
             ! creg holds the rk3_w-weighted step-integral flux for the once-per-step STATE reflux into this parent
             ! (s_amr_reflux_to_parent). Captures the TOTAL flux - advective (flux_dir), then viscous (flux_src, mom..E), then
             ! chemistry species+energy - mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves (no
-            ! checker gate). np=1 (children co-owned with the parent); np>=2 P2P delivery is future work.
+            ! checker gate). creg is the PARENT's OWN flux, so the parent owner captures it for EVERY child of this block -
+            ! including children owned by another rank, which supply only the matching freg (s_amr_p2p_freg_to_parent). Framing
+            ! therefore comes from s_amr_parent_foot (replicated metadata), NOT amr_isect_*_all(:,kc), which is the empty sentinel
+            ! for a child this rank does not own. Under tower co-location every child IS owned, so this captures the identical set.
             ! Fill per-slot (per-child) geometry, then one batched kernel per capture category. Each child is its OWN creg slot
-            ! (slot=kc); both faces always owned (child co-located), t1lo=t2lo=0.
+            ! (slot=kc); both faces always owned (the parent spans the whole child footprint), t1lo=t2lo=0.
             ccoef = rk3_w(stage); cacc = (stage > 1)
             bactive = .false.
             maxt1 = 0; maxt2 = 0
             do kc = 1, amr_num_blocks
-                if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1 .or. .not. amr_owns_all(kc)) cycle
+                if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1) cycle
                 is_child = .true.
                 do dch = 1, 3
                     is_child = is_child .and. amr_region_lo_all(dch, kc) <= amr_region_hi_all(dch, &
                         & amr_cur) .and. amr_region_hi_all(dch, kc) >= amr_region_lo_all(dch, amr_cur)
                 end do
                 if (.not. is_child) cycle
+                call s_amr_parent_foot(kc, amr_cur, cflo, cfhi)
                 select case (id)
-                case (1); jlo = amr_isect_lo_all(1, kc) - 1; jhi = amr_isect_hi_all(1, kc)
-                    o1 = amr_isect_lo_all(2, kc); t1_hi = amr_isect_hi_all(2, kc) - amr_isect_lo_all(2, kc)
-                    o2 = amr_isect_lo_all(3, kc); t2_hi = amr_isect_hi_all(3, kc) - amr_isect_lo_all(3, kc)
-                case (2); jlo = amr_isect_lo_all(2, kc) - 1; jhi = amr_isect_hi_all(2, kc)
-                    o1 = amr_isect_lo_all(1, kc); t1_hi = amr_isect_hi_all(1, kc) - amr_isect_lo_all(1, kc)
-                    o2 = amr_isect_lo_all(3, kc); t2_hi = amr_isect_hi_all(3, kc) - amr_isect_lo_all(3, kc)
-                case (3); jlo = amr_isect_lo_all(3, kc) - 1; jhi = amr_isect_hi_all(3, kc)
-                    o1 = amr_isect_lo_all(1, kc); t1_hi = amr_isect_hi_all(1, kc) - amr_isect_lo_all(1, kc)
-                    o2 = amr_isect_lo_all(2, kc); t2_hi = amr_isect_hi_all(2, kc) - amr_isect_lo_all(2, kc)
+                case (1); jlo = cflo(1) - 1; jhi = cfhi(1)
+                    o1 = cflo(2); t1_hi = cfhi(2) - cflo(2)
+                    o2 = cflo(3); t2_hi = cfhi(3) - cflo(3)
+                case (2); jlo = cflo(2) - 1; jhi = cfhi(2)
+                    o1 = cflo(1); t1_hi = cfhi(1) - cflo(1)
+                    o2 = cflo(3); t2_hi = cfhi(3) - cflo(3)
+                case (3); jlo = cflo(3) - 1; jhi = cfhi(3)
+                    o1 = cflo(1); t1_hi = cfhi(1) - cflo(1)
+                    o2 = cflo(2); t2_hi = cfhi(2) - cflo(2)
                 end select
                 bactive(kc) = .true.; bclo(kc) = .true.; bchi(kc) = .true.
                 bjlo(kc) = jlo; bjhi(kc) = jhi; bo1(kc) = o1; bo2(kc) = o2
