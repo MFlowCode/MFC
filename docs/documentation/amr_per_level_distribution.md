@@ -175,9 +175,16 @@ These are structural, not tuning knobs, and each sets a floor on achievable bala
 - **Granularity floor.** A level cannot be balanced across more ranks than it has boxes. In
   `s_amr_sfc_cut` a level holding one box always lands on rank 0 (the loop assigns `r = 0` and
   advances only once cumulative weight crosses a share boundary), so a shallow hierarchy leaves
-  ranks idle *by construction*. Scaling therefore requires `boxes_per_level >> num_procs`, which
-  is what the absolute cap `amr_max_grid_size` exists to deliver — the cap and the balancer are
-  one mechanism, not two.
+  ranks holding *no block at that level* by construction. Scaling therefore requires
+  `boxes_per_level >> num_procs`, which is what the absolute cap `amr_max_grid_size` exists to
+  deliver — the cap and the balancer are one mechanism, not two.
+
+  **This is not idleness, and the `[amr-balance]` counter must not be read as if it were.** A rank
+  holding no level-`L` block still owns level-0 work — level 0 covers every rank always — and may
+  own blocks at other levels. Even the TOTAL line's counter means only "owns no *fine* block". The
+  counters are named `no_blocks_ranks` / `ranks_with_no_fine_block` for exactly this reason. Idleness
+  is measurable only from `m_rank_timing`; a granularity-floor count is an upper bound on the harm,
+  never a measurement of it.
 - **Indivisible atom.** The cut is contiguous in Morton order and cannot split a box, so
   imbalance is bounded below by the heaviest single block's weight. As ranks grow, mean per-rank
   weight falls while that floor does not, so imbalance rises unless the cap falls with it.
@@ -228,11 +235,17 @@ them are load-bearing and a reader retracing the work needs them. Steps 5-7 are 
 
 ### Next
 
-5. **Instrument balance.** Report per-level and total `max/mean` assigned weight, alongside the
-   `m_rank_timing` measured per-rank time. Until this exists the balancer is unmeasured: steps 1-4
-   are gated on correctness and on end-to-end s/step, neither of which distinguishes "balanced"
-   from "uniformly slow". This is the smallest step that makes the rest falsifiable, so it comes
-   before any further tuning.
+5. **Instrument balance.** LANDED (`fc53e097`): `s_amr_report_balance` prints per-level and total
+   `max/mean` assigned weight plus the no-block rank count, gated behind `load_weight_wrt`. It needs
+   no MPI — `wt`, `amr_block_level` and `amr_block_owner` are replicated, so rank 0 prints.
+   The `m_rank_timing` half is NOT done, and it is the half that measures idleness rather than
+   inferring it; step 6 should not be read as complete until the model can be checked against
+   measured per-rank time.
+
+   First result: at np=2 the metric is already ~1.005-1.05, i.e. step 4 had no headroom to recover;
+   at np=8 the benchmark collapses to ~2 boxes per level and both distribution schemes produce
+   byte-identical assignments. **Box supply binds, not the owner mapping** — which points at
+   `amr_max_grid_size` and regrid box production, not at distribution.
 6. **Exercise the cost model.** Add a cost-heterogeneous benchmark (IB or phase change) with
    `load_weight_wrt` on. Every AMR benchmark to date is geometry-only, so `K_ib`/`K_pc` have never
    influenced a measured assignment.
