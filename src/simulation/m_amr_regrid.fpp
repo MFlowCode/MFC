@@ -1083,8 +1083,25 @@ contains
                             if (chi(1) < clo(1)) cycle  ! inset left no interior in x
                             if (n_glb > 0 .and. chi(2) < clo(2)) cycle
                             if (p_glb > 0 .and. chi(3) < clo(3)) cycle
-                            nboxes = nboxes + 1
-                            boxes(nboxes)%lo = clo; boxes(nboxes)%hi = chi; box_level(nboxes) = lev
+                            ! Tile to the SAME slot cap as the clustered path above. The inset bounds the child as a FRACTION of
+                            ! its parent, which is not the constraint that matters: the slot coord arrays are allocated once to
+                            ! amr_ref_ratio*amr_maxc_fit, so the child must be bounded in ABSOLUTE cells. A parent of span 63
+                            ! (an ordinary tile - s_amr_tile_box splits a wide region into 63 and 64, not 64 and 64) gives
+                            ! ins = 63/4 = 15 and a child of span 33 against a level-2 cap of 32; s_amr_build_block_coords then
+                            ! sizes fcb from the TRUE extent and writes one past x_cb. Span 64 gives exactly 32 and is fine, so a
+                            ! one-cell difference in the parent flipped it.
+                            block
+                                type(t_box) :: nrt(amr_max_blocks)
+                                integer     :: nnr, nrc, it2
+                                nnr = 0; nrc = 0
+                                call s_amr_tile_box(clo, chi, nrt, nnr, amr_max_blocks, nrc, amr_maxc_fit/amr_ref_ratio**(lev - 1))
+                                do it2 = 1, nnr
+                                    if (nboxes + 1 > amr_max_fine) exit
+                                    nboxes = nboxes + 1
+                                    boxes(nboxes)%lo = nrt(it2)%lo; boxes(nboxes)%hi = nrt(it2)%hi
+                                    box_level(nboxes) = lev
+                                end do
+                            end block
                         end if
                     end do
                     deallocate (gidx, gkb, covered, mlo_all, mhi_all)  ! per-level scratch - freed every level (no leak)
