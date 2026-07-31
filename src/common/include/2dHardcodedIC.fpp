@@ -21,6 +21,10 @@
     real(wp) :: Y_N2, Y_O2, MW_N2, MW_O2
     real(wp) :: bottom_blend_u, bottom_blend_T
 
+    ! # 299 - scattered blobs for AMR load-balance benchmarking
+    real(wp) :: blob_cx, blob_cy, blob_r, blob_amp, blob_seed, blob_d2
+    integer  :: blob_n, blob_i
+
     ! # 207
     real(wp) :: sigma, gauss1, gauss2
 
@@ -536,6 +540,35 @@
             q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, 0) = rhov_avg/rho_avg
             q_prim_vf(eqn_idx%E)%sf(i, j, 0) = (E_avg - 0.5_wp*(rhou_avg**2 + rhov_avg**2)/rho_avg)*0.4_wp
         end if
+    case (299)  ! AMR load-balance benchmark: blob_n blobs scattered over the whole domain
+        ! Exists so one build yields an unlimited family of refinement topologies. An ANALYTIC patch would bake each expression
+        ! into case.fpp and cost a rebuild per variation; the knobs below are read at run time, so box count and placement can be
+        ! swept freely. Purpose is to stress the BALANCER: scattered features give many disjoint tag clusters, hence many boxes
+        ! per level, which is the regime where an owner mapping can actually differ from another.
+        !
+        ! a(2) = blob count, a(3) = seed, a(4) = blob radius (domain fraction), a(5) = density/pressure amplitude.
+        !
+        ! Centres come from an additive-irrational (Weyl) sequence, NOT random_number. Each rank fills only its own cells, so the
+        ! IC must be a pure function of position or ranks disagree across the seam and the decomposition stops being exact. The
+        ! golden-ratio increments give a low-discrepancy spread with no integer overflow and no RNG state.
+        blob_n = max(int(patch_icpp(patch_id)%a(2)), 1)
+        blob_seed = patch_icpp(patch_id)%a(3)
+        blob_r = patch_icpp(patch_id)%a(4)
+        blob_amp = patch_icpp(patch_id)%a(5)
+        if (blob_r <= 0._wp) blob_r = 0.02_wp
+        if (blob_amp <= 0._wp) blob_amp = 4._wp
+        do blob_i = 1, blob_n
+            blob_cx = mod(0.5_wp + real(blob_i, wp)*0.6180339887498949_wp + blob_seed*0.7548776662466927_wp, 1._wp)
+            blob_cy = mod(0.5_wp + real(blob_i, wp)*0.3819660112501051_wp + blob_seed*0.5698402909980532_wp, 1._wp)
+            blob_cx = x_domain%beg + blob_cx*(x_domain%end - x_domain%beg)
+            blob_cy = y_domain%beg + blob_cy*(y_domain%end - y_domain%beg)
+            blob_d2 = (x_cc(i) - blob_cx)**2 + (y_cc(j) - blob_cy)**2
+            if (blob_d2 <= blob_r*blob_r) then
+                q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = blob_amp
+                q_prim_vf(eqn_idx%E)%sf(i, j, 0) = blob_amp
+                exit  ! overlapping blobs must not compound - first hit wins, keeping the field bounded
+            end if
+        end do
     case (291)  ! Isothermal Flat Plate
         T_inf = 1125.0_wp
         T_wall = 600.0_wp
