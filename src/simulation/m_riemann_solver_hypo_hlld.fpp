@@ -162,7 +162,7 @@ contains
         real(wp)            :: phi
         real(wp), parameter :: ADC_power = 1.0_wp
         real(wp)            :: alpha_L_sum, alpha_R_sum
-        logical             :: degenerate
+        logical             :: degenerate, fan_fallback
         integer             :: i, j, k, l, ipass, zone
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -185,7 +185,7 @@ contains
                 ! (_hlld_p1..p4) are ONLY for source readability; fypp concatenates them into one
                 ! clause below. That wrapping is FOLD_DIRECTIVE's job -- its within-clause comma split
                 ! exists for exactly this case -- not the fragments'.
-                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
+                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,fan_fallback,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
                 #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
@@ -594,8 +594,26 @@ contains
                                     F_R(11) = U_R(11)*u_n_R + rho_hat*(2._wp/3._wp*G_hat + tau_qq_hat)*u_n_R
                                 end if
 
-                                if (degenerate) then
-                                    ! HLL (or one-sided) fallback for degenerate wave structure
+                                ! The shear impedance is anchor-dependent, so validate the raw inner speeds per pass. A
+                                ! speed-only clamp would change the wave speed without rebuilding its star-state jump and
+                                ! therefore break the corresponding Rankine--Hugoniot relation. Fall back with the whole
+                                ! anchored flux whenever the five-wave fan is not ordered.
+                                fan_fallback = degenerate
+                                if (.not. fan_fallback) then
+                                    C_NC = rho_hat*(G_hat + tau_nn_hat)
+                                    if (C_NC < C_NC_degen_floor) then
+                                        S_Lstar = S_M
+                                        S_Rstar = S_M
+                                    else
+                                        sqrtC_NC = sqrt(C_NC)
+                                        S_Lstar = S_M - sqrtC_NC/rhoL_star
+                                        S_Rstar = S_M + sqrtC_NC/rhoR_star
+                                        fan_fallback = (S_Lstar < S_L .or. S_Rstar > S_R)
+                                    end if
+                                end if
+
+                                if (fan_fallback) then
+                                    ! HLL (or one-sided) fallback for an invalid wave structure
                                     if (S_L < 0._wp .and. S_R > 0._wp) then
                                         do i = 1, ncomp
                                             @:hll_flux_component(F_hlld(i), i)
@@ -617,24 +635,17 @@ contains
                                     tau_qq_R_star = tau_qq_R
                                     zone = f_hlld_wave_zone(S_L, S_Lstar, s_M, S_Rstar, S_R)
                                 else
-                                    C_NC = rho_hat*(G_hat + tau_nn_hat)
+                                    ! A preceding anchored pass may have taken the fallback and assigned a safe face value.
+                                    ! Restore the anchor-independent HLLD contact pressure for this valid pass.
+                                    pTot_star = pTot_L + A_L*(S_M - u_n_L)
 
                                     if (C_NC < C_NC_degen_floor) then
                                         ! Degenerate shear impedance: collapse inner waves to HLLC
-                                        S_Lstar = S_M
-                                        S_Rstar = S_M
                                         u_t_star = 5e-1_wp*(u_t_L + u_t_R)
                                         tau_nt_star = 5e-1_wp*(tau_nt_L + tau_nt_R)
                                         u_t2_star = 5e-1_wp*(u_t2_L + u_t2_R)
                                         tau_nt2_star = 5e-1_wp*(tau_nt2_L + tau_nt2_R)
                                     else
-                                        sqrtC_NC = sqrt(C_NC)
-                                        ! C_NC carries the anchor-cell shear impedance while rhoL_star/rhoR_star come from
-                                        ! the reconstructed face states, so an anchor/face material mismatch (e.g. at a
-                                        ! one-cell interface) can place an inner wave outside the outer fan and invert the
-                                        ! five-wave ordering; clamp the inner speeds into [S_L, S_R].
-                                        S_Lstar = max(S_M - sqrtC_NC/rhoL_star, S_L)
-                                        S_Rstar = min(S_M + sqrtC_NC/rhoR_star, S_R)
                                         u_t_star = 5e-1_wp*((tau_nt_R - tau_nt_L)/sqrtC_NC + (u_t_R + u_t_L))
                                         tau_nt_star = 5e-1_wp*((u_t_R - u_t_L)*sqrtC_NC + (tau_nt_R + tau_nt_L))
                                         u_t2_star = 5e-1_wp*((tau_nt2_R - tau_nt2_L)/sqrtC_NC + (u_t2_R + u_t2_L))
@@ -855,9 +866,9 @@ contains
                                     else
                                         u_n_face = u_n_R; u_t_face = u_t_R
                                     end if
-                                    ! ADC blend NC face velocities with HLL scalar traces (non-degenerate only; the degenerate
-                                    ! branch does not set phi / HLL traces)
-                                    if (riemann_hypo_ADC .and. .not. degenerate) then
+                                    ! ADC blend NC face velocities with HLL scalar traces (HLLD path only; a fallback
+                                    ! branch does not set the HLL traces)
+                                    if (riemann_hypo_ADC .and. .not. fan_fallback) then
                                         u_n_face = u_n_HLL_trace + phi*(u_n_face - u_n_HLL_trace)
                                         u_t_face = u_t_HLL_trace + phi*(u_t_face - u_t_HLL_trace)
                                     end if
@@ -894,9 +905,9 @@ contains
                                                 else
                                                     p_face = pres%R; tau_qq_face = tau_qq_R
                                                 end if
-                                                ! ADC blend face state (non-degenerate only; the degenerate branch does not set phi
-                                                ! / HLL traces)
-                                                if (riemann_hypo_ADC .and. .not. degenerate) then
+                                                ! ADC blend face state (HLLD path only; a fallback branch does not set the
+                                                ! HLL traces)
+                                                if (riemann_hypo_ADC .and. .not. fan_fallback) then
                                                     p_face = p_face_HLL + phi*(p_face - p_face_HLL)
                                                     tau_qq_face = tau_qq_face_HLL + phi*(tau_qq_face - tau_qq_face_HLL)
                                                 end if

@@ -2221,6 +2221,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # A solid-anchored, light-gas face puts the raw right shear wave outside
+        # the outer fan. Tangential slip makes HLL fallback differ from clipping.
+        cases.append(
+            define_case_f(
+                "2D -> Hypoelasticity -> HLLD -> Fan-order fallback",
+                "examples/2D_hypo_fan_order_fallback/case.py",
+            )
+        )
+
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
