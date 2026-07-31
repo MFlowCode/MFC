@@ -4609,8 +4609,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # L2->L1 reflux must SKIP the sibling-tile seam faces (a fine-fine seam is not a c/f boundary; refluxing there
         # double-writes -> a residual ~3e-5). Closed walls (bc=-2) make it a clean conservation problem; eps=1e-4
         # keeps every tagged cell far from the threshold so the tag set (hence the deterministic tile boundaries) is
-        # cross-compiler stable. LOCK-STEP (amr_subcycle=F): subcycle advances L2 children per-block with no L2-L2
-        # halo, so it keeps ONE capped child (tiling that path is future work) and is unaffected here.
+        # cross-compiler stable. LOCK-STEP (amr_subcycle=F); (q) below is the subcycled twin.
         stack.push(
             "AMR -> 1D -> multi-level dynamic regrid tiled L2 np=2",
             {
@@ -4628,6 +4627,37 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_buf": 6,
                 "amr_max_level": 2,
                 "amr_max_blocks": 16,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+        # (q) multi-level + subcycle + dynamic regrid at np=2 - the combination the checker gated until
+        # s_amr_advance_children walked whole levels. (k)'s "wide L2 tiles" covers adjacent level-2 siblings under
+        # subcycle but at np=1, where nothing leaves the rank. amr_buf = 12 (the BUFFER widens the box, not the eps -
+        # see (k)) fills each parent's nesting window past the slot cap so the child TILES into adjacent siblings.
+        # VERIFIED to exercise, by dumping block lo/hi/owner: adjacent level-2 siblings [7,11]+[12,16] under one
+        # parent, AND a child on a different rank from its parent (L2 [52,56] on rank 0 under L1 [49,59] on rank 1
+        # at an intermediate regrid). That second one is the point: the per-substep SETUP posts two P2P parent-patch
+        # pairs per child, so a rank owning a child but not its parent must reach both or the receiver never posts -
+        # a DEADLOCK, which no tolerance comparison would catch.
+        # NOT covered, deliberately: the level-2 seam halo over MPI. The adjacent pair consistently lands on ONE rank
+        # because Morton order keeps a contiguous run contiguous and the SFC cut is a single split point; an eps/buf
+        # sweep (0.002-0.05 x 8,12) never split one. Contriving it would pin this golden to a specific SFC outcome
+        # that any cost-model change would silently undo. The two ingredients ARE covered separately: level-2 fmul
+        # arithmetic by (k) at np=1, MPI seam transport by (o) at level 1.
+        # Deep seams are always SAME-parent: the nesting window insets each parent by amr_cpat_mar >= 1, so children
+        # of different parents sit >= 2 coarse cells apart and never form an exact-match pair.
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic subcycle wide L2 np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.01,
+                "amr_buf": 12,
+                "amr_max_level": 2,
+                "amr_max_blocks": 16,
+                "amr_subcycle": "T",
             },
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
