@@ -23,9 +23,13 @@ Two findings from the step-4 A/B that redirect this work:
    noise at every rank count). Expected from the granularity floor below, but **not attributable**
    — there is no imbalance metric, so a flat result cannot distinguish "nothing to fix" from
    "balancer did nothing".
-2. **Per-box overhead, not balance, is the dominant cost.** The same case runs ~20x the coarse
-   solve while the refinement it adds accounts for only ~2.5x. That residual belongs to
-   @ref amr_block_batching, not here.
+2. **Per-box overhead, not balance, is the dominant cost.** At np=1 the same case runs ~40x the
+   coarse solve while the refinement it adds accounts for only ~2.5x. That ~16x residual belongs
+   to @ref amr_block_batching, not here.
+3. **The sweep was run too small above np=2.** The uniform control reaches only 18% parallel
+   efficiency at np=8, so both arms are latency-bound exactly where distribution should have
+   mattered — finding 1 is therefore inconclusive rather than negative. Check the control's
+   efficiency before trusting any A/B run against it.
 
 The consequence for sequencing: **instrumentation precedes further distribution work.** Steps 1-4
 were gated on correctness and end-to-end s/step, neither of which measures balance.
@@ -268,11 +272,39 @@ Against it, AMR costs ~20x at np=8. The refinement added accounts for roughly
 
     1 + 0.20*(4-1) + 0.075*(16-4) ~= 2.5x
 
-(level 1 over ~20% of the domain at 4x cells; level 2 over ~7.5% at 16x). The residual is ~8x, and
-regrid is only 7-10% of runtime, so it is not regrid. That points at per-block launch cost —
-@ref amr_block_batching — as the dominant term for "efficient AMR", which per-level distribution
-does not address. Treat the arithmetic as an order-of-magnitude estimate: the area fractions are
-nominal and a 16x-cell uniform grid would not cost exactly 16x on a GPU.
+(level 1 over ~20% of the domain at 4x cells; level 2 over ~7.5% at 16x). Compare at **np=1**,
+where both arms are still compute-bound: 2.6403 / 0.0648 = **40.7x** for ~2.5x the nominal work, a
+residual of **~16x**. Regrid is only 7-10% of runtime, so it is not regrid. That points at
+per-block launch cost — @ref amr_block_batching — as the dominant term for "efficient AMR", which
+per-level distribution does not address. Treat the arithmetic as an order-of-magnitude estimate:
+the area fractions are nominal and a 16x-cell uniform grid would not cost exactly 16x on a GPU.
+
+Do **not** read this ratio at np=8 (20x, apparent residual 8x). The uniform control degrades faster
+than AMR there — see the regime warning below — so the gap narrows for a reason that has nothing to
+do with AMR overhead.
+
+### Regime warning: this sweep is too small above np=2
+
+Parallel efficiency, from the same runs:
+
+| arm | np=1 | np=2 | np=4 | np=8 |
+|---|---|---|---|---|
+| uniform | 100% | 61% | 33% | **18%** |
+| co-located | 100% | 86% | 64% | 36% |
+| per-level | 100% | 85% | 60% | 36% |
+
+The **uniform** control — no AMR, no blocks, no balancing — reaches only 1.41x on 8 GCDs. At np=8
+the case holds 262k cells/rank, far below what saturates an MI250X GCD, so per-step fixed costs
+dominate and the run is latency-bound. That is the machine floor for this problem size: AMR cannot
+scale better than the uniform grid on the same mesh.
+
+**Consequence: the flat A/B above is not conclusive.** At the rank counts where per-level
+distribution should help most, both arms are dominated by costs that distribution cannot affect,
+so the measurement could not have detected the effect even if present. Any future distribution A/B
+must keep ~1M+ cells/rank at its TOP rank count (np=2 here, at 1.05M cells/rank and 86%
+efficiency, is the last trustworthy point) — for np=8 that means a 4096x2048 case. Always run the
+uniform control and check its efficiency FIRST: if the control is not scaling, nothing measured
+against it means anything.
 
 **Implication for the thesis.** Per-level distribution removes a structural ceiling (proven: a
 tower can now split across ranks and stay correct). It has not been shown to lift a ceiling that
