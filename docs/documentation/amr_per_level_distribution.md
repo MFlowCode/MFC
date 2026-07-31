@@ -13,7 +13,7 @@ and the reason matters more than the steps did — see "Measured outcome".
 | Step | Commit | Result |
 |---|---|---|
 | 1. Scratch decoupling | `86782249` | landed |
-| 2. Rank-independent cap | `a108dd37` | np=4->8 flipped 1.16x slower to 0.84x faster (single level) |
+| 2. Rank-independent cap | `a108dd37` | np=4->8 flipped 1.16x slower to 0.84x faster (single level) — **but see the caveat below** |
 | 3. P2P parent<->child | `6832d299`, `d53fac46` | landed; 3d `26e0d080` hoists the level advance to lockstep |
 | 4. Per-level mapping | `cfdd2847` | landed; correctness proven with a split tower, **no measured speedup** |
 | 5. Balance metric | `fc53e097`, `3780f30a` | landed; `[amr-balance]` per-level max/mean behind `load_weight_wrt` |
@@ -24,6 +24,28 @@ Landed alongside, from auditing the above (2026-07-31):
 |---|---|---|
 | Multi-level subcycle at np>1 un-gated | `8dca4b65` | its stated blocker had been removed by `3db24df0`; golden `C45DBB52` |
 | Level-general child slot cap | `be94db38`, `1e07eb65` | fixed `/2` was level-2-specific; **verified to fail without** — old cap core-dumps at `amr_max_level=3` |
+| Brand-new-region box skipped the cap | `cfbacebe` | **heap corruption** under the pinned cap; golden `00EB793A` |
+
+### Caveat on step 2, and the coverage hole behind it
+
+`amr_max_grid_size` had **zero test coverage** until `00EB793A` — not one golden or example case set
+it, only the schema, validator and parameter definitions. It is the mechanism this whole step rests
+on (pin the cap → many small boxes → `boxes_per_level >> num_procs`), and nothing exercised it.
+
+That is not hypothetical. `s_amr_regrid`'s brand-new-region branch emitted level≥2 boxes without ever
+consulting `amr_maxc_fit` — the one box emitter that skipped `s_amr_tile_box` — so a child over the
+cap made `s_amr_build_block_coords` write past `x_cb`, corrupting the heap on every regrid and
+surfacing much later as `corrupted size vs. prev_size` inside an unrelated `free()`. Under `-O2` it is
+silent. It needs all four of: pinned cap ≡ 0 (mod 8), `amr_max_level ≥ 2`, `num_procs ≥ 2`, and a
+scattered IC (a Sod-like patch grows regions that already have fine data, so the branch never fires).
+
+**Therefore step 2's measured numbers were collected on a code path that could silently corrupt the
+heap, and a corrupting run still produces plausible timings.** The conclusion is probably still right
+— the defect is a bounds overrun, not a change to the distribution — but it is no longer a clean
+measurement, and it should be re-run on fixed code before being cited as settled.
+
+The general lesson is the one worth keeping: **a parameter with no golden is a parameter whose every
+failure mode is invisible**, and the plan leaned on this one for months.
 | `no_blocks_ranks` is not idleness | `3ab65ab6` | see "What binds at scale" |
 
 Two findings from the step-4 A/B that redirect this work:
