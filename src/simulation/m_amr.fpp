@@ -1895,8 +1895,48 @@ contains
         end do
 
         call s_amr_validate_owner()
+        call s_amr_report_balance(wt, maxlev)
 
     end subroutine s_amr_assign_block_owners
+
+    !> Per-level and total load-balance report: max/mean assigned block weight over ranks, the metric the balancer is actually
+    !! trying to minimise. Without it a distribution change can only be judged by end-to-end s/step, which cannot separate
+    !! "balanced" from "uniformly slow" - the step-4 A/B measured flat and was uninterpretable for exactly that reason.
+    !!
+    !! Needs no MPI: wt, amr_block_level and amr_block_owner are replicated and identical on every rank (the cost vector is
+    !! allreduced in s_amr_block_cost), so every rank computes the same numbers and rank 0 prints. ratio == 1 is perfect balance;
+    !! ratio == num_procs means one rank holds everything at that level. `empty` counts ranks assigned nothing, which is the
+    !! granularity floor showing up directly: a level with fewer boxes than ranks CANNOT balance, however good the cut is.
+    impure subroutine s_amr_report_balance(wt, maxlev)
+
+        real(wp), intent(in) :: wt(:)
+        integer, intent(in)  :: maxlev
+        real(wp)             :: rw(0:num_procs - 1), tw(0:num_procs - 1), mx, mean
+        integer              :: k, lev, nb, empty
+
+        if (.not. load_weight_wrt) return
+        if (proc_rank /= 0) return
+
+        tw = 0._wp
+        do lev = 1, maxlev
+            rw = 0._wp
+            nb = 0
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) /= lev) cycle
+                rw(amr_block_owner(k)) = rw(amr_block_owner(k)) + wt(k)
+                nb = nb + 1
+            end do
+            if (nb == 0) cycle
+            tw = tw + rw
+            mx = maxval(rw); mean = sum(rw)/real(num_procs, wp)
+            empty = count(rw <= 0._wp)
+            print '(A,I0,A,I0,A,I0,A,F8.3,A,I0,A,I0)', ' [amr-balance] level ', lev, ': boxes ', nb, '/ranks ', num_procs, &
+                & ' max/mean ', merge(mx/mean, 1._wp, mean > 0._wp), ' idle_ranks ', empty, ' of ', num_procs
+        end do
+        mx = maxval(tw); mean = sum(tw)/real(num_procs, wp)
+        if (mean > 0._wp) print '(A,F8.3,A,I0)', ' [amr-balance] TOTAL   : max/mean ', mx/mean, ' idle_ranks ', count(tw <= 0._wp)
+
+    end subroutine s_amr_report_balance
 
     !> Owner rank of block k from the O(num_procs) SFC cut-points: binary-search k's OWN Morton key in the owning authority's cut. A
     !! level-0 TILE resolves against amr_owner_cut (the tile cut in tiled modes); a FINE block (level>=1) resolves against its own
