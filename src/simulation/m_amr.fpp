@@ -1796,7 +1796,7 @@ contains
         integer, intent(out)         :: owner(n)
         integer                      :: ord(n), k, kk, r, tmpo
         integer(kind=8)              :: tmpk
-        real(wp)                     :: total, cum, tgt
+        real(wp)                     :: total, cum, tgt, tol
 
         cut = -1_8
         if (n < 1) return
@@ -1825,7 +1825,14 @@ contains
         r = 0; cum = 0._wp
         do k = 1, n
             tgt = real(r + 1, wp)*total/real(num_procs, wp)
-            if (cum >= tgt .and. r < num_procs - 1) r = r + 1
+            ! cum is an n-term ACCUMULATION while tgt is CLOSED FORM over another n-term sum, so at an exact share boundary the
+            ! two differ by rounding rather than by intent, and the comparison turns on 1 ULP. This was correct only by luck:
+            ! every cost term to date is integer-valued (footprint cells, K_ib, K_pc x integer counts), so the arithmetic was
+            ! exact. MEASURED with a fractional cost term: 32 IDENTICAL weights over 8 ranks split 5/3 instead of 4/4, reporting
+            ! max/mean 1.250 where the same case with integer weights reports exactly 1.000. Tolerance is the accumulated
+            ! rounding bound, O(n) ULP of the target; far from a boundary it is negligible and the greedy is unchanged.
+            tol = spacing(tgt)*real(n, wp)
+            if (cum >= tgt - tol .and. r < num_procs - 1) r = r + 1
             owner(ord(k)) = r
             cut(r) = keys(ord(k))  ! items visited in ascending Morton key => running upper bound for rank r
             cum = cum + wt(ord(k))
