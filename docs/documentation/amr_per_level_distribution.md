@@ -5,6 +5,31 @@ independently, so AMR strong-scales instead of degrading as ranks are added. Wri
 2026-07-29 against `up/mega` @ `7b1e4933`. Companion to @ref amr_block_batching, which covers
 the per-block launch cost, and @ref amr_multilevel, which covers the nesting.
 
+## Status
+
+All four design steps are landed. The measured outcome did **not** confirm the performance thesis,
+and the reason matters more than the steps did — see "Measured outcome".
+
+| Step | Commit | Result |
+|---|---|---|
+| 1. Scratch decoupling | `86782249` | landed |
+| 2. Rank-independent cap | `a108dd37` | np=4->8 flipped 1.16x slower to 0.84x faster (single level) |
+| 3. P2P parent<->child | `6832d299`, `d53fac46` | landed; 3d `26e0d080` hoists the level advance to lockstep |
+| 4. Per-level mapping | `cfdd2847` | landed; correctness proven with a split tower, **no measured speedup** |
+
+Two findings from the step-4 A/B that redirect this work:
+
+1. **Per-level distribution shows no benefit at np<=8** on a 3-heavy-tower case (flat within
+   noise at every rank count). Expected from the granularity floor below, but **not attributable**
+   — there is no imbalance metric, so a flat result cannot distinguish "nothing to fix" from
+   "balancer did nothing".
+2. **Per-box overhead, not balance, is the dominant cost.** The same case runs ~20x the coarse
+   solve while the refinement it adds accounts for only ~2.5x. That residual belongs to
+   @ref amr_block_batching, not here.
+
+The consequence for sequencing: **instrumentation precedes further distribution work.** Steps 1-4
+were gated on correctness and end-to-end s/step, neither of which measures balance.
+
 ## The problem, measured
 
 Cost tracks the **total** number of refined boxes, not the number a rank owns. On a fixed 2D
@@ -72,19 +97,111 @@ This is less of a leap than it appears; the branch has been converging on it.
 - Per-level box lists already exist (`amr_block_level`, `box_level`).
 - Level-selective seam halo already exists (`1895c0ef`).
 
-## What is missing
+## What was missing — Track 2 (now landed)
 
-**P2P parent<->child coupling — Track 2.** Gather, restrict and flux-register delivery are
-np=1-local (future work #27; `m_amr.fpp:629, 967, 988, 1006, 2350, 2372, 4354`). Multi-rank works
-today only because a refinement tower co-locates on its level-1 anchor, which makes a whole tower
-the balancer's smallest atom (weight `cost * rr^(l*d)`, `m_amr.fpp:1673-1679`) and caps
-granularity at depth.
+Gather, restrict and flux-register delivery were all np=1-local. Multi-rank worked only because a
+refinement tower co-located on its level-1 anchor, which made a whole tower the balancer's smallest
+atom (weight `cost * rr^(l*d)`) and capped granularity at depth. Under per-level distribution
+co-location is not a constraint to be relaxed separately — it disappears as a consequence, which is
+why Track 2 was the spine of this phase rather than one item on a queue.
 
-Under per-level distribution, tower co-location is not a constraint to be relaxed separately — it
-disappears as a consequence. Track 2 therefore stops being one item on a queue and becomes the
-spine of this phase.
+All three paths are now P2P (`6832d299`, `d53fac46`), plus a fourth constraint that was **not** on
+the original list and blocked step 4:
+
+- **3d, the per-level lockstep advance** (`26e0d080`). `s_amr_advance_children` drove one parent's
+  subtree to completion while the `s_amr_fine_fine_halo(clev)` interposed in its stage loop spans
+  EVERY parent, so a seam pair straddling two parents had only one side present. Co-location hid
+  the MPI half by putting both ends on one rank. The codebase already knew — `m_checker.fpp`
+  fail-closes `amr_subcycle .and. amr_regrid_int > 0 .and. num_procs > 1 .and. amr_max_level > 1`
+  citing exactly this. Lifting that PROHIBIT is now unblocked and is the only thing that would
+  cover the subcycle SETUP gather added in `cfdd2847`, which currently has **no golden coverage**.
+
+The general lesson, since it cost four bugs: **whenever an invariant says two owners always
+coincide, every read that depends on it is load-bearing and invisible.** Grep for the invariant,
+not for the symptom.
+
+## Load balancing
+
+Distribution decides *where* a box lives; balancing decides whether that placement spreads work
+evenly. Per-level distribution is a prerequisite for the second, not a substitute — this section
+states the mechanism, the metric, and the limits that bind at scale.
+
+### Mechanism
+
+Three pieces, only the third of which is AMR-specific:
+
+| Piece | Where | Role |
+|---|---|---|
+| L0 Cartesian rebalance | `m_load_balance.fpp`, `s_load_balance_rebalance` (called once from `m_start_up`) | weighted splits of the base grid; `load_balance` |
+| Cost model + imbalance metric | `m_load_weight.fpp`, `m_rank_timing.fpp` | per-cell weights and a measured per-rank compute time; `load_weight_wrt` |
+| AMR block assignment | `s_amr_block_cost` -> `s_amr_sfc_cut` (`m_amr.fpp`) | owner map for level>=1 blocks |
+
+The AMR path weighs each block by `cost(k) * rr**(level*d)`, where `cost` sums a per-cell model
+over the block's L0 footprint: base 1, plus `K_ib` per IB-marked cell, plus `K_pc` per
+phase-change Newton iteration (`m_constants`: 2 and 3; `K_bub` = 50 applies to Lagrangian bubbles,
+which are excluded from blocks by construction). One `MPI_ALLREDUCE(SUM)` makes the vector
+identical on every rank, after which the assignment is deterministic and rank-independent.
+`s_amr_sfc_cut` then does a chains-on-chains split of the blocks in Morton order of their low
+corner, one independent cut **per level**.
+
+**Step 4 is the load-balancing enabler, not merely a distribution change.** Under tower
+co-location the balancer's smallest atom was a whole refinement tower, weight `cost * rr**(l*d)`.
+No assignment can fix an imbalance whose atom is larger than the imbalance itself, so a single
+deep tower pinned work that adding ranks could not relieve. Cutting each level independently is
+what makes the cost model actionable.
+
+### The metric
+
+Balance is `max_r W(r) / mean_r W(r)` over per-rank assigned weight `W`, reported per level and
+for the total. Two properties are required, and only the second is about scale:
+
+1. **Quality** — imbalance below a fixed tolerance at a given rank count.
+2. **Scale invariance** — imbalance must not *grow* with rank count. A scheme that is well
+   balanced at np=8 and degrades monotonically by np=1024 has not solved the problem; this is the
+   property to test, and it is not visible on a single-node sweep.
+
+`m_rank_timing` supplies the measured counterpart (per-rank RHS + relaxation time), which is the
+honest check on the *model*: a cost model that predicts balance while measured times diverge is
+wrong, and the model is what the assignment actually uses.
+
+### What binds at scale
+
+These are structural, not tuning knobs, and each sets a floor on achievable balance:
+
+- **Granularity floor.** A level cannot be balanced across more ranks than it has boxes. In
+  `s_amr_sfc_cut` a level holding one box always lands on rank 0 (the loop assigns `r = 0` and
+  advances only once cumulative weight crosses a share boundary), so a shallow hierarchy leaves
+  ranks idle *by construction*. Scaling therefore requires `boxes_per_level >> num_procs`, which
+  is what the absolute cap `amr_max_grid_size` exists to deliver — the cap and the balancer are
+  one mechanism, not two.
+- **Indivisible atom.** The cut is contiguous in Morton order and cannot split a box, so
+  imbalance is bounded below by the heaviest single block's weight. As ranks grow, mean per-rank
+  weight falls while that floor does not, so imbalance rises unless the cap falls with it.
+- **Static within a regrid interval.** Cost is sampled at regrid; work that migrates between
+  regrids is not tracked. The relevant knob is `amr_regrid_int`, and its cost is itself
+  rank-scaling work (see the box-count analysis above).
+- **Cost-model blindness by default.** With no live signals `cost(k)` degenerates to the
+  footprint cell count — pure geometry. `pc_iter_count` is populated only when `load_weight_wrt`
+  is enabled. A run with heterogeneous per-cell cost and `load_weight_wrt` off is balanced on
+  geometry alone, which will look correct and be wrong.
+- **Assignment cost.** `s_amr_block_cost` is an allreduce over the global block vector every
+  regrid, and the cut is O(nblocks^2) in the insertion sort. Both grow with the *global* box set,
+  the same term identified in "The problem, measured".
+
+### Acceptance criteria
+
+1. Per-level and total imbalance reported at np = 1..N, with imbalance flat or falling in `N`.
+2. Model vs measured agreement: `m_rank_timing` per-rank times consistent with assigned weight.
+3. A cost-heterogeneous case (IB or phase change) with `load_weight_wrt` on, showing the weighted
+   assignment beating the pure-geometry fallback. Geometry-only cases cannot demonstrate this.
+4. Deep-tower case: imbalance must not depend on refinement depth once towers may split.
 
 ## Sequencing
+
+Steps 1-4 are LANDED (see "Status"); they are kept here because the ordering constraints between
+them are load-bearing and a reader retracing the work needs them. Steps 5-7 are the live queue.
+
+### Landed
 
 1. **Finish the scratch decoupling.** Convert the `m`/`n`/`p`-keyed allocation family that an
    `idwbuff` grep does not find: `m_riemann_solvers` sizes on `-1:m,-1:n,-1:p` and `m_weno` on
@@ -98,17 +215,90 @@ spine of this phase.
    the coarse one — behaviour-preserving, so the existing goldens gate it.
 4. **Give each level its own mapping** and drop tower co-location.
 
+   Splitting towers made four latent reads reachable, all one shape: a **parent-slot field
+   guarded on owning the CHILD**, safe only while the two owners always coincided. Undefined
+   `amr_slots(pblk)%%amr_ref_ratio`, a bisected unallocated `%%x_cb`, and `lbound`/`ubound` of that
+   same unallocated array. Symptom was garbage cell widths and NaNs at the rank seam, several
+   steps later. Anything reading another block's slot must be guarded on owning **that** block, or
+   derive from replicated metadata (`s_amr_parent_foot`, `s_amr_build_block_coords`).
+
+### Next
+
+5. **Instrument balance.** Report per-level and total `max/mean` assigned weight, alongside the
+   `m_rank_timing` measured per-rank time. Until this exists the balancer is unmeasured: steps 1-4
+   are gated on correctness and on end-to-end s/step, neither of which distinguishes "balanced"
+   from "uniformly slow". This is the smallest step that makes the rest falsifiable, so it comes
+   before any further tuning.
+6. **Exercise the cost model.** Add a cost-heterogeneous benchmark (IB or phase change) with
+   `load_weight_wrt` on. Every AMR benchmark to date is geometry-only, so `K_ib`/`K_pc` have never
+   influenced a measured assignment.
+7. **Scale-invariance run.** Sweep rank count past the box count per level and confirm imbalance
+   does not grow. Single-node np<=8 cannot show this — the granularity floor and the indivisible
+   atom only bind once ranks approach box count.
+
+## Measured outcome
+
+hpcfund MI250X, amdflang OMP offload, 1 rank/GCD, 2047x1023, `amr_max_level=2`, `amr_subcycle=F`,
+`amr_max_grid_size=128`, 8 stripes of which 3 are sharp (3 deep towers among 8 level-1 blocks),
+20 steps, 3 reps, median s/step with the first 2 steps dropped. Arms are two worktrees:
+`26e0d080` (co-location) vs `cfdd2847` (per-level). Harness: `amr-bench/sweep_ml.sh`.
+
+| np | co-located | per-level | ratio | uniform control |
+|---|---|---|---|---|
+| 1 | 2.6403 | 2.6188 | 0.99x | 0.0648 |
+| 2 | 1.5315 | 1.5372 | 1.00x | 0.0533 |
+| 4 | 1.0393 | 1.0943 | 1.05x | 0.0486 |
+| 8 | 0.9186 | 0.9128 | 0.99x | 0.0458 |
+
+**Flat at every rank count** (rep scatter 2-6%). Two readings, and the doc should not pretend to
+choose between them without the metric:
+
+- *Consistent with design.* With 3 heavy towers and np<=8, co-location can already place each
+  tower on its own rank. The granularity floor says per-level cannot help until ranks approach the
+  box count per level, so np<=8 is the wrong regime to see it.
+- *Not demonstrated.* Equally consistent with the assignment not changing at all. **A flat
+  end-to-end time is not evidence either way** — that is what step 5 exists to resolve, and it is
+  why step 5 now precedes further distribution work.
+
+### The overhead finding
+
+The uniform control solves the same base grid with no refinement, so it bounds AMR's *overhead*,
+not its efficiency (the efficiency baseline would be a uniform grid at the finest resolution).
+Against it, AMR costs ~20x at np=8. The refinement added accounts for roughly
+
+    1 + 0.20*(4-1) + 0.075*(16-4) ~= 2.5x
+
+(level 1 over ~20% of the domain at 4x cells; level 2 over ~7.5% at 16x). The residual is ~8x, and
+regrid is only 7-10% of runtime, so it is not regrid. That points at per-block launch cost —
+@ref amr_block_batching — as the dominant term for "efficient AMR", which per-level distribution
+does not address. Treat the arithmetic as an order-of-magnitude estimate: the area fractions are
+nominal and a 16x-cell uniform grid would not cost exactly 16x on a GPU.
+
+**Implication for the thesis.** Per-level distribution removes a structural ceiling (proven: a
+tower can now split across ranks and stay correct). It has not been shown to lift a ceiling that
+was binding on any case measured so far. Both statements should survive into whatever comes next.
+
 ## Validation
 
 The bar this branch already uses: np=1 bit-identical, np>=2 conservation-exact, plus the goldens'
-tolerance compare, and Frontier CCE as the cross-compiler gate — this work touches device
-residency of grid state, where every regression so far has been CCE-only.
+tolerance compare. Cross-compiler coverage (CCE, gfortran, nvfortran, ifx) is CI's job and runs on
+the PR — the **local** gate is correctness under OMP GPU offload with the AMD AFAR compilers. Do
+not hold work waiting on a Frontier run. Expect CCE to be where a regression in this area first
+appears, though: every one so far has been CCE-only, so treat a CCE failure as a real bug rather
+than flaky infrastructure.
 
 For steps 3 and 4, prefer the **conservation ladder** over field diffs: authoritative mass after
 each stage, the pure reflux delta, coarse-equivalent fine mass per block, and covered-cell mass
 per block, all allreduced and printed from both arms. That is what localised the np>=2 restrict
 bug (`ab87d49e`) when field diffs could not; many-to-many coupling is exactly where that class of
 bug hides.
+
+Balance is validated separately from correctness, and neither substitutes for the other. A run can
+be conservation-exact and golden-clean while every fine block sits on one rank; nothing in the
+golden suite measures distribution quality, because the goldens are single- and two-rank
+tolerance compares of field data. Use the acceptance criteria in "Load balancing" above, and treat
+end-to-end s/step as a *consequence* of balance rather than evidence of it — a case whose towers
+happen to spread evenly will scale well regardless of whether the balancer did anything.
 
 Note that `./mfc.sh test --only AMR` does not match the coexist goldens — their trace token is
 "AMR + L0 tiles". Run `1F074C5D 8D466A94 83CC5C6D 33060D84 FD056B71 98AA6EDB D99F85F8 09E0D257
