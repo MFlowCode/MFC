@@ -25,8 +25,8 @@ module m_variables_conversion
         & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
-        & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_fast_magnetosonic_speed, &
-        & s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+        & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_fast_magnetosonic_speed, f_internal_energy, &
+        & f_bulk_modulus, s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -88,6 +88,7 @@ contains
         real(wp)                                       :: T_guess
         integer                                        :: s  !< Generic loop iterator
         #:if not chemistry
+            ! Non-chemistry EOS branch (compile-time selected)
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure for computing pressure is targeted by the
             ! procedure pointer
 
@@ -121,7 +122,7 @@ contains
                 pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
             end if
         #:else
-            ! Reacting mixture pressure from temperature and species
+            ! Reacting mixture pressure from temperature and species (chemistry branch, via m_thermochem)
             Y_rs(:) = rhoYks(:)/rho
             e_Per_Kg = energy/rho
             Pdyn_Per_Kg = dyn_p/rho
@@ -874,7 +875,7 @@ contains
                         else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler)) then
                             ! Bubble-augmented energy with void fraction correction
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + (1._wp - q_prim_vf(eqn_idx%alf)%sf(j, k, &
-                                      & l))*(gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + pi_inf)
+                                      & l))*f_internal_energy(gamma, real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp), pi_inf)
                         else
                             ! Four-equation model (Kapila et al. PoF 2001): Tait EOS, no conserved energy variable
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
@@ -885,8 +886,8 @@ contains
                     if (model_eqns == model_eqns_6eq) then
                         do i = 1, num_fluids
                             q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                                      & l)*(gammas(i)*q_prim_vf(eqn_idx%E)%sf(j, k, &
-                                      & l) + pi_infs(i)) + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
+                                      & l)*f_internal_energy(gammas(i), real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp), &
+                                      & pi_infs(i)) + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
                         end do
                     end if
 
@@ -1058,7 +1059,7 @@ contains
                         E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
                     else
                         ! Computing the energy from the pressure
-                        E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
+                        E_K = f_internal_energy(gamma_K, pres_K, pi_inf_K) + 5.e-1_wp*rho_K*vel_K_sum + qv_K
                     end if
 
                     ! mass flux, this should be \alpha_i \rho_i u_i
@@ -1205,8 +1206,8 @@ contains
             c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
         else
             if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
-                blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
-                blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
+                blkmod1 = f_bulk_modulus(1, pres)
+                blkmod2 = f_bulk_modulus(2, pres)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
             else if (model_eqns == model_eqns_6eq) then  ! Six-equation model sound speed
                 c = 0._wp
@@ -1235,6 +1236,31 @@ contains
         end if
 
     end subroutine s_compute_speed_of_sound
+
+    !> Stiffened-gas internal energy density, Gamma*p + Pi_inf. Caller adds kinetic energy and qv.
+    function f_internal_energy(gamma, pres, pi_inf) result(energy)
+
+        $:GPU_ROUTINE(function_name='f_internal_energy', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: gamma, pres, pi_inf
+        real(wp)             :: energy
+
+        energy = gamma*pres + pi_inf
+
+    end function f_internal_energy
+
+    !> Stiffened-gas bulk modulus of fluid f, ((gamma+1)p + pi_inf)/gamma.
+    function f_bulk_modulus(f, pres) result(blkmod)
+
+        $:GPU_ROUTINE(function_name='f_bulk_modulus', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in)  :: f
+        real(wp), intent(in) :: pres
+        real(wp)             :: blkmod
+
+        blkmod = ((gammas(f) + 1._wp)*pres + pi_infs(f))/gammas(f)
+
+    end function f_bulk_modulus
 
     !> Compute the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
     subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
