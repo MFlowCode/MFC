@@ -1045,8 +1045,13 @@ contains
                                 ! slot cap: a level-lev block's fine grid spans amr_ref_ratio**lev*(its L0 extent) cells while the
                                 ! slot holds amr_ref_ratio*amr_maxc_fit (max_f* = amr_ref_ratio*amr_maxc_fit - 1), so a child's L0
                                 ! extent must be <= amr_maxc_fit/amr_ref_ratio**(lev-1) - HALVING once per level, not a fixed /2.
-                                ! At lev = 2 that is amr_maxc_fit/2 (unchanged); at lev = 3 a fixed /2 would admit a box twice what
-                                ! the slot holds. TILE a wider feature into adjacent sub-blocks (like the L1 tiling): the per-stage
+                                ! At lev = 2 that is amr_maxc_fit/2 (unchanged); at lev = 3 a fixed /2 admits a box twice what the
+                                ! slot holds. VERIFIED to fail without this: m = 255, amr_max_level = 3, amr_buf = 48, np = 1 -
+                                ! the fixed /2 keeps ONE oversized level-3 box where this keeps 2, and the run dies in
+                                ! s_amr_free_slot ("Invalid descriptor", core dumped) on the corrupted field descriptor. It takes
+                                ! all three of a big grid, depth 3 AND a wide buffer: boxes track the FEATURE, so scaling only the
+                                ! grid leaves them far below either cap and both versions agree.
+                                ! TILE a wider feature into adjacent sub-blocks (like the L1 tiling): the per-stage
                                 ! fine-fine halo
                                 ! (s_amr_fine_fine_halo, level-aware) matches the shared seam flux and the L2->L1 reflux skips those
                                 ! fine-fine faces. Subcycle used to keep ONE capped child instead - under-refining a wide feature -
