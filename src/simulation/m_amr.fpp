@@ -118,11 +118,13 @@ module m_amr
     !> (0:num_procs-1) SFC Morton-key upper bound per rank from the cost-weighted split; owner = cut-search (f_amr_owner). The O(P)
     !! computed replacement for the O(global_blocks) amr_block_owner table (validated against it during bring-up).
     integer(kind=8), allocatable :: amr_owner_cut(:)
-    !> (0:num_procs-1) companion cut for FINE-block (level>=1) owners: the level-1 anchor cut. In no-tile AMR the fine owner IS
-    !! amr_owner_cut, but in coexist amr_owner_cut is overwritten by the TILE cut, so the level-1 cut is kept here so f_amr_owner
-    !! can reproduce fine owners (which straddle tiles and so cannot be derived from the tile cut) alongside tile owners. One cut
-    !! per authority, both O(num_procs).
-    integer(kind=8), allocatable :: amr_fine_cut(:)
+    !> (0:num_procs-1, 1:amr_max_level) companion cuts for FINE-block (level>=1) owners: ONE INDEPENDENT CUT PER LEVEL. Each level's
+    !! boxes are balanced across all ranks on their own weight, so a deep refinement tower no longer pins its whole subtree to one
+    !! rank. Per level rather than one mixed cut because same-level boxes are disjoint and so have DISTINCT Morton keys, which the
+    !! cut-point binary search requires; a mixed cut would let a child share its parent's region_lo and make the search ambiguous.
+    !! In no-tile AMR level 1's cut also mirrors amr_owner_cut, but in coexist amr_owner_cut is overwritten by the TILE cut, so the
+    !! fine cuts are kept here for f_amr_owner (fine blocks straddle tiles and cannot be derived from the tile cut).
+    integer(kind=8), allocatable :: amr_fine_cut(:,:)
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min-over-ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
@@ -273,7 +275,7 @@ contains
         allocate (amr_owns_all(amr_max_blocks))
         allocate (amr_block_owner(amr_max_blocks))
         allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
-        allocate (amr_fine_cut(0:num_procs - 1)); amr_fine_cut = -1_8
+        allocate (amr_fine_cut(0:num_procs - 1,1:max(amr_max_level, 1))); amr_fine_cut = -1_8
         allocate (amr_block_level(amr_max_blocks))
         ! amr_ovl_gather/scatter (the 2D rank lists) are allocated to the computed max overlap in s_amr_build_seam_pairs; only the
         ! per-block counts are sized here.
@@ -588,6 +590,55 @@ contains
         end do
 
     end subroutine s_build_level_coords
+
+    !> Fine cell coordinates of block k in dimension d, rebuilt from the GLOBAL coarse boundaries gcb by replaying k's ancestor
+    !! chain - touching no other block's slot arrays. A level-l block's grid is l nested midpoint subdivisions of the L0 boundaries,
+    !! and every box in the chain is known from REPLICATED metadata (amr_region_*_all + the global amr_ref_ratio), so any rank can
+    !! reproduce it. Bit-identical to bisecting the parent's stored coords, because that array is itself the same subdivision.
+    !!
+    !! This exists because the direct form - bisecting amr_slots(parent)%x_cb - reads the PARENT's slot, which is
+    !! ALLOCATED ONLY ON THE PARENT'S OWNER. Under tower co-location the child's owner was always the parent's owner too, so it
+    !! worked; under per-level distribution a level>=2 block can be owned by a rank holding no part of its parent, and bisecting an
+    !! unallocated array there produced garbage cell widths and NaNs a few steps later.
+    impure subroutine s_amr_build_block_coords(k, gcb, fcb, fcc, fdx, d)
+
+        integer, intent(in)                  :: k, d
+        real(wp), intent(in)                 :: gcb(:)  !< global L0 cell boundaries, lbound -1
+        real(wp), allocatable, intent(inout) :: fcb(:), fcc(:), fdx(:)
+        integer                              :: chain(0:amr_max_level), lev, j, a, lo, nf, span, rr, plo(3), phi(3)
+        real(wp), allocatable                :: cur(:), scb(:), scc(:), sdx(:)
+
+        rr = amr_ref_ratio
+        lev = amr_block_level(k)
+        a = k
+        do j = lev, 1, -1  ! chain(j) = k's ancestor at level j; chain(lev) = k
+            chain(j) = a
+            if (j > 1) a = f_amr_parent_block(a)
+        end do
+
+        cur = gcb  ! level 0: the global coarse boundaries (allocatable assignment carries lbound -1)
+        do j = 1, lev
+            a = chain(j)
+            span = amr_region_hi_all(d, a) - amr_region_lo_all(d, a) + 1  ! L0 cells the box covers
+            nf = rr**j*span - 1  ! its fine extent at level j
+            if (j == 1) then
+                lo = amr_region_lo_all(d, a)  ! global L0 index of the box's low corner
+            else
+                call s_amr_parent_foot(a, chain(j - 1), plo, phi)  ! low corner in the parent's fine frame
+                lo = plo(d)
+            end if
+            if (j == lev) then
+                call s_build_level_coords(cur, -1, lo, nf, fcb, fcc, fdx)
+            else
+                if (allocated(scb)) deallocate (scb, scc, sdx)
+                allocate (scb(-1:nf), scc(0:nf), sdx(0:nf))
+                call s_build_level_coords(cur, -1, lo, nf, scb, scc, sdx)
+                cur = scb
+            end if
+        end do
+        if (allocated(scb)) deallocate (scb, scc, sdx)
+
+    end subroutine s_amr_build_block_coords
 
     !> Compute this rank's per-dim intersection of the box lo:hi with its subdomain (GLOBAL indices, mirrored to amr_isect_lo/hi)
     !! and whether it holds fine cells (amr_rank_owns_block: nonempty in all active dims). Must be called with the COARSE grid state
@@ -1797,15 +1848,16 @@ contains
 
         integer         :: k, a, lev, maxlev, na, aidx(amr_num_blocks), aown(amr_num_blocks)
         integer(kind=8) :: key(amr_num_blocks), akey(amr_num_blocks)
-        real(wp)        :: wt(amr_num_blocks), twt(amr_num_blocks), cost(amr_num_blocks), awt(amr_num_blocks)
+        real(wp)        :: wt(amr_num_blocks), cost(amr_num_blocks), awt(amr_num_blocks)
 
         if (amr_num_blocks < 1) return
 
         call s_amr_block_cost(cost)
 
         ! per-block own fine-work weight = footprint cost x amr_ref_ratio**(level*active dims). A level-l block is amr_ref_ratio**l
-        ! finer than L0 per dim, so its work is the footprint cost x rr**(l*d); the level factor keeps the co-located-tower load
-        ! balance honest. With no cost signals this reduces to the fine cell count (geometry only).
+        ! finer than L0 per dim, so its work is the footprint cost x rr**(l*d). The level factor now only scales blocks WITHIN a
+        ! level relative to each other (each level is cut separately), but it stays because a level's boxes can differ in footprint.
+        ! With no cost signals this reduces to the fine cell count (geometry only).
         do k = 1, amr_num_blocks
             wt(k) = cost(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
             if (n_glb > 0) wt(k) = wt(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
@@ -1813,57 +1865,44 @@ contains
             key(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
         end do
 
-        ! CO-LOCATE refinement towers: a level-1 block and all its nested descendants are owned WHOLE by one rank so every
-        ! parent<->child gather/restrict/reflux stays LOCAL (no new MPI - only L0<->L1 crosses ranks). Roll each block's own work up
-        ! onto its top-level (level-1) ancestor, SFC-balance only the level-1 anchors, then let descendants inherit. Single-level
-        ! (all blocks level 1): twt == wt and the inherit pass is empty, so this is byte-identical to before.
-        twt = 0._wp
-        do k = 1, amr_num_blocks
-            a = k
-            do while (amr_block_level(a) > 1)
-                if (f_amr_parent_block(a) < 1) exit  ! proper-nesting invariant broken; stop before indexing amr_block_level(0)
-                a = f_amr_parent_block(a)
-            end do
-            twt(a) = twt(a) + wt(k)
-        end do
-
-        ! gather the level-1 anchors in block-index order, then SFC-split them by whole-tower weight into num_procs contiguous
-        ! Morton-key ranges. The shared cut helper fills amr_owner_cut and the per-anchor owner (anchor-only sort is byte-identical
-        ! to the all-block sort skipping non-anchors: insertion sort is stable on equal keys, so the anchors keep the same relative
-        ! order, and total/cum still sum in block-index order).
-        na = 0
-        do k = 1, amr_num_blocks
-            if (amr_block_level(k) /= 1) cycle
-            na = na + 1
-            akey(na) = key(k); awt(na) = twt(k); aidx(na) = k
-        end do
-        ! this IS the fine (level>=1) owner cut, so cut straight into amr_fine_cut: fine blocks straddle tiles, so their owner is
-        ! not tile-cut-derivable and f_amr_owner reads amr_fine_cut for them. amr_owner_cut mirrors it ONLY without tiles, where
-        ! the two are the same authority. Under coexist amr_owner_cut holds the TILE cut that s_l0_tiles_init built; cutting into
-        ! it here (as this did) is harmless at init - the assigner runs before s_l0_tiles_init - but at REGRID time it clobbers
-        ! the tile cut, and every level-0 tile then resolves f_amr_owner against the fine cut.
-        call s_amr_sfc_cut(akey, awt, na, amr_fine_cut, aown)
-        do a = 1, na
-            amr_block_owner(aidx(a)) = aown(a)
-        end do
-        if (l0_slot_off == 0) amr_owner_cut = amr_fine_cut
-
-        ! descendants inherit their parent's owner (top-down, level by level - parents already assigned when their children run)
+        ! PER-LEVEL DISTRIBUTION: balance EVERY level independently, each block on its OWN weight. Tower co-location is gone - a
+        ! level-1 block and its descendants are assigned separately, so a deep tower no longer pins its whole subtree (weight
+        ! cost*rr**(l*d)) to one rank, which is what capped granularity at depth. The parent<->child gather/restrict/reflux paths
+        ! are P2P, so a split tower costs messages rather than correctness.
+        !
+        ! One cut PER LEVEL, not one mixed cut over all fine blocks: same-level boxes are disjoint and so have DISTINCT Morton
+        ! keys, which the cut-point binary search in f_amr_owner needs. Mixed, a level-2 block sharing its parent's region_lo would
+        ! collide with it and the search could not tell them apart.
+        !
+        ! Each level's cut goes into amr_fine_cut(:, lev): fine blocks straddle tiles, so their owner is not tile-cut-derivable and
+        ! f_amr_owner reads amr_fine_cut for them. amr_owner_cut mirrors LEVEL 1 only without tiles, where the two are the same
+        ! authority. Under coexist amr_owner_cut holds the TILE cut that s_l0_tiles_init built; overwriting it here is harmless at
+        ! init (the assigner runs first) but at REGRID time would clobber the tile cut.
         maxlev = maxval(amr_block_level(1:amr_num_blocks))
-        do lev = 2, maxlev
+        do lev = 1, maxlev
+            na = 0
             do k = 1, amr_num_blocks
-                if (amr_block_level(k) == lev) amr_block_owner(k) = amr_block_owner(f_amr_parent_block(k))
+                if (amr_block_level(k) /= lev) cycle
+                na = na + 1
+                akey(na) = key(k); awt(na) = wt(k); aidx(na) = k
             end do
+            if (na < 1) cycle
+            call s_amr_sfc_cut(akey, awt, na, amr_fine_cut(:,lev), aown)
+            do a = 1, na
+                amr_block_owner(aidx(a)) = aown(a)
+            end do
+            if (lev == 1 .and. l0_slot_off == 0) amr_owner_cut = amr_fine_cut(:,1)
         end do
 
         call s_amr_validate_owner()
 
     end subroutine s_amr_assign_block_owners
 
-    !> Owner rank of block k from the O(num_procs) SFC cut-points: resolve k's level-1 tower anchor, then binary-search its Morton
-    !! key in the owning authority's cut. A level-0 TILE resolves against amr_owner_cut (the tile cut in tiled modes); a FINE block
-    !! (level>=1) resolves its level-1 tower anchor against amr_fine_cut (== amr_owner_cut in no-tile AMR). Reproduces
-    !! s_amr_assign_block_owners' / the tile split's cost-weighted SFC assignment exactly.
+    !> Owner rank of block k from the O(num_procs) SFC cut-points: binary-search k's OWN Morton key in the owning authority's cut. A
+    !! level-0 TILE resolves against amr_owner_cut (the tile cut in tiled modes); a FINE block (level>=1) resolves against its own
+    !! level's cut amr_fine_cut(:, level) (level 1's == amr_owner_cut in no-tile AMR). No tower-anchor resolution: under per-level
+    !! distribution a block's owner depends on its own key and level alone. Reproduces s_amr_assign_block_owners' / the tile split's
+    !! cost-weighted SFC assignment exactly.
     pure integer function f_amr_owner(k) result(r)
 
         integer, intent(in) :: k
@@ -1874,11 +1913,7 @@ contains
         if (amr_block_level(k) == 0) then
             cut = amr_owner_cut  ! tile: own Morton key vs the tile cut
         else
-            do while (amr_block_level(a) > 1)  ! fine: resolve to the level-1 tower anchor
-                if (f_amr_parent_block(a) < 1) exit
-                a = f_amr_parent_block(a)
-            end do
-            cut = amr_fine_cut
+            cut = amr_fine_cut(:,amr_block_level(k))
         end if
         mk = f_morton(amr_region_lo_all(1, a), amr_region_lo_all(2, a), amr_region_lo_all(3, a))
         lo = 0; hi = num_procs - 1
@@ -1960,13 +1995,12 @@ contains
                 ! spans rr fine cells per parent-covered L0 cell. m below then gets amr_ref_ratio*(footprint) cells, as for a
                 ! level-1
                 ! block over L0. amr_cg / the prolong read this frame, so no other coupling code changes for the local (np=1) path.
-                pblk = f_amr_parent_block(amr_cur); rr = amr_slots(pblk)%amr_ref_ratio
-                do d = 1, 3
-                    amr_isect_lo(d) = rr*(lo(d) - amr_region_lo_all(d, pblk))
-                    amr_isect_hi(d) = rr*(hi(d) - amr_region_lo_all(d, pblk)) + (rr - 1)
-                end do
-                if (n_glb == 0) then; amr_isect_lo(2) = 0; amr_isect_hi(2) = 0; end if
-                if (p_glb == 0) then; amr_isect_lo(3) = 0; amr_isect_hi(3) = 0; end if
+                ! rr is the GLOBAL amr_ref_ratio, not amr_slots(pblk)%amr_ref_ratio: that field is written by s_amr_alloc_slot,
+                ! which a rank owning this block but NOT its parent never calls for pblk, so it would read undefined. The two agree
+                ! wherever both are defined - only an L0 tile carries a per-slot ratio of 1, and a level>=2 block's parent is never
+                ! an L0 tile. This is the same footprint s_amr_parent_foot derives from replicated metadata.
+                pblk = f_amr_parent_block(amr_cur)
+                call s_amr_parent_foot(amr_cur, pblk, amr_isect_lo, amr_isect_hi)
             end if
         else
             amr_isect_lo = 1; amr_isect_hi = 0  ! empty footprint
@@ -1989,26 +2023,17 @@ contains
         if (p_glb > 0) then
             amr_slots(amr_cur)%idwbuff(3)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(3)%end = amr_slots(amr_cur)%p + buff_size
         end if
-        ! coord building only on ranks with fine cells (others never read their coord arrays); the parent origin is this rank's
-        ! INTERSECTION start, converted to LOCAL indexing so the bisection reads its x_cb slice
-        if (amr_rank_owns_block .and. amr_block_level(amr_cur) >= 2) then
-            ! level >= 2: bisect the PARENT block's fine coords (its x_cb, lbound -1), parent origin = the parent-fine footprint
-            call s_build_level_coords(amr_slots(pblk)%x_cb, -1, amr_isect_lo(1), amr_slots(amr_cur)%m, amr_slots(amr_cur)%x_cb, &
-                                      & amr_slots(amr_cur)%x_cc, amr_slots(amr_cur)%dx)
-            if (n_glb > 0) call s_build_level_coords(amr_slots(pblk)%y_cb, -1, amr_isect_lo(2), amr_slots(amr_cur)%n, &
-                & amr_slots(amr_cur)%y_cb, amr_slots(amr_cur)%y_cc, amr_slots(amr_cur)%dy)
-            if (p_glb > 0) call s_build_level_coords(amr_slots(pblk)%z_cb, -1, amr_isect_lo(3), amr_slots(amr_cur)%p, &
-                & amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, amr_slots(amr_cur)%dz)
-        else if (amr_rank_owns_block) then
-            ! level 1: whole-block fine coords from the GLOBAL L0 boundaries (owner may not hold the coarse coordinate slice for
-            ! cells
-            ! it now refines). amr_gxcb has lbound -1; the parent origin is the block's GLOBAL low corner.
-            call s_build_level_coords(amr_gxcb, -1, amr_isect_lo(1), amr_slots(amr_cur)%m, amr_slots(amr_cur)%x_cb, &
-                                      & amr_slots(amr_cur)%x_cc, amr_slots(amr_cur)%dx)
-            if (n_glb > 0) call s_build_level_coords(amr_gycb, -1, amr_isect_lo(2), amr_slots(amr_cur)%n, &
-                & amr_slots(amr_cur)%y_cb, amr_slots(amr_cur)%y_cc, amr_slots(amr_cur)%dy)
-            if (p_glb > 0) call s_build_level_coords(amr_gzcb, -1, amr_isect_lo(3), amr_slots(amr_cur)%p, &
-                & amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, amr_slots(amr_cur)%dz)
+        ! coord building only on ranks with fine cells (others never read their coord arrays)
+        if (amr_rank_owns_block) then
+            ! Every level builds the same way: replay the ancestor chain from the GLOBAL L0 boundaries. The owner may hold no part
+            ! of the coarse slice it refines, and (level>=2) may not own the parent at all, so neither the local coarse coords nor
+            ! the parent's slot can be read here. At level 1 the chain is one step and this is the previous global-boundary form.
+            call s_amr_build_block_coords(amr_cur, amr_gxcb, amr_slots(amr_cur)%x_cb, amr_slots(amr_cur)%x_cc, &
+                                          & amr_slots(amr_cur)%dx, 1)
+            if (n_glb > 0) call s_amr_build_block_coords(amr_cur, amr_gycb, amr_slots(amr_cur)%y_cb, amr_slots(amr_cur)%y_cc, &
+                & amr_slots(amr_cur)%dy, 2)
+            if (p_glb > 0) call s_amr_build_block_coords(amr_cur, amr_gzcb, amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, &
+                & amr_slots(amr_cur)%dz, 3)
         end if
 
         ! Fine ghost prolongation reads up to nmar coarse cells past each face of the intersection; if that stencil leaves ANY
@@ -2280,7 +2305,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
         integer                                                :: L2, n1, i, par, inset(3)
 
-        if (amr_max_level < 2) return  ! np>=2: the L2 is co-located with block 1
+        if (amr_max_level < 2) return
         n1 = amr_num_blocks
         if (n1 < 1) return
         ! the static hierarchy nests exactly one level-2 block; without pool room it would SILENTLY refine only to level 1 (an
@@ -3398,8 +3423,8 @@ contains
         ! GLOBAL boundaries amr_g?cb (cl is a GLOBAL coarse index, region_lo + floor(jg/rr)), matching the interior build. Blocks
         ! stay buff_size inside the domain, so every ghost parent is an in-domain coarse cell with exact coords.
         block
-            integer               :: jg, cl, pblk2, k, rr
-            real(wp), allocatable :: cxb(:), cyb(:), czb(:)
+            integer               :: jg, cl, pblk2, k, rr, pnf
+            real(wp), allocatable :: cxb(:), cyb(:), czb(:), tcc(:), tdx(:)
             rr = amr_slots(amr_cur)%amr_ref_ratio
             ! ghost parent boundaries: a level>=2 block's coarse side is its PARENT's fine grid (indexed in the parent-fine
             ! amr_isect
@@ -3408,13 +3433,26 @@ contains
             ! parent's
             ! fine coords for level>=2, the global L0 boundaries for level 1.
             if (amr_block_level(amr_cur) >= 2) then
+                ! REBUILD the parent's fine boundaries from replicated metadata - do NOT read amr_slots(pblk2)%x_cb. That array is
+                ! allocated only on the PARENT's owner, and under per-level distribution this block's owner need not be it; taking
+                ! lbound/ubound of an unallocated allocatable is undefined. Same ancestor replay as the interior build, so the
+                ! ghost bisection and the interior agree exactly.
                 pblk2 = f_amr_parent_block(amr_cur)
-                allocate (cxb(lbound(amr_slots(pblk2)%x_cb, 1):ubound(amr_slots(pblk2)%x_cb, 1))); cxb = amr_slots(pblk2)%x_cb
+                pnf = amr_ref_ratio**amr_block_level(pblk2)*(amr_region_hi_all(1, pblk2) - amr_region_lo_all(1, pblk2) + 1) - 1
+                allocate (cxb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
+                call s_amr_build_block_coords(pblk2, amr_gxcb, cxb, tcc, tdx, 1)
+                deallocate (tcc, tdx)
                 if (n_glb > 0) then
-                    allocate (cyb(lbound(amr_slots(pblk2)%y_cb, 1):ubound(amr_slots(pblk2)%y_cb, 1))); cyb = amr_slots(pblk2)%y_cb
+                    pnf = amr_ref_ratio**amr_block_level(pblk2)*(amr_region_hi_all(2, pblk2) - amr_region_lo_all(2, pblk2) + 1) - 1
+                    allocate (cyb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
+                    call s_amr_build_block_coords(pblk2, amr_gycb, cyb, tcc, tdx, 2)
+                    deallocate (tcc, tdx)
                 end if
                 if (p_glb > 0) then
-                    allocate (czb(lbound(amr_slots(pblk2)%z_cb, 1):ubound(amr_slots(pblk2)%z_cb, 1))); czb = amr_slots(pblk2)%z_cb
+                    pnf = amr_ref_ratio**amr_block_level(pblk2)*(amr_region_hi_all(3, pblk2) - amr_region_lo_all(3, pblk2) + 1) - 1
+                    allocate (czb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
+                    call s_amr_build_block_coords(pblk2, amr_gzcb, czb, tcc, tdx, 3)
+                    deallocate (tcc, tdx)
                 end if
             else
                 allocate (cxb(lbound(amr_gxcb, 1):ubound(amr_gxcb, 1))); cxb = amr_gxcb
@@ -4648,11 +4686,24 @@ contains
         do kc = 1, amr_num_blocks
             if (amr_block_level(kc) /= clev) cycle
             call s_amr_select_slot(kc)  ! amr_cur = kc; mirrors (isect already parent-fine)
-            if (.not. amr_rank_owns_block) cycle  ! np>=2: child on another rank - future work (#27)
             pblk = f_amr_parent_block(kc)
-            call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons_stor, .false.)  ! parent @ t_a (device C/F fill)
-            call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_a)
-            call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons, .false.)  ! parent @ t_b (device C/F fill)
+            if (.not. (amr_rank_owns_block .or. amr_block_owner(pblk) == proc_rank)) cycle
+            ! Two P2P pairs (parent @ t_a, then @ t_b), so BOTH owners must arrive or the receiver never posts. The parent owner
+            ! packs and sends from its own slot; the child owner receives WITHOUT naming the parent field - amr_slots(pblk) is
+            ! unallocated there. Co-located (np=1, or parent and child on one rank) takes the local device-copy path unchanged.
+            ! Both sends carry tag amr_cur; MPI non-overtaking on a fixed (source, tag, comm) keeps t_a ahead of t_b.
+            if (amr_block_owner(pblk) == proc_rank) then
+                call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons_stor, .false.)  ! parent @ t_a (device C/F fill)
+            else
+                call s_amr_recv_parent_patch(pblk, .false.)
+            end if
+            if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_a)
+            if (amr_block_owner(pblk) == proc_rank) then
+                call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons, .false.)  ! parent @ t_b (device C/F fill)
+            else
+                call s_amr_recv_parent_patch(pblk, .false.)
+            end if
+            if (.not. amr_rank_owns_block) cycle
             call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_b)
             call s_amr_zero_fine_registers()
         end do
@@ -5130,7 +5181,7 @@ contains
             allocate (amr_owns_all(amr_max_blocks))
             allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
             allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
-            allocate (amr_fine_cut(0:num_procs - 1)); amr_fine_cut = -1_8
+            allocate (amr_fine_cut(0:num_procs - 1,1:max(amr_max_level, 1))); amr_fine_cut = -1_8
             allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
             allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
             allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
