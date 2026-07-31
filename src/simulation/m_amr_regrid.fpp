@@ -1042,9 +1042,12 @@ contains
                                     if (n_glb > 0) then; clo(2) = max(clo(2), mlo(2)); chi(2) = min(chi(2), mhi(2)); end if
                                     if (p_glb > 0) then; clo(3) = max(clo(3), mlo(3)); chi(3) = min(chi(3), mhi(3)); end if
                                 end if
-                                ! slot cap: a level>=2 block's fine grid spans 4*(its L0 extent) cells while the slot holds
-                                ! 2*amr_maxc_fit fine cells, so a child's L0 extent must be <= amr_maxc_fit/2. TILE a wider feature
-                                ! into adjacent <= amr_maxc_fit/2 sub-blocks (like the L1 tiling): the per-stage fine-fine halo
+                                ! slot cap: a level-lev block's fine grid spans amr_ref_ratio**lev*(its L0 extent) cells while the
+                                ! slot holds amr_ref_ratio*amr_maxc_fit (max_f* = amr_ref_ratio*amr_maxc_fit - 1), so a child's L0
+                                ! extent must be <= amr_maxc_fit/amr_ref_ratio**(lev-1) - HALVING once per level, not a fixed /2.
+                                ! At lev = 2 that is amr_maxc_fit/2 (unchanged); at lev = 3 a fixed /2 would admit a box twice what
+                                ! the slot holds. TILE a wider feature into adjacent sub-blocks (like the L1 tiling): the per-stage
+                                ! fine-fine halo
                                 ! (s_amr_fine_fine_halo, level-aware) matches the shared seam flux and the L2->L1 reflux skips those
                                 ! fine-fine faces. Subcycle used to keep ONE capped child instead - under-refining a wide feature -
                                 ! because s_amr_advance_children advanced children per-block with no L2-L2 halo; it now advances
@@ -1053,7 +1056,8 @@ contains
                                     type(t_box) :: l2t(amr_max_blocks)
                                     integer     :: nl2, cpd, it
                                     nl2 = 0; cpd = 0
-                                    call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, amr_maxc_fit/2)
+                                    call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, &
+                                                        & amr_maxc_fit/amr_ref_ratio**(lev - 1))
                                     do it = 1, nl2
                                         if (nboxes + 1 > amr_max_fine) exit
                                         nboxes = nboxes + 1
