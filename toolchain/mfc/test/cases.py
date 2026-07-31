@@ -7,7 +7,7 @@ from mfc import common
 
 from ..state import ARG
 from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
-from .convergence import ConvergenceSpec, run_dt_sweep, run_h_sweep, run_sod_l1
+from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_sod_l1
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -159,6 +159,27 @@ def add_convergence_cases(cases):
                     num_ranks=num_ranks,
                 ),
                 ppn=num_ranks,
+            )
+        )
+
+    # Hypoelastic shear-contact amplitude order (see examples/2D_hypo_shear_contact):
+    # HLLD's paired tangential momentum/energy star fluxes give a quadratic spurious-
+    # pressure response to a tau_xy jump; HLLC's mismatched weights give linear. The
+    # HLLC leg is the control that the case still discriminates (with v0 = 0 both
+    # solvers are quadratic, so a drifted case would silently pass HLLD alone).
+    for label, solver, expected, tol in [("HLLD", "hlld", 2.0, 0.1), ("HLLC", "hllc", 1.0, 0.2)]:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> HypoShearContact -> {label}",
+                spec=ConvergenceSpec(
+                    runner=run_amp_sweep,
+                    case_path="examples/2D_hypo_shear_contact/case.py",
+                    extra_args=["--solver", solver],
+                    expected_order=expected,
+                    tol=tol,
+                    amps=[1.0e-3, 2.0e-3, 4.0e-3, 8.0e-3, 1.6e-2],
+                ),
+                ppn=1,
             )
         )
 
