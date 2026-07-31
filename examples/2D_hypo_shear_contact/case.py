@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Stationary hypoelastic shear-bearing contact with a swept tau_xy jump.
+"""Hypoelastic shear Riemann problem with a swept tau_xy jump.
 
 Normalized density contact (rho 1|2 at x = 0.5) with uniform pressure p0 = 1,
 zero normal velocity, uniform tangential velocity v0, tau_xx = 0, and a
-tangential-stress jump tau_xy = 0|A. The exact solution is steady, so any
-pressure change is spurious solver response. The amplitude-order regression
-(`Convergence -> HypoShearContact` in ./mfc.sh test) sweeps A at fixed grid:
-HLLD's momentum and energy fluxes carry the same tangential double-star state,
-cancelling the velocity-linear energy error, so its pressure response is
-O(A^2); HLLC's mismatched weights leave an O(A) response. The uniform v0 /= 0
-is essential — with v0 = 0 both solvers respond at O(A^2).
+tangential-stress jump tau_xy = 0|A, which launches shear waves. The
+amplitude-order regression (`Convergence -> HypoShearContact` in ./mfc.sh
+test) sweeps A at fixed grid: HLLD's momentum and energy fluxes carry the same
+tangential double-star state, cancelling the velocity-linear mismatch and
+leaving an O(A^2) pressure response; HLLC's mismatched weights leave an O(A)
+response. The uniform v0 /= 0 is essential — with v0 = 0 both solvers respond
+at O(A^2).
 
 Both fluids are physically identical (gamma = 1.4, pi_inf = 0, G = 1) because
 hypoelastic HLLD validation currently requires exactly two components.

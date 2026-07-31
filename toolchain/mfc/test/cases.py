@@ -163,8 +163,8 @@ def add_convergence_cases(cases):
         )
 
     # Hypoelastic shear-contact amplitude order (see examples/2D_hypo_shear_contact):
-    # HLLD's paired tangential momentum/energy star fluxes give a quadratic spurious-
-    # pressure response to a tau_xy jump; HLLC's mismatched weights give linear. The
+    # HLLD's paired tangential momentum/energy star fluxes give a quadratic pressure
+    # response to a tau_xy jump; HLLC's mismatched weights give linear. The
     # HLLC leg is the control that the case still discriminates (with v0 = 0 both
     # solvers are quadratic, so a drifted case would silently pass HLLD alone).
     for label, solver, expected, tol in [("HLLD", "hlld", 2.0, 0.1), ("HLLC", "hllc", 1.0, 0.2)]:

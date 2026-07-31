@@ -16,7 +16,7 @@ Four runner flavours, picked by setting spec.runner in cases.py:
   run_sod_l1    1D L1 self-convergence: compare each N against 2N after
                 cell-averaging the fine grid.
   run_amp_sweep fix the grid, sweep an IC jump amplitude A (one step). Fits
-                the order of the spurious response in A — an algebraic flux
+                the order of the pressure response in A — an algebraic flux
                 regression, not a spatial-convergence test — and asserts it
                 two-sided: |fitted - expected_order| <= tol.
 
@@ -341,14 +341,13 @@ def _hypo_pressure_2d(run_dir: str, step: int, cell_count: int, cfg: dict) -> np
 def run_amp_sweep(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     """Fix the grid, sweep the IC tau_xy jump amplitude A; fit response order.
 
-    Stationary shear-bearing contact: the exact solution is steady, so the
-    baseline-subtracted (A = 0 run) pressure change after one step is spurious
-    solver response, measured as Linf over the interface-adjacent cells. HLLD
-    pairs the same tangential double-star state in its momentum and energy
-    fluxes, so the velocity-linear energy error cancels: order 2 in A. HLLC
-    weights them differently: order 1 (the nonzero uniform tangential velocity
-    in the case is what exposes it). Asserted two-sided so the HLLC control
-    also guards the case's discriminating power.
+    The tau_xy jump launches shear waves. Measure the baseline-subtracted
+    (A = 0 run) pressure response after one step as Linf over the
+    interface-adjacent cells. HLLD pairs the same tangential double-star state
+    in its momentum and energy fluxes, cancelling the velocity-linear mismatch:
+    order 2 in A. HLLC weights them differently: order 1 (the nonzero uniform
+    tangential velocity in the case is what exposes it). Asserted two-sided so
+    the HLLC control also guards the case's discriminating power.
     """
     errors, tags = [], []
     baseline = None
