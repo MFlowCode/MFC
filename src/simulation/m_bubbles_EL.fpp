@@ -660,7 +660,7 @@ contains
 
             ! Obtain liquid density and computing speed of sound from pinf
             call s_compute_species_fraction(q_prim_vf, cell(1), cell(2), cell(3), myalpha_rho, myalpha)
-            call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, myalpha_rho, Re)
+            call s_convert_species_to_mixture_variables_kernel(myRho, gamma, pi_inf, qv, myalpha, myalpha_rho, Re)
             call s_compute_cson_from_pinf(q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
 
             ! Adaptive time stepping

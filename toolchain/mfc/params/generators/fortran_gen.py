@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List, Tuple
 
-from ..definitions import CASE_OPT_PARAMS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
+from ..definitions import CASE_OPT_PARAMS, DECLARATION_TARGETS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
 from ..registry import REGISTRY
 from ..schema import ParamDef, ParamType
 
@@ -27,6 +27,97 @@ _FORTRAN_TYPES = {
 _REAL_TYPES = (ParamType.REAL, ParamType.ANALYTIC_REAL)
 
 _VALID_TARGETS = ("pre", "sim", "post")
+
+# Scalar simulation parameters whose generated declarations own device storage.
+# Case-optimization parameters are emitted by generated_case_opt_decls.fpp; all
+# other names are emitted by generated_decls.fpp.
+SIM_GPU_DECL_VARS = {
+    "Bx0",
+    "Ca",
+    "R0ref",
+    "Re_inv",
+    "Web",
+    "acoustic_source",
+    "adap_dt",
+    "adap_dt_max_iters",
+    "adap_dt_tol",
+    "adv_n",
+    "alpha_bar",
+    "alt_soundspeed",
+    "avg_state",
+    "bubble_model",
+    "bubbles_euler",
+    "bubbles_lagrange",
+    "cfl_target",
+    "cont_damage",
+    "cont_damage_s",
+    "cyl_coord",
+    "down_sample",
+    "dt",
+    "fd_order",
+    "hyper_cleaning",
+    "hyper_cleaning_speed",
+    "hyper_cleaning_tau",
+    "hypoelasticity",
+    "ib",
+    "ib_coefficient_of_friction",
+    "ic_beta",
+    "ic_eps",
+    "igr",
+    "igr_iter_solver",
+    "igr_order",
+    "igr_pres_lim",
+    "int_comp",
+    "low_Mach",
+    "m",
+    "mapped_weno",
+    "mixture_err",
+    "model_eqns",
+    "mp_weno",
+    "mhd",
+    "mpp_lim",
+    "muscl_eps",
+    "muscl_lim",
+    "muscl_order",
+    "muscl_polyn",
+    "n",
+    "num_dims",
+    "num_fluids",
+    "num_ibs",
+    "num_source",
+    "num_turbulent_sources",
+    "num_vels",
+    "p",
+    "palpha_eps",
+    "pi_fac",
+    "poly_sigma",
+    "polydisperse",
+    "polytropic",
+    "pref",
+    "ptgalpha_eps",
+    "qbmm",
+    "recon_type",
+    "relativity",
+    "relax",
+    "relax_model",
+    "rhoref",
+    "sigma",
+    "surface_tension",
+    "synth_U_inf",
+    "synthetic_turbulence",
+    "tau_star",
+    "teno",
+    "teno_CT",
+    "thermal",
+    "viscous",
+    "weno_eps",
+    "weno_num_stencils",
+    "weno_order",
+    "weno_polyn",
+    "wenojs",
+    "wenoz",
+    "wenoz_q",
+}
 
 
 def _check_target(target: str) -> None:
@@ -57,6 +148,12 @@ def _is_simple_scalar(name: str) -> bool:
 
 def _vars_for_target(target: str) -> List[str]:
     return sorted(v for v, ts in NAMELIST_VARS.items() if target in ts)
+
+
+def _decl_vars_for_target(target: str) -> List[str]:
+    namelist_vars = {v for v, targets in NAMELIST_VARS.items() if target in targets}
+    common_module_vars = {v for v, targets in DECLARATION_TARGETS.items() if target in targets}
+    return sorted(namelist_vars | common_module_vars)
 
 
 def _pack_namelist(vars_list: List[str], first_prefix: str, cont_prefix: str, max_line: int) -> List[str]:
@@ -111,7 +208,8 @@ def generate_decls_fpp(target: str) -> str:
     """Return Fortran declarations (scalars + known arrays) for a target."""
     _check_target(target)
     lines = [_HEADER.rstrip()]
-    for name in _vars_for_target(target):
+    declared_names = set()
+    for name in _decl_vars_for_target(target):
         if not _is_simple_scalar(name):
             continue
         if target == "sim" and name in CASE_OPT_PARAMS:
@@ -126,6 +224,7 @@ def generate_decls_fpp(target: str) -> str:
             ftype = fortran_type_decl(member)
             dim = FORTRAN_ARRAY_DIMS[name]
             lines.append(f"{(ftype + ', dimension(' + dim + ')').ljust(_ARRAY_DECL_COL)}:: {name}")
+            declared_names.add(name)
             continue
         param = REGISTRY.all_params.get(name)
         if param is None:
@@ -133,8 +232,10 @@ def generate_decls_fpp(target: str) -> str:
         if any(k.startswith(f"{name}(") for k in REGISTRY.all_params):
             raise ValueError(f"{name!r} has indexed variants (e.g. {name}(1)) but is missing from " "FORTRAN_ARRAY_DIMS. Add it there with its Fortran dimension expression.")
         lines.append(f"{fortran_type_decl(param).ljust(_DECL_COL)}:: {name}")
+        declared_names.add(name)
     for name, (ftype, dim, gpu, desc) in TYPED_DECLS.items():
-        if name not in NAMELIST_VARS or target not in NAMELIST_VARS[name]:
+        declaration_targets = NAMELIST_VARS.get(name, set()) | DECLARATION_TARGETS.get(name, set())
+        if target not in declaration_targets:
             continue
         decl = f"{ftype}, dimension({dim})" if dim else ftype
         padded = decl.ljust(_ARRAY_DECL_COL)
@@ -142,7 +243,11 @@ def generate_decls_fpp(target: str) -> str:
             padded += " "
         doc = f" !< {desc}" if desc else ""
         lines.append(f"{padded}:: {name}{doc}")
+        declared_names.add(name)
         if gpu and target == "sim":
+            lines.append(f"$:GPU_DECLARE(create='[{name}]')")
+    if target == "sim":
+        for name in sorted(SIM_GPU_DECL_VARS & declared_names):
             lines.append(f"$:GPU_DECLARE(create='[{name}]')")
     return "\n".join(lines) + "\n"
 
@@ -173,6 +278,7 @@ CASE_OPT_EXTRA_LINES = [
     ("weno_num_stencils", "integer", "Number of stencils for WENO reconstruction"),
     ("wenojs", "logical", "WENO-JS (default)"),
 ]
+COMMON_CASE_OPT_EXTRA_NAMES = {"num_dims", "num_vels", "weno_polyn", "muscl_polyn"}
 
 _CASE_OPT_DECL_COL = 24  # '::' alignment for case-opt declarations
 
@@ -221,12 +327,30 @@ def generate_case_opt_decls_fpp() -> str:
             if_lines.append(f"    {ftype}, parameter :: {name} = ${{{name}}}$  !< {desc}")
             else_lines.append(f"    {ftype.ljust(_CASE_OPT_DECL_COL)}:: {name}")
 
+    declared_names = {name for name, _, _ in CASE_OPT_EXTRA_LINES} | set(params_to_emit)
+    for name in sorted(SIM_GPU_DECL_VARS & declared_names):
+        else_lines.append(f"    $:GPU_DECLARE(create='[{name}]')")
+
     parts = [_HEADER.rstrip(), "#:if MFC_CASE_OPTIMIZATION"]
     parts.extend(if_lines)
     parts.append("#:else")
     parts.extend(else_lines)
     parts.append("#:endif")
     return "\n".join(parts) + "\n"
+
+
+def generate_common_extra_decls_fpp() -> str:
+    """Return computed-scalar declarations needed by common pre/post code."""
+    # A name here that CASE_OPT_EXTRA_LINES does not define emits nothing, leaving pre/post
+    # without a declaration that common code references. Fail on the orphan instead.
+    orphans = sorted(COMMON_CASE_OPT_EXTRA_NAMES - {name for name, _, _ in CASE_OPT_EXTRA_LINES})
+    if orphans:
+        raise ValueError(f"COMMON_CASE_OPT_EXTRA_NAMES entries missing from CASE_OPT_EXTRA_LINES: {', '.join(orphans)}.")
+    lines = [_HEADER.rstrip()]
+    for name, ftype, _ in CASE_OPT_EXTRA_LINES:
+        if name in COMMON_CASE_OPT_EXTRA_NAMES:
+            lines.append(f"{ftype.ljust(_CASE_OPT_DECL_COL)}:: {name}")
+    return "\n".join(lines) + "\n"
 
 
 # Struct roots in NAMELIST_VARS whose member-level broadcasts are irregular
@@ -566,9 +690,8 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
 
     Paths match the cmake include directory structure:
       build_dir/include/{full_target}/generated_{namelist,decls,constants,case_opt_decls,bcast}.fpp
-    Every target gets generated_case_opt_decls.fpp: real content for simulation,
-    a header-only stub for the others (Fypp resolves #:include at parse time, so
-    the file must exist for every target even inside a dead conditional).
+    Every target gets generated_case_opt_decls.fpp: the full case-optimization
+    block for simulation and common computed-scalar declarations for pre/post.
     Every target gets generated_bcast.fpp with its MPI broadcast statements.
     """
     result = []
@@ -577,10 +700,19 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
         result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
         result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
+    sim_gpu_decls = ""
     for short, full in TARGETS:
         inc = build_dir / "include" / full
-        content = generate_case_opt_decls_fpp() if short == "sim" else _HEADER + "! (no case-optimization declarations for this target)\n"
+        content = generate_case_opt_decls_fpp() if short == "sim" else generate_common_extra_decls_fpp()
+        if short == "sim":
+            sim_gpu_decls = content
         result.append((inc / "generated_case_opt_decls.fpp", content))
+    # A name here that simulation never declares emits no GPU_DECLARE, so the variable
+    # silently loses device residency. Fail on the stale entry instead.
+    sim_gpu_decls += generate_decls_fpp("sim")
+    stale = sorted(n for n in SIM_GPU_DECL_VARS if f"$:GPU_DECLARE(create='[{n}]')" not in sim_gpu_decls)
+    if stale:
+        raise ValueError(f"SIM_GPU_DECL_VARS names that simulation does not declare: {', '.join(stale)}. Remove them or restore the parameter.")
     for short, full in TARGETS:
         inc = build_dir / "include" / full
         result.append((inc / "generated_bcast.fpp", generate_bcast_fpp(short)))
