@@ -29,22 +29,14 @@ module m_data_output
         & s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, s_close_run_time_information_file, &
         & s_close_com_files, s_close_probe_files, s_finalize_data_output_module
 
-    real(wp), allocatable, dimension(:,:,:)       :: icfl_sf  !< ICFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: vcfl_sf  !< VCFL stability criterion
-    real(wp), allocatable, dimension(:,:,:)       :: Rc_sf    !< Rc stability criterion
     real(wp), public, allocatable, dimension(:,:) :: c_mass
-    $:GPU_DECLARE(create='[icfl_sf, vcfl_sf, Rc_sf, c_mass]')
+    $:GPU_DECLARE(create='[c_mass]')
 
-    real(wp) :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
-    real(wp) :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
-    real(wp) :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
-    $:GPU_DECLARE(create='[icfl_max_loc, icfl_max_glb, vcfl_max_loc, vcfl_max_glb]')
-    $:GPU_DECLARE(create='[Rc_min_loc, Rc_min_glb]')
-
-    !> @name ICFL, VCFL, and Rc stability criteria extrema over all the time-steps
+    !> @name ICFL, VCFL, CCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
     real(wp) :: icfl_max  !< ICFL criterion maximum
     real(wp) :: vcfl_max  !< VCFL criterion maximum
+    real(wp) :: ccfl_max  !< CCFL criterion maximum
     real(wp) :: Rc_min    !< Rc criterion maximum
     !> @}
 
@@ -96,8 +88,16 @@ contains
 
         write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
 
+        if (surface_tension) then
+            write (3, '(13X,A10)', advance="no") trim('CCFL Max')
+        end if
+
         if (viscous) then
             write (3, '(13X,A10,13X,A16)', advance="no") trim('VCFL Max'), trim('Rc Min')
+        end if
+
+        if (bubbles_lagrange) then
+            write (3, '(13X,A10)', advance="no") trim('N Bubbles')
         end if
 
         write (3, *)  ! new line
@@ -174,20 +174,30 @@ contains
             real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
             real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
         #:endif
-        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)               :: pres     !< Cell-avg. pressure
-        real(wp)               :: gamma    !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv       !< Cell-avg. internal energy reference value
-        real(wp)               :: c        !< Cell-avg. sound speed
-        real(wp)               :: H        !< Cell-avg. enthalpy
-        real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum                     !< Cell-avg. velocity sum
+        real(wp)               :: pres                        !< Cell-avg. pressure
+        real(wp)               :: gamma                       !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf                      !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv                          !< Cell-avg. internal energy reference value
+        real(wp)               :: c                           !< Cell-avg. sound speed
+        real(wp)               :: H                           !< Cell-avg. enthalpy
+        real(wp), dimension(2) :: Re                          !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
-        integer                :: fl       !< Fluid loop iterator
+        real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
+        real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
+        real(wp)               :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
+        real(wp)               :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
+        real(wp)               :: icfl, vcfl, ccfl, Rc
+        integer                :: fl                          !< Fluid loop iterator
 
+        icfl_max_loc = 0._wp
+        vcfl_max_loc = 0._wp
+        ccfl_max_loc = 0._wp
+        Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
-
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
+                            & vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
+                            & reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -207,51 +217,34 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    if (viscous) then
-                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
-                    else
-                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf)
-                    end if
+                    call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
+
+                    icfl_max_loc = max(icfl_max_loc, icfl)
+                    vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
+                    ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
+                    Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-
-#ifdef _CRAYFTN
-        $:GPU_UPDATE(host='[icfl_sf]')
-
-        if (viscous) then
-            $:GPU_UPDATE(host='[vcfl_sf, Rc_sf]')
-        end if
-
-        icfl_max_loc = maxval(icfl_sf)
-
-        if (viscous) then
-            vcfl_max_loc = maxval(vcfl_sf)
-            Rc_min_loc = minval(Rc_sf)
-        end if
-#else
-        #:call GPU_PARALLEL(copyout='[icfl_max_loc]', copyin='[icfl_sf]')
-            icfl_max_loc = maxval(icfl_sf)
-        #:endcall GPU_PARALLEL
-        if (viscous) then
-            #:call GPU_PARALLEL(copyout='[vcfl_max_loc, Rc_min_loc]', copyin='[vcfl_sf,Rc_sf]')
-                vcfl_max_loc = maxval(vcfl_sf)
-                Rc_min_loc = minval(Rc_sf)
-            #:endcall GPU_PARALLEL
-        end if
-#endif
+        ! end: Computing Stability Criteria at Current Time-step
 
         if (num_procs > 1) then
-            call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, icfl_max_glb, vcfl_max_glb, &
-                & Rc_min_glb)
+            call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, n_el_bubs_loc, icfl_max_glb, &
+                & vcfl_max_glb, Rc_min_glb, n_el_bubs_glb, ccfl_max_loc, ccfl_max_glb)
         else
             icfl_max_glb = icfl_max_loc
             if (viscous) vcfl_max_glb = vcfl_max_loc
             if (viscous) Rc_min_glb = Rc_min_loc
+            if (surface_tension) ccfl_max_glb = ccfl_max_loc
+            if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
+
+        if (surface_tension) then
+            if (ccfl_max_glb > ccfl_max) ccfl_max = ccfl_max_glb
+        end if
 
         if (viscous) then
             if (vcfl_max_glb > vcfl_max) vcfl_max = vcfl_max_glb
@@ -261,8 +254,16 @@ contains
         if (proc_rank == 0) then
             write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
 
+            if (surface_tension) then
+                write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
+            end if
+
             if (viscous) then
                 write (3, '(13X,F10.6,13X,ES16.6)', advance="no") vcfl_max_glb, Rc_min_glb
+            end if
+
+            if (bubbles_lagrange) then
+                write (3, '(13X,I10)', advance="no") n_el_bubs_glb
             end if
 
             write (3, *)  ! new line
@@ -280,6 +281,12 @@ contains
                 else if (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
                     call s_mpi_abort('VCFL is greater than 1.0. Exiting.')
+                end if
+            end if
+
+            if (bubbles_lagrange) then
+                if (n_el_bubs_glb == 0) then
+                    call s_mpi_abort('No Lagrangian bubbles remain in the domain. Exiting.')
                 end if
             end if
         end if
@@ -687,12 +694,13 @@ contains
             call s_int_to_str(t_step, t_step_string)
 
             if (down_sample) then
-                call s_initialize_mpi_data_ds(q_cons_temp_ds)
+                call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
             else
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                               & qbmm_mv=mv_ts(1))
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                 end if
             end if
 
@@ -707,7 +715,7 @@ contains
             call s_mpi_barrier()
             call DelayFileAccess(proc_rank)
 
-            call s_initialize_mpi_data(q_cons_vf)
+            call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
 
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
@@ -773,11 +781,12 @@ contains
             end if
         else
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                           & qbmm_mv=mv_ts(1))
             else if (present(beta)) then
-                call s_initialize_mpi_data(q_cons_vf, beta=beta)
+                call s_initialize_mpi_data(q_cons_vf, beta=beta, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
             end if
 
             write (file_loc, '(I0,A)') t_step, '.dat'
@@ -1206,7 +1215,7 @@ contains
                     end if
 
                     ! Computing/Sharing necessary state variables
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, rho, gamma, pi_inf, qv, Re, G_local, &
                                                             & fluid_pp(:)%G)
                     else
@@ -1218,7 +1227,7 @@ contains
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         if (cont_damage) then
                             damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k, l)
                             G_local = G_local*max((1._wp - damage_state), 0._wp)
@@ -1235,7 +1244,7 @@ contains
 
                     if (model_eqns == model_eqns_4eq) then
                         lit_gamma = gammas(1)
-                    else if (elasticity) then
+                    else if (hypoelasticity) then
                         tau_e(1) = q_cons_vf(eqn_idx%stress%end)%sf(j - 2, k, l)/rho
                     end if
 
@@ -1322,7 +1331,7 @@ contains
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
-                        if (elasticity) then
+                        if (hypoelasticity) then
                             if (cont_damage) then
                                 damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l)
                                 G_local = G_local*max((1._wp - damage_state), 0._wp)
@@ -1339,7 +1348,7 @@ contains
 
                         if (model_eqns == model_eqns_4eq) then
                             lit_gamma = gs_min(1)
-                        else if (elasticity) then
+                        else if (hypoelasticity) then
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
                             end do
@@ -1409,7 +1418,7 @@ contains
                                 end do
                             end if
 
-                            if (elasticity) then
+                            if (hypoelasticity) then
                                 if (cont_damage) then
                                     damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l - 2)
                                     G_local = G_local*max((1._wp - damage_state), 0._wp)
@@ -1460,7 +1469,7 @@ contains
                     end if
                 end if
 
-                if (elasticity) then
+                if (hypoelasticity) then
                     do s = 1, (num_dims*(num_dims + 1))/2
                         tmp = tau_e(s)
                         call s_mpi_allreduce_sum(tmp, tau_e(s))
@@ -1502,7 +1511,7 @@ contains
                             write (i + 30, '(6X,10F24.8)') nondim_time, rho, vel(1), vel(2), pres, alf, nR(1), nRdot(1), R(1), &
                                    & Rdot(1)
                         #:endif
-                    else if (elasticity) then
+                    else if (hypoelasticity) then
                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                             write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8)') nondim_time, rho, &
                                    & vel(1), vel(2), pres, tau_e(1), tau_e(2), tau_e(3)
@@ -1651,8 +1660,9 @@ contains
         write (3, '(A)') ''
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
+        if (surface_tension) write (3, '(A,F9.6)') 'CCFL Max: ', ccfl_max
         if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (viscous) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
+        if (viscous) write (3, '(A,ES16.6)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
@@ -1691,15 +1701,13 @@ contains
         integer :: i, m_ds, n_ds, p_ds
 
         if (run_time_info) then
-            @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
             icfl_max = 0._wp
-
+            if (surface_tension) then
+                ccfl_max = 0._wp
+            end if
             if (viscous) then
-                @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
-                @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
-
                 vcfl_max = 0._wp
-                Rc_min = 1.e3_wp
+                Rc_min = 1.e12_wp
             end if
         end if
 
@@ -1727,13 +1735,6 @@ contains
 
         if (probe_wrt) then
             @:DEALLOCATE(c_mass)
-        end if
-
-        if (run_time_info) then
-            @:DEALLOCATE(icfl_sf)
-            if (viscous) then
-                @:DEALLOCATE(vcfl_sf, Rc_sf)
-            end if
         end if
 
         if (down_sample) then

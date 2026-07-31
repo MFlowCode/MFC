@@ -2,7 +2,6 @@
 MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
-This replaces the definitions/ directory.
 """
 
 import re
@@ -125,10 +124,11 @@ TAG_DISPLAY_NAMES = {
     "grid": "Grid",
     "weno": "WENO",
     "viscosity": "Viscosity",
-    "elasticity": "Elasticity",
+    "hypoelasticity": "Hypoelasticity",
     "surface_tension": "Surface tension",
     "acoustic": "Acoustic",
     "ib": "Immersed boundary",
+    "reactive_burn": "Reactive burn",
     "probes": "Probe/integral",
     "riemann": "Riemann solver",
     "relativity": "Relativity",
@@ -343,9 +343,9 @@ CONSTRAINTS = {
     },
     # Bubbles
     "bubble_model": {
-        "choices": [1, 2, 3],
-        "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
-        "names": {"gilmore": 1, "keller_miksis": 2, "rayleigh_plesset": 3},
+        "choices": [0, 1, 2, 3],
+        "value_labels": {0: "Particle", 1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
+        "names": {"particle": 0, "gilmore": 1, "keller_miksis": 2, "rayleigh_plesset": 3},
     },
     # Output
     "format": {
@@ -640,12 +640,11 @@ def _load():
     # Viscosity
     _r("viscous", LOG, {"viscosity"})
 
-    # Elasticity
-    for n in ["hypoelasticity", "hyperelasticity"]:
-        _r(n, LOG, {"elasticity"})
-    _r("riemann_hypo_ADC", LOG, {"elasticity"})
-    _r("ADC_kappa", REAL, {"elasticity"})
-    _r("hypo_hll_interface_rhs", LOG, {"elasticity"})
+    # Hypoelasticity
+    _r("hypoelasticity", LOG, {"hypoelasticity"})
+    _r("riemann_hypo_ADC", LOG, {"hypoelasticity"})
+    _r("ADC_kappa", REAL, {"hypoelasticity"})
+    _r("hypo_hll_interface_rhs", LOG, {"hypoelasticity"})
     _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension
@@ -655,6 +654,11 @@ def _load():
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
     _r("chemistry", LOG, {"chemistry"})
+
+    # Condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)
+    _r("reactive_burn", LOG, {"reactive_burn"})
+    for a in ["k", "pign", "pref", "n", "ta"]:
+        _r(f"rburn%{a}", REAL, {"reactive_burn"})
 
     # Acoustic
     _r("num_source", INT, {"acoustic"})
@@ -793,7 +797,6 @@ def _load():
         "mixlayer_perturb",
         "perturb_flow",
         "perturb_sph",
-        "pre_stress",
         "elliptic_smoothing",
         "simplex_perturb",
         "alt_soundspeed",
@@ -816,6 +819,21 @@ def _load():
         _r(f"w_{d}", REAL, math=r"\f$\omega_" + d + r"\f$")
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
+
+    # Interfacial flow inputs
+    _r("normMag", REAL)
+    _r("p0_ic", REAL)
+    _r("g0_ic", REAL)
+    _r("normFac", REAL)
+    _r("interface_file", STR)
+
+    # Body force with spatial support (Wei & Freund, JFM 2005)
+    _r("bf_spatial_support", LOG)
+    for a in ["amp", "x_centroid", "y_centroid", "conv_vel", "sigma"]:
+        _r(f"spatial_bf%{a}", REAL)
+    for j in range(1, 9):
+        _r(f"spatial_bf%freq({j})", REAL)
+        _r(f"spatial_bf%phase({j})", REAL)
 
     # Synthetic turbulence forcing
     _r("synthetic_turbulence", LOG, {"synthetic_turbulence"})
@@ -870,9 +888,9 @@ def _load():
         for f in range(1, NF + 1):
             _r(f"{px}alpha({f})", A_REAL, math=r"\f$\alpha_" + str(f) + r"\f$")
             _r(f"{px}alpha_rho({f})", A_REAL, math=r"\f$\alpha \rho\f$")
-        # Elasticity stress tensor
+        # Hypoelastic stress tensor
         for j in range(1, 7):
-            _r(f"{px}tau_e({j})", A_REAL, {"elasticity"}, math=r"\f$\tau_e\f$")
+            _r(f"{px}tau_e({j})", A_REAL, {"hypoelasticity"}, math=r"\f$\tau_e\f$")
         if i >= 2:
             for j in range(1, i):
                 _r(f"{px}alter_patch({j})", LOG)
@@ -896,7 +914,7 @@ def _load():
         px = f"fluid_pp({f})%"
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
-        _r(f"{px}G", REAL, {"elasticity"}, math=r"\f$G_k\f$")
+        _r(f"{px}G", REAL, {"hypoelasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
         _r(f"{px}non_newtonian", LOG, {"viscosity"}, math=r"\mathrm{non\text{-}Newtonian}_k")
@@ -938,9 +956,9 @@ def _load():
     # grow patch_ib beyond this at runtime, but those entries are never in the namelist.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
-    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id"]:
+    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -1097,20 +1115,22 @@ def _load():
     # lag_params (Lagrangian bubbles)
     # Members present in bubbles_lagrange_parameters: solver_approach, cluster_type,
     # pressure_corrector, smooth_type, heatTransfer_model, massTransfer_model,
-    # write_bubbles, write_bubbles_stats, nBubs_glb, epsilonb, charwidth, valmaxvoid.
-    # T0/Thost/c0/rho0/x0 were removed from the Fortran type by upstream #1085/#1093
-    # — they must NOT be registered (namelist read would crash).
-    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"]:
+    # write_bubbles, write_bubbles_stats, write_void_evol, pressure_force,
+    # gravity_force, nBubs_glb, epsilonb, charwidth, valmaxvoid. T0/Thost/c0/rho0/x0
+    # were removed from the Fortran type by upstream #1085/#1093 — they must NOT be
+    # registered (namelist read would crash).
+    for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol", "kahan_summation"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
+    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
+    _r("lag_params%input_path", STR, {"bubbles"})
 
     # chem_params
-    for a in ["diffusion", "reactions"]:
+    for a in ["diffusion", "reactions", "adap_substeps"]:
         _r(f"chem_params%{a}", LOG, {"chemistry"})
-    for a in ["gamma_method", "transport_model"]:
+    for a in ["gamma_method", "transport_model", "reaction_substeps", "reaction_substeps_max"]:
         _r(f"chem_params%{a}", INT, {"chemistry"})
 
     # Per-fluid output arrays
@@ -1164,6 +1184,11 @@ _init_registry()
 
 NAMELIST_VARS: dict[str, set[str]] = {}
 
+# Some common modules are compiled into every executable even though the
+# corresponding user input remains meaningful in only a subset of namelists.
+# Keep declaration visibility separate from input acceptance.
+DECLARATION_TARGETS: dict[str, set[str]] = {}
+
 # Maps indexed-family base names to their Fortran dimension expression.
 # The generator emits `{type}, dimension({dim}) :: {name}` for each entry.
 # Add here whenever a new array param needs no manual Fortran declaration.
@@ -1198,9 +1223,11 @@ TYPED_DECLS: dict[str, tuple] = {
     "integral": ("type(integral_parameters)", "num_probes_max", False, None),
     "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
     "chem_params": ("type(chemistry_parameters)", None, True, None),
+    "rburn": ("type(reactive_burn_parameters)", None, True, "Condensed-phase reactive-burn (programmed detonation) parameters"),
     "lag_params": ("type(bubbles_lagrange_parameters)", None, True, "Lagrange bubbles' parameters"),
     "particle_cloud": ("type(particle_cloud_parameters)", "num_particle_clouds_max", False, "Particle bed specifications"),
     "simplex_params": ("type(simplex_noise_params)", None, False, None),
+    "spatial_bf": ("type(spbf_parameters)", None, True, "Parameters for spatially supported body force (Wei & Freund, JFM 2005)"),
 }
 
 
@@ -1209,11 +1236,30 @@ def _nv(targets: set, *names: str) -> None:
         NAMELIST_VARS[n] = set(targets)
 
 
+def _decl(targets: set, *names: str) -> None:
+    for n in names:
+        DECLARATION_TARGETS[n] = set(targets)
+
+
 _ALL, _PRE_SIM, _SIM_POST = {"pre", "sim", "post"}, {"pre", "sim"}, {"sim", "post"}
 _PRE_POST = {"pre", "post"}
 _SIM = {"sim"}
 _PRE = {"pre"}
 _POST = {"post"}
+
+_decl(
+    _ALL,
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
+    "sigR",
+    "viscous",
+    "riemann_solver",
+    "stl_models",
+    "num_stl_models",
+    "palpha_eps",
+    "ptgalpha_eps",
+)
 
 _nv(
     _ALL,
@@ -1252,7 +1298,6 @@ _nv(
     "sigma",
     "adv_n",
     "hypoelasticity",
-    "hyperelasticity",
     "surface_tension",
     "relativity",
     "ib",
@@ -1273,31 +1318,23 @@ _nv(
     "t_stop",
     "t_save",
     "cfl_target",
-    "avg_state",
     "prim_vars_wrt",
-    "alt_soundspeed",
-    "mixture_err",
     "fd_order",
     "ib_state_wrt",
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
 )
 _nv(
     _PRE_SIM,
-    "x_domain",
-    "y_domain",
-    "z_domain",
-    "x_a",
-    "y_a",
-    "z_a",
-    "x_b",
-    "y_b",
-    "z_b",
     "palpha_eps",
     "ptgalpha_eps",
     "t_step_old",
     "patch_ib",
     "pi_fac",
 )
-_nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
+_nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "igr", "igr_order", "sigR")
+_nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
 _nv(
@@ -1319,7 +1356,6 @@ _nv(
     "int_comp",
     "ic_eps",
     "ic_beta",
-    "riemann_solver",
     "riemann_hypo_ADC",
     "ADC_kappa",
     "hll_u_interface",
@@ -1344,6 +1380,8 @@ _nv(
     "bf_x",
     "bf_y",
     "bf_z",
+    "bf_spatial_support",
+    "spatial_bf",
     "k_x",
     "k_y",
     "k_z",
@@ -1386,9 +1424,19 @@ _nv(
     "nv_uvm_out_of_core",
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
+    "riemann_solver",
 )
 _nv(
     _PRE,
+    "x_domain",
+    "y_domain",
+    "z_domain",
+    "x_a",
+    "y_a",
+    "z_a",
+    "x_b",
+    "y_b",
+    "z_b",
     "stretch_x",
     "stretch_y",
     "stretch_z",
@@ -1405,7 +1453,6 @@ _nv(
     "sigV",
     "dist_type",
     "rhoRV",
-    "viscous",
     "old_grid",
     "old_ic",
     "perturb_flow",
@@ -1419,13 +1466,13 @@ _nv(
     "mixlayer_perturb",
     "mixlayer_perturb_nk",
     "mixlayer_perturb_k0",
-    "pre_stress",
     "elliptic_smoothing",
     "elliptic_smoothing_iters",
     "simplex_perturb",
     "simplex_params",
     "files_dir",
     "file_extension",
+    "viscous",
 )
 _nv(
     _POST,

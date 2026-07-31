@@ -243,7 +243,7 @@ contains
 
     end subroutine s_int_to_str
 
-    !> Computes the Simpson weights for quadrature
+    !> Compute the Simpson weights for quadrature
     subroutine s_simpson(local_weight, local_R0)
 
         real(wp), dimension(:), intent(inout) :: local_weight
@@ -339,7 +339,7 @@ contains
 
     end function modmul
 
-    !> @brief Computes the cross product c = a x b of two 3D vectors.
+    !> Compute the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -352,9 +352,7 @@ contains
 
     end subroutine s_cross_product
 
-    !> This procedure swaps two real numbers.
-    !! @param lhs Left-hand side.
-    !! @param rhs Right-hand side.
+    !> Swap two real numbers.
     elemental subroutine s_swap(lhs, rhs)
 
         real(wp), intent(inout) :: lhs, rhs

@@ -90,8 +90,10 @@ contains
 
         radius = patch_ib(ib_patch_id)%radius
 
-        dist_vec(1) = x_cc(i) - (patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg))
-        dist_vec(2) = y_cc(j) - (patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg))
+        dist_vec(1) = x_cc(i) - (patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, &
+                 & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
+        dist_vec(2) = y_cc(j) - (patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, &
+                 & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
         dist_vec(3) = 0._wp
         dist = sqrt(sum(dist_vec**2))
 
@@ -123,8 +125,9 @@ contains
 
         airfoil_id = patch_ib(ib_patch_id)%airfoil_id
         Np_local = ib_airfoil_grids(airfoil_id)%Np
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
@@ -205,9 +208,10 @@ contains
 
         airfoil_id = patch_ib(ib_patch_id)%airfoil_id
         Np_local = ib_airfoil_grids(airfoil_id)%Np
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+
         lz = patch_ib(ib_patch_id)%length_z
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
@@ -284,7 +288,7 @@ contains
 
     end subroutine s_3d_airfoil_levelset
 
-    !> Subroutine for computing the levelset values at a ghost point belonging to the rectangle IB
+    !> Compute the signed distance and outward normal from a ghost point to a 2D rectangle
     subroutine s_rectangle_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -306,8 +310,8 @@ contains
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
@@ -372,8 +376,8 @@ contains
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
@@ -425,9 +429,9 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         length_z = patch_ib(ib_patch_id)%length_z
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
 
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
@@ -503,9 +507,9 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        periodicity(1) = real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        periodicity(2) = real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        periodicity(3) = real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        periodicity(1) = real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        periodicity(2) = real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        periodicity(3) = real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         center(1) = patch_ib(ib_patch_id)%x_centroid
         center(2) = patch_ib(ib_patch_id)%y_centroid
         center(3) = patch_ib(ib_patch_id)%z_centroid
@@ -545,9 +549,9 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         length(1) = patch_ib(ib_patch_id)%length_x
         length(2) = patch_ib(ib_patch_id)%length_y
         length(3) = patch_ib(ib_patch_id)%length_z
@@ -620,12 +624,12 @@ contains
 
         center = 0._wp
         if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid + real(gp%x_periodicity, &
-            & wp)*(x_domain%end - x_domain%beg)
+            & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
         if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid + real(gp%y_periodicity, &
-            & wp)*(y_domain%end - y_domain%beg)
+            & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
         if (p > 0) then
             if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid &
-                & + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+                & + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
         end if
 
         inverse_rotation(:,:) = patch_ib(patch_id)%rotation_matrix_inverse(:,:)

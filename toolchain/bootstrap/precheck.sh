@@ -55,6 +55,7 @@ echo ""
 
 # Temp files for collecting results from parallel jobs
 TMPDIR_PC=$(mktemp -d)
+export TMPDIR_PC
 trap "rm -rf $TMPDIR_PC" EXIT
 
 # --- Phase 1: Format check (non-mutating; mirrors CI's format+diff check) ---

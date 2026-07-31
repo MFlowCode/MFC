@@ -12,7 +12,8 @@ dependencies = [
     "PyYAML",
     "argparse",
     "dataclasses",
-    "fastjsonschema",
+    "fastjsonschema<2.22; python_version < '3.10'",
+    "fastjsonschema; python_version >= '3.10'",
     "rapidfuzz",  # For "did you mean?" typo suggestions
 
     # Build System
@@ -34,8 +35,9 @@ dependencies = [
 
     # Chemistry
     "cantera>=3.1.0",
-    #"pyrometheus == 1.0.5",
-    "pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git",
+    "pyrometheus == 1.1.1",  # ==1.1.1 for get_creation_destruction_rates; also provides pyrometheus.flamelets (mixing-layer examples)
+    "jax",  # flamelet IC solve in the reacting mixing-layer examples (via pyrometheus.flamelets)
+    "scipy",  # flamelet IC interpolation (scipy.interpolate) in the reacting mixing-layer examples
 
     # Frontier Profiling
     "astunparse==1.6.2",

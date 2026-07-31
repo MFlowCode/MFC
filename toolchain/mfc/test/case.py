@@ -251,9 +251,9 @@ class TestCase(case.Case):
         return trace_to_uuid(self.trace)
 
     def coverage_key(self) -> str:
-        from .coverage import param_hash
+        from .coverage import canonicalize_param_paths, param_hash
 
-        return param_hash(self.params)
+        return param_hash(canonicalize_param_paths(self.params, common.MFC_ROOT_DIR))
 
     def get_dirpath(self):
         return os.path.join(common.MFC_TEST_DIR, self.get_uuid())
@@ -485,7 +485,7 @@ def create_input_lagrange(path_test):
         os.mkdir(folder_path_lagrange)
 
     with open(file_path_lagrange, "w") as file:
-        file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0")
+        file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0\n")
 
 
 def copy_input_lagrange(path_example_input, path_test):

@@ -128,7 +128,7 @@ contains
             call s_mpi_abort('Unsupported choice for the value of case_dir.' // 'Exiting.')
         end if
 
-        call s_check_inputs_common()
+        call s_check_inputs_common(check_total_cells=.true., n_global=nGlobal)
         call s_check_inputs()
 
         call s_check_patches()
@@ -171,8 +171,8 @@ contains
 
         x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2._wp
 
-        dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
-        if (num_procs > 1) call s_mpi_reduce_min(dx)
+        dx_min = minval(x_cb(0:m) - x_cb(-1:m - 1))
+        if (num_procs > 1) call s_mpi_reduce_min(dx_min)
 
         x_domain%beg = x_cb(-1)
         x_domain%end = x_cb(m)
@@ -191,8 +191,8 @@ contains
 
             y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2._wp
 
-            dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
-            if (num_procs > 1) call s_mpi_reduce_min(dy)
+            dy_min = minval(y_cb(0:n) - y_cb(-1:n - 1))
+            if (num_procs > 1) call s_mpi_reduce_min(dy_min)
 
             y_domain%beg = y_cb(-1)
             y_domain%end = y_cb(n)
@@ -211,8 +211,8 @@ contains
 
                 z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2._wp
 
-                dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
-                if (num_procs > 1) call s_mpi_reduce_min(dz)
+                dz_min = minval(z_cb(0:p) - z_cb(-1:p - 1))
+                if (num_procs > 1) call s_mpi_reduce_min(dz_min)
 
                 z_domain%beg = z_cb(-1)
                 z_domain%end = z_cb(p)
@@ -344,8 +344,8 @@ contains
 
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
         x_cc(0:m) = (x_cb(0:m) + x_cb(-1:(m - 1)))/2._wp
-        dx = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
-        if (num_procs > 1) call s_mpi_reduce_min(dx)
+        dx_min = minval(x_cb(0:m) - x_cb(-1:(m - 1)))
+        if (num_procs > 1) call s_mpi_reduce_min(dx_min)
         x_domain%beg = x_cb(-1)
         x_domain%end = x_cb(m)
 
@@ -364,8 +364,8 @@ contains
 
             y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
             y_cc(0:n) = (y_cb(0:n) + y_cb(-1:(n - 1)))/2._wp
-            dy = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
-            if (num_procs > 1) call s_mpi_reduce_min(dy)
+            dy_min = minval(y_cb(0:n) - y_cb(-1:(n - 1)))
+            if (num_procs > 1) call s_mpi_reduce_min(dy_min)
             y_domain%beg = y_cb(-1)
             y_domain%end = y_cb(n)
 
@@ -384,8 +384,8 @@ contains
 
                 z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
                 z_cc(0:p) = (z_cb(0:p) + z_cb(-1:(p - 1)))/2._wp
-                dz = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
-                if (num_procs > 1) call s_mpi_reduce_min(dz)
+                dz_min = minval(z_cb(0:p) - z_cb(-1:(p - 1)))
+                if (num_procs > 1) call s_mpi_reduce_min(dz_min)
                 z_domain%beg = z_cb(-1)
                 z_domain%end = z_cb(p)
             end if
@@ -424,7 +424,7 @@ contains
         if (file_exist) then
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-            call s_initialize_mpi_data(q_cons_vf_in)
+            call s_initialize_mpi_data(q_cons_vf_in, qbmm_pb=pb, qbmm_mv=mv)
 
             data_size = (m + 1)*(n + 1)*(p + 1)
 
@@ -476,7 +476,7 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module()
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=.false.)
         call s_initialize_data_output_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()
@@ -608,6 +608,8 @@ contains
     !> Initialize MPI, read and validate user inputs on rank 0, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
 
+        type(bounds_info), dimension(3) :: local_domains
+
         call s_mpi_initialize()
 
         if (proc_rank == 0) then
@@ -628,7 +630,14 @@ contains
         y_domain_glb = y_domain
         z_domain_glb = z_domain
 
-        call s_mpi_decompose_computational_domain()
+        local_domains = (/x_domain, y_domain, z_domain/)
+        call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=.false., adjust_local_domains= .not. old_grid, &
+            & local_domains=local_domains)
+        x_domain = local_domains(1)
+        y_domain = local_domains(2)
+        z_domain = local_domains(3)
+
+        bc = bc_xyz_info(bc_x, bc_y, bc_z)
 
     end subroutine s_initialize_mpi_domain
 

@@ -13,7 +13,7 @@ module m_global_parameters
 
     use m_derived_types  ! Definitions of the derived types
     use m_helper_basic  ! Functions to compare floating point numbers
-    ! Shared state: generated_decls, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*
+    ! Shared state: generated_decls, sys_size, eqn_idx, chemistry, shear_*
     use m_global_parameters_common
 
     implicit none
@@ -36,14 +36,13 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
-    real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> Global (pre-decomposition) domain bounds, needed by s_generate_serial_grid to stretch the grid using the full domain length
     !! rather than a local processor's sub-domain length
     type(bounds_info) :: x_domain_glb, y_domain_glb, z_domain_glb
 
     ! Simulation Algorithm Parameters
-    ! sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*: in m_global_parameters_common
+    ! sys_size, eqn_idx, chemistry, shear_*: in m_global_parameters_common
     ! weno_polyn, muscl_polyn, num_dims, num_vels: in m_global_parameters_common
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings.
@@ -53,10 +52,21 @@ module m_global_parameters
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
     type(int_bounds_info) :: bc_x, bc_y, bc_z  !< Boundary conditions in the x-, y- and z-coordinate directions
+    type(bc_xyz_info)     :: bc                !< Combined BC storage (used by the shared beta-buffer routines; pre-process-local)
     ! simplex_params: auto-generated in generated_decls.fpp
+    ! shear_num/shear_indices/shear_BC_flip_*, bc: in m_global_parameters_common
+    integer                           :: fd_order    !< Finite-difference order for CoM/probe derivative approximations
+    integer                           :: fd_number   !< FD half-stencil size: MAX(1, fd_order/2)
+    type(bubbles_lagrange_parameters) :: lag_params  !< Lagrange bubbles' parameters (pre_process-local; not in generated_decls)
 
     ! fluid_rho (perturbs surrounding-air density to break grid symmetry): auto-generated in generated_decls.fpp
     ! proc_coords, start_idx, mpiiofs, mpi_info_int: in m_global_parameters_common
+
+    !> @name MPI domain-decomposition neighbor info (Lagrangian-bubble decomposition, #1290)
+    !> @{
+    type(int_bounds_info), dimension(3)    :: nidx
+    integer, allocatable, dimension(:,:,:) :: neighbor_ranks  !< Neighbor ranks
+    !> @}
 #ifdef MFC_MPI
     type(mpi_io_var), public :: MPI_IO_DATA
 #endif
@@ -94,6 +104,10 @@ module m_global_parameters
     type(pres_field)                       :: mv
     integer                                :: buff_size  !< Number of ghost cells for boundary condition storage
 
+    ! Variables for hardcoded initial conditions that are read from input files
+    character(LEN=2*path_len) :: interface_file
+    real(wp)                  :: normFac, normMag, g0_ic, p0_ic
+
 contains
 
     !> Assigns default values to user inputs prior to reading them in. This allows for an easier consistency check of these
@@ -102,7 +116,7 @@ contains
 
         integer :: i  !< Generic loop operator
 
-        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, BC blocks,
         ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
         ! IB flags, parallel I/O flags, fft_wrt)
 
@@ -166,10 +180,7 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         igr_order = dflt_int
-        pre_stress = .false.
-
         precision = 2
-        viscous = .false.
         mixlayer_vel_profile = .false.
         mixlayer_vel_coef = 1._wp
         mixlayer_perturb = .false.
@@ -196,6 +207,25 @@ contains
 
         ! Initial condition parameters
         num_patches = dflt_int
+
+        fd_order = dflt_int
+        lag_params%cluster_type = dflt_int
+        lag_params%pressure_corrector = .false.
+        lag_params%smooth_type = dflt_int
+        lag_params%heatTransfer_model = .false.
+        lag_params%massTransfer_model = .false.
+        lag_params%write_bubbles = .false.
+        lag_params%write_bubbles_stats = .false.
+        lag_params%write_void_evol = .false.
+        lag_params%pressure_force = .false.
+        lag_params%gravity_force = .false.
+        lag_params%nBubs_glb = dflt_int
+        lag_params%vel_model = dflt_int
+        lag_params%drag_model = dflt_int
+        lag_params%epsilonb = 1._wp
+        lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
+        lag_params%valmaxvoid = dflt_real
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
@@ -284,7 +314,6 @@ contains
         Web = dflt_real
 
         nmom = 1
-        sigR = dflt_real
         sigV = dflt_real
         rhoRV = 0._wp
         dist_type = dflt_int
@@ -310,6 +339,10 @@ contains
             patch_ib(i)%airfoil_id = 0
             patch_ib(i)%model_id = 0
             patch_ib(i)%slip = .false.
+            patch_ib(i)%v_blow = 0._wp
+            patch_ib(i)%inj_species = 0
+            patch_ib(i)%burn_rate_exp = 0._wp
+            patch_ib(i)%burn_rate_pref = 0._wp
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
@@ -346,6 +379,10 @@ contains
 
         chem_params%gamma_method = 1
         chem_params%transport_model = 1
+
+        chem_params%reaction_substeps = 0
+        chem_params%adap_substeps = .false.
+        chem_params%reaction_substeps_max = 0
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -407,8 +444,8 @@ contains
         ! (guards match the original site: 5-equation bubbles with 4-node qbmm)
         if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. qbmm .and. nnode == 4) nmom = 6
 
-        ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom, nb)
+        ! Populate eqn_idx, sys_size, shear_* (shared logic)
+        call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.false.)
 
         ! Per-target (pre_process): qbmm_idx allocations and fills
         if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
@@ -484,8 +521,10 @@ contains
             end if
         end if
 
+        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib)
+                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
         if (qbmm .and. .not. polytropic) then
@@ -574,6 +613,8 @@ contains
             deallocate (MPI_IO_DATA%view)
         end if
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

@@ -21,6 +21,7 @@ module m_ibm
     use m_model
     use m_patch_geometries
     use m_collisions
+    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass
 
     implicit none
 
@@ -75,11 +76,11 @@ contains
         call nvtxStartRange("SETUP-IBM-MODULE")
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x%beg, ib_bc_y%beg]')
+        $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, dx, dy, ib_bc_x%beg, ib_bc_y%beg]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z%beg]')
+            $:GPU_UPDATE(device='[z_cc, dz, ib_bc_z%beg]')
         end if
-        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs), glb_bounds]')
 
         ! do all set up for moving immersed boundaries
         $:GPU_PARALLEL_LOOP(private='[i]')
@@ -160,13 +161,17 @@ contains
             real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(18) :: nmom_IP
             real(wp), dimension(12) :: presb_IP, massv_IP
+            real(wp), dimension(10) :: Ys_IP
         #:else
-            real(wp), dimension(num_fluids) :: Gs
-            real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
-            real(wp), dimension(nb)         :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(nb*nmom)    :: nmom_IP
-            real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
+            real(wp), dimension(num_fluids)  :: Gs
+            real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP
+            real(wp), dimension(nb)          :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(nb*nmom)     :: nmom_IP
+            real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
+            real(wp), dimension(num_species) :: Ys_IP
         #:endif
+        real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
+        real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
@@ -189,7 +194,13 @@ contains
                         call s_decode_patch_periodicity(patch_id, patch_id_temp)
                         call s_get_neighborhood_idx(patch_id_temp, patch_id)
                         if (patch_id > 0) then
-                            q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
+                            ! Placeholder low pressure inside the IB solid. Skip it with
+                            ! chemistry on: it would force an unphysical temperature
+                            ! (P=1 Pa at the ambient density -> T~0.01 K), which the
+                            ! Cantera temperature/transport evaluation (run grid-wide
+                            ! before the IB mask is applied) cannot handle -> NaN/hang.
+                            ! The interior is masked from the RHS regardless.
+                            if (.not. chemistry) q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                             rho = 0._wp
                             do i = 1, num_fluids
                                 rho = rho + q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
@@ -210,7 +221,8 @@ contains
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
-                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id]')
+                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
+                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -235,8 +247,23 @@ contains
                 else if (qbmm .and. .not. polytropic) then
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
                                                    & pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                else if (chemistry) then
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, Ys_IP=Ys_IP)
                 else
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
+                end if
+
+                ! Injecting (burning) surface: replace the mirrored ghost composition with pure
+                ! injected fuel at the local pressure and the ambient (image-point) temperature.
+                ! Setting a consistent injected density here (rather than reusing the heavy ambient
+                ! rho) keeps the light fuel at a physical temperature and feeds the surface flame.
+                if (chemistry .and. patch_ib(patch_id)%inj_species > 0) then
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    T_IP = pres_IP*mw_IP/(alpha_rho_IP(1)*gas_constant)
+                    Ys_IP = 0._wp
+                    Ys_IP(patch_ib(patch_id)%inj_species) = 1._wp
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    alpha_rho_IP(1) = pres_IP*mw_IP/(T_IP*gas_constant)
                 end if
 
                 dyn_pres = 0._wp
@@ -268,23 +295,23 @@ contains
 
                 if (model_eqns /= model_eqns_4eq) then
                     ! If in simulation, use acc mixture subroutines
-                    if (elasticity) then
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
-                            & G_K, Gs)
+                    if (hypoelasticity) then
+                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, &
+                            & Re_K, G_K, Gs)
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
+                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                     end if
                 end if
 
                 if (patch_ib(patch_id)%moving_ibm /= 0) then
                     ! get the vector that points from the centroid to the ghost
                     radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
-                                  & wp)*(x_domain%end - x_domain%beg))
+                                  & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
                     radial_vector(2) = physical_loc(2) - (patch_ib(patch_id)%y_centroid + real(ghost_points(i)%y_periodicity, &
-                                  & wp)*(y_domain%end - y_domain%beg))
+                                  & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
                     radial_vector(3) = 0._wp
                     if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
-                        & + real(ghost_points(i)%z_periodicity, wp)*(z_domain%end - z_domain%beg))
+                        & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
                 end if
 
                 ! Calculate velocity of ghost cell
@@ -317,6 +344,24 @@ contains
                     end if
                 end if
 
+                ! Burning/injecting surface: superimpose wall-normal (outward) blowing on the
+                ! ghost velocity so the immersed surface transpires/injects gas into the flow.
+                if (patch_ib(patch_id)%v_blow > 0._wp) then
+                    v_blow_eff = patch_ib(patch_id)%v_blow
+                    ! Pressure-coupled burn rate (Vieille's law r_dot ~ p^n): the local surface
+                    ! pressure scales the blowing speed, giving chamber-pressure feedback (internal
+                    ! ballistics) in a closed chamber. Off (constant) when burn_rate_pref <= 0.
+                    if (patch_ib(patch_id)%burn_rate_pref > 0._wp) then
+                        ! max(pres_IP, 0) guards the fractional power against a transient negative
+                        ! interpolated pressure, which would otherwise return NaN and poison the field.
+                        v_blow_eff = v_blow_eff*(max(pres_IP, &
+                                                 & 0._wp)/patch_ib(patch_id)%burn_rate_pref)**patch_ib(patch_id)%burn_rate_exp
+                    end if
+                    norm(1:3) = gp%levelset_norm
+                    buf = sqrt(sum(norm**2))
+                    if (buf > 0._wp) vel_g = vel_g + v_blow_eff*norm/buf
+                end if
+
                 ! Set momentum
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = eqn_idx%mom%beg, eqn_idx%mom%end
@@ -337,7 +382,21 @@ contains
                 end if
 
                 ! Set Energy
-                if (bubbles_euler) then
+                if (chemistry) then
+                    ! Mirror the reacting-mixture state at the ghost point: interpolated species,
+                    ! plus a thermodynamically consistent conserved energy from the mixture EOS.
+                    ! (The gamma*pres_IP closure below is only valid for a calorically perfect gas
+                    ! and yields an out-of-range temperature when inverted against the Cantera model.)
+                    mw_IP = 0._wp
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    T_IP = pres_IP*mw_IP/(rho*gas_constant)
+                    call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_species
+                        q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
+                    end do
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_IP + dyn_pres
+                else if (bubbles_euler) then
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
                 else
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
@@ -475,7 +534,7 @@ contains
                                 print *, [x_cc(i), y_cc(j), z_cc(k)]
                             end if
                             print *, "We are searching in dimension ", dim, " for image point at ", ghost_points_in(q)%ip_loc(:)
-                            print *, "Domain size: ", [x_cc(-buff_size), y_cc(-buff_size), z_cc(-buff_size)]
+                            print *, "Domain size: "
                             print *, "x: ", x_cc(-buff_size), " to: ", x_cc(m + buff_size - 1)
                             print *, "y: ", y_cc(-buff_size), " to: ", y_cc(n + buff_size - 1)
                             if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
@@ -566,8 +625,7 @@ contains
         if (p == 0) gp_layers_z = 0
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, neighborhood_patch_id, &
-                            & xp, yp, zp]', copyin='[count, count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers, &
-                            & gp_layers_z]', collapse=3)
+                            & xp, yp, zp]', copyin='[count, count_i, glb_bounds]', firstprivate='[gp_layers, gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -601,26 +659,26 @@ contains
                             ghost_points_in(local_idx)%z_periodicity = zp
                             ghost_points_in(local_idx)%slip = patch_ib(neighborhood_patch_id)%slip
 
-                            if ((x_cc(i) - dx(i)) < x_domain%beg) then
+                            if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
                                 ghost_points_in(local_idx)%DB(1) = -1
-                            else if ((x_cc(i) + dx(i)) > x_domain%end) then
+                            else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
                                 ghost_points_in(local_idx)%DB(1) = 1
                             else
                                 ghost_points_in(local_idx)%DB(1) = 0
                             end if
 
-                            if ((y_cc(j) - dy(j)) < y_domain%beg) then
+                            if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
                                 ghost_points_in(local_idx)%DB(2) = -1
-                            else if ((y_cc(j) + dy(j)) > y_domain%end) then
+                            else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
                                 ghost_points_in(local_idx)%DB(2) = 1
                             else
                                 ghost_points_in(local_idx)%DB(2) = 0
                             end if
 
                             if (p /= 0) then
-                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
+                                if ((z_cc(k) - dz(k)) < glb_bounds(3)%beg) then
                                     ghost_points_in(local_idx)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
+                                else if ((z_cc(k) + dz(k)) > glb_bounds(3)%end) then
                                     ghost_points_in(local_idx)%DB(3) = 1
                                 else
                                     ghost_points_in(local_idx)%DB(3) = 0
@@ -742,8 +800,7 @@ contains
 
     !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
-                                         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
-
+                                         & nmom_IP, pb_in, mv_in, presb_IP, massv_IP, Ys_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Primitive Variables
@@ -760,7 +817,8 @@ contains
         real(wp), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), optional, dimension(:), intent(inout) :: nmom_IP
         real(wp), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
-        integer                                         :: i, j, k, l, q           !< Iterator variables
+        real(wp), optional, dimension(:), intent(inout) :: Ys_IP  !< Interpolated species mass fractions (chemistry)
+        integer                                         :: i, j, k, l, q  !< Iterator variables
         integer                                         :: i1, i2, j1, j2, k1, k2  !< Iterator variables
         real(wp)                                        :: coeff
 
@@ -777,6 +835,8 @@ contains
         alpha_IP = 0._wp
         pres_IP = 0._wp
         vel_IP = 0._wp
+
+        if (chemistry) Ys_IP = 0._wp
 
         if (surface_tension) c_IP = 0._wp
 
@@ -820,6 +880,13 @@ contains
 
                     if (surface_tension) then
                         c_IP = c_IP + coeff*q_prim_vf(eqn_idx%c)%sf(i, j, k)
+                    end if
+
+                    if (chemistry) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_species
+                            Ys_IP(q) = Ys_IP(q) + coeff*q_prim_vf(eqn_idx%species%beg + q - 1)%sf(i, j, k)
+                        end do
                     end if
 
                     if (bubbles_euler .and. .not. qbmm) then
@@ -950,11 +1017,13 @@ contains
                         call s_get_neighborhood_idx(ib_idx_temp, ib_idx)  ! global patch ID -> local index
                         if (ib_idx > 0) then
                             ! get the vector pointing to the grid cell from the IB centroid
-                            radial_vector(1) = x_cc(i) - (patch_ib(ib_idx)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg))
-                            radial_vector(2) = y_cc(j) - (patch_ib(ib_idx)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg))
+                            radial_vector(1) = x_cc(i) - (patch_ib(ib_idx)%x_centroid + real(xp, &
+                                          & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
+                            radial_vector(2) = y_cc(j) - (patch_ib(ib_idx)%y_centroid + real(yp, &
+                                          & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
                             radial_vector(3) = 0._wp
                             if (num_dims == 3) radial_vector(3) = z_cc(k) - (patch_ib(ib_idx)%z_centroid + real(zp, &
-                                & wp)*(z_domain%end - z_domain%beg))
+                                & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
                             local_force_contribution(:) = 0._wp
 
@@ -1189,19 +1258,19 @@ contains
         $:GPU_PARALLEL_LOOP(private='[patch_id]')
         do patch_id = 1, num_ibs
             ! check domain wraps in x, y,
-            #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-                if (num_dims >= ${ID}$) then
+            #:for X, DIR in [('x', 1), ('y', 2), ('z', 3)]
+                if (num_dims >= ${DIR}$) then
                     ! check for periodicity
                     if (ib_bc_${X}$%beg == BC_PERIODIC) then
                         ! check if the boundary has left the domain, and then correct
-                        if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
+                        if (patch_ib(patch_id)%${X}$_centroid < glb_bounds(${DIR}$)%beg) then
                             ! if the boundary exited "left", wrap it back around to the "right"
-                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end &
-                                     & - ${X}$_domain%beg)
-                        else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
+                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${DIR}$)%end &
+                                     & - glb_bounds(${DIR}$)%beg)
+                        else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${DIR}$)%end) then
                             ! if the boundary exited "right", wrap it back around to the "left"
-                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end &
-                                     & - ${X}$_domain%beg)
+                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${DIR}$)%end &
+                                     & - glb_bounds(${DIR}$)%beg)
                         end if
                     end if
                 end if

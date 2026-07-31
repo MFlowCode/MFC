@@ -3,7 +3,7 @@
 # Submits a script as a SLURM batch job, then monitors it until completion.
 # Rerun-safe: cancels stale jobs from previous runs before resubmission.
 #
-# Usage: submit-slurm-job.sh <script.sh> <cpu|gpu> <none|acc|omp> <cluster> [shard]
+# Usage: submit-slurm-job.sh <script.sh> <cpu|gpu> <none|acc|omp> <cluster> [shard] [variant]
 
 set -euo pipefail
 
@@ -11,7 +11,7 @@ set -euo pipefail
 trap '' HUP
 
 usage() {
-    echo "Usage: $0 <script.sh> <cpu|gpu> <none|acc|omp> <cluster> [shard]"
+    echo "Usage: $0 <script.sh> <cpu|gpu> <none|acc|omp> <cluster> [shard] [variant]"
 }
 
 script_path="${1:-}"
@@ -19,6 +19,9 @@ device="${2:-}"
 interface="${3:-}"
 cluster="${4:-}"
 shard="${5:-}"
+# Build variant ("base"/"chem"), letting one build job be split into concurrent
+# per-variant jobs. Empty = build everything in this job (default).
+variant="${6:-}"
 
 if [ -z "$script_path" ] || [ -z "$device" ] || [ -z "$interface" ] || [ -z "$cluster" ]; then
     usage
@@ -136,7 +139,12 @@ shard_suffix=""
 if [ -n "$shard" ]; then
     shard_suffix="-$(echo "$shard" | sed 's|/|-of-|')"
 fi
-job_slug="$(basename "$script_path" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g')-${device}-${interface}${shard_suffix}"
+variant_suffix=""
+if [ -n "$variant" ]; then
+    # Sanitized like the rest of the slug: these become file names in the workspace.
+    variant_suffix="-$(echo "$variant" | sed 's/[^a-zA-Z0-9]/-/g')"
+fi
+job_slug="$(basename "$script_path" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g')-${device}-${interface}${shard_suffix}${variant_suffix}"
 output_file="$job_slug.out"
 id_file="${job_slug}.slurm_job_id"
 
@@ -187,6 +195,7 @@ job_slug="$job_slug"
 job_device="$device"
 job_interface="$interface"
 job_shard="$shard"
+job_variant="$variant"
 job_cluster="$cluster"
 export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 

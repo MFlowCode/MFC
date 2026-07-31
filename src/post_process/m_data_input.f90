@@ -84,7 +84,7 @@ contains
         integer(KIND=MPI_OFFSET_KIND), intent(out) :: WP_MOK, MOK, str_MOK, NVARS_MOK
 
         if (ib) then
-            call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA)
         else
             call s_initialize_mpi_data(q_cons_vf)
         end if
@@ -235,9 +235,6 @@ contains
                 open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
                 read (1) q_cons_vf(i)%sf(0:m,0:n,0:p)
                 close (1)
-            else if (bubbles_lagrange .and. i == beta_idx) then
-                ! beta (Lagrangian void fraction) is not written by pre_process for t_step_start; initialize to zero.
-                q_cons_vf(i)%sf(0:m,0:n,0:p) = 0._wp
             else
                 call s_mpi_abort('File q_cons_vf' // trim(file_num) // '.dat is missing in ' // trim(t_step_dir) // '. Exiting.')
             end if
@@ -297,9 +294,9 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
 
-        x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
+        ! Bitwise-consistent grid distribution from the global file
+        call s_apply_grid_from_global_dim(x_cb_glb, m_glb, m, start_idx(1), bc_x%beg, bc_x%end, offset_x%beg, offset_x%end, &
+                                          & buff_size, buff_size, x_cb, x_cc, dx)
 
         if (n > 0) then
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
@@ -321,9 +318,8 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
 
-            y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
+            call s_apply_grid_from_global_dim(y_cb_glb, n_glb, n, start_idx(2), bc_y%beg, bc_y%end, offset_y%beg, offset_y%end, &
+                                              & buff_size, buff_size, y_cb, y_cc, dy)
 
             if (p > 0) then
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
@@ -345,9 +341,8 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
                 end if
 
-                z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
+                call s_apply_grid_from_global_dim(z_cb_glb, p_glb, p, start_idx(3), bc_z%beg, bc_z%end, offset_z%beg, &
+                                                  & offset_z%end, buff_size, buff_size, z_cb, z_cc, dz)
             end if
         end if
 
@@ -389,10 +384,10 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (down_sample) then
-                    call s_initialize_mpi_data_ds(q_cons_temp)
+                    call s_initialize_mpi_data_ds(m, n, p, q_cons_temp)
                 else
                     if (ib) then
-                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA)
                     else
                         call s_initialize_mpi_data(q_cons_vf)
                     end if
@@ -412,7 +407,7 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity .or. mhd) then
+                if (bubbles_euler .or. hypoelasticity .or. mhd) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)

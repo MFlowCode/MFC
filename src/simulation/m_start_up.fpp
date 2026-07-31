@@ -28,7 +28,6 @@ module m_start_up
     use m_qbmm
     use m_derived_variables
     use m_hypoelastic
-    use m_hyperelastic
     use m_phase_change
     use m_viscous
     use m_bubbles_EE
@@ -105,7 +104,7 @@ contains
 
             close (1)
 
-            if ((bf_x) .or. (bf_y) .or. (bf_z)) then
+            if ((bf_x) .or. (bf_y) .or. (bf_z) .or. (bf_spatial_support)) then
                 bodyForces = .true.
             end if
 
@@ -120,6 +119,10 @@ contains
             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == -17) .or. num_bc_patches > 0) then
                 bc_io = .true.
             end if
+
+            if (bc_x%beg == BC_PERIODIC .and. bc_x%end == BC_PERIODIC) periodic_bc(1) = .true.
+            if (bc_y%beg == BC_PERIODIC .and. bc_y%end == BC_PERIODIC) periodic_bc(2) = .true.
+            if (bc_z%beg == BC_PERIODIC .and. bc_z%end == BC_PERIODIC) periodic_bc(3) = .true.
         else
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
@@ -140,7 +143,7 @@ contains
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
 
-        call s_check_inputs_common()
+        call s_check_inputs_common(check_total_cells=.false., n_global=0_8)
         call s_check_inputs()
 
     end subroutine s_check_input_file
@@ -230,7 +233,7 @@ contains
             end if
         end do
 
-        if (bubbles_euler .or. elasticity) then
+        if (bubbles_euler .or. hypoelasticity) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
@@ -311,9 +314,8 @@ contains
             call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
         end if
 
-        x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
+        call s_apply_grid_from_global_dim(x_cb_glb, m_glb, m, start_idx(1), bc_x%beg, bc_x%end, buff_size, buff_size, buff_size, &
+                                          & buff_size, x_cb, x_cc, dx)
 
         if (n > 0) then
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
@@ -328,9 +330,8 @@ contains
                 call s_mpi_abort('File ' // trim(file_loc) // ' is missing. Exiting.')
             end if
 
-            y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
+            call s_apply_grid_from_global_dim(y_cb_glb, n_glb, n, start_idx(2), bc_y%beg, bc_y%end, buff_size, buff_size, &
+                                              & buff_size, buff_size, y_cb, y_cc, dy)
 
             if (p > 0) then
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
@@ -345,9 +346,8 @@ contains
                     call s_mpi_abort('File ' // trim(file_loc) // 'is missing. Exiting.')
                 end if
 
-                z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-                z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
+                call s_apply_grid_from_global_dim(z_cb_glb, p_glb, p, start_idx(3), bc_z%beg, bc_z%end, buff_size, buff_size, &
+                                                  & buff_size, buff_size, z_cb, z_cc, dz)
             end if
         end if
 
@@ -366,12 +366,13 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (down_sample) then
-                    call s_initialize_mpi_data_ds(q_cons_vf)
+                    call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
                 else
                     if (ib) then
-                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, &
+                                                   & qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                     else
-                        call s_initialize_mpi_data(q_cons_vf)
+                        call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                     end if
                 end if
 
@@ -393,7 +394,7 @@ contains
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -442,9 +443,10 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                               & qbmm_mv=mv_ts(1))
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                 end if
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -455,7 +457,7 @@ contains
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -759,7 +761,7 @@ contains
         if (bubbles_lagrange) then
             $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
                          & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC]')
-            do i = 1, nBubs
+            do i = 1, n_el_bubs_loc
                 if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
                     call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
                 end if
@@ -813,9 +815,9 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module()
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi)
         call s_initialize_mpi_proxy_module()
-        call s_initialize_variables_conversion_module()
+        call s_initialize_variables_conversion_module(enforce_density_floor=.true., preserve_qbmm_number=.true.)
         if (grid_geometry == 3) call s_initialize_fftw_module()
 
         if (bubbles_euler) call s_initialize_bubbles_EE_module()
@@ -842,7 +844,7 @@ contains
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
 
-        call s_initialize_boundary_common_module()
+        call s_initialize_boundary_common_module(use_dirichlet_buffers=.true.)
 
         if (down_sample) then
             m_ds = int((m + 1)/3) - 1
@@ -869,7 +871,26 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
-        call s_populate_grid_variables_buffers()
+        block
+            type(int_bounds_info), dimension(3) :: grid_offsets
+
+            grid_offsets(:)%beg = buff_size
+            grid_offsets(:)%end = buff_size
+            if (n == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), &
+                                                       & global_bounds=glb_bounds)
+            else if (p == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), y_cb, &
+                                                       & y_cc, dy, global_bounds=glb_bounds)
+            else
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), y_cb, &
+                                                       & y_cc, dy, z_cb, z_cc, dz, glb_bounds)
+            end if
+        end block
+        $:GPU_UPDATE(device='[glb_bounds]')
+        dx_min = minval(dx)
+        if (n > 0) dy_min = minval(dy)
+        if (p > 0) dz_min = minval(dz)
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
@@ -918,10 +939,9 @@ contains
         end if
         if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
+        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
-        if (hyperelasticity) call s_initialize_hyperelastic_module()
 
     end subroutine s_initialize_modules
 
@@ -996,7 +1016,9 @@ contains
 
         call s_initialize_parallel_io()
 
-        call s_mpi_decompose_computational_domain()
+        call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=.false., adjust_local_domains=.false.)
+
+        bc = bc_xyz_info(bc_x, bc_y, bc_z)
 
     end subroutine s_initialize_mpi_domain
 
@@ -1019,6 +1041,8 @@ contains
         end if
 
         $:GPU_UPDATE(device='[chem_params]')
+
+        $:GPU_UPDATE(device='[rburn]')
 
         $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
                      & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, &
@@ -1054,6 +1078,8 @@ contains
         $:GPU_UPDATE(device='[bc_z%isothermal_in, bc_z%isothermal_out]')
         $:GPU_UPDATE(device='[bc_x%Twall_in, bc_x%Twall_out, bc_y%Twall_in, bc_y%Twall_out, bc_z%Twall_in, bc_z%Twall_out]')
 
+        $:GPU_UPDATE(device='[bc]')
+
         $:GPU_UPDATE(device='[relax, relax_model]')
         if (relax) then
             $:GPU_UPDATE(device='[palpha_eps, ptgalpha_eps]')
@@ -1073,7 +1099,6 @@ contains
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
-        if (hyperelasticity) call s_finalize_hyperelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()

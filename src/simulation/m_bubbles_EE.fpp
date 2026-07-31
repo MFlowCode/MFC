@@ -141,12 +141,13 @@ contains
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), intent(in)                         :: divu_in  !< matrix for div(u)
-        real(wp)                                               :: rddot
-        real(wp)                                               :: pb_local, mv_local, vflux, pbdot
-        real(wp)                                               :: n_tait, B_tait
+        type(scalar_field), intent(in) :: divu_in  !< matrix for div(u)
+        real(wp) :: rddot
+        real(wp) :: pb_local, mv_local, vflux, pbdot
+        real(wp) :: n_tait, B_tait
+        real(wp) :: chi_vw_l, k_mw_l, rho_mw_l     !< Per-thread bubble-wall scratch (avoid module-scalar race)
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: Rtmp, Vtmp
@@ -158,7 +159,7 @@ contains
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
         real(wp) :: nbub                            !< Bubble number density
         integer  :: i, j, k, l, q, ii               !< Loop variables
-        integer  :: adap_dt_stop_max, adap_dt_stop  !< Fail-safe exit if max iteration count reached
+        integer  :: adap_dt_stop_sum, adap_dt_stop  !< Fail-safe exit if max iteration count reached
         integer  :: dmBub_id                        !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
@@ -180,10 +181,10 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        adap_dt_stop_max = 0
+        adap_dt_stop_sum = 0
         $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, &
-                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait]', collapse=3, &
-                            & reduction = '[[adap_dt_stop_max]]', reductionOp = '[MAX]', copy = '[adap_dt_stop_max]')
+                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, adap_dt_stop, chi_vw_l, k_mw_l, &
+                            & rho_mw_l]', collapse=3, copy='[adap_dt_stop_sum]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -262,33 +263,34 @@ contains
                             if (.not. polytropic) then
                                 pb_local = q_prim_vf(ps(q))%sf(j, k, l)
                                 mv_local = q_prim_vf(ms(q))%sf(j, k, l)
-                                call s_bwproperty(pb_local, q, chi_vw, k_mw, rho_mw)
-                                call s_vflux(myR, myV, pb_local, mv_local, q, vflux)
-                                pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q)
+                                call s_bwproperty(pb_local, q, chi_vw_l, k_mw_l, rho_mw_l)
+                                call s_vflux(myR, myV, pb_local, mv_local, q, vflux, fchi_vw=chi_vw_l, frho_mw=rho_mw_l)
+                                pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q, fk_mw=k_mw_l)
                                 bub_p_src(j, k, l, q) = nbub*pbdot
                                 bub_m_src(j, k, l, q) = nbub*vflux*4._wp*pi*(myR**2._wp)
                             else
                                 pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
                             end if
 
+                            adap_dt_stop = 0
+
                             ! Adaptive time stepping
                             if (adap_dt) then
-                                adap_dt_stop = 0
-
-                                call s_advance_step(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, &
-                                                    & bub_adv_src(j, k, l), divu_in%sf(j, k, l), dmBub_id, dmMass_v, dmMass_n, &
-                                                    & dmBeta_c, dmBeta_t, dmCson, adap_dt_stop)
+                                adap_dt_stop = f_advance_step(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, &
+                                                              & bub_adv_src(j, k, l), divu_in%sf(j, k, l), dmBub_id, dmMass_v, &
+                                                              & dmMass_n, dmBeta_c, dmBeta_t, dmCson)
 
                                 q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                                 q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-
-                                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
                             else
                                 rddot = f_rddot(myRho, myP, myR, myV, R0(q), pb_local, pbdot, alf, n_tait, B_tait, bub_adv_src(j, &
                                                 & k, l), divu_in%sf(j, k, l), dmCson)
                                 bub_v_src(j, k, l, q) = nbub*rddot
                                 bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                             end if
+
+                            $:GPU_ATOMIC(atomic='update')
+                            adap_dt_stop_sum = adap_dt_stop_sum + adap_dt_stop
                         end if
                     end do
                 end do
@@ -296,7 +298,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
+        if (adap_dt .and. adap_dt_stop_sum > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
             $:GPU_PARALLEL_LOOP(private='[i, k, l, q]', collapse=3)

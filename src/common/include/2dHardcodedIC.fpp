@@ -40,7 +40,6 @@
     select case (patch_icpp(patch_id)%hcid)  ! 2D_hardcoded_ic example case
     case (200)  ! Two-fluid cubic interface
         if (y_cc(j) <= (-x_cc(i)**3 + 1)**(1._wp/3._wp)) then
-            ! Volume Fractions
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, 0) = eps
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - eps
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = eps*1000._wp
@@ -162,7 +161,7 @@
         ! Smoothening function to smooth out sharp discontinuity in the interface
         if (x_cc(i) <= 0.7_wp*lam) then
             d = x_cc(i) - lam*(0.4_wp - 0.1_wp*sin(2.0_wp*pi*(y_cc(j)/lam + 0.25_wp)))
-            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx*dy))))
+            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx_min*dy_min))))
             alpha_air = eps + (1.0_wp - 2.0_wp*eps)*fsm
             alpha_sf6 = 1.0_wp - alpha_air
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alpha_sf6*5.04_wp
@@ -286,6 +285,106 @@
     case (270)  ! 2D extrusion of 1D profile from external data
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
         @: HardcodedReadValues()
+    case (273)  ! Temporal reacting mixing layer: 2D extrusion + streamwise velocity
+        ! @:HardcodedReadValues() always zeros mom%end (the extruded-axis velocity).
+        ! The mom%beg file slot is repurposed to carry the streamwise-velocity-vs-
+        ! cross-stream-position profile (real cross-stream velocity is legitimately
+        ! zero everywhere in the unperturbed base state), so swap it into mom%end and
+        ! zero out mom%beg's true physical value.
+        @: HardcodedReadValues()
+        q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0)
+        q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = 0.0_wp
+    case (274)  ! Full 2D field from external data (no extrusion)
+        ! Unlike case(270-273), this reads a genuinely 2D (x,y) field per variable, with no
+        ! extrusion direction and no zeroed component -- all sys_size variables are read and
+        ! assigned directly. Data files must have exactly (m_glb+1)*(n_glb+1) lines per
+        ! variable, in x-major order (outer loop x, inner loop y), matching this rank's
+        ! global grid exactly -- by construction, since the IC generator derives both the
+        ! grid and the file contents from the same computation.
+        !
+        ! A local cell's global (x, y) index is derived from x_cc(i)/y_cc(j) against the
+        ! file's own first coordinate and this rank's uniform grid spacing -- following the
+        ! same pattern as case(270)'s global_offset_x/y above -- rather than from start_idx:
+        ! start_idx is only allocated when parallel_io=T (s_initialize_parallel_io_common
+        ! returns before allocating it otherwise), so a serial-IO run (the default for
+        ! golden-file tests) would index into an unallocated array.
+        !
+        ! Every rank still scans the whole file (matching case(270)'s existing per-rank-reads-
+        ! everything pattern), but stored_values274 only holds this rank's LOCAL (0:m, 0:n)
+        ! slice rather than the full global grid -- a full-grid copy on every rank would scale
+        ! as O(m_glb*n_glb*sys_size) per rank, which is the wrong axis to duplicate work on for
+        ! a genuinely 2D (not 1D-profile) field. local_ix_beg274/local_iy_beg274 (this rank's
+        ! global cell offset) are pinned from f274==1's very first record, before any other
+        ! record is read, so every subsequent record -- across all variables -- can be tested
+        ! against this rank's range and dropped if it falls outside it.
+        x_step274 = x_cc(1) - x_cc(0)
+        y_step274 = y_cc(1) - y_cc(0)
+
+        if (.not. files_loaded274) then
+            @:ALLOCATE(stored_values274(0:m, 0:n, sys_size))
+            do f274 = 1, sys_size
+                write (file_num_str274, '(I0)') f274
+                fname274 = trim(files_dir) // "/prim." // trim(file_num_str274) // ".00." // trim(file_extension) // ".dat"
+                open (newunit=unit274, file=trim(fname274), status='old', action='read', iostat=ios274)
+                if (ios274 /= 0) call s_mpi_abort("Error opening file: " // trim(fname274))
+                do ix274 = 0, m_glb
+                    do iy274 = 0, n_glb
+                        read (unit274, *, iostat=ios274) dummy_x274, dummy_y274, dummy_val274
+                        if (ios274 /= 0) call s_mpi_abort("Error reading file (fewer lines than grid?): " // trim(fname274))
+                        ! Capture the file's own origin and spacing from its first records so we can
+                        ! confirm it was sampled on this run's grid (a silent mismatch would otherwise
+                        ! read a wrong partial slice -> nonphysical field -> VCFL=Inf downstream).
+                        if (f274 == 1) then
+                            if (ix274 == 0 .and. iy274 == 0) then
+                                x0_274 = dummy_x274
+                                y0_274 = dummy_y274
+                                local_ix_beg274 = nint((x_cc(0) - x0_274)/x_step274)
+                                local_iy_beg274 = nint((y_cc(0) - y0_274)/y_step274)
+                            end if
+                            if (ix274 == 1 .and. iy274 == 0) file_dx274 = dummy_x274 - x0_274
+                            if (ix274 == 0 .and. iy274 == 1) file_dy274 = dummy_y274 - y0_274
+                        end if
+                        if (ix274 - local_ix_beg274 >= 0 .and. ix274 - local_ix_beg274 <= m .and. iy274 - local_iy_beg274 >= 0 &
+                            & .and. iy274 - local_iy_beg274 <= n) then
+                            stored_values274(ix274 - local_ix_beg274, iy274 - local_iy_beg274, f274) = dummy_val274
+                        end if
+                    end do
+                end do
+                ! The file must contain exactly (m_glb+1)*(n_glb+1) records: a successful extra
+                ! read means it was generated for a larger grid and would be silently misread.
+                read (unit274, *, iostat=ios274) dummy_x274, dummy_y274
+                if (ios274 == 0) call s_mpi_abort("hcid=274 file has more lines than the grid: " // trim(fname274))
+                close (unit274)
+            end do
+
+            ! The run grid must be aligned with the file grid (uniform grid assumed, as in case 270).
+            ! Check alignment via the integer cell offset of this rank's first cell from the file
+            ! origin -- decomposition-safe: on every MPI rank x_cc(0) sits an integer number of cells
+            ! into the global file, so a non-integer offset means a shifted/mismatched IC. (Comparing
+            ! x0_274 to x_cc(0) directly would false-abort every rank whose subdomain doesn't start at
+            ! the global origin.) The spacing checks below must also hold.
+            r_align274 = (x_cc(0) - x0_274)/x_step274
+            if (abs(r_align274 - nint(r_align274)) > 1.e-6_wp) &
+                & call s_mpi_abort("hcid=274 file x-grid is misaligned with the run grid; regenerate the IC for this grid.")
+            if (m_glb >= 1) then
+                if (abs(file_dx274 - x_step274) > 1.e-6_wp*abs(x_step274)) &
+                    & call s_mpi_abort("hcid=274 file x-spacing does not match the grid; regenerate the IC for this grid.")
+            end if
+            if (n_glb >= 1) then
+                r_align274 = (y_cc(0) - y0_274)/y_step274
+                if (abs(r_align274 - nint(r_align274)) > 1.e-6_wp) &
+                    & call s_mpi_abort("hcid=274 file y-grid is misaligned with the run grid; regenerate the IC for this grid.")
+                if (abs(file_dy274 - y_step274) > 1.e-6_wp*abs(y_step274)) &
+                    & call s_mpi_abort("hcid=274 file y-spacing does not match the grid; regenerate the IC for this grid.")
+            end if
+
+            files_loaded274 = .true.
+        end if
+        ! Alignment is verified above (or this rank would already have aborted), so the local
+        ! cell (i, j) maps to stored_values274(i, j, :) directly -- no re-derivation needed.
+        do f274 = 1, sys_size
+            q_prim_vf(f274)%sf(i, j, 0) = stored_values274(i, j, f274)
+        end do
     case (271)  ! Premixed Flame Vortices Interaction
         @: HardcodedReadValues()
         x1c = 0.0027_wp
@@ -342,6 +441,21 @@
                           & v) + interp_wt*stored_values(idx_hi, 1, v)
             end do
             q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
+        end if
+    case (275)  ! reactive shock-flame: sinusoidal (burned | fresh) flame interface
+        ! Applied on the burned patch; cells AHEAD of the wavy interface are reset to the fresh
+        ! reactant state (patch 1), giving a finite-amplitude flame front for a shock to wrinkle
+        ! (Richtmyer-Meshkov). a(2) = mean interface x, a(3) = amplitude, a(4) = transverse wavenumber.
+        d = patch_icpp(patch_id)%a(2) + patch_icpp(patch_id)%a(3)*sin(2._wp*pi*patch_icpp(patch_id)%a(4)*y_cc(j)/(y_domain%end &
+                       & - y_domain%beg))
+        if (x_cc(i) > d) then
+            q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(1)%pres
+            q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = patch_icpp(1)%vel(1)
+            q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, 0) = patch_icpp(1)%vel(2)
+            do v = eqn_idx%species%beg, eqn_idx%species%end
+                q_prim_vf(v)%sf(i, j, 0) = patch_icpp(1)%Y(v - eqn_idx%species%beg + 1)
+            end do
         end if
     case (280)  ! Isentropic vortex
         ! This is patch is hard-coded for test suite optimization used in the 2D_isentropicvortex case: This analytic patch uses

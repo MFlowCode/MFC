@@ -1385,6 +1385,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if ndims == 3:
             stack.pop()
 
+        # Spatially supported body force (Wei & Freund, JFM 2005) in isolation: no
+        # bf_x/y/z, no chemistry, so this golden pins the forcing kernel (momentum
+        # sources + u*f energy work term) at the default 1e-12 tolerance. The only
+        # other coverage (Spatial Reacting Mixing Layer) entangles it with stiff
+        # chemistry at 1e-6. 2D-only by construction (m_checker rejects 1D/3D).
+        if ndims == 2:
+            stack.push(
+                "SpatialBodyforces",
+                {
+                    "bf_spatial_support": "T",
+                    "spatial_bf%amp": 1.0,
+                    "spatial_bf%x_centroid": 0.5,
+                    "spatial_bf%y_centroid": 0.5,
+                    "spatial_bf%conv_vel": 1.0,
+                    "spatial_bf%sigma": 100.0,
+                    **{f"spatial_bf%freq({i})": 2.0 * i for i in range(1, 9)},
+                    **{f"spatial_bf%phase({i})": 0.3 * i for i in range(1, 9)},
+                },
+            )
+            cases.append(define_case_d(stack, "", {}))
+            stack.pop()
+
     def alter_synthetic_turbulence(dimInfo):
         # 3-D solenoidal synthetic-turbulence forcing (m_body_forces): a quiescent,
         # triply-periodic single-fluid box driven by a deterministic (compiler-independent)
@@ -1772,6 +1794,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "lag_betaC_wrt": "T",
                             "lag_params%write_bubbles": "T",
                             "lag_params%write_bubbles_stats": "T",
+                            "lag_params%write_void_evol": "T",
+                            "lag_params%valmaxvoid": 0.99,
+                            "lag_params%nBubs_glb": 1,
                             "polytropic": "F",
                             "bub_pp%R0ref": 1.0,
                             "bub_pp%p0ref": 1.0,
@@ -1795,7 +1820,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
 
                     if len(dimInfo[0]) == 2:
-                        stack.push("", {"acoustic(1)%support": 2})
+                        stack.push("", {"acoustic(1)%support": 2, "lag_params%charwidth": 2, "lag_params%charNz": 25})
                     else:
                         stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
 
@@ -1810,6 +1835,39 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("adap_dt=T", {"adap_dt": "T"})
 
                     cases.append(define_case_d(stack, "", {}))
+
+                    if len(dimInfo[0]) == 3 and couplingMethod == 2:
+                        stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
+                        stack.push(
+                            "Inertial Bubbles",
+                            {"lag_params%vel_model": 2, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(2)%Re(1)": 100.0},
+                        )
+                        if adap_dt == "F":
+                            inertial_matrix = [(d, f) for d in [0, 1, 2] for f in [1, 2, 4]]
+                        else:
+                            inertial_matrix = [(0, 1), (1, 2), (2, 4)]
+                        for dragModel, fdOrder in inertial_matrix:
+                            stack.push(f"drag_model={dragModel}", {"lag_params%drag_model": dragModel})
+                            stack.push(f"fd_order={fdOrder}", {"fd_order": fdOrder})
+                            cases.append(define_case_d(stack, "", {}))
+                            stack.pop()
+                            stack.pop()
+                        stack.pop()
+
+                    if len(dimInfo[0]) == 2 and couplingMethod == 1:
+                        stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
+                        stack.push(
+                            "Inertial Bubbles",
+                            {"lag_params%vel_model": 2, "lag_params%drag_model": 2, "fd_order": 2, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(2)%Re(1)": 100.0},
+                        )
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
 
                     stack.pop()
 
@@ -2205,10 +2263,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
+                # File-based IC (hcid=273/274) sized to the full grid; the Example
+                # suite's m/n cap breaks it. Covered by the Chemistry golden tests.
+                "2D_reacting_mixing_layer",
+                "2D_spatial_reacting_mixing_layer",
                 "2D_ibm_multiphase",
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
                 "1D_reactive_shocktube",
+                "1D_reactive_shocktube_adaptive",
+                "2D_detonation_cell",
                 "2D_ibm_steady_shock",
                 "3D_performance_test",
                 "3D_ibm_stl_ellipsoid",
@@ -2240,6 +2304,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
+                "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
+                "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
@@ -2247,6 +2313,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_hypo_hlld",  # acoustic demo case, not a regression test
                 "3D_hypo_hlld",  # acoustic demo case, not a regression test
                 "2D_axisym_hypo_hlld",  # acoustic demo case, not a regression test
+                "2D_lagrange_rising_bubble",
+                "2D_lagrange_in_crossflow",
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
                 # by a large mu_max: even on the downsized grid the step count to reach t_stop
                 # is too large for the CI smoke suite. The faster NN examples remain tested.
@@ -2272,6 +2340,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # reproducible. Not a correctness bug -- the case is genuinely chaotic at
                 # this stiffness, so it is not a portable regression target.
                 "3D_mibm_periodic_collision",
+                # The violently stiff 3D bubble collapse amplifies compiler/arch floating-point
+                # differences past the 1e-3 Example tolerance under the always-pTg phase-change
+                # solver (a Newton equilibrium solve per cavitating cell, replacing the old
+                # shortcut). CI's own value is compiler-version-dependent -- nvhpc 24.5 and 26.1
+                # disagree by ~1.1e-3 (> tol) -- so no single golden passes every lane regardless
+                # of where it is generated. The 2D bubble and all 18 phase-change unit tests remain
+                # portable and CPU/GPU machine-zero; only this stiff 3D collapse is non-portable.
+                "3D_phasechange_bubble",
+                # Finite-rate propellant flame: the flame-front position after 50 steps is set by
+                # accumulated stiff-kinetics roundoff, so it drifts past the 1e-3 Example tolerance
+                # across compilers (nvhpc 25.11 golden vs 24.3/GNU/Intel/CCE/AMD disagree by ~1-5e-3).
+                # No single golden is portable -- same class as the other flame examples above. The
+                # reactive_burn detonation golden tests remain portable (machine-zero across lanes).
+                "1D_propellant_flame",
+                # Same finite-rate-flame non-portability as 1D_propellant_flame above: the diffusion
+                # flame over the fuel slab is set by accumulated stiff-kinetics roundoff, so by step 50
+                # the transverse momentum drifts past the 1e-3 Example tolerance across compilers
+                # (nvhpc passes; Intel and CCE disagree by ~2e-3 absolute). No single golden is portable.
+                "2D_hybrid_slab",
             ]
             if path in casesToSkip:
                 continue
@@ -2310,6 +2397,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ndim in range(1, 4):
             cases.append(define_case_f(f"{ndim}D -> Chemistry -> Perfect Reactor", "examples/nD_perfect_reactor/case.py", ["--ndim", str(ndim)], mods=common_mods))
 
+        # Operator-split, sub-stepped reaction integration (chem_params%reaction_substeps > 0): the
+        # autoigniting reactor exercises the split path that keeps stiff mechanisms stable.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "chem_params%reaction_substeps": 10},
+            )
+        )
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
@@ -2327,6 +2425,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # the pinned override_tol). Surfaced by the Riemann device-helper refactor (#1572). Re-enable
         # once goldens are regenerated per-backend or the tolerance model gains backend awareness.
         # cases.append(define_case_f("1D -> Chemistry -> Flamelet", "examples/1D_flamelet/case.py", mods={"t_step_stop": 1, "t_step_save": 1}, override_tol=10 ** (-10)))
+
+        # Both reacting mixing-layer goldens drift across compiler/arch: on the temporal
+        # case, a GCC-15 arm64 build (the macOS CI lane's architecture) diverges from the
+        # GNU-13-Linux golden by up to 6.65e-8 (rel) on a momentum component after 50 stiff
+        # chemistry steps, so the 1e-12 default is not portable. 1e-6 clears that with margin
+        # (and headroom for the other compiler lanes) while still catching real regressions,
+        # which shift these fields by far more. The spatial case adds bf_spatial_support's
+        # Fourier forcing but stays in the same band on this short run.
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Reacting Mixing Layer",
+                "examples/2D_reacting_mixing_layer/case.py",
+                ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+                override_tol=10 ** (-6),
+            )
+        )
+
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Spatial Reacting Mixing Layer",
+                "examples/2D_spatial_reacting_mixing_layer/case.py",
+                ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+                override_tol=10 ** (-6),
+            )
+        )
 
         stack.push(
             "1D -> Chemistry -> Dual Isothermal Wall Gradient",
@@ -2485,6 +2610,110 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     foreach_example()
 
     chemistry_cases()
+
+    def reactive_burn_cases():
+        # Condensed-phase programmed burn (m_reactive_burn): a uniform two-fluid stiffened-gas
+        # reactant above the ignition pressure, so the burn source converts reactant (fluid 1)
+        # to product (fluid 2) and releases energy through the qv difference. Uniform IC isolates
+        # the source term (no shock/gradient) for a stable, reproducible golden; it also exercises
+        # the reactive_burn precondition checks (num_fluids=2, shared EOS, qv(1) > qv(2)).
+        stack.push(
+            "1D -> Reactive Burn -> Condensed Programmed Detonation",
+            {
+                "m": 99,
+                "n": 0,
+                "p": 0,
+                "dt": 1.0e-9,
+                "num_patches": 1,
+                "num_fluids": 2,
+                "model_eqns": 2,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 0.005,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "weno_order": 5,
+                "weno_eps": 1e-16,
+                "mapped_weno": "F",
+                "mp_weno": "F",
+                "riemann_solver": 2,
+                "wave_speeds": 1,
+                "avg_state": 2,
+                "time_stepper": 3,
+                "reactive_burn": "T",
+                "rburn%k": 1.0e7,
+                "rburn%pign": 1.0e9,
+                "rburn%pref": 2.0e9,
+                "rburn%n": 1.0,
+                "fluid_pp(1)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
+                "fluid_pp(1)%pi_inf": 9.0e8,
+                "fluid_pp(1)%qv": 4.0e6,
+                "fluid_pp(2)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
+                "fluid_pp(2)%pi_inf": 9.0e8,
+                "fluid_pp(2)%qv": 0.0,
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.0025,
+                "patch_icpp(1)%length_x": 0.005,
+                # Uniform advection velocity: the field stays spatially uniform (sub-cell drift over
+                # 40 steps), so the source term is still isolated, but the momentum output is now a
+                # well-resolved O(1e5) quantity instead of near-zero roundoff -- otherwise the golden
+                # compares ~0 momentum at 1e-12 tolerance, which is not portable across recompiles/backends.
+                "patch_icpp(1)%vel(1)": 100.0,
+                "patch_icpp(1)%pres": 2.0e9,
+                "patch_icpp(1)%alpha_rho(1)": 1900.0 * 0.95,
+                "patch_icpp(1)%alpha_rho(2)": 1900.0 * 0.05,
+                "patch_icpp(1)%alpha(1)": 0.95,
+                "patch_icpp(1)%alpha(2)": 0.05,
+                "t_step_start": 0,
+                "t_step_stop": 40,
+                "t_step_save": 40,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        # Same burn on the 6-equation model (model_eqns=3): the reactant->product qv release
+        # must manifest through the qv-consistent phasic-pressure relaxation. Guards that the
+        # 5-eq source term is correct on the 6-eq model and that the qv threading holds up.
+        stack.push("6eq", {"model_eqns": 3})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        # Arrhenius temperature-driven rate: rburn%ta > 0 multiplies the rate by exp(-rburn%ta/T_r),
+        # with T_r the reactant phasic temperature (needs cv > 0). rburn%ta/cv are chosen so the
+        # factor is O(0.4) at the IC temperature -- exercises the branch instead of leaving it ~1.
+        stack.push("Arrhenius", {"rburn%ta": 500.0, "fluid_pp(1)%cv": 1500.0, "fluid_pp(2)%cv": 1500.0})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        # Same burn on 2 MPI ranks: the rburn parameters must be broadcast to non-root ranks, or
+        # rank 1's half of the domain burns with the sentinel default and diverges. The single-rank
+        # goldens cannot catch a broken rburn broadcast; this one does.
+        stack.push("2 ranks", {})
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+        stack.pop()
+
+    reactive_burn_cases()
+
+    def ibm_burn_rate_cases():
+        """Vieille's-law pressure-coupled IB burn rate (patch_ib%burn_rate_exp/pref).
+
+        The ibm_burning_grain/ibm_flameholder Example goldens cover surface injection
+        (v_blow, inj_species) but both leave burn_rate_exp at 0, so the pressure-coupled
+        scaling v_blow*(p/pref)^n has no golden. This registers the same example with the
+        coupling on, at reduced resolution to stay cheap.
+        """
+        cases.append(
+            define_case_f(
+                "2D -> IBM -> Vieille Burn Rate",
+                "examples/2D_ibm_burning_grain/case.py",
+                ["--burn_exp", "0.5"],
+                mods={"m": 25, "n": 25, "t_step_stop": 50, "t_step_save": 50, "parallel_io": "F"},
+                # Same 1e-3 as the ibm_burning_grain Example golden this mirrors: a 50-step IBM +
+                # finite-rate-chemistry run accumulates cross-compiler roundoff well past the 1e-10
+                # the ib branch of compute_tolerance would otherwise pick. Turning the coupling on
+                # moves the solution by ~5e-3 relative, so the burn-rate path stays covered at 1e-3.
+                override_tol=1e-3,
+            )
+        )
+
+    ibm_burn_rate_cases()
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.

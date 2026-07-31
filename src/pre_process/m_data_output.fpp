@@ -121,6 +121,27 @@ contains
             close (1)
         end do
 
+        if (bubbles_lagrange) then
+            block
+                real(stp), allocatable                         :: beta_ones(:,:,:)
+                character(LEN=len_trim(t_step_dir) + name_len) :: beta_file_loc
+                integer                                        :: jj, kk, ll
+                allocate (beta_ones(0:m,0:n,0:p))
+                do ll = 0, p
+                    do kk = 0, n
+                        do jj = 0, m
+                            beta_ones(jj, kk, ll) = 1.0_stp
+                        end do
+                    end do
+                end do
+                write (beta_file_loc, '(A,I0,A)') trim(t_step_dir) // '/q_cons_vf', sys_size + 1, '.dat'
+                open (1, FILE=trim(beta_file_loc), form='unformatted', STATUS=status)
+                write (1) beta_ones
+                close (1)
+                deallocate (beta_ones)
+            end block
+        end if
+
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
@@ -436,9 +457,9 @@ contains
             call DelayFileAccess(proc_rank)
 
             if (down_sample) then
-                call s_initialize_mpi_data_ds(q_cons_temp)
+                call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb, qbmm_mv=mv)
             end if
 
             if (cfl_dt) then
@@ -504,9 +525,26 @@ contains
                 end if
             end if
 
+            if (bubbles_lagrange) then
+                block
+                    real(stp), allocatable :: beta_ones(:,:,:)
+                    integer                :: jj, kk, ll
+                    allocate (beta_ones(0:m,0:n,0:p))
+                    do ll = 0, p
+                        do kk = 0, n
+                            do jj = 0, m
+                                beta_ones(jj, kk, ll) = 1.0_stp
+                            end do
+                        end do
+                    end do
+                    call MPI_FILE_WRITE_ALL(ifile, beta_ones, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                    deallocate (beta_ones)
+                end block
+            end if
+
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            call s_initialize_mpi_data(q_cons_vf)
+            call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb, qbmm_mv=mv)
 
             if (cfl_dt) then
                 write (file_loc, '(I0,A)') n_start, '.dat'
@@ -559,6 +597,26 @@ contains
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
+            end if
+
+            if (bubbles_lagrange) then
+                block
+                    real(stp), allocatable :: beta_ones(:,:,:)
+                    integer                :: jj, kk, ll
+                    allocate (beta_ones(0:m,0:n,0:p))
+                    do ll = 0, p
+                        do kk = 0, n
+                            do jj = 0, m
+                                beta_ones(jj, kk, ll) = 1.0_stp
+                            end do
+                        end do
+                    end do
+                    var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(1), 'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, beta_ones, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                    deallocate (beta_ones)
+                end block
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -652,7 +710,6 @@ contains
         call write_range(eqn_idx%bub%beg, eqn_idx%bub%end, " Bubbles")
         call write_range(eqn_idx%stress%beg, eqn_idx%stress%end, " Stress")
         call write_range(eqn_idx%int_en%beg, eqn_idx%int_en%end, " Internal Energies")
-        call write_range(eqn_idx%xi%beg, eqn_idx%xi%end, " Reference Map")
         call write_range(eqn_idx%B%beg, eqn_idx%B%end, " Magnetic Field")
         call write_range(eqn_idx%c, eqn_idx%c, " Color Function")
         call write_range(eqn_idx%species%beg, eqn_idx%species%end, " Chemistry")

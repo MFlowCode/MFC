@@ -122,7 +122,7 @@ contains
 
         $:GPU_UPDATE(device='[is1, is2, is3]')
 
-        if (elasticity) then
+        if (hypoelasticity) then
             ! dir_idx_tau(1:3) = (nn, nt, nt2): face-normal stress row for wave speeds and momentum flux. stress_perm(1:n_stress) =
             ! full tensor permutation mapping F_HLL local basis index -> physical storage index. Local order: (nn, nt, tt, nt2,
             ! t1t2, t2t2). In 2D only entries 1-3 are used.

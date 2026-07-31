@@ -522,6 +522,25 @@ with \f$\sigma = \varepsilon_b \max(\Delta x^{1/3}_\text{cell},\;R_\text{bubble}
 
 Each bubble is tracked individually with Keller-Miksis dynamics and 4th-order adaptive Runge-Kutta time integration.
 
+**Translational motion (`vel_model > 0`):**
+
+Bubbles may also translate through the carrier flow. Let \f$\mathbf{x}_b\f$ be the bubble position, \f$\mathbf{u}_b\f$ its velocity, \f$a\f$ its radius, and \f$\mathbf{u}_l(\mathbf{x}_b)\f$ the carrier velocity interpolated to the bubble location (a Lagrange polynomial of order `fd_order`, which must be set when `vel_model > 0`).
+
+- **Tracer bubbles (`vel_model = 1`)** follow the local carrier velocity:
+  \f[\frac{d\mathbf{x}_b}{dt} = \mathbf{u}_l(\mathbf{x}_b).\f]
+
+- **Newton's second law (`vel_model = 2`)** integrates the bubble momentum:
+  \f[m_b\,\frac{d\mathbf{u}_b}{dt} = \mathbf{F}_D + \mathbf{F}_p + \mathbf{F}_g, \qquad \frac{d\mathbf{x}_b}{dt} = \mathbf{u}_b,\f]
+  with bubble mass \f$m_b\f$ and forces acting on the slip velocity \f$\mathbf{u}_\text{rel} = \mathbf{u}_b - \mathbf{u}_l\f$:
+
+| Force | `case.py` control | Non-dimensional form |
+|---|---|---|
+| Drag \f$\mathbf{F}_D\f$ | `drag_model` | \f$-\,c_D\,\pi\,a\,\mathbf{u}_\text{rel} / \text{Re}\f$, with \f$c_D = 4\f$ free-slip (\cite Hadamard1911; \cite Rybczynski1911), \f$c_D = 6\f$ no-slip Stokes (\cite Stokes1851), \f$c_D = 12\f$ Levich (\cite Levich1962) |
+| Pressure \f$\mathbf{F}_p\f$ | `pressure_force` | \f$-V_b\,\nabla p\f$, with bubble volume \f$V_b = \frac{4}{3}\pi a^3\f$ |
+| Gravity \f$\mathbf{F}_g\f$ | `gravity_force` | \f$m_b\,\mathbf{g}\f$, with \f$\mathbf{g}\f$ the body-force acceleration |
+
+Here \f$\text{Re}\f$ is the mixture Reynolds number — the same `fluid_pp%%Re(1)` that scales the viscous stress tensor (@ref sec-two-viscosities) — so the drag scales with the liquid viscosity. The three drag models increase in magnitude free-slip \f$<\f$ no-slip \f$<\f$ Levich; see \cite Magnaudet2000 for a review of these bubble-drag regimes.
+
 ---
 
 ## 7. Fluid-Structure Interaction
@@ -553,34 +572,6 @@ where \f$\mathbf{l} = \nabla \mathbf{u}\f$ is the velocity gradient and \f$\math
 \f[\hat{\boldsymbol{\tau}}^e = \frac{D\boldsymbol{\tau}^e}{Dt} - \mathbf{l} \cdot \boldsymbol{\tau}^e - \boldsymbol{\tau}^e \cdot \mathbf{l}^T + \boldsymbol{\tau}^e\,\text{tr}(\mathbf{D}) = 2G\,\mathbf{D}^d\f]
 
 This adds 6 additional transport equations in 3D (symmetric stress tensor: \f$\tau_{xx}^e, \tau_{xy}^e, \tau_{yy}^e, \tau_{xz}^e, \tau_{yz}^e, \tau_{zz}^e\f$).
-
-### 7.2 Hyperelastic Model (`hyperelasticity = .true.`) (\cite Kamrin12; \cite Wilfong26 Sec. 4.1.6)
-
-**Source:** `src/simulation/m_hyperelastic.fpp`
-
-**Reference map evolution:**
-
-\f[\frac{\partial (\rho\,\boldsymbol{\xi})}{\partial t} + \nabla \cdot (\rho\,\boldsymbol{\xi} \otimes \mathbf{u}) = 0\f]
-
-**Deformation gradient from reference map:**
-
-\f[\mathbf{F} = (\nabla \boldsymbol{\xi})^{-1}\f]
-
-**Left Cauchy-Green tensor:**
-
-\f[\mathbf{b} = \mathbf{F}\,\mathbf{F}^T\f]
-
-**Neo-Hookean Cauchy stress:**
-
-\f[\boldsymbol{\tau}^e = \frac{G}{J}\left(\mathbf{b} - \frac{\text{tr}(\mathbf{b})}{3}\,\mathbf{I}\right)\f]
-
-where \f$J = \det(\mathbf{F})\f$.
-
-**Hyperelastic energy:**
-
-\f[e^e = \frac{G}{2}\bigl(I_{\mathbf{b}} - 3\bigr), \qquad I_{\mathbf{b}} = \text{tr}(\mathbf{b})\f]
-
----
 
 ## 8. Phase Change (`relax = .true.`) (\cite Wilfong26 Sec. 4.1.3)
 
