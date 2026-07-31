@@ -24,12 +24,7 @@ contains
 
     !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Each packing
     !! method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice / s_particle_cloud_random_box) and
-    !! hands back only the entries that fall within this rank's IB neighborhood (get_neighbor_bounds() must already have been
-    !! called); those are copied here into particle_cloud_ibs, allocated once to a worst-case capacity of
-    !! min(num_ib_patches_max_namelist, total particles requested across all clouds). Only the first num_particle_cloud_ibs of them
-    !! are actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is left
-    !! uninitialized. Each entry's gbl_patch_id is already the final, absolute global patch id (namelist patches occupy 1..num_ibs,
-    !! so the running index here starts at num_ibs) - s_reduce_ib_patch_array copies it as-is.
+    !! hands back only the entries that fall within this rank's IB neighborhood
     impure subroutine s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
@@ -61,6 +56,8 @@ contains
                 call s_particle_cloud_random_box(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
             case (2)  ! lattice packing method
                 call s_particle_cloud_lattice(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
+            case default
+                call s_mpi_abort("Particle cloud packing method is not a known packing method of MFC. Exiting.")
             end select
 
             @:PROHIBIT(num_particle_cloud_ibs + num_cloud_ibs > num_ib_patches_max_namelist, &
@@ -113,7 +110,7 @@ contains
 
         min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
 
-        if (p == 0) then
+        if (num_dims < 3) then
             geom = 2  ! circle for 2D
             dz_lo = 0
             dz_hi = 0
@@ -144,7 +141,7 @@ contains
 
             rx = xmin + f_xorshift(seed)*(xmax - xmin)
             ry = ymin + f_xorshift(seed)*(ymax - ymin)
-            if (p == 0) then
+            if (num_dims < 3) then
                 rz = particle_cloud(cloud_idx)%z_centroid
             else
                 rz = zmin + f_xorshift(seed)*(zmax - zmin)
@@ -166,7 +163,7 @@ contains
                         slot = f_bin_hash(nbx, nby, nbz, hash_size)
                         j = hash_head(slot)
                         do while (j > 0)
-                            if (p == 0) then
+                            if (num_dims < 3) then
                                 dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2)
                             else
                                 dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2 + (rz - placed(3, j))**2)
@@ -372,15 +369,15 @@ contains
     !> Compacts cloud_ibs(1:num_ibs) in place, discarding entries outside this rank's IB neighborhood (get_neighbor_bounds() must
     !! already have run) and updating num_ibs to the retained count. Used by rejection packing, which cannot filter as it places
     !! particles (see s_particle_cloud_random_box), to pare its full, unfiltered placement down to this rank's neighborhood.
-    subroutine s_reduce_particle_cloud_ibs(cloud_ibs, num_ibs)
+    subroutine s_reduce_particle_cloud_ibs(cloud_ibs, num_cloud_ibs)
 
         type(ib_patch_parameters), intent(inout), dimension(:) :: cloud_ibs
-        integer, intent(inout)                                 :: num_ibs
+        integer, intent(inout)                                 :: num_cloud_ibs
         integer                                                :: i, write_idx
         real(wp), dimension(3)                                 :: centroid
 
         write_idx = 0
-        do i = 1, num_ibs
+        do i = 1, num_cloud_ibs
             centroid = [cloud_ibs(i)%x_centroid, cloud_ibs(i)%y_centroid, 0._wp]
             if (num_dims == 3) centroid(3) = cloud_ibs(i)%z_centroid
             if (f_neighborhood_ranks_own_location(centroid)) then
@@ -388,7 +385,7 @@ contains
                 if (write_idx /= i) cloud_ibs(write_idx) = cloud_ibs(i)
             end if
         end do
-        num_ibs = write_idx
+        num_cloud_ibs = write_idx
 
     end subroutine s_reduce_particle_cloud_ibs
 
