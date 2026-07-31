@@ -620,7 +620,7 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
   - **HLLC**: interface-consistent velocity gradient from the Riemann solution.
   - **HLLD**: dual-pass approach resolving the elastic wave structure. Requires 2D+ and exactly 2 fluid components.
 
-- `riemann_hypo_ADC`: Enables anti-diffusion correction (ADC) for hypoelastic HLLC or HLLD. Blends HLLC/HLLD fluxes toward HLL based on a local sensor, improving robustness and reducing interfacial overshoots in strong supersonic hypoelastic problems. `ADC_kappa` (default 1.0) scales the ADC sensor; larger values blend more toward HLL (more diffusive and robust).
+- `riemann_hypo_ADC`: Enables anti-diffusion correction (ADC) for hypoelastic HLLC or HLLD. Blends the HLLC/HLLD flux locally toward the more diffusive HLL flux where a jump sensor (total normal stress, tangential velocity, and tangential stress) detects a strong contact or material interface, improving robustness and reducing interfacial overshoots. This trades contact and shear resolution for robustness where the sensor activates. `ADC_kappa` (default 1.0) scales the sensor; larger values blend more toward HLL (more diffusive and robust). Off by default and recommended off: in MFC's tested hypoelastic cases, including strong shock-interface interactions, HLLD is stable and accurate without ADC (which has negligible effect on it). The option is a robustness fallback intended for regimes with intense shocks and intense shear at material interfaces.
 
 #### Boundary Condition Patches {#boundary-condition-patches}
 
