@@ -16,6 +16,15 @@ and the reason matters more than the steps did — see "Measured outcome".
 | 2. Rank-independent cap | `a108dd37` | np=4->8 flipped 1.16x slower to 0.84x faster (single level) |
 | 3. P2P parent<->child | `6832d299`, `d53fac46` | landed; 3d `26e0d080` hoists the level advance to lockstep |
 | 4. Per-level mapping | `cfdd2847` | landed; correctness proven with a split tower, **no measured speedup** |
+| 5. Balance metric | `fc53e097`, `3780f30a` | landed; `[amr-balance]` per-level max/mean behind `load_weight_wrt` |
+
+Landed alongside, from auditing the above (2026-07-31):
+
+| Change | Commit | Note |
+|---|---|---|
+| Multi-level subcycle at np>1 un-gated | `8dca4b65` | its stated blocker had been removed by `3db24df0`; golden `C45DBB52` |
+| Level-general child slot cap | `be94db38`, `1e07eb65` | fixed `/2` was level-2-specific; **verified to fail without** — old cap core-dumps at `amr_max_level=3` |
+| `no_blocks_ranks` is not idleness | `3ab65ab6` | see "What binds at scale" |
 
 Two findings from the step-4 A/B that redirect this work:
 
@@ -235,21 +244,31 @@ them are load-bearing and a reader retracing the work needs them. Steps 5-7 are 
 
 ### Next
 
-5. **Instrument balance.** LANDED (`fc53e097`): `s_amr_report_balance` prints per-level and total
-   `max/mean` assigned weight plus the no-block rank count, gated behind `load_weight_wrt`. It needs
-   no MPI — `wt`, `amr_block_level` and `amr_block_owner` are replicated, so rank 0 prints.
-   The `m_rank_timing` half is NOT done, and it is the half that measures idleness rather than
-   inferring it; step 6 should not be read as complete until the model can be checked against
-   measured per-rank time.
+5. **Instrument balance.** LANDED (`fc53e097`, fixed in `3780f30a`): `s_amr_report_balance` prints
+   per-level and total `max/mean` assigned weight plus the no-block rank count, gated behind
+   `load_weight_wrt`. It needs no MPI — `wt`, `amr_block_level` and `amr_block_owner` are
+   replicated, so rank 0 prints.
 
    First result: at np=2 the metric is already ~1.005-1.05, i.e. step 4 had no headroom to recover;
    at np=8 the benchmark collapses to ~2 boxes per level and both distribution schemes produce
    byte-identical assignments. **Box supply binds, not the owner mapping** — which points at
    `amr_max_grid_size` and regrid box production, not at distribution.
-6. **Exercise the cost model.** Add a cost-heterogeneous benchmark (IB or phase change) with
+
+   **Correction (supersedes an earlier revision of this file).** A previous version of this entry
+   said "the `m_rank_timing` half is NOT done". That was wrong: `m_rank_timing` is fully implemented
+   and wired — `s_rank_time_tic`/`toc`/`s_report_rank_time`, gated on `rank_time_wrt`, with the AMR
+   fine advance bracketed at eight call sites in `m_amr.fpp` under `amr_rank_owns_block`, and the
+   allreduce already printing `[rank_time] imbalance(max/mean)`. Acceptance criterion 2 is therefore
+   not work to be written; it is a run to be performed. Harness: `amr-bench/model_vs_measured.sh`.
+6. **Model vs measured (acceptance criterion 2).** Run the balance sweep with `load_weight_wrt` AND
+   `rank_time_wrt` on and compare `[amr-balance]` against `[rank_time]` at each rank count. This is
+   what distinguishes a balancer that works from a cost model that merely looks self-consistent, and
+   nothing before it can. Do this BEFORE any further tuning — the same ordering error as running the
+   step-4 A/B before the metric existed.
+7. **Exercise the cost model.** Add a cost-heterogeneous benchmark (IB or phase change) with
    `load_weight_wrt` on. Every AMR benchmark to date is geometry-only, so `K_ib`/`K_pc` have never
    influenced a measured assignment.
-7. **Scale-invariance run.** Sweep rank count past the box count per level and confirm imbalance
+8. **Scale-invariance run.** Sweep rank count past the box count per level and confirm imbalance
    does not grow. Single-node np<=8 cannot show this — the granularity floor and the indivisible
    atom only bind once ranks approach box count.
 
@@ -347,4 +366,13 @@ happen to spread evenly will scale well regardless of whether the balancer did a
 
 Note that `./mfc.sh test --only AMR` does not match the coexist goldens — their trace token is
 "AMR + L0 tiles". Run `1F074C5D 8D466A94 83CC5C6D 33060D84 FD056B71 98AA6EDB D99F85F8 09E0D257
-93EFC4F6` by UUID as well, or they silently go untested.
+93EFC4F6` by UUID as well, or they silently go untested. (A `-l | grep -i amr` filter does catch
+them, since the token still contains "AMR"; the suite is 71 cases as of `1e07eb65`.)
+
+**A new golden must be shown to fail without the change it protects.** `3db24df0` set this bar and
+it has caught real self-deception since: two attempted counterfactuals for the level-3 slot cap
+produced byte-identical output and proved nothing, because the case was too small and then because
+only the grid was scaled and not `amr_buf` — boxes track the *feature*, not the domain. The third
+attempt crashed the old code outright. Where a path genuinely cannot be covered, say so in the test
+comment with the reason, as `C45DBB52` does for the level-2 seam over MPI; silent non-coverage reads
+exactly like coverage a year later.
