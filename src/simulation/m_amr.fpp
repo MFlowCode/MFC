@@ -1905,18 +1905,24 @@ contains
     !!
     !! Needs no MPI: wt, amr_block_level and amr_block_owner are replicated and identical on every rank (the cost vector is
     !! allreduced in s_amr_block_cost), so every rank computes the same numbers and rank 0 prints. ratio == 1 is perfect balance;
-    !! ratio == num_procs means one rank holds everything at that level. `empty` counts ranks assigned nothing, which is the
-    !! granularity floor showing up directly: a level with fewer boxes than ranks CANNOT balance, however good the cut is.
+    !! ratio == num_procs means one rank holds everything at that level. no_blocks_ranks counts ranks holding no block AT THIS
+    !! LEVEL, which is the granularity floor showing up directly: a level with fewer boxes than ranks CANNOT balance, however good
+    !! the cut is. It is NOT an idleness measure - those ranks still own level-0 work (level 0 covers every rank) and may own
+    !! blocks at other levels. Only m_rank_timing measures idleness; do not read this counter as one.
     impure subroutine s_amr_report_balance(wt, maxlev)
 
-        real(wp), intent(in) :: wt(:)
-        integer, intent(in)  :: maxlev
-        real(wp)             :: rw(0:num_procs - 1), tw(0:num_procs - 1), mx, mean
-        integer              :: k, lev, nb, empty
+        real(wp), intent(in)  :: wt(:)
+        integer, intent(in)   :: maxlev
+        real(wp), allocatable :: rw(:), tw(:)
+        real(wp)              :: mx, mean
+        integer               :: k, lev, nb, empty
 
         if (.not. load_weight_wrt) return
         if (proc_rank /= 0) return
 
+        ! heap, not automatic: these are num_procs long and this is the routine that runs AT SCALE - two automatic wp arrays would
+        ! put O(num_procs) on the stack, which is where the module already puts amr_owner_cut / amr_fine_cut on the heap instead
+        allocate (rw(0:num_procs - 1), tw(0:num_procs - 1))
         tw = 0._wp
         do lev = 1, maxlev
             rw = 0._wp
@@ -1930,11 +1936,16 @@ contains
             tw = tw + rw
             mx = maxval(rw); mean = sum(rw)/real(num_procs, wp)
             empty = count(rw <= 0._wp)
-            print '(A,I0,A,I0,A,I0,A,F8.3,A,I0,A,I0)', ' [amr-balance] level ', lev, ': boxes ', nb, '/ranks ', num_procs, &
-                & ' max/mean ', merge(mx/mean, 1._wp, mean > 0._wp), ' idle_ranks ', empty, ' of ', num_procs
+            ! NOT merge(): merge is a function, so BOTH arms are evaluated and the mean == 0 arm would still divide by zero - the
+            ! guard would not guard. no_blocks_ranks counts ranks holding no block AT THIS LEVEL; they are not idle (they still
+            ! own level-0 work and possibly other levels), they just take no share of this level's.
+            if (mean > 0._wp) print '(A,I0,A,I0,A,I0,A,F8.3,A,I0,A,I0)', ' [amr-balance] level ', lev, ': boxes ', nb, '/ranks ', &
+                & num_procs, ' max/mean ', mx/mean, ' no_blocks_ranks ', empty, ' of ', num_procs
         end do
-        mx = maxval(tw); mean = sum(tw)/real(num_procs, wp)
-        if (mean > 0._wp) print '(A,F8.3,A,I0)', ' [amr-balance] TOTAL   : max/mean ', mx/mean, ' idle_ranks ', count(tw <= 0._wp)
+        mean = sum(tw)/real(num_procs, wp)
+        if (mean > 0._wp) print '(A,F8.3,A,I0)', ' [amr-balance] TOTAL   : max/mean ', maxval(tw)/mean, &
+            & ' ranks_with_no_fine_block ', count(tw <= 0._wp)
+        deallocate (rw, tw)
 
     end subroutine s_amr_report_balance
 
@@ -4553,9 +4564,9 @@ contains
     !! conserves at the seam - the per-block order did not run the halo and leaked there. Two dt/2 SSP-RK3 substeps AFTER the coarse
     !! step: q_old/q_new are the coarse t^n / t^{n+1} states; each stage's ghosts are the linear time interpolation at stage time
     !! theta = (substep-1 + c_s)/2 with SSP-RK3 abscissae c = [0, 1, 1/2]. Level-1 blocks drive their level-2 children per substep
-    !! (s_amr_advance_children); the L2-L2 seam halo is future work (s_amr_check_seam_topology aborts if an L2+ seam pair is reached
-    !! under subcycle, e.g. via a restart mode-switch from a lockstep-produced layout). A single owned level-1 block is
-    !! byte-identical to the old per-block subcycle (the halo is a no-op with < 2 adjacent same-level blocks).
+    !! (s_amr_advance_children), which applies this same transposed shape at every deeper level, so L2-L2 seams are reconciled by
+    !! the level-filtered halo too. A single owned level-1 block is byte-identical to the old per-block subcycle (the halo is a
+    !! no-op with < 2 adjacent same-level blocks).
     impure subroutine s_amr_advance_fine_subcycle_all(q_old, q_new, coefs, bc_type, q_T_sf, pb_old, mv_old, pb_in, rhs_pb, mv_in, &
         & rhs_mv, t_step)
 
@@ -4928,10 +4939,12 @@ contains
     !! capped=1 and stops if the amr_max_blocks cap is hit. Collapsed dims stay [0:0].
     pure subroutine s_amr_tile_box(lo, hi, out, nt, cap, capped, tsz)
 
-        integer, intent(in)           :: lo(3), hi(3), cap
-        type(t_box), intent(inout)    :: out(:)
-        integer, intent(inout)        :: nt, capped
-        integer, intent(in), optional :: tsz(3)  !< per-dim tile size (default amr_maxc_fit; level>=2 passes amr_maxc_fit/2)
+        integer, intent(in)        :: lo(3), hi(3), cap
+        type(t_box), intent(inout) :: out(:)
+        integer, intent(inout)     :: nt, capped
+        !> per-dim tile size (default amr_maxc_fit; a level-lev caller passes amr_maxc_fit/amr_ref_ratio**(lev-1) - the slot holds
+        !! amr_ref_ratio*amr_maxc_fit fine cells and a level-lev block spans amr_ref_ratio**lev per coarse cell)
+        integer, intent(in), optional :: tsz(3)
         integer                       :: ntl(3), s(3), t1, t2, t3, qlo(3), qhi(3), tc(3)
 
         tc = amr_maxc_fit; if (present(tsz)) tc = tsz
