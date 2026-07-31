@@ -2221,14 +2221,182 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        edge_common = {
+            "run_time_info": "F",
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "n": 7,
+            "p": 0,
+            "t_step_start": 0,
+            "t_step_stop": 1,
+            "t_step_save": 1,
+            "num_patches": 2,
+            "model_eqns": 2,
+            "alt_soundspeed": "F",
+            "num_fluids": 2,
+            "mpp_lim": "F",
+            "mixture_err": "F",
+            "time_stepper": 1,
+            "recon_type": 1,
+            "weno_order": 1,
+            "weno_eps": 1.0e-16,
+            "riemann_solver": 4,
+            "wave_speeds": 1,
+            "avg_state": 2,
+            "riemann_hypo_ADC": "F",
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -1,
+            "bc_y%end": -1,
+            "format": 1,
+            "precision": 2,
+            "parallel_io": "F",
+            "hypoelasticity": "T",
+            "fd_order": 4,
+        }
+
         # A solid-anchored, light-gas face puts the raw right shear wave outside
         # the outer fan. Tangential slip makes HLL fallback differ from clipping.
+        gamma = 1.4
+        p0 = 1.0
+        G_solid = 1.0
+        rho_solid = 1.0
+        rho_gas = 1.0e-2
+        eps_alpha = 1.0e-12
+        nx = 32
+        dx = 1.0 / nx
+        c_outer = math.sqrt(gamma * p0 / rho_gas)
+        fan_order_cfg = {
+            **edge_common,
+            "m": nx - 1,
+            "dt": 0.2 * dx / c_outer,
+            "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+            "fluid_pp(1)%pi_inf": 0.0,
+            "fluid_pp(1)%G": G_solid,
+            "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
+            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%G": 0.0,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%pres": p0,
+            "patch_icpp(1)%tau_e(1)": 0.0,
+            "patch_icpp(1)%tau_e(2)": 0.0,
+            "patch_icpp(1)%tau_e(3)": 0.0,
+            "patch_icpp(1)%alpha_rho(1)": rho_solid * (1.0 - eps_alpha),
+            "patch_icpp(1)%alpha(1)": 1.0 - eps_alpha,
+            "patch_icpp(1)%alpha_rho(2)": rho_solid * eps_alpha,
+            "patch_icpp(1)%alpha(2)": eps_alpha,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": 1.0,
+            "patch_icpp(2)%pres": p0,
+            "patch_icpp(2)%tau_e(1)": 0.0,
+            "patch_icpp(2)%tau_e(2)": 0.0,
+            "patch_icpp(2)%tau_e(3)": 0.0,
+            "patch_icpp(2)%alpha_rho(1)": rho_gas * eps_alpha,
+            "patch_icpp(2)%alpha(1)": eps_alpha,
+            "patch_icpp(2)%alpha_rho(2)": rho_gas * (1.0 - eps_alpha),
+            "patch_icpp(2)%alpha(2)": 1.0 - eps_alpha,
+        }
         cases.append(
             define_case_f(
                 "2D -> Hypoelasticity -> HLLD -> Fan-order fallback",
-                "examples/2D_hypo_fan_order_fallback/case.py",
+                "",
+                mods=fan_order_cfg,
             )
         )
+
+        # Exercise the two changed G_eff = G_hat + tau_nn_hat outcomes: resolved
+        # positive HLLD and negative-state HLL fallback. The exact-zero HLLC
+        # limit is unchanged by this patch.
+
+        def make_shear_guard_cfg(regime):
+            gamma = 1.4
+            if regime == "positive":
+                G = 1.0e-8
+                rho0 = 1.0e-5
+                p0 = 1.0e-5
+                tau_xx = 0.0
+            else:
+                G = 1.0
+                rho0 = 1.0
+                p0 = 1.0
+                tau_xx = -1.1 * G
+            tau_yy = -tau_xx
+
+            nx = 16
+            dx = 1.0 / nx
+            c_outer = math.sqrt((gamma * p0 + 4.0 * G / 3.0 + tau_xx) / rho0)
+            return {
+                **edge_common,
+                "m": nx - 1,
+                "dt": 0.2 * dx / c_outer,
+                "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%G": G,
+                "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%G": G,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 1.0,
+                "patch_icpp(1)%pres": p0,
+                "patch_icpp(1)%tau_e(1)": tau_xx,
+                "patch_icpp(1)%tau_e(2)": 0.0,
+                "patch_icpp(1)%tau_e(3)": tau_yy,
+                "patch_icpp(1)%alpha_rho(1)": 0.5 * rho0,
+                "patch_icpp(1)%alpha(1)": 0.5,
+                "patch_icpp(1)%alpha_rho(2)": 0.5 * rho0,
+                "patch_icpp(1)%alpha(2)": 0.5,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%geometry": 3,
+                "patch_icpp(2)%x_centroid": 0.75,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%length_y": 1.0,
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": 2.0,
+                "patch_icpp(2)%pres": p0,
+                "patch_icpp(2)%tau_e(1)": tau_xx,
+                "patch_icpp(2)%tau_e(2)": 0.0,
+                "patch_icpp(2)%tau_e(3)": tau_yy,
+                "patch_icpp(2)%alpha_rho(1)": 0.5 * rho0,
+                "patch_icpp(2)%alpha(1)": 0.5,
+                "patch_icpp(2)%alpha_rho(2)": 0.5 * rho0,
+                "patch_icpp(2)%alpha(2)": 0.5,
+            }
+
+        for label, regime, override_tol in [
+            # The positive-case signal is O(1e-8), below the generic hypoelastic
+            # absolute tolerance; 1e-9 keeps the regression discriminating while
+            # remaining loose relative to single-precision roundoff at O(1e-5).
+            ("Resolved positive", "positive", 1e-9),
+            ("Negative fallback", "negative", None),
+        ]:
+            cases.append(
+                define_case_f(
+                    f"2D -> Hypoelasticity -> HLLD -> Shear guard -> {label}",
+                    "",
+                    mods=make_shear_guard_cfg(regime),
+                    override_tol=override_tol,
+                )
+            )
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
