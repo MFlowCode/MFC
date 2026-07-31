@@ -223,18 +223,6 @@ contains
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")
         @:PROHIBIT(amr_subcycle .and. cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
-        ! Subcycled fine advance at np>1 needs the block-to-block fine-fine seam halo (s_amr_fine_fine_halo) PER SUBSTEP:
-        ! max_grid_size TILING can split a feature into ADJACENT same-level sub-blocks; the halo overwrites their shared-face
-        ! ghosts with the neighbour's fine interior so both sides compute a MATCHING seam flux (else mass leaks at the seam).
-        ! s_amr_advance_fine_subcycle_all advances all LEVEL-1 blocks stage-by-stage in lockstep with the halo interposed, and
-        ! s_amr_advance_children does the same for every deeper level, so a level>=2 seam is reconciled per substep too. Deep
-        ! seams are always SAME-parent: the nesting window insets each parent by amr_cpat_mar >= 1 coarse cells, so two children
-        ! under different parents are separated by >= 2 cells and never form an exact-match pair. What per-level distribution
-        ! does add at np>1 is that same-parent siblings, and a child and its parent, may land on DIFFERENT ranks - so the seam
-        ! halo runs over MPI and the substep ghost gather becomes a P2P pair. (Tiling can produce adjacent sub-blocks at any np -
-        ! amr_maxc_fit caps a box at half the global extent even at np=1 - so the subcycle path runs the seam halo
-        ! unconditionally; a regrid-time check aborts on the seam topologies no halo covers: partial-overlap adjacency and
-        ! same-level intersection.)
 
         @:PROHIBIT(bf_spatial_support .and. (n == 0 .or. p /= 0), &
                    & "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
