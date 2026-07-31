@@ -4663,6 +4663,60 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (r) amr_max_grid_size at multi-level, np=2 - the ONLY golden that sets the pinned cap at all.
+        # Before this, amr_max_grid_size appeared in NO test or example case, only in the schema and
+        # validator, despite being the mechanism the rank-independent-cap work rests on: pin the cap ->
+        # many small boxes -> boxes_per_level >> num_procs. Any defect reachable only through the pinned
+        # path was invisible, and one was: s_amr_regrid's brand-new-region branch (a level>=2 child whose
+        # region has no old fine data to cluster) emitted its box without ever consulting amr_maxc_fit -
+        # the only box-emitting path that skipped s_amr_tile_box. Slot coord arrays are allocated once to
+        # amr_ref_ratio*amr_maxc_fit, so a child over the cap made s_amr_build_block_coords write past
+        # x_cb; under -O2 that silently corrupts the heap every regrid and surfaces later as
+        # "corrupted size vs. prev_size" in an unrelated free().
+        # VERIFIED to fail without the fix: 28 over-cap boxes, and a bounds-checked build traps at
+        # m_amr.fpp:584 "Index 128 of dimension 1 of array 'fcb' above upper bound of 127".
+        # The knobs are load-bearing and narrow. amr_max_grid_size=16 makes s_amr_tile_box split a wide
+        # region into 16 and 15, and span 15 gives ins = 15/4 = 3 and a child of 9 against a level-2 cap
+        # of 8 - INTEGER DIVISION is the trigger, so a cap of 20 splits evenly (20/20 -> child 10, cap 10)
+        # and does NOT reproduce. The blob IC is equally load-bearing: a Sod-like patch grows level-2
+        # regions that already have fine data, so the brand-new-region branch never fires and the bug is
+        # unreachable however the cap is set.
+        stack.push(
+            "AMR -> 2D -> pinned max_grid_size multi-level np=2",
+            {
+                **amr_2d_base,
+                "m": 127,
+                "n": 63,
+                "dt": 2.0e-4,
+                # patch 2 must OVERLAY THE WHOLE DOMAIN for the hcid to stamp blobs everywhere, and the
+                # AMR block must be rescaled - amr_2d_base's 16..47 / 8..23 are sized for m=63/n=31 and
+                # would cover a quarter of this grid, leaving too little refined area to tile.
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%length_x": 1.0,
+                "patch_icpp(2)%length_y": 1.0,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%hcid": 299,
+                "patch_icpp(2)%a(2)": 8.0,
+                "patch_icpp(2)%a(3)": 1.0,
+                "patch_icpp(2)%a(4)": 0.05,
+                "patch_icpp(2)%a(5)": 1.5,
+                "amr_block_beg(1)": 32,
+                "amr_block_end(1)": 95,
+                "amr_block_beg(2)": 16,
+                "amr_block_end(2)": 47,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.02,
+                "amr_buf": 4,
+                "amr_max_level": 2,
+                "amr_max_blocks": 64,
+                "amr_max_grid_size": 16,
+                "amr_subcycle": "F",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
     amr_golden_tests()
 
     def load_balance_tests():
