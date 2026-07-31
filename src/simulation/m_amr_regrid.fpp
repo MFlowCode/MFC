@@ -85,6 +85,40 @@ contains
 
     end subroutine s_amr_check_seam_topology
 
+    !> Abort if any box exceeds the slot cap for its level. The slot coord/field arrays are allocated ONCE to
+    !! amr_ref_ratio*amr_maxc_fit fine cells, and a level-lev block spans amr_ref_ratio**lev fine cells per coarse cell, so its
+    !! coarse extent must be <= amr_maxc_fit/amr_ref_ratio**(lev-1). Every emitter enforces that via s_amr_tile_box; this checks the
+    !! invariant once, where the box set is final, rather than trusting each emitter to have done it.
+    !!
+    !! It exists because a violation is otherwise SILENT AND CATASTROPHIC: s_amr_build_block_coords sizes the fine coords from the
+    !! block's true extent, so an over-cap box writes past x_cb, corrupting the heap on EVERY regrid and surfacing much later as
+    !! "corrupted size vs. prev_size" inside an unrelated free(). One emitter did skip the cap (cfbacebe, the brand-new-region
+    !! branch) and finding it took a bounds-checked rebuild and a multi-hour hunt, because the crash site was nowhere near the bug.
+    !! Matches s_amr_tile_box's own floor (tc = max(tc, 1)) so a collapsed dim, whose cap divides to 0, is not flagged.
+    impure subroutine s_amr_check_box_caps(boxes, nboxes, box_level)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: nboxes, box_level(:)
+        integer                 :: k, d, lev, cap, span
+
+        do k = 1, nboxes
+            lev = box_level(k)
+            if (lev < 1) cycle  ! level-0 tiles are sized by the tile decomposition, not this cap
+            do d = 1, num_dims
+                cap = max(amr_maxc_fit(d)/amr_ref_ratio**(lev - 1), 1)
+                span = boxes(k)%hi(d) - boxes(k)%lo(d) + 1
+                if (span > cap) then
+                    if (proc_rank == 0) print '(A,I0,A,I0,A,I0,A,I0)', ' [amr] box cap violated: level ', lev, ' dim ', d, &
+                        & ' span ', span, ' > cap ', cap
+                    call s_mpi_abort("AMR regrid: a fine box exceeds the slot cap for its level (span and cap printed above). " &
+                                     & // "The fine coord arrays are sized to amr_ref_ratio*amr_maxc_fit, so this would write " &
+                                     & // "past x_cb and corrupt the heap. A box emitter did not route through s_amr_tile_box.")
+                end if
+            end do
+        end do
+
+    end subroutine s_amr_check_box_caps
+
     !> Shrink box [blo:bhi] to the tight bbox of its tagged cells. ok=.false. if none tagged. Collapsed dims (lo=hi=0) survive
     !! unchanged. Deterministic (integer scan of the identical sparse tag list).
     impure subroutine s_amr_trim_box(tags, ts, te, blo, bhi, ok)
@@ -589,6 +623,7 @@ contains
         call s_amr_regrid_shape_boxes(boxes, nboxes)
         if (nboxes == 0) return  ! every box was confined to the domain margin
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
+        call s_amr_check_box_caps(boxes, nboxes, box_level)  ! invariant: no box may exceed its level's slot cap
         call s_amr_regrid_boxes_unchanged(boxes, nboxes, box_level, same)
         if (same) return  ! identical box set and levels: keep the live slots
         call s_amr_regrid_stash_migrate(boxes, nboxes, box_level, old_np, old_ilo, old_ext, old_level, old_owns)

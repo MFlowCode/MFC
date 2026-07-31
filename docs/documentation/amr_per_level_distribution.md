@@ -15,8 +15,9 @@ and the reason matters more than the steps did — see "Measured outcome".
 | 1. Scratch decoupling | `86782249` | landed |
 | 2. Rank-independent cap | `a108dd37` | np=4->8 flipped 1.16x slower to 0.84x faster (single level) — **but see the caveat below** |
 | 3. P2P parent<->child | `6832d299`, `d53fac46` | landed; 3d `26e0d080` hoists the level advance to lockstep |
-| 4. Per-level mapping | `cfdd2847` | landed; correctness proven with a split tower, **no measured speedup** |
-| 5. Balance metric | `fc53e097`, `3780f30a` | landed; `[amr-balance]` per-level max/mean behind `load_weight_wrt` |
+| 4. Per-level mapping | `cfdd2847` | landed; correctness proven with a split tower, **no measured speedup — now explained**, see "The cost model weighs the wrong quantity" |
+| 5. Balance metric | `fc53e097`, `3780f30a` | landed; `[amr-balance]` per-level max/mean behind `load_weight_wrt`. Its *conclusion* ("box supply binds") is **retracted** — see below |
+| 6. Model vs measured | — | done; **the cost model does not predict measured time**. Redirects the effort to step 7 |
 
 Landed alongside, from auditing the above (2026-07-31):
 
@@ -282,17 +283,51 @@ them are load-bearing and a reader retracing the work needs them. Steps 5-7 are 
    fine advance bracketed at eight call sites in `m_amr.fpp` under `amr_rank_owns_block`, and the
    allreduce already printing `[rank_time] imbalance(max/mean)`. Acceptance criterion 2 is therefore
    not work to be written; it is a run to be performed. Harness: `amr-bench/model_vs_measured.sh`.
-6. **Model vs measured (acceptance criterion 2).** Run the balance sweep with `load_weight_wrt` AND
-   `rank_time_wrt` on and compare `[amr-balance]` against `[rank_time]` at each rank count. This is
-   what distinguishes a balancer that works from a cost model that merely looks self-consistent, and
-   nothing before it can. Do this BEFORE any further tuning — the same ordering error as running the
-   step-4 A/B before the metric existed.
-7. **Exercise the cost model.** Add a cost-heterogeneous benchmark (IB or phase change) with
+6. **Model vs measured (acceptance criterion 2).** DONE — and it overturned the working thesis. See
+   "The cost model weighs the wrong quantity" below. Harness: `amr-bench/model_vs_measured.sh`.
+7. **Reweight `s_amr_block_cost` on a fixed per-box term.** THE LIVE TASK. `cost = K_fixed +
+   cells(k)`, with `K_fixed` calibrated from `m_rank_timing` rather than guessed. The acceptance
+   test already exists: re-run the step-6 sweep and require model `max/mean` to converge on
+   measured. Everything below is downstream of getting the cost function right.
+8. **Exercise the heterogeneous terms.** A cost-heterogeneous benchmark (IB or phase change) with
    `load_weight_wrt` on. Every AMR benchmark to date is geometry-only, so `K_ib`/`K_pc` have never
-   influenced a measured assignment.
-8. **Scale-invariance run.** Sweep rank count past the box count per level and confirm imbalance
+   influenced a measured assignment — and they are corrections to a base term that is itself wrong.
+9. **Scale-invariance run.** Sweep rank count past the box count per level and confirm imbalance
    does not grow. Single-node np<=8 cannot show this — the granularity floor and the indivisible
    atom only bind once ranks approach box count.
+
+## The cost model weighs the wrong quantity
+
+Measured 2026-07-31 with `load_weight_wrt` and `rank_time_wrt` both on. 511x255, 24 blobs (`hcid`
+299), `amr_max_level=2`, `amr_max_grid_size=64` (pinned, so boxes are many), 30 steps.
+
+| np | weight `max/mean` (what the balancer optimizes) | **box count** `max/mean` | measured `[rank_time]` |
+|---|---|---|---|
+| 2 | 1.015 | **1.130** | 1.087 |
+| 4 | 1.054 | **1.176** | 1.170 |
+| 8 | 1.050 | **1.308** | 1.259 |
+
+**Box count predicts measured time; cell weight does not.** The cell-based model sits flat near 1.05
+while both box count and measured time climb together, and the gap widens with rank count — the
+scale-invariance failure this document names as the real requirement. Level 1 is perfect in both
+metrics (32 equal boxes); all the divergence is at level 2, where 104 boxes over 8 ranks give weight
+1.050 and count 1.308.
+
+The mechanism was already in our own data: a per-block advance costs ~1x a full monolithic step
+**regardless of block size and does not amortize** (@ref amr_block_batching). If per-block cost is
+essentially fixed, a rank's load is how many boxes it holds, not how many cells. Equal cells with
+unequal counts reads as perfectly balanced and runs badly skewed.
+
+**Two consequences.** First, **step 4's flat A/B now has an explanation**: per-level distribution
+redistributed *cells*, and cells were never the binding cost — it was balancing the wrong quantity,
+not proving distribution irrelevant. Second, **step 5's conclusion that "box supply binds, not the
+owner mapping" does not survive**; it was inferred from box counts and model imbalance with no
+measured counterpart, and the model it rested on does not track reality.
+
+Caveats, since this redirects the effort: single run per rank count (np=4 measured 1.084 in one run
+and 1.170 in another, so variance is real — the *pattern* held in both); `[rank_time]` brackets
+compute regions, so some spread may be MPI wait rather than work; one case, one node, np<=8. The
+direction and its growth with scale are actionable, the exact ratios are not.
 
 ## Measured outcome
 

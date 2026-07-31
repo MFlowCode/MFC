@@ -1913,8 +1913,8 @@ contains
 
         real(wp), intent(in)  :: wt(:)
         integer, intent(in)   :: maxlev
-        real(wp), allocatable :: rw(:), tw(:)
-        real(wp)              :: mx, mean
+        real(wp), allocatable :: rw(:), tw(:), rc(:)
+        real(wp)              :: mx, mean, cmx, cmean
         integer               :: k, lev, nb, empty
 
         if (.not. load_weight_wrt) return
@@ -1922,30 +1922,39 @@ contains
 
         ! heap, not automatic: these are num_procs long and this is the routine that runs AT SCALE - two automatic wp arrays would
         ! put O(num_procs) on the stack, which is where the module already puts amr_owner_cut / amr_fine_cut on the heap instead
-        allocate (rw(0:num_procs - 1), tw(0:num_procs - 1))
+        allocate (rw(0:num_procs - 1), tw(0:num_procs - 1), rc(0:num_procs - 1))
         tw = 0._wp
         do lev = 1, maxlev
-            rw = 0._wp
+            rw = 0._wp; rc = 0._wp
             nb = 0
             do k = 1, amr_num_blocks
                 if (amr_block_level(k) /= lev) cycle
                 rw(amr_block_owner(k)) = rw(amr_block_owner(k)) + wt(k)
+                rc(amr_block_owner(k)) = rc(amr_block_owner(k)) + 1._wp
                 nb = nb + 1
             end do
             if (nb == 0) cycle
             tw = tw + rw
             mx = maxval(rw); mean = sum(rw)/real(num_procs, wp)
             empty = count(rw <= 0._wp)
+            ! BOX COUNT imbalance beside weight imbalance. cost(k) is a footprint CELL count, but the measured per-block advance
+            ! costs ~1x a full monolithic step almost regardless of block size and does not amortize - so if per-block cost is
+            ! largely FIXED, a rank's true load tracks how many boxes it holds, not how many cells. Equal cells with unequal box
+            ! counts then reads as perfectly balanced and runs badly skewed, which is exactly the model/measured gap observed
+            ! (model 1.03 vs rank_time 1.26 at np=8). Printing both makes that hypothesis falsifiable in one run.
+            cmx = maxval(rc); cmean = sum(rc)/real(num_procs, wp)
             ! NOT merge(): merge is a function, so BOTH arms are evaluated and the mean == 0 arm would still divide by zero - the
             ! guard would not guard. no_blocks_ranks counts ranks holding no block AT THIS LEVEL; they are not idle (they still
             ! own level-0 work and possibly other levels), they just take no share of this level's.
-            if (mean > 0._wp) print '(A,I0,A,I0,A,I0,A,F8.3,A,I0,A,I0)', ' [amr-balance] level ', lev, ': boxes ', nb, '/ranks ', &
-                & num_procs, ' max/mean ', mx/mean, ' no_blocks_ranks ', empty, ' of ', num_procs
+            ! cmean cannot be zero here: nb >= 1, so sum(rc) = nb >= 1. No guard needed, and emphatically not merge().
+            if (mean > 0._wp) print '(A,I0,A,I0,A,I0,A,F8.3,A,F8.3,A,I0,A,I0)', ' [amr-balance] level ', lev, ': boxes ', nb, &
+                & '/ranks ', num_procs, ' max/mean ', mx/mean, ' boxes_max/mean ', cmx/cmean, ' no_blocks_ranks ', empty, ' of ', &
+                & num_procs
         end do
         mean = sum(tw)/real(num_procs, wp)
         if (mean > 0._wp) print '(A,F8.3,A,I0)', ' [amr-balance] TOTAL   : max/mean ', maxval(tw)/mean, &
             & ' ranks_with_no_fine_block ', count(tw <= 0._wp)
-        deallocate (rw, tw)
+        deallocate (rw, tw, rc)
 
     end subroutine s_amr_report_balance
 
