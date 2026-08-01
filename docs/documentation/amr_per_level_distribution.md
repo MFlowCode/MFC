@@ -568,6 +568,29 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
     best cap, from a different case, dimension, and cap — the first time that figure has been
     confirmed twice.
 
+14. **THE SCALING LIMITER IS CROSS-RANK BLOCK ADJACENCY, not the per-block constant.** Same 3D case
+    enlarged to 256^3 (16.8M base), rank-invariant (64 L1 + 256 L2 boxes, `fine_work` 15160320
+    identical at every rank count), np=1 device-OOMs so efficiencies are normalized to np=2:
+
+    | np | AMR s/step | uniform s/step | AMR eff | uniform eff | AMR ns/cell-upd | uniform ns/cell-upd | per-cell |
+    |---|---|---|---|---|---|---|---|
+    | 2 | 13.121 | 0.3146 | 1.000 | 1.000 | 410.8 | 18.75 | 21.9x |
+    | 4 | 9.071 | 0.1763 | 0.723 | 0.892 | 284.0 | 10.51 | 27.0x |
+    | 8 | 7.544 | 0.1281 | 0.435 | 0.614 | 236.2 | 7.63 | 30.9x |
+
+    Against the 128^3 case (16 blocks) run identically, AMR there scaled BETTER than uniform and its
+    per-cell overhead SHRANK with ranks (7.46 -> 5.03). Here, with 320 blocks, AMR scales WORSE than
+    uniform and per-cell overhead GROWS (21.9 -> 30.9). Same code, machine, cap and dimension; the
+    only variable is block count.
+
+    **That difference is the diagnosis.** A fixed per-block cost would scale PERFECTLY - spreading 320
+    blocks over more ranks gives each rank fewer blocks. Overhead rising with rank count therefore
+    requires a term that grows with the number of CROSS-RANK block adjacencies: the fine-fine seam
+    exchange and the reflux capture. That is the same super-linear-in-box-count term left unisolated
+    in item 9, now shown to carry a rank dependence - which promotes it from a constant factor to the
+    exascale-relevant limiter, ahead of the per-block launch count that @ref amr_block_batching
+    targets. Isolate it before spending further effort on launch fusion.
+
 12. **Where does the residual ~7.3x go at the best cap?** Even at cap 1024 - the largest that fits
     device memory here - AMR is 11.4 ns/cell-update against uniform's 1.55. Packing cannot close it
     and raising the cap further OOMs, so this is the standing efficiency question. Candidates, in the
