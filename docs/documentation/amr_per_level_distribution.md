@@ -543,6 +543,31 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
    flat backing store and its unresolved `ACC_SETUP_SFs` aliasing risk. Confirming that a cost is
    per-block says nothing about whether a given mechanism can remove it.
 
+13. **A proper 3D scaling benchmark.** The 2D 75.5M pair is retired for scaling work: it cannot
+    strong-scale (per-rank AMR memory is ~refined-volume/ranks, so it OOMs at np <= 4 at most caps —
+    memory pressure rises as ranks are REMOVED) and its refinement is not reproducible across rank
+    counts (@ref amr_block_batching, "the box set is not rank-invariant"). The replacement is a 3D
+    sharp-interface case, verified rank-invariant first. The current one (128^3) is still small — at
+    np=8 both arms sit near the starvation floor — and forms no level-2 blocks, so it exercises a
+    single refinement level. Deepen and enlarge it before treating it as the primary benchmark.
+
+    First valid AMR-vs-uniform strong scaling, identical box set at every rank count (16 level-1
+    boxes, `fine_work` 691200, imbalance 1.000):
+
+    | np | AMR s/step | uniform s/step | AMR eff | uniform eff | AMR ns/cell-upd | uniform ns/cell-upd | ratio |
+    |---|---|---|---|---|---|---|---|
+    | 1 | 1.132 | 0.1142 | 1.000 | 1.000 | 405.9 | 54.4 | 7.46 |
+    | 2 | 0.712 | 0.0841 | 0.795 | 0.679 | 255.3 | 40.1 | 6.37 |
+    | 4 | 0.656 | 0.0714 | 0.431 | 0.399 | 235.3 | 34.1 | 6.91 |
+    | 8 | 0.454 | 0.0679 | 0.312 | 0.210 | 162.7 | 32.4 | 5.03 |
+
+    Two results worth keeping. **AMR scales BETTER than uniform at every rank count here** (0.431 vs
+    0.399 at np=4), because at 2.1M cells the uniform arm starves first — AMR carries more work per
+    rank and hides latency longer. So AMR is not the scaling limiter at these sizes; problem size is.
+    And the per-cell overhead of 5.0–7.5x independently reproduces the ~7.3x measured in 2D at the
+    best cap, from a different case, dimension, and cap — the first time that figure has been
+    confirmed twice.
+
 12. **Where does the residual ~7.3x go at the best cap?** Even at cap 1024 - the largest that fits
     device memory here - AMR is 11.4 ns/cell-update against uniform's 1.55. Packing cannot close it
     and raising the cap further OOMs, so this is the standing efficiency question. Candidates, in the

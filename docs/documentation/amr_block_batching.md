@@ -156,6 +156,35 @@ runs over *all* boxes on *all* ranks. This is a concrete, previously unattribute
 for the np=8 turnover, and it ties that turnover to the same base-subdomain scratch cap the
 packed super-grid has to address — not to MPI collective volume.
 
+**Resolved (2026-08-01): that was the DERIVED cap, and with `amr_max_grid_size` pinned the AMR
+machinery is exactly rank-invariant.** Measured on a 3D sharp-interface case (128^3, two slabs at
+a density ratio of 8, cap 32) at np = 1, 2, 4, 8: the level-1 tag sets are **byte-identical** —
+31752 tags, zero symmetric difference in the tagged cell coordinates — and that carries through to
+16 level-1 boxes and `fine_work` = 691200 at every rank count. The tagger, the `MPI_ALLGATHERV` tag
+union, the coarse-CONS halo exchange, and the signature clusterer are all rank-invariant as designed,
+including at np=1 where active-box windowing is active.
+
+**But a badly conditioned CASE will still make the box set look rank-dependent, and that is not a
+code defect.** The 2D benchmark pair (`hg8_*`, `sc_*`) uses the `hcid 299` multi-mode analytic
+perturbation, which leaves a large fraction of cells sitting marginally at `amr_tag_eps` = 0.02.
+Any floating-point-level difference then flips them wholesale: at np = 1/2/4/8 the level-1 tag
+counts were 26849 / 37674 / 53924 / 61924 and the tag SETS were nearly disjoint (np=2 vs np=8 shared
+**zero** cells; np=1 vs np=2 shared 77 of ~27000). Only 1.5–6.7% of tags lay on internal rank-seam
+planes, so seam effects were a minor contributor — the bulk was threshold marginality across the
+whole domain. Consequence: `fine_work` varied 5.4x with rank count (35.0M at np=1 to 188.8M at np=8),
+which makes any AMR strong-scaling number from that case meaningless.
+
+**Benchmark rule that follows.** An AMR scaling case must be verified rank-invariant BEFORE it is
+timed — compare `fine_work` and the per-level box counts across the rank counts to be used, and
+reject the case if they move. Prefer a sharp discontinuity (unambiguous tagging) over a smooth
+perturbation. The literature is explicit that AMR strong scaling is hard to interpret for exactly
+this reason (Athena++: work "is highly variable and depends on the refinement criteria"; PLUTO:
+strong scaling is "difficult to interpret in the case of AMR computations"), and the standard metric
+is zone-cycles/s — cell-updates summed over ALL levels, divided by wall time — which is what
+`fine_work` + base cells provides here. A second, complementary option is to freeze the hierarchy
+(`amr_regrid_int = 0`, valid up to `amr_max_level = 2`), which holds work constant by construction
+and isolates solver and halo scaling from AMR-decision variability.
+
 ## What this rules out
 
 @ref amr says "per-slot state instead of the global swap" is the lever. That is necessary but
