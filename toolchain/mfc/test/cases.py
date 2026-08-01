@@ -2471,6 +2471,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_sod_convergence",
                 "2D_advection_convergence",
                 "3D_advection_convergence",
+                "2D_hypo_shear_contact",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",
