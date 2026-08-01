@@ -47,9 +47,9 @@ module m_amr
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
     public :: amr_slots, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reconcile_slots, &
-        & s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
-        & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap, f_l0_slot
+        & s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, &
+        & s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
+        & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, f_l0_slot
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -192,6 +192,11 @@ module m_amr
     !! only PRIM ghosts, so the CONS ghosts the fill prolongs from must be halo-exchanged first. Never true at np=1 (block faces sit
     !! >= buff_size inside the domain).
     logical :: amr_xchg_coarse_ghosts = .false.
+    !> local (un-reduced) accumulator behind amr_xchg_coarse_ghosts. s_set_amr_fine_geometry ORs each block's answer in here and
+    !! s_amr_reduce_xchg_flag performs ONE allreduce for the whole scan. Previously the reduction sat inside the routine, so a
+    !! regrid over nboxes blocks issued nboxes global collectives - the dominant term in the assignment's cost at scale, and one
+    !! measured at 7.4-13 ms per call because it absorbs the spread in the owner-only work that precedes it.
+    integer :: amr_xchg_bad = 0
 
     !> Per-block gathered coarse patch (fine-level distribution). The block owner may not hold the coarse cells its block refines,
     !! so before each prolongation/ghost-fill the coarse patch spanning region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full
@@ -552,6 +557,7 @@ contains
                 amr_cur = f_l0_slot(kk)
                 call s_set_amr_fine_geometry(tiled(kk)%lo, tiled(kk)%hi)
             end do
+            call s_amr_reduce_xchg_flag()
             call s_amr_select_slot(f_l0_slot(1))  ! refresh the per-block mirrors (geometry loop left them on the last tile)
             deallocate (tiled)
         end block
@@ -2053,7 +2059,7 @@ contains
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
-        integer             :: sidx(3), ext(3), nmar, bad_loc, bad_glb, pblk, d, rr
+        integer             :: sidx(3), ext(3), nmar, bad_loc, pblk, d, rr
 
         amr_slots(amr_cur)%region%lo = lo; amr_slots(amr_cur)%region%hi = hi
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
@@ -2130,10 +2136,26 @@ contains
             if (n_glb > 0 .and. (amr_isect_lo(2) - sidx(2) < nmar .or. sidx(2) + ext(2) - amr_isect_hi(2) < nmar)) bad_loc = 1
             if (p_glb > 0 .and. (amr_isect_lo(3) - sidx(3) < nmar .or. sidx(3) + ext(3) - amr_isect_hi(3) < nmar)) bad_loc = 1
         end if
-        call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
-        amr_xchg_coarse_ghosts = bad_glb == 1
+        ! ACCUMULATE, do not reduce: the caller closes the scan with s_amr_reduce_xchg_flag. Every caller loops over blocks and
+        ! wants "does ANY block need the exchange", so a per-block collective was both O(nboxes) collectives and, at two call
+        ! sites, WRONG - those loops kept the LAST block's answer rather than the OR, so an earlier block needing the exchange
+        ! could be masked by a later one that did not.
+        amr_xchg_bad = max(amr_xchg_bad, bad_loc)
 
     end subroutine s_set_amr_fine_geometry
+
+    !> Close a geometry scan: ONE allreduce of the accumulated flag, then reset so the next scan starts clean. Must be called after
+    !! every s_set_amr_fine_geometry loop (or single call) - the flag it sets is read by the fine advance
+    !! (s_amr_exchange_coarse_cons_halo).
+    impure subroutine s_amr_reduce_xchg_flag()
+
+        integer :: bad_glb
+
+        call s_mpi_allreduce_integer_max(amr_xchg_bad, bad_glb)
+        amr_xchg_coarse_ghosts = bad_glb == 1
+        amr_xchg_bad = 0
+
+    end subroutine s_amr_reduce_xchg_flag
 
     !> Conservative-linear prolongation for a single variable pair. Reads coarse interior/ghost from qc; writes fine interior to qf.
     !! Minmod-limited slopes.
@@ -2427,6 +2449,7 @@ contains
         call s_amr_reconcile_slots()
         amr_cur = L2
         call s_set_amr_fine_geometry(amr_region_lo_all(:,L2), amr_region_hi_all(:,L2))
+        call s_amr_reduce_xchg_flag()
         call s_amr_gather_coarse_patch(q_cons_base, .false.)  ! q_coarse ignored for level>=2 (reads the parent block); pass the
         ! always-allocated base field, not amr_slots(1) (the parent slot is unallocated on a non-owner rank at np>1)
         if (amr_rank_owns_block) then

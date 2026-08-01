@@ -135,8 +135,16 @@ Where a full rebuild's time actually goes differs with rank count:
   spread in the owner-only `s_amr_alloc_slot` work that precedes it. Inserting an
   `MPI_BARRIER` at the top of the rebuild loop collapses that phase from 0.089 s to 0.0011 s
   (np=4) and 0.119 s to 0.0001 s (np=8), with the barrier picking up the difference.
-  **Batching those allreduces into one would therefore buy nothing**; the rebuild loop would
-  have to stop synchronizing per box at all.
+  **Batching those allreduces into one buys nothing AT THIS BOX COUNT** (14-21 boxes, np<=8):
+  the time is the wait, not the reduction, so hoisting only moves the rendezvous. The rebuild
+  loop would have to stop synchronizing per box at all to help here.
+
+  **That conclusion is regime-limited and does not carry to scale.** With `nboxes` collectives the
+  cost has a floor of `nboxes x latency` independent of any imbalance - at 10^5 boxes that is ~0.5 s
+  of pure rendezvous per regrid, before a single byte of imbalance. The reduction was hoisted anyway
+  (@ref amr_per_level_distribution, "What actually blocks exascale") because it removes an O(nboxes)
+  term from the assignment; **expect no measurable change at the sizes benchmarked in this note**,
+  which is what this paragraph predicts.
 
 ### The box set is not rank-invariant
 
@@ -342,7 +350,7 @@ also collapsed 3.3% -> 0.5%.
 
 ### Why this arc is now the main line
 
-Per-level distribution is done and its cost model is fixed (`amr_per_level_distribution.md`, steps
+Per-level distribution is done and its cost model is fixed (@ref amr_per_level_distribution, steps
 4-7). Measured imbalance is now 1.012 at np=4 — 98.8% of perfect — while parallel efficiency on the
 same run is only 62%. **Balance has been eliminated as the limiter by fixing it**, and the residual
 is the per-block fixed overhead measured below. This arc is what remains.
