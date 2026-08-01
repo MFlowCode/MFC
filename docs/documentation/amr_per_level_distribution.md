@@ -106,6 +106,76 @@ ranks are added, so it strong-scales. The MFC ceiling was never ownership; it wa
 from the subdomain* combined with solver scratch *sized to the subdomain*. Those are
 `amr_max_grid_size` (landed, `3a718392`) and `idwbuff_alloc` (landed, `7b1e4933`).
 
+## What actually blocks exascale: the assignment and regrid cost scale with the GLOBAL box set
+
+**This is the primary open work item.** It was previously recorded only as a diagnosis inside "The
+problem, measured" and had no design entry, no queue entry, and no owner. Audited against the code
+2026-07-31.
+
+The strategy demands `boxes_per_level >> num_procs`. Three costs in the current implementation grow
+with the *global* box count, so the strategy and the implementation are in direct contradiction:
+
+| # | limit | code | 512 boxes (today) | 10^5 boxes |
+|---|---|---|---|---|
+| 1 | **one global collective PER BOX per regrid** | `s_set_amr_fine_geometry` ends in `s_mpi_allreduce_integer_max`, called from `do k = 1, nboxes` in `s_amr_regrid_rebuild_slots` | 512 collectives | **10^5 collectives** |
+| 2 | O(n^2) sort in the cut | `s_amr_sfc_cut` insertion sort, comment says "n small" | 1.3e5 ops | 5e9 ops, ~5 s |
+| 3 | O(global boxes) replicated metadata per rank | `amr_region_lo_all`, `region_hi_all`, `isect_lo_all`, `isect_hi_all`, `block_owner`, `block_level`, all sized `amr_max_blocks` | 5.6 MB/rank | ~560 MB/rank at 10^7 |
+
+Limit 1 is the worst, and it is worse than box count alone suggests: @ref amr_block_batching measured
+that allreduce at **7.4 ms (np=4) to 13 ms (np=8) per call, ~700x a real one-integer allreduce**,
+because it absorbs the spread in the owner-only work preceding it. Inserting a barrier collapses the
+phase from 0.089 s to 0.0011 s. So its cost grows with rank count as well as with box count.
+
+### Limit 1 is trivially removable - the per-box results are discarded
+
+The reduction answers "is any block too close to a subdomain edge to prolong its ghosts". Every
+per-box answer is immediately OR-ed into one accumulator and only the accumulator survives:
+
+    any_xchg = .false.
+    do k = 1, nboxes
+        call s_set_amr_fine_geometry(...)          ! ends in s_mpi_allreduce_integer_max
+        any_xchg = any_xchg .or. amr_xchg_coarse_ghosts
+    end do
+    ...
+    amr_xchg_coarse_ghosts = any_xchg              ! m_amr_regrid.fpp:1456 - ONLY the OR is kept
+
+So `nboxes` collectives can become **one**: compute `bad_loc` locally for every box, allreduce the OR
+once after the loop. `amr_xchg_coarse_ghosts` is module state also read in the fine advance
+(`m_amr.fpp:4426`, `:4558`), so the flag must still end up global - which is exactly what the hoisted
+single reduction produces. Roughly ten lines: split the local test from the reduction and hoist.
+
+### The AMReX model, and which half is adopted
+
+The ownership half is done. The communication half is where the gap is.
+
+| AMReX property | MFC | evidence |
+|---|---|---|
+| whole-box ownership | yes | always had it |
+| absolute small box cap | yes | `amr_max_grid_size` (`3a718392`) |
+| per-box scratch, not subdomain-sized | yes | `idwbuff_alloc` (`7b1e4933`) |
+| per-level box list AND rank mapping | yes | `cfdd2847` |
+| mapping computed redundantly, no communication | yes | `s_amr_sfc_cut` is all-real arithmetic on replicated weights in a fixed order |
+| data movement P2P, not collective | yes | `s_amr_gather_coarse_patch`: "Non-participants send/recv nothing (no global collective)" |
+| **regrid free of per-box collectives** | **NO** | limit 1 above |
+
+Note what is NOT wrong: the gather is already P2P, and the owner mapping is already computed without
+communication. The single defect is the reduction, which was never a design decision - it is a
+convenience that is invisible at 512 boxes.
+
+### Sequencing for this arc
+
+1. **Hoist the per-box reduction** (limit 1). Small, mechanically safe, removes the dominant term.
+   Correctness bar: byte-identical goldens, since the OR is unchanged.
+2. **Replace the insertion sort** with an O(n log n) sort (limit 2). Must stay deterministic and
+   identical on every rank - the assignment depends on it, and `s_amr_validate_owner` will catch any
+   divergence immediately.
+3. **Only then consider the replicated metadata** (limit 3). It is the least urgent: 5.6 MB/rank at
+   10^5 boxes is tolerable, and removing it means giving up the redundant-mapping property that makes
+   the assignment communication-free. Do not trade that away without a measurement showing it binds.
+
+None of this is visible on a single node: 512 boxes is three orders of magnitude below where limit 1
+bites, which is why the measurements in this document could not have found it and a code audit did.
+
 ## Target design
 
 Adopt (3). Each level keeps its own box list and its own owner mapping, chosen without reference
@@ -318,16 +388,19 @@ single-run comparison earlier suggested 15% at np=4 purely as an artifact: three
 Consequence for measurement discipline: at 11% run-to-run spread on this machine, **any A/B claiming
 less than ~10% needs repetitions**, taken alternating between arms so drift hits both equally.
 
-8. **What does AMR actually cost relative to uniform, at a loaded size?** STILL UNKNOWN and now the
-   gating question. The AMR np=1 point at 75.5M exceeded the harness's 1800 s cap, so there is no
+8. **Hoist the per-box reduction in the regrid rebuild loop.** THE PRIMARY WORK ITEM - see "What
+   actually blocks exascale" above. `nboxes` global collectives per regrid become one; the per-box
+   results are already discarded. ~10 lines, byte-identical goldens expected.
+9. **What does AMR actually cost relative to uniform, at a loaded size?** STILL UNKNOWN and the
+   gating measurement. The AMR np=1 point at 75.5M exceeded the harness's 1800 s cap, so there is no
    baseline and therefore no overhead ratio. Raise the cap or cut the step count for that point.
    Without this number there is no way to size the prize for any AMR-side optimisation.
-9. **Then, and only then, revisit @ref amr_block_batching.** Its premise - that per-block overhead
+10. **Then, and only then, revisit @ref amr_block_batching.** Its premise - that per-block overhead
    dominates - was argued from efficiency figures since found contaminated (starved GPUs at 16k
    cells/rank, and `run_time_info` forcing a device sync every step). It may still be right, but
    against a ~60% uniform ceiling the recoverable headroom is smaller than the original framing
    assumed, and step 8 is what sizes it.
-10. **Multi-node scale invariance.** This is the actual exascale question and single-node np<=8 cannot
+11. **Multi-node scale invariance.** This is the actual exascale question and single-node np<=8 cannot
     answer it: the granularity floor and the indivisible atom only bind once ranks approach the box
     count per level. Everything measured here tops out at 8 ranks with 13-64 boxes per rank - a
     regime where the balancer is comfortable. The interesting regime is the one where it is not.
