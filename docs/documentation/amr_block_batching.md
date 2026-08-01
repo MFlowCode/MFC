@@ -53,6 +53,15 @@ penalty is still 15x at 512^2.
 per RK stage, not work — dominated by per-block kernel launch count plus the per-swap device
 syncs, none of which shrink as blocks shrink.
 
+> **SCOPE LIMIT added 2026-08-01: the launch-count premise below holds only at LOW block counts.**
+> Profiling a 320-block 3D case (`rocprofv3`, kernels + memory copies, np=2) puts kernel execution at
+> 8.5% of the span, device-to-device copies at 23.5% (2937729 of them, 20.5 per kernel), and the GPU
+> idle ~68%. Mean kernel duration is 69 us, and 143k launches at 10 us each is ~1.4 s against ~82 s of
+> idle - launch count is not in the top two cost terms at that scale. The measurements in this section
+> were taken on a 16-tile / 1-fine-block case and remain valid there, but **ranking increments by
+> "launches removed" does not generalize to the many-block regime this arc exists to fix.** See
+> @ref amr_per_level_distribution, queue item 14, including its sizing caveat.
+
 ## Direct confirmation: the cost is kernel launch count
 
 Counted with `rocprofv3 --kernel-trace` (2D 128^2, 6 steps, np=1, under `srun`):
