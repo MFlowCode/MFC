@@ -601,13 +601,34 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
     cost becoming a larger share as compute shrinks. This is Amdahl, not a communication blow-up, and
     it caps AMR strong scaling regardless of how cheap the per-block advance becomes.
 
-    **Mechanism still unattributed - do not guess it again.** The non-compute term bundles the coarse
-    and fine-fine halo exchanges, reflux capture, regrid, block swaps, and interpolation. Some of that
-    is per-block work that SHOULD distribute; that it does not points at work each rank performs
-    proportional to the GLOBAL box count rather than its own - which is exactly the shape of Limit 3
-    (replicated metadata, 29 arrays sized `amr_max_blocks` per rank). If so, Limit 3 bites at 320
-    boxes, three orders of magnitude earlier than the estimate in this document's limits table. That
-    is a hypothesis, not a result: the next step is a per-region breakdown of the non-compute time.
+    **Mechanism, measured with `rocprofv3` - and it is NOT kernel launch count.** One profiled run in
+    the 320-block steady state at np=2, tracing kernels and memory copies together:
+
+    | stream | count | GPU time | share of span | mean |
+    |---|---|---|---|---|
+    | kernel execution | 143290 | 9.91 s | 8.5% | 69.2 us |
+    | device-to-device copies | **2937729** | 28.60 s | 23.5% | 9.7 us |
+    | GPU idle (host / MPI) | - | ~82 s | **~68%** | - |
+
+    Mean kernel duration is 69 us, so these are not launch-latency-bound kernels, and 143k launches at
+    a generous 10 us each is ~1.4 s - it cannot explain ~82 s of idle. The striking number is **20.5
+    device-to-device copies per kernel**, ~306 per block per RK stage, costing 2.9x more GPU time than
+    all kernel execution combined. Ranking: host/MPI serialization first, small device-to-device
+    copies second, compute a distant third.
+
+    **This undercuts @ref amr_block_batching's core premise.** That arc ranks increments by launches
+    removed, on the strength of a 16-tile / 1-fine-block measurement where launch count was the cost.
+    At 320 blocks launch count is not in the top two terms, so launch fusion cannot address the
+    limiter. Re-derive the increment ranking against copies and host time before spending on it.
+
+    **SIZING CAVEAT - these magnitudes are provisional.** Measured density on this machine is 19.34 GiB
+    for 16.8M uniform 3D points = 0.87M points/GiB, so a 64 GiB GCD holds ~56M points. This case runs
+    2.1M points/rank at np=8, about **4% of capacity**, which inflates the non-compute share (compute
+    is tiny while AMR overhead is roughly fixed). The DIRECTION - AMR-side work does not distribute -
+    is robust, but every magnitude above needs re-measuring at ~30-40M points/rank (roughly 640^3 for
+    the uniform control, with headroom for AMR slots) before being quoted. Profiling also costs ~16%
+    (15.9 vs 13.7 s/step), inflating the idle fraction somewhat, though not enough to change the
+    ranking.
 
 12. **Where does the residual ~7.3x go at the best cap?** Even at cap 1024 - the largest that fits
     device memory here - AMR is 11.4 ns/cell-update against uniform's 1.55. Packing cannot close it
