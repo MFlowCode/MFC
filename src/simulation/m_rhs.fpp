@@ -1051,7 +1051,6 @@ contains
         integer :: i_fluid_loop
         real(wp) :: inv_ds, flux_face1, flux_face2
         real(wp) :: advected_qty_val, pressure_val, velocity_val
-        real(wp) :: geom_fac
         real(wp) :: G1_eff, G2_eff
 
         G1_eff = 0._wp
@@ -1246,20 +1245,54 @@ contains
             end if
 
             if (cyl_coord) then
-                geom_fac = merge(0.25_wp, 5.e-1_wp, hypo_nc_mode == hypo_nc_mode_dual_pass)
-                $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, flux_face1, flux_face2]')
-                do j = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do q = 0, m
-                                flux_face1 = flux_gsrc_n(2)%vf(j)%sf(q, k - 1, l)
-                                flux_face2 = flux_gsrc_n(2)%vf(j)%sf(q, k, l)
-                                rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) - geom_fac/y_cc(k)*(flux_face1 + flux_face2)
+                if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
+                    ! Cell-owned anchored geometry: the hat_L pass owns the cell's outer radial face and the hat_R pass its
+                    ! inner face (the same anchor ownership as the one-sided flux differences above), so the summed RHS
+                    ! carries -(H_outer + H_inner)/(2*y_cc) with both faces anchored to the cell itself. With midpoint cell
+                    ! centers this equals the annular finite-volume divergence (r_+ F_+ - r_- F_-)/(y_cc*dy) for the rows
+                    ! whose geometric flux is the full radial flux.
+                    if (is_hat_L) then
+                        $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, flux_face2]')
+                        do j = 1, sys_size
+                            do l = 0, p
+                                do k = 0, n
+                                    do q = 0, m
+                                        flux_face2 = flux_gsrc_n(2)%vf(j)%sf(q, k, l)
+                                        rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) - 5.e-1_wp/y_cc(k)*flux_face2
+                                    end do
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    else  ! is_hat_R
+                        $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, flux_face1]')
+                        do j = 1, sys_size
+                            do l = 0, p
+                                do k = 0, n
+                                    do q = 0, m
+                                        flux_face1 = flux_gsrc_n(2)%vf(j)%sf(q, k - 1, l)
+                                        rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) - 5.e-1_wp/y_cc(k)*flux_face1
+                                    end do
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                else
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, flux_face1, flux_face2]')
+                    do j = 1, sys_size
+                        do l = 0, p
+                            do k = 0, n
+                                do q = 0, m
+                                    flux_face1 = flux_gsrc_n(2)%vf(j)%sf(q, k - 1, l)
+                                    flux_face2 = flux_gsrc_n(2)%vf(j)%sf(q, k, l)
+                                    rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) - 5.e-1_wp/y_cc(k)*(flux_face1 + flux_face2)
+                                end do
                             end do
                         end do
                     end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
             end if
 
             call s_add_directional_advection_source_terms(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, Kterm)
