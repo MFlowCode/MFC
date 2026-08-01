@@ -962,13 +962,15 @@ contains
     end subroutine s_convert_primitive_to_conservative_variables
 
     !> Convert primitive variables to Eulerian flux variables.
-    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b, dir_idx_in, dir_flg_in)
+    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b, dir_idx_in, &
+        & dir_flg_in, hll_u_interface_in)
 
         integer, intent(in) :: s2b, s3b
         !> Working-direction mapping, passed explicitly: it is simulation state (m_global_parameters), and use-associating it into
         !! this common kernel spills registers on AMD OpenMP offload.
         integer, dimension(3), intent(in)                                                       :: dir_idx_in
         real(wp), dimension(3), intent(in)                                                      :: dir_flg_in
+        logical, intent(in)                                                                     :: hll_u_interface_in
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in)                  :: qK_prim_vf
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout)               :: FK_vf
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,eqn_idx%adv%beg:), intent(inout) :: FK_src_vf
@@ -1009,7 +1011,7 @@ contains
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, dir_flg_in]')
+                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1085,7 +1087,10 @@ contains
                         end do
                     end if
 
-                    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
+                    ! Match the volume-fraction flux representation exported by the Riemann solver. HLL Method 1 and HLLD use
+                    ! per-fluid alpha source traces; HLL Method 2 uses the shared-velocity representation below, like HLLC.
+                    if ((riemann_solver == riemann_solver_hll .and. .not. hll_u_interface_in) &
+                        & .or. riemann_solver == riemann_solver_hlld) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
                             FK_vf(j, k, l, i) = 0._wp

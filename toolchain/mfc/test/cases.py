@@ -551,8 +551,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
-    def add_hll_u_interface_cases(trace_prefix: str):
-        cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface", {"riemann_solver": 1, "hll_u_interface": "T"}))
+    def add_hll_u_interface_cases(trace_prefix: str, u_interface_mods: typing.Optional[dict] = None):
+        cases.append(
+            define_case_d(
+                stack,
+                f"{trace_prefix} -> u-interface",
+                {"riemann_solver": 1, "hll_u_interface": "T", **(u_interface_mods or {})},
+            )
+        )
         cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface -> alt_soundspeed", {"riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T"}))
 
     def alter_low_Mach_correction():
@@ -647,7 +653,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             alter_riemann_solvers(num_fluids)
             if num_fluids == 2 and len(dimInfo[0]) > 1:
-                add_hll_u_interface_cases("riemann_solver=1")
+                # The existing 2D fluid-only HLL Method-2 row also guards the characteristic-CBC shared-velocity representation.
+                cbc_mods = {"bc_y%end": -6} if len(dimInfo[0]) == 2 else None
+                add_hll_u_interface_cases("riemann_solver=1", cbc_mods)
             alter_low_Mach_correction()
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
