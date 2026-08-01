@@ -4717,6 +4717,44 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (s) amr_max_level = 3 - the ONLY golden with a THIRD refinement level. Every case above stops at 2, so the
+        # per-level slot cap amr_maxc_fit/amr_ref_ratio**(lev - 1) was only ever evaluated at lev = 2, where it equals
+        # the fixed /2 it replaced: the level-GENERAL form was untested by construction and a regression to /2 would
+        # pass the whole suite. It is not a benign difference. MEASURED counterfactual on this exact case (cap reverted
+        # to amr_maxc_fit/2, CPU bounds-checked build): amr_maxc_fit = 128 at m = 255/np = 1, so the level-3 cap is
+        # 128/4 = 32 while /2 gives 64, and the run aborts with
+        #     [amr] box cap violated: level 3 dim 1 span 39 > cap 32
+        # from s_amr_check_box_caps. The per-level form exits 0 and builds levels 1/2/3 with 2/4/2-4 boxes. Before that
+        # invariant existed the same box instead had s_amr_build_block_coords write past the slot coord arrays and the
+        # run died in s_amr_free_slot ("Invalid descriptor", core dumped) - so this case guards the cap and the
+        # invariant that fails it loudly, together.
+        #
+        # All three knobs are load-bearing and none can be relaxed: boxes track the FEATURE, not the grid, so a big
+        # grid ALONE leaves every box far below both caps and /2 and the level-general form agree. m = 255 (4x the
+        # 1D base) sets the cap high enough that a box can sit between 32 and 64; amr_buf = 48 pads the clustered
+        # child wide enough to actually reach there; and depth 3 is what makes the two formulas differ at all.
+        # Dynamic (amr_regrid_int = 2) is REQUIRED, not a choice - the checker prohibits amr_regrid_int = 0 with
+        # amr_max_level > 2, because static nesting places exactly one level-2 child. np = 1 (multi-level coupling
+        # is local). eps = 0.1 on the same sharp Sod as (b)/(i): the shock cells sit far from the threshold, so the
+        # tag set is cross-compiler stable at every level. amr_max_blocks = 32 leaves room for the tiled L3 pair
+        # plus the L1/L2 chain above them.
+        stack.push(
+            "AMR -> 1D -> three levels",
+            {
+                **amr_1d_base,
+                "m": 255,
+                "amr_block_beg(1)": 64,
+                "amr_block_end(1)": 191,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 48,
+                "amr_max_level": 3,
+                "amr_max_blocks": 32,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
     amr_golden_tests()
 
     def load_balance_tests():

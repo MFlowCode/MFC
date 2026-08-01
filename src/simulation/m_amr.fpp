@@ -1993,8 +1993,11 @@ contains
                 & num_procs
         end do
         mean = sum(tw)/real(num_procs, wp)
-        if (mean > 0._wp) print '(A,F8.3,A,I0)', ' [amr-balance] TOTAL   : max/mean ', maxval(tw)/mean, &
-            & ' ranks_with_no_fine_block ', count(tw <= 0._wp)
+        ! fine_work = sum of the assigned weights = the FINE CELLS advanced per step (with no cost signals wt is exactly that).
+        ! Without it an AMR-vs-uniform wall-clock ratio is uninterpretable: 5x the time is the expected outcome of advancing 5x
+        ! the cells and the failure mode of 5x per-cell overhead, and the two are indistinguishable from the ratio alone.
+        if (mean > 0._wp) print '(A,F8.3,A,I0,A,I0)', ' [amr-balance] TOTAL   : max/mean ', maxval(tw)/mean, &
+            & ' ranks_with_no_fine_block ', count(tw <= 0._wp), ' fine_work ', nint(sum(tw), kind=8)
         deallocate (rw, tw, rc)
 
     end subroutine s_amr_report_balance
