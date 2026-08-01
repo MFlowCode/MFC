@@ -143,9 +143,23 @@ endif()
 # HIPFORT
 if (MFC_HIPFORT)
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        # hipfort's Fortran bindings are versioned alongside ROCm. Pinning a literal tag
+        # means bumping the rocm module in toolchain/modules silently builds mismatched
+        # bindings, which surfaces as versioned-symbol link errors rather than anything
+        # legible. Track the loaded module (ROCM_PATH is e.g. /opt/rocm-7.2.0) and fall
+        # back to the last known-good tag when it cannot be determined.
+        set(MFC_HIPFORT_TAG "rocm-6.3.1")
+        if (DEFINED ENV{ROCM_PATH})
+            string(REGEX MATCH "rocm-[0-9]+\\.[0-9]+\\.[0-9]+" MFC_ROCM_TAG "$ENV{ROCM_PATH}")
+            if (MFC_ROCM_TAG)
+                set(MFC_HIPFORT_TAG "${MFC_ROCM_TAG}")
+            endif()
+        endif()
+        message(STATUS "hipfort tag: ${MFC_HIPFORT_TAG}")
+
         ExternalProject_Add(hipfort
             GIT_REPOSITORY "https://github.com/ROCmSoftwarePlatform/hipfort"
-            GIT_TAG        rocm-6.3.1
+            GIT_TAG        ${MFC_HIPFORT_TAG}
             GIT_SHALLOW    ON
             GIT_PROGRESS   ON
             CMAKE_ARGS     "-DHIPFORT_COMPILER=${CMAKE_Fortran_COMPILER}"

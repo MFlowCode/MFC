@@ -67,20 +67,25 @@
         #:if not isinstance(function_name, str)
             #:stop "When using cray_noinline, function name must be given and given as a string"
         #:endif
-        #:set cray_noinline_directive = ('!DIR$ NOINLINE ' + function_name).strip('\n')
+        #! INLINENEVER is the Cray spelling; !DIR$ NOINLINE draws ftn-790 "Unknown or
+        #! unsupported compiler directive" and is silently ignored.
+        #:set cray_noinline_directive = ('!DIR$ INLINENEVER ' + function_name).strip('\n')
 #ifdef _CRAYFTN
-#if MFC_OpenACC
+        #! !DIR$ INLINENEVER is independent of the offload directive: on a Cray GPU build the
+        #! routine needs BOTH its acc/omp device-registration directive and the inlining
+        #! control. Emitting only one of them silently dropped every cray_noinline request
+        #! on Cray GPU builds.
+#if defined(MFC_OpenACC)
         $:acc_directive
-#elif MFC_OpenMP
+#elif defined(MFC_OpenMP)
         $:omp_directive
-#else
-        $:cray_noinline_directive
 #endif
+        $:cray_noinline_directive
         #! On non-Cray CPU builds (no _CRAYFTN, no MFC_OpenACC, no MFC_OpenMP), nothing is
-        #! emitted — intentional, since !DIR$ NOINLINE is a Cray-specific directive.
-#elif MFC_OpenACC
+        #! emitted — intentional, since !DIR$ INLINENEVER is a Cray-specific directive.
+#elif defined(MFC_OpenACC)
         $:acc_directive
-#elif MFC_OpenMP
+#elif defined(MFC_OpenMP)
         $:omp_directive
 #endif
     #:elif cray_inline == True
@@ -89,16 +94,17 @@
         #:endif
         #:set cray_directive = ('!DIR$ INLINEALWAYS ' + function_name).strip('\n')
 #ifdef _CRAYFTN
-#if MFC_OpenACC
+        #! Same as cray_noinline above: the offload directive and !DIR$ INLINEALWAYS are
+        #! independent, and a Cray GPU build needs both.
+#if defined(MFC_OpenACC)
         $:acc_directive
-#elif MFC_OpenMP
+#elif defined(MFC_OpenMP)
         $:omp_directive
-#else
-        $:cray_directive
 #endif
-#elif MFC_OpenACC
+        $:cray_directive
+#elif defined(MFC_OpenACC)
         $:acc_directive
-#elif MFC_OpenMP
+#elif defined(MFC_OpenMP)
         $:omp_directive
 #endif
     #:else
