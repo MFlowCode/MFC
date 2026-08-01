@@ -80,13 +80,14 @@ were gated on correctness and end-to-end s/step, neither of which measures balan
 problem, measured" and had no design entry, no queue entry, and no owner. Audited against the code
 2026-07-31.
 
-The strategy demands `boxes_per_level >> num_procs`. Three costs in the current implementation grow
-with the *global* box count, so the strategy and the implementation are in direct contradiction:
+The strategy demands `boxes_per_level >> num_procs`. Three costs in the implementation grew with the
+*global* box count, so the strategy and the implementation were in direct contradiction. Limits 1
+and 2 are now fixed; limit 3 is open and deliberately not next:
 
 | # | limit | code | 512 boxes (today) | 10^5 boxes |
 |---|---|---|---|---|
 | 1 | ~~one global collective PER BOX per regrid~~ **HOISTED** | was: `s_set_amr_fine_geometry` reduced inside `do k = 1, nboxes`. Now accumulates into `amr_xchg_bad`; `s_amr_reduce_xchg_flag` reduces ONCE per scan | 512 -> **1** | 10^5 -> **1** |
-| 2 | O(n^2) sort in the cut | `s_amr_sfc_cut` insertion sort, comment says "n small" | 1.3e5 ops | 5e9 ops, ~5 s |
+| 2 | ~~O(n^2) sort in the cut~~ **FIXED** | was: `s_amr_sfc_cut` insertion sort, comment "n small". Now a bottom-up stable merge sort | 1.3e5 -> 4.6e3 ops | 5e9 -> 1.7e6 ops |
 | 3 | O(global boxes) replicated metadata per rank | `amr_region_lo_all`, `region_hi_all`, `isect_lo_all`, `isect_hi_all`, `block_owner`, `block_level`, all sized `amr_max_blocks` | 5.6 MB/rank | ~560 MB/rank at 10^7 |
 
 **What the hoist will and will not do.** @ref amr_block_batching measured that batching these
@@ -147,9 +148,11 @@ convenience that is invisible at 512 boxes.
 
 1. **Hoist the per-box reduction** (limit 1). Small, mechanically safe, removes the dominant term.
    Correctness bar: byte-identical goldens, since the OR is unchanged.
-2. **Replace the insertion sort** with an O(n log n) sort (limit 2). Must stay deterministic and
-   identical on every rank - the assignment depends on it, and `s_amr_validate_owner` will catch any
-   divergence immediately.
+2. ~~**Replace the insertion sort**~~ **DONE.** Bottom-up merge sort: O(n log n), iterative, and
+   stable (`<=` keeps the left run first on ties), so the order is a pure function of the input and
+   every rank still produces the identical permutation - which is what the assignment depends on and
+   what `s_amr_validate_owner` checks. All 72 AMR goldens byte-identical, as expected: same-level
+   boxes have distinct Morton keys, so any correct sort yields the same order.
 3. **Only then consider the replicated metadata** (limit 3). It is the least urgent: 5.6 MB/rank at
    10^5 boxes is tolerable, and removing it means giving up the redundant-mapping property that makes
    the assignment communication-free. Do not trade that away without a measurement showing it binds.
@@ -319,8 +322,9 @@ These are structural, not tuning knobs, and each sets a floor on achievable bala
   is enabled. A run with heterogeneous per-cell cost and `load_weight_wrt` off is balanced on
   geometry alone, which will look correct and be wrong.
 - **Assignment cost.** `s_amr_block_cost` is an allreduce over the global block vector every
-  regrid, and the cut is O(nblocks^2) in the insertion sort. Both grow with the *global* box set,
-  the same term identified in "The problem, measured".
+  regrid - one call, not one per box (limit 1), and the cut is now O(n log n) (limit 2). What
+  remains is that the vector itself is sized by the *global* box set, the same term identified in
+  "The problem, measured"; that is limit 3.
 
 ### Acceptance criteria
 
