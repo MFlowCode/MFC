@@ -19,10 +19,10 @@ module m_amr_regrid
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_amr, only: amr_slots, amr_maxc_fit, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
-        & s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, &
-        & s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
-        & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
-        & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
+        & s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
+        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
+        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
+        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -1369,19 +1369,16 @@ contains
         integer, intent(in)                                    :: nboxes, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(in)                                    :: old_owns(:)
         integer                                                :: sh(3), k, kk, i, fi, fj, fk, ofi, ofj, ofk, ks, kks
-        logical                                                :: any_xchg
 
         ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
         ! box k lives in shared-pool slot ks = f_l0_slot(k) (identity without L0 tiles); old block kk in slot kks
 
-        any_xchg = .false.
         do k = 1, nboxes
             ks = f_l0_slot(k)
             amr_cur = ks
             ! owned slot needs its arrays before geometry/prolong
             if (amr_block_owner(ks) == proc_rank) call s_amr_alloc_slot(ks)
             call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
-            any_xchg = any_xchg .or. amr_xchg_coarse_ghosts
             ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
             ! q_cons_base is host-current with valid ghosts from the exchange at the top of s_amr_regrid)
             call s_amr_gather_coarse_patch(q_cons_base, .false.)
@@ -1453,7 +1450,7 @@ contains
             end if
             ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
         end do
-        amr_xchg_coarse_ghosts = any_xchg  ! coarse halo exchanged once per step if ANY block needs it
+        call s_amr_reduce_xchg_flag()  ! ONE allreduce for the whole loop; sets amr_xchg_coarse_ghosts if ANY block needs it
         ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
         ! new-owned slots were allocated in the build loop, so this only frees - a rank keeps just its owned blocks' fine arrays
         call s_amr_reconcile_slots()

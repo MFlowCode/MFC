@@ -1,3 +1,5 @@
+@page amr_per_level_distribution AMR per-level distribution
+
 # AMR per-level distribution
 
 Design for the next phase of block-structured AMR: distribute each refinement level
@@ -74,7 +76,7 @@ were gated on correctness and end-to-end s/step, neither of which measures balan
 
 ## What actually blocks exascale: the assignment and regrid cost scale with the GLOBAL box set
 
-**This is the primary open work item.** It was previously recorded only as a diagnosis inside "The
+**Limit 1 is implemented (pending goldens); limits 2 and 3 remain open.** It was previously recorded only as a diagnosis inside "The
 problem, measured" and had no design entry, no queue entry, and no owner. Audited against the code
 2026-07-31.
 
@@ -83,16 +85,23 @@ with the *global* box count, so the strategy and the implementation are in direc
 
 | # | limit | code | 512 boxes (today) | 10^5 boxes |
 |---|---|---|---|---|
-| 1 | **one global collective PER BOX per regrid** | `s_set_amr_fine_geometry` ends in `s_mpi_allreduce_integer_max`, called from `do k = 1, nboxes` in `s_amr_regrid_rebuild_slots` | 512 collectives | **10^5 collectives** |
+| 1 | ~~one global collective PER BOX per regrid~~ **HOISTED** | was: `s_set_amr_fine_geometry` reduced inside `do k = 1, nboxes`. Now accumulates into `amr_xchg_bad`; `s_amr_reduce_xchg_flag` reduces ONCE per scan | 512 -> **1** | 10^5 -> **1** |
 | 2 | O(n^2) sort in the cut | `s_amr_sfc_cut` insertion sort, comment says "n small" | 1.3e5 ops | 5e9 ops, ~5 s |
 | 3 | O(global boxes) replicated metadata per rank | `amr_region_lo_all`, `region_hi_all`, `isect_lo_all`, `isect_hi_all`, `block_owner`, `block_level`, all sized `amr_max_blocks` | 5.6 MB/rank | ~560 MB/rank at 10^7 |
+
+**What the hoist will and will not do.** @ref amr_block_batching measured that batching these
+allreduces "buys nothing" at 14-21 boxes, because the 7.4-13 ms per call is absorbing load-imbalance
+spread and a barrier collapses it - the time is the wait, not the reduction. That is correct in that
+regime and the hoist should NOT be expected to speed up current benchmarks. It removes the O(nboxes)
+term: with `nboxes` collectives the cost has a floor of `nboxes x latency` regardless of imbalance,
+~0.5 s per regrid at 10^5 boxes before any imbalance at all.
 
 Limit 1 is the worst, and it is worse than box count alone suggests: @ref amr_block_batching measured
 that allreduce at **7.4 ms (np=4) to 13 ms (np=8) per call, ~700x a real one-integer allreduce**,
 because it absorbs the spread in the owner-only work preceding it. Inserting a barrier collapses the
 phase from 0.089 s to 0.0011 s. So its cost grows with rank count as well as with box count.
 
-### Limit 1 is trivially removable - the per-box results are discarded
+### Limit 1: how it was removed, and a latent bug it was hiding
 
 The reduction answers "is any block too close to a subdomain edge to prolong its ghosts". Every
 per-box answer is immediately OR-ed into one accumulator and only the accumulator survives:
@@ -105,8 +114,14 @@ per-box answer is immediately OR-ed into one accumulator and only the accumulato
     ...
     amr_xchg_coarse_ghosts = any_xchg              ! m_amr_regrid.fpp:1456 - ONLY the OR is kept
 
-So `nboxes` collectives can become **one**: compute `bad_loc` locally for every box, allreduce the OR
-once after the loop. `amr_xchg_coarse_ghosts` is module state also read in the fine advance
+So `nboxes` collectives became **one**: each call ORs into the module accumulator `amr_xchg_bad`, and
+`s_amr_reduce_xchg_flag` performs a single allreduce to close the scan. All five call sites close
+their scan explicitly.
+
+**Two of those call sites were also wrong.** The loops in `s_initialize_amr_module` (L0 tiles) and in
+both restart paths kept only the LAST block's answer rather than the OR - an earlier block needing the
+coarse-ghost exchange could be masked by a later one that did not, silently skipping an exchange the
+fine advance depends on. The accumulator fixes that by construction, since every block ORs in. `amr_xchg_coarse_ghosts` is module state also read in the fine advance
 (`m_amr.fpp:4426`, `:4558`), so the flag must still end up global - which is exactly what the hoisted
 single reduction produces. Roughly ten lines: split the local test from the reduction and hoist.
 

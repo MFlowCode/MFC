@@ -18,8 +18,8 @@ module m_amr_restart
     use m_constants, only: amr_restart_blk_hdr_ints
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min
-    use m_amr, only: amr_slots, amr_seam_pairs_dirty, s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_assign_block_owners, &
-        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_set_amr_fine_geometry
+    use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_seam_pairs_dirty, s_amr_alloc_slot, s_amr_reconcile_slots, &
+        & s_amr_assign_block_owners, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_set_amr_fine_geometry
     use m_amr_regrid, only: s_amr_check_seam_topology
 
     implicit none
@@ -290,6 +290,7 @@ contains
                                      & // ' run''s (identical decomposition - rank count and load_balance settings - required)')
                 end if
             end do
+            call s_amr_reduce_xchg_flag()
             deallocate (had_data)
         else
 #ifdef MFC_MPI
@@ -356,6 +357,7 @@ contains
                 amr_cur = k
                 call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
             end do
+            call s_amr_reduce_xchg_flag()
             ! hoist per-block metadata collectives: one ALLGATHER/EXSCAN over ALL blocks
             allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks))
             allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
