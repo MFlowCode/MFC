@@ -267,83 +267,100 @@ them are load-bearing and a reader retracing the work needs them. Steps 5-7 are 
 
 ### Next
 
-5. **Instrument balance.** LANDED (`fc53e097`, fixed in `3780f30a`): `s_amr_report_balance` prints
-   per-level and total `max/mean` assigned weight plus the no-block rank count, gated behind
-   `load_weight_wrt`. It needs no MPI — `wt`, `amr_block_level` and `amr_block_owner` are
-   replicated, so rank 0 prints.
+5. **Instrument balance.** LANDED (`fc53e097`, fixed in `3780f30a`). `s_amr_report_balance` prints
+   per-level and total `max/mean` assigned weight, box-count imbalance, and the no-block rank count,
+   gated behind `load_weight_wrt`. Needs no MPI - the inputs are replicated, so rank 0 prints.
+   Its first conclusion ("box supply binds, not the owner mapping") was RETRACTED: it was inferred
+   from box counts and model imbalance on a starved case, with no measured counterpart.
+   `m_rank_timing` was already implemented and wired the whole time - acceptance criterion 2 was a run
+   to perform, not code to write.
+6. **Model vs measured (acceptance criterion 2).** DONE. At production scale the model predicts the
+   measurement: 1.000 model vs 1.006-1.058 measured across np = 2, 4, 8 at 75.5M cells. On starved
+   cases they diverged 8x, which is what motivated step 7.
+7. **Reweight `s_amr_block_cost` on a fixed per-box term.** ATTEMPTED, MEASURED, **REJECTED.**
+   `K_box` (fixed per-box cost in mean-block-cell units, added after the allreduce, fine blocks only)
+   improved balance substantially on small cases and delivers ~2% at production scale - inside this
+   machine's run-to-run variance. Not worth a tunable constant that also requires the ULP cut fix as a
+   prerequisite. Removed in `0e3418ef`; see "The cost model is regime-dependent" below for the
+   measurements and for a prediction of mine that failed.
 
-   First result: at np=2 the metric is already ~1.005-1.05, i.e. step 4 had no headroom to recover;
-   at np=8 the benchmark collapses to ~2 boxes per level and both distribution schemes produce
-   byte-identical assignments. **Box supply binds, not the owner mapping** — which points at
-   `amr_max_grid_size` and regrid box production, not at distribution.
+   **The experiment paid for itself anyway.** Perturbing the weights exposed two latent partitioner
+   bugs, both fixed independently and both of which had survived only because the arithmetic happened
+   to be benign:
+   - `2051aa19` - `s_amr_sfc_cut` compared an n-term accumulation against a closed-form target, so an
+     exact share boundary turned on 1 ULP. Correct only because every cost term is integer-valued.
+   - `c3364a5b` - uninitialized L0 tile-prefix slots entered the fine-level cut as phantom key-0
+     blocks. Correct only because they all happened to land on rank 0.
 
-   **Correction (supersedes an earlier revision of this file).** A previous version of this entry
-   said "the `m_rank_timing` half is NOT done". That was wrong: `m_rank_timing` is fully implemented
-   and wired — `s_rank_time_tic`/`toc`/`s_report_rank_time`, gated on `rank_time_wrt`, with the AMR
-   fine advance bracketed at eight call sites in `m_amr.fpp` under `amr_rank_owns_block`, and the
-   allreduce already printing `[rank_time] imbalance(max/mean)`. Acceptance criterion 2 is therefore
-   not work to be written; it is a run to be performed. Harness: `amr-bench/model_vs_measured.sh`.
-6. **Model vs measured (acceptance criterion 2).** DONE — and it overturned the working thesis. See
-   "The cost model weighs the wrong quantity" below. Harness: `amr-bench/model_vs_measured.sh`.
-7. **Reweight `s_amr_block_cost` on a fixed per-box term.** MEASURED GOOD, **NOT LANDED — blocked by
-   a coexist regression.** `K_box = 8` in
-   mean-block-cell units, added after the allreduce. MEASURED on `[rank_time]`, same case:
+### The live queue
 
-   | np | measured, `K_box=0` | measured, `K_box=8` | excess removed |
-   |---|---|---|---|
-   | 2 | 1.087 | **1.020** | 77% |
-   | 4 | 1.170 | **1.012** | 93% |
-   | 8 | 1.259 | **1.144** | 44% |
+Balance is no longer the open question: at 75.5M with clustered refinement the balancer holds
+1.03-1.06 and spreads boxes across every rank. What is NOT known is how much AMR costs relative to
+uniform at that size, and whether the ceiling is even AMR's.
 
-   `K_box=8`, not 4: a CPU sweep of assignment quality (`amr-bench/sweep_kbox.sh`) shows level-2 box
-   imbalance at 1.362 for `K=0`, **1.106 across {1,2,4}**, and **1.021 across {8,16}** — two plateaus,
-   saturating at 8. An earlier value of 4 sat in the lower plateau and bought nothing over `K=1`.
+8. **Is the np=8 ceiling MFC's or this branch's?** The uniform control at 75.5M measures 85 / 71 / 45%
+   efficiency at np = 2 / 4 / 8 - with no AMR involved at all. Run the SAME portable case
+   (`amr-bench/gen_uniform.py`, standard geometry patches, no `hcid`, no AMR) on MFC master and on
+   this branch. If master shows the same curve, 45% is baseline MFC on this machine and no amount of
+   AMR work will move it; if the branch is worse, that is a regression to find. Cheapest decisive
+   experiment available, and it gates everything below.
+9. **AMR cost relative to uniform at production scale.** The AMR np=1 point at 75.5M exceeded the
+   harness's 1800 s cap, so there is no AMR baseline and therefore no AMR speedup or overhead ratio.
+   Raise the cap or cut the step count for that point specifically, then quantify what the fine
+   overlay actually costs where the GPUs are loaded.
+10. **Only then, revisit @ref amr_block_batching.** The argument that per-box overhead dominates rests
+    on efficiency figures that were later found contaminated (starved GPUs, `run_time_info`
+    serialisation). It may well be right, but it has not been re-measured cleanly and should not be
+    treated as established.
+11. **Scale-invariance run.** Sweep rank count past the box count per level. Single-node np<=8 cannot
+    show this; the granularity floor and the indivisible atom only bind once ranks approach box count.
 
-   **Requires the ULP cut fix (`2051aa19`) as a prerequisite.** Without it `K_box` makes the weights
-   non-representable and level 1 breaks from 1.000 to 1.250 — the reweighting was unshippable until
-   the partitioner stopped being tie-fragile.
+## The cost model is regime-dependent, and production is the cell-dominated regime
 
-   Caveat: one run per point, and np=4 measured 1.084 vs 1.170 across two baseline runs, so variance
-   is real. The improvement holds at all three rank counts, which is stronger than any single point,
-   but the magnitudes are not settled.
+Measured 2026-07-31 across three problem sizes. Which metric predicts measured `[rank_time]` flips
+with how much work a box carries:
 
-   **It exposed a pre-existing bug, now fixed: phantom tile-prefix slots in the fine cut.** Four
-   coexist (L0 tiles + AMR) goldens at np=2 — `8D466A94`, `33060D84`, `98AA6EDB`, `09E0D257` — aborted
-   with `SFC cut-point owner disagrees with amr_block_owner`. Dumping the block table showed why:
+| regime | boxes/rank | box size | measured time tracks |
+|---|---|---|---|
+| 511x255, `mgs=64`, np=8 | ~2 | tiny | **box count** (1.308 vs measured 1.259; cell weight flat at 1.050) |
+| 75.5M, `mgs=256`, np=8 | 13-19 | large | **cell weight** (1.058 vs measured 1.058; box count 1.121) |
 
-       fine_cut(:,1) =      0   33792        owner_cut =     -1      -1   (tile cut NOT built yet)
-       blk 1..8   lev 1  key 0      lo (0,0,0)     <- the 8 tile-prefix slots, UNINITIALIZED
-       blk 9      lev 1  key 5120   lo (16,8,0)    <- real fine block
-       blk 10     lev 1  key 33792  lo (32,8,0)    <- real fine block
+Per-block overhead is a FIXED cost - a per-block advance costs ~1x a monolithic step regardless of
+size (@ref amr_block_batching). When boxes are tiny that fixed term dominates and load tracks box
+count. When boxes carry real work the cell term grows until the two metrics nearly coincide: at 75.5M
+with clustered refinement, level-2 weight imbalance is 1.058 and box count 1.121, so the two
+objectives barely conflict.
 
-   Fine blocks occupy slots `(l0_slot_off, amr_num_blocks]`; slots `[1, l0_slot_off]` are the L0 tile
-   prefix. At init the assigner runs BEFORE `s_l0_tiles_init`, so those prefix slots are still
-   uninitialized — level reads 1, `region_lo` is all zeros, i.e. **Morton key 0**. The assigner was
-   looping from slot 1, so it fed eight phantom key-0 "level-1 blocks" into the level-1 cut and split
-   them across ranks. **A key-0 block can only ever resolve to rank 0** — the cut is non-decreasing and
-   the search returns the first `r` with `key <= cut(r)` — so any phantom placed on a higher rank is
-   unrecoverable, and the validator correctly aborts.
+**A prediction that failed, recorded because it constrains the model.** Reading "measured tracks
+weight, not box count" at 75.5M, the expectation was that a fixed per-box term would make balance
+WORSE by steering toward the metric that does not predict runtime. It did not: `K_box = 8` on the
+clustered case moved measured imbalance 1.031 -> 1.022 (np=2, 4) and 1.058 -> 1.038 (np=8), pulling
+box-count imbalance 1.121 -> 1.047 while weight imbalance stayed ~1.05. So at scale the two objectives
+are close enough that improving one does not cost the other. The regime difference is real but it is a
+CONVERGENCE of the two metrics, not a reversal.
 
-   **This was latent, not new.** With the old weights all eight phantoms happened to land on rank 0 and
-   the validator agreed by luck; `K_box` moved the cut and exposed it. Same shape as the ULP tie
-   (`2051aa19`): a fragility that survived only because the arithmetic happened to be benign.
+Consequence for `K_box` (not landed, see `0e3418ef`): the gain at production scale is ~2% imbalance,
+comfortably inside the run-to-run variance measured on this machine (np=4 moved 1.084 -> 1.170 between
+two runs of an identical configuration). That does not justify a tunable constant that also requires
+the ULP cut fix as a prerequisite. It remains worth revisiting if a future regime pushes
+boxes-per-rank back down - which `amr_max_grid_size` does directly.
 
-   Fix: the assigner and the validator both restrict to `(l0_slot_off, amr_num_blocks]`, with the
-   validator skipping the prefix only while `amr_owner_cut` is unbuilt (the tile-init call site
-   populates both cuts and validates there).
+Three measurement flaws had to be removed before any of this was visible, each of which produced a
+confident wrong conclusion first:
 
-   **`s_amr_validate_owner` is load-bearing.** It is marked TRANSITIONAL in-source ("removed once the
-   table is deleted"); it is the only thing that caught this, and it caught it immediately. Do not
-   delete it while the cut and the owner table are both live.
+1. **Starved GPUs.** 511x255 at np=8 is 16k cells/rank; an MI250X GCD needs O(1e6) to be compute
+   bound. `mfcrun.sh` now refuses below 1e5 cells/rank.
+2. **`run_time_info=T`** forces a device->host sync and a global reduction EVERY step. It made a
+   uniform 75.5M control look like 6% parallel efficiency at np=8. Now off in every generated case.
+3. **A low-discrepancy IC.** `gen_blobs.py` places blob centres with a Weyl sequence - evenly spread
+   BY DESIGN (24 blobs land 3,3,2,4,3,2,4,3 across eight x-slabs). The workload is inherently
+   balanced, so the case cannot discriminate between cost models. `gen_clustered.py` concentrates the
+   refinement instead.
 
-   Two things this already establishes, independent of the eventual fix:
-
-   - **The benchmark case never exercises coexist.** The np sweep that produced the numbers above runs
-     plain AMR, so the defect was invisible to every measurement and visible only to the suite. Run the
-     goldens *before* reporting a performance result, not after.
-   - **`s_amr_validate_owner` is load-bearing.** It is described in-source as TRANSITIONAL ("removed
-     once the table is deleted"); it is the only thing that caught this, and it caught it immediately.
-     Do not delete it while the cut and the owner table are both live.
+And a fourth, which is a result rather than a flaw: **spatial clustering does not create imbalance**,
+because per-level distribution decouples ownership from position. With all refinement in one quadrant
+the balancer still spreads boxes over every rank (`no_blocks_ranks 0 of 8`, imbalance 1.03-1.06).
+That is step 4 working as designed.
 
 ## Balance is no longer the limiter, and that redirects the effort
 
