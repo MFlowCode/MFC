@@ -583,13 +583,31 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
     uniform and per-cell overhead GROWS (21.9 -> 30.9). Same code, machine, cap and dimension; the
     only variable is block count.
 
-    **That difference is the diagnosis.** A fixed per-block cost would scale PERFECTLY - spreading 320
-    blocks over more ranks gives each rank fewer blocks. Overhead rising with rank count therefore
-    requires a term that grows with the number of CROSS-RANK block adjacencies: the fine-fine seam
-    exchange and the reflux capture. That is the same super-linear-in-box-count term left unisolated
-    in item 9, now shown to carry a rank dependence - which promotes it from a constant factor to the
-    exascale-relevant limiter, ahead of the per-block launch count that @ref amr_block_batching
-    targets. Isolate it before spending further effort on launch fusion.
+    **CORRECTION - the mechanism is NOT growing communication.** This section first attributed the
+    rising overhead to cross-rank block adjacency. Direct attribution with `rank_time_wrt` (which
+    accumulates per-rank RHS + relaxation compute behind a device sync) refutes that. Same case, same
+    ranks, 20 steps:
+
+    | np | s/step | compute s/step | non-compute s/step | non-compute share | compute efficiency |
+    |---|---|---|---|---|---|
+    | 2 | 13.048 | 5.472 | 7.576 | 58.1% | 1.000 |
+    | 4 | 9.003 | 2.794 | 6.209 | 69.0% | 0.979 |
+    | 8 | 7.227 | 1.447 | 5.780 | 80.0% | 0.946 |
+
+    **The solver scales almost perfectly (0.946 at np=8). The AMR-side work barely distributes:**
+    7.58 -> 5.78 s/step for 4x the ranks, a 1.31x reduction against an ideal 4x, rising from 58% to
+    80% of runtime. So the overhead is not growing with rank count - it is roughly CONSTANT in
+    absolute time and fails to parallelize. The per-cell overhead trend (21.9 -> 30.9x) is that fixed
+    cost becoming a larger share as compute shrinks. This is Amdahl, not a communication blow-up, and
+    it caps AMR strong scaling regardless of how cheap the per-block advance becomes.
+
+    **Mechanism still unattributed - do not guess it again.** The non-compute term bundles the coarse
+    and fine-fine halo exchanges, reflux capture, regrid, block swaps, and interpolation. Some of that
+    is per-block work that SHOULD distribute; that it does not points at work each rank performs
+    proportional to the GLOBAL box count rather than its own - which is exactly the shape of Limit 3
+    (replicated metadata, 29 arrays sized `amr_max_blocks` per rank). If so, Limit 3 bites at 320
+    boxes, three orders of magnitude earlier than the estimate in this document's limits table. That
+    is a hypothesis, not a result: the next step is a per-region breakdown of the non-compute time.
 
 12. **Where does the residual ~7.3x go at the best cap?** Even at cap 1024 - the largest that fits
     device memory here - AMR is 11.4 ns/cell-update against uniform's 1.55. Packing cannot close it
