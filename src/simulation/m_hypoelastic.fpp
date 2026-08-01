@@ -16,7 +16,7 @@ module m_hypoelastic
 
     private; public :: s_initialize_hypoelastic_module, s_finalize_hypoelastic_module, &
         & s_compute_hypoelastic_rhs_finite_diff_per_sweep, s_compute_hypoelastic_rhs_iface, &
-        & s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_damage_state
+        & s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_hypoelastic_rhs_axisym_geom_dual_pass, s_compute_damage_state
 
     real(wp), allocatable, dimension(:) :: Gs_hypo
     $:GPU_DECLARE(create='[Gs_hypo]')
@@ -586,6 +586,76 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_hypoelastic_rhs_axisym_geom_iface
+
+    !> Cylindrical completion for the dual-pass (anchored HLLD) hypoelastic path. The anchored augmented fluxes already carry every
+    !! axial/radial derivative term of the stress law and the stress rows of flux_gsrc are zero, so the complete remaining
+    !! cylindrical physics is the cell-local v/r family: the advective metric -q_s*v/r plus the constitutive v/r terms. Per
+    !! density-weighted row q_s = rho*tau_s: S_xx = -rho*(2*tau_xx + 2G/3)*C, S_xr = -2*rho*tau_xr*C, S_rr = -rho*(2*tau_rr +
+    !! 2G/3)*C, S_thetatheta = +(4/3)*rho*G*C, plus (+K*C, -K*C) for the volume fractions when alt_soundspeed is active (the
+    !! augmented fluxes carry only the in-plane K*(du/dx + dv/dr) part). The discrete C = v/r averages the cell's own two anchored
+    !! radial face traces (hat_L outer face, hat_R inner face) over y_cc, so no absolute axial velocity enters and uniform axial
+    !! translation gives exactly zero. Called once after the two anchored partial RHS's are summed. Continuum damage needs no
+    !! handling here: HLLD + cont_damage is prohibited (m_checker.fpp).
+    !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf rhs variables
+    !! @param nc_iface_vel_y_vf hat_L-pass radial-direction interface velocities
+    !! @param nc_iface_vel_y_hatR_vf hat_R-pass radial-direction interface velocities
+    subroutine s_compute_hypoelastic_rhs_axisym_geom_dual_pass(q_prim_vf, rhs_vf, nc_iface_vel_y_vf, nc_iface_vel_y_hatR_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_y_vf
+        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_y_hatR_vf
+        real(wp)                                               :: rho_K, G_K, K_K, C_num, pres_K, blkmod1_K, blkmod2_K
+        integer                                                :: i, k, l, q
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_K, G_K, K_K, C_num, pres_K, blkmod1_K, blkmod2_K]')
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    rho_K = 0._wp
+                    G_K = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)
+                        G_K = G_K + q_prim_vf(eqn_idx%adv%beg - 1 + i)%sf(k, l, q)*Gs_hypo(i)
+                    end do
+
+                    if (G_K < verysmall) G_K = 0._wp
+
+                    ! Cell-owned anchored radial face traces: hat_L owns the outer face l, hat_R the inner face l - 1
+                    C_num = 5e-1_wp*(nc_iface_vel_y_vf(2)%sf(k, l, q) + nc_iface_vel_y_hatR_vf(2)%sf(k, l - 1, q))/y_cc(l)
+
+                    if (alt_soundspeed) then
+                        ! Same two-component K as the HLLD anchor state (see m_riemann_solver_hypo_hlld.fpp), including the
+                        ! verysmall denominator regularization
+                        pres_K = q_prim_vf(eqn_idx%E)%sf(k, l, q)
+                        blkmod1_K = ((gammas(1) + 1._wp)*pres_K + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_hypo(1)
+                        blkmod2_K = ((gammas(2) + 1._wp)*pres_K + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_hypo(2)
+                        K_K = q_prim_vf(eqn_idx%adv%beg)%sf(k, l, q)*q_prim_vf(eqn_idx%adv%end)%sf(k, l, &
+                                        & q)*(blkmod2_K - blkmod1_K)/(q_prim_vf(eqn_idx%adv%beg)%sf(k, l, &
+                                        & q)*blkmod2_K + q_prim_vf(eqn_idx%adv%end)%sf(k, l, q)*blkmod1_K + verysmall)
+                        rhs_vf(eqn_idx%adv%beg)%sf(k, l, q) = rhs_vf(eqn_idx%adv%beg)%sf(k, l, q) + K_K*C_num
+                        rhs_vf(eqn_idx%adv%end)%sf(k, l, q) = rhs_vf(eqn_idx%adv%end)%sf(k, l, q) - K_K*C_num
+                    end if
+
+                    rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, &
+                           & q) - rho_K*(2._wp*q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q) + 2._wp*G_K/3._wp)*C_num
+
+                    rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, &
+                           & q) - 2._wp*rho_K*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)*C_num
+
+                    rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, &
+                           & q) - rho_K*(2._wp*q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)*C_num
+
+                    rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, &
+                           & q) + (4._wp/3._wp)*rho_K*G_K*C_num
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_hypoelastic_rhs_axisym_geom_dual_pass
 
     !> Finalize the hypoelastic module
     impure subroutine s_finalize_hypoelastic_module()

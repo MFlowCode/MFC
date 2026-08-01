@@ -768,8 +768,9 @@ contains
             ! Fused dual-pass HLLD: per direction, the Riemann states are reconstructed once and ONE fused solve computes both
             ! anchored flux sets (hat_L into flux_n/nc_iface_vel_n through the solver's own finalize; hat_R into the flux_hatR_rs*
             ! buffers). The hat_L partial RHS is assembled first; the hat_R set is then finalized into the same (already consumed)
-            ! flux field arrays and assembled. The full RHS is the sum of the two anchored partial RHS's; the axisymmetric geometric
-            ! source is applied per pass at half weight so the sum carries the symmetric average of the hat_L/hat_R face velocities.
+            ! flux field arrays and assembled. The full RHS is the sum of the two anchored partial RHS's; the axisymmetric
+            ! cylindrical completion for the volume fractions and stresses is applied once on the summed RHS, using the cell's own
+            ! two anchored radial face traces (hat_L outer face, hat_R inner face).
             do id = 1, num_dims
                 call s_reconstruct_riemann_states(id)
                 call s_compute_directional_rhs(id, rhs_hatL_vf, .true.)
@@ -783,14 +784,6 @@ contains
                 call s_compute_advection_source_term(id, rhs_hatR_vf, q_cons_qp, q_prim_qp, flux_src_n(id), .false.)
                 call nvtxEndRange
             end do
-            if (grid_geometry == 2) then
-                call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
-                call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_hatL_vf, nc_iface_vel_n(1)%vf, &
-                    & nc_iface_vel_n(2)%vf, 0.5_wp)
-                call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_hatR_vf, nc_iface_vel_hatR_n(1)%vf, &
-                    & nc_iface_vel_hatR_n(2)%vf, 0.5_wp)
-                call nvtxEndRange
-            end if
 
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
             do i = 1, sys_size
@@ -803,6 +796,13 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
+            if (grid_geometry == 2) then
+                call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
+                call s_compute_hypoelastic_rhs_axisym_geom_dual_pass(q_prim_qp%vf, rhs_vf, nc_iface_vel_n(2)%vf, &
+                    & nc_iface_vel_hatR_n(2)%vf)
+                call nvtxEndRange
+            end if
         end if
         ! END: Dimensional Splitting Loop
 

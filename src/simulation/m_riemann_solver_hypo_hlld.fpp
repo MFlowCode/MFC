@@ -898,7 +898,11 @@ contains
                                     #:endfor
                                 end if
 
-                                ! Radial geometric source flux for cylindrical coordinates
+                                ! Radial geometric source flux for cylindrical coordinates. Only genuinely conservative rows
+                                ! (masses, momenta, energy) carry a numerical geometric flux: their full radial flux IS the
+                                ! -H/r metric quantity. The stress rows are zeroed below: their augmented fluxes fold
+                                ! constitutive velocity terms that must not be divided by r; the complete cylindrical stress
+                                ! completion is the cell-local dual-pass source (s_compute_hypoelastic_rhs_axisym_geom_dual_pass).
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         #:for HATPASS, GSRC, FLUX in [(1, 'flux_gsrc_rsx', 'flux_rsx'), (2, &
@@ -928,6 +932,10 @@ contains
                                                             & eqn_idx%cont%end + dir_idx(1)) - p_face + tau_qq_face
                                                 $:GPU_LOOP(parallelism='[seq]')
                                                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                                    ${GSRC}$_vf(${SF('')}$, i) = 0._wp
+                                                end do
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do i = eqn_idx%stress%beg, eqn_idx%stress%end
                                                     ${GSRC}$_vf(${SF('')}$, i) = 0._wp
                                                 end do
                                             end if
