@@ -285,10 +285,80 @@ them are load-bearing and a reader retracing the work needs them. Steps 5-7 are 
    not work to be written; it is a run to be performed. Harness: `amr-bench/model_vs_measured.sh`.
 6. **Model vs measured (acceptance criterion 2).** DONE — and it overturned the working thesis. See
    "The cost model weighs the wrong quantity" below. Harness: `amr-bench/model_vs_measured.sh`.
-7. **Reweight `s_amr_block_cost` on a fixed per-box term.** THE LIVE TASK. `cost = K_fixed +
-   cells(k)`, with `K_fixed` calibrated from `m_rank_timing` rather than guessed. The acceptance
-   test already exists: re-run the step-6 sweep and require model `max/mean` to converge on
-   measured. Everything below is downstream of getting the cost function right.
+7. **Reweight `s_amr_block_cost` on a fixed per-box term.** MEASURED GOOD, **NOT LANDED — blocked by
+   a coexist regression.** `K_box = 8` in
+   mean-block-cell units, added after the allreduce. MEASURED on `[rank_time]`, same case:
+
+   | np | measured, `K_box=0` | measured, `K_box=8` | excess removed |
+   |---|---|---|---|
+   | 2 | 1.087 | **1.020** | 77% |
+   | 4 | 1.170 | **1.012** | 93% |
+   | 8 | 1.259 | **1.144** | 44% |
+
+   `K_box=8`, not 4: a CPU sweep of assignment quality (`amr-bench/sweep_kbox.sh`) shows level-2 box
+   imbalance at 1.362 for `K=0`, **1.106 across {1,2,4}**, and **1.021 across {8,16}** — two plateaus,
+   saturating at 8. An earlier value of 4 sat in the lower plateau and bought nothing over `K=1`.
+
+   **Requires the ULP cut fix (`2051aa19`) as a prerequisite.** Without it `K_box` makes the weights
+   non-representable and level 1 breaks from 1.000 to 1.250 — the reweighting was unshippable until
+   the partitioner stopped being tie-fragile.
+
+   Caveat: one run per point, and np=4 measured 1.084 vs 1.170 across two baseline runs, so variance
+   is real. The improvement holds at all three rank counts, which is stronger than any single point,
+   but the magnitudes are not settled.
+
+   **It exposed a pre-existing bug, now fixed: phantom tile-prefix slots in the fine cut.** Four
+   coexist (L0 tiles + AMR) goldens at np=2 — `8D466A94`, `33060D84`, `98AA6EDB`, `09E0D257` — aborted
+   with `SFC cut-point owner disagrees with amr_block_owner`. Dumping the block table showed why:
+
+       fine_cut(:,1) =      0   33792        owner_cut =     -1      -1   (tile cut NOT built yet)
+       blk 1..8   lev 1  key 0      lo (0,0,0)     <- the 8 tile-prefix slots, UNINITIALIZED
+       blk 9      lev 1  key 5120   lo (16,8,0)    <- real fine block
+       blk 10     lev 1  key 33792  lo (32,8,0)    <- real fine block
+
+   Fine blocks occupy slots `(l0_slot_off, amr_num_blocks]`; slots `[1, l0_slot_off]` are the L0 tile
+   prefix. At init the assigner runs BEFORE `s_l0_tiles_init`, so those prefix slots are still
+   uninitialized — level reads 1, `region_lo` is all zeros, i.e. **Morton key 0**. The assigner was
+   looping from slot 1, so it fed eight phantom key-0 "level-1 blocks" into the level-1 cut and split
+   them across ranks. **A key-0 block can only ever resolve to rank 0** — the cut is non-decreasing and
+   the search returns the first `r` with `key <= cut(r)` — so any phantom placed on a higher rank is
+   unrecoverable, and the validator correctly aborts.
+
+   **This was latent, not new.** With the old weights all eight phantoms happened to land on rank 0 and
+   the validator agreed by luck; `K_box` moved the cut and exposed it. Same shape as the ULP tie
+   (`2051aa19`): a fragility that survived only because the arithmetic happened to be benign.
+
+   Fix: the assigner and the validator both restrict to `(l0_slot_off, amr_num_blocks]`, with the
+   validator skipping the prefix only while `amr_owner_cut` is unbuilt (the tile-init call site
+   populates both cuts and validates there).
+
+   **`s_amr_validate_owner` is load-bearing.** It is marked TRANSITIONAL in-source ("removed once the
+   table is deleted"); it is the only thing that caught this, and it caught it immediately. Do not
+   delete it while the cut and the owner table are both live.
+
+   Two things this already establishes, independent of the eventual fix:
+
+   - **The benchmark case never exercises coexist.** The np sweep that produced the numbers above runs
+     plain AMR, so the defect was invisible to every measurement and visible only to the suite. Run the
+     goldens *before* reporting a performance result, not after.
+   - **`s_amr_validate_owner` is load-bearing.** It is described in-source as TRANSITIONAL ("removed
+     once the table is deleted"); it is the only thing that caught this, and it caught it immediately.
+     Do not delete it while the cut and the owner table are both live.
+
+## Balance is no longer the limiter, and that redirects the effort
+
+At np=4 measured imbalance is **1.012** — 98.8% of perfect — while parallel efficiency on the same
+run is **62%** (2.46x on 4 ranks; `t_max` 41.4 -> 16.8 s). At np=8, imbalance 1.144 and efficiency
+**38%**. Imbalance accounts for almost none of the loss.
+
+So the remaining cost is a non-scaling term that distribution cannot touch, and it is already
+measured: a per-block advance costs ~1.05x a full monolithic step **regardless of block size** and
+**does not amortize with problem size** (16 tiles = 16.75x monolithic; cost is linear in block
+count). That is the same fixed per-box quantity `K_box` had to model in order to balance correctly.
+
+**The main line moves to @ref amr_block_batching.** Steps 8-9 below remain useful but are refinements
+to a balancer that is now close to optimal on this class of case; they are not where the machine is
+being lost.
 8. **Exercise the heterogeneous terms.** A cost-heterogeneous benchmark (IB or phase change) with
    `load_weight_wrt` on. Every AMR benchmark to date is geometry-only, so `K_ib`/`K_pc` have never
    influenced a measured assignment — and they are corrections to a base term that is itself wrong.

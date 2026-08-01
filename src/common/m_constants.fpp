@@ -48,6 +48,11 @@ module m_constants
     real(wp), parameter :: K_bub = 50._wp  !< per local Lagrangian bubble (stiff adaptive ODE)
     real(wp), parameter :: K_ib = 2._wp    !< per IB ghost/interior cell
     real(wp), parameter :: K_pc = 3._wp    !< per phase-change Newton iteration
+    !> Fixed per-BOX cost, in units of the mean block cell count. cost(k) was a pure footprint cell count, but MEASURED per-rank
+    !! time tracks BOX COUNT: a per-block advance costs ~1x a full monolithic step almost regardless of size and does not amortize.
+    !! Calibrated by sweep (amr-bench/sweep_kbox.sh): level-2 box imbalance is 1.362 at K_box=0, 1.106 across {1,2,4}, and 1.021
+    !! across {8,16} - two plateaus, saturating at 8. An earlier value of 4 sat in the lower plateau and bought nothing over 1.
+    real(wp), parameter :: K_box = 8._wp  !< fixed per-block cost, in mean-block-cell units
     !> AMR fine-level restart per-block header size, in integers: region box (6) + amr_block_level (1).
     !> The writer (m_amr:s_write_amr_restart) and BOTH readers (m_amr:s_read_amr_restart and
     !> m_data_input:s_read_amr_data) must agree on this layout - a mismatch silently misaligns every

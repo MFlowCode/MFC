@@ -323,6 +323,32 @@ run before it can be trusted.
 
 ## Increments
 
+### 0. Same-rank seam exchange — LANDED (`2e7151fa`)
+
+`s_amr_fine_seam_exchange` replaced the four `s_amr_fine_slice` calls in the same-rank branch of
+`s_amr_fine_fine_halo` with ONE fused device kernel doing both directions. Byte-identical.
+Measured (2D 64x32, `l0_ntile=4` = 16 tiles / 24 seam pairs, MI250X): launches 10561 -> 7969
+(`rocprofv3`), Time Avg 0.8179 -> 0.7121 s, n=3 per arm, **ranges disjoint**; run-to-run variance
+also collapsed 3.3% -> 0.5%.
+
+**Two rules this increment established, which govern everything below:**
+
+- **Rank increments by LAUNCHES REMOVED. Credit transfer savings at zero.** The intermediate step
+  (device-to-device but still 2 kernels/pair) was worth **+0.03%** — removing four blocking
+  device<->host round trips per pair per stage bought *nothing*, while going 2 -> 1 kernels bought
+  13%. On this machine launch count is the cost and small-slab PCIe traffic is free.
+- **Measure with `rocprofv3 --kernel-trace`, not wall time.** Back-to-back runs scatter 0.17%; runs
+  separated in time scatter 3%+. A 1.7% "win" was once reported here that was pure noise.
+
+### Why this arc is now the main line
+
+Per-level distribution is done and its cost model is fixed (`amr_per_level_distribution.md`, steps
+4-7). Measured imbalance is now 1.012 at np=4 — 98.8% of perfect — while parallel efficiency on the
+same run is only 62%. **Balance has been eliminated as the limiter by fixing it**, and the residual
+is the per-block fixed overhead measured below. This arc is what remains.
+
+### Remaining increments
+
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
    selects rather than rebuilds. Bit-identical; measurable only on stretched/axisymmetric
    grids (`amr_weno_coef_recompute`), where it also drops ~18 device transfers per swap.
