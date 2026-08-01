@@ -160,6 +160,61 @@ convenience that is invisible at 512 boxes.
 None of this is visible on a single node: 512 boxes is three orders of magnitude below where limit 1
 bites, which is why the measurements in this document could not have found it and a code audit did.
 
+## The per-block floor: AMR costs ~31x uniform per cell, and the overhead is per-BLOCK
+
+The three limits above are about *scalability* - costs that grow with the global box count. This one
+is about *efficiency*, it is a constant factor, and it is much larger than anything else here. A
+constant factor of 31 is not fixed by scaling better.
+
+**The measurement.** 75.5M cells, 2D, np=8, `run_time_info=F`, 8 steps, identical grid and IC in both
+arms (`amr-bench/cases/hg8_amr.py` and `hg8_ctl.py`); the AMR arm additionally advances a refined
+level, so the arms are compared per cell-update, not per step:
+
+| arm | s/step | cell-updates/step | ns per cell-update |
+|---|---|---|---|
+| uniform | 0.117 | 75.5M | **1.55** |
+| AMR (`amr_max_grid_size` 256) | 10.2 | 75.5M + 134.1M fine | **48.7** |
+
+That ratio was unreadable until the balance report started printing `fine_work` (the summed assigned
+weight, which with no cost signals is exactly the fine cells advanced). Without it, "AMR is 87x
+slower per step" cannot be separated into "it advances 2.78x the cells" and "it pays 31x per cell",
+and only the second is a defect.
+
+**The cause is the block count, not the block size.** Same case, same ranks, varying only
+`amr_max_grid_size` - which changes how finely the same feature is tiled (`amr_max_blocks` raised to
+4096 so it never binds):
+
+| `amr_max_grid_size` | boxes | fine cells | s/step | s per box | ns per cell-update |
+|---|---|---|---|---|---|
+| 128 | 4096 | 268M | 70.3 | 0.0172 | 204 |
+| 256 | 934 | 414M | 40.3 | 0.0431 | 82 |
+| 512 | 458 | 511M | 12.9 | 0.0282 | 22 |
+| 1024 | 144 | 761M | 8.5 | 0.0588 | 10 |
+
+**s per box varies ~3.4x while cells per box varies 80x** (65.5k -> 5.28M). The cost of advancing a
+block is dominated by a fixed term, near-independent of how much data is in it. This confirms at
+production scale what @ref amr_block_batching measured in the small: a per-block advance costs a
+substantial fraction of a full monolithic step regardless of block size, and does not amortize.
+
+**Consequences.**
+
+- @ref amr_block_batching's premise is CONFIRMED. It was previously argued from efficiency figures
+  since found contaminated (starved GPUs, `run_time_info` device syncs), so it was left open. It is
+  now the main efficiency work item, and the table sizes the prize: ~20x between the finest and
+  coarsest tiling of the same feature.
+- The per-level cap `amr_max_grid_size` is a first-order performance knob, not just a correctness or
+  portability one. Small caps are ~20x worse per cell.
+- This interacts with balance in the wrong direction. More boxes per level is what gives the balancer
+  freedom (`boxes_per_level >> num_procs`), and it is exactly what costs. The two goals are in
+  tension until batching removes the per-block floor, and any future balance work that buys evenness
+  by splitting boxes further must be measured against this table.
+
+**What this measurement is not.** The arms do not refine identical areas - a block is a rectangle, so
+coarser tiling over-covers, which is why fine cells RISE with the cap. So this is not a clean
+single-variable A/B on tiling, and the ns-per-cell column mixes the two effects. What is clean, and
+what the argument rests on, is `s per box` against `cells per box`: 3.4x against 80x. Single runs on
+a machine with ~11% run-to-run spread; the effects here are 2-20x, far above that.
+
 ## The problem, measured
 
 Cost tracks the **total** number of refined boxes, not the number a rank owns. On a fixed 2D
@@ -460,18 +515,14 @@ single-run comparison earlier suggested 15% at np=4 purely as an artifact: three
 Consequence for measurement discipline: at 11% run-to-run spread on this machine, **any A/B claiming
 less than ~10% needs repetitions**, taken alternating between arms so drift hits both equally.
 
-8. **Hoist the per-box reduction in the regrid rebuild loop.** THE PRIMARY WORK ITEM - see "What
-   actually blocks exascale" above. `nboxes` global collectives per regrid become one; the per-box
-   results are already discarded. ~10 lines, byte-identical goldens expected.
-9. **What does AMR actually cost relative to uniform, at a loaded size?** STILL UNKNOWN and the
-   gating measurement. The AMR np=1 point at 75.5M exceeded the harness's 1800 s cap, so there is no
-   baseline and therefore no overhead ratio. Raise the cap or cut the step count for that point.
-   Without this number there is no way to size the prize for any AMR-side optimisation.
-10. **Then, and only then, revisit @ref amr_block_batching.** Its premise - that per-block overhead
-   dominates - was argued from efficiency figures since found contaminated (starved GPUs at 16k
-   cells/rank, and `run_time_info` forcing a device sync every step). It may still be right, but
-   against a ~60% uniform ceiling the recoverable headroom is smaller than the original framing
-   assumed, and step 8 is what sizes it.
+8. ~~**Hoist the per-box reduction in the regrid rebuild loop.**~~ **DONE** (`3f754893`), and limit 2
+   with it (`83bf4572`).
+9. ~~**What does AMR actually cost relative to uniform, at a loaded size?**~~ **ANSWERED: ~31x the
+   per-cell cost of uniform**, and the overhead is per-BLOCK, not per-cell. See "The per-block floor"
+   below - this is now the largest single number in this document.
+10. ~~**Then, and only then, revisit @ref amr_block_batching.**~~ **Its premise is CONFIRMED**, and by
+   a measurement rather than by the contaminated efficiency figures it originally rested on. Per-block
+   overhead does dominate; item 9 sizes the prize at ~20x. Batching is now the main efficiency item.
 11. **Multi-node scale invariance.** This is the actual exascale question and single-node np<=8 cannot
     answer it: the granularity floor and the indivisible atom only bind once ranks approach the box
     count per level. Everything measured here tops out at 8 ranks with 13-64 boxes per rank - a
