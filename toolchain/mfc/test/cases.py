@@ -2167,11 +2167,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     if base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLL -> Interface RHS" and alt_soundspeed == "T":
                         continue
 
-                    # 2D axisymmetric HLLD + alt_soundspeed=T is unstable across build
-                    # configurations (exceeds 1e-7 tolerance). Needs investigation.
-                    if base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLLD" and alt_soundspeed == "T":
-                        continue
-
                     # Axisym HLLC amplifies FP perturbations beyond 1e-6;
                     # the scheme is numerically unstable and needs looser tolerance.
                     is_axisym_hllc = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace.startswith("HLLC")
