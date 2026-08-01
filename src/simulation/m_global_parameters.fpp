@@ -965,7 +965,8 @@ contains
         !
         ! 1. adv_src_mode_alpha_iface + alt_soundspeed: face-normal velocity only, for the KdivU correction (flux_src already
         ! carries alpha in this mode) 2. hypo_nc_mode_interface: all components for the hypoelastic velocity-gradient tensor
-        ! 3. hypo_nc_mode_dual_pass + axisym: normal + tangential velocity for the axisymmetric geometry correction
+        ! 3. hypo_nc_mode_dual_pass + axisym: anchored radial face traces for the cylindrical completion (both velocity
+        ! components are exported per face; the completion consumes the radial one from each pass)
         use_nc_iface_vel = hypo_nc_mode == hypo_nc_mode_interface .or. (hypo_nc_mode == hypo_nc_mode_dual_pass &
             & .and. grid_geometry == 2) .or. (adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed)
 

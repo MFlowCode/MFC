@@ -900,16 +900,17 @@ contains
 
                                 ! Radial geometric source flux for cylindrical coordinates. Only genuinely conservative rows
                                 ! (masses, momenta, energy) carry a numerical geometric flux: their full radial flux IS the
-                                ! -H/r metric quantity. The stress rows are zeroed below: their augmented fluxes fold
-                                ! constitutive velocity terms that must not be divided by r; the complete cylindrical stress
-                                ! completion is the cell-local dual-pass source (s_compute_hypoelastic_rhs_axisym_geom_dual_pass).
+                                ! -H/r metric quantity. The volume-fraction and stress rows are zeroed: the augmented stress
+                                ! fluxes fold constitutive velocity terms that must not be divided by r; their complete
+                                ! cylindrical completion is the cell-local dual-pass source
+                                ! (s_compute_hypoelastic_rhs_axisym_geom_dual_pass).
                                 #:if (NORM_DIR == 2)
                                     if (cyl_coord) then
                                         #:for HATPASS, GSRC, FLUX in [(1, 'flux_gsrc_rsx', 'flux_rsx'), (2, &
                                                                        & 'flux_gsrc_hatR_rsx', 'flux_hatR_rsx')]
                                             if (ipass == ${HATPASS}$) then
                                                 $:GPU_LOOP(parallelism='[seq]')
-                                                do i = 1, sys_size
+                                                do i = 1, eqn_idx%E
                                                     ${GSRC}$_vf(${SF('')}$, i) = ${FLUX}$_vf(${SF('')}$, i)
                                                 end do
                                                 ! Pure HLLD face state, upwinded by wave-fan wedge (left/right of the contact)
@@ -930,12 +931,10 @@ contains
                                                 end if
                                                 ${GSRC}$_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = ${FLUX}$_vf(${SF('')}$, &
                                                             & eqn_idx%cont%end + dir_idx(1)) - p_face + tau_qq_face
+                                                ! Every HLLD-legal configuration places only the volume-fraction and stress rows
+                                                ! above eqn_idx%E (see s_check_inputs_hypo_branch)
                                                 $:GPU_LOOP(parallelism='[seq]')
-                                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                                    ${GSRC}$_vf(${SF('')}$, i) = 0._wp
-                                                end do
-                                                $:GPU_LOOP(parallelism='[seq]')
-                                                do i = eqn_idx%stress%beg, eqn_idx%stress%end
+                                                do i = eqn_idx%adv%beg, sys_size
                                                     ${GSRC}$_vf(${SF('')}$, i) = 0._wp
                                                 end do
                                             end if

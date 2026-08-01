@@ -517,7 +517,7 @@ contains
         end if
 
         if (grid_geometry == 2) then
-            call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, nc_iface_vel_n(1)%vf, nc_iface_vel_n(2)%vf, 1.0_wp)
+            call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, nc_iface_vel_n(1)%vf, nc_iface_vel_n(2)%vf)
         end if
 
     end subroutine s_compute_hypoelastic_rhs_iface
@@ -529,14 +529,12 @@ contains
     !! @param rhs_vf rhs variables
     !! @param nc_iface_vel_x_vf Interface velocities in x-direction
     !! @param nc_iface_vel_y_vf Interface velocities in y-direction
-    !! @param weight Sub-step weighting factor
-    subroutine s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, nc_iface_vel_x_vf, nc_iface_vel_y_vf, weight)
+    subroutine s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, nc_iface_vel_x_vf, nc_iface_vel_y_vf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_x_vf
         type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_y_vf
-        real(wp), intent(in)                                   :: weight
         integer                                                :: i, k, l, q
         real(wp)                                               :: rho_K, G_K, v_over_r, divU_axi
 
@@ -569,16 +567,16 @@ contains
                     divU_axi = du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q) + v_over_r
 
                     rhs_vf(eqn_idx%stress%beg)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg)%sf(k, l, &
-                           & q) - weight*rho_K*v_over_r*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q) + 2._wp*G_K/3._wp)
+                           & q) - rho_K*v_over_r*(q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q) + 2._wp*G_K/3._wp)
 
                     rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 1)%sf(k, l, &
-                           & q) - weight*rho_K*v_over_r*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)
+                           & q) - rho_K*v_over_r*q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)
 
                     rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 2)%sf(k, l, &
-                           & q) - weight*rho_K*v_over_r*(q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)
+                           & q) - rho_K*v_over_r*(q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)
 
                     rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) = rhs_vf(eqn_idx%stress%beg + 3)%sf(k, l, &
-                           & q) + weight*rho_K*(-(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, &
+                           & q) + rho_K*(-(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, &
                            & q) + 2._wp*G_K/3._wp)*divU_axi + 2._wp*(q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q) + G_K)*v_over_r)
                 end do
             end do
@@ -589,13 +587,11 @@ contains
 
     !> Cylindrical completion for the dual-pass (anchored HLLD) hypoelastic path. The anchored augmented fluxes already carry every
     !! axial/radial derivative term of the stress law and the stress rows of flux_gsrc are zero, so the complete remaining
-    !! cylindrical physics is the cell-local v/r family: the advective metric -q_s*v/r plus the constitutive v/r terms. Per
-    !! density-weighted row q_s = rho*tau_s: S_xx = -rho*(2*tau_xx + 2G/3)*C, S_xr = -2*rho*tau_xr*C, S_rr = -rho*(2*tau_rr +
-    !! 2G/3)*C, S_thetatheta = +(4/3)*rho*G*C, plus (+K*C, -K*C) for the volume fractions when alt_soundspeed is active (the
-    !! augmented fluxes carry only the in-plane K*(du/dx + dv/dr) part). The discrete C = v/r averages the cell's own two anchored
-    !! radial face traces (hat_L outer face, hat_R inner face) over y_cc, so no absolute axial velocity enters and uniform axial
-    !! translation gives exactly zero. Called once after the two anchored partial RHS's are summed. Continuum damage needs no
-    !! handling here: HLLD + cont_damage is prohibited (m_checker.fpp).
+    !! cylindrical physics is the cell-local v/r family below: the advective metric -q_s*v/r plus the constitutive v/r terms (and
+    !! +/-K*C for the volume fractions under alt_soundspeed). The discrete C = v/r averages the cell's own two anchored radial face
+    !! traces (hat_L outer face, hat_R inner face) over y_cc, so no absolute axial velocity enters and uniform axial translation
+    !! gives exactly zero. Called once after the two anchored partial RHS's are summed. Continuum damage needs no handling here:
+    !! HLLD + cont_damage is prohibited (m_checker.fpp).
     !! @param q_prim_vf Primitive variables
     !! @param rhs_vf rhs variables
     !! @param nc_iface_vel_y_vf hat_L-pass radial-direction interface velocities
