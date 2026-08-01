@@ -355,6 +355,66 @@ Per-level distribution is done and its cost model is fixed (@ref amr_per_level_d
 same run is only 62%. **Balance has been eliminated as the limiter by fixing it**, and the residual
 is the per-block fixed overhead measured below. This arc is what remains.
 
+### DISPROVED (2026-08-01): the packed super-grid cannot work, because blocks are already slot-sized
+
+The packed super-grid — lay \f$P\f$ same-level blocks contiguously along x in one slot and call the
+unmodified `s_compute_rhs` once — is **arithmetically impossible for tiled blocks**, at every level
+and every rank count. It is not a scheduling or memory-budget problem; there is no \f$P>1\f$ to reach.
+
+Each packed block keeps its full buffered extent, so \f$P\f$ blocks of fine extent \f$f\f$ need
+\f$P(f + 2\,\texttt{buff\_size}) - 2\,\texttt{buff\_size} \le \texttt{max\_f1} + 1\f$. Writing the
+block's coarse extent as \f$b_c\f$ and the cap as \f$C\f$ (so \f$\texttt{max\_f1}+1 = 2C\f$):
+
+\f[ P_{\max} = \left\lfloor \frac{C - b_c}{b_c + \texttt{buff\_size}} \right\rfloor + 1 \f]
+
+so \f$P>1\f$ requires \f$b_c \lesssim C/2\f$. But `s_amr_tile_box` splits **evenly**:
+\f$n_{tl} = \lceil e/t_c \rceil\f$ then \f$s = \lceil e/n_{tl}\rceil\f$, which for \f$n_{tl}\ge 2\f$
+gives \f$s > t_c(1 - 1/n_{tl}) \ge t_c/2\f$. **Every tiled block therefore exceeds half the tile
+size, and \f$P_{\max} = 1\f$ identically.** The tiler's purpose is to make blocks as large as the
+slot permits, so a slot sized to hold one maximal block can never hold two.
+
+Measured on the 75.5M case (2D, np=8, `amr_max_blocks` = 4096) with a temporary probe printing each
+level's block extents against `max_f1` — level-1 blocks come out *exactly* slot-sized at every cap:
+
+| `amr_max_grid_size` | `max_f1` | level-1 `fx_min`/`fx_max` | \f$P\f$ | blocks packable 2-up |
+|---|---|---|---|---|
+| 128  | 255  | 240 / 256   | 1 | 0 of 4096 |
+| 256  | 511  | 496 / 512   | 1 | 0 of 1152 |
+| 512  | 1023 | 1008 / 1024 | 1 | 0 of 288 |
+| 1024 | 2047 | 2032 / 2048 | 1 | 0 of 72 |
+
+Level 2 leaves 2–3 blocks per run small enough to pack, out of 128–1156 — under 0.3%.
+
+This also retires the "packing is 7x at np=1 but collapses to ~2x at np>=4" table. That table was
+never about rank count in the way it read: it came from a case (2047x1023, 7 stripes) whose blocks
+were 108 coarse cells against a 1024 cap, i.e. *untiled* clustered boxes far below the cap — a
+regime that does not survive a pinned cap at production scale. Separately, the rank-dependence it
+worried about is genuinely gone: `amr_max_grid_size > 0` makes both the pack slot
+(`amr_maxc_fit(d) = min(amr_maxc(d), amr_max_grid_size)`) and the solver scratch
+(`idwbuff_alloc`, `m/n/p_alloc`) independent of the decomposition. \f$P_{\max}=1\f$ regardless.
+
+Reviving packing would require a pack buffer and solver scratch sized \f$P\times\f$ a maximal block —
+a genuinely new allocation, which is exactly the cost the design's "no new allocation is needed"
+scope cut claimed to avoid. That cut relied on the np=1 coincidence \f$\texttt{max\_f1} = m_{glb}\f$,
+which the pinned cap removes by construction.
+
+### The lever that does exist: block size, bounded by device memory
+
+Since per-block cost is near-fixed, the way to spend it on fewer blocks is to make each block bigger —
+which is the `amr_max_grid_size` parameter, not new code. Same case and ranks, varying only the cap
+(@ref amr_per_level_distribution, "The per-block floor"): 70.3 s/step at cap 128 versus 8.5–9.5 at
+cap 1024, a ~20x span, *while the cap-1024 arm advances 2.8x more cells*.
+
+That does not extend indefinitely. Per-rank scratch is \f$O(C^{\,\texttt{num\_dims}})\f$, and at cap
+2048 this case aborts inside `__tgt_target_data_begin_mapper` — device out of memory — before
+completing a single step. The failure mode is worth knowing: one rank core-dumps and the rest block
+until the job is killed, so it presents as a hang. **The efficient regime is the largest cap that
+fits device memory**, which for this case at np=8 in 2D lies between 1024 and 2048.
+
+Even at the best measured cap the residual is ~7.3x uniform per cell (11.4 vs 1.55 ns/cell-update),
+so per-block overhead remains the target — but it must be attacked by making each block's advance
+cheaper (launch fusion, increments 1–3 below), not by combining blocks.
+
 ### Remaining increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
@@ -366,7 +426,13 @@ is the per-block fixed overhead measured below. This arc is what remains.
 3. **Batched block kernels.** Replace the per-block launch of each RHS/RK kernel with one
    launch over a block list, with the per-block geometry read from the slot arrays produced
    by increments 1 and 2. This is the increment that actually removes the measured cost, and
-   the one that retires the `amr_swapped` paired-swap guard.
+   the one that retires the `amr_swapped` paired-swap guard. With the packed super-grid
+   disproved above, this is again the *only* route to batching — and it still needs the flat
+   backing store it always did, since `amr_slots` is not `GPU_DECLARE`'d and a runtime slot
+   index inside a kernel is a null dereference. Cost and risk are unchanged from the original
+   assessment: `ACC_SETUP_SFs` would perform overlapping partial mappings of one shared array,
+   which is undefined for the present table and untestable outside Cray. Settle that with a
+   build before committing to the increment.
 
 Re-measure with the `l0_ntile` sweep above after each increment: it is cheap, byte-identity
 checked, and needs no new instrumentation. Two harness traps: the LAST `Time Avg` line in a
