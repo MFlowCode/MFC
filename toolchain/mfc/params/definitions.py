@@ -124,7 +124,7 @@ TAG_DISPLAY_NAMES = {
     "grid": "Grid",
     "weno": "WENO",
     "viscosity": "Viscosity",
-    "hypoelasticity": "Hypoelasticity",
+    "elasticity": "Elasticity",
     "surface_tension": "Surface tension",
     "acoustic": "Acoustic",
     "ib": "Immersed boundary",
@@ -617,8 +617,10 @@ def _load():
     # Viscosity
     _r("viscous", LOG, {"viscosity"})
 
-    # Hypoelasticity
-    _r("hypoelasticity", LOG, {"hypoelasticity"})
+    # Elasticity
+    for n in ["hypoelasticity", "hyperelasticity"]:
+        _r(n, LOG, {"elasticity"})
+    _r("hyper_model", INT, {"elasticity"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
@@ -861,9 +863,9 @@ def _load():
         for f in range(1, NF + 1):
             _r(f"{px}alpha({f})", A_REAL, math=r"\f$\alpha_" + str(f) + r"\f$")
             _r(f"{px}alpha_rho({f})", A_REAL, math=r"\f$\alpha \rho\f$")
-        # Hypoelastic stress tensor
+        # Elasticity stress tensor
         for j in range(1, 7):
-            _r(f"{px}tau_e({j})", A_REAL, {"hypoelasticity"}, math=r"\f$\tau_e\f$")
+            _r(f"{px}tau_e({j})", A_REAL, {"elasticity"}, math=r"\f$\tau_e\f$")
         if i >= 2:
             for j in range(1, i):
                 _r(f"{px}alter_patch({j})", LOG)
@@ -887,7 +889,7 @@ def _load():
         px = f"fluid_pp({f})%"
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
-        _r(f"{px}G", REAL, {"hypoelasticity"}, math=r"\f$G_k\f$")
+        _r(f"{px}G", REAL, {"elasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
         _r(f"{px}non_newtonian", LOG, {"viscosity"}, math=r"\mathrm{non\text{-}Newtonian}_k")
@@ -1271,6 +1273,7 @@ _nv(
     "sigma",
     "adv_n",
     "hypoelasticity",
+    "hyperelasticity",
     "surface_tension",
     "relativity",
     "ib",
@@ -1329,6 +1332,7 @@ _nv(
     "int_comp",
     "ic_eps",
     "ic_beta",
+    "hyper_model",
     "wave_speeds",
     "low_Mach",
     "hyper_cleaning_speed",

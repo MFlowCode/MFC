@@ -30,8 +30,10 @@ module m_global_parameters_common
     !> @name Annotations of the structure of the state and flux vectors in terms of the size and configuration of the system of
     !! equations
     !> @{
-    integer            :: sys_size  !< Number of unknowns in system of equations
-    type(eqn_idx_info) :: eqn_idx   !< All conserved-variable equation index ranges and scalars
+    integer            :: sys_size     !< Number of unknowns in system of equations
+    type(eqn_idx_info) :: eqn_idx      !< All conserved-variable equation index ranges and scalars
+    integer            :: b_size       !< Number of elements in the symmetric b tensor, plus one
+    integer            :: tensor_size  !< Number of elements in the full tensor plus one
     !> @}
 
     !> @name Chemistry modeling (Fypp compile-time constant; same value in all targets)
@@ -39,8 +41,9 @@ module m_global_parameters_common
     logical, parameter :: chemistry = .${chemistry}$.
     !> @}
 
-    !> @name Hypoelastic shear stress state (identical across all three executables)
+    !> @name Elasticity and shear stress state (identical across all three executables)
     !> @{
+    logical                  :: elasticity             !< elasticity modeling, true for hyper or hypo
     integer                  :: shear_num              !< Number of shear stress components
     integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
     integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
@@ -65,7 +68,8 @@ module m_global_parameters_common
     !> Minimum cell widths. These are distinct from the per-cell width arrays named dx, dy, and dz in simulation and post-process.
     real(wp) :: dx_min, dy_min, dz_min
 
-    $:GPU_DECLARE(create='[sys_size, eqn_idx]')
+    $:GPU_DECLARE(create='[sys_size, eqn_idx, b_size, tensor_size]')
+    $:GPU_DECLARE(create='[elasticity]')
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
 
     !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)
@@ -85,8 +89,9 @@ module m_global_parameters_common
 
 contains
 
-    !> Initialize equation-index state (eqn_idx and sys_size) from the namelist parameters. This is the shared skeleton: it covers
-    !! the model_eqns dispatch, all eqn_idx field assignments, and the hypoelastic/surface-tension/chemistry extensions.
+    !> Initialize equation-index state (eqn_idx, sys_size, b_size, tensor_size) from the namelist parameters. This is the shared
+    !! skeleton: it covers the model_eqns dispatch, all eqn_idx field assignments, and the elasticity/surface-tension/chemistry
+    !! extensions.
     !!
     !! @param nmom_in  Number of carried moments per R0 location (per-target: pre/post pass an
     !!   integer variable; sim passes its integer parameter nmom = 6).  Used only in the 5eq
@@ -213,7 +218,8 @@ contains
         end if
 
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
-            if (hypoelasticity) then
+            if (hypoelasticity .or. hyperelasticity) then
+                elasticity = .true.
                 eqn_idx%stress%beg = sys_size + 1
                 eqn_idx%stress%end = sys_size + (num_dims*(num_dims + 1))/2
                 if (cyl_coord) eqn_idx%stress%end = eqn_idx%stress%end + 1
@@ -238,6 +244,16 @@ contains
                     shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
                     ! x-dir: flip tau_xy and tau_xz; y-dir: flip tau_xy and tau_yz; z-dir: flip tau_xz and tau_yz
                 end if
+            end if
+
+            if (hyperelasticity) then
+                ! number of entries in the symmetric b tensor plus the jacobian
+                b_size = (num_dims*(num_dims + 1))/2 + 1
+                tensor_size = num_dims**2 + 1
+                eqn_idx%xi%beg = sys_size + 1
+                eqn_idx%xi%end = sys_size + num_dims
+                ! adding equations for the xi field and the elastic energy
+                sys_size = eqn_idx%xi%end + 1
             end if
 
             if (surface_tension) then
@@ -345,6 +361,10 @@ contains
         relax = .false.
         relax_model = dflt_int
         hypoelasticity = .false.
+        hyperelasticity = .false.
+        elasticity = .false.
+        b_size = dflt_int
+        tensor_size = dflt_int
         cont_damage = .false.
         hyper_cleaning = .false.
 

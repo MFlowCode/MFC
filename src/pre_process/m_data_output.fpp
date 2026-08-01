@@ -710,6 +710,7 @@ contains
         call write_range(eqn_idx%bub%beg, eqn_idx%bub%end, " Bubbles")
         call write_range(eqn_idx%stress%beg, eqn_idx%stress%end, " Stress")
         call write_range(eqn_idx%int_en%beg, eqn_idx%int_en%end, " Internal Energies")
+        call write_range(eqn_idx%xi%beg, eqn_idx%xi%end, " Reference Map")
         call write_range(eqn_idx%B%beg, eqn_idx%B%end, " Magnetic Field")
         call write_range(eqn_idx%c, eqn_idx%c, " Color Function")
         call write_range(eqn_idx%species%beg, eqn_idx%species%end, " Chemistry")

@@ -231,6 +231,7 @@ contains
         real(wp)                       :: orig_qv
         real(wp)                       :: muR, muV
         real(wp)                       :: R3bar
+        real(wp), dimension(3)         :: xi_cart
         real(wp)                       :: Ys(1:num_species)
         real(stp), dimension(sys_size) :: orig_prim_vf  !< Vector to hold original values of cell for smoothing purposes
         integer                        :: i
@@ -374,11 +375,26 @@ contains
             end if
         end if
 
-        if (hypoelasticity) then
+        if (elasticity) then
             do i = 1, (eqn_idx%stress%end - eqn_idx%stress%beg) + 1
                 q_prim_vf(i + eqn_idx%stress%beg - 1)%sf(j, k, &
                           & l) = (eta*patch_icpp(patch_id)%tau_e(i) + (1._wp - eta)*orig_prim_vf(i + eqn_idx%stress%beg - 1))
             end do
+        end if
+
+        if (hyperelasticity) then
+            xi_cart(1) = x_cc(j)
+            xi_cart(2) = y_cc(k)
+            xi_cart(3) = z_cc(l)
+
+            ! assigning the reference map to the q_prim vector field
+            do i = 1, num_dims
+                q_prim_vf(i + eqn_idx%xi%beg - 1)%sf(j, k, l) = eta*xi_cart(i) + (1._wp - eta)*orig_prim_vf(i + eqn_idx%xi%beg - 1)
+            end do
+            do i = eqn_idx%stress%beg, eqn_idx%stress%end
+                q_prim_vf(i)%sf(j, k, l) = 0._wp
+            end do
+            q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l) = 0._wp
         end if
 
         if (mpp_lim .and. bubbles_euler) then

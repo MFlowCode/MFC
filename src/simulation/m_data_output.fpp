@@ -1215,7 +1215,7 @@ contains
                     end if
 
                     ! Computing/Sharing necessary state variables
-                    if (hypoelasticity) then
+                    if (elasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, rho, gamma, pi_inf, qv, Re, G_local, &
                                                             & fluid_pp(:)%G)
                     else
@@ -1227,7 +1227,7 @@ contains
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
-                    if (hypoelasticity) then
+                    if (elasticity) then
                         if (cont_damage) then
                             damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k, l)
                             G_local = G_local*max((1._wp - damage_state), 0._wp)
@@ -1244,7 +1244,7 @@ contains
 
                     if (model_eqns == model_eqns_4eq) then
                         lit_gamma = gammas(1)
-                    else if (hypoelasticity) then
+                    else if (elasticity) then
                         tau_e(1) = q_cons_vf(eqn_idx%stress%end)%sf(j - 2, k, l)/rho
                     end if
 
@@ -1331,7 +1331,7 @@ contains
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
-                        if (hypoelasticity) then
+                        if (elasticity) then
                             if (cont_damage) then
                                 damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l)
                                 G_local = G_local*max((1._wp - damage_state), 0._wp)
@@ -1348,7 +1348,7 @@ contains
 
                         if (model_eqns == model_eqns_4eq) then
                             lit_gamma = gs_min(1)
-                        else if (hypoelasticity) then
+                        else if (elasticity) then
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
                             end do
@@ -1418,7 +1418,7 @@ contains
                                 end do
                             end if
 
-                            if (hypoelasticity) then
+                            if (elasticity) then
                                 if (cont_damage) then
                                     damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l - 2)
                                     G_local = G_local*max((1._wp - damage_state), 0._wp)
@@ -1468,7 +1468,7 @@ contains
                     end if
                 end if
 
-                if (hypoelasticity) then
+                if (elasticity) then
                     do s = 1, (num_dims*(num_dims + 1))/2
                         tmp = tau_e(s)
                         call s_mpi_allreduce_sum(tmp, tau_e(s))
@@ -1510,7 +1510,7 @@ contains
                             write (i + 30, '(6X,10F24.8)') nondim_time, rho, vel(1), vel(2), pres, alf, nR(1), nRdot(1), R(1), &
                                    & Rdot(1)
                         #:endif
-                    else if (hypoelasticity) then
+                    else if (elasticity) then
                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                             write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8)') nondim_time, rho, &
                                    & vel(1), vel(2), pres, tau_e(1), tau_e(2), tau_e(3)

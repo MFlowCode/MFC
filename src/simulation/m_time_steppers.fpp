@@ -17,6 +17,7 @@ module m_time_steppers
     use m_bubbles_EE
     use m_bubbles_EL
     use m_ibm
+    use m_hyperelastic
     use m_mpi_proxy
     use m_boundary_common
     use m_helper
@@ -249,8 +250,16 @@ contains
                 end do
             end if
 
-            if (hypoelasticity) then
+            if (elasticity) then
                 do i = eqn_idx%stress%beg, eqn_idx%stress%end
+                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ACC_SETUP_SFs(q_prim_vf(i))
+                end do
+            end if
+
+            if (hyperelasticity) then
+                do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
                     @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
@@ -977,8 +986,14 @@ contains
                 end do
             end if
 
-            if (hypoelasticity) then
+            if (elasticity) then
                 do i = eqn_idx%stress%beg, eqn_idx%stress%end
+                    @:DEALLOCATE(q_prim_vf(i)%sf)
+                end do
+            end if
+
+            if (hyperelasticity) then
+                do i = eqn_idx%xi%beg, eqn_idx%xi%end + 1
                     @:DEALLOCATE(q_prim_vf(i)%sf)
                 end do
             end if

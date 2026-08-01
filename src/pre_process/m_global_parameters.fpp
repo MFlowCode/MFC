@@ -13,7 +13,7 @@ module m_global_parameters
 
     use m_derived_types  ! Definitions of the derived types
     use m_helper_basic  ! Functions to compare floating point numbers
-    ! Shared state: generated_decls, sys_size, eqn_idx, chemistry, shear_*
+    ! Shared state: generated_decls, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*
     use m_global_parameters_common
 
     implicit none
@@ -42,7 +42,7 @@ module m_global_parameters
     type(bounds_info) :: x_domain_glb, y_domain_glb, z_domain_glb
 
     ! Simulation Algorithm Parameters
-    ! sys_size, eqn_idx, chemistry, shear_*: in m_global_parameters_common
+    ! sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*: in m_global_parameters_common
     ! weno_polyn, muscl_polyn, num_dims, num_vels: in m_global_parameters_common
     ! Annotations of the structure, i.e. the organization, of the state vectors
     type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings.
@@ -116,7 +116,7 @@ contains
 
         integer :: i  !< Generic loop operator
 
-        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, BC blocks,
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
         ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
         ! IB flags, parallel I/O flags, fft_wrt)
 

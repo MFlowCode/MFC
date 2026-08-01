@@ -58,6 +58,8 @@ SIM_GPU_DECL_VARS = {
     "hyper_cleaning",
     "hyper_cleaning_speed",
     "hyper_cleaning_tau",
+    "hyper_model",
+    "hyperelasticity",
     "hypoelasticity",
     "ib",
     "ib_coefficient_of_friction",

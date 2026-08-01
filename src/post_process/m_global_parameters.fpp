@@ -15,7 +15,7 @@ module m_global_parameters
     use m_helper_basic
     use m_thermochem, only: species_names
     use m_constants, only: format_silo, precision_single
-    ! Shared state: generated_decls, num_dims, num_vels, sys_size, eqn_idx, chemistry, shear_*
+    ! Shared state: generated_decls, num_dims, num_vels, sys_size, eqn_idx, b_size, tensor_size, chemistry, elasticity, shear_*
     use m_global_parameters_common
 
     implicit none
@@ -75,7 +75,7 @@ module m_global_parameters
 
     !> @name Simulation Algorithm Parameters
     !> @{
-    ! sys_size, chemistry, eqn_idx: in m_global_parameters_common
+    ! sys_size, elasticity, b_size, tensor_size, chemistry, eqn_idx: in m_global_parameters_common
     !> @}
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
@@ -152,7 +152,7 @@ contains
 
         integer :: i  !< Generic loop iterator
 
-        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, BC blocks,
+        ! Shared defaults (case_dir, m/n/p, cyl_coord, cfl flags, model_eqns, elasticity, BC blocks,
         ! recon/weno/muscl/num_fluids/igr/mhd/relativity under case-opt guard, Tait EOS, bubble flags,
         ! IB flags, parallel I/O flags, fft_wrt)
 

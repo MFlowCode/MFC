@@ -1090,6 +1090,7 @@ class CaseValidator:
         acoustic_source = self.get("acoustic_source", "F") == "T"
         relax = self.get("relax", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
+        hyperelasticity = self.get("hyperelasticity", "F") == "T"
         cyl_coord = self.get("cyl_coord", "F") == "T"
         probe_wrt = self.get("probe_wrt", "F") == "T"
         int_comp = self.get("int_comp", 0)
@@ -1108,6 +1109,7 @@ class CaseValidator:
         self.prohibit(acoustic_source, "IGR does not support acoustic sources")
         self.prohibit(relax, "IGR does not support phase change")
         self.prohibit(mhd, "IGR does not support magnetohydrodynamics")
+        self.prohibit(hyperelasticity, "IGR does not support hyperelasticity")
         self.prohibit(cyl_coord, "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt, "IGR does not support probe writes")
         self.prohibit(int_comp > 0, "IGR does not support int_comp > 0")
@@ -1385,6 +1387,27 @@ class CaseValidator:
         self.prohibit(probe_wrt and fd_order is None, "fd_order must be specified for probe_wrt")
         self.prohibit(integral_wrt and fd_order is None, "fd_order must be specified for integral_wrt")
         self.prohibit(integral_wrt and not bubbles_euler, "integral_wrt requires bubbles_euler to be enabled")
+
+    def check_hyperelasticity(self):
+        """Checks hyperelasticity constraints"""
+        hyperelasticity = self.get("hyperelasticity", "F") == "T"
+
+        if not hyperelasticity:
+            return
+
+        model_eqns = self.get("model_eqns")
+        hyper_model = self.get("hyper_model")
+        riemann_solver = self.get("riemann_solver")
+        fd_order = self.get("fd_order")
+        p = self.get("p", 0)
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+
+        self.prohibit(model_eqns not in (2, 3), "hyperelasticity requires model_eqns = 2 or 3")
+        self.prohibit(hyper_model != 1, "hyperelasticity currently requires hyper_model = 1 (neo-Hookean)")
+        self.prohibit(riemann_solver != 2, "hyperelasticity currently requires the HLLC Riemann solver (riemann_solver = 2)")
+        self.prohibit(p <= 0, "hyperelasticity currently requires a 3D domain (p > 0)")
+        self.prohibit(cyl_coord, "hyperelasticity currently supports Cartesian coordinates only")
+        self.prohibit(fd_order is None or fd_order <= 0, "hyperelasticity requires fd_order > 0")
 
     # Pre-Process Specific Checks
 
@@ -2306,6 +2329,7 @@ class CaseValidator:
         self.check_qbmm_and_polydisperse()
         self.check_adv_n()
         self.check_hypoelasticity()
+        self.check_hyperelasticity()
         self.check_phase_change()
         self.check_ibm()
         self.check_stiffened_eos()

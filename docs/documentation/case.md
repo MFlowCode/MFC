@@ -1123,6 +1123,8 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | Parameter         | Type    | Description                                         |
 | ---:              | :---:   | :---                                                |
 | `hypoelasticity`  | Logical | Enable hypoelasticity simulation                    |
+| `hyperelasticity` | Logical | Enable hyperelasticity simulation                   |
+| `hyper_model`     | Integer | Hyperelastic constitutive model [1]: neo-Hookean    |
 | `cont_damage`     | Logical | Enable continuum damage model                       |
 | `tau_star`        | Real    | Threshold stress for continuum damage model         |
 | `cont_damage_s`   | Real    | Power `s` for continuum damage model                |
