@@ -5,17 +5,23 @@ independently, so AMR strong-scales instead of degrading as ranks are added. Wri
 2026-07-29 against `up/mega` @ `7b1e4933`. Companion to @ref amr_block_batching, which covers
 the per-block launch cost, and @ref amr_multilevel, which covers the nesting.
 
+**How to read this.** "What actually blocks exascale" is the primary open work item and comes first.
+"Status" says what has landed. "The cost model is regime-dependent" and "Superseded measurements"
+together record what measurement has and has not established - several earlier conclusions in this
+file were retracted, and the retractions are kept rather than deleted. "Sequencing" is the queue.
+
 ## Status
 
 All four design steps are landed. The measured outcome did **not** confirm the performance thesis,
-and the reason matters more than the steps did — see "Measured outcome".
+and the reason matters more than the steps did — see "The cost model is regime-dependent" and
+"Superseded measurements".
 
 | Step | Commit | Result |
 |---|---|---|
 | 1. Scratch decoupling | `86782249` | landed |
 | 2. Rank-independent cap | `a108dd37` | np=4->8 flipped 1.16x slower to 0.84x faster (single level) — **but see the caveat below** |
 | 3. P2P parent<->child | `6832d299`, `d53fac46` | landed; 3d `26e0d080` hoists the level advance to lockstep |
-| 4. Per-level mapping | `cfdd2847` | landed; correctness proven with a split tower, **no measured speedup — now explained**, see "The cost model weighs the wrong quantity" |
+| 4. Per-level mapping | `cfdd2847` | landed; correctness proven with a split tower, **no measured speedup**; the A/B that produced that result was run too small to interpret — see "Superseded measurements" |
 | 5. Balance metric | `fc53e097`, `3780f30a` | landed; `[amr-balance]` per-level max/mean behind `load_weight_wrt`. Its *conclusion* ("box supply binds") is **retracted** — see below |
 | 6. Model vs measured | — | done; **the cost model does not predict measured time**. Redirects the effort to step 7 |
 
@@ -65,46 +71,6 @@ Two findings from the step-4 A/B that redirect this work:
 
 The consequence for sequencing: **instrumentation precedes further distribution work.** Steps 1-4
 were gated on correctness and end-to-end s/step, neither of which measures balance.
-
-## The problem, measured
-
-Cost tracks the **total** number of refined boxes, not the number a rank owns. On a fixed 2D
-2048x1024 case with seven refined features, varying only rank count:
-
-| np | `amr_maxc_fit` | boxes | per-rank boxes | s/step |
-|---|---|---|---|---|
-| 1 | 1024 x 512 | 14 | 14 | 0.6552 |
-| 4 | 256 x 512 | 14 | 3.5 | 0.2892 |
-| 8 | 256 x 256 | 21 | 2.6 | 0.3479 |
-
-Two things go wrong together. **Box count grows with rank count** — `amr_maxc_fit` is the
-min-over-ranks local half-extent, so adding ranks shrinks the cap until a fixed feature must be
-tiled into more pieces (a 624-cell-tall feature needs 2 tiles at a cap of 512 and 3 at 256; at
-np=32 the cap reaches 128 and it needs 5, giving 35 boxes). And **cost follows total box count
-near-linearly**: holding the box set fixed at 35 with `amr_max_grid_size` and comparing against
-the default arm at matched rank counts gives time ratios of 2.25x, 2.09x and 1.42x against box
-ratios of 2.50x, 2.50x and 1.67x — an exponent of 0.68 to 0.93.
-
-That combination is why np=4 -> 8 regresses. Per-rank boxes *fall* 3.5 -> 2.6, so per-rank work
-should drop to ~0.217 s/step; measured it *rose* to 0.3479. The ~1.6x gap is work proportional
-to the global box set: every per-box collective in the regrid rebuild loop runs over all boxes on
-all ranks.
-
-## Why whole-box ownership is not the problem
-
-An earlier reading of this concluded that a rank must hold an entire block, so per-rank AMR
-memory cannot strong-scale, and therefore blocks must be split across ranks. **That conclusion
-was wrong.** AMReX, Chombo and BoxLib all keep whole-box ownership — a box belongs to exactly one
-rank. They scale because of three properties MFC only partly has:
-
-1. an **absolute, small** box size cap, so boxes are many and small;
-2. **per-box scratch**, sized to the box, rather than one working set sized to the subdomain;
-3. **per-level distribution** — each level has its own box list *and its own rank mapping*.
-
-Under (1) and (2), per-rank memory is `O(boxes_per_rank * cap^d)`, and `boxes_per_rank` falls as
-ranks are added, so it strong-scales. The MFC ceiling was never ownership; it was a cap *derived
-from the subdomain* combined with solver scratch *sized to the subdomain*. Those are
-`amr_max_grid_size` (landed, `3a718392`) and `idwbuff_alloc` (landed, `7b1e4933`).
 
 ## What actually blocks exascale: the assignment and regrid cost scale with the GLOBAL box set
 
@@ -175,6 +141,46 @@ convenience that is invisible at 512 boxes.
 
 None of this is visible on a single node: 512 boxes is three orders of magnitude below where limit 1
 bites, which is why the measurements in this document could not have found it and a code audit did.
+
+## The problem, measured
+
+Cost tracks the **total** number of refined boxes, not the number a rank owns. On a fixed 2D
+2048x1024 case with seven refined features, varying only rank count:
+
+| np | `amr_maxc_fit` | boxes | per-rank boxes | s/step |
+|---|---|---|---|---|
+| 1 | 1024 x 512 | 14 | 14 | 0.6552 |
+| 4 | 256 x 512 | 14 | 3.5 | 0.2892 |
+| 8 | 256 x 256 | 21 | 2.6 | 0.3479 |
+
+Two things go wrong together. **Box count grows with rank count** — `amr_maxc_fit` is the
+min-over-ranks local half-extent, so adding ranks shrinks the cap until a fixed feature must be
+tiled into more pieces (a 624-cell-tall feature needs 2 tiles at a cap of 512 and 3 at 256; at
+np=32 the cap reaches 128 and it needs 5, giving 35 boxes). And **cost follows total box count
+near-linearly**: holding the box set fixed at 35 with `amr_max_grid_size` and comparing against
+the default arm at matched rank counts gives time ratios of 2.25x, 2.09x and 1.42x against box
+ratios of 2.50x, 2.50x and 1.67x — an exponent of 0.68 to 0.93.
+
+That combination is why np=4 -> 8 regresses. Per-rank boxes *fall* 3.5 -> 2.6, so per-rank work
+should drop to ~0.217 s/step; measured it *rose* to 0.3479. The ~1.6x gap is work proportional
+to the global box set: every per-box collective in the regrid rebuild loop runs over all boxes on
+all ranks.
+
+## Why whole-box ownership is not the problem
+
+An earlier reading of this concluded that a rank must hold an entire block, so per-rank AMR
+memory cannot strong-scale, and therefore blocks must be split across ranks. **That conclusion
+was wrong.** AMReX, Chombo and BoxLib all keep whole-box ownership — a box belongs to exactly one
+rank. They scale because of three properties MFC only partly has:
+
+1. an **absolute, small** box size cap, so boxes are many and small;
+2. **per-box scratch**, sized to the box, rather than one working set sized to the subdomain;
+3. **per-level distribution** — each level has its own box list *and its own rank mapping*.
+
+Under (1) and (2), per-rank memory is `O(boxes_per_rank * cap^d)`, and `boxes_per_rank` falls as
+ranks are added, so it strong-scales. The MFC ceiling was never ownership; it was a cap *derived
+from the subdomain* combined with solver scratch *sized to the subdomain*. Those are
+`amr_max_grid_size` (landed, `3a718392`) and `idwbuff_alloc` (landed, `7b1e4933`).
 
 ## Target design
 
@@ -309,6 +315,53 @@ These are structural, not tuning knobs, and each sets a floor on achievable bala
    assignment beating the pure-geometry fallback. Geometry-only cases cannot demonstrate this.
 4. Deep-tower case: imbalance must not depend on refinement depth once towers may split.
 
+## The cost model is regime-dependent, and production is the cell-dominated regime
+
+Measured 2026-07-31 across three problem sizes. Which metric predicts measured `[rank_time]` flips
+with how much work a box carries:
+
+| regime | boxes/rank | box size | measured time tracks |
+|---|---|---|---|
+| 511x255, `mgs=64`, np=8 | ~2 | tiny | **box count** (1.308 vs measured 1.259; cell weight flat at 1.050) |
+| 75.5M, `mgs=256`, np=8 | 13-19 | large | **cell weight** (1.058 vs measured 1.058; box count 1.121) |
+
+Per-block overhead is a FIXED cost - a per-block advance costs ~1x a monolithic step regardless of
+size (@ref amr_block_batching). When boxes are tiny that fixed term dominates and load tracks box
+count. When boxes carry real work the cell term grows until the two metrics nearly coincide: at 75.5M
+with clustered refinement, level-2 weight imbalance is 1.058 and box count 1.121, so the two
+objectives barely conflict.
+
+**A prediction that failed, recorded because it constrains the model.** Reading "measured tracks
+weight, not box count" at 75.5M, the expectation was that a fixed per-box term would make balance
+WORSE by steering toward the metric that does not predict runtime. It did not: `K_box = 8` on the
+clustered case moved measured imbalance 1.031 -> 1.022 (np=2, 4) and 1.058 -> 1.038 (np=8), pulling
+box-count imbalance 1.121 -> 1.047 while weight imbalance stayed ~1.05. So at scale the two objectives
+are close enough that improving one does not cost the other. The regime difference is real but it is a
+CONVERGENCE of the two metrics, not a reversal.
+
+Consequence for `K_box` (not landed, see `0e3418ef`): the gain at production scale is ~2% imbalance,
+comfortably inside the run-to-run variance measured on this machine (np=4 moved 1.084 -> 1.170 between
+two runs of an identical configuration). That does not justify a tunable constant that also requires
+the ULP cut fix as a prerequisite. It remains worth revisiting if a future regime pushes
+boxes-per-rank back down - which `amr_max_grid_size` does directly.
+
+Three measurement flaws had to be removed before any of this was visible, each of which produced a
+confident wrong conclusion first:
+
+1. **Starved GPUs.** 511x255 at np=8 is 16k cells/rank; an MI250X GCD needs O(1e6) to be compute
+   bound. `mfcrun.sh` now refuses below 1e5 cells/rank.
+2. **`run_time_info=T`** forces a device->host sync and a global reduction EVERY step. It made a
+   uniform 75.5M control look like 6% parallel efficiency at np=8. Now off in every generated case.
+3. **A low-discrepancy IC.** `gen_blobs.py` places blob centres with a Weyl sequence - evenly spread
+   BY DESIGN (24 blobs land 3,3,2,4,3,2,4,3 across eight x-slabs). The workload is inherently
+   balanced, so the case cannot discriminate between cost models. `gen_clustered.py` concentrates the
+   refinement instead.
+
+And a fourth, which is a result rather than a flaw: **spatial clustering does not create imbalance**,
+because per-level distribution decouples ownership from position. With all refinement in one quadrant
+the balancer still spreads boxes over every rank (`no_blocks_ranks 0 of 8`, imbalance 1.03-1.06).
+That is step 4 working as designed.
+
 ## Sequencing
 
 Steps 1-4 are LANDED (see "Status"); they are kept here because the ordering constraints between
@@ -405,176 +458,29 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
     count per level. Everything measured here tops out at 8 ranks with 13-64 boxes per rank - a
     regime where the balancer is comfortable. The interesting regime is the one where it is not.
 
-## The cost model is regime-dependent, and production is the cell-dominated regime
+## Superseded measurements, and why they are kept out of the body
 
-Measured 2026-07-31 across three problem sizes. Which metric predicts measured `[rank_time]` flips
-with how much work a box carries:
+Three earlier sections were removed in the 2026-07-31 reorganisation because their numbers are known
+to be contaminated. They are recorded here so a reader meeting them in git history knows not to trust
+them, not because they are still evidence.
 
-| regime | boxes/rank | box size | measured time tracks |
-|---|---|---|---|
-| 511x255, `mgs=64`, np=8 | ~2 | tiny | **box count** (1.308 vs measured 1.259; cell weight flat at 1.050) |
-| 75.5M, `mgs=256`, np=8 | 13-19 | large | **cell weight** (1.058 vs measured 1.058; box count 1.121) |
+- **"Balance is no longer the limiter"** quoted 62% parallel efficiency at np=4 and 38% at np=8, and
+  concluded that per-box overhead had to be the remaining cost. Both figures came from runs with
+  `run_time_info = T`, which forces a device->host sync and a global reduction every step. The same
+  configuration measured 6% efficiency at np=8 on a *uniform* 75.5M-cell control, i.e. the figure was
+  measuring a diagnostic barrier.
+- **"The cost model weighs the wrong quantity"** reported measured time tracking box count (1.308)
+  while cell weight stayed flat (1.050) at np=8. That is real, but only in the starved regime: at
+  511x255 a rank holds ~2 boxes of 16k cells. See "The cost model is regime-dependent" for the
+  measurement at production size, where the two metrics converge.
+- **The step-4 A/B "Measured outcome"** (2047x1023, co-location vs per-level) was run at a size where
+  the uniform control reached 18% parallel efficiency at np=8, so both arms were latency-bound
+  exactly where the effect should have appeared. It cannot distinguish "no imbalance to fix" from
+  "balancer did nothing".
 
-Per-block overhead is a FIXED cost - a per-block advance costs ~1x a monolithic step regardless of
-size (@ref amr_block_batching). When boxes are tiny that fixed term dominates and load tracks box
-count. When boxes carry real work the cell term grows until the two metrics nearly coincide: at 75.5M
-with clustered refinement, level-2 weight imbalance is 1.058 and box count 1.121, so the two
-objectives barely conflict.
-
-**A prediction that failed, recorded because it constrains the model.** Reading "measured tracks
-weight, not box count" at 75.5M, the expectation was that a fixed per-box term would make balance
-WORSE by steering toward the metric that does not predict runtime. It did not: `K_box = 8` on the
-clustered case moved measured imbalance 1.031 -> 1.022 (np=2, 4) and 1.058 -> 1.038 (np=8), pulling
-box-count imbalance 1.121 -> 1.047 while weight imbalance stayed ~1.05. So at scale the two objectives
-are close enough that improving one does not cost the other. The regime difference is real but it is a
-CONVERGENCE of the two metrics, not a reversal.
-
-Consequence for `K_box` (not landed, see `0e3418ef`): the gain at production scale is ~2% imbalance,
-comfortably inside the run-to-run variance measured on this machine (np=4 moved 1.084 -> 1.170 between
-two runs of an identical configuration). That does not justify a tunable constant that also requires
-the ULP cut fix as a prerequisite. It remains worth revisiting if a future regime pushes
-boxes-per-rank back down - which `amr_max_grid_size` does directly.
-
-Three measurement flaws had to be removed before any of this was visible, each of which produced a
-confident wrong conclusion first:
-
-1. **Starved GPUs.** 511x255 at np=8 is 16k cells/rank; an MI250X GCD needs O(1e6) to be compute
-   bound. `mfcrun.sh` now refuses below 1e5 cells/rank.
-2. **`run_time_info=T`** forces a device->host sync and a global reduction EVERY step. It made a
-   uniform 75.5M control look like 6% parallel efficiency at np=8. Now off in every generated case.
-3. **A low-discrepancy IC.** `gen_blobs.py` places blob centres with a Weyl sequence - evenly spread
-   BY DESIGN (24 blobs land 3,3,2,4,3,2,4,3 across eight x-slabs). The workload is inherently
-   balanced, so the case cannot discriminate between cost models. `gen_clustered.py` concentrates the
-   refinement instead.
-
-And a fourth, which is a result rather than a flaw: **spatial clustering does not create imbalance**,
-because per-level distribution decouples ownership from position. With all refinement in one quadrant
-the balancer still spreads boxes over every rank (`no_blocks_ranks 0 of 8`, imbalance 1.03-1.06).
-That is step 4 working as designed.
-
-## Balance is no longer the limiter, and that redirects the effort
-
-At np=4 measured imbalance is **1.012** — 98.8% of perfect — while parallel efficiency on the same
-run is **62%** (2.46x on 4 ranks; `t_max` 41.4 -> 16.8 s). At np=8, imbalance 1.144 and efficiency
-**38%**. Imbalance accounts for almost none of the loss.
-
-So the remaining cost is a non-scaling term that distribution cannot touch, and it is already
-measured: a per-block advance costs ~1.05x a full monolithic step **regardless of block size** and
-**does not amortize with problem size** (16 tiles = 16.75x monolithic; cost is linear in block
-count). That is the same fixed per-box quantity `K_box` had to model in order to balance correctly.
-
-**The main line moves to @ref amr_block_batching.** Steps 8-9 below remain useful but are refinements
-to a balancer that is now close to optimal on this class of case; they are not where the machine is
-being lost.
-8. **Exercise the heterogeneous terms.** A cost-heterogeneous benchmark (IB or phase change) with
-   `load_weight_wrt` on. Every AMR benchmark to date is geometry-only, so `K_ib`/`K_pc` have never
-   influenced a measured assignment — and they are corrections to a base term that is itself wrong.
-9. **Scale-invariance run.** Sweep rank count past the box count per level and confirm imbalance
-   does not grow. Single-node np<=8 cannot show this — the granularity floor and the indivisible
-   atom only bind once ranks approach box count.
-
-## The cost model weighs the wrong quantity
-
-Measured 2026-07-31 with `load_weight_wrt` and `rank_time_wrt` both on. 511x255, 24 blobs (`hcid`
-299), `amr_max_level=2`, `amr_max_grid_size=64` (pinned, so boxes are many), 30 steps.
-
-| np | weight `max/mean` (what the balancer optimizes) | **box count** `max/mean` | measured `[rank_time]` |
-|---|---|---|---|
-| 2 | 1.015 | **1.130** | 1.087 |
-| 4 | 1.054 | **1.176** | 1.170 |
-| 8 | 1.050 | **1.308** | 1.259 |
-
-**Box count predicts measured time; cell weight does not.** The cell-based model sits flat near 1.05
-while both box count and measured time climb together, and the gap widens with rank count — the
-scale-invariance failure this document names as the real requirement. Level 1 is perfect in both
-metrics (32 equal boxes); all the divergence is at level 2, where 104 boxes over 8 ranks give weight
-1.050 and count 1.308.
-
-The mechanism was already in our own data: a per-block advance costs ~1x a full monolithic step
-**regardless of block size and does not amortize** (@ref amr_block_batching). If per-block cost is
-essentially fixed, a rank's load is how many boxes it holds, not how many cells. Equal cells with
-unequal counts reads as perfectly balanced and runs badly skewed.
-
-**Two consequences.** First, **step 4's flat A/B now has an explanation**: per-level distribution
-redistributed *cells*, and cells were never the binding cost — it was balancing the wrong quantity,
-not proving distribution irrelevant. Second, **step 5's conclusion that "box supply binds, not the
-owner mapping" does not survive**; it was inferred from box counts and model imbalance with no
-measured counterpart, and the model it rested on does not track reality.
-
-Caveats, since this redirects the effort: single run per rank count (np=4 measured 1.084 in one run
-and 1.170 in another, so variance is real — the *pattern* held in both); `[rank_time]` brackets
-compute regions, so some spread may be MPI wait rather than work; one case, one node, np<=8. The
-direction and its growth with scale are actionable, the exact ratios are not.
-
-## Measured outcome
-
-hpcfund MI250X, amdflang OMP offload, 1 rank/GCD, 2047x1023, `amr_max_level=2`, `amr_subcycle=F`,
-`amr_max_grid_size=128`, 8 stripes of which 3 are sharp (3 deep towers among 8 level-1 blocks),
-20 steps, 3 reps, median s/step with the first 2 steps dropped. Arms are two worktrees:
-`26e0d080` (co-location) vs `cfdd2847` (per-level). Harness: `amr-bench/sweep_ml.sh`.
-
-| np | co-located | per-level | ratio | uniform control |
-|---|---|---|---|---|
-| 1 | 2.6403 | 2.6188 | 0.99x | 0.0648 |
-| 2 | 1.5315 | 1.5372 | 1.00x | 0.0533 |
-| 4 | 1.0393 | 1.0943 | 1.05x | 0.0486 |
-| 8 | 0.9186 | 0.9128 | 0.99x | 0.0458 |
-
-**Flat at every rank count** (rep scatter 2-6%). Two readings, and the doc should not pretend to
-choose between them without the metric:
-
-- *Consistent with design.* With 3 heavy towers and np<=8, co-location can already place each
-  tower on its own rank. The granularity floor says per-level cannot help until ranks approach the
-  box count per level, so np<=8 is the wrong regime to see it.
-- *Not demonstrated.* Equally consistent with the assignment not changing at all. **A flat
-  end-to-end time is not evidence either way** — that is what step 5 exists to resolve, and it is
-  why step 5 now precedes further distribution work.
-
-### The overhead finding
-
-The uniform control solves the same base grid with no refinement, so it bounds AMR's *overhead*,
-not its efficiency (the efficiency baseline would be a uniform grid at the finest resolution).
-Against it, AMR costs ~20x at np=8. The refinement added accounts for roughly
-
-    1 + 0.20*(4-1) + 0.075*(16-4) ~= 2.5x
-
-(level 1 over ~20% of the domain at 4x cells; level 2 over ~7.5% at 16x). Compare at **np=1**,
-where both arms are still compute-bound: 2.6403 / 0.0648 = **40.7x** for ~2.5x the nominal work, a
-residual of **~16x**. Regrid is only 7-10% of runtime, so it is not regrid. That points at
-per-block launch cost — @ref amr_block_batching — as the dominant term for "efficient AMR", which
-per-level distribution does not address. Treat the arithmetic as an order-of-magnitude estimate:
-the area fractions are nominal and a 16x-cell uniform grid would not cost exactly 16x on a GPU.
-
-Do **not** read this ratio at np=8 (20x, apparent residual 8x). The uniform control degrades faster
-than AMR there — see the regime warning below — so the gap narrows for a reason that has nothing to
-do with AMR overhead.
-
-### Regime warning: this sweep is too small above np=2
-
-Parallel efficiency, from the same runs:
-
-| arm | np=1 | np=2 | np=4 | np=8 |
-|---|---|---|---|---|
-| uniform | 100% | 61% | 33% | **18%** |
-| co-located | 100% | 86% | 64% | 36% |
-| per-level | 100% | 85% | 60% | 36% |
-
-The **uniform** control — no AMR, no blocks, no balancing — reaches only 1.41x on 8 GCDs. At np=8
-the case holds 262k cells/rank, far below what saturates an MI250X GCD, so per-step fixed costs
-dominate and the run is latency-bound. That is the machine floor for this problem size: AMR cannot
-scale better than the uniform grid on the same mesh.
-
-**Consequence: the flat A/B above is not conclusive.** At the rank counts where per-level
-distribution should help most, both arms are dominated by costs that distribution cannot affect,
-so the measurement could not have detected the effect even if present. Any future distribution A/B
-must keep ~1M+ cells/rank at its TOP rank count (np=2 here, at 1.05M cells/rank and 86%
-efficiency, is the last trustworthy point) — for np=8 that means a 4096x2048 case. Always run the
-uniform control and check its efficiency FIRST: if the control is not scaling, nothing measured
-against it means anything.
-
-**Implication for the thesis.** Per-level distribution removes a structural ceiling (proven: a
-tower can now split across ranks and stay correct). It has not been shown to lift a ceiling that
-was binding on any case measured so far. Both statements should survive into whatever comes next.
+The general lesson, which cost most of a day: **a timing number is only as good as the configuration
+that produced it.** Check `run_time_info`, cells per rank, and the uniform control's own efficiency
+before interpreting any of them.
 
 ## Validation
 
