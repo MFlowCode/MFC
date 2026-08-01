@@ -31,6 +31,7 @@ module m_rhs
     use m_helper
     use m_surface_tension
     use m_body_forces
+    use m_jwl_sources
     use m_chemistry
     use m_reactive_burn
     use m_igr
@@ -756,7 +757,7 @@ contains
                 end if
 
                 ! Viscous stress contribution to RHS
-                if (viscous .or. surface_tension .or. chem_params%diffusion) then
+                if (viscous .or. surface_tension .or. jwl_afterburn .or. jwl_reactive .or. chem_params%diffusion) then
                     call nvtxStartRange("RHS-ADD-PHYSICS")
                     call s_compute_additional_physics_rhs(id, q_prim_qp%vf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
                                                           & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
@@ -855,6 +856,10 @@ contains
         end if
 
         if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
+
+        #:if not MFC_CASE_OPTIMIZATION or jwl_active
+            if (prog_burn .or. jwl_afterburn .or. jwl_reactive) call s_compute_jwl_sources(q_cons_qp%vf, rhs_vf)
+        #:endif
 
         ! END: Additional physics and source terms
 
@@ -1377,6 +1382,34 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
+            if (jwl_afterburn) then
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(eqn_idx%abn)%sf(j, k, l) = rhs_vf(eqn_idx%abn)%sf(j, k, &
+                                   & l) + 1._wp/dx(j)*q_prim_vf(eqn_idx%abn)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
+                                   & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j - 1, k, l))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+            if (jwl_reactive) then
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(eqn_idx%rxn)%sf(j, k, l) = rhs_vf(eqn_idx%rxn)%sf(j, k, &
+                                   & l) + 1._wp/dx(j)*q_prim_vf(eqn_idx%rxn)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
+                                   & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j - 1, k, l))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
             if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
@@ -1416,6 +1449,34 @@ contains
                         do j = 0, m
                             rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
                                    & l) + 1._wp/dy(k)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
+                                   & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k - 1, l))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+            if (jwl_afterburn) then
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(eqn_idx%abn)%sf(j, k, l) = rhs_vf(eqn_idx%abn)%sf(j, k, &
+                                   & l) + 1._wp/dy(k)*q_prim_vf(eqn_idx%abn)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
+                                   & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k - 1, l))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+            if (jwl_reactive) then
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(eqn_idx%rxn)%sf(j, k, l) = rhs_vf(eqn_idx%rxn)%sf(j, k, &
+                                   & l) + 1._wp/dy(k)*q_prim_vf(eqn_idx%rxn)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
                                    & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k - 1, l))
                         end do
                     end do
@@ -1547,6 +1608,34 @@ contains
                         do j = 0, m
                             rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
                                    & l) + 1._wp/dz(l)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
+                                   & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, l - 1))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+            if (jwl_afterburn) then
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(eqn_idx%abn)%sf(j, k, l) = rhs_vf(eqn_idx%abn)%sf(j, k, &
+                                   & l) + 1._wp/dz(l)*q_prim_vf(eqn_idx%abn)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
+                                   & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, l - 1))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+            if (jwl_reactive) then
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(eqn_idx%rxn)%sf(j, k, l) = rhs_vf(eqn_idx%rxn)%sf(j, k, &
+                                   & l) + 1._wp/dz(l)*q_prim_vf(eqn_idx%rxn)%sf(j, k, l)*(flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, &
                                    & l) - flux_src_n_in(eqn_idx%adv%beg)%sf(j, k, l - 1))
                         end do
                     end do

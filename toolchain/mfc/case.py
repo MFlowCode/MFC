@@ -27,6 +27,7 @@ QPVF_IDX_VARS = {
     "tau_e": "eqn_idx%stress%beg",
     "Y": "eqn_idx%species%beg",
     "cf_val": "eqn_idx%c",
+    "rxn_val": "eqn_idx%rxn",
     "Bx": "eqn_idx%B%beg",
     "By": "eqn_idx%B%end-1",
     "Bz": "eqn_idx%B%end",
@@ -422,8 +423,12 @@ gbl_id = patch_ib(i)%gbl_patch_id
         from . import build
 
         def _prepend() -> str:
+            num_fluids = int(self.params.get("num_fluids", 1))
+            jwl_names = {"2", "jwl", "eos_jwl"}
+            jwl_active = any(str(self.params.get(f"fluid_pp({i})%eos", 1)).strip().lower() in jwl_names for i in range(1, num_fluids + 1))
             return f"""\
 #:set chemistry             = {self.params.get("chemistry", "F") == "T"}
+#:set jwl_active            = {jwl_active}
 """
 
         def _default(_) -> str:

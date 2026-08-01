@@ -136,16 +136,27 @@ contains
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
-                WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
-                save_index = t_step/t_step_save  ! get the number of saves done to this point
+                ! ib_markers is 4-byte integers; stride by the larger of the stp and
+                ! integer sizes so half-precision builds cannot overlap save slots.
+                WP_MOK = int(max(storage_size(0._stp), storage_size(0))/8, MPI_OFFSET_KIND)
+                ! Under cfl_dt, t_step is already the save index and t_step_save is
+                ! unset; dividing would make every frame read slot 0.
+                if (cfl_dt) then
+                    save_index = t_step
+                else
+                    save_index = t_step/t_step_save
+                end if
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
-                var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-                if (t_step == 0) then
-                    disp = 0
+                ! Slot base must match the simulation writer, whose sys_size does not
+                ! include the beta field post_process appends for bubbles_lagrange.
+                if (bubbles_lagrange) then
+                    var_MOK = int(sys_size, MPI_OFFSET_KIND)
                 else
-                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(save_index, MPI_OFFSET_KIND))
+                    var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
                 end if
+                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(save_index, MPI_OFFSET_KIND))
+                if (t_step == 0) disp = 0
 
                 call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, 'native', mpi_info_int, ierr)
                 call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, MPI_INTEGER, status, ierr)

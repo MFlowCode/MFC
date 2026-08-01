@@ -12,6 +12,7 @@ module m_data_output
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_jwl, only: jwl_idx
     use m_compile_specific
     use m_helper
     use m_helper_basic
@@ -181,6 +182,8 @@ contains
         real(wp)               :: qv                          !< Cell-avg. internal energy reference value
         real(wp)               :: c                           !< Cell-avg. sound speed
         real(wp)               :: H                           !< Cell-avg. enthalpy
+        real(wp)               :: Y_jwl                       !< Cell-avg. JWL mass fraction
+        real(wp)               :: lambda_jwl                  !< JWL reaction progress (1 unless jwl_reactive)
         real(wp), dimension(2) :: Re                          !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
         real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
@@ -195,15 +198,28 @@ contains
         ccfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
-                            & vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
-                            & reductionOp='[max, min]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, Y_jwl, &
+                            & lambda_jwl, icfl, vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, &
+                            & ccfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                        if (jwl_idx > 0) then
+                            Y_jwl = min(max(q_prim_vf(jwl_idx)%sf(j, k, l)/max(rho, sgm_eps), 0._wp), 1._wp)
+                            ! Match the lambda-aware sound speed the dt/CFL loop uses so the
+                            ! reported ICFL corresponds to the EOS branch that actually ran.
+                            lambda_jwl = 1._wp
+                            if (jwl_reactive) lambda_jwl = min(max(q_prim_vf(eqn_idx%rxn)%sf(j, k, l), 0._wp), 1._wp)
+                            call s_compute_jwl_speed_of_sound(pres, rho, Y_jwl, c, lambda_jwl)
+                        else
+                        #:endif
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+                        #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                        end if
+                    #:endif
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp
@@ -884,7 +900,7 @@ contains
         integer(kind=MPI_OFFSET_kind)        :: disp
         integer(kind=MPI_OFFSET_kind)        :: m_MOK, n_MOK, p_MOK
         integer(kind=MPI_OFFSET_kind)        :: WP_MOK, var_MOK, MOK
-        integer                              :: ifile, ierr, data_size
+        integer                              :: ifile, ierr, data_size, save_index
         integer, dimension(MPI_STATUS_SIZE)  :: status
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
@@ -893,7 +909,9 @@ contains
         m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
         n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
         p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-        WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
+        ! ib_markers is 4-byte integers; stride by the larger of the stp and
+        ! integer sizes so half-precision builds cannot overlap save slots.
+        WP_MOK = int(max(storage_size(0._stp), storage_size(0))/8, MPI_OFFSET_KIND)
         MOK = int(1._wp, MPI_OFFSET_KIND)
 
         write (file_loc, '(A)') 'ib.dat'
@@ -901,7 +919,15 @@ contains
         call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
         var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(time_step/t_step_save))
+        ! Under cfl_dt, time_step is already the save index and t_step_save is
+        ! unset; dividing would make every save overwrite slot 0. Must match the
+        ! post_process reader.
+        if (cfl_dt) then
+            save_index = time_step
+        else
+            save_index = time_step/t_step_save
+        end if
+        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(save_index, MPI_OFFSET_KIND))
         if (time_step == 0) disp = 0
 
         call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, 'native', mpi_info_int, ierr)
@@ -1150,6 +1176,7 @@ contains
         real(wp), dimension(6)          :: tau_e
         real(wp)                        :: G_local
         real(wp)                        :: dyn_p, T
+        real(wp)                        :: lambda_jwl        !< JWL reaction progress (1 unless jwl_reactive)
         real(wp)                        :: damage_state
         integer                         :: i, j, k, l, s, d  !< Generic loop iterator
         real(wp)                        :: nondim_time       !< Non-dimensional time
@@ -1237,6 +1264,15 @@ contains
                                                 & pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                                                 & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
                                                 & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
+                    else if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                        ! Pass the cell's products mass fraction so probes in air or
+                        ! mixed cells do not evaluate the pure-products branch, and the
+                        ! reaction progress so unreacted cells keep their energy offset.
+                        lambda_jwl = 1._wp
+                        if (jwl_reactive) lambda_jwl = min(max(q_cons_vf(eqn_idx%rxn)%sf(j - 2, k, l), 0._wp), 1._wp)
+                        call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
+                                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                                                & jwl_Y=q_cons_vf(jwl_idx)%sf(j - 2, k, l)/max(rho, sgm_eps), jwl_lambda=lambda_jwl)
                     else
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1341,6 +1377,13 @@ contains
                                                     & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
                                                     & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
                                                     & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
+                        else if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                            lambda_jwl = 1._wp
+                            if (jwl_reactive) lambda_jwl = min(max(q_cons_vf(eqn_idx%rxn)%sf(j - 2, k - 2, l), 0._wp), 1._wp)
+                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
+                                                    & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                                                    & jwl_Y=q_cons_vf(jwl_idx)%sf(j - 2, k - 2, l)/max(rho, sgm_eps), &
+                                                    & jwl_lambda=lambda_jwl)
                         else
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1428,6 +1471,14 @@ contains
                                                         & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
                                                         & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), G_local)
+                            else if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                                lambda_jwl = 1._wp
+                                if (jwl_reactive) lambda_jwl = min(max(q_cons_vf(eqn_idx%rxn)%sf(j - 2, k - 2, l - 2), 0._wp), &
+                                    & 1._wp)
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
+                                                        & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
+                                                        & rho, qv, rhoYks, pres, T, jwl_Y=q_cons_vf(jwl_idx)%sf(j - 2, k - 2, &
+                                                        & l - 2)/max(rho, sgm_eps), jwl_lambda=lambda_jwl)
                             else
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &

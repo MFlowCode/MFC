@@ -1,0 +1,8 @@
+# Local visualization artifacts and helper scripts, not part of the example.
+visualize.py
+make_movie.py
+paraview_movie.py
+*.png
+*.mp4
+frames/
+pv_frames/

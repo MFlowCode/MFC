@@ -269,6 +269,16 @@ module m_global_parameters
     !> @{
     !> @}
 
+    ! JWL per-fluid property tables: allocated and populated in m_jwl (s_initialize_jwl_module) for
+    ! every target, but declared here in simulation so the GPU_DECLARE binds in the declaring module
+    ! (Cray ftn rejects declare-target on use-associated names).
+    real(wp), allocatable, dimension(:) :: jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s
+    real(wp), allocatable, dimension(:) :: jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas, jwl_ej_rho_refs, jwl_air_pi_infs
+    real(wp), allocatable, dimension(:) :: jwl_delta_es
+    $:GPU_DECLARE(create='[jwl_As, jwl_Bs, jwl_R1s, jwl_R2s, jwl_omegas, jwl_rho0s, jwl_E0s]')
+    $:GPU_DECLARE(create='[jwl_air_e0s, jwl_air_rho0s, jwl_air_gammas, jwl_ej_rho_refs, jwl_air_pi_infs]')
+    $:GPU_DECLARE(create='[jwl_delta_es]')
+
     real(wp)                                    :: mytime     !< Current simulation time
     real(wp)                                    :: finaltime  !< Final simulation time
     type(pres_field), allocatable, dimension(:) :: pb_ts
@@ -437,6 +447,8 @@ contains
             fluid_pp(i)%mu_min = dflt_real
             fluid_pp(i)%mu_max = dflt_real
             fluid_pp(i)%mu_bulk = dflt_real
+            fluid_pp(i)%eos = eos_stiffened_gas
+            call s_assign_jwl_fluid_defaults(fluid_pp(i))
         end do
 
         ! Subgrid bubble parameters (bub_pp struct + scalar companions; scalar companions are
@@ -923,6 +935,10 @@ contains
         $:GPU_UPDATE(device='[rburn]')
 
         $:GPU_UPDATE(device='[cont_damage, tau_star, cont_damage_s, alpha_bar]')
+
+        $:GPU_UPDATE(device='[jwl_afterburn, jwl_ab_model, jwl_q_ab, jwl_ab_tau, jwl_ab_A, jwl_ab_theta, jwl_ab_n]')
+        $:GPU_UPDATE(device='[prog_burn, pb_D_cj, pb_width, pb_x_det, pb_y_det, pb_z_det, pb_t_det]')
+        $:GPU_UPDATE(device='[jwl_reactive, jwl_G, jwl_b_exp]')
 
         $:GPU_UPDATE(device='[hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau]')
 

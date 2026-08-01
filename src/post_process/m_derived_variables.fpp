@@ -12,6 +12,7 @@ module m_derived_variables
     use m_helper_basic
     use m_variables_conversion
     use m_constants, only: model_eqns_gamma_law
+    use m_jwl, only: jwl_idx
 
     implicit none
 
@@ -97,11 +98,20 @@ contains
 
         integer  :: i, j, k
         real(wp) :: blkmod1, blkmod2
+        real(wp) :: lambda_jwl  !< JWL reaction progress (1 unless jwl_reactive)
 
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
-                    if (alt_soundspeed .neqv. .true.) then
+                    if (jwl_idx > 0 .and. jwl_idx <= eqn_idx%cont%end) then
+                        ! JWL closure sound speed (squared here; the shared sqrt below recovers c).
+                        lambda_jwl = 1._wp
+                        if (jwl_reactive) lambda_jwl = min(max(q_prim_vf(eqn_idx%rxn)%sf(i, j, k), 0._wp), 1._wp)
+                        call s_compute_jwl_speed_of_sound(q_prim_vf(eqn_idx%E)%sf(i, j, k), rho_sf(i, j, k), &
+                                                          & q_prim_vf(jwl_idx)%sf(i, j, k)/max(rho_sf(i, j, k), sgm_eps), q_sf(i, &
+                                                          & j, k), lambda_jwl)
+                        q_sf(i, j, k) = q_sf(i, j, k)**2._wp
+                    else if (alt_soundspeed .neqv. .true.) then
                         q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_inf_sf(i, j, &
                              & k))/(gamma_sf(i, j, k)*rho_sf(i, j, k)))
                     else

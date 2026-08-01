@@ -93,6 +93,19 @@ contains
             ic%q_prim_vf(eqn_idx%damage)%sf = 0._wp
         end if
 
+        ! Initial JWL afterburn progress is always zero (nothing has burned yet)
+        if (jwl_afterburn) then
+            ic%q_cons_vf(eqn_idx%abn)%sf = 0._wp
+            ic%q_prim_vf(eqn_idx%abn)%sf = 0._wp
+        end if
+
+        ! Initial JWL++ reaction progress defaults to zero (unreacted); booster
+        ! patches can seed it via patch_icpp(i)%rxn_val in s_assign_variables
+        if (jwl_reactive) then
+            ic%q_cons_vf(eqn_idx%rxn)%sf = 0._wp
+            ic%q_prim_vf(eqn_idx%rxn)%sf = 0._wp
+        end if
+
         ! Initial hyper_cleaning state is always zero TODO more general
         if (hyper_cleaning) then
             ic%q_cons_vf(eqn_idx%psi)%sf = 0._wp

@@ -624,6 +624,18 @@ def _load():
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
     _r("surface_tension", LOG, {"surface_tension"})
 
+    # JWL reaction sources (afterburn and program burn)
+    _r("jwl_afterburn", LOG, desc="Enable JWL afterburn energy release (adds a progress variable equation)")
+    _r("jwl_ab_model", INT, desc="Afterburn rate model: 1 = mixing-rate, 2 = Arrhenius (Rocflu-style, default)")
+    for n in ["jwl_q_ab", "jwl_ab_tau", "jwl_ab_A", "jwl_ab_theta", "jwl_ab_n"]:
+        _r(n, REAL)
+    _r("prog_burn", LOG, desc="Enable kinematic program burn (Rocflu-style lighting-time energy release)")
+    for n in ["pb_D_cj", "pb_width", "pb_x_det", "pb_y_det", "pb_z_det", "pb_t_det"]:
+        _r(n, REAL)
+    _r("jwl_reactive", LOG, desc="Enable JWL++ pressure-driven reactive burn (adds a reaction progress equation)")
+    for n in ["jwl_G", "jwl_b_exp"]:
+        _r(n, REAL)
+
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
     _r("chemistry", LOG, {"chemistry"})
@@ -674,6 +686,7 @@ def _load():
         "qm_wrt",
         "liutex_wrt",
         "cf_wrt",
+        "jwl_wrt",
         "sim_data",
         "output_partial_domain",
     ]:
@@ -845,6 +858,7 @@ def _load():
             _r(f"{px}a({j})", REAL)
         _r(f"{px}pres", A_REAL, math=r"\f$p\f$")
         _r(f"{px}cf_val", A_REAL)
+        _r(f"{px}rxn_val", A_REAL)
         # MHD fields
         for a, sym in [("Bx", r"\f$B_x\f$"), ("By", r"\f$B_y\f$"), ("Bz", r"\f$B_z\f$")]:
             _r(f"{px}{a}", A_REAL, {"mhd"}, math=sym)
@@ -898,6 +912,20 @@ def _load():
         _r(f"{px}mu_min", REAL, {"viscosity"}, math=r"\mu_{\min,k}")
         _r(f"{px}mu_max", REAL, {"viscosity"}, math=r"\mu_{\max,k}")
         _r(f"{px}mu_bulk", REAL, {"viscosity"}, math=r"\mu_{\mathrm{bulk},k}")
+        _r(f"{px}eos", INT, math=r"\mathrm{EOS}_k")
+        _r(f"{px}jwl_A", REAL, math=r"\f$A_k\f$")
+        _r(f"{px}jwl_B", REAL, math=r"\f$B_k\f$")
+        _r(f"{px}jwl_R1", REAL, math=r"\f$R_{1,k}\f$")
+        _r(f"{px}jwl_R2", REAL, math=r"\f$R_{2,k}\f$")
+        _r(f"{px}jwl_omega", REAL, math=r"\f$\omega_k\f$")
+        _r(f"{px}jwl_rho0", REAL, math=r"\f$\rho_{0,k}\f$")
+        _r(f"{px}jwl_Q", REAL, math=r"\f$Q_k\f$")
+        _r(f"{px}jwl_E0", REAL, math=r"\f$E_{0,k}\f$")
+        _r(f"{px}jwl_air_e0", REAL, math=r"\f$e_{\mathrm{air},k}\f$")
+        _r(f"{px}jwl_air_rho0", REAL, math=r"\f$\rho_{\mathrm{air},k}\f$")
+        _r(f"{px}jwl_air_p0", REAL, math=r"\f$p_{\mathrm{air},k}\f$")
+        _r(f"{px}jwl_ej_rho_ref", REAL, math=r"\f$\rho_{e_j,k}\f$")
+        _r(f"{px}jwl_delta_e", REAL, math=r"\f$\Delta e_k\f$")
 
     # bub_pp (bubble properties)
     for a, sym in [
@@ -1277,6 +1305,8 @@ _nv(
     "num_ibs",
     "cont_damage",
     "hyper_cleaning",
+    "jwl_afterburn",
+    "jwl_reactive",
     "Bx0",
     "precision",
     "parallel_io",
@@ -1312,6 +1342,21 @@ _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
 _nv(
     _SIM,
+    "jwl_ab_model",
+    "jwl_q_ab",
+    "jwl_ab_tau",
+    "jwl_ab_A",
+    "jwl_ab_theta",
+    "jwl_ab_n",
+    "prog_burn",
+    "pb_D_cj",
+    "pb_width",
+    "pb_x_det",
+    "pb_y_det",
+    "pb_z_det",
+    "pb_t_det",
+    "jwl_G",
+    "jwl_b_exp",
     "dt",
     "t_step_print",
     "time_stepper",
@@ -1458,6 +1503,7 @@ _nv(
     "E_wrt",
     "pres_wrt",
     "c_wrt",
+    "jwl_wrt",
     "gamma_wrt",
     "heat_ratio_wrt",
     "pi_inf_wrt",

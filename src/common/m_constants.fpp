@@ -94,6 +94,10 @@ module m_constants
     ! System constants
     integer, parameter :: CASE_FILE_ERROR_CODE = 22  !< Exit code for case file validation errors
 
+    ! Equation-of-state selectors for fluid_pp(:)%eos.
+    integer, parameter :: eos_stiffened_gas = 1
+    integer, parameter :: eos_jwl = 2
+
     ! Boundary condition enumeration Abbreviations CHAR - Characteristic NR - Non-reflecting SUB - subsonic SUP - supersonic FF -
     ! Force-free CP - Constant pressure
     integer, parameter :: BC_PERIODIC = -1

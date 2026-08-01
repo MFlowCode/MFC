@@ -7,6 +7,7 @@ module m_data_output
 
     use m_derived_types
     use m_global_parameters
+    use m_jwl, only: jwl_idx
     use m_derived_variables
     use m_mpi_proxy
     use m_compile_specific
@@ -271,6 +272,12 @@ contains
             end if
 
             if (schlieren_wrt) out%dbvars = out%dbvars + 1
+
+            ! JWL viz arrays: T and Y_products always, lambda only when reactive.
+            if (jwl_wrt .and. jwl_idx > 0) then
+                out%dbvars = out%dbvars + 2
+                if (jwl_reactive) out%dbvars = out%dbvars + 1
+            end if
         end if
 
     end subroutine s_initialize_data_output_module
