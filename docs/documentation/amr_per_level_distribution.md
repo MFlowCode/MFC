@@ -187,14 +187,24 @@ and only the second is a defect.
 | `amr_max_grid_size` | boxes | fine cells | s/step | s per box | ns per cell-update |
 |---|---|---|---|---|---|
 | 128 | 4096 | 268M | 70.3 | 0.0172 | 204 |
-| 256 | 934 | 414M | 40.3 | 0.0431 | 82 |
-| 512 | 458 | 511M | 12.9 | 0.0282 | 22 |
+| 256 | 934 | 414M | 40.3 (39.8) | 0.0431 | 82 (81) |
+| 512 | 458 | 511M | 12.9 (12.6) | 0.0282 | 22 (21) |
 | 1024 | 144 | 761M | 8.5 | 0.0588 | 10 |
 
-**s per box varies ~3.4x while cells per box varies 80x** (65.5k -> 5.28M). The cost of advancing a
-block is dominated by a fixed term, near-independent of how much data is in it. This confirms at
-production scale what @ref amr_block_batching measured in the small: a per-block advance costs a
-substantial fraction of a full monolithic step regardless of block size, and does not amortize.
+Parenthesised values are a repetition of those two rows: 1.3% and 2.9% apart, so everything below is
+far outside run-to-run spread.
+
+**Read the first three columns together: the arm that advances the MOST cells is the FASTEST.** 144
+boxes over 761M fine cells takes 8.5 s/step; 4096 boxes over 268M fine cells takes 70.3 s/step. Time
+rises monotonically with box count while the work done falls monotonically. Cost is set by the number
+of blocks advanced, not by the amount of data in them - no curve fitting required to see it.
+
+This confirms at production scale what @ref amr_block_batching measured in the small: a per-block
+advance costs a substantial fraction of a full monolithic step regardless of block size, and does not
+amortize. Note the per-block cost is not a clean constant either - `s per box` is non-monotonic
+(0.0431 at 934 boxes vs 0.0282 at 458), reproducibly so, so it is not simply `a + b*cells`. Something
+super-linear in box count is present as well - adjacency-driven work such as fine-fine seam exchange
+is the obvious suspect and is not yet isolated.
 
 **Consequences.**
 
@@ -211,9 +221,9 @@ substantial fraction of a full monolithic step regardless of block size, and doe
 
 **What this measurement is not.** The arms do not refine identical areas - a block is a rectangle, so
 coarser tiling over-covers, which is why fine cells RISE with the cap. So this is not a clean
-single-variable A/B on tiling, and the ns-per-cell column mixes the two effects. What is clean, and
-what the argument rests on, is `s per box` against `cells per box`: 3.4x against 80x. Single runs on
-a machine with ~11% run-to-run spread; the effects here are 2-20x, far above that.
+single-variable A/B on tiling, and the ns-per-cell column mixes the two effects. The argument
+deliberately does not rest on that column: it rests on time and work moving in OPPOSITE directions,
+which no confound between them can produce. Repeated rows agree to 1-3%.
 
 ## The problem, measured
 
