@@ -183,7 +183,7 @@ contains
 
     end subroutine s_check_inputs_ib_injection
 
-    !> Checks that each active particle cloud has a valid packing_method specified
+    !> Checks that each active particle cloud has a valid geometry and packing_method specified
     impure subroutine s_check_inputs_particle_clouds
 
         integer          :: i
@@ -191,11 +191,22 @@ contains
 
         do i = 1, num_particle_clouds
             call s_int_to_str(i, idxStr)
+            @:PROHIBIT(particle_cloud(i)%cloud_geometry /= 1 .and. particle_cloud(i)%cloud_geometry /= 2, &
+                       & "particle_cloud("//trim(idxStr) //")%cloud_geometry must be 1 (box) or 2 (hemisphere shell)")
             @:PROHIBIT(particle_cloud(i)%packing_method == dflt_int, &
                        & "particle_cloud("//trim(idxStr) &
                        & //")%packing_method must be specified (1 = rejection sampling, 2 = lattice)")
             @:PROHIBIT(particle_cloud(i)%packing_method /= 1 .and. particle_cloud(i)%packing_method /= 2, &
                        & "particle_cloud("//trim(idxStr) //")%packing_method must be 1 (rejection sampling) or 2 (lattice)")
+            @:PROHIBIT(particle_cloud(i)%cloud_geometry == 2 .and. particle_cloud(i)%shell_inner_radius < 0._wp, &
+                       & "particle_cloud("//trim(idxStr) //") hemisphere shell requires shell_inner_radius >= 0")
+            @:PROHIBIT(particle_cloud(i)%cloud_geometry == 2 &
+                       & .and. particle_cloud(i)%shell_outer_radius <= particle_cloud(i)%shell_inner_radius &
+                       & + 2._wp*particle_cloud(i)%radius, &
+                       & "particle_cloud("//trim(idxStr) &
+                       & //") hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius")
+            @:PROHIBIT(particle_cloud(i)%cloud_geometry == 2 .and. particle_cloud(i)%packing_method == 2, &
+                       & "particle_cloud("//trim(idxStr) //") hemisphere-shell lattice packing is not implemented")
         end do
 
     end subroutine s_check_inputs_particle_clouds

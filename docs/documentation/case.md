@@ -425,18 +425,25 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | Parameter         | Type    | Description |
 | ---:              | :----:  | :---        |
 | `x[y,z]_centroid` | Real    | Centre of the cloud region in the [x,y,z]-direction. |
-| `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction. |
+| `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction for `cloud_geometry = 1`; ignored by `cloud_geometry = 2`. |
 | `num_particles`   | Integer | Number of particles to place in the region. |
 | `radius`          | Real    | Radius of every particle in the cloud. |
 | `mass`            | Real    | Mass of every particle in the cloud. |
 | `min_spacing`     | Real    | Minimum surface-to-surface gap between particles (centres are `2*radius + min_spacing` apart). |
+| `cloud_geometry`  | Integer | Shape of the cloud region. |
+| `shell_inner_radius` | Real | Inner radius for hemisphere-shell clouds (`cloud_geometry = 2`). |
+| `shell_outer_radius` | Real | Outer radius for hemisphere-shell clouds (`cloud_geometry = 2`). |
 | `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`). |
 | `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
 | `packing_method`  | Integer | Algorithm used to place the particles. |
 
+- `cloud_geometry` selects the cloud region:
+  - `1` (box) uses `x[y,z]_centroid` and `length_x[y,z]` to define the region.
+  - `2` uses `x[y,z]_centroid`, `shell_inner_radius`, and `shell_outer_radius` to define a half-annulus in 2D and a hemisphere shell in 3D. Particle centres are sampled between `shell_inner_radius + radius` and `shell_outer_radius - radius`, and the flat plane is kept clear by one particle radius. The flat face is fixed at `y_centroid` in 2D and `z_centroid` in 3D; the filled region opens toward positive `y` in 2D and positive `z` in 3D.
 - `packing_method` selects how the `num_particles` are positioned within the cloud region:
   - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
   - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
+  - Hemisphere-shell clouds currently support rejection sampling only; `cloud_geometry = 2` with `packing_method = 2` is rejected during input validation.
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 

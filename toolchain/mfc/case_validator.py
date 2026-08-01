@@ -638,7 +638,12 @@ class CaseValidator:
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
+            geometry = self.get(f"particle_cloud({i})%cloud_geometry", 1)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
+            self.prohibit(
+                geometry not in [1, 2],
+                f"particle_cloud({i})%cloud_geometry must be 1 (box) or 2 (hemisphere shell)",
+            )
             self.prohibit(
                 packing_method is None,
                 f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
@@ -647,6 +652,55 @@ class CaseValidator:
                 packing_method is not None and packing_method not in [1, 2],
                 f"particle_cloud({i})%packing_method must be 1 (rejection sampling) or 2 (lattice)",
             )
+            shell_outer_radius = self.get(f"particle_cloud({i})%shell_outer_radius", None)
+            shell_inner_radius = self.get(f"particle_cloud({i})%shell_inner_radius", None)
+            radius = self.get(f"particle_cloud({i})%radius", None)
+            self.prohibit(
+                geometry == 2 and (shell_inner_radius is None or shell_inner_radius < 0),
+                f"particle_cloud({i}) hemisphere shell requires shell_inner_radius >= 0",
+            )
+            self.prohibit(
+                geometry == 2 and (shell_outer_radius is None or radius is None or shell_inner_radius is None or shell_outer_radius <= shell_inner_radius + 2 * radius),
+                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
+            )
+            self.prohibit(
+                geometry == 2 and packing_method == 2,
+                f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
+            )
+            if geometry == 2 and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
+                x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
+                y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
+                z_centroid = self.get(f"particle_cloud({i})%z_centroid", None)
+                x_beg = self.get("x_domain%beg", None)
+                x_end = self.get("x_domain%end", None)
+                y_beg = self.get("y_domain%beg", None)
+                y_end = self.get("y_domain%end", None)
+                z_beg = self.get("z_domain%beg", None)
+                z_end = self.get("z_domain%end", None)
+                n = self.get("n", 0)
+                p = self.get("p", 0)
+
+                if all(self._is_numeric(v) for v in [x_centroid, x_beg, x_end]):
+                    self.prohibit(
+                        x_centroid - shell_outer_radius < x_beg or x_centroid + shell_outer_radius > x_end,
+                        f"particle_cloud({i}) hemisphere shell x-extent must lie within x_domain",
+                    )
+                if n > 0 and all(self._is_numeric(v) for v in [y_centroid, y_beg, y_end]):
+                    if p > 0:
+                        self.prohibit(
+                            y_centroid - shell_outer_radius < y_beg or y_centroid + shell_outer_radius > y_end,
+                            f"particle_cloud({i}) hemisphere shell y-extent must lie within y_domain",
+                        )
+                    else:
+                        self.prohibit(
+                            y_centroid < y_beg or y_centroid + shell_outer_radius > y_end,
+                            f"particle_cloud({i}) half-annulus y-extent must lie within y_domain",
+                        )
+                if p > 0 and all(self._is_numeric(v) for v in [z_centroid, z_beg, z_end]):
+                    self.prohibit(
+                        z_centroid < z_beg or z_centroid + shell_outer_radius > z_end,
+                        f"particle_cloud({i}) hemisphere shell z-extent must lie within z_domain",
+                    )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)

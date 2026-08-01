@@ -43,11 +43,21 @@ contains
         ib_idx = 0  ! index into particle_cloud_ibs
 
         do cloud_idx = 1, num_particle_clouds
-            select case (particle_cloud(cloud_idx)%packing_method)
-            case (1)  ! random box packing method
-                call s_particle_cloud_random_box(cloud_idx, ib_idx, particle_cloud_ibs)
-            case (2)  ! lattice packing method
-                call s_particle_cloud_lattice(cloud_idx, ib_idx, particle_cloud_ibs)
+            select case (particle_cloud(cloud_idx)%cloud_geometry)
+            case (1)  ! box geometry
+                select case (particle_cloud(cloud_idx)%packing_method)
+                case (1)  ! rejection sampling method
+                    call s_particle_cloud_random_box(cloud_idx, ib_idx, particle_cloud_ibs)
+                case (2)  ! lattice packing method
+                    call s_particle_cloud_lattice(cloud_idx, ib_idx, particle_cloud_ibs)
+                end select
+            case (2)  ! hemisphere-shell geometry
+                select case (particle_cloud(cloud_idx)%packing_method)
+                case (1)  ! rejection sampling method
+                    call s_particle_cloud_random_hemi_shell(cloud_idx, ib_idx, particle_cloud_ibs)
+                case (2)
+                    call s_mpi_abort("Error :: Lattice packing is not implemented for hemisphere-shell particle clouds")
+                end select
             end select
         end do
 
@@ -65,12 +75,11 @@ contains
         integer                                                :: n_placed, geom, seed
         integer(8)                                             :: n_attempts, max_attempts
         real(wp)                                               :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp)                                               :: rx, ry, rz, dist
+        real(wp)                                               :: rx, ry, rz
         logical                                                :: overlaps
         real(wp), allocatable                                  :: placed(:,:)
         integer                                                :: hash_size, slot
-        integer                                                :: bx, by, bz, nbx, nby, nbz
-        integer                                                :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        integer                                                :: bx, by, bz
         integer, allocatable                                   :: hash_head(:), chain_next(:)
 
         xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
@@ -82,14 +91,10 @@ contains
 
         min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
 
-        if (p == 0) then
+        if (num_dims < 3) then
             geom = 2  ! circle for 2D
-            dz_lo = 0
-            dz_hi = 0
         else
             geom = 8  ! sphere for 3D
-            dz_lo = -1
-            dz_hi = 1
         end if
 
         max_attempts = int(particle_cloud(cloud_idx)%num_particles, 8)*1000_8
@@ -113,42 +118,14 @@ contains
 
             rx = xmin + f_xorshift(seed)*(xmax - xmin)
             ry = ymin + f_xorshift(seed)*(ymax - ymin)
-            if (p == 0) then
+            if (num_dims < 3) then
                 rz = particle_cloud(cloud_idx)%z_centroid
             else
                 rz = zmin + f_xorshift(seed)*(zmax - zmin)
             end if
 
-            bx = int(floor(rx/min_dist))
-            by = int(floor(ry/min_dist))
-            bz = 0
-            if (p /= 0) bz = int(floor(rz/min_dist))
-
-            ! Check 3x3(x3) neighboring bins - O(1) average via hash lookup
-            overlaps = .false.
-            outer: do dx_b = -1, 1
-                do dy_b = -1, 1
-                    do dz_b = dz_lo, dz_hi
-                        nbx = bx + dx_b
-                        nby = by + dy_b
-                        nbz = bz + dz_b
-                        slot = f_bin_hash(nbx, nby, nbz, hash_size)
-                        j = hash_head(slot)
-                        do while (j > 0)
-                            if (p == 0) then
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2)
-                            else
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2 + (rz - placed(3, j))**2)
-                            end if
-                            if (dist < min_dist) then
-                                overlaps = .true.
-                                exit outer
-                            end if
-                            j = chain_next(j)
-                        end do
-                    end do
-                end do
-            end do outer
+            call s_check_cloud_particle_overlap(rx, ry, rz, placed, hash_head, chain_next, hash_size, min_dist, overlaps, bx, by, &
+                                                & bz)
 
             if (.not. overlaps) then
                 n_placed = n_placed + 1
@@ -172,6 +149,103 @@ contains
         deallocate (placed, hash_head, chain_next)
 
     end subroutine s_particle_cloud_random_box
+
+    !> Generates a random distribution of particles in a hemisphere shell with a minimum spacing.
+    subroutine s_particle_cloud_random_hemi_shell(cloud_idx, ib_idx, particle_cloud_ibs)
+
+        integer, intent(in)                                    :: cloud_idx
+        integer, intent(inout)                                 :: ib_idx
+        type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
+        integer                                                :: n_placed, geom, seed
+        integer(8)                                             :: n_attempts, max_attempts
+        real(wp)                                               :: min_dist
+        real(wp)                                               :: rx, ry, rz, theta, phi, r_shell, rho, u
+        real(wp)                                               :: r_inner, r_outer, zdir
+        logical                                                :: overlaps
+        real(wp), allocatable                                  :: placed(:,:)
+        integer                                                :: hash_size, slot
+        integer                                                :: bx, by, bz
+        integer, allocatable                                   :: hash_head(:), chain_next(:)
+
+        r_inner = particle_cloud(cloud_idx)%shell_inner_radius + particle_cloud(cloud_idx)%radius
+        r_outer = particle_cloud(cloud_idx)%shell_outer_radius - particle_cloud(cloud_idx)%radius
+        min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
+
+        if (r_inner < 0._wp .or. r_outer <= r_inner) then
+            call s_mpi_abort("Error :: Invalid hemisphere-shell radii for particle cloud packing")
+        end if
+
+        if (num_dims < 3) then
+            geom = 2
+        else
+            geom = 8
+        end if
+
+        max_attempts = int(particle_cloud(cloud_idx)%num_particles, 8)*1000_8
+        n_placed = 0
+        n_attempts = 0
+        seed = particle_cloud(cloud_idx)%seed
+        if (seed == 0) seed = 1 + cloud_idx*1013904223
+
+        allocate (placed(3, particle_cloud(cloud_idx)%num_particles))
+
+        hash_size = max(16, 4*particle_cloud(cloud_idx)%num_particles)
+        allocate (hash_head(hash_size))
+        allocate (chain_next(particle_cloud(cloud_idx)%num_particles))
+        hash_head = -1
+        chain_next = -1
+
+        do while (n_placed < particle_cloud(cloud_idx)%num_particles .and. n_attempts < max_attempts)
+            n_attempts = n_attempts + 1
+
+            if (num_dims < 3) then
+                theta = pi*f_xorshift(seed)
+                u = f_xorshift(seed)
+                r_shell = sqrt((r_outer**2 - r_inner**2)*u + r_inner**2)
+                rx = particle_cloud(cloud_idx)%x_centroid + r_shell*cos(theta)
+                ry = particle_cloud(cloud_idx)%y_centroid + r_shell*sin(theta)
+                rz = particle_cloud(cloud_idx)%z_centroid
+            else
+                phi = 2._wp*pi*f_xorshift(seed)
+                zdir = f_xorshift(seed)
+                rho = sqrt(max(0._wp, 1._wp - zdir**2))
+                u = f_xorshift(seed)
+                r_shell = ((r_outer**3 - r_inner**3)*u + r_inner**3)**(1._wp/3._wp)
+                rx = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
+                ry = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*sin(phi)
+                rz = particle_cloud(cloud_idx)%z_centroid + r_shell*zdir
+            end if
+
+            if (num_dims < 3) then
+                if (ry < particle_cloud(cloud_idx)%y_centroid + particle_cloud(cloud_idx)%radius) cycle
+            else
+                if (rz < particle_cloud(cloud_idx)%z_centroid + particle_cloud(cloud_idx)%radius) cycle
+            end if
+
+            call s_check_cloud_particle_overlap(rx, ry, rz, placed, hash_head, chain_next, hash_size, min_dist, overlaps, bx, by, &
+                                                & bz)
+
+            if (.not. overlaps) then
+                n_placed = n_placed + 1
+                placed(1, n_placed) = rx
+                placed(2, n_placed) = ry
+                placed(3, n_placed) = rz
+
+                slot = f_bin_hash(bx, by, bz, hash_size)
+                chain_next(n_placed) = hash_head(slot)
+                hash_head(slot) = n_placed
+
+                call s_add_cloud_particle(cloud_idx, ib_idx, geom, rx, ry, rz, particle_cloud_ibs)
+            end if
+        end do
+
+        if (n_placed < particle_cloud(cloud_idx)%num_particles) then
+            call s_mpi_abort("Error :: Failed to place all particles in hemisphere-shell particle bed")
+        end if
+
+        deallocate (placed, hash_head, chain_next)
+
+    end subroutine s_particle_cloud_random_hemi_shell
 
     !> Places particles on the optimally dense lattice for the cloud region: a triangular lattice in 2D, a face-centered cubic
     !! lattice in 3D. The lattice spacing is set by the particle density (num_particles over the region area/volume); if that
@@ -312,6 +386,73 @@ contains
         particle_cloud_ibs(ib_idx)%burn_rate_pref = 0._wp
 
     end subroutine s_add_cloud_particle
+
+    !> Convert a candidate particle centre to spatial-hash bin coordinates.
+    subroutine s_get_cloud_bin(px, py, pz, min_dist, bx, by, bz)
+
+        real(wp), intent(in) :: px, py, pz, min_dist
+        integer, intent(out) :: bx, by, bz
+
+        bx = int(floor(px/min_dist))
+        by = int(floor(py/min_dist))
+        if (num_dims < 3) then
+            bz = 0
+        else
+            bz = int(floor(pz/min_dist))
+        end if
+
+    end subroutine s_get_cloud_bin
+
+    !> Check whether a candidate particle centre overlaps any already-placed particle in neighbouring spatial-hash bins.
+    subroutine s_check_cloud_particle_overlap(px, py, pz, placed, hash_head, chain_next, hash_size, min_dist, overlaps, bx, by, bz)
+
+        real(wp), intent(in)                 :: px, py, pz, min_dist
+        real(wp), intent(in), dimension(:,:) :: placed
+        integer, intent(in), dimension(:)    :: hash_head, chain_next
+        integer, intent(in)                  :: hash_size
+        logical, intent(out)                 :: overlaps
+        integer, intent(out)                 :: bx, by, bz
+        integer                              :: nbx, nby, nbz, slot
+        integer                              :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        real(wp)                             :: dist_sq, min_dist_sq
+
+        call s_get_cloud_bin(px, py, pz, min_dist, bx, by, bz)
+
+        dz_lo = -1
+        dz_hi = 1
+        if (num_dims < 3) then
+            dz_lo = 0
+            dz_hi = 0
+        end if
+
+        min_dist_sq = min_dist**2
+        overlaps = .false.
+
+        do dx_b = -1, 1
+            do dy_b = -1, 1
+                do dz_b = dz_lo, dz_hi
+                    nbx = bx + dx_b
+                    nby = by + dy_b
+                    nbz = bz + dz_b
+                    slot = f_bin_hash(nbx, nby, nbz, hash_size)
+                    j = hash_head(slot)
+                    do while (j > 0)
+                        if (num_dims < 3) then
+                            dist_sq = (px - placed(1, j))**2 + (py - placed(2, j))**2
+                        else
+                            dist_sq = (px - placed(1, j))**2 + (py - placed(2, j))**2 + (pz - placed(3, j))**2
+                        end if
+                        if (dist_sq < min_dist_sq) then
+                            overlaps = .true.
+                            return
+                        end if
+                        j = chain_next(j)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_check_cloud_particle_overlap
 
     !> Xorshift PRNG. Advances seed in-place and returns a value in [0, 1).
     function f_xorshift(seed) result(rval)
