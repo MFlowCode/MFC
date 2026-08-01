@@ -294,26 +294,43 @@ them are load-bearing and a reader retracing the work needs them. Steps 5-7 are 
 
 ### The live queue
 
-Balance is no longer the open question: at 75.5M with clustered refinement the balancer holds
-1.03-1.06 and spreads boxes across every rank. What is NOT known is how much AMR costs relative to
-uniform at that size, and whether the ceiling is even AMR's.
+Two questions are now settled, and they narrow the remaining work considerably.
 
-8. **Is the np=8 ceiling MFC's or this branch's?** The uniform control at 75.5M measures 85 / 71 / 45%
-   efficiency at np = 2 / 4 / 8 - with no AMR involved at all. Run the SAME portable case
-   (`amr-bench/gen_uniform.py`, standard geometry patches, no `hcid`, no AMR) on MFC master and on
-   this branch. If master shows the same curve, 45% is baseline MFC on this machine and no amount of
-   AMR work will move it; if the branch is worse, that is a regression to find. Cheapest decisive
-   experiment available, and it gates everything below.
-9. **AMR cost relative to uniform at production scale.** The AMR np=1 point at 75.5M exceeded the
-   harness's 1800 s cap, so there is no AMR baseline and therefore no AMR speedup or overhead ratio.
-   Raise the cap or cut the step count for that point specifically, then quantify what the fine
-   overlay actually costs where the GPUs are loaded.
-10. **Only then, revisit @ref amr_block_batching.** The argument that per-box overhead dominates rests
-    on efficiency figures that were later found contaminated (starved GPUs, `run_time_info`
-    serialisation). It may well be right, but it has not been re-measured cleanly and should not be
-    treated as established.
-11. **Scale-invariance run.** Sweep rank count past the box count per level. Single-node np<=8 cannot
-    show this; the granularity floor and the indivisible atom only bind once ranks approach box count.
+**Balance is solved at production scale.** At 75.5M cells with refinement clustered in one quadrant,
+the balancer holds 1.03-1.06 measured imbalance and puts blocks on every rank. Spatial concentration
+does NOT create imbalance, because per-level distribution decouples ownership from position - step 4
+working as designed. The cell-based cost model is adequate there; an experimental fixed per-box term
+bought ~2%, inside run-to-run variance, and was rejected (`0e3418ef`).
+
+**The scaling ceiling is MFC's, not this branch's and not AMR's.** Same portable uniform case
+(`amr-bench/gen_uniform.py`, no AMR in the path), same harness, run on MFC master `bfdc8f5e` and on
+this branch, 3 reps alternating between trees:
+
+| np | master median | branch median | ratio | within-tree spread |
+|---|---|---|---|---|
+| 4 | 0.3285 s | 0.3359 s | **1.022** | 6.9% / 2.0% |
+| 8 | 0.2326 s | 0.2380 s | **1.023** | 11.1% / 5.2% |
+
+The branch costs ~2% on a uniform problem - indistinguishable from noise at an 11% within-tree
+spread. Uniform efficiency is ~60% at np=8 on both trees. **No AMR work can move that**, and a
+single-run comparison earlier suggested 15% at np=4 purely as an artifact: three reps put it at 2%.
+
+Consequence for measurement discipline: at 11% run-to-run spread on this machine, **any A/B claiming
+less than ~10% needs repetitions**, taken alternating between arms so drift hits both equally.
+
+8. **What does AMR actually cost relative to uniform, at a loaded size?** STILL UNKNOWN and now the
+   gating question. The AMR np=1 point at 75.5M exceeded the harness's 1800 s cap, so there is no
+   baseline and therefore no overhead ratio. Raise the cap or cut the step count for that point.
+   Without this number there is no way to size the prize for any AMR-side optimisation.
+9. **Then, and only then, revisit @ref amr_block_batching.** Its premise - that per-block overhead
+   dominates - was argued from efficiency figures since found contaminated (starved GPUs at 16k
+   cells/rank, and `run_time_info` forcing a device sync every step). It may still be right, but
+   against a ~60% uniform ceiling the recoverable headroom is smaller than the original framing
+   assumed, and step 8 is what sizes it.
+10. **Multi-node scale invariance.** This is the actual exascale question and single-node np<=8 cannot
+    answer it: the granularity floor and the indivisible atom only bind once ranks approach the box
+    count per level. Everything measured here tops out at 8 ranks with 13-64 boxes per rank - a
+    regime where the balancer is comfortable. The interesting regime is the one where it is not.
 
 ## The cost model is regime-dependent, and production is the cell-dominated regime
 
