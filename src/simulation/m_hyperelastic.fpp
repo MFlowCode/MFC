@@ -100,8 +100,7 @@ contains
                 do j = 0, m
                     call s_compute_species_fraction(q_cons_vf, j, k, l, alpha_rho_k, alpha_k)
 
-                    ! If in simulation, use acc mixture subroutines
-                    call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha_k, alpha_rho_k, Re, G_local, &
+                    call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_k, alpha_rho_k, Re, G_local, &
                         & Gs_hyper)
                     rho = max(rho, sgm_eps)
                     G_local = max(G_local, sgm_eps)

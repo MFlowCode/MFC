@@ -21,29 +21,12 @@ module m_variables_conversion
     implicit none
 
     private
-    public :: s_initialize_variables_conversion_module, &
-              s_initialize_pb, &
-              s_initialize_mv, &
-              s_convert_to_mixture_variables, &
-              s_convert_mixture_to_mixture_variables, &
-              s_convert_species_to_mixture_variables, &
-              s_convert_species_to_mixture_variables_acc, &
-              s_convert_conservative_to_primitive_variables, &
-              s_convert_primitive_to_conservative_variables, &
-              s_convert_primitive_to_flux_variables, &
-              s_compute_pressure, &
-              s_compute_species_fraction, &
-#ifndef MFC_PRE_PROCESS
-    s_compute_speed_of_sound, &
-              s_compute_fast_magnetosonic_speed, &
-#endif
-    s_finalize_variables_conversion_module
-
-    ! In simulation, gammas, pi_infs, and qvs are already declared in m_global_variables
-#ifndef MFC_SIMULATION
-    real(wp), allocatable, public, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
-#endif
+    public :: s_initialize_variables_conversion_module, s_initialize_pb, s_initialize_mv, s_convert_to_mixture_variables, &
+        & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
+        & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
+        & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
+        & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_fast_magnetosonic_speed, &
+        & s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -52,6 +35,11 @@ module m_variables_conversion
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     $:GPU_DECLARE(create='[is1b, is2b, is3b, is1e, is2e, is3e]')
+
+    logical :: enforce_density_floor_vc = .false.
+    logical :: preserve_qbmm_number_vc = .false.
+    integer :: lagrange_beta_index_vc = 0
+    $:GPU_DECLARE(create='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
     real(wp), allocatable, dimension(:,:,:), public :: rho_sf     !< Scalar density function
     real(wp), allocatable, dimension(:,:,:), public :: gamma_sf   !< Scalar sp. heat ratio function
@@ -165,13 +153,13 @@ contains
         pi_inf = q_vf(eqn_idx%pi_inf)%sf(i, j, k)
         qv = 0._wp  ! keep this value nil for now. For future adjustment
 
-        ! Post process requires rho_sf/gamma_sf/pi_inf_sf/qv_sf to also be updated
-#ifdef MFC_POST_PROCESS
-        rho_sf(i, j, k) = rho
-        gamma_sf(i, j, k) = gamma
-        pi_inf_sf(i, j, k) = pi_inf
-        qv_sf(i, j, k) = qv
-#endif
+        ! Store derived mixture fields when requested during module initialization.
+        if (allocated(rho_sf)) then
+            rho_sf(i, j, k) = rho
+            gamma_sf(i, j, k) = gamma
+            pi_inf_sf(i, j, k) = pi_inf
+            qv_sf(i, j, k) = qv
+        end if
 
     end subroutine s_convert_mixture_to_mixture_variables
 
@@ -195,60 +183,24 @@ contains
 
         call s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
 
-        ! Calculating the density, the specific heat ratio function, the liquid stiffness function, and the energy reference
-        ! function, respectively, from the species analogs
-        if (num_fluids == 1 .and. bubbles_euler) then
-            rho = alpha_rho_K(1)
-            gamma = gammas(1)
-            pi_inf = pi_infs(1)
-            qv = qvs(1)
-        else
-            rho = 0._wp; gamma = 0._wp; pi_inf = 0._wp; qv = 0._wp
-            do i = 1, num_fluids
-                rho = rho + alpha_rho_K(i)
-                gamma = gamma + alpha_K(i)*gammas(i)
-                pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
-                qv = qv + alpha_rho_K(i)*qvs(i)
-            end do
+        ! Use the same scalar kernel on host and device so mixture semantics do not depend on the executable or accelerator backend.
+        ! Absent optional dummies forward as absent, so the optional arguments need no dispatch here.
+        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, Re_K, G_K, G)
+
+        ! Store derived mixture fields when requested during module initialization.
+        if (allocated(rho_sf)) then
+            rho_sf(k, l, r) = rho
+            gamma_sf(k, l, r) = gamma
+            pi_inf_sf(k, l, r) = pi_inf
+            qv_sf(k, l, r) = qv
         end if
-
-#ifdef MFC_SIMULATION
-        ! Computing the shear and bulk Reynolds numbers from species analogs
-        if (viscous) then
-            do i = 1, 2
-                Re_K(i) = dflt_real; if (Re_size(i) > 0) Re_K(i) = 0._wp
-
-                do j = 1, Re_size(i)
-                    Re_K(i) = alpha_K(Re_idx(i, j))/fluid_pp(Re_idx(i, j))%Re(i) + Re_K(i)
-                end do
-
-                Re_K(i) = 1._wp/max(Re_K(i), sgm_eps)
-            end do
-        end if
-#endif
-
-        if (present(G_K)) then
-            G_K = 0._wp
-            do i = 1, num_fluids
-                G_K = G_K + alpha_K(i)*G(i)
-            end do
-            G_K = max(0._wp, G_K)
-        end if
-
-        ! Post process requires rho_sf/gamma_sf/pi_inf_sf/qv_sf to also be updated
-#ifdef MFC_POST_PROCESS
-        rho_sf(k, l, r) = rho
-        gamma_sf(k, l, r) = gamma
-        pi_inf_sf(k, l, r) = pi_inf
-        qv_sf(k, l, r) = qv
-#endif
 
     end subroutine s_convert_species_to_mixture_variables
 
-    !> GPU-accelerated conversion of species volume fractions and partial densities to mixture density, gamma, pi_inf, and qv.
-    subroutine s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, G_K, G)
+    !> Host- and device-callable conversion kernel for species and mixture variables.
+    subroutine s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, G_K, G)
 
-        $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_acc', parallelism='[seq]', cray_noinline=True)
+        $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_kernel', parallelism='[seq]', cray_noinline=True)
 
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -258,19 +210,18 @@ contains
             real(wp), dimension(num_fluids), intent(inout)        :: alpha_rho_K, alpha_K
             real(wp), optional, dimension(num_fluids), intent(in) :: G
         #:endif
-        real(wp), dimension(2), intent(out) :: Re_K
-        real(wp), optional, intent(out)     :: G_K
-        real(wp)                            :: alpha_K_sum
-        integer                             :: i, j  !< Generic loop iterators
+        real(wp), optional, dimension(2), intent(out) :: Re_K
+        real(wp), optional, intent(out)               :: G_K
+        real(wp)                                      :: alpha_K_sum
+        integer                                       :: i, j  !< Generic loop iterators
 
         rho_K = 0._wp
         gamma_K = 0._wp
         pi_inf_K = 0._wp
         qv_K = 0._wp
-        Re_K = dflt_real
+        if (present(Re_K)) Re_K = dflt_real
         if (present(G_K)) G_K = 0._wp
 
-#ifdef MFC_SIMULATION
         ! Constrain partial densities and volume fractions within physical bounds
         if (num_fluids == 1 .and. bubbles_euler) then
             rho_K = alpha_rho_K(1)
@@ -305,7 +256,7 @@ contains
             G_K = max(0._wp, G_K)
         end if
 
-        if (viscous) then
+        if (viscous .and. present(Re_K)) then
             do i = 1, 2
                 Re_K(i) = dflt_real
 
@@ -318,16 +269,30 @@ contains
                 Re_K(i) = 1._wp/max(Re_K(i), sgm_eps)
             end do
         end if
-#endif
 
-    end subroutine s_convert_species_to_mixture_variables_acc
+    end subroutine s_convert_species_to_mixture_variables_kernel
 
     !> Initialize the variables conversion module.
-    impure subroutine s_initialize_variables_conversion_module
+    impure subroutine s_initialize_variables_conversion_module(store_mixture_fields, enforce_density_floor, preserve_qbmm_number, &
+        & lagrange_beta_index)
 
-        integer :: i, j
+        integer                       :: i, j
+        logical, optional, intent(in) :: store_mixture_fields
+        logical, optional, intent(in) :: enforce_density_floor, preserve_qbmm_number
+        integer, optional, intent(in) :: lagrange_beta_index
+        logical                       :: allocate_mixture_fields
+
+        allocate_mixture_fields = .false.
+        if (present(store_mixture_fields)) allocate_mixture_fields = store_mixture_fields
+        enforce_density_floor_vc = .false.
+        if (present(enforce_density_floor)) enforce_density_floor_vc = enforce_density_floor
+        preserve_qbmm_number_vc = .false.
+        if (present(preserve_qbmm_number)) preserve_qbmm_number_vc = preserve_qbmm_number
+        lagrange_beta_index_vc = 0
+        if (present(lagrange_beta_index)) lagrange_beta_index_vc = lagrange_beta_index
 
         $:GPU_ENTER_DATA(copyin='[is1b, is1e, is2b, is2e, is3b, is3e]')
+        $:GPU_UPDATE(device='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(gs_min (1:num_fluids))
@@ -350,18 +315,17 @@ contains
         end do
         $:GPU_UPDATE(device='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc]')
 
-#ifdef MFC_SIMULATION
-        if (viscous) then
-            @:ALLOCATE(Res_vc(1:2, 1:Re_size_max))
+        @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
+        Res_vc = dflt_real
+        if (allocated(Re_idx)) then
             do i = 1, 2
                 do j = 1, Re_size(i)
                     Res_vc(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-
-            $:GPU_UPDATE(device='[Res_vc, Re_idx, Re_size]')
+            $:GPU_UPDATE(device='[Re_idx]')
         end if
-#endif
+        $:GPU_UPDATE(device='[Res_vc, Re_size]')
 
         if (bubbles_euler) then
             @:ALLOCATE(bubrs_vc(1:nb))
@@ -371,34 +335,27 @@ contains
             $:GPU_UPDATE(device='[bubrs_vc]')
         end if
 
-#ifdef MFC_POST_PROCESS
-        ! Allocating the density, the specific heat ratio function and the liquid stiffness function, respectively
-
-        ! Simulation is at least 2D
-        if (n > 0) then
-            ! Simulation is 3D
-            if (p > 0) then
-                allocate (rho_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
-                allocate (gamma_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
-                allocate (pi_inf_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
-                allocate (qv_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
-
-                ! Simulation is 2D
+        if (allocate_mixture_fields) then
+            ! Allocate derived mixture fields over the available grid storage.
+            if (n > 0) then
+                if (p > 0) then
+                    allocate (rho_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
+                    allocate (gamma_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
+                    allocate (pi_inf_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
+                    allocate (qv_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
+                else
+                    allocate (rho_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                    allocate (gamma_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                    allocate (pi_inf_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                    allocate (qv_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                end if
             else
-                allocate (rho_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
-                allocate (gamma_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
-                allocate (pi_inf_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
-                allocate (qv_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
+                allocate (rho_sf(-buff_size:m + buff_size,0:0,0:0))
+                allocate (gamma_sf(-buff_size:m + buff_size,0:0,0:0))
+                allocate (pi_inf_sf(-buff_size:m + buff_size,0:0,0:0))
+                allocate (qv_sf(-buff_size:m + buff_size,0:0,0:0))
             end if
-
-            ! Simulation is 1D
-        else
-            allocate (rho_sf(-buff_size:m + buff_size,0:0,0:0))
-            allocate (gamma_sf(-buff_size:m + buff_size,0:0,0:0))
-            allocate (pi_inf_sf(-buff_size:m + buff_size,0:0,0:0))
-            allocate (qv_sf(-buff_size:m + buff_size,0:0,0:0))
         end if
-#endif
 
     end subroutine s_initialize_variables_conversion_module
 
@@ -513,17 +470,17 @@ contains
                     call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
 
                     if (model_eqns /= model_eqns_4eq) then
-#ifdef MFC_SIMULATION
-                        ! If in simulation, use acc mixture subroutines
+#ifdef MFC_GPU
+                        ! Device regions call the device-compiled scalar kernel directly.
                         if (elasticity) then
-                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                                & Re_K, G_K, Gs_vc)
+                            call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                & alpha_rho_K, Re_K, G_K, Gs_vc)
                         else
-                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                                & Re_K)
+                            call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                & alpha_rho_K, Re_K)
                         end if
 #else
-                        ! If pre-processing, use non acc mixture subroutines
+                        ! Host execution uses the wrapper, which also stores requested diagnostics.
                         if (elasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, &
                                                                 & fluid_pp(:)%G)
@@ -635,9 +592,7 @@ contains
                         end do
                     end if
 
-#ifdef MFC_SIMULATION
-                    rho_K = max(rho_K, sgm_eps)
-#endif
+                    if (enforce_density_floor_vc) rho_K = max(rho_K, sgm_eps)
 
                     ! Recover velocity from momentum: u = rho*u / rho, and accumulate dynamic pressure 0.5*rho*|u|^2
                     $:GPU_LOOP(parallelism='[seq]')
@@ -700,9 +655,9 @@ contains
                                 qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
                             end do
                             ! Need to keep track of nb in the primitive variable list (converted back to true value before output)
-#ifdef MFC_SIMULATION
-                            qK_prim_vf(eqn_idx%bub%beg)%sf(j, k, l) = qK_cons_vf(eqn_idx%bub%beg)%sf(j, k, l)
-#endif
+                            if (preserve_qbmm_number_vc) then
+                                qK_prim_vf(eqn_idx%bub%beg)%sf(j, k, l) = qK_cons_vf(eqn_idx%bub%beg)%sf(j, k, l)
+                            end if
                         else
                             if (adv_n) then
                                 qK_prim_vf(eqn_idx%n)%sf(j, k, l) = qK_cons_vf(eqn_idx%n)%sf(j, k, l)
@@ -770,9 +725,9 @@ contains
                     if (cont_damage) qK_prim_vf(eqn_idx%damage)%sf(j, k, l) = qK_cons_vf(eqn_idx%damage)%sf(j, k, l)
 
                     if (hyper_cleaning) qK_prim_vf(eqn_idx%psi)%sf(j, k, l) = qK_cons_vf(eqn_idx%psi)%sf(j, k, l)
-#ifdef MFC_POST_PROCESS
-                    if (bubbles_lagrange) qK_prim_vf(beta_idx)%sf(j, k, l) = qK_cons_vf(beta_idx)%sf(j, k, l)
-#endif
+                    if (bubbles_lagrange .and. lagrange_beta_index_vc > 0) then
+                        qK_prim_vf(lagrange_beta_index_vc)%sf(j, k, l) = qK_cons_vf(lagrange_beta_index_vc)%sf(j, k, l)
+                    end if
                 end do
             end do
         end do
@@ -812,7 +767,6 @@ contains
 
         G = 0._wp
 
-#ifndef MFC_SIMULATION
         ! Converting the primitive variables to the conservative variables
         do l = 0, p
             do k = 0, n
@@ -1019,18 +973,17 @@ contains
                 end do
             end do
         end do
-#else
-        if (proc_rank == 0) then
-            call s_mpi_abort('Conversion from primitive to ' // 'conservative variables not ' // 'implemented. Exiting.')
-        end if
-#endif
 
     end subroutine s_convert_primitive_to_conservative_variables
 
     !> Convert primitive variables to Eulerian flux variables.
-    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b)
+    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b, dir_idx_in, dir_flg_in)
 
-        integer, intent(in)                                                                     :: s2b, s3b
+        integer, intent(in) :: s2b, s3b
+        !> Working-direction mapping, passed explicitly: it is simulation state (m_global_parameters), and use-associating it into
+        !! this common kernel spills registers on AMD OpenMP offload.
+        integer, dimension(3), intent(in)                                                       :: dir_idx_in
+        real(wp), dimension(3), intent(in)                                                      :: dir_flg_in
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in)                  :: qK_prim_vf
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout)               :: FK_vf
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,eqn_idx%adv%beg:), intent(inout) :: FK_src_vf
@@ -1070,9 +1023,8 @@ contains
 
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
-#ifdef MFC_SIMULATION
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]')
+                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, dir_flg_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1099,10 +1051,11 @@ contains
 
                     pres_K = qK_prim_vf(j, k, l, eqn_idx%E)
                     if (elasticity) then
-                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
+                        call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
                             & Re_K, G_K, Gs_vc)
                     else
-                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
+                        call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
+                            & Re_K)
                     end if
 
                     ! Computing the energy from the pressure
@@ -1126,24 +1079,24 @@ contains
                     ! mass flux, this should be \alpha_i \rho_i u_i
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, eqn_idx%cont%end
-                        FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(dir_idx(1))
+                        FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(dir_idx_in(1))
                     end do
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_vels
                         FK_vf(j, k, l, &
-                              & eqn_idx%cont%end + dir_idx(i)) = rho_K*vel_K(dir_idx(1))*vel_K(dir_idx(i)) &
-                              & + pres_K*dir_flg(dir_idx(i))
+                              & eqn_idx%cont%end + dir_idx_in(i)) = rho_K*vel_K(dir_idx_in(1))*vel_K(dir_idx_in(i)) &
+                              & + pres_K*dir_flg_in(dir_idx_in(i))
                     end do
 
                     ! energy flux, u(E+p)
-                    FK_vf(j, k, l, eqn_idx%E) = vel_K(dir_idx(1))*(E_K + pres_K)
+                    FK_vf(j, k, l, eqn_idx%E) = vel_K(dir_idx_in(1))*(E_K + pres_K)
 
                     ! Species advection Flux, \rho*u*Y
                     if (chemistry) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_species
-                            FK_vf(j, k, l, i - 1 + eqn_idx%species%beg) = vel_K(dir_idx(1))*(rho_K*Y_K(i))
+                            FK_vf(j, k, l, i - 1 + eqn_idx%species%beg) = vel_K(dir_idx_in(1))*(rho_K*Y_K(i))
                         end do
                     end if
 
@@ -1157,19 +1110,18 @@ contains
                         ! Could be bubbles_euler!
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            FK_vf(j, k, l, i) = vel_K(dir_idx(1))*alpha_K(i - eqn_idx%E)
+                            FK_vf(j, k, l, i) = vel_K(dir_idx_in(1))*alpha_K(i - eqn_idx%E)
                         end do
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            FK_src_vf(j, k, l, i) = vel_K(dir_idx(1))
+                            FK_src_vf(j, k, l, i) = vel_K(dir_idx_in(1))
                         end do
                     end if
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-#endif
 
     end subroutine s_convert_primitive_to_flux_variables
 
@@ -1227,29 +1179,18 @@ contains
     !> Deallocate fluid property arrays and post-processing fields allocated during module initialization.
     impure subroutine s_finalize_variables_conversion_module()
 
-        ! Deallocating the density, the specific heat ratio function and the liquid stiffness function
-#ifdef MFC_POST_PROCESS
-        deallocate (rho_sf, gamma_sf, pi_inf_sf, qv_sf)
-#endif
+        if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf, qv_sf)
 
-#ifdef MFC_SIMULATION
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
-        if (bubbles_euler) then
+        if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
-        if (viscous) then
+        if (allocated(Res_vc)) then
             @:DEALLOCATE(Res_vc)
         end if
-#else
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
-        if (bubbles_euler) then
-            @:DEALLOCATE(bubrs_vc)
-        end if
-#endif
 
     end subroutine s_finalize_variables_conversion_module
 
-#ifndef MFC_PRE_PROCESS
     !> Compute the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
 
@@ -1309,9 +1250,7 @@ contains
         end if
 
     end subroutine s_compute_speed_of_sound
-#endif
 
-#ifndef MFC_PRE_PROCESS
     !> Compute the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
     subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
 
@@ -1348,5 +1287,5 @@ contains
         c_fast = sqrt(0.5_wp*(term + sqrt(disc)))
 
     end subroutine s_compute_fast_magnetosonic_speed
-#endif
+
 end module m_variables_conversion

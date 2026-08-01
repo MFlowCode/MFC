@@ -2,7 +2,6 @@
 MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
-This replaces the definitions/ directory.
 """
 
 import re
@@ -1160,6 +1159,11 @@ _init_registry()
 
 NAMELIST_VARS: dict[str, set[str]] = {}
 
+# Some common modules are compiled into every executable even though the
+# corresponding user input remains meaningful in only a subset of namelists.
+# Keep declaration visibility separate from input acceptance.
+DECLARATION_TARGETS: dict[str, set[str]] = {}
+
 # Maps indexed-family base names to their Fortran dimension expression.
 # The generator emits `{type}, dimension({dim}) :: {name}` for each entry.
 # Add here whenever a new array param needs no manual Fortran declaration.
@@ -1207,11 +1211,30 @@ def _nv(targets: set, *names: str) -> None:
         NAMELIST_VARS[n] = set(targets)
 
 
+def _decl(targets: set, *names: str) -> None:
+    for n in names:
+        DECLARATION_TARGETS[n] = set(targets)
+
+
 _ALL, _PRE_SIM, _SIM_POST = {"pre", "sim", "post"}, {"pre", "sim"}, {"sim", "post"}
 _PRE_POST = {"pre", "post"}
 _SIM = {"sim"}
 _PRE = {"pre"}
 _POST = {"post"}
+
+_decl(
+    _ALL,
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
+    "sigR",
+    "viscous",
+    "riemann_solver",
+    "stl_models",
+    "num_stl_models",
+    "palpha_eps",
+    "ptgalpha_eps",
+)
 
 _nv(
     _ALL,
@@ -1271,12 +1294,12 @@ _nv(
     "t_stop",
     "t_save",
     "cfl_target",
-    "avg_state",
     "prim_vars_wrt",
-    "alt_soundspeed",
-    "mixture_err",
     "fd_order",
     "ib_state_wrt",
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
 )
 _nv(
     _PRE_SIM,
@@ -1286,7 +1309,7 @@ _nv(
     "patch_ib",
     "pi_fac",
 )
-_nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
+_nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "igr", "igr_order", "sigR")
 _nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
@@ -1309,7 +1332,6 @@ _nv(
     "int_comp",
     "ic_eps",
     "ic_beta",
-    "riemann_solver",
     "hyper_model",
     "wave_speeds",
     "low_Mach",
@@ -1375,6 +1397,7 @@ _nv(
     "nv_uvm_out_of_core",
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
+    "riemann_solver",
 )
 _nv(
     _PRE,
@@ -1403,7 +1426,6 @@ _nv(
     "sigV",
     "dist_type",
     "rhoRV",
-    "viscous",
     "old_grid",
     "old_ic",
     "perturb_flow",
@@ -1423,6 +1445,7 @@ _nv(
     "simplex_params",
     "files_dir",
     "file_extension",
+    "viscous",
 )
 _nv(
     _POST,

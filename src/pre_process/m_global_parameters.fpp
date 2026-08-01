@@ -36,7 +36,6 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
-    real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> Global (pre-decomposition) domain bounds, needed by s_generate_serial_grid to stretch the grid using the full domain length
     !! rather than a local processor's sub-domain length
@@ -182,7 +181,6 @@ contains
         ptgalpha_eps = dflt_real
         igr_order = dflt_int
         precision = 2
-        viscous = .false.
         mixlayer_vel_profile = .false.
         mixlayer_vel_coef = 1._wp
         mixlayer_perturb = .false.
@@ -316,7 +314,6 @@ contains
         Web = dflt_real
 
         nmom = 1
-        sigR = dflt_real
         sigV = dflt_real
         rhoRV = 0._wp
         dist_type = dflt_int
@@ -447,8 +444,8 @@ contains
         ! (guards match the original site: 5-equation bubbles with 4-node qbmm)
         if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. qbmm .and. nnode == 4) nmom = 6
 
-        ! Populate eqn_idx, sys_size, b_size, tensor_size, elasticity, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom, nb)
+        ! Populate eqn_idx, sys_size, shear_* (shared logic)
+        call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.false.)
 
         ! Per-target (pre_process): qbmm_idx allocations and fills
         if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
