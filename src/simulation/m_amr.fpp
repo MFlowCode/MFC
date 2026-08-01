@@ -1885,10 +1885,18 @@ contains
         ! f_amr_owner reads amr_fine_cut for them. amr_owner_cut mirrors LEVEL 1 only without tiles, where the two are the same
         ! authority. Under coexist amr_owner_cut holds the TILE cut that s_l0_tiles_init built; overwriting it here is harmless at
         ! init (the assigner runs first) but at REGRID time would clobber the tile cut.
-        maxlev = maxval(amr_block_level(1:amr_num_blocks))
+        ! Fine blocks occupy slots (l0_slot_off, amr_num_blocks]; slots [1, l0_slot_off] are the L0 TILE
+        ! prefix. At init the assigner runs BEFORE s_l0_tiles_init, so those prefix slots are still
+        ! uninitialized - level reads 1 and region_lo is all zeros, i.e. Morton key 0. Including them
+        ! fed 8 phantom key-0 "level-1 blocks" into the level-1 cut, which the cut then split across
+        ! ranks. A key-0 block can only ever resolve to rank 0 (cut is non-decreasing and the search
+        ! returns the first r with key <= cut(r)), so any phantom placed on a higher rank is
+        ! unrecoverable and s_amr_validate_owner aborts. This was latent: with the old weights all the
+        ! phantoms happened to land on rank 0 and the validator agreed by luck.
+        maxlev = maxval(amr_block_level(l0_slot_off + 1:amr_num_blocks))
         do lev = 1, maxlev
             na = 0
-            do k = 1, amr_num_blocks
+            do k = l0_slot_off + 1, amr_num_blocks
                 if (amr_block_level(k) /= lev) cycle
                 na = na + 1
                 akey(na) = key(k); awt(na) = wt(k); aidx(na) = k
@@ -2002,6 +2010,10 @@ contains
         integer :: k
 
         do k = 1, amr_num_blocks
+            ! Skip the L0 tile prefix when its cut has not been built yet (amr_owner_cut still -1): those
+            ! slots are uninitialized at assigner time and carry a stale level with Morton key 0. The
+            ! tile-init call site populates both cuts and validates them there.
+            if (k <= l0_slot_off .and. amr_owner_cut(num_procs - 1) < 0_8) cycle
             ! every block resolves: tiles (level 0) via amr_owner_cut (tile cut), fine blocks (level>=1) via amr_fine_cut. The
             ! caller
             ! guarantees the relevant cut is populated for the blocks present at each call site (assigner: fine cut; tile init:
