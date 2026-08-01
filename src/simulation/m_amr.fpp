@@ -1800,24 +1800,44 @@ contains
         real(wp), intent(in)         :: wt(n)
         integer(kind=8), intent(out) :: cut(0:num_procs - 1)
         integer, intent(out)         :: owner(n)
-        integer                      :: ord(n), k, kk, r, tmpo
-        integer(kind=8)              :: tmpk
+        integer                      :: ord(n), mrg(n), k, r
+        integer                      :: width, lo_m, mid_m, hi_m, i_m, j_m, t_m
         real(wp)                     :: total, cum, tgt, tol
 
         cut = -1_8
         if (n < 1) return
 
-        ! sort item indices by Morton key (insertion sort - n small; stable in original order for equal keys)
+        ! Sort item indices by Morton key. Bottom-up MERGE sort: O(n log n), STABLE (ties keep their original
+        ! order), iterative, and a pure function of the input - every rank must produce byte-identical
+        ! order or the assignment diverges and s_amr_validate_owner aborts. The previous insertion sort
+        ! was O(n^2) with the comment "n small"; that holds at the box counts benchmarked so far (512
+        ! boxes = 1.3e5 ops) and fails at the counts this design targets (1e5 boxes = 5e9 ops, seconds
+        ! per regrid), since the whole strategy is boxes_per_level >> num_procs.
         do k = 1, n
             ord(k) = k
         end do
-        do k = 2, n
-            tmpk = keys(ord(k)); tmpo = ord(k); kk = k - 1
-            do while (kk >= 1)
-                if (keys(ord(kk)) <= tmpk) exit
-                ord(kk + 1) = ord(kk); kk = kk - 1
+        width = 1
+        do while (width < n)
+            lo_m = 1
+            do while (lo_m <= n - width)
+                mid_m = lo_m + width - 1
+                hi_m = min(lo_m + 2*width - 1, n)
+                i_m = lo_m; j_m = mid_m + 1; t_m = lo_m
+                do while (i_m <= mid_m .and. j_m <= hi_m)
+                    ! <= keeps the left run first on ties: stability
+                    if (keys(ord(i_m)) <= keys(ord(j_m))) then
+                        mrg(t_m) = ord(i_m); i_m = i_m + 1
+                    else
+                        mrg(t_m) = ord(j_m); j_m = j_m + 1
+                    end if
+                    t_m = t_m + 1
+                end do
+                do while (i_m <= mid_m); mrg(t_m) = ord(i_m); i_m = i_m + 1; t_m = t_m + 1; end do
+                do while (j_m <= hi_m); mrg(t_m) = ord(j_m); j_m = j_m + 1; t_m = t_m + 1; end do
+                ord(lo_m:hi_m) = mrg(lo_m:hi_m)
+                lo_m = lo_m + 2*width
             end do
-            ord(kk + 1) = tmpo
+            width = 2*width
         end do
 
         total = 0._wp
