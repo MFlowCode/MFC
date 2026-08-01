@@ -1,44 +1,10 @@
-This file was created on 2026-07-12 20:41:09.809470.
+This file was created on 2026-07-31 23:15:19.945696.
 
 mfc.sh:
 
-    Invocation: test --generate --only Weighted_Composition -j 8
+    Invocation: test --generate --only B652C055 DC926C1D 74D73BCF --no-build
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        df3e0694e83abbc17503871c12941af6eb996170 on jwl-upstream-rebase (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v4.3.2 on Fahads-MacBook-Pro.local
-    
-        C       : AppleClang v21.0.0.21000099 (/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/fahadnabid/code/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        1d6a1b5dc03efe23e1b9daeed52c57988558d69f on jwl-fastpt-closure (dirty)
 
 pre_process:
 
@@ -60,7 +26,7 @@ pre_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /Users/fahadnabid/code/MFC/build/venv/bin/fypp
+        Fypp    : /Users/fahadnabid/code/MFC/.claude/worktrees/jwl-fastpt/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -74,7 +40,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -84,8 +50,8 @@ post_process:
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -94,7 +60,7 @@ post_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /Users/fahadnabid/code/MFC/build/venv/bin/fypp
+        Fypp    : /Users/fahadnabid/code/MFC/.claude/worktrees/jwl-fastpt/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -128,7 +94,41 @@ syscheck:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /Users/fahadnabid/code/MFC/build/venv/bin/fypp
+        Fypp    : /Users/fahadnabid/code/MFC/.claude/worktrees/jwl-fastpt/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v4.3.2 on Fahads-MacBook-Pro.local
+    
+        C       : AppleClang v21.0.0.21000099 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/fahadnabid/code/MFC/.claude/worktrees/jwl-fastpt/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
