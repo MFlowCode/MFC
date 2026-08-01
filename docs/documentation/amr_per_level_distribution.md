@@ -208,12 +208,17 @@ is the obvious suspect and is not yet isolated.
 
 **Consequences.**
 
-- @ref amr_block_batching's premise is CONFIRMED. It was previously argued from efficiency figures
-  since found contaminated (starved GPUs, `run_time_info` device syncs), so it was left open. It is
-  now the main efficiency work item, and the table sizes the prize: ~20x between the finest and
-  coarsest tiling of the same feature.
+- @ref amr_block_batching's premise is CONFIRMED — per-block overhead is what costs, and the table
+  sizes the prize at ~20x between the finest and coarsest tiling of the same feature. Its premise was
+  previously argued from efficiency figures since found contaminated (starved GPUs, `run_time_info`
+  device syncs), so it had been left open. **But confirming the premise did not validate the planned
+  fix:** the packed super-grid was subsequently DISPROVED (2026-08-01), because `s_amr_tile_box`
+  splits evenly and so leaves every tiled block larger than half the tile size, making blocks exactly
+  slot-sized and \f$P_{\max} = 1\f$. See @ref amr_block_batching, "the packed super-grid cannot work".
 - The per-level cap `amr_max_grid_size` is a first-order performance knob, not just a correctness or
-  portability one. Small caps are ~20x worse per cell.
+  portability one. Small caps are ~20x worse per cell. With packing disproved this is the *only*
+  presently-available lever on the per-block floor, and it is bounded by device memory: cap 2048 on
+  this case runs the GCD out of memory before the first step completes.
 - This interacts with balance in the wrong direction. More boxes per level is what gives the balancer
   freedom (`boxes_per_level >> num_procs`), and it is exactly what costs. The two goals are in
   tension until batching removes the per-block floor, and any future balance work that buys evenness
@@ -532,7 +537,18 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
    below - this is now the largest single number in this document.
 10. ~~**Then, and only then, revisit @ref amr_block_batching.**~~ **Its premise is CONFIRMED**, and by
    a measurement rather than by the contaminated efficiency figures it originally rested on. Per-block
-   overhead does dominate; item 9 sizes the prize at ~20x. Batching is now the main efficiency item.
+   overhead does dominate; item 9 sizes the prize at ~20x. **The planned fix, however, is DISPROVED:**
+   the packed super-grid needs blocks smaller than half the cap, and the even-split tiler guarantees
+   the opposite, so \f$P_{\max} = 1\f$ on every measured configuration. Batching survives only via the
+   flat backing store and its unresolved `ACC_SETUP_SFs` aliasing risk. Confirming that a cost is
+   per-block says nothing about whether a given mechanism can remove it.
+
+12. **Where does the residual ~7.3x go at the best cap?** Even at cap 1024 - the largest that fits
+    device memory here - AMR is 11.4 ns/cell-update against uniform's 1.55. Packing cannot close it
+    and raising the cap further OOMs, so this is the standing efficiency question. Candidates, in the
+    order they are worth measuring: remaining unfused ghost-slab loops (`s_amr_lerp_fine_ghosts` is
+    the valuable one - it runs per SUBSTEP, not per stage), the super-linear-in-box-count term from
+    item 9, and per-block occupancy at the RHS kernels themselves.
 11. **Multi-node scale invariance.** This is the actual exascale question and single-node np<=8 cannot
     answer it: the granularity floor and the indivisible atom only bind once ranks approach the box
     count per level. Everything measured here tops out at 8 ranks with 13-64 boxes per rank - a
