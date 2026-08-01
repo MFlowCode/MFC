@@ -365,6 +365,14 @@ def test_simulation_generated_scalars_own_gpu_declarations():
         assert generated.count(f"$:GPU_DECLARE(create='[{name}]')") == 1
 
 
+def test_hypo_riemann_controls_own_gpu_declarations():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp
+
+    generated = generate_decls_fpp("sim")
+    for name in ("riemann_hypo_ADC", "ADC_kappa", "hll_u_interface", "hypo_hll_interface_rhs"):
+        assert generated.count(f"$:GPU_DECLARE(create='[{name}]')") == 1
+
+
 # ── generate_bcast_fpp tests ──────────────────────────────────────────────────
 
 
