@@ -114,21 +114,21 @@ module m_constants
     integer, parameter :: BC_NO_SLIP_WALL = -16
     integer, parameter :: BC_DIRICHLET = -17
 
-    ! fluid_pp(:)%eos selector; values must match _EOS_NAMES in toolchain/mfc/params/definitions.py.
-    ! Hand-written, not part of the auto-generated block below: fluid_pp(1)%eos is a compound
-    ! registry key, and generate_constants_fpp skips those (see common-pitfalls.md).
+    ! Synthetic turbulence array size limits
+    integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
+    integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
+
+    ! Named values for enumerated case parameters (e.g. riemann_solver_hllc) are AUTO-GENERATED
+    ! from "names" in toolchain/mfc/params/definitions.py by the include below. Exception:
+    ! generate_constants_fpp silently skips any registry key containing "%" or "(", because the
+    ! generated {param}_{name} form (e.g. fluid_pp(1)%eos_stiffened_gas) is not a valid Fortran
+    ! identifier. Enum constants for such compound keys are therefore hand-written here, directly
+    ! above the include, and must stay in sync with their "names" dict (see common-pitfalls.md).
+    ! Current case: the eos_* selector, whose values must match _EOS_NAMES in definitions.py.
     integer, parameter :: eos_stiffened_gas = 1
     integer, parameter :: eos_ideal_gas_mixture = 2
     integer, parameter :: eos_mie_gruneisen = 3
     integer, parameter :: eos_jwl = 4
     integer, parameter :: eos_table = 5
-
-    ! Synthetic turbulence array size limits
-    integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
-    integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
-
-    ! Named values for enumerated case parameters (e.g. riemann_solver_hllc). AUTO-GENERATED
-    ! from "names" in toolchain/mfc/params/definitions.py; compound registry keys are skipped
-    ! (their constants are hand-written above instead, e.g. the eos_* block).
     #:include 'generated_constants.fpp'
 end module m_constants
