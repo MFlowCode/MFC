@@ -1224,6 +1224,9 @@ contains
                     do s = 1, num_vels
                         vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k, l)/rho
                     end do
+                    do s = 1, num_fluids
+                        alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k, l)
+                    end do
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
@@ -1328,6 +1331,9 @@ contains
                         do s = 1, num_vels
                             vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
+                        do s = 1, num_fluids
+                            alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l)
+                        end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
@@ -1350,7 +1356,7 @@ contains
                             lit_gamma = gs_min(1)
                         else if (hypoelasticity) then
                             do s = 1, 3
-                                tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
+                                tau_e(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k - 2, l)/rho
                             end do
                         end if
 
@@ -1408,6 +1414,9 @@ contains
                                                                 & G_local, fluid_pp(:)%G)
                             do s = 1, num_vels
                                 vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k - 2, l - 2)/rho
+                            end do
+                            do s = 1, num_fluids
+                                alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l - 2)
                             end do
 
                             dyn_p = 0.5_wp*rho*dot_product(vel, vel)
