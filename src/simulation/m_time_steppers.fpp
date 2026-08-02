@@ -28,10 +28,11 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
-    use m_amr, only: s_amr_fine_stage_fill, s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, &
-        & s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_advance_stage, &
-        & s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
-        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse
+    use m_amr, only: amr_xchg_coarse_ghosts, s_amr_exchange_coarse_cons_halo, s_amr_fine_stage_fill, s_amr_fine_stage_advance, &
+        & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, s_amr_relax_fine, &
+        & s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
+        & s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, &
+        & s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -555,6 +556,10 @@ contains
                 ! ghosts from its PARENT (s_amr_gather_coarse_patch's level branch), a level-1 block from L0. Blocks are stored
                 ! parent-before-child (L2 at higher slot), so slot order fills the parent's stage-entry state before the child reads
                 ! it.
+                ! valid coarse CONS ghosts for every block's ghost prolongation, ONCE for the whole loop (ALL ranks call: pairwise
+                ! halo). q_cons_ts(1)%vf is read by the fills below and never written by them, so one exchange serves every block;
+                ! doing it inside s_amr_fine_stage_fill repeated it amr_num_blocks times per stage.
+                if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
