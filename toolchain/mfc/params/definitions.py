@@ -888,7 +888,7 @@ def _load():
                 _r(f"{px}sph_har_coeff({ll},{mm})", REAL)
 
     # fluid_pp (10 fluids)
-    # Members present in physical_parameters: gamma, pi_inf, Re, cv, qv, qvp, G.
+    # Members present in physical_parameters: gamma, pi_inf, Re, cv, qv, qvp, eos, G.
     # mul0/ss/pv/gamma_v/M_v/mu_v/k_v/cp_v/D_v were removed from the Fortran type
     # by upstream #1085/#1093 — they must NOT be registered (namelist read would crash).
     for f in range(1, NF + 1):

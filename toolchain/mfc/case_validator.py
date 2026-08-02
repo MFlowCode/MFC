@@ -761,13 +761,18 @@ class CaseValidator:
         """Restricts the per-fluid EOS selector to the currently supported adapters"""
         num_fluids = self.get("num_fluids")
         chemistry = self.get("chemistry", "F") == "T"
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
 
         if num_fluids is None:
             return
 
-        eos_stiffened_gas, eos_ideal_gas_mixture = 1, 2
+        eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
+        eos_stiffened_gas, eos_ideal_gas_mixture = eos_names["stiffened_gas"], eos_names["ideal_gas_mixture"]
 
-        for i in range(1, num_fluids + 1):
+        # Allow one extra fluid property slot when using bubbles_euler
+        bub_fac = 1 if (bubbles_euler) else 0
+
+        for i in range(1, num_fluids + 1 + bub_fac):
             eos = self.get(f"fluid_pp({i})%eos")
             if eos is None:
                 continue

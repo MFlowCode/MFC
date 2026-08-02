@@ -114,7 +114,9 @@ module m_constants
     integer, parameter :: BC_NO_SLIP_WALL = -16
     integer, parameter :: BC_DIRICHLET = -17
 
-    ! fluid_pp(:)%eos selector; values must match _EOS_NAMES in toolchain/mfc/params/definitions.py
+    ! fluid_pp(:)%eos selector; values must match _EOS_NAMES in toolchain/mfc/params/definitions.py.
+    ! Hand-written, not part of the auto-generated block below: fluid_pp(1)%eos is a compound
+    ! registry key, and generate_constants_fpp skips those (see common-pitfalls.md).
     integer, parameter :: eos_stiffened_gas = 1
     integer, parameter :: eos_ideal_gas_mixture = 2
     integer, parameter :: eos_mie_gruneisen = 3
@@ -125,7 +127,8 @@ module m_constants
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
     integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
 
-    ! Named values for enumerated case parameters (e.g. riemann_solver_hllc).
-    ! AUTO-GENERATED from "names" in toolchain/mfc/params/definitions.py.
+    ! Named values for enumerated case parameters (e.g. riemann_solver_hllc). AUTO-GENERATED
+    ! from "names" in toolchain/mfc/params/definitions.py; compound registry keys are skipped
+    ! (their constants are hand-written above instead, e.g. the eos_* block).
     #:include 'generated_constants.fpp'
 end module m_constants

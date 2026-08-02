@@ -39,7 +39,7 @@ contains
 
         integer :: i
 
-        do i = 1, num_fluids
+        do i = 1, num_fluids + merge(1, 0, bubbles_euler)
             @:PROHIBIT(chemistry .and. fluid_pp(i)%eos /= eos_ideal_gas_mixture, &
                        & "fluid_pp(:)%eos must be 'ideal_gas_mixture' for every fluid when chemistry is enabled")
             @:PROHIBIT(.not. chemistry .and. fluid_pp(i)%eos /= eos_stiffened_gas, &
