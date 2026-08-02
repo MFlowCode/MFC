@@ -642,12 +642,28 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
     (`hsa_amd_memory_async_copy_on_engine` fires 2928329 times) they account for ~88% of all 33.2M host
     GPU-API calls.
 
-    **Leading hypothesis for what the copies ARE, explicitly NOT yet proven:** OpenMP map/descriptor
-    traffic for the derived-type arguments. `q_cons`/`q_prim`/`rhs` are arrays of `scalar_field` with
-    pointer `%%sf` components, and ~50 such arguments x `sys_size` = 6 lands near the observed ~305. The
-    cheap discriminator is to vary `sys_size` (e.g. `num_fluids` = 2) and see whether copies-per-call
-    moves with it. Three mechanism guesses have already been refuted on this branch (packing,
-    cross-rank adjacency, launch count) - do not act on this one before running that test.
+    **What the copies ARE - CONFIRMED by varying `sys_size`.** `q_cons`/`q_prim`/`rhs` are arrays of
+    `scalar_field` with pointer `%%sf` components, so the suspicion was OpenMP map/descriptor traffic
+    rather than bulk data movement. Test: 3D uniform control, `num_fluids` 1 -> 2 (`sys_size` 6 -> 8),
+    everything else fixed.
+
+    | `num_fluids` | `sys_size` | kernels / call | copies / call |
+    |---|---|---|---|
+    | 1 | 6 | 30 | 626 |
+    | 2 | 8 | 30 | 719 |
+
+    **Copies scale with `sys_size`; kernel count does not** (the `sys_size` loops live INSIDE the
+    kernels). Solving the two points gives **~46.5 copies per field variable plus a ~347 fixed base**.
+    That is descriptor traffic per (field variable x mapped argument) on every `s_compute_rhs` entry -
+    it is why the copies are latency-bound at ~10 us rather than bandwidth-bound, and why their count
+    is independent of how many cells the call covers.
+
+    **Consequence for the fix.** Making these mappings persistent instead of per-call is the lever, and
+    it is worth noting this is the same flat-backing-store restructuring
+    (`%%sf => amr_qall(:,:,:,i,k)`) that @ref amr_block_batching proposed for an unrelated reason
+    (enabling batched kernels). The batching rationale is dead (see "the packed super-grid cannot
+    work"); the descriptor-traffic rationale is live and is supported by direct measurement. Its
+    `ACC_SETUP_SFs` aliasing risk on Cray is unchanged and still needs a build to settle.
 
     **SIZING CAVEAT - these magnitudes are provisional.** Measured density on this machine is 19.34 GiB
     for 16.8M uniform 3D points = 0.87M points/GiB, so a 64 GiB GCD holds ~56M points. This case runs
