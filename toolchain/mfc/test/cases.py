@@ -559,7 +559,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 {"riemann_solver": 1, "hll_u_interface": "T", **(u_interface_mods or {})},
             )
         )
-        cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface -> alt_soundspeed", {"riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T"}))
+        cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface -> alt_soundspeed", {"riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T", **(u_interface_mods or {})}))
 
     def alter_low_Mach_correction():
         stack.push("", {"fluid_pp(1)%gamma": 0.16, "fluid_pp(1)%pi_inf": 3515.0, "dt": 1e-7})
@@ -2455,6 +2455,87 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     mods=make_cbc_uniform_cfg(alt),
                 )
             )
+
+        # Production-configuration pin: every other HLLD golden runs WENO1/Euler, so
+        # this is the one reference exercising the recommended WENO5-M + RK3 path
+        # (including the roundoff symmetrization WENO reconstruction motivates).
+        weno5_cfg = {
+            **make_cbc_uniform_cfg("T"),
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "t_step_stop": 10,
+            "num_patches": 2,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 10.0,
+            "patch_icpp(2)%vel(2)": 0.0,
+            "patch_icpp(2)%pres": 2.0e5,
+            "patch_icpp(2)%tau_e(1)": 1.0e3,
+            "patch_icpp(2)%tau_e(2)": 5.0e2,
+            "patch_icpp(2)%tau_e(3)": -1.0e3,
+            "patch_icpp(2)%alpha_rho(1)": 0.9 * 1000.0,
+            "patch_icpp(2)%alpha(1)": 0.9,
+            "patch_icpp(2)%alpha_rho(2)": 0.1 * 1.2,
+            "patch_icpp(2)%alpha(2)": 0.1,
+            "fluid_pp(1)%G": 1.0e6,
+            "fluid_pp(2)%G": 0.0,
+        }
+        cases.append(
+            define_case_f(
+                "2D -> Hypoelasticity -> HLLD -> WENO5 RK3",
+                "",
+                mods=weno5_cfg,
+            )
+        )
+
+        # Rigid axial translation in axisymmetric coordinates: every stress rate must
+        # vanish identically (the pre-repair operator produced d(tau_xr)/dt = G*U0/r).
+        # The golden pins the invariant as a permanent semantic regression.
+        rigid_cfg = {
+            **edge_common,
+            "m": 23,
+            "n": 23,
+            "t_step_stop": 10,
+            "dt": 1.0e-6,
+            "cyl_coord": "T",
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -2,
+            "bc_y%end": -2,
+            "num_patches": 1,
+            "fluid_pp(1)%gamma": 1.0 / (4.4 - 1.0),
+            "fluid_pp(1)%pi_inf": 4.4 * 6.0e8 / (4.4 - 1.0),
+            "fluid_pp(1)%G": 1.0e6,
+            "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
+            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%G": 1.0e6,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 10.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%pres": 1.0e5,
+            "patch_icpp(1)%tau_e(1)": 0.0,
+            "patch_icpp(1)%tau_e(2)": 0.0,
+            "patch_icpp(1)%tau_e(3)": 0.0,
+            "patch_icpp(1)%alpha_rho(1)": 0.5 * 1000.0,
+            "patch_icpp(1)%alpha(1)": 0.5,
+            "patch_icpp(1)%alpha_rho(2)": 0.5 * 1.2,
+            "patch_icpp(1)%alpha(2)": 0.5,
+        }
+        cases.append(
+            define_case_f(
+                "2D -> Axisymmetric -> Hypoelasticity -> HLLD -> Rigid axial translation",
+                "",
+                mods=rigid_cfg,
+            )
+        )
 
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
