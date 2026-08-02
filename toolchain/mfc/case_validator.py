@@ -630,8 +630,6 @@ class CaseValidator:
         cfl_adap_dt = self.get("cfl_adap_dt", "F") == "T"
         self.prohibit(fd_order is None, "hypoelasticity requires fd_order to be set (1, 2, or 4); the finite-difference coefficients are initialized unconditionally")
         self.prohibit(wave_speeds == 2, "Pressure-based wave speeds (wave_speeds = 2) omit the elastic longitudinal speed and are not supported with hypoelasticity")
-        self.prohibit(riemann_solver == 4 and wave_speeds == 2, "HLLD uses its own direct wave-speed estimates; wave_speeds = 2 is not supported")
-        self.prohibit(riemann_solver == 4 and low_Mach > 0, "low_Mach corrections are not implemented for HLLD")
         self.prohibit(riemann_hypo_ADC and low_Mach > 0, "riemann_hypo_ADC does not support low_Mach (the ADC HLL reference flux uses pre-correction velocities)")
         self.prohibit(riemann_hypo_ADC and ADC_kappa is not None and ADC_kappa <= 0, "ADC_kappa must be positive")
         self.prohibit(
@@ -857,6 +855,8 @@ class CaseValidator:
         self.prohibit(low_Mach not in [0, 1, 2], "low_Mach must be 0, 1, or 2")
         self.prohibit(riemann_solver != 2 and low_Mach == 2, "low_Mach = 2 requires riemann_solver = 2")
         self.prohibit(low_Mach != 0 and model_eqns not in [2, 3], "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
+        self.prohibit(riemann_solver == 4 and wave_speeds == 2, "HLLD uses its own direct wave-speed estimates; wave_speeds = 2 is not supported")
+        self.prohibit(riemann_solver == 4 and low_Mach > 0, "low_Mach corrections are not implemented for HLLD")
         self.prohibit(riemann_solver == 5 and cyl_coord and viscous, "Lax Friedrichs with cylindrical viscous flux not supported")
 
     def check_time_stepping(self):
