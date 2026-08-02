@@ -31,8 +31,8 @@ contains
 
     !> Classify the position of the interface (xi = 0) in the five-wave HLLD fan: 0 left of S_L, 1..4 for the four inner wedges, 5
     !! right of S_R. Single definition of the wave-fan geometry shared by the flux fold, the NC face-velocity export, and the
-    !! axisymmetric face-state pick, which must stay consistent. In the degenerate-fan branch it is called on the fallback wave
-    !! speeds and reproduces their one-sided selection.
+    !! axisymmetric face-state pick, which must stay consistent. Valid fans only: a fallback face exports the HLL/one-sided traces
+    !! instead of a fan classification.
     integer function f_hlld_wave_zone(S_L, S_Lstar, s_M, S_Rstar, S_R) result(zone)
 
         $:GPU_ROUTINE(function_name='f_hlld_wave_zone', parallelism='[seq]', cray_inline=True)
@@ -636,8 +636,9 @@ contains
                                     else
                                         F_hlld(1:ncomp) = F_R(1:ncomp)
                                     end if
-                                    ! Initialize star-state variables to safe fallback values so subsequent face-state and
-                                    ! axisymmetric source logic never reads uninitialized memory regardless of wave configuration.
+                                    ! Initialize star-state variables to safe values so no path reads uninitialized memory
+                                    ! (a subsequent valid pass restores what it needs). Fallback face exports do not use
+                                    ! them: they take the HLL/one-sided traces computed below.
                                     pTot_star = 5e-1_wp*(pTot_L + pTot_R)
                                     S_Lstar = S_L
                                     S_Rstar = S_R
@@ -646,7 +647,6 @@ contains
                                     tau_nn_R_star = tau_nn_R
                                     tau_qq_L_star = tau_qq_L
                                     tau_qq_R_star = tau_qq_R
-                                    zone = f_hlld_wave_zone(S_L, S_Lstar, s_M, S_Rstar, S_R)
                                 else
                                     ! A preceding anchored pass may have taken the fallback and assigned a safe face value.
                                     ! Restore the anchor-independent HLLD contact pressure for this valid pass.
@@ -760,34 +760,6 @@ contains
                                         ! instead of a materialized F_HLL array; outside the subsonic fan F_HLL equals
                                         ! F_hlld and the identity blend is kept explicitly so the arithmetic (including
                                         ! signed-zero behavior) matches the array form bit-for-bit.
-                                        if (cyl_coord) then
-                                            if (0._wp <= S_L) then
-                                                u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L
-                                                p_face_HLL = pres%L; tau_qq_face_HLL = tau_qq_L
-                                            else if (S_R <= 0._wp) then
-                                                u_n_HLL_trace = u_n_R; u_t_HLL_trace = u_t_R
-                                                p_face_HLL = pres%R; tau_qq_face_HLL = tau_qq_R
-                                            else
-                                                u_n_HLL_trace = (S_R*u_n_L - S_L*u_n_R)/(S_R - S_L + verysmall)
-                                                u_t_HLL_trace = (S_R*u_t_L - S_L*u_t_R)/(S_R - S_L + verysmall)
-                                                ! Only HLL-state components 1, 2, 3, 8 and 11 feed the axisym trace
-                                                U_HLL_c = (S_R*U_R(1) - S_L*U_L(1) - (F_R(1) - F_L(1)))/(S_R - S_L + verysmall)
-                                                rho_HLL = U_HLL_c
-                                                U_HLL_c = (S_R*U_R(2) - S_L*U_L(2) - (F_R(2) - F_L(2)))/(S_R - S_L + verysmall)
-                                                rho_HLL = rho_HLL + U_HLL_c
-                                                U_HLL_c = (S_R*U_R(3) - S_L*U_L(3) - (F_R(3) - F_L(3)))/(S_R - S_L + verysmall)
-                                                u_n_HLL_cons = U_HLL_c/(rho_HLL + verysmall)
-                                                U_HLL_c = (S_R*U_R(8) - S_L*U_L(8) - (F_R(8) - F_L(8)))/(S_R - S_L + verysmall)
-                                                tau_nn_HLL = U_HLL_c/(rho_HLL + verysmall)
-                                                U_HLL_c = (S_R*U_R(11) - S_L*U_L(11) - (F_R(11) - F_L(11)))/(S_R - S_L + verysmall)
-                                                tau_qq_face_HLL = U_HLL_c/(rho_HLL + verysmall)
-                                                ! This branch implies S_L < 0 < S_R, so component 3 of F_HLL is the
-                                                ! interior HLL flux
-                                                @:hll_flux_component(F_HLL_c, 3)
-                                                p_face_HLL = F_HLL_c - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
-                                            end if
-                                        end if
-
                                         ! phi is anchor-independent: computed once in the shared section above
                                         if (S_L < 0._wp .and. S_R > 0._wp) then
                                             do i = 1, ncomp
@@ -800,6 +772,37 @@ contains
                                                 F_hlld(i) = F_HLL_c + phi*(F_hlld(i) - F_HLL_c)
                                             end do
                                         end if
+                                    end if
+                                end if
+
+                                ! HLL face traces for the axisymmetric completion: consumed by the ADC face-state blend on
+                                ! valid fans and by the face exports on fallback faces (whose conservative flux is the
+                                ! matching HLL/one-sided flux). Rows 8/11 carry the pass's anchored folds, so the traces
+                                ! are anchor-dependent, like the ADC reference they generalize.
+                                if (cyl_coord .and. (riemann_hypo_ADC .or. fan_fallback)) then
+                                    if (0._wp <= S_L) then
+                                        u_n_HLL_trace = u_n_L; u_t_HLL_trace = u_t_L
+                                        p_face_HLL = pres%L; tau_qq_face_HLL = tau_qq_L
+                                    else if (S_R <= 0._wp) then
+                                        u_n_HLL_trace = u_n_R; u_t_HLL_trace = u_t_R
+                                        p_face_HLL = pres%R; tau_qq_face_HLL = tau_qq_R
+                                    else
+                                        u_n_HLL_trace = (S_R*u_n_L - S_L*u_n_R)/(S_R - S_L + verysmall)
+                                        u_t_HLL_trace = (S_R*u_t_L - S_L*u_t_R)/(S_R - S_L + verysmall)
+                                        ! Only HLL-state components 1, 2, 3, 8 and 11 feed the axisym trace
+                                        U_HLL_c = (S_R*U_R(1) - S_L*U_L(1) - (F_R(1) - F_L(1)))/(S_R - S_L + verysmall)
+                                        rho_HLL = U_HLL_c
+                                        U_HLL_c = (S_R*U_R(2) - S_L*U_L(2) - (F_R(2) - F_L(2)))/(S_R - S_L + verysmall)
+                                        rho_HLL = rho_HLL + U_HLL_c
+                                        U_HLL_c = (S_R*U_R(3) - S_L*U_L(3) - (F_R(3) - F_L(3)))/(S_R - S_L + verysmall)
+                                        u_n_HLL_cons = U_HLL_c/(rho_HLL + verysmall)
+                                        U_HLL_c = (S_R*U_R(8) - S_L*U_L(8) - (F_R(8) - F_L(8)))/(S_R - S_L + verysmall)
+                                        tau_nn_HLL = U_HLL_c/(rho_HLL + verysmall)
+                                        U_HLL_c = (S_R*U_R(11) - S_L*U_L(11) - (F_R(11) - F_L(11)))/(S_R - S_L + verysmall)
+                                        tau_qq_face_HLL = U_HLL_c/(rho_HLL + verysmall)
+                                        ! This branch implies S_L < 0 < S_R, so component 3 of F_HLL is the interior HLL flux
+                                        @:hll_flux_component(F_HLL_c, 3)
+                                        p_face_HLL = F_HLL_c - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
                                     end if
                                 end if
 
@@ -865,25 +868,31 @@ contains
 
                                 ! Export face velocities for axisym hypo source terms
                                 if (grid_geometry == 2) then
-                                    ! Upwind by wave-fan wedge: the inner zones ride the contact (u_n = S_M) and the
-                                    ! tangential state switches L -> star -> R across the shear waves (zones 2 and 3
-                                    ! share the tangential star state)
-                                    if (zone == 0) then
-                                        u_n_face = u_n_L; u_t_face = u_t_L
-                                    else if (zone == 1) then
-                                        u_n_face = S_M; u_t_face = u_t_L
-                                    else if (zone <= 3) then
-                                        u_n_face = S_M; u_t_face = u_t_star
-                                    else if (zone == 4) then
-                                        u_n_face = S_M; u_t_face = u_t_R
+                                    if (fan_fallback) then
+                                        ! Fallback face: the conservative flux is the HLL/one-sided flux, so export the
+                                        ! matching HLL/one-sided traces, not the rejected fan's contact speed/star states
+                                        u_n_face = u_n_HLL_trace; u_t_face = u_t_HLL_trace
                                     else
-                                        u_n_face = u_n_R; u_t_face = u_t_R
-                                    end if
-                                    ! ADC blend NC face velocities with HLL scalar traces (HLLD path only; a fallback
-                                    ! branch does not set the HLL traces)
-                                    if (riemann_hypo_ADC .and. .not. fan_fallback) then
-                                        u_n_face = u_n_HLL_trace + phi*(u_n_face - u_n_HLL_trace)
-                                        u_t_face = u_t_HLL_trace + phi*(u_t_face - u_t_HLL_trace)
+                                        ! Upwind by wave-fan wedge: the inner zones ride the contact (u_n = S_M) and the
+                                        ! tangential state switches L -> star -> R across the shear waves (zones 2 and 3
+                                        ! share the tangential star state)
+                                        if (zone == 0) then
+                                            u_n_face = u_n_L; u_t_face = u_t_L
+                                        else if (zone == 1) then
+                                            u_n_face = S_M; u_t_face = u_t_L
+                                        else if (zone <= 3) then
+                                            u_n_face = S_M; u_t_face = u_t_star
+                                        else if (zone == 4) then
+                                            u_n_face = S_M; u_t_face = u_t_R
+                                        else
+                                            u_n_face = u_n_R; u_t_face = u_t_R
+                                        end if
+                                        ! ADC blend NC face velocities with HLL scalar traces (valid fans; a fallback
+                                        ! face already exports the pure HLL traces)
+                                        if (riemann_hypo_ADC) then
+                                            u_n_face = u_n_HLL_trace + phi*(u_n_face - u_n_HLL_trace)
+                                            u_t_face = u_t_HLL_trace + phi*(u_t_face - u_t_HLL_trace)
+                                        end if
                                     end if
                                     #:for HATPASS, NCV in [(1, 'nc_iface_vel_rsx'), (2, 'nc_iface_vel_hatR_rsx')]
                                         if (ipass == ${HATPASS}$) then
@@ -913,21 +922,27 @@ contains
                                                 do i = 1, eqn_idx%E
                                                     ${GSRC}$_vf(${SF('')}$, i) = ${FLUX}$_vf(${SF('')}$, i)
                                                 end do
-                                                ! Pure HLLD face state, upwinded by wave-fan wedge (left/right of the contact)
-                                                if (zone == 0) then
-                                                    p_face = pres%L; tau_qq_face = tau_qq_L
-                                                else if (zone <= 2) then
-                                                    p_face = pTot_star + tau_nn_L_star; tau_qq_face = tau_qq_L_star
-                                                else if (zone <= 4) then
-                                                    p_face = pTot_star + tau_nn_R_star; tau_qq_face = tau_qq_R_star
+                                                if (fan_fallback) then
+                                                    ! Fallback face: HLL/one-sided face state, consistent with the
+                                                    ! selected conservative flux
+                                                    p_face = p_face_HLL; tau_qq_face = tau_qq_face_HLL
                                                 else
-                                                    p_face = pres%R; tau_qq_face = tau_qq_R
-                                                end if
-                                                ! ADC blend face state (HLLD path only; a fallback branch does not set the
-                                                ! HLL traces)
-                                                if (riemann_hypo_ADC .and. .not. fan_fallback) then
-                                                    p_face = p_face_HLL + phi*(p_face - p_face_HLL)
-                                                    tau_qq_face = tau_qq_face_HLL + phi*(tau_qq_face - tau_qq_face_HLL)
+                                                    ! Pure HLLD face state, upwinded by wave-fan wedge (left/right of the contact)
+                                                    if (zone == 0) then
+                                                        p_face = pres%L; tau_qq_face = tau_qq_L
+                                                    else if (zone <= 2) then
+                                                        p_face = pTot_star + tau_nn_L_star; tau_qq_face = tau_qq_L_star
+                                                    else if (zone <= 4) then
+                                                        p_face = pTot_star + tau_nn_R_star; tau_qq_face = tau_qq_R_star
+                                                    else
+                                                        p_face = pres%R; tau_qq_face = tau_qq_R
+                                                    end if
+                                                    ! ADC blend face state (valid fans; a fallback face already uses the
+                                                    ! pure HLL state)
+                                                    if (riemann_hypo_ADC) then
+                                                        p_face = p_face_HLL + phi*(p_face - p_face_HLL)
+                                                        tau_qq_face = tau_qq_face_HLL + phi*(tau_qq_face - tau_qq_face_HLL)
+                                                    end if
                                                 end if
                                                 ${GSRC}$_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = ${FLUX}$_vf(${SF('')}$, &
                                                             & eqn_idx%cont%end + dir_idx(1)) - p_face + tau_qq_face

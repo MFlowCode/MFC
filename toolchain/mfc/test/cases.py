@@ -2411,6 +2411,78 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # Axisymmetric fallback-face trace consistency: tau_rr = -1.1*G makes the
+        # radial-sweep fan invalid everywhere (G_eff < 0), so the radial geometric
+        # source and NC velocity traces must come from the HLL/one-sided face state
+        # that matches the fallback flux -- not from the rejected fan's contact
+        # speed and star states. The stress IC is deviatoric with tau_rr = tau_qq
+        # (axis-regular); the radial band contrast (rho, p, axial velocity) makes
+        # the two trace families measurably different at the band interface. The
+        # ADC twin pins that ADC on/off is identical on fallback-selected faces.
+        def make_axisym_fallback_cfg(adc):
+            G = 1.0
+            cfg = {
+                **edge_common,
+                "m": 15,
+                "cyl_coord": "T",
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -2,
+                "bc_y%end": -3,
+                "dt": 2.0e-3,
+                "fluid_pp(1)%gamma": 2.5,
+                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%G": G,
+                "fluid_pp(2)%gamma": 2.5,
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%G": G,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%tau_e(1)": 2.2 * G,
+                "patch_icpp(1)%tau_e(2)": 0.0,
+                "patch_icpp(1)%tau_e(3)": -1.1 * G,
+                "patch_icpp(1)%tau_e(4)": -1.1 * G,
+                "patch_icpp(1)%alpha_rho(1)": 0.5,
+                "patch_icpp(1)%alpha(1)": 0.5,
+                "patch_icpp(1)%alpha_rho(2)": 0.5,
+                "patch_icpp(1)%alpha(2)": 0.5,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%geometry": 3,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.75,
+                "patch_icpp(2)%length_x": 1.0,
+                "patch_icpp(2)%length_y": 0.5,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%pres": 1.5,
+                "patch_icpp(2)%tau_e(1)": 2.2 * G,
+                "patch_icpp(2)%tau_e(2)": 0.0,
+                "patch_icpp(2)%tau_e(3)": -1.1 * G,
+                "patch_icpp(2)%tau_e(4)": -1.1 * G,
+                "patch_icpp(2)%alpha_rho(1)": 0.25,
+                "patch_icpp(2)%alpha(1)": 0.5,
+                "patch_icpp(2)%alpha_rho(2)": 0.25,
+                "patch_icpp(2)%alpha(2)": 0.5,
+            }
+            if adc:
+                cfg.update({"riemann_hypo_ADC": "T", "ADC_kappa": 1.0})
+            return cfg
+
+        for label, adc in [("", False), (" -> ADC", True)]:
+            cases.append(
+                define_case_f(
+                    f"2D -> Axisymmetric -> Hypoelasticity -> HLLD -> Fallback traces{label}",
+                    "",
+                    mods=make_axisym_fallback_cfg(adc),
+                )
+            )
+
         # Uniform-state preservation across a characteristic boundary: the CBC flux
         # rebuild must reproduce HLLD's folded volume-fraction representation
         # (adv_src_mode_none; -/+ K*u_n under alt_soundspeed). The WENO5 path is the
