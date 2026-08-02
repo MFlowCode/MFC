@@ -79,6 +79,11 @@ contains
         write (3, '(13X,A)') 'number and the cell Reynolds (Rc) ' // 'number. Please note that only'
         write (3, '(13X,A)') 'those stability conditions pertinent ' // 'to the physics included in'
         write (3, '(13X,A)') 'the current computation are displayed.'
+        if (hypoelasticity) then
+            write (3, '(13X,A)') 'NOTE: the reported ICFL uses the acoustic ' // 'sound speed only; the'
+            write (3, '(13X,A)') 'elastic longitudinal characteristic speed ' // 'is higher and is not'
+            write (3, '(13X,A)') 'reflected in this number.'
+        end if
 
         call date_and_time(DATE=file_date)
 

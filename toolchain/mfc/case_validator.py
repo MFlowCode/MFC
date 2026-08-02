@@ -622,6 +622,21 @@ class CaseValidator:
             riemann_hypo_ADC and (bubbles_euler or surface_tension or chemistry or cont_damage),
             "riemann_hypo_ADC does not support bubbles, surface tension, chemistry, or continuum damage (the ADC HLL blend omits their flux components)",
         )
+        fd_order = self.get("fd_order")
+        wave_speeds = self.get("wave_speeds")
+        low_Mach = self.get("low_Mach", 0)
+        ADC_kappa = self.get("ADC_kappa")
+        cfl_const_dt = self.get("cfl_const_dt", "F") == "T"
+        cfl_adap_dt = self.get("cfl_adap_dt", "F") == "T"
+        self.prohibit(fd_order is None, "hypoelasticity requires fd_order to be set (1, 2, or 4); the finite-difference coefficients are initialized unconditionally")
+        self.prohibit(wave_speeds == 2, "Pressure-based wave speeds (wave_speeds = 2) omit the elastic longitudinal speed and are not supported with hypoelasticity")
+        self.prohibit(riemann_solver == 4 and wave_speeds == 2, "HLLD uses its own direct wave-speed estimates; wave_speeds = 2 is not supported")
+        self.prohibit(riemann_solver == 4 and low_Mach > 0, "low_Mach corrections are not implemented for HLLD")
+        self.prohibit(riemann_hypo_ADC and low_Mach > 0, "riemann_hypo_ADC does not support low_Mach (the ADC HLL reference flux uses pre-correction velocities)")
+        self.prohibit(riemann_hypo_ADC and ADC_kappa is not None and ADC_kappa <= 0, "ADC_kappa must be positive")
+        self.prohibit(
+            cfl_const_dt or cfl_adap_dt, "Automatic CFL time stepping uses the acoustic sound speed only and does not bound the elastic characteristic speed; set dt explicitly for hypoelastic runs"
+        )
 
     def check_phase_change(self):
         """Checks constraints on phase change parameters"""
@@ -829,6 +844,11 @@ class CaseValidator:
 
         self.prohibit(riemann_solver not in [1, 2, 4, 5], "riemann_solver must be 1 (HLL), 2 (HLLC), 4 (HLLD), or 5 (Lax-Friedrichs)")
         self.prohibit(hll_u_interface and riemann_solver != 1, "hll_u_interface requires HLL Riemann solver (riemann_solver = 1)")
+        mhd = self.get("mhd", "F") == "T"
+        surface_tension = self.get("surface_tension", "F") == "T"
+        self.prohibit(hll_u_interface and mhd, "HLL Method 2 does not support MHD (the MHD path zeroes the shared interface-velocity trace)")
+        self.prohibit(surface_tension and riemann_solver == 1 and not hll_u_interface, "surface_tension requires a shared interface-velocity representation (HLL Method 2 or HLLC)")
+        self.prohibit(surface_tension and riemann_solver == 5, "surface_tension requires a shared interface-velocity representation (HLL Method 2 or HLLC)")
         self.prohibit(riemann_solver != 2 and model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2 (HLLC)")
         self.prohibit(wave_speeds is not None and wave_speeds not in [1, 2], "wave_speeds must be 1 or 2")
         self.prohibit(avg_state is not None and avg_state not in [1, 2], "avg_state must be 1 or 2")
@@ -1337,7 +1357,7 @@ class CaseValidator:
         self.prohibit(bubbles_euler, "alt_soundspeed is not compatible with bubbles_euler")
         self.prohibit(avg_state is not None and avg_state != 2, "alt_soundspeed requires avg_state = 2")
         self.prohibit(riemann_solver is not None and riemann_solver not in [1, 2, 4], "alt_soundspeed requires HLL (1), HLLC (2), or HLLD (4) Riemann solver")
-        self.prohibit(num_fluids is not None and num_fluids not in [2, 3], "alt_soundspeed requires num_fluids = 2 or 3")
+        self.prohibit(num_fluids is not None and num_fluids != 2, "alt_soundspeed requires exactly 2 fluid components (the Kapila K coefficient is a two-fluid closure)")
 
     def check_bubbles_lagrange(self):
         """Checks Lagrangian bubble parameters (simulation)"""
