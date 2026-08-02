@@ -9,7 +9,7 @@ computed separately in `m_rhs.fpp`. This note explains which arrays carry what,
 how they get from the solver to the RHS, and how the meaning changes depending
 on the solver mode.
 
-Companion document: `notes/explanations/hll_hllc_nc_terms_notes.md` (mathematical
+Companion document: `misc/dev_notes/HLL_HLLC_non_conservative_terms_derivations.md` (mathematical
 derivations of the NC constructions).
 
 All examples below use the x-sweep. The y/z sweeps follow the same logic with
@@ -26,7 +26,7 @@ code selects exactly one of three modes at initialization
 |------|-----------|------------------------------------------------|
 | `adv_src_mode_alpha_iface` | HLL Method 1 (`riemann_solver == 1, .not. hll_u_interface`) | Per-fluid interface $\Psi_{\alpha_k}$ in slots `adv%beg:adv%end` |
 | `adv_src_mode_vel_iface` | HLL Method 2, HLLC, Exact, LF | Shared face-normal $\Psi_u$ in slot `adv%beg` only |
-| `adv_src_mode_none` | HLLD (`riemann_solver == 4`) | Zeros (all NC terms handled inside the solver) |
+| `adv_src_mode_none` | HLLD (`riemann_solver == 4`) | `adv%beg` zeroed; the per-fluid slots are not written (all NC terms handled inside the solver) |
 
 Notes:
 
@@ -65,7 +65,7 @@ built directly in physical space by `s_compute_viscous_source_flux` and
 | Slot | `adv_src_mode_alpha_iface` (HLL M1) | `adv_src_mode_vel_iface` (HLL M2 / HLLC) | `adv_src_mode_none` (HLLD) | Finalized? |
 |------|------|------|------|------|
 | `adv%beg` | First $\Psi_\alpha$ | $\Psi_u$ | 0 | Always |
-| `adv%beg+1:adv%end` | Remaining $\Psi_\alpha$ per fluid | Unused | 0 | Only when `adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none` |
+| `adv%beg+1:adv%end` | Remaining $\Psi_\alpha$ per fluid | Unused | Not written | Only when `adv_src_mode == adv_src_mode_alpha_iface` |
 
 When `adv_src_mode_vel_iface` is active, `flux_src_n(dir)%vf(adv%beg+1:adv%end)` are
 pointer-aliased to `flux_src_n(dir)%vf(adv%beg)` in `m_rhs.fpp`, so the RHS loop
@@ -118,7 +118,7 @@ The x-sweep buffer exists but is not exported.
 |--------|-------------|-----------|
 | `flux_rs(1:sys_size)` | `flux_vf(1:sys_size)` | Always |
 | `flux_src_rs(adv%beg)` | `flux_src_vf(adv%beg)` | Always |
-| `flux_src_rs(adv%beg+1:adv%end)` | `flux_src_vf(adv%beg+1:adv%end)` | `adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none` |
+| `flux_src_rs(adv%beg+1:adv%end)` | `flux_src_vf(adv%beg+1:adv%end)` | `adv_src_mode == adv_src_mode_alpha_iface` |
 | `nc_iface_vel_rs` | `nc_iface_vel_vf` | `use_nc_iface_vel` |
 | `flux_gsrc_rs` | `flux_gsrc_vf` | `cyl_coord` (y-sweep) or `grid_geometry == 3` (z-sweep) |
 | `vel_src_rs` | — | Never finalized |

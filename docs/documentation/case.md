@@ -573,7 +573,7 @@ Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%end = 
 The difference of the two models is assessed by (\cite Schmidmayer20).
 Note that some code parameters are only compatible with 5-equation model.
 
-- `alt_soundspeed` activates the source term in the advection equations for the volume fractions, \f$K\nabla\cdot \underline{u}\f$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
+- `alt_soundspeed` activates the source term in the advection equations for the volume fractions, \f$K\nabla\cdot \underline{u}\f$, that regularizes the speed of sound in the mixture region when the 5-equation model is used. Requires exactly two fluid components (\f$K\f$ is a two-fluid closure).
 The effect and use of the source term are assessed by \cite Schmidmayer20.
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
@@ -643,12 +643,12 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
-- `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in `fluid_pp`. Compatible with HLL (`riemann_solver = 1`), HLLC (`riemann_solver = 2`), and HLLD (`riemann_solver = 4`). The Riemann solver choice determines how the elastic stress source term \f$\mathbf{S}^e\f$ is discretized:
+- `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in `fluid_pp`, and `fd_order` to be set (1, 2, or 4). Compatible with HLL (`riemann_solver = 1`), HLLC (`riemann_solver = 2`), and HLLD (`riemann_solver = 4`). The Riemann solver choice determines how the elastic stress source term \f$\mathbf{S}^e\f$ is discretized:
   - **HLL**: finite-difference velocity gradient (default), or interface-consistent velocity gradient when ``hypo_hll_interface_rhs = 'T'`` (matches HLLC).
   - **HLLC**: interface-consistent velocity gradient from the Riemann solution.
   - **HLLD**: dual-pass approach resolving the elastic wave structure. Requires 2D+ and exactly 2 fluid components.
 
-- `riemann_hypo_ADC`: Enables anti-diffusion correction (ADC) for hypoelastic HLLC or HLLD. Blends the HLLC/HLLD flux locally toward the more diffusive HLL flux where a jump sensor (total normal stress, tangential velocity, and tangential stress) detects a strong contact or material interface, improving robustness and reducing interfacial overshoots. This trades contact and shear resolution for robustness where the sensor activates. `ADC_kappa` (default 1.0) scales the reference jump the sensor is normalized by; smaller values blend more toward HLL (more diffusive and robust). Off by default and recommended off: in MFC's tested hypoelastic cases, including strong shock-interface interactions, HLLD is stable and accurate without ADC (which has negligible effect on it). The option is a robustness fallback intended for regimes with intense shocks and intense shear at material interfaces.
+- `riemann_hypo_ADC`: Enables anti-diffusion correction (ADC) for hypoelastic HLLC or HLLD. Blends the HLLC/HLLD flux locally toward the more diffusive HLL flux where a jump sensor (total normal stress, tangential velocity, and tangential stress) detects a strong contact or material interface, improving robustness and reducing interfacial overshoots. This trades contact and shear resolution for robustness where the sensor activates. `ADC_kappa` (default 1.0) scales the reference jump the sensor is normalized by; smaller values blend more toward HLL (more diffusive and robust). Off by default and recommended off: in MFC's tested hypoelastic cases, including strong shock-interface interactions, HLLD is stable and accurate without ADC. The option is a robustness fallback intended for regimes with intense shocks and intense shear at material interfaces.
 
 #### Boundary Condition Patches {#boundary-condition-patches}
 
