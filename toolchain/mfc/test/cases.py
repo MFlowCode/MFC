@@ -2094,6 +2094,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_y%end": -2,
                 **_patch1_2d,
                 **_patch2_2d,
+                # Axis regularity: vel(2) is the radial velocity here, and a nonzero
+                # value at r = 0 is not a smooth axisymmetric state (v_r must be O(r)).
+                # Move the two-stream dynamics to the axial component instead.
+                "patch_icpp(1)%vel(1)": 10.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(2)%vel(1)": -10.0,
+                "patch_icpp(2)%vel(2)": 0.0,
             },
             "3D -> Hypoelasticity": {
                 **_common,
@@ -2175,18 +2182,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     if base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLL -> Interface RHS" and alt_soundspeed == "T":
                         continue
 
-                    # Axisym HLLC amplifies FP perturbations beyond 1e-6;
-                    # the scheme is numerically unstable and needs looser tolerance.
-                    is_axisym_hllc = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace.startswith("HLLC")
-                    tol = 1e-2 if is_axisym_hllc else None
-
                     trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
                     cases.append(
                         define_case_f(
                             trace,
                             "",
                             mods={},
-                            override_tol=tol,
                             functor=lambda case, bc=base_cfg, sm=solver_mods, alt_ss=alt_soundspeed: apply_solver(case, bc, sm, alt_ss),
                         )
                     )
