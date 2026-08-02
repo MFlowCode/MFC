@@ -2182,12 +2182,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     if base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLL -> Interface RHS" and alt_soundspeed == "T":
                         continue
 
+                    # With the axis-regular IC this case's early shear-stress rows are
+                    # near-zero, so the comparison is absolute-noise-dominated there:
+                    # measured GPU(nvfortran) vs CPU(gfortran) drift 1.07e-6 abs on
+                    # cons.9 (field scale ~1e7). 2e-6 bounds that noise; all sibling
+                    # rows hold the suite default.
+                    is_axisym_hlld_base = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLLD" and alt_soundspeed == "F"
+                    tol = 2e-6 if is_axisym_hlld_base else None
+
                     trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
                     cases.append(
                         define_case_f(
                             trace,
                             "",
                             mods={},
+                            override_tol=tol,
                             functor=lambda case, bc=base_cfg, sm=solver_mods, alt_ss=alt_soundspeed: apply_solver(case, bc, sm, alt_ss),
                         )
                     )
