@@ -139,10 +139,56 @@ Measured 2026-08-02, 3D, np=8, 256^3 two-slab interface, `fine_work` IDENTICAL i
 | `amr_max_grid_size` | 32 -> **64** | **3.2x** | nothing measurable here; bounded by device memory (96 OOMs in 3D) |
 | `amr_regrid_int` | 2 -> **8** | **1.39x** | the box set lags a moving feature |
 | `amr_subcycle` | F -> **T** | **1.55x** | a DIFFERENT time integration, not a free optimization |
-| combined | | **~6.9x** | no code changes |
+| **combined (MEASURED, not multiplied)** | | **7.012x** | no code changes |
 
-For comparison, the loop-invariant halo hoist landed the same day is worth 2.4x. **The parameters are
-worth roughly three times the code change.**
+Measured cumulatively at np=8, each row adding one lever, `fine_work` identical across the last three
+arms (17765376) so the comparison is like-for-like refinement:
+
+| arm | s per unit PHYSICAL time | vs default | marginal |
+|---|---|---|---|
+| default (cap 32, lock-step, regrid 2) | 6.716e4 | 1.000x | - |
+| + `amr_max_grid_size` 64 | 2.210e4 | 3.039x | 3.04x |
+| + `amr_subcycle` | 1.408e4 | 4.771x | 1.57x |
+| + `amr_regrid_int` 8 | **9.578e3** | **7.012x** | 1.47x |
+
+**The three levers compose cleanly** - every marginal contribution reproduces its standalone value
+(3.2 / 1.55 / 1.39), because they act on independent things: the cap cuts per-block invocation count,
+subcycling cuts how often the coarse level is integrated, and the regrid interval cuts tag-sweep
+frequency.
+
+**A retraction.** An earlier draft of this section warned that naive multiplication (~6.9x) was
+"impossible, because it would put AMR faster per cell than a uniform grid". That objection was wrong:
+it compared against a uniform per-cell rate computed at FIXED dt, but subcycling CHANGES dt, so the
+comparison rather than the composition was invalid. The measured total is 7.0x.
+
+For comparison, the loop-invariant halo hoist landed the same day is worth 2.4x, and the entire
+remaining code agenda - flat backing store (~1.13x), P2P batching (~1.08x), per-phase rebalancing
+(<=1.24x) - totals under 1.6x even if all three land. **The parameters are worth more than every code
+lever combined, several times over.**
+
+### Per-phase load imbalance: the balancer optimises the wrong quantity
+
+Whole-step balance reads 1.000-1.010 at every rank count tested, including 32 ranks on 4 nodes. But
+per-phase imbalance (`[amr-imbal]`, same `rank_time_wrt` gate) is 1.12-1.64, and it worsens off-node:
+
+| phase | np=8 max/mean | np=16 max/mean | wait s/step at np=16 |
+|---|---|---|---|
+| fill | 1.229 | 1.475 | 0.128 |
+| coarse_rhs | - | 1.447 | 0.085 |
+| reflux | 1.212 | 1.348 | 0.080 |
+| halo | 1.357 | 1.611 | 0.065 |
+| restrict | 1.453 | 1.643 | 0.059 |
+| coarse_halo | 1.133 | 1.476 | 0.017 |
+
+**19.4% of the np=16 step is ranks waiting at phase syncs.** The cause is structural: the balancer
+distributes TOTAL weight, but every phase has its own barrier and each is driven by a DIFFERENT
+quantity - `reflux` touches only level-1 blocks, `restrict` is per-block, `coarse_rhs` is per-cell. A
+rank can carry exactly the right total weight and still hold the wrong number of level-1 blocks, so it
+arrives late at that phase's barrier while every other rank waits. Perfect per-phase balance is
+unattainable (blocks are indivisible), so 1.24x is a ceiling, not a target - but it is the largest
+measured code-side lever, and it is confined to the balancer rather than the solver.
+
+
 
 **`amr_max_grid_size`.** The default of 0 derives the cap from the decomposition, so it SHRINKS as
 ranks are added - backwards for strong scaling. AMReX defaults to 32 in 3D but its GPU guidance pushes
