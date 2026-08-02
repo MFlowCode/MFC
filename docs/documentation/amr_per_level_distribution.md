@@ -654,9 +654,28 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
 
     **Copies scale with `sys_size`; kernel count does not** (the `sys_size` loops live INSIDE the
     kernels). Solving the two points gives **~46.5 copies per field variable plus a ~347 fixed base**.
-    That is descriptor traffic per (field variable x mapped argument) on every `s_compute_rhs` entry -
-    it is why the copies are latency-bound at ~10 us rather than bandwidth-bound, and why their count
-    is independent of how many cells the call covers.
+
+    That correlation alone does NOT identify descriptors - any per-field operation in a
+    `do i = 1, sys_size` loop scales identically. Two further tests settle it. Varying grid size at
+    fixed `sys_size` (63^3 / 127^3 / 255^3, a 64x volume change) gives **626 copies per call at every
+    size - exactly constant** - so the count is not data-proportional. And the duration distribution at
+    255^3 is sharply bimodal:
+
+    | bucket | count | share of copy time |
+    |---|---|---|
+    | ~5.4 us (p50) | 11243 (99.7%) | 29.4% |
+    | >1 ms | 29 (0.3%) | 70.6% |
+
+    The 29 millisecond-scale copies are bulk data (initial load and save, ~5 per step, not per call);
+    they are what made the MEAN appear to grow with grid size. The per-call population is 99.7% flat
+    ~5.4 us copies, p10-p99 spanning only 5.0-7.0 us across that 64x volume change - latency-bound, so
+    bytes not megabytes. Count fixed in volume, duration flat in volume, count linear in `sys_size`:
+    that is metadata/descriptor traffic per (field x mapped argument), ~3.4 ms per `s_compute_rhs`
+    entry. Uniform pays it 3x/step (~10 ms, invisible); AMR pays it 963x.
+
+    **Why it is addressable:** `sys_size` is fixed once `s_read_input_file` completes, so every array
+    shaped by it has known, unchanging extents from initialization onward. Re-establishing these
+    mappings on every RHS entry is redundant work, not an inherent cost.
 
     **Consequence for the fix.** Making these mappings persistent instead of per-call is the lever, and
     it is worth noting this is the same flat-backing-store restructuring
