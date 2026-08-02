@@ -621,6 +621,34 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
     At 320 blocks launch count is not in the top two terms, so launch fusion cannot address the
     limiter. Re-derive the increment ranking against copies and host time before spending on it.
 
+    **ROOT CAUSE - `s_compute_rhs` has a FIXED per-invocation cost, and AMR pays it per BLOCK.**
+    Profiling the uniform control on the identical base grid isolates it. Per `s_compute_rhs` call the
+    cost is ~15-31 kernel dispatches and ~305-609 device-to-device copies, essentially independent of
+    how many cells that call covers. Uniform pays it 3x per step; AMR pays it 963x (320 blocks x 3
+    stages + coarse):
+
+    | | uniform | AMR (320 blocks) | ratio |
+    |---|---|---|---|
+    | RHS invocations / step | 3 | 963 | **321x** |
+    | kernel dispatches (10 steps) | 936 | 143290 | 153x |
+    | memory copies (10 steps) | 18260 | 2937743 | 161x |
+    | **copy GPU time** | **0.26 s** | **28.53 s** | **109x** |
+    | kernel GPU time | 2.58 s | 9.86 s | 3.8x |
+    | mean kernel duration | 2761 us | 69 us | 0.025x |
+
+    So the per-block floor is not a mystery constant: it is the RHS machinery's fixed setup, paid once
+    per block per stage rather than once per stage. The copies dominate - negligible at 0.26 s in the
+    uniform run, they become the largest single GPU consumer at 28.5 s, and with their HSA signalling
+    (`hsa_amd_memory_async_copy_on_engine` fires 2928329 times) they account for ~88% of all 33.2M host
+    GPU-API calls.
+
+    **Leading hypothesis for what the copies ARE, explicitly NOT yet proven:** OpenMP map/descriptor
+    traffic for the derived-type arguments. `q_cons`/`q_prim`/`rhs` are arrays of `scalar_field` with
+    pointer `%%sf` components, and ~50 such arguments x `sys_size` = 6 lands near the observed ~305. The
+    cheap discriminator is to vary `sys_size` (e.g. `num_fluids` = 2) and see whether copies-per-call
+    moves with it. Three mechanism guesses have already been refuted on this branch (packing,
+    cross-rank adjacency, launch count) - do not act on this one before running that test.
+
     **SIZING CAVEAT - these magnitudes are provisional.** Measured density on this machine is 19.34 GiB
     for 16.8M uniform 3D points = 0.87M points/GiB, so a 64 GiB GCD holds ~56M points. This case runs
     2.1M points/rank at np=8, about **4% of capacity**, which inflates the non-compute share (compute
