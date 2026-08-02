@@ -80,9 +80,8 @@ contains
         write (3, '(13X,A)') 'those stability conditions pertinent ' // 'to the physics included in'
         write (3, '(13X,A)') 'the current computation are displayed.'
         if (hypoelasticity) then
-            write (3, '(13X,A)') 'NOTE: the reported ICFL uses the acoustic ' // 'sound speed only; the'
-            write (3, '(13X,A)') 'elastic longitudinal characteristic speed ' // 'is higher and is not'
-            write (3, '(13X,A)') 'reflected in this number.'
+            write (3, '(13X,A)') 'NOTE: the reported ICFL uses the acoustic ' // 'sound speed only; it may'
+            write (3, '(13X,A)') 'underestimate the elastic characteristic ' // 'speeds.'
         end if
 
         call date_and_time(DATE=file_date)

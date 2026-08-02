@@ -180,7 +180,7 @@ PHYSICS_DOCS = {
     "check_alt_soundspeed": {
         "title": "Alternative Sound Speed",
         "category": "Feature Compatibility",
-        "explanation": "Requires model_eqns = 2, num_fluids 2 or 3, HLL/HLLC/HLLD solver. Incompatible with bubbles.",
+        "explanation": "Requires model_eqns = 2, exactly two fluid components, HLL/HLLC/HLLD solver. Incompatible with bubbles.",
     },
     "check_igr": {
         "title": "Iterative Generalized Riemann (IGR)",

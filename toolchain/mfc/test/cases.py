@@ -2554,9 +2554,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        # Production-configuration pin: every other HLLD golden runs WENO1/Euler, so
-        # this is the one reference exercising the recommended WENO5-M + RK3 path
-        # (including the roundoff symmetrization WENO reconstruction motivates).
+        # Pins the recommended WENO5-M + RK3 configuration on interior two-patch
+        # dynamics (the CBC cases share the discretization but test the boundary).
         weno5_cfg = {
             **make_cbc_uniform_cfg("T"),
             "bc_x%beg": -3,
