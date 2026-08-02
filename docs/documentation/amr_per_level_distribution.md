@@ -74,6 +74,122 @@ Two findings from the step-4 A/B that redirect this work:
 The consequence for sequencing: **instrumentation precedes further distribution work.** Steps 1-4
 were gated on correctness and end-to-end s/step, neither of which measures balance.
 
+## Where this stands (2026-08-02), and what large scale actually demands
+
+**The goal is state-of-the-art AMR with load balancing at large scale.** This section is the current
+measured position against that goal; everything below it is the history that produced it, including
+several retracted conclusions.
+
+### Measured position
+
+| question | answer | evidence |
+|---|---|---|
+| Does AMR strong-scale? | **yes, 0.790 at np=8** (was 0.426) | 3D 256^3, rank-invariant box set, n=3 |
+| Does AMR weak-scale? | **yes, 0.846 at np=8** | constant 2.10M base cells/rank, work/rank held to 1.00-1.10x |
+| Is load balance the constraint? | **no** | imbalance 1.000-1.071 and ZERO idle ranks at every cap, even at 152 blocks/rank |
+| Is AMR efficient? | **no - 4.2x uniform per cell** at the best cap | cap sweep, np=8 |
+| Biggest single lever | `amr_max_grid_size`: 64 is **3.2x** faster than 32 | cap sweep |
+| Beyond one node? | **UNKNOWN** | nothing here exceeds 8 GCDs on one node |
+
+Two cautions on those numbers. The scaling figures are AMR compared to ITSELF at constant work; the
+uniform control at these sizes runs at ~4% of device capacity, so comparisons against it are
+meaningless (an earlier version of this document claimed "AMR scales better than uniform" - that was
+an artifact of a starved baseline and is retracted). And the strong/weak efficiencies come from a
+single case at a single cap on a single node.
+
+### What produced the gain, and what that implies about this plan's method
+
+The 0.426 -> 0.790 improvement did NOT come from per-level distribution. It came from removing a
+**loop-invariant call**: `s_amr_exchange_coarse_cons_halo` sat inside per-block loops in both the
+lock-step and subcycle paths, exchanging a coarse field that every fill reads and none writes -
+~960 identical whole-subdomain exchanges per step where 3 suffice. Because the count tracked the
+GLOBAL box count while each exchange costs the same, it did not distribute at all.
+
+It was found by top-down phase attribution in one run. It was NOT predicted by any cost model in this
+document, and the hypotheses this document did advance - replicated metadata as "THE exascale
+blocker", per-box collectives, cross-rank adjacency, kernel launch count - were each measured and
+found to be minor or wrong (regrid is 2.4% of the step and SCALES DOWN; launches are 8.5% of GPU
+time). **Attribute before hypothesizing.** `amr-bench/audit.sh` encodes the measurement failure modes
+that produced the wrong conclusions.
+
+### The tension that governs large scale
+
+Load-balance freedom requires `boxes_per_level >> num_procs`. Per-block cost is approximately FIXED
+per block. These pull in opposite directions, and rank count decides which wins:
+
+- At np=8, cap 64 gives 10 blocks/rank - enough for perfect balance (1.000, no idle ranks) and few
+  enough that per-block cost is tolerable (4.2x uniform per cell).
+- At 10^3-10^4 ranks, holding 10 blocks/rank means 10^4-10^5 blocks GLOBALLY. That simultaneously
+  (a) multiplies the fixed per-block cost by the block count, and (b) reactivates every O(global
+  boxes) term, including limit 3's replicated metadata (~560 MB/rank at 10^7 boxes).
+
+**So per-block cost is escapable at 8 ranks and unavoidable at 10^4.** Raising `amr_max_grid_size`
+is the lever today, but it is bounded by device memory (cap 96 device-OOMs in 3D) and by the block
+supply the balancer needs. At large scale the code is forced into the many-blocks-per-rank regime,
+which is precisely the regime where per-block cost dominates. **That, not balance, is what stands
+between this implementation and large-scale AMR.**
+
+### Gap against the state of the art
+
+| | AMReX | Parthenon | MFC today |
+|---|---|---|---|
+| per-block compute | box bounds passed as ARGUMENTS to a lambda over a POD view | `MeshBlockPack` - many blocks in ONE kernel launch | swaps GLOBAL state (`m/n/p`, `idwint/idwbuff`, coords) and calls the monolithic solver PER BLOCK |
+| ghost fill | `FillPatch` over a whole MultiFab: one aggregated communication phase for the level | device-resident, packed | per BLOCK, with every rank participating in every block's gather |
+| data residency | device-resident | "all data in device memory" | per-slot allocations; `~626 descriptor copies per RHS call` |
+| demonstrated scale | production exascale | **92% weak scaling to 73,728 GPUs** | 8 GCDs, one node |
+
+The architectural difference is *granularity of both compute and communication*: both reference codes
+operate on a whole level at once, MFC operates per block. Parthenon adopted packing for exactly the
+symptom measured here - kernel runtime smaller than the per-invocation overhead. That is the target
+to match, and it is the same flat-backing-store restructuring @ref amr_block_batching describes -
+but justified by the LARGE-SCALE argument above rather than by the packing rationale, which was
+disproved (see "the packed super-grid cannot work").
+
+### Queue
+
+1. **Multi-node weak scaling (8/16/32 ranks, 1/2/4 nodes).** The open exascale question. Nothing
+   measured so far leaves one node, so inter-node MPI has never been exercised. Harness:
+   `amr-bench/multinode.sbatch` - no uniform control for the scaling claim, oversubscription guard,
+   and per-run host verification (GPUs here are not Slurm-managed, and ranks silently packing onto one
+   node once produced a fake interconnect cliff).
+2. **Sibling-defect audit of the remaining per-block loops.** The hoist found ONE loop-invariant call.
+   Three per-block communication sites remain - `s_amr_gather_coarse_patch`, the fine-fine halo, and
+   reflux - each entered by every rank per block. This is the only vector that has actually produced a
+   large win, and it is cheap.
+3. **`amr_max_grid_size` guidance.** The default is 0 = the DERIVED cap, which SHRINKS as ranks grow -
+   backwards for strong scaling. Measured: 64 is 3.2x faster than 32 and 10.8x faster than 16 in 3D.
+   Documenting the curve is nearly free; changing the default moves every AMR golden and needs its own
+   commit.
+4. **Then per-block cost**, re-derived at the cap the code should actually run at (the descriptor
+   figures were taken at cap 32, where blocks/rank is 4x higher), and checked on a second compiler
+   first - the ~626 copies per call may be an amdflang OpenMP mapping artifact rather than structural.
+
+**Correction on limit 3.** An earlier draft of this queue demoted it as "2.4% of the step and scales
+down". That measurement was taken at **80 global boxes** and is structurally incapable of seeing the
+effect. Balance requires roughly constant blocks/rank, so the GLOBAL box count grows linearly with
+rank count, and with it every O(global boxes) term:
+
+| ranks | global boxes (10/rank) | replicated metadata |
+|---|---|---|
+| 8 | 80 | 0.9 MB/rank |
+| 32 | 320 | 3.5 MB/rank |
+| 10^3 | 10,000 | 110 MB/rank |
+| 10^4 | 100,000 | **1.1 GB/rank** |
+
+Per-block COMPUTE per rank stays constant at fixed blocks/rank - that scales. What grows is the
+O(global) work. So limit 3 is not refuted, it is unmeasurable at the scales tested here, and absence
+of evidence at 8 ranks is not evidence of absence at 10^4.
+
+**It is testable without 10^4 ranks**, by decoupling global box count from rank count: at fixed np=8
+the cap sweep already varies global boxes 1217 -> 80. Run it WITH phase attribution and watch which
+phases grow with the GLOBAL box count rather than with blocks/rank - `regrid` growing implicates the
+tag allgatherv and assignment, `gather_patch` growing implicates the per-block communication, and
+`advance` growing implicates only per-block compute, which is not a scaling problem. That is a
+cheaper and strictly more targeted probe than multi-node, which at 32 ranks reaches only 320 global
+boxes.
+
+Deliberately NOT next: packing (disproved), launch fusion (8.5% of GPU time).
+
 ## What actually blocks exascale: the assignment and regrid cost scale with the GLOBAL box set
 
 **Limit 1 is implemented (pending goldens); limits 2 and 3 remain open.** It was previously recorded only as a diagnosis inside "The
@@ -620,6 +736,51 @@ less than ~10% needs repetitions**, taken alternating between arms so drift hits
     removed, on the strength of a 16-tile / 1-fine-block measurement where launch count was the cost.
     At 320 blocks launch count is not in the top two terms, so launch fusion cannot address the
     limiter. Re-derive the increment ranking against copies and host time before spending on it.
+
+15. **THE ACTUAL LIMITER WAS A LOOP-INVARIANT CALL, and the biggest lever is a PARAMETER.** Two
+    results supersede much of the framing in item 14, both found by top-down phase attribution rather
+    than by reasoning about mechanisms.
+
+    **(a) `s_amr_exchange_coarse_cons_halo` ran once per BLOCK.** It sat inside `s_amr_fine_stage_fill`
+    (lock-step) and `s_amr_subcycle_setup_block` (subcycle, twice - two lerp sources), both called per
+    block per stage. It exchanges the COARSE field, which every fill READS and none WRITES, so it is
+    loop-invariant: ~960 identical whole-subdomain exchanges per step where 3 suffice. Because the
+    count tracked the GLOBAL block count while each exchange costs the same, it did not distribute -
+    adding ranks made it absolutely SLOWER (phase efficiency 0.155, 58% of the step at np=8).
+    Hoisting it to the two call sites gives, on the 256^3 rank-invariant case:
+
+    | np | before | after | strong-scaling efficiency |
+    |---|---|---|---|
+    | 2 | 13.48 | 10.37 | 1.000 -> 1.000 |
+    | 4 | 9.54 | 6.00 | 0.707 -> 0.864 |
+    | 8 | 7.91 | 3.28 | **0.426 -> 0.790** |
+
+    `fine_work` is identical at every rank count, and 61 AMR goldens are byte-identical. AMR now
+    strong-scales BETTER than the uniform control (0.790 vs 0.432, the control starving first).
+
+    **(b) `amr_max_grid_size` is worth more than the code fix.** Sweeping it at np=8 (2 reps,
+    `amr_max_blocks` pinned so it cannot bind):
+
+    | cap | boxes | blocks/rank | idle ranks | imbalance | s/step | ns/cell-update |
+    |---|---|---|---|---|---|---|
+    | 16 | 1217 | 152.1 | 0 | 1.017 | 11.82 | 428.1 |
+    | 32 | 320 | 40.0 | 0 | 1.000 | 3.47 | 108.6 |
+    | 48 | 180 | 22.5 | 0 | 1.071 | 2.17 | 65.5 |
+    | **64** | **80** | **10.0** | **0** | **1.000** | **1.09** | **31.7** |
+    | 96 | - | - | - | - | device OOM | - |
+
+    Monotone to 64, then a MEMORY wall (confirmed `__tgt_target_data_begin_mapper`; slot and solver
+    scratch both go as cap^num_dims). **Cap 64 is 3.2x faster than 32 - which is AMReX's 3D DEFAULT -
+    and 10.8x faster than 16**, with perfect load balance at the fastest point. So granularity, not
+    balance, is the binding constraint in 3D here; AMReX's own GPU guidance (`max_grid_size` 128) says
+    the same. Against the accuracy-matched baseline (brute-force uniform 1024^3 at 8.19 s/step) AMR
+    captures 3% of the available 33.6x benefit before the fix, 7% after, and **22% at cap 64**.
+
+    **What this demotes.** Item 14's "replicated metadata / Limit 3" hypothesis is WRONG: regrid is
+    2.4% of the step and scales DOWN. The per-invocation descriptor traffic is real and is now the
+    largest GPU-side term (66% of GPU time), but at cap 64 there are 10 blocks/rank rather than 40, so
+    it matters ~4x less than the cap-32 measurements suggested. Re-derive its value at the cap the code
+    should actually run at before committing to the flat backing store.
 
     **ROOT CAUSE - `s_compute_rhs` has a FIXED per-invocation cost, and AMR pays it per BLOCK.**
     Profiling the uniform control on the identical base grid isolates it. Per `s_compute_rhs` call the

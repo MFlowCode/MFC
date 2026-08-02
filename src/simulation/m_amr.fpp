@@ -4468,8 +4468,11 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout)         :: pb_in, mv_in
 
         if (.not. amr) return
-        ! valid coarse CONS ghosts for the ghost prolongation below (ALL ranks call: pairwise halo)
-        if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_coarse)
+        ! NOTE: the coarse CONS halo this fill needs is LOOP-INVARIANT - q_cons_coarse is read here and never written - so
+        ! exchanging it per block repeated one whole-subdomain exchange amr_num_blocks times per stage. Hoisted to the caller
+        ! (before the phase-1 loop in m_time_steppers). Measured at ~58% of the step at np=8, and because the count tracked the
+        ! GLOBAL block count while each exchange costs the same, it did not distribute: adding ranks made it absolutely SLOWER
+        ! (efficiency 0.155 at np=8).
         ! the Lagrangian-cloud guard runs on EVERY rank (rank-local bubbles vs the block's GLOBAL box): a non-owner rank's bubbles
         ! can reach into a block across a rank seam
         call s_amr_check_lag_clear()
@@ -4601,10 +4604,9 @@ contains
         ! valid coarse CONS ghosts on both lerp sources (ALL ranks call: pairwise halo); the exchanged t^n / t^{n+1} ghost layers
         ! make the prolonged block-boundary ghosts correct even at rank boundaries
 
-        if (amr_xchg_coarse_ghosts) then
-            call s_amr_exchange_coarse_cons_halo(q_old)
-            call s_amr_exchange_coarse_cons_halo(q_new)
-        end if
+        ! the two lerp sources' coarse halos are LOOP-INVARIANT over the setup loop (both read, neither written), so the
+        ! exchanges are hoisted to s_amr_advance_fine_subcycle_all - same defect as the lock-step path, doubled for two fields
+
         call s_amr_check_lag_clear()  ! EVERY rank: non-owner bubbles can reach the block across a seam
 
         ! fine-level distribution: gather each lerp source's coarse patch (collective - ALL ranks) then prolong its ghost shell on
@@ -4657,6 +4659,13 @@ contains
         real(wp)                                                                                :: th
 
         if (.not. amr) return
+
+        ! valid coarse CONS ghosts on BOTH lerp sources, ONCE for the whole setup loop (ALL ranks call: pairwise halo). Neither
+        ! source is written below, so this is the loop-invariant hoist described in s_amr_subcycle_setup_block.
+        if (amr_xchg_coarse_ghosts) then
+            call s_amr_exchange_coarse_cons_halo(q_old)
+            call s_amr_exchange_coarse_cons_halo(q_new)
+        end if
 
         ! SETUP: each level-1 block prepares its two time-lerp ghost sources and zeros its registers (collective; ALL ranks call)
         do islot = 1, amr_num_blocks
