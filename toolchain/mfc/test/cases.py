@@ -2483,12 +2483,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        # Uniform-state preservation across a characteristic boundary: the CBC flux
-        # rebuild must reproduce HLLD's folded volume-fraction representation
-        # (adv_src_mode_none; -/+ K*u_n under alt_soundspeed). The WENO5 path is the
-        # one that calls the primitive-to-flux converter at the boundary. Pre-fix,
-        # the alt_soundspeed variant drifted alpha by O(1e-3) within five steps; the
-        # goldens pin exact uniformity for both variants.
+        # Base for the CBC coverage: uniform two-fluid state, WENO5-M + RK3, both x
+        # boundaries characteristic (-6). The anchored cases below make alpha (and,
+        # under alt_soundspeed, the normal velocity) smoothly nonuniform across the
+        # end boundary.
         def make_cbc_uniform_cfg(alt_soundspeed):
             nx, ny = 64, 32
             alpha_w = 0.5
@@ -2528,12 +2526,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(1)%alpha(2)": 1.0 - alpha_w,
             }
 
+        # Anchored CBC transport: HLLD folds all volume-fraction NC terms into
+        # per-face, per-pass ANCHORED fluxes (adv_src_mode_none), and the CBC flux
+        # rebuild must reproduce that representation, not a cell-local reduction of
+        # it. A smooth alpha transition intersecting the end characteristic boundary
+        # exercises the anchored transport (a cell-local rebuild reconstructs zero
+        # there and freezes/corrupts alpha in the boundary band); the alt_soundspeed
+        # variant adds a normal-velocity gradient so the folded -/+ K*du_n/dn
+        # exchange is exercised at the boundary face as well.
+        def make_cbc_anchored_cfg(alt_soundspeed):
+            profile = "0.5 + 0.3*tanh((x - 1.0)/0.08)"
+            cfg = {
+                **make_cbc_uniform_cfg(alt_soundspeed),
+                "patch_icpp(1)%alpha(1)": profile,
+                "patch_icpp(1)%alpha(2)": f"1.0 - ({profile})",
+                "patch_icpp(1)%alpha_rho(1)": f"1000.0*({profile})",
+                "patch_icpp(1)%alpha_rho(2)": f"1.2*(1.0 - ({profile}))",
+            }
+            if alt_soundspeed == "T":
+                cfg["patch_icpp(1)%vel(1)"] = "10.0 + 2.0*tanh((x - 1.0)/0.08)"
+            return cfg
+
         for label, alt in [("", "F"), (" -> alt_soundspeed", "T")]:
             cases.append(
                 define_case_f(
-                    f"2D -> Hypoelasticity -> HLLD -> CBC uniform preservation{label}",
+                    f"2D -> Hypoelasticity -> HLLD -> CBC anchored transport{label}",
                     "",
-                    mods=make_cbc_uniform_cfg(alt),
+                    mods=make_cbc_anchored_cfg(alt),
                 )
             )
 

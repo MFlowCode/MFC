@@ -12,7 +12,8 @@ module m_cbc
     use m_global_parameters
     use m_variables_conversion
     use m_compute_cbc
-    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
+    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_gamma_law, recon_type_weno, recon_type_muscl, &
+        & verysmall
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
         & get_mole_fractions, get_species_specific_heats_r
@@ -461,12 +462,13 @@ contains
     end subroutine s_associate_cbc_coefficients_pointers
 
     !> Apply characteristic boundary conditions by modifying fluxes near domain boundaries
-    subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, cbc_dir_norm, cbc_loc_norm, ix, iy, iz)
+    subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, cbc_dir_norm, cbc_loc_norm, ix, iy, iz, is_hat_L)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
         integer, intent(in)                                    :: cbc_dir_norm, cbc_loc_norm
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
+        logical, intent(in)                                    :: is_hat_L
         real(wp)                                               :: drho_dt
         real(wp)                                               :: dpres_dt
         real(wp)                                               :: dgamma_dt
@@ -498,19 +500,24 @@ contains
         #:endif
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(3) :: lambda
-        real(wp)               :: rho         !< Cell averaged density
-        real(wp)               :: pres        !< Cell averaged pressure
-        real(wp)               :: E           !< Cell averaged energy
-        real(wp)               :: H           !< Cell averaged enthalpy
-        real(wp)               :: gamma       !< Cell averaged specific heat ratio
-        real(wp)               :: pi_inf      !< Cell averaged liquid stiffness
-        real(wp)               :: qv          !< Cell averaged fluid reference energy
+        real(wp)               :: rho     !< Cell averaged density
+        real(wp)               :: pres    !< Cell averaged pressure
+        real(wp)               :: E       !< Cell averaged energy
+        real(wp)               :: H       !< Cell averaged enthalpy
+        real(wp)               :: gamma   !< Cell averaged specific heat ratio
+        real(wp)               :: pi_inf  !< Cell averaged liquid stiffness
+        real(wp)               :: qv      !< Cell averaged fluid reference energy
         real(wp)               :: c
         real(wp)               :: Ma
         real(wp)               :: T, sum_Enthalpies
         real(wp)               :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)               :: vel_K_sum, vel_dv_dt_sum
-        integer                :: i, j, k, r  !< Generic loop iterators
+        !! Hypoelastic HLLD anchored volume-fraction reconstruction at CBC faces
+        real(wp) :: P_u_cbc, P_a1u_cbc, P_a2u_cbc
+        real(wp) :: a1_hat_cbc, a2_hat_cbc, K_hat_cbc, blkmod1_cbc, blkmod2_cbc, pres_hat_cbc
+        real(wp) :: G1_cbc, G2_cbc
+        integer  :: jf, ja, anchor_off, nidx
+        integer  :: i, j, k, r  !< Generic loop iterators
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
 
@@ -522,6 +529,21 @@ contains
         call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, ix, iy, iz)
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
+
+        ! Hypoelastic HLLD anchored volume-fraction reconstruction: the anchor of a face is
+        ! the cell that consumes it in the active pass. In boundary-local coordinates that is
+        ! cell jf for one pass and jf + 1 for the other, with the roles mirrored at an end
+        ! boundary (the local frame reverses the sweep direction).
+        G1_cbc = 0._wp; G2_cbc = 0._wp
+        if (hypoelasticity) then
+            G1_cbc = fluid_pp(1)%G
+            G2_cbc = fluid_pp(2)%G
+        end if
+        if (is_hat_L .eqv. (cbc_loc == 1)) then
+            anchor_off = 1
+        else
+            anchor_off = 0
+        end if
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$ .and. recon_type == recon_type_weno) then
@@ -592,12 +614,106 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
 
+                ! Hypoelastic HLLD: the volume-fraction rows carry anchored folded fluxes
+                ! F_i = (alpha_i - alpha_i_hat -/+ K_hat)*u_n with the anchor fixed per face and
+                ! pass. A PI combination of cell-local converter fluxes cannot represent this
+                ! (each stencil cell would re-anchor to itself; the converter rows are neutral
+                ! zeros), so rebuild the two rows as PI[alpha_i*u_n] - C_hat_i*PI[u_n] with the
+                ! anchored coefficient taken from the consuming cell of this pass.
+                if (riemann_solver == riemann_solver_hlld .and. hypoelasticity) then
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[jf, r, k, ja, nidx, P_u_cbc, P_a1u_cbc, P_a2u_cbc, a1_hat_cbc, &
+                                        & a2_hat_cbc, K_hat_cbc, blkmod1_cbc, blkmod2_cbc, pres_hat_cbc]', copyin='[dir_idx]')
+                    do jf = 0, weno_order/2 - 1
+                        do r = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                nidx = eqn_idx%cont%end + dir_idx(1)
+                                if (weno_order == 3) then
+                                    P_u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, nidx) + pi_coef_${XYZ}$ (0, 0, &
+                                                                  & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                  & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                    P_a1u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                    & nidx) + pi_coef_${XYZ}$ (0, 0, &
+                                                                    & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                    & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                    P_a2u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                    & nidx) + pi_coef_${XYZ}$ (0, 0, &
+                                                                    & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                    & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                else
+                                    P_u_cbc = q_prim_rs${XYZ}$_vf(jf, k, r, nidx) + pi_coef_${XYZ}$ (jf, 0, &
+                                                                  & cbc_loc)*(q_prim_rs${XYZ}$_vf(3, k, r, &
+                                                                  & nidx) - q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                  & nidx)) + pi_coef_${XYZ}$ (jf, 1, &
+                                                                  & cbc_loc)*(q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                  & nidx) - q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                  & nidx)) + pi_coef_${XYZ}$ (jf, 2, &
+                                                                  & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                  & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                    P_a1u_cbc = q_prim_rs${XYZ}$_vf(jf, k, r, eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(jf, k, r, &
+                                                                    & nidx) + pi_coef_${XYZ}$ (jf, 0, &
+                                                                    & cbc_loc)*(q_prim_rs${XYZ}$_vf(3, k, r, &
+                                                                    & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(3, k, r, &
+                                                                    & nidx) - q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                    & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                    & nidx)) + pi_coef_${XYZ}$ (jf, 1, &
+                                                                    & cbc_loc)*(q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                    & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                    & nidx) - q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & nidx)) + pi_coef_${XYZ}$ (jf, 2, &
+                                                                    & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                    & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                    P_a2u_cbc = q_prim_rs${XYZ}$_vf(jf, k, r, eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(jf, k, r, &
+                                                                    & nidx) + pi_coef_${XYZ}$ (jf, 0, &
+                                                                    & cbc_loc)*(q_prim_rs${XYZ}$_vf(3, k, r, &
+                                                                    & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(3, k, r, &
+                                                                    & nidx) - q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                    & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                    & nidx)) + pi_coef_${XYZ}$ (jf, 1, &
+                                                                    & cbc_loc)*(q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                    & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                    & nidx) - q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & nidx)) + pi_coef_${XYZ}$ (jf, 2, &
+                                                                    & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                    & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                    & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                end if
+
+                                ja = jf + anchor_off
+                                a1_hat_cbc = q_prim_rs${XYZ}$_vf(ja, k, r, eqn_idx%adv%beg)
+                                a2_hat_cbc = q_prim_rs${XYZ}$_vf(ja, k, r, eqn_idx%adv%end)
+                                K_hat_cbc = 0._wp
+                                if (alt_soundspeed) then
+                                    pres_hat_cbc = q_prim_rs${XYZ}$_vf(ja, k, r, eqn_idx%E)
+                                    blkmod1_cbc = ((gammas(1) + 1._wp)*pres_hat_cbc + pi_infs(1))/gammas(1) + (4._wp/3._wp)*G1_cbc
+                                    blkmod2_cbc = ((gammas(2) + 1._wp)*pres_hat_cbc + pi_infs(2))/gammas(2) + (4._wp/3._wp)*G2_cbc
+                                    K_hat_cbc = a1_hat_cbc*a2_hat_cbc*(blkmod2_cbc - blkmod1_cbc)/(a1_hat_cbc*blkmod2_cbc &
+                                                                       & + a2_hat_cbc*blkmod1_cbc + verysmall)
+                                end if
+
+                                flux_rs${XYZ}$_vf_l(jf, k, r, eqn_idx%adv%beg) = P_a1u_cbc - (a1_hat_cbc + K_hat_cbc)*P_u_cbc
+                                flux_rs${XYZ}$_vf_l(jf, k, r, eqn_idx%adv%end) = P_a2u_cbc - (a2_hat_cbc - K_hat_cbc)*P_u_cbc
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+
                 ! FD2 or FD4 of RHS at j = 0
                 $:GPU_PARALLEL_LOOP(collapse=2, private='[r, k, alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, &
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, H, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j]', copyin='[dir_idx]')
+                                    & vel_dv_dt_sum, i, j, nidx, P_u_cbc, P_a1u_cbc, P_a2u_cbc, K_hat_cbc, blkmod1_cbc, &
+                                    & blkmod2_cbc, pres_hat_cbc]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         ! Transferring the Primitive Variables
@@ -831,6 +947,21 @@ contains
                             end do
                         end if
 
+                        ! Hypoelastic HLLD with alt_soundspeed: the interior scheme folds the
+                        ! -/+ K*div(u) exchange into its anchored alpha fluxes, so the boundary
+                        ! rates must carry the same term; K from the boundary cell, normal
+                        ! derivative from the FD stencil (physical sign at both boundary ends).
+                        K_hat_cbc = 0._wp
+                        if (riemann_solver == riemann_solver_hlld .and. hypoelasticity .and. alt_soundspeed) then
+                            pres_hat_cbc = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E)
+                            blkmod1_cbc = ((gammas(1) + 1._wp)*pres_hat_cbc + pi_infs(1))/gammas(1) + (4._wp/3._wp)*G1_cbc
+                            blkmod2_cbc = ((gammas(2) + 1._wp)*pres_hat_cbc + pi_infs(2))/gammas(2) + (4._wp/3._wp)*G2_cbc
+                            K_hat_cbc = adv_local(1)*adv_local(2)*(blkmod2_cbc - blkmod1_cbc)/(adv_local(1)*blkmod2_cbc &
+                                                  & + adv_local(2)*blkmod1_cbc + verysmall)
+                            dadv_dt(1) = dadv_dt(1) + K_hat_cbc*dvel_ds(dir_idx(1))
+                            dadv_dt(2) = dadv_dt(2) - K_hat_cbc*dvel_ds(dir_idx(1))
+                        end if
+
                         drho_dt = 0._wp; dgamma_dt = 0._wp; dpi_inf_dt = 0._wp; dqv_dt = 0._wp
 
                         if (model_eqns == model_eqns_gamma_law) then
@@ -899,6 +1030,79 @@ contains
                                                         & vel(dir_idx(1)))*(flux_rs${XYZ}$_vf_l(0, k, r, &
                                                         & i) + vel(dir_idx(1))*flux_src_rs${XYZ}$_vf_l(0, k, r, &
                                                         & i) + ds(0)*dadv_dt(i - eqn_idx%E))
+                            end do
+                        else if (riemann_solver == riemann_solver_hlld .and. hypoelasticity) then
+                            ! Anchored representation: the boundary cell reads face -1 in one pass and
+                            ! face 0 in the other, both anchored to itself. The face -1 construction must
+                            ! therefore seed from the CELL-0-anchored face-0 value (recomputed here; the
+                            ! stored face-0 flux carries this pass's own anchor), so the two faces
+                            ! telescope to exactly ds(0)*dadv_dt for the boundary cell.
+                            nidx = eqn_idx%cont%end + dir_idx(1)
+                            if (weno_order == 3) then
+                                P_u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, nidx) + pi_coef_${XYZ}$ (0, 0, &
+                                                              & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                              & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                P_a1u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                & nidx) + pi_coef_${XYZ}$ (0, 0, cbc_loc)*(q_prim_rs${XYZ}$_vf(1, &
+                                                                & k, r, eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                P_a2u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                & nidx) + pi_coef_${XYZ}$ (0, 0, cbc_loc)*(q_prim_rs${XYZ}$_vf(1, &
+                                                                & k, r, eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                            else
+                                P_u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, nidx) + pi_coef_${XYZ}$ (0, 0, &
+                                                              & cbc_loc)*(q_prim_rs${XYZ}$_vf(3, k, r, &
+                                                              & nidx) - q_prim_rs${XYZ}$_vf(2, k, r, nidx)) + pi_coef_${XYZ}$ (0, &
+                                                              & 1, cbc_loc)*(q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                              & nidx) - q_prim_rs${XYZ}$_vf(1, k, r, nidx)) + pi_coef_${XYZ}$ (0, &
+                                                              & 2, cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                              & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                P_a1u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                & nidx) + pi_coef_${XYZ}$ (0, 0, cbc_loc)*(q_prim_rs${XYZ}$_vf(3, &
+                                                                & k, r, eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(3, k, r, &
+                                                                & nidx) - q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                & nidx)) + pi_coef_${XYZ}$ (0, 1, &
+                                                                & cbc_loc)*(q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                & nidx) - q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & nidx)) + pi_coef_${XYZ}$ (0, 2, &
+                                                                & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                & eqn_idx%adv%beg)*q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                                P_a2u_cbc = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                & nidx) + pi_coef_${XYZ}$ (0, 0, cbc_loc)*(q_prim_rs${XYZ}$_vf(3, &
+                                                                & k, r, eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(3, k, r, &
+                                                                & nidx) - q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                & nidx)) + pi_coef_${XYZ}$ (0, 1, &
+                                                                & cbc_loc)*(q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(2, k, r, &
+                                                                & nidx) - q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & nidx)) + pi_coef_${XYZ}$ (0, 2, &
+                                                                & cbc_loc)*(q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(1, k, r, &
+                                                                & nidx) - q_prim_rs${XYZ}$_vf(0, k, r, &
+                                                                & eqn_idx%adv%end)*q_prim_rs${XYZ}$_vf(0, k, r, nidx))
+                            end if
+
+                            ! K_hat_cbc already holds the cell-0 K (zero unless alt_soundspeed)
+                            flux_rs${XYZ}$_vf_l(-1, k, r, &
+                                                & eqn_idx%adv%beg) = P_a1u_cbc - (adv_local(1) + K_hat_cbc)*P_u_cbc + ds(0) &
+                                                & *dadv_dt(1)
+                            flux_rs${XYZ}$_vf_l(-1, k, r, &
+                                                & eqn_idx%adv%end) = P_a2u_cbc - (adv_local(2) - K_hat_cbc)*P_u_cbc + ds(0) &
+                                                & *dadv_dt(2)
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = flux_src_rs${XYZ}$_vf_l(0, k, r, i)
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')
