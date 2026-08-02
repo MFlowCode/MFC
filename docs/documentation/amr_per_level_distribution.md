@@ -129,6 +129,41 @@ supply the balancer needs. At large scale the code is forced into the many-block
 which is precisely the regime where per-block cost dominates. **That, not balance, is what stands
 between this implementation and large-scale AMR.**
 
+### Configuration guidance: the parameters are worth more than the code
+
+Measured 2026-08-02, 3D, np=8, 256^3 two-slab interface, `fine_work` IDENTICAL in every arm
+(17765376) so all comparisons are like-for-like refinement.
+
+| lever | setting | gain | what it costs |
+|---|---|---|---|
+| `amr_max_grid_size` | 32 -> **64** | **3.2x** | nothing measurable here; bounded by device memory (96 OOMs in 3D) |
+| `amr_regrid_int` | 2 -> **8** | **1.39x** | the box set lags a moving feature |
+| `amr_subcycle` | F -> **T** | **1.55x** | a DIFFERENT time integration, not a free optimization |
+| combined | | **~6.9x** | no code changes |
+
+For comparison, the loop-invariant halo hoist landed the same day is worth 2.4x. **The parameters are
+worth roughly three times the code change.**
+
+**`amr_max_grid_size`.** The default of 0 derives the cap from the decomposition, so it SHRINKS as
+ranks are added - backwards for strong scaling. AMReX defaults to 32 in 3D but its GPU guidance pushes
+to 128; measured here, 64 is 3.2x faster than 32 and 10.8x faster than 16, with imbalance 1.000 and
+ZERO idle ranks at the fastest point. Granularity, not balance, is the binding constraint in 3D.
+
+**`amr_regrid_int`.** `regrid` is ~9% of the step and, importantly, FLAT in global box count (1.8x
+across a 15x box-count range), so it is dominated by the per-cell tag sweep rather than the box
+machinery. Regridding less often recovers more than regrid's own share (1.39x for interval 2 -> 8),
+which means it triggers downstream work - slot rebuild, migration - that the phase timers do not
+attribute to it. Risk: a fast-moving feature can outrun a stale box set. This case's refinement is
+stable so it costs nothing; a strong moving shock would under-refine.
+
+**`amr_subcycle`.** THE METRIC MATTERS. Lock-step advances every level at the FINEST-stable dt, so the
+coarse grid is integrated 2**amr_max_level = 4x more often than its own stability requires. Berger-
+Oliger subcycling advances L0 at its own dt, which is 4x larger: per unit physical time the work drops
+from 34.5M to 22.0M cell-updates, predicting 1.57x - measured 1.551x, agreement to 1%. On a per-STEP
+basis the subcycled arm looks 2.6x WORSE (2.8564 vs 1.1079 s/step) because each of its steps covers 4x
+the physical time; comparing s/step would reject the better algorithm. **This is not a drop-in:** the
+two are different time integrations and the answers differ beyond roundoff.
+
 ### Gap against the state of the art
 
 | | AMReX | Parthenon | MFC today |
