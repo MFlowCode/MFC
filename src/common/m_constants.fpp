@@ -118,13 +118,9 @@ module m_constants
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
     integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
 
-    ! Named values for enumerated case parameters (e.g. riemann_solver_hllc) are AUTO-GENERATED
-    ! from "names" in toolchain/mfc/params/definitions.py by the include below. Exception:
-    ! generate_constants_fpp silently skips any registry key containing "%" or "(", because the
-    ! generated {param}_{name} form (e.g. fluid_pp(1)%eos_stiffened_gas) is not a valid Fortran
-    ! identifier. Enum constants for such compound keys are therefore hand-written here, directly
-    ! above the include, and must stay in sync with their "names" dict (see common-pitfalls.md).
-    ! Current case: the eos_* selector, whose values must match _EOS_NAMES in definitions.py.
+    ! Enum values are auto-generated from "names" in definitions.py by the include below, except
+    ! compound keys ("%" or "("), which generate_constants_fpp silently skips. So eos_* is
+    ! hand-written here and must match _EOS_NAMES in definitions.py (see common-pitfalls.md).
     integer, parameter :: eos_stiffened_gas = 1
     integer, parameter :: eos_ideal_gas_mixture = 2
     integer, parameter :: eos_mie_gruneisen = 3
