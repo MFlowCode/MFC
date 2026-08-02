@@ -2401,6 +2401,60 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # Uniform-state preservation across a characteristic boundary: the CBC flux
+        # rebuild must reproduce HLLD's folded volume-fraction representation
+        # (adv_src_mode_none; -/+ K*u_n under alt_soundspeed). The WENO5 path is the
+        # one that calls the primitive-to-flux converter at the boundary. Pre-fix,
+        # the alt_soundspeed variant drifted alpha by O(1e-3) within five steps; the
+        # goldens pin exact uniformity for both variants.
+        def make_cbc_uniform_cfg(alt_soundspeed):
+            nx, ny = 64, 32
+            alpha_w = 0.5
+            return {
+                **edge_common,
+                "m": nx - 1,
+                "n": ny - 1,
+                "t_step_stop": 5,
+                "dt": 1.0e-6,
+                "time_stepper": 3,
+                "weno_order": 5,
+                "mapped_weno": "T",
+                "alt_soundspeed": alt_soundspeed,
+                "num_patches": 1,
+                "bc_x%beg": -6,
+                "bc_x%end": -6,
+                "fluid_pp(1)%gamma": 1.0 / (4.4 - 1.0),
+                "fluid_pp(1)%pi_inf": 4.4 * 6.0e8 / (4.4 - 1.0),
+                "fluid_pp(1)%G": 0.0,
+                "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%G": 0.0,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 10.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0e5,
+                "patch_icpp(1)%tau_e(1)": 0.0,
+                "patch_icpp(1)%tau_e(2)": 0.0,
+                "patch_icpp(1)%tau_e(3)": 0.0,
+                "patch_icpp(1)%alpha_rho(1)": alpha_w * 1000.0,
+                "patch_icpp(1)%alpha(1)": alpha_w,
+                "patch_icpp(1)%alpha_rho(2)": (1.0 - alpha_w) * 1.2,
+                "patch_icpp(1)%alpha(2)": 1.0 - alpha_w,
+            }
+
+        for label, alt in [("", "F"), (" -> alt_soundspeed", "T")]:
+            cases.append(
+                define_case_f(
+                    f"2D -> Hypoelasticity -> HLLD -> CBC uniform preservation{label}",
+                    "",
+                    mods=make_cbc_uniform_cfg(alt),
+                )
+            )
+
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)

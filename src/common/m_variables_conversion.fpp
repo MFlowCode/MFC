@@ -999,6 +999,7 @@ contains
         real(wp)               :: qv_K
         real(wp), dimension(2) :: Re_K
         real(wp)               :: G_K
+        real(wp)               :: blkmod1_K, blkmod2_K, K_K
         real(wp)               :: T_K, mix_mol_weight, R_gas
         integer                :: i, j, k, l  !< Generic loop iterators
 
@@ -1011,7 +1012,8 @@ contains
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]')
+                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, &
+                            & dir_flg_in, hll_u_interface_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1087,10 +1089,37 @@ contains
                         end do
                     end if
 
-                    ! Match the volume-fraction flux representation exported by the Riemann solver. HLL Method 1 and HLLD use
-                    ! per-fluid alpha source traces; HLL Method 2 uses the shared-velocity representation below, like HLLC.
-                    if ((riemann_solver == riemann_solver_hll .and. .not. hll_u_interface_in) &
-                        & .or. riemann_solver == riemann_solver_hlld) then
+                    ! Match the volume-fraction flux representation exported by the Riemann solver. HLL Method 1: zero alpha
+                    ! flux plus per-fluid interface-alpha source traces. Hypoelastic HLLD folds every non-conservative term
+                    ! into its augmented flux (adv_src_mode_none), so its source trace is zero; for this cell-local conversion
+                    ! the fold collapses exactly to -/+ K*u_n on the two volume-fraction rows (K = 0 without alt_soundspeed),
+                    ! with the same two-fluid longitudinal-modulus K as the HLLD kernel (num_fluids = 2 is checker-enforced).
+                    ! MHD HLLD keeps the per-fluid-trace representation it has always used. HLL Method 2, HLLC, and LF use the
+                    ! shared-velocity representation below.
+                    if (riemann_solver == riemann_solver_hlld) then
+                        if (hypoelasticity) then
+                            K_K = 0._wp
+                            if (alt_soundspeed) then
+                                blkmod1_K = ((gammas(1) + 1._wp)*pres_K + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_vc(1)
+                                blkmod2_K = ((gammas(2) + 1._wp)*pres_K + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_vc(2)
+                                K_K = alpha_K(1)*alpha_K(2)*(blkmod2_K - blkmod1_K)/(alpha_K(1)*blkmod2_K + alpha_K(2)*blkmod1_K &
+                                              & + verysmall)
+                            end if
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                FK_vf(j, k, l, i) = 0._wp
+                                FK_src_vf(j, k, l, i) = 0._wp
+                            end do
+                            FK_vf(j, k, l, eqn_idx%adv%beg) = -K_K*vel_K(dir_idx_in(1))
+                            FK_vf(j, k, l, eqn_idx%adv%end) = K_K*vel_K(dir_idx_in(1))
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                FK_vf(j, k, l, i) = 0._wp
+                                FK_src_vf(j, k, l, i) = alpha_K(i - eqn_idx%E)
+                            end do
+                        end if
+                    else if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface_in) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
                             FK_vf(j, k, l, i) = 0._wp
