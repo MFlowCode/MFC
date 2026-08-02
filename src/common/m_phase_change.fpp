@@ -19,7 +19,8 @@ module m_phase_change
     implicit none
 
     private
-    public :: s_initialize_phasechange_module, s_relaxation_solver, s_infinite_relaxation_k, s_finalize_relaxation_solver_module
+    public :: s_initialize_phasechange_module, s_relaxation_solver, s_infinite_relaxation_k, s_finalize_relaxation_solver_module, &
+        & pc_iter_count
 
     !> @name Parameters for the first order transition phase change
     !> @{
@@ -31,6 +32,11 @@ module m_phase_change
     integer, parameter  :: lp = 1                       !< index for the liquid phase of the reacting fluid
     integer, parameter  :: vp = 2                       !< index for the vapor phase of the reacting fluid
     !> @}
+
+    !> Per-cell Newton-iteration count for the current step; allocated only when relax .and. (load_weight_wrt .or.
+    !! sfc_partition_wrt).
+    real(stp), allocatable :: pc_iter_count(:,:,:)
+    $:GPU_DECLARE(create='[pc_iter_count]')
 
 contains
 
@@ -46,6 +52,15 @@ contains
 
     !> Initialize the phase change module (no module-level state to set up; the pT/pTg relaxation solvers are self-contained)
     impure subroutine s_initialize_phasechange_module
+
+#ifdef MFC_SIMULATION
+        ! the load-weight field is computed for load_weight_wrt AND for sfc_partition_wrt:
+        ! allocate and populate under the same condition, else the sfc-only path reads
+        ! unallocated (or allocated-but-never-written) iteration counts
+        if (relax .and. (load_weight_wrt .or. sfc_partition_wrt)) then
+            @:ALLOCATE(pc_iter_count(0:m, 0:n, 0:p))
+        end if
+#endif
 
     end subroutine s_initialize_phasechange_module
 
@@ -69,6 +84,8 @@ contains
 
         !> Generic loop iterators
         integer :: i, j, k, l
+        integer :: ns_pc, ns_tmp   !< per-cell Newton-iteration accumulators for load-weight diagnostic
+        logical :: count_pc_iters  !< host-evaluated kernel guard (a device copy of the wrt flags is never synced)
 
 #ifdef _CRAYFTN
 #ifdef MFC_OpenACC
@@ -79,8 +96,14 @@ contains
 
         ! starting equilibrium solver
 
+#ifdef MFC_SIMULATION
+        count_pc_iters = load_weight_wrt .or. sfc_partition_wrt
+#else
+        count_pc_iters = .false.
+#endif
+
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infpT, sk, hk, gk, ek, rhok, pS, TS, rhoe, dynE, rhos, rho, rM, &
-                            & m1, m2, MCT, TvF]')
+                            & m1, m2, MCT, TvF, ns_pc, ns_tmp]', copyin='[count_pc_iters]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -121,7 +144,7 @@ contains
 
                     ! Calling pT-equilibrium for either finishing phase-change module, or as an IC for the pTg-equilibrium for this
                     ! case, MFL cannot be either 0 or 1, so I chose it to be 2
-                    call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
+                    call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS, ns_pc)
 
                     ! Check if pTg-equilibrium needed; only partial densities require updating
                     if ((relax_model == 6) .and. ((q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, &
@@ -136,7 +159,8 @@ contains
                         q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m1
                         q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m2
 
-                        call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
+                        call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS, ns_tmp)
+                        ns_pc = ns_pc + ns_tmp
                     end if
 
                     ! Calculations AFTER equilibrium
@@ -175,6 +199,12 @@ contains
                         ! Total entropy
                         rhos = rhos + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*sk(i)
                     end do
+
+#ifdef MFC_SIMULATION
+                    ! Accumulate Newton iteration count for the load-weight diagnostic (matches the
+                    ! allocation condition; no-op when neither writer is enabled).
+                    if (count_pc_iters) pc_iter_count(j, k, l) = real(ns_pc, stp)
+#endif
                 end do
             end do
         end do
@@ -184,7 +214,7 @@ contains
 
     !> Apply pT-equilibrium relaxation for N fluids
     !! @param MFL flag: 0=gas, 1=liquid, 2=mixture
-    subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, q_cons_vf, rhoe, TS)
+    subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, q_cons_vf, rhoe, TS, ns_out)
 
         $:GPU_ROUTINE(function_name='s_infinite_pt_relaxation_k', parallelism='[seq]', cray_noinline=True)
 
@@ -195,6 +225,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), intent(in)                                :: rhoe
         real(wp), intent(out)                               :: TS
+        integer, intent(out)                                :: ns_out                    !< Newton iteration count for this call
         real(wp)                                            :: gp, gpp, hp, pO, mCP, mQ  !< variables for the Newton Solver
         real(wp)                                            :: p_infpT_sum
         integer                                             :: i, ns                     !< generic loop iterators
@@ -233,6 +264,7 @@ contains
                 ! temperature
                 TS = 0.0_wp
 
+                ns_out = 0
                 return
             end if
         end if
@@ -277,6 +309,7 @@ contains
 
         ! common temperature
         TS = (rhoe + pS - mQ)/mCP
+        ns_out = ns
 
     end subroutine s_infinite_pt_relaxation_k
 
@@ -330,7 +363,7 @@ contains
     !! rhoe-relative branch). Every step is projected onto the physical bounds 0 <= ml <= mT, pS > pmin. This converges in a handful
     !! of iterations with a bounded, uniform count (no GPU warp divergence), unlike the former fixed 1e-3 underrelaxation that
     !! stalled far from the root.
-    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
+    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS, ns_out)
 
         $:GPU_ROUTINE(function_name='s_infinite_ptg_relaxation_k', parallelism='[seq]', cray_noinline=True)
 
@@ -339,6 +372,7 @@ contains
         real(wp), intent(in)                                   :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout)                                :: TS
+        integer, intent(out)                                   :: ns_out  !< Newton iteration count for this call
         real(wp), dimension(2, 2)                              :: Jac, InvJac
         real(wp), dimension(2)                                 :: R2D, R2D_try, DeltamP
         real(wp)                                               :: mCP, mCPD, mCVGP, mCVGP2, mQ
@@ -422,6 +456,7 @@ contains
         q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = mT - ml
 
         TS = (rhoe + pS - mQ)/mCP
+        ns_out = ns
 
     end subroutine s_infinite_ptg_relaxation_k
 
@@ -467,6 +502,10 @@ contains
 
     !> Finalize the phase change module
     impure subroutine s_finalize_relaxation_solver_module
+
+        if (allocated(pc_iter_count)) then
+            @:DEALLOCATE(pc_iter_count)
+        end if
 
     end subroutine s_finalize_relaxation_solver_module
 

@@ -286,6 +286,11 @@ contains
 
         allocate (proc_coords(1:num_dims))
 
+        ! start_idx is read by decomposition-aware features (amr, sfc_partition_wrt) in ALL builds;
+        ! the serial/single-rank offset is 0 and the MPI decomposition overwrites it
+        allocate (start_idx(1:num_dims))
+        start_idx = 0
+
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
@@ -297,8 +302,6 @@ contains
 
         ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
         ! MPI_INFO_NULL
-
-        allocate (start_idx(1:num_dims))
 #endif
 
     end subroutine s_initialize_parallel_io_common
@@ -309,12 +312,7 @@ contains
     impure subroutine s_finalize_global_parameters_common
 
         deallocate (proc_coords)
-
-#ifdef MFC_MPI
-        if (parallel_io) then
-            deallocate (start_idx)
-        end if
-#endif
+        deallocate (start_idx)
 
     end subroutine s_finalize_global_parameters_common
 

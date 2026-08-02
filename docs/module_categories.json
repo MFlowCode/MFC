@@ -3,6 +3,7 @@
         "category": "Solver Core",
         "modules": [
             "m_rhs",
+            "m_active_box",
             "m_time_steppers",
             "m_weno",
             "m_riemann_solvers",
@@ -58,7 +59,11 @@
             "m_start_up",
             "m_data_output",
             "m_data_input",
-            "m_delay_file_access"
+            "m_delay_file_access",
+            "m_load_weight",
+            "m_load_balance",
+            "m_sfc_partition",
+            "m_rank_timing"
         ]
     },
     {
@@ -69,6 +74,11 @@
             "m_global_parameters_common",
             "m_mpi_common",
             "m_mpi_proxy",
+            "m_box",
+            "m_amr",
+            "m_amr_regrid",
+            "m_amr_restart",
+            "m_amr_registers",
             "m_constants",
             "m_precision_select",
             "m_helper",

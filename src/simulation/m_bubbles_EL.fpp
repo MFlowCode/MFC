@@ -127,11 +127,12 @@ contains
         end if
 
         do i = 1, q_beta_idx
-            @:ALLOCATE(q_beta(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(q_beta(i)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             @:ACC_SETUP_SFs(q_beta(i))
             if (lag_params%kahan_summation) then
-                @:ALLOCATE(kahan_comp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(kahan_comp(i)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                           & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 @:ACC_SETUP_SFs(kahan_comp(i))
             end if
         end do
@@ -184,26 +185,26 @@ contains
         $:GPU_UPDATE(device='[moving_lag_bubbles, lag_pressure_force, lag_gravity_force, lag_vel_model, lag_drag_model]')
 
         if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then
-            @:ALLOCATE(grad_p_x(0:m, 0:n, 0:p))
-            @:ALLOCATE(fd_coeff_x_pgrad(-fd_number:fd_number, 0:m))
+            @:ALLOCATE(grad_p_x(0:m_alloc, 0:n_alloc, 0:p_alloc))
+            @:ALLOCATE(fd_coeff_x_pgrad(-fd_number:fd_number, 0:m_alloc))
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_pgrad, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_x_pgrad]')
             if (n > 0) then
-                @:ALLOCATE(grad_p_y(0:m, 0:n, 0:p))
-                @:ALLOCATE(fd_coeff_y_pgrad(-fd_number:fd_number, 0:n))
+                @:ALLOCATE(grad_p_y(0:m_alloc, 0:n_alloc, 0:p_alloc))
+                @:ALLOCATE(fd_coeff_y_pgrad(-fd_number:fd_number, 0:n_alloc))
                 call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_pgrad, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_y_pgrad]')
             end if
             if (p > 0) then
-                @:ALLOCATE(grad_p_z(0:m, 0:n, 0:p))
-                @:ALLOCATE(fd_coeff_z_pgrad(-fd_number:fd_number, 0:p))
+                @:ALLOCATE(grad_p_z(0:m_alloc, 0:n_alloc, 0:p_alloc))
+                @:ALLOCATE(fd_coeff_z_pgrad(-fd_number:fd_number, 0:p_alloc))
                 call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_pgrad, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_z_pgrad]')
             end if
         end if
 
-        @:ALLOCATE(cell_list_start(0:m, 0:n, 0:p))
-        @:ALLOCATE(cell_list_count(0:m, 0:n, 0:p))
+        @:ALLOCATE(cell_list_start(0:m_alloc, 0:n_alloc, 0:p_alloc))
+        @:ALLOCATE(cell_list_count(0:m_alloc, 0:n_alloc, 0:p_alloc))
         @:ALLOCATE(cell_list_idx(1:lag_params%nBubs_glb))
 
         call s_read_input_bubbles(q_cons_vf, bc_type)
@@ -1969,6 +1970,28 @@ contains
 #endif
 
     end subroutine s_write_restart_lag_bubbles
+
+    !> Physical-space bounding box of this rank's Lagrangian bubbles (committed step positions, register 1). Rank-local: the caller
+    !! allreduces if it needs the global cloud. Returns pmin > pmax when the rank holds no bubbles.
+    impure subroutine s_lag_cloud_bbox_local(pmin, pmax)
+
+        real(wp), dimension(3), intent(out) :: pmin, pmax
+        real(wp)                            :: x1n, x2n, x3n, x1x, x2x, x3x
+        integer                             :: k
+
+        x1n = huge(1._wp); x2n = huge(1._wp); x3n = huge(1._wp)
+        x1x = -huge(1._wp); x2x = -huge(1._wp); x3x = -huge(1._wp)
+        $:GPU_PARALLEL_LOOP(private='[k]', reduction='[[x1n, x2n, x3n], [x1x, x2x, x3x]]', reductionOp='[MIN, MAX]', copy='[x1n, &
+                            & x2n, x3n, x1x, x2x, x3x]')
+        do k = 1, n_el_bubs_loc
+            x1n = min(x1n, mtn_pos(k, 1, 1)); x1x = max(x1x, mtn_pos(k, 1, 1))
+            x2n = min(x2n, mtn_pos(k, 2, 1)); x2x = max(x2x, mtn_pos(k, 2, 1))
+            x3n = min(x3n, mtn_pos(k, 3, 1)); x3x = max(x3x, mtn_pos(k, 3, 1))
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        pmin = [x1n, x2n, x3n]; pmax = [x1x, x2x, x3x]
+
+    end subroutine s_lag_cloud_bbox_local
 
     !> Compute the maximum and minimum radius of each bubble
     subroutine s_calculate_lag_bubble_stats()

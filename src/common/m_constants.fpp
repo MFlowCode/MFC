@@ -14,6 +14,8 @@ module m_constants
     real(wp), parameter  :: small_alf = 1.e-11_wp       !< Small alf tolerance
     real(wp), parameter  :: pi = 3.141592653589793_wp   !< Pi
     real(wp), parameter  :: verysmall = 1.e-12_wp       !< Very small number
+    !> Residual modulus fraction below which a damaged state's elastic energy is dropped (cont_damage)
+    real(wp), parameter :: damage_energy_cutoff = 1.e-3_wp
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5        !< Minimum # of stencils
@@ -41,6 +43,16 @@ module m_constants
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50  !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp            !< scaling factor for IGR alpha
     integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
+    ! Load-weight relative cost coefficients (calibrated against measured RHS-time imbalance; base RHS cell = 1).
+    ! Shared by the m_load_weight diagnostic and the AMR block-owner cost weighting.
+    real(wp), parameter :: K_bub = 50._wp  !< per local Lagrangian bubble (stiff adaptive ODE)
+    real(wp), parameter :: K_ib = 2._wp    !< per IB ghost/interior cell
+    real(wp), parameter :: K_pc = 3._wp    !< per phase-change Newton iteration
+    !> AMR fine-level restart per-block header size, in integers: region box (6) + amr_block_level (1).
+    !> The writer (m_amr:s_write_amr_restart) and BOTH readers (m_amr:s_read_amr_restart and
+    !> m_data_input:s_read_amr_data) must agree on this layout - a mismatch silently misaligns every
+    !> per-block record (see the post-process off-by-one that read the level field as the x-extent).
+    integer, parameter :: amr_restart_blk_hdr_ints = 7
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6
     !> Spatial support width of acoustic source, used in s_source_spatial

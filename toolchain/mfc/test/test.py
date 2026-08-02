@@ -140,7 +140,23 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
 
     for case in cases[:]:
         if ARG("single"):
-            skip = ["low_Mach", "Hypoelasticity", "teno", "Chemistry", "Phase Change model 6", "Axisymmetric", "Transducer", "Transducer Array", "Cylindrical", "HLLD", "Example"]
+            skip = [
+                "low_Mach",
+                "Hypoelasticity",
+                "teno",
+                "Chemistry",
+                "Phase Change model 6",
+                "Axisymmetric",
+                "Transducer",
+                "Transducer Array",
+                "Cylindrical",
+                "HLLD",
+                "Example",
+                # 200-step acoustic propagation drifts past the single tolerance; the AMR
+                # nonpolytropic pair carries override_tol=5e-9, unsatisfiable below single epsilon
+                "AMR -> 1D -> acoustic",
+                "nonpolytropic",
+            ]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
                 skipped_cases.append(case)
@@ -153,8 +169,14 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
 
     # Skip tests that fail under nvfortran in Docker (pass natively/Apptainer):
     #  - 3D_rayleigh_taylor_muscl: segfaults with nvfortran+MPI (seccomp/mprotect)
+    #  - the six UUIDs: intermittent post-detected NaN on Lagrangian-bubble goldens with the
+    #    NVHPC 24.1/24.3 compat images (-tp=px -Kieee + HPC-X under the CI docker image);
+    #    unreproducible natively/Apptainer and green on 24.5+. Four are pre-existing 2D
+    #    Lagrange cases (B9553426 One-way, 4A1BD9B8 Two-way, 0D1FA5C5 One-way adap_dt,
+    #    2122A4F6 Two-way adap_dt); two are AMR+Lagrange (4B08E9B7 Two-way AMR,
+    #    BCE1BBAE Two-way AMR dynamic regrid). Native nvfortran runs still cover all six.
     if os.environ.get("FC") == "nvfortran" and os.path.exists("/.dockerenv"):
-        nvhpc_skip_uuids = {}
+        nvhpc_skip_uuids = {"B9553426", "4A1BD9B8", "0D1FA5C5", "2122A4F6", "4B08E9B7", "BCE1BBAE"}
         nvhpc_skip_traces = {"rayleigh_taylor_muscl"}
         for case in cases[:]:
             if case.get_uuid() in nvhpc_skip_uuids or any(t in case.trace for t in nvhpc_skip_traces):
