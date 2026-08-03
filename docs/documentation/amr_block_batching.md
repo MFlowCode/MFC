@@ -537,6 +537,58 @@ validate it against `00EB793A` specifically. Note `GPU_ENTER_DATA(attach=)` has 
 `m_rhs.fpp`/`m_igr.fpp`, so its expansion cannot be changed casually - they currently rely on the
 `always,to` behaviour.
 
+### THE GOVERNING LAW (2026-08-03, profiled): wall time is set by GPU OPERATION COUNT
+
+Gap analysis of a real AMR run (`rocprofv3`, kernel + copy traces, np=1 2D, 6 steps):
+
+| | |
+|---|---|
+| span | 13516.7 ms |
+| kernel busy | 1823.3 ms (13.5%) |
+| copy busy | 2000.4 ms (14.8%) |
+| union busy | 3823.6 ms (28.3%) |
+| **GPU IDLE** | **9693.0 ms (71.7%)** |
+
+The idle is not a few big stalls - it is ~354,000 operations each separated by a **~15 us median gap**:
+261k gaps under 20 us (27.6% of span), 89k between 20-100 us (21.1%), and only 143 gaps over 1 ms
+(16.7%, worth attributing separately). **95% of those operations are COPIES** (337k of 354k), so the
+map traffic costs ~2.0 s of transfer PLUS ~5 s of serialization - closer to half the span than the 15%
+a busy-time reading suggests.
+
+A faithful reproducer (`amr-bench/attach/serial/`) matches the signature - 81.6% idle, 18.7 us median
+gap against MFC's 71.7% / 15.4 us - and a clean sweep holding work and arrays fixed while varying only
+how many regions the work is split into gives:
+
+| regions fused | operations | span |
+|---|---|---|
+| 1 | 6555 | 202.4 ms |
+| 2 | 3315 | 120.2 ms |
+| 4 | 1695 | 73.8 ms |
+| 8 | 885 | 56.0 ms |
+| 24 | 345 | **37.6 ms** |
+
+Net of ~29 ms fixed startup the variable time falls **20x for a 19x reduction in operations**, and the
+median gap is ~18 us at every point. So:
+
+> **span = fixed + (operations x ~18 us).** The per-operation gap is irreducible; only the COUNT moves.
+
+**`nowait` is REFUTED as a lever.** Enqueuing the same dependent regions with `nowait` + `depend` and one
+`taskwait` per advance measured 213 ms against 202 ms baseline, with the median gap unchanged (18.6 vs
+18.4 us). Asynchronous enqueue does not collapse the serialization.
+
+**Consequences, in priority order.**
+1. **Fewer block advances** - `amr_max_grid_size`. Every advance multiplies the whole operation count.
+   Already measured ~20x and already shipped with runtime advisories. Still the largest available win.
+2. **Kernel fusion inside `s_compute_rhs`** (16 direct regions). The sweep above is the evidence that
+   this pays, and it pays on BOTH factors: a fused region removes its own gap and its maps together.
+   Note fusing raises copies-per-kernel slightly (8.1 -> 10.1 measured) because a fused region touches
+   more arrays; total operations still fell 19x, so the trade is strongly favourable.
+3. **The 143 stalls over 1 ms** (2253 ms, 16.7% of span, one of 543 ms) are host-side and unattributed.
+   Cheap to investigate and potentially a large easy win.
+
+What this retires: anything that reduces the COST of an operation rather than the NUMBER of them. See
+the retraction below - seven such mechanisms were measured and all failed.
+
 ### RETRACTED 2026-08-03: the promotion plan below is DEAD, and so is its premise
 
 **The premise was an attribution artifact.** "Dummy-argument kernels pay 33-54 maps per dispatch while
