@@ -999,6 +999,7 @@ contains
         real(wp)               :: qv_K
         real(wp), dimension(2) :: Re_K
         real(wp)               :: G_K
+        real(wp)               :: blkmod1_K, blkmod2_K, K_K
         real(wp)               :: T_K, mix_mol_weight, R_gas
         integer                :: i, j, k, l  !< Generic loop iterators
 
@@ -1011,7 +1012,8 @@ contains
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]')
+                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, &
+                            & dir_flg_in, hll_u_interface_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1089,18 +1091,32 @@ contains
 
                     ! Match the volume-fraction flux representation exported by the Riemann solver. HLL Method 1: zero alpha
                     ! flux plus per-fluid interface-alpha source traces. Hypoelastic HLLD folds every non-conservative term
-                    ! into its augmented flux (adv_src_mode_none) with a per-face, per-pass ANCHOR, which a cell-local
-                    ! conversion cannot represent: these rows are left neutral (zero) and m_cbc rebuilds them as
-                    ! PI[alpha_i*u_n] - C_hat_i*PI[u_n] with the anchored coefficient of the consuming cell.
+                    ! into its augmented flux (adv_src_mode_none), so its source trace is zero; for this cell-local conversion
+                    ! the fold collapses exactly to -/+ K*u_n on the two volume-fraction rows (K = 0 without alt_soundspeed),
+                    ! with the same two-fluid longitudinal-modulus K as the HLLD kernel (num_fluids = 2 is checker-enforced).
                     ! MHD HLLD keeps the per-fluid-trace representation it has always used. HLL Method 2, HLLC, and LF use the
                     ! shared-velocity representation below.
                     if (riemann_solver == riemann_solver_hlld) then
                         if (hypoelasticity) then
+                            K_K = 0._wp
+                            ! The fluid-2 subscripts must not be compiled when case optimization
+                            ! bakes num_fluids = 1 (amdflang rejects them at compile time); the
+                            ! checker prohibits hypoelastic HLLD there, so the block is dead code.
+                            #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
+                                if (alt_soundspeed) then
+                                    blkmod1_K = ((gammas(1) + 1._wp)*pres_K + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_vc(1)
+                                    blkmod2_K = ((gammas(2) + 1._wp)*pres_K + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_vc(2)
+                                    K_K = alpha_K(1)*alpha_K(2)*(blkmod2_K - blkmod1_K)/(alpha_K(1)*blkmod2_K + alpha_K(2) &
+                                                  & *blkmod1_K + verysmall)
+                                end if
+                            #:endif
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%adv%beg, eqn_idx%adv%end
                                 FK_vf(j, k, l, i) = 0._wp
                                 FK_src_vf(j, k, l, i) = 0._wp
                             end do
+                            FK_vf(j, k, l, eqn_idx%adv%beg) = -K_K*vel_K(dir_idx_in(1))
+                            FK_vf(j, k, l, eqn_idx%adv%end) = K_K*vel_K(dir_idx_in(1))
                         else
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%adv%beg, eqn_idx%adv%end
