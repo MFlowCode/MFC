@@ -537,6 +537,47 @@ validate it against `00EB793A` specifically. Note `GPU_ENTER_DATA(attach=)` has 
 `m_rhs.fpp`/`m_igr.fpp`, so its expansion cannot be changed casually - they currently rely on the
 `always,to` behaviour.
 
+### RETRACTED 2026-08-03: the promotion plan below is DEAD, and so is its premise
+
+**The premise was an attribution artifact.** "Dummy-argument kernels pay 33-54 maps per dispatch while
+module-level `GPU_DECLARE`'d kernels pay 0" came from TEMPORAL attribution: correlation ids do not match
+between the kernel and copy traces, so each copy was assigned to the next dispatch by timestamp. Copies
+CLUSTER - 11.5% of inter-dispatch intervals contain zero copies and one contains 2893 - so a kernel
+dispatched in a burst shows "0" whether or not it needs maps. The `m_amr_registers` kernels that
+measured 0 are ~8% of dispatches, squarely inside that zero-interval share. The MEDIAN of 20 copies per
+interval is real and matches the deep-member count, so the ~20 maps/dispatch AVERAGE stands; the
+per-kernel split does not.
+
+**Every mechanism was then measured directly by COPY COUNT** (`amr-bench/attach/clauses/`, one variant
+per process under `rocprofv3`, no attribution needed, immune to the launch-time noise floor):
+
+| mechanism | copies/kernel | verdict |
+|---|---|---|
+| deep-type dummies (MFC today) | 9.4 | baseline |
+| flat-array dummies (no derived type) | 9.4 | no gain - retires "flatten the interface" for good |
+| pointer dummies | 9.1 | no gain |
+| `defaultmap(present:aggregate)` | 9.1 | no effect |
+| `map(present,alloc:)` | 9.1 | no effect |
+| `!$omp declare mapper` | 39.1 | **4x WORSE** |
+| module state - static, allocatable, or the exact `freg` pattern | 32.8 | **3.5x WORSE** |
+
+**Per-region map traffic is irreducible by any interface or clause change on this compiler, and moving
+fields to module scope makes it worse.** That kills promotion, flattening, and the view/attach design
+together. It also explains why `freg`-style code looked free: it was never measured, only attributed.
+
+**What survives.** The tax itself is real and first-order (2.0 s of copy time against ~1.5 s of kernel
+time). Since it cannot be reduced PER REGION, the only remaining levers are fewer regions and fewer
+block advances:
+
+1. **Fewer block advances** - `amr_max_grid_size`. Already measured at ~20x (70.3 s/step at cap 128
+   versus 8.5-9.5 at cap 1024) and already shipped as a default plus runtime advisories. This remains
+   by far the largest available win and needs no code.
+2. **Fewer regions per advance** - kernel fusion inside `s_compute_rhs` (16 direct regions). Untested,
+   touches numerics-adjacent code, and is the only untried lever left.
+
+Do not re-attempt promotion, flattening, mapper, or attach without first re-measuring the table above;
+all seven were tested on 2026-08-03 and all seven failed.
+
 ### PLAN (2026-08-03): promote the RHS working set from dummy arguments to module scope
 
 **The insight that removes the blocker.** The attach hunt was solving the wrong problem. The tax is not
