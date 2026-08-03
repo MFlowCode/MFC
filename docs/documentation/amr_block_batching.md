@@ -813,6 +813,55 @@ migrate while those 8 sites exist. And because `s_amr_lerp_fine_ghosts` and the 
 call both terminate in a `q_cons` write, even the ghost-only migration stops short of a batchable path.
 The remaining forks are recorded below; do not restart sub-step 4 without picking one.
 
+#### DECISION + STATE (2026-08-03): fork 1 chosen - AMR-local migration behind a copy bridge
+
+Of the three forks above the choice was **fork 1**: migrate the AMR-local sites to the flat store and
+copy device-to-device around the 8 shared-solver call sites, leaving `s_compute_rhs` and friends with
+their `scalar_field` interfaces untouched.
+
+**Landed and golden-clean (76/76 each):**
+
+| commit | what |
+|---|---|
+| `905e9d7c` | step 1a - dense local index |
+| `cacc14ec` | the flat store + `s_amr_st_reserve` (device-preserving geometric growth) + `s_amr_st_finalize` |
+| `bbf8ec8e` | **2a - the subcycle ghost sources migrated**; first change where data really flows through the store |
+
+2a is +10 net lines because `s_amr_fill_fine_ghosts` is now generated for three targets (`_sf`, `_gsta`,
+`_gstb`) from ONE source body using a Fypp accessor lambda -
+``#:set QF = (lambda ix: ...) if TGT == '' else (lambda ix: ...)`` - the idiom `m_riemann_solver_hlld`
+already uses for its per-direction stencil variants. Branching on the target inside a single region is
+not an option: a dummy referenced in ANY branch is still mapped.
+
+**2b - `q_cons` + the copy bridge. NOT STARTED. It is ATOMIC and bigger than the original plan said.**
+
+- **70 code sites** (not 59), across `m_amr.fpp` 47, `m_amr_regrid.fpp` 17, `m_amr_restart.fpp` 6,
+  `m_time_steppers.fpp` 1.
+- They cascade into **~17 AMR-local callee signatures**: `f_amr_rho_tot`, `s_l0_pack_unpack_block`,
+  `s_amr_fine_slice`, `s_l0_edge_bc_tile`, `s_l0_copy_block`, `s_amr_restrict_pack_device`,
+  `s_amr_gather_from_parent_field`, `s_amr_fine_rk_update`, `s_amr_copy_fine_fields`,
+  `s_prolong_species_closure`, `s_prolong_one_var`, `s_prolong_alphas_closure`,
+  `s_l0_fill_ghost_corners`, `s_amr_restrict_overwrite_device`, `s_amr_reflux_apply_faces`,
+  `s_amr_fine_seam_exchange`, `s_amr_fill_fine_ghosts_sf`. Some take TWO block fields (parent+child,
+  or two seam neighbours) and become two `loc` arguments - which is better for batching, not worse.
+  Some take a MIX (`s_amr_copy_fine_fields(q_cons, q_cons_stor, ...)`); the unmigrated dummy is still
+  mapped there, so that call site keeps its per-region tax until `q_cons_stor` follows.
+- `m_amr_restart.fpp`'s 6 sites are HOST-side I/O with explicit `GPU_UPDATE` - retarget them at the
+  store (whole-store update is wasteful but restart is rare).
+- **It cannot be split.** The store is either authoritative for `q_cons` or it is not; a dual-write
+  staging period is exactly the silent-divergence trap. Convert in dependency order, build often, run
+  the goldens once at the end, and bisect by reverting individual routines if they fail.
+
+**The bridge costs more than first assumed, so the payoff is smaller.** All four shared routines are
+`intent(inout)`, and `s_compute_rhs` reaches `s_populate_variables_buffers`, which writes `q_cons`'s
+buffer region - so the bridge must copy BOTH directions at all 8 sites. Each crossing is a region taking
+a `scalar_field` dummy (~20 argument maps) while the batched kernels it enables cost 0. Per block
+advance that turns ~9.3 AMR-local launches into ~2.4, i.e. **~25-30% of total operations, not the ~35%
+launch share**. Quote the 25-30%.
+
+**Harness note:** the session scratchpad rotates and ate a UUID list mid-run (the failure looks like a
+kill, not a missing file). Keep test lists and logs under `amr-bench/logs/store/`.
+
 #### EXECUTION PLAN for 1b + 2 (written 2026-08-03, SUPERSEDED IN PART - read the section above first)
 
 **1b - migrate `{q_cons, q_ghost_a, q_ghost_b}` to the flat store.** They move together because
