@@ -552,7 +552,11 @@ contains
         amr_tag_eps = 0.1_wp
         amr_buf = 3
         amr_subcycle = .false.
-        amr_max_blocks = 4
+        ! 4 was indefensible: it caps the GLOBAL box count at four, so any real refinement binds
+        ! immediately and silently truncates the refined region (the clusterer/tiler warn, but the answer
+        ! has already changed). amr_max_blocks sizes REPLICATED METADATA only - slots are allocated
+        ! lazily for owned blocks - so a large pool costs ~11 kB/box/rank and nothing else.
+        amr_max_blocks = 1024
         amr_max_grid_size = 0  ! 0 = derive the cap from the decomposition (rank-dependent, the historical behaviour)
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
