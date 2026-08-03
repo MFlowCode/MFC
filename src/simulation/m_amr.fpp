@@ -91,7 +91,18 @@ module m_amr
     !> Fixed pool of refined-block slots (at init one slot is active; dynamic regrid activates up to amr_max_blocks). The working
     !! slot amr_cur (m_global_parameters) selects which slot every per-block routine operates on.
     type(t_level), allocatable :: amr_slots(:)
-    integer                    :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
+
+    !> DENSE LOCAL INDEX for live slots. `amr_slots` is indexed by GLOBAL block index and allocated lazily, so live slots are SPARSE
+    !! across 1:amr_max_blocks (1024 by default). A contiguous per-block field store - the layout AMReX's MultiFab uses and the
+    !! prerequisite for batching one kernel over all blocks - must be indexed DENSELY by a local index instead, or it would have to
+    !! be sized for the whole global pool. `amr_loc_of(g)` is the local index of global slot g (0 if not live), `amr_loc_n` is the
+    !! high-water mark, and freed indices are recycled through `amr_loc_free` so the dense range stays tight under regrid churn.
+    !! Pure bookkeeping: nothing reads it yet.
+    integer, allocatable :: amr_loc_of(:)      !< global slot -> dense local index, 0 if not live
+    integer, allocatable :: amr_loc_free(:)    !< stack of recycled local indices
+    integer              :: amr_loc_n = 0      !< high-water mark of local indices handed out
+    integer              :: amr_loc_nfree = 0  !< depth of the recycle stack
+    integer              :: amr_maxc(3)        !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
     !> Per-slot field-array sizing (module-scope, used by s_amr_alloc_slot/s_amr_free_slot): max fine cells per dim (2*maxc_loc-1)
     !! and the buffered array bounds. amr_slot_live(k) tracks whether slot k's field arrays are allocated - lazy owned-only sizing
@@ -275,6 +286,7 @@ contains
         ! fixed pool of amr_max_blocks slots; init activates exactly one (amr_cur = f_l0_slot(1), the initial fine-block slot);
         ! regrid clusters into up to amr_max_blocks
         allocate (amr_slots(1:amr_max_blocks))
+        call s_amr_loc_index_init()
         allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
         allocate (amr_owns_all(amr_max_blocks))
@@ -5144,12 +5156,31 @@ contains
     !> Allocate slot islot's per-block field arrays (coords + the 6 device-resident field vectors + non-poly QBMM side-state), sized
     !! to the max buffered block. Idempotent (no-op if already live). The single QBMM RHS scratch amr_rhs_pb_f/mv_f and the global
     !! amr_cg are NOT per-slot and stay in init/finalize.
+    !> Allocate/reset the dense local-index maps. Called from BOTH pool-allocation sites - s_initialize_amr_module and
+    !! s_l0_tiles_init - because pure-L0 mode (amr = F) returns early from the former yet still calls s_amr_alloc_slot. Idempotent
+    !! so either order is safe.
+    impure subroutine s_amr_loc_index_init()
+
+        if (.not. allocated(amr_loc_of)) allocate (amr_loc_of(1:amr_max_blocks))
+        if (.not. allocated(amr_loc_free)) allocate (amr_loc_free(1:amr_max_blocks))
+        amr_loc_of = 0; amr_loc_free = 0; amr_loc_n = 0; amr_loc_nfree = 0
+
+    end subroutine s_amr_loc_index_init
+
     impure subroutine s_amr_alloc_slot(islot)
 
         integer, intent(in) :: islot
         integer             :: i
 
         if (amr_slot_live(islot)) return
+        ! recycle a freed local index if one is available, else extend the dense range
+        if (amr_loc_nfree > 0) then
+            amr_loc_of(islot) = amr_loc_free(amr_loc_nfree)
+            amr_loc_nfree = amr_loc_nfree - 1
+        else
+            amr_loc_n = amr_loc_n + 1
+            amr_loc_of(islot) = amr_loc_n
+        end if
         amr_slots(islot)%amr_ref_ratio = amr_ref_ratio
         amr_slots(islot)%buff_size = buff_size
         allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
@@ -5204,6 +5235,11 @@ contains
         integer             :: i
 
         if (.not. amr_slot_live(islot)) return
+        if (amr_loc_of(islot) > 0) then
+            amr_loc_nfree = amr_loc_nfree + 1
+            amr_loc_free(amr_loc_nfree) = amr_loc_of(islot)
+            amr_loc_of(islot) = 0
+        end if
         ! Undo each field's ACC_SETUP_SFs (Cray descriptor + %sf copyin) BEFORE the @:DEALLOCATE - Cray 'exit data delete'
         ! decrements
         ! the ref count, so the lone @:DEALLOCATE would leave the descriptor and the ACC_SETUP %sf ref dangling; the leaked host
@@ -5379,6 +5415,7 @@ contains
 
             ! block-metadata pool (mirror of s_initialize_amr_module's allocation)
             allocate (amr_slots(1:amr_max_blocks))
+            call s_amr_loc_index_init()
             allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
             allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
             allocate (amr_owns_all(amr_max_blocks))
@@ -6494,6 +6531,7 @@ contains
             @:DEALLOCATE(amr_cg_mv)
         end if
         deallocate (amr_slot_live)
+        if (allocated(amr_loc_of)) deallocate (amr_loc_of, amr_loc_free)
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
