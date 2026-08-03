@@ -85,6 +85,50 @@ __extract() {
     __combine "$(grep -E "^$1\s+" toolchain/modules | sed "s/^$1\s\+//")"
 }
 
+# Export the KEY=value assignments on one toolchain/modules line.
+#
+# A line may carry several assignments (CC=nvc CXX=nvc++ FC=nvfortran), and a
+# value may itself contain spaces (linker/compiler flags). Splitting on
+# whitespace would truncate the latter; splitting on the first '=' would merge
+# the former. So start a new assignment only at a word shaped like an
+# identifier followed by '=', and treat every other word as a continuation of
+# the current value.
+#
+# Values are still passed through eval so that "$VAR" references to previously
+# exported variables keep expanding, as they always have.
+__export_assignments() {
+    local _entry="$1" _word _acc="" _key _val _noglob=0
+
+    # Word-splitting below must not glob values such as -Wl,*.
+    case "$-" in *f*) _noglob=1 ;; esac
+    set -f
+
+    __flush() {
+        [ -z "$_acc" ] && return 0
+        _key="${_acc%%=*}"
+        _val="${_acc#*=}"
+        # One round of expansion (so "$VAR" references still work), then export
+        # the result directly -- re-evaluating it would word-split the value
+        # again, which is the bug this function exists to avoid.
+        _val="$(eval "echo \"$_val\"")"
+        log " \$ export $_key=$_val"
+        export "$_key=$_val"
+        _acc=""
+    }
+
+    for _word in $_entry; do
+        if [[ "$_word" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+            __flush
+            _acc="$_word"
+        else
+            _acc="$_acc $_word"
+        fi
+    done
+    __flush
+
+    [ "$_noglob" -eq 0 ] && set +f
+}
+
 COMPUTER="$(__extract "$u_c")"
 
 if [[ -z "$COMPUTER" ]]; then
@@ -122,8 +166,7 @@ fi
 for _suffix in "all" "$cg"; do
     while IFS= read -r _entry; do
         if echo "$_entry" | grep -q '='; then
-            log " $ export $(eval "echo \"$_entry\"")"
-            eval "export $_entry"
+            __export_assignments "$_entry"
         fi
     done < <(grep -E "^$u_c-$_suffix\s+" toolchain/modules | sed "s/^$u_c-$_suffix\s\+//")
 done
