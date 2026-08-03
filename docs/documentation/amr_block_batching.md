@@ -774,7 +774,46 @@ recursion sits OUTSIDE the stage loop - every level-`clev` block completes all t
 then does the routine recurse into level `clev+1`. `s_l0_advance_stage_rhs` and the fine-advance loops
 are likewise serial over blocks. No nesting, so no working-set stack is required.
 
-#### EXECUTION PLAN for 1b + 2 (written 2026-08-03, ready to start)
+#### MEASURED 2026-08-03, AFTER step 1a landed: where the operations actually are
+
+Step 1a (`905e9d7c`) and the flat store itself (`cacc14ec`) are in. Before converting 78 call sites, the
+per-module split was read out of four independent `rocprofv3` kernel-stats profiles
+(`amr-bench/scratch/{l0p-hVcToX/p0,l0p-hVcToX/p2,att-dQ6b8U,sat2-UvUxRt}`). The two metrics disagree, and
+which one governs is the whole question:
+
+| | kernel TIME | LAUNCH count |
+|---|---|---|
+| `s_compute_rhs` tree (`m_variables_conversion`, `m_weno`, `m_riemann_solver_hllc`, `m_riemann_state`, `m_rhs`) | 88.7 - 91.1% | 60.6 - 66.7% |
+| AMR-local (`m_amr`, `m_amr_registers`) | 5.1 - 10.1% | 32.7 - 38.2% |
+
+**Launch count governs**, because the regime is latency-bound (cost proportional to operations, 71.7%
+idle) - so the AMR-local kernels this plan set out to batch are worth about **one third of the operation
+budget**, not the ~8% their kernel time suggests. That third is real and worth taking. The other two
+thirds are inside the RHS tree and this plan does not reach them.
+
+**THE BLOCKER, and it is an interface problem, not a mechanism problem.** Splitting the 78
+`amr_slots(...)%%q_cons` references by what consumes them:
+
+| kind | count | can the interface change? |
+|---|---|---|
+| element access `%%q_cons(i)%%sf(a,b,c)` | 15 | yes - free |
+| whole-array pass to an AMR-local callee | 40 | yes - the callee is ours |
+| whole-array pass to a SHARED solver routine | 8 | **no** |
+
+The 8 are `s_compute_rhs` (x4), `s_ibm_correct_state` (x2), `s_pressure_relaxation_procedure`, and
+`s_infinite_relaxation_k` - the last living in `src/common/`, shared by all three executables. All take
+`type(scalar_field), dimension(sys_size)` and all are used by the MONOLITHIC path too, so their signatures
+cannot follow `q_cons` into a flat store without dragging `q_cons_ts(i)%%vf` and the whole of `m_rhs` with
+them. The pointer-view bridge that would avoid this (a `scalar_field` whose `%%sf` points into the store)
+is the MWE's variant D1/D2, already shown to fail silently on this backend - the device sees a descriptor
+holding a host address.
+
+**Consequence for the plan below: sub-steps 4 and 5 as written are not reachable.** `q_cons` cannot
+migrate while those 8 sites exist. And because `s_amr_lerp_fine_ghosts` and the 4579 `s_amr_fill_fine_ghosts`
+call both terminate in a `q_cons` write, even the ghost-only migration stops short of a batchable path.
+The remaining forks are recorded below; do not restart sub-step 4 without picking one.
+
+#### EXECUTION PLAN for 1b + 2 (written 2026-08-03, SUPERSEDED IN PART - read the section above first)
 
 **1b - migrate `{q_cons, q_ghost_a, q_ghost_b}` to the flat store.** They move together because
 `s_amr_fill_fine_ghosts` targets all three; see the scoping constraint above.
