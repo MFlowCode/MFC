@@ -74,8 +74,6 @@ module m_amr
         type(scalar_field), allocatable :: q_cons_stor(:)  !< stage storage (fine advance, same bounds as q_cons)
         type(scalar_field), allocatable :: q_prim(:)       !< primitive stage (fine advance, same bounds as q_cons)
         type(scalar_field), allocatable :: rhs(:)          !< RHS (fine interior only: 0:m, 0:n, 0:p)
-        type(scalar_field), allocatable :: q_ghost_a(:)    !< subcycle ghost-lerp source at coarse t^n (ghost shell only)
-        type(scalar_field), allocatable :: q_ghost_b(:)    !< subcycle ghost-lerp source at coarse t^{n+1} (ghost shell only)
         !> non-polytropic QBMM quadrature side-state on the block (nnode x nb per cell). pb/mv evolve cell-locally (their rhs reads
         !! only the local cell + the block's own moment fluxes), so the fine treatment is prolong -> advance -> restrict with no
         !! reflux; ghosts feed the widened-idwint conversions and are prolonged piecewise-constant (CHyQMOM realizability, like the
@@ -472,9 +470,10 @@ contains
         ! MEMORY DEMAND, reported not guessed. There is no portable way to ask how much device (or
         ! host) memory is available - hipMemGetInfo / cudaMemGetInfo / nothing-on-CPU across four
         ! compilers and three offload backends - so do NOT try to pick a cap from a memory budget.
-        ! What IS exactly known here is the DEMAND: a slot is 6 field families (q_cons, q_cons_stor,
-        ! q_prim, rhs, q_ghost_a, q_ghost_b) x sys_size arrays on the mbuf extents. Print it and let
-        ! the reader compare against hardware they know.
+        ! What IS exactly known here is the DEMAND: a block costs 4 per-slot field families (q_cons,
+        ! q_cons_stor, q_prim, rhs) plus, under amr_subcycle only, 2 more in the flat store
+        ! (amr_gst_a/amr_gst_b, sized per LOCAL slot) x sys_size arrays on the mbuf extents. Print it
+        ! and let the reader compare against hardware they know.
         !
         ! Why this matters more than a default: the OPTIMAL cap is set by the largest slot that
         ! fits, and slot volume goes as cap**num_dims - so the best cap measured 1024 in 2D and 64
@@ -484,13 +483,14 @@ contains
         ! MPI), so a silent over-large cap is expensive to diagnose.
         if (proc_rank == 0) then
             block
-                real(wp) :: slot_gib, cells
+                real(wp) :: slot_gib, cells, nfam
                 cells = real(mbuf1_hi - mbuf1_lo + 1, wp)
                 if (n_glb > 0) cells = cells*real(mbuf2_hi - mbuf2_lo + 1, wp)
                 if (p_glb > 0) cells = cells*real(mbuf3_hi - mbuf3_lo + 1, wp)
-                slot_gib = cells*real(sys_size, wp)*6._wp*real(storage_size(1._wp)/8, wp)/1024._wp**3
-                print '(A,I0,A,ES10.3,A,F8.3,A)', ' [amr] per-block slot: ', nint(cells), ' cells x sys_size x 6 fields = ', &
-                    & cells*real(sys_size, wp)*6._wp, ' words (', slot_gib, ' GiB per owned block)'
+                nfam = 4._wp; if (amr_subcycle) nfam = 6._wp
+                slot_gib = cells*real(sys_size, wp)*nfam*real(storage_size(1._wp)/8, wp)/1024._wp**3
+                print '(A,I0,A,I0,A,ES10.3,A,F8.3,A)', ' [amr] per-block slot: ', nint(cells), ' cells x sys_size x ', &
+                    & nint(nfam), ' fields = ', cells*real(sys_size, wp)*nfam, ' words (', slot_gib, ' GiB per owned block)'
                 print '(A,F9.2,A,I0,A)', ' [amr]   worst case if one rank owned every block: ', slot_gib*real(amr_max_blocks, &
                     & wp), ' GiB (amr_max_blocks = ', amr_max_blocks, '). Typical is amr_max_blocks/num_procs blocks per rank.'
             end block
@@ -3941,57 +3941,129 @@ contains
     !! target in device memory. floor/modulo mapping is valid for negative fine indices (ghosts). Interior untouched. Multi-fluid
     !! volume fractions get the same sum-preserving closure as the interior prolongation (second kernel). TWIN
     !! s_amr_fill_fine_ghosts_pbmv (q<->pb/mv): pb/mv sibling; keep the mapping lockstep.
-    impure subroutine s_amr_fill_fine_ghosts(q_coarse, q_fine)
+    !!
+    !! ONE body, several targets. The prolongation is identical whatever it writes into, and the target differs only in the write
+    !! EXPRESSION, so the variants are generated from a single source body with a Fypp accessor lambda (the idiom
+    !! m_riemann_solver_hlld already uses for its per-direction stencil variants). Branching on the target inside one region is NOT
+    !! an option: a dummy referenced in ANY branch of a target region is still mapped, which is the per-region tax this whole
+    !! exercise exists to remove. `_sf` writes a scalar_field vector (q_cons, until it migrates); `_gsta`/`_gstb` write the flat
+    !! per-block store at dense local index `loc`.
+    #:for SFX, TGT in [('sf', ''), ('gsta', 'amr_gst_a'), ('gstb', 'amr_gst_b')]
+        #:set QF = (lambda ix: 'q_fine(' + ix + ')%sf(fi, fj, fk)') if TGT == '' else (lambda ix: TGT + '(fi, fj, fk, ' + ix &
+                    & + ', loc)')
+        impure subroutine s_amr_fill_fine_ghosts_${SFX}$(q_coarse, ${'q_fine' if TGT == '' else 'loc'}$)
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_coarse
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_fine
-        integer                                                :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
-        integer                                                :: rr, lo1, lo2, lo3
-        integer                                                :: advb, adve, bbeg, bend, bstride
-        integer                                                :: s, ns, l1, u1, l2, u2, l3, u3
-        integer                                                :: ss, g, r, n1, n2, stot
-        integer, dimension(6)                                  :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
-        logical                                                :: d2, d3, multi, shx, shy, shz, bubEE
-        real(wp)                                               :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
+            type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
 
-        ! q_coarse is the gathered block-local patch amr_cg (fine-level distribution); amr_isect_lo (GLOBAL, == region_lo on the
-        ! owner) + f/rr - amr_cpat_off is the patch-local coarse index. Fine indices are LOCAL to this block.
+            #:if TGT == ''
+                type(scalar_field), dimension(sys_size), intent(inout) :: q_fine
+            #:else
+                integer, intent(in) :: loc
+            #:endif
+            integer               :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
+            integer               :: rr, lo1, lo2, lo3
+            integer               :: advb, adve, bbeg, bend, bstride
+            integer               :: s, ns, l1, u1, l2, u2, l3, u3
+            integer               :: ss, g, r, n1, n2, stot
+            integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
+            logical               :: d2, d3, multi, shx, shy, shz, bubEE
+            real(wp)              :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
 
-        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-        d2 = n_glb > 0; d3 = p_glb > 0
-        rr = amr_slots(amr_cur)%amr_ref_ratio
-        lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
-        multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
-        advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
-        bubEE = bubbles_euler; bbeg = eqn_idx%bub%beg; bend = eqn_idx%bub%end
-        bstride = 1; if (bubEE) bstride = (bend - bbeg + 1)/nb
-        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        ! ONE kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their union
-        ! is exactly the ghost shell (s_amr_build_ghost_slabs), so every ghost cell is still written exactly once and the result is
-        ! byte-identical however the flat index is ordered. NOT the padded-hull form of s_amr_capture_creg_dense_batch: the x slabs
-        ! span the full transverse extent, so a hull over all slabs is the whole buffered volume and masking it would throw away the
-        ! O(surface) decomposition this routine exists to get.
-        soff(1) = 0
-        do s = 1, ns
-            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
-            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
-        end do
-        stot = soff(ns) + scnt(ns)
-        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, fj, &
-                            & fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
-        do i = 1, sys_size
-            do g = 0, stot - 1
-                s = 1  ! decode the flat index: ns <= 6, so a scan beats storing a per-cell slab map
-                do ss = 2, ns
-                    if (g >= soff(ss)) s = ss
+            ! q_coarse is the gathered block-local patch amr_cg (fine-level distribution); amr_isect_lo (GLOBAL, == region_lo on the
+            ! owner) + f/rr - amr_cpat_off is the patch-local coarse index. Fine indices are LOCAL to this block.
+
+            ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
+            d2 = n_glb > 0; d3 = p_glb > 0
+            rr = amr_slots(amr_cur)%amr_ref_ratio
+            lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
+            multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
+            advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
+            bubEE = bubbles_euler; bbeg = eqn_idx%bub%beg; bend = eqn_idx%bub%end
+            bstride = 1; if (bubEE) bstride = (bend - bbeg + 1)/nb
+            call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
+            ! ONE kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their
+            ! union
+            ! is exactly the ghost shell (s_amr_build_ghost_slabs), so every ghost cell is still written exactly once and the result
+            ! is
+            ! byte-identical however the flat index is ordered. NOT the padded-hull form of s_amr_capture_creg_dense_batch: the x
+            ! slabs
+            ! span the full transverse extent, so a hull over all slabs is the whole buffered volume and masking it would throw away
+            ! the
+            ! O(surface) decomposition this routine exists to get.
+            soff(1) = 0
+            do s = 1, ns
+                scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
+                if (s < ns) soff(s + 1) = soff(s) + scnt(s)
+            end do
+            stot = soff(ns) + scnt(ns)
+            $:GPU_PARALLEL_LOOP(collapse=2, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, &
+                                & fj, fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
+            do i = 1, sys_size
+                do g = 0, stot - 1
+                    s = 1  ! decode the flat index: ns <= 6, so a scan beats storing a per-cell slab map
+                    do ss = 2, ns
+                        if (g >= soff(ss)) s = ss
+                    end do
+                    r = g - soff(s)
+                    n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
+                    fi = sb1(s) + mod(r, n1)
+                    fj = sb2(s) + mod(r/n1, n2)
+                    fk = sb3(s) + r/(n1*n2)
+                    ! the slabs cover exactly the ghost shell; multi-fluid, skip the volume fractions (closure kernel below)
+                    if (.not. (multi .and. i >= advb .and. i <= adve)) then
+                        ck = 0; xiz = 0._wp
+                        if (d3) then
+                            ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                            xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        end if
+                        cj = 0; xiy = 0._wp
+                        if (d2) then
+                            cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                            xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        end if
+                        ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                        xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                        sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
+                        sy = 0._wp
+                        if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, &
+                            & ck), wp))
+                        sz = 0._wp
+                        if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
+                            & ck - 1), wp))
+                        ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the coarse cell's
+                        ! realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component minmod slopes would break
+                        ! that joint constraint). Non-QBMM Euler-Euler bubbles instead floor their positive moments (nR /
+                        ! npb / nmv); the signed velocity moment nV (offset 1) is skipped.
+                        if (qbmm .and. i >= bbeg .and. i <= bend) then
+                            sx = 0._wp; sy = 0._wp; sz = 0._wp
+                        end if
+                        ${QF('i')}$ = u0 + sx*xix + sy*xiy + sz*xiz
+                        if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
+                            if (mod(i - bbeg, bstride) /= 1) ${QF('i')}$ = max(real(${QF('i')}$, wp), bub_pos_frac*u0)
+                        end if
+                    end if
                 end do
-                r = g - soff(s)
-                n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
-                fi = sb1(s) + mod(r, n1)
-                fj = sb2(s) + mod(r/n1, n2)
-                fk = sb3(s) + r/(n1*n2)
-                ! the slabs cover exactly the ghost shell; multi-fluid, skip the volume fractions (closure kernel below)
-                if (.not. (multi .and. i >= advb .and. i <= adve)) then
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (shared limiter switch over
+            ! all
+            ! fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
+            if (multi) then
+                ! same flat-index fusion as the prolongation loop above, over the same disjoint slabs
+                $:GPU_PARALLEL_LOOP(copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, fj, fk, &
+                                    & i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
+                do g = 0, stot - 1
+                    s = 1
+                    do ss = 2, ns
+                        if (g >= soff(ss)) s = ss
+                    end do
+                    r = g - soff(s)
+                    n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
+                    fi = sb1(s) + mod(r, n1)
+                    fj = sb2(s) + mod(r/n1, n2)
+                    fk = sb3(s) + r/(n1*n2)
                     ck = 0; xiz = 0._wp
                     if (d3) then
                         ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
@@ -4004,103 +4076,52 @@ contains
                     end if
                     ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
                     xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                    sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
-                    sy = 0._wp
-                    if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
-                        & wp))
-                    sz = 0._wp
-                    if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
-                        & wp))
-                    ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the coarse cell's
-                    ! realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component minmod slopes would break
-                    ! that joint constraint). Non-QBMM Euler-Euler bubbles instead floor their positive moments (nR /
-                    ! npb / nmv); the signed velocity moment nV (offset 1) is skipped.
-                    if (qbmm .and. i >= bbeg .and. i <= bend) then
-                        sx = 0._wp; sy = 0._wp; sz = 0._wp
-                    end if
-                    q_fine(i)%sf(fi, fj, fk) = u0 + sx*xix + sy*xiy + sz*xiz
-                    if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
-                        if (mod(i - bbeg, bstride) /= 1) q_fine(i)%sf(fi, fj, fk) = max(real(q_fine(i)%sf(fi, fj, fk), wp), &
-                            & bub_pos_frac*u0)
-                    end if
-                end if
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (shared limiter switch over all
-        ! fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
-        if (multi) then
-            ! same flat-index fusion as the prolongation loop above, over the same disjoint slabs
-            $:GPU_PARALLEL_LOOP(copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, fj, fk, i, &
-                                & ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
-            do g = 0, stot - 1
-                s = 1
-                do ss = 2, ns
-                    if (g >= soff(ss)) s = ss
+                    shx = .true.; shy = d2; shz = d3
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = advb, adve
+                        u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                        if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
+                            & wp)) <= 0._wp) shx = .false.
+                        if (d2) then
+                            if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
+                                & wp)) <= 0._wp) shy = .false.
+                        end if
+                        if (d3) then
+                            if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
+                                & wp)) <= 0._wp) shz = .false.
+                        end if
+                    end do
+                    asum = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = advb, adve - 1
+                        u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                        sx = 0._wp
+                        if (shx) sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, &
+                            & ck), wp))
+                        sy = 0._wp
+                        if (shy) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, &
+                            & ck), wp))
+                        sz = 0._wp
+                        if (shz) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
+                            & ck - 1), wp))
+                        av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
+                        ${QF('i')}$ = av
+                        asum = asum + av
+                    end do
+                    ${QF('adve')}$ = 1._wp - asum
                 end do
-                r = g - soff(s)
-                n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
-                fi = sb1(s) + mod(r, n1)
-                fj = sb2(s) + mod(r/n1, n2)
-                fk = sb3(s) + r/(n1*n2)
-                ck = 0; xiz = 0._wp
-                if (d3) then
-                    ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                    xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                end if
-                cj = 0; xiy = 0._wp
-                if (d2) then
-                    cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                    xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                end if
-                ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                shx = .true.; shy = d2; shz = d3
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = advb, adve
-                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                    if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
-                        & wp)) <= 0._wp) shx = .false.
-                    if (d2) then
-                        if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
-                            & wp)) <= 0._wp) shy = .false.
-                    end if
-                    if (d3) then
-                        if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
-                            & wp)) <= 0._wp) shz = .false.
-                    end if
-                end do
-                asum = 0._wp
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = advb, adve - 1
-                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                    sx = 0._wp
-                    if (shx) sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
-                        & wp))
-                    sy = 0._wp
-                    if (shy) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
-                        & wp))
-                    sz = 0._wp
-                    if (shz) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
-                        & wp))
-                    av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
-                    q_fine(i)%sf(fi, fj, fk) = av
-                    asum = asum + av
-                end do
-                q_fine(adve)%sf(fi, fj, fk) = 1._wp - asum
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+                $:END_GPU_PARALLEL_LOOP()
+            end if
 
-    end subroutine s_amr_fill_fine_ghosts
+        end subroutine s_amr_fill_fine_ghosts_${SFX}$
+    #:endfor
 
-    !> Lerp the fine ghost shell of q_tgt between q_a (coarse t^n) and q_b (coarse t^{n+1}) at time fraction th (device kernel).
-    !! Interior untouched. TWIN s_amr_lerp_fine_ghosts_pbmv (q<->pb/mv): pb/mv sibling of this ghost lerp; keep lockstep.
-    impure subroutine s_amr_lerp_fine_ghosts(q_a, q_b, q_tgt, th)
+    !> Lerp the fine ghost shell of q_tgt between the coarse t^n and t^{n+1} ghost sources - block loc's slices of the flat store
+    !! amr_gst_a/amr_gst_b - at time fraction th (device kernel). Interior untouched. TWIN s_amr_lerp_fine_ghosts_pbmv (q<->pb/mv):
+    !! pb/mv sibling of this ghost lerp; keep lockstep.
+    impure subroutine s_amr_lerp_fine_ghosts(loc, q_tgt, th)
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_a, q_b
+        integer, intent(in)                                    :: loc
         type(scalar_field), dimension(sys_size), intent(inout) :: q_tgt
         real(wp), intent(in)                                   :: th
         integer                                                :: i, fi, fj, fk, s, ns, l1, u1, l2, u2, l3, u3
@@ -4129,7 +4150,8 @@ contains
                 fi = sb1(s) + mod(r, n1)
                 fj = sb2(s) + mod(r/n1, n2)
                 fk = sb3(s) + r/(n1*n2)
-                q_tgt(i)%sf(fi, fj, fk) = (1._wp - th)*real(q_a(i)%sf(fi, fj, fk), wp) + th*real(q_b(i)%sf(fi, fj, fk), wp)
+                q_tgt(i)%sf(fi, fj, fk) = (1._wp - th)*real(amr_gst_a(fi, fj, fk, i, loc), wp) + th*real(amr_gst_b(fi, fj, fk, i, &
+                      & loc), wp)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -4576,7 +4598,7 @@ contains
         ! pair
         ! nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
-        call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_cons)
+        call s_amr_fill_fine_ghosts_sf(amr_cg, amr_slots(amr_cur)%q_cons)
         ! the coarse-prolonged ghost shell is the final ghost state EXCEPT at faces shared with an adjacent sub-block (tiling),
         ! which
         ! the block-to-block fine-fine halo overwrites with the neighbour's fine interior after this fill.
@@ -4704,12 +4726,12 @@ contains
         ! (ALL ranks - P2P); fills owner-only.
         call s_amr_gather_coarse_patch(q_old, .true.)
         if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_old, mv_old, .true.)
-        if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_ghost_a)
+        if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gsta(amr_cg, amr_loc_of(amr_cur))
         if (amr_rank_owns_block .and. qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &
             & amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf)
         call s_amr_gather_coarse_patch(q_new, .true.)
         if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_in, mv_in, .true.)
-        if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(amr_cur)%q_ghost_b)
+        if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gstb(amr_cg, amr_loc_of(amr_cur))
         if (amr_rank_owns_block .and. qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &
             & amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf)
         if (.not. amr_rank_owns_block) return
@@ -4807,7 +4829,7 @@ contains
 
         if (rank_time_wrt) call s_rank_time_tic()
         ! lerp the ghost shell into q_cons at the stage time (device kernel; interior untouched)
-        call s_amr_lerp_fine_ghosts(amr_slots(amr_cur)%q_ghost_a, amr_slots(amr_cur)%q_ghost_b, amr_slots(amr_cur)%q_cons, th)
+        call s_amr_lerp_fine_ghosts(amr_loc_of(amr_cur), amr_slots(amr_cur)%q_cons, th)
         if (qbmm .and. .not. polytropic) call s_amr_lerp_fine_ghosts_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
             & amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf, amr_slots(amr_cur)%pb_ghost_b%sf, &
             & amr_slots(amr_cur)%mv_ghost_b%sf, th)
@@ -4918,14 +4940,14 @@ contains
             else
                 call s_amr_recv_parent_patch(pblk, .false.)
             end if
-            if (amr_rank_owns_block) call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_a)
+            if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gsta(amr_cg, amr_loc_of(kc))
             if (amr_block_owner(pblk) == proc_rank) then
                 call s_amr_gather_from_parent_field(pblk, amr_slots(pblk)%q_cons, .false.)  ! parent @ t_b (device C/F fill)
             else
                 call s_amr_recv_parent_patch(pblk, .false.)
             end if
             if (.not. amr_rank_owns_block) cycle
-            call s_amr_fill_fine_ghosts(amr_cg, amr_slots(kc)%q_ghost_b)
+            call s_amr_fill_fine_ghosts_gstb(amr_cg, amr_loc_of(kc))
             call s_amr_zero_fine_registers()
         end do
         ! ADVANCE the level TRANSPOSED - every level-clev block through each substep together, with the level-clev seam halo
@@ -5249,8 +5271,6 @@ contains
         @:ALLOCATE(amr_slots(islot)%q_cons_stor(1:sys_size))
         @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
         @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
-        @:ALLOCATE(amr_slots(islot)%q_ghost_a(1:sys_size))
-        @:ALLOCATE(amr_slots(islot)%q_ghost_b(1:sys_size))
         do i = 1, sys_size
             @:ALLOCATE(amr_slots(islot)%q_cons(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
             @:ALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
@@ -5262,14 +5282,10 @@ contains
             else
                 @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
             end if
-            @:ALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-            @:ALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
             @:ACC_SETUP_SFs(amr_slots(islot)%q_cons(i))
             @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
             @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
             @:ACC_SETUP_SFs(amr_slots(islot)%q_cons_stor(i))
-            @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_a(i))
-            @:ACC_SETUP_SFs(amr_slots(islot)%q_ghost_b(i))
         end do
         if (qbmm .and. .not. polytropic) then
             #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
@@ -5314,17 +5330,11 @@ contains
             @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
             @:ACC_TEARDOWN_SFs(amr_slots(islot)%rhs(i))
             @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
-            @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_ghost_a(i))
-            @:DEALLOCATE(amr_slots(islot)%q_ghost_a(i)%sf)
-            @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_ghost_b(i))
-            @:DEALLOCATE(amr_slots(islot)%q_ghost_b(i)%sf)
         end do
         @:DEALLOCATE(amr_slots(islot)%q_cons)
         @:DEALLOCATE(amr_slots(islot)%q_cons_stor)
         @:DEALLOCATE(amr_slots(islot)%q_prim)
         @:DEALLOCATE(amr_slots(islot)%rhs)
-        @:DEALLOCATE(amr_slots(islot)%q_ghost_a)
-        @:DEALLOCATE(amr_slots(islot)%q_ghost_b)
         if (qbmm .and. .not. polytropic) then
             #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
                 @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
