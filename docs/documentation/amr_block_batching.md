@@ -774,6 +774,56 @@ recursion sits OUTSIDE the stage loop - every level-`clev` block completes all t
 then does the routine recurse into level `clev+1`. `s_l0_advance_stage_rhs` and the fine-advance loops
 are likewise serial over blocks. No nesting, so no working-set stack is required.
 
+#### EXECUTION PLAN for 1b + 2 (written 2026-08-03, ready to start)
+
+**1b - migrate `{q_cons, q_ghost_a, q_ghost_b}` to the flat store.** They move together because
+`s_amr_fill_fine_ghosts` targets all three; see the scoping constraint above.
+
+```fortran
+real(stp), allocatable :: amr_cons_st(:,:,:,:,:)   ! (x, y, z, var, LOCAL slot)
+real(stp), allocatable :: amr_gst_a(:,:,:,:,:), amr_gst_b(:,:,:,:,:)
+$:GPU_DECLARE(create='[amr_cons_st, amr_gst_a, amr_gst_b]')
+integer :: amr_st_cap = 0
+```
+
+Order of work, each sub-step compiling and golden-clean before the next:
+
+1. Declare the stores + `s_amr_st_reserve()` (geometric growth on `amr_loc_n`). Call it from
+   `s_amr_alloc_slot` after `amr_slot_live = .true.`. Guard the ghost stores on `amr_subcycle`.
+   `q_cons` growth MUST preserve device contents (unlike the ghosts) - copy old -> new before freeing.
+2. Convert `s_amr_fill_fine_ghosts`: replace the `q_fine` dummy with `(target, loc)` where target
+   selects `amr_cons_st`/`amr_gst_a`/`amr_gst_b`. **Duplicate the target region per branch** rather than
+   branching inside one region, or the unmigrated dummy is still mapped and the win is lost.
+3. Convert `s_amr_lerp_fine_ghosts` (1 write site) and the 5 ghost call sites.
+4. Convert the `q_cons` readers/writers. 59 references across 4 files - do it file by file, building
+   between each. `amr_slots(k)%%q_cons(i)%%sf(a,b,c)` becomes `amr_cons_st(a,b,c,i,amr_loc_of(k))`.
+5. Delete `q_cons`/`q_ghost_a`/`q_ghost_b` from `t_level` and from alloc/free.
+
+**2 - batch the per-block kernels.** Replace `do k = ...; call s_amr_select_slot(k); <one kernel>` with
+a single region carrying `loc` as an extra collapsed dimension over `1:amr_loc_n`. Start with
+`s_amr_fine_rk_update` (self-contained, 2 regions), then the RHS path. Requires that per-block loop
+bounds (`amr_slots(k)%%m/n/p`) also be readable on device - stage them into a small
+`GPU_DECLARE`'d `integer :: amr_blk_m(:), amr_blk_n(:), amr_blk_p(:)` indexed by `loc`.
+
+**Verification protocol, non-negotiable.** Every sub-step is a pure data-layout or scheduling change,
+so **all 76 AMR/L0 goldens must stay byte-identical**. A diff means the change is wrong, not that the
+goldens need regenerating. In addition, after step 2 confirm the mechanism actually engaged by
+re-running the gap analysis (`amr-bench/attach/serial/gaps.py` on a `rocprofv3` dir) and checking that
+the operation count fell - a passing golden set with an unchanged operation count means the batching
+did not take effect.
+
+**Traps already paid for, do not rediscover:**
+- `amr_slots` is allocated in TWO places (`s_initialize_amr_module`, behind `if (.not. amr) return`, and
+  `s_l0_tiles_init` for pure-L0). Anything allocated beside it must follow the POOL. Fingerprint: only
+  the `L0 tiles` goldens fail.
+- Print the text being REPLACED on every non-trivial substitution. A `max(..., bub_pos_frac*u0)` clamp
+  was nearly rewritten to `max(..., 0._wp)` - a silent physics change that only a Lagrange-bubbles
+  golden would have caught, hours later.
+- Do NOT pass the store as a dummy argument. A plain-array dummy costs the same per-region map traffic
+  as a deep-type one (9.4 vs 9.4); only a plain MODULE array reaches 0.
+- The tool timeout is 10 minutes and an MFC rebuild exceeds it - background the build and poll a log
+  marker, and never write `pgrep -f "<string in your own command line>"`, which matches the poller.
+
 #### De-risking MWEs, each run BEFORE the matching phase
 
 Build them as one matrix in a single compile (`amr-bench/attach/mtu/`), not one hypothesis per MFC
