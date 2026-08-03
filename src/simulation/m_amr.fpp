@@ -313,6 +313,46 @@ contains
                 & // 'factor), or enable amr_subcycle, else the fine block may go unstable'
         end if
 
+        ! CONFIGURATION ADVISORIES. Measured 2026-08-02 (3D, np=8, cap-64 optimum); see
+        ! @ref amr_per_level_distribution, "Configuration guidance". These are ADVICE, not constraints -
+        ! every setting below is legal and sometimes correct, so they warn rather than abort.
+        if (proc_rank == 0) then
+            ! amr_regrid_int = 0 is STATIC AMR: the block set never changes. That is a legitimate mode
+            ! (and the only one supported above amr_max_level = 2), but a user who set `amr = T` expecting
+            ! adaptivity gets none, silently.
+            if (amr_regrid_int == 0) then
+                print '(A)', &
+                    & ' [amr] NOTE: amr_regrid_int = 0 - the block set is STATIC and never adapts. ' &
+                    & // 'Set amr_regrid_int > 0 (4-8 is a reasonable start) for adaptive refinement.'
+            end if
+            ! The derived cap is the min-over-ranks local half-extent, so it SHRINKS as ranks are added -
+            ! the wrong direction for strong scaling, and it makes the box set (hence the answer, within
+            ! tolerance) depend on the rank count. Measured 3.0x slower than a pinned cap of 64 in 3D.
+            if (amr_max_grid_size == 0 .and. num_procs > 1) then
+                print '(A)', &
+                    & ' [amr] NOTE: amr_max_grid_size = 0 derives the block cap from the ' &
+                    & // 'decomposition, so it SHRINKS as ranks are added and the box set depends on rank ' &
+                    & // 'count. Pinning it (64 measured best in 3D on MI250X, memory-bounded) was 3.0x ' &
+                    & // 'faster and makes the box set rank-invariant.'
+            end if
+            ! Lock-step integrates the COARSE level at the finest-stable dt, i.e. amr_ref_ratio**level
+            ! times more often than its own stability requires. Measured 1.55x at amr_max_level = 2.
+            ! NB this changes the time integration - it is not a free optimization.
+            if (.not. amr_subcycle .and. amr_max_level >= 1 .and. amr_regrid_int > 0) then
+                print '(A,I0,A)', ' [amr] NOTE: amr_subcycle = F integrates the coarse level ', amr_ref_ratio**amr_max_level, &
+                    & 'x more often than its own CFL requires. ' &
+                    & // 'amr_subcycle = T was 1.55x faster per unit physical time (it is a DIFFERENT ' &
+                    & // 'time integration, not a drop-in).'
+            end if
+
+            ! Frequent regridding is dominated by the per-cell tag sweep, which is flat in box count.
+            if (amr_regrid_int > 0 .and. amr_regrid_int < 4) then
+                print '(A,I0,A)', ' [amr] NOTE: amr_regrid_int = ', amr_regrid_int, &
+                    & ' regrids often; the tag sweep is per-CELL and flat in box count, so interval 8 ' &
+                    & // 'measured 1.39x faster. Raise it unless the refined feature moves quickly.'
+            end if
+        end if
+
         ! Mirror decomposition: each rank holds the fine cells covering block /\ its own subdomain (np=1: the intersection is the
         ! whole block). buff_size is not available at checker time, so the geometric aborts below must live here.
         sidx = 0; ext = 0
@@ -408,6 +448,33 @@ contains
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
+
+        ! MEMORY DEMAND, reported not guessed. There is no portable way to ask how much device (or
+        ! host) memory is available - hipMemGetInfo / cudaMemGetInfo / nothing-on-CPU across four
+        ! compilers and three offload backends - so do NOT try to pick a cap from a memory budget.
+        ! What IS exactly known here is the DEMAND: a slot is 6 field families (q_cons, q_cons_stor,
+        ! q_prim, rhs, q_ghost_a, q_ghost_b) x sys_size arrays on the mbuf extents. Print it and let
+        ! the reader compare against hardware they know.
+        !
+        ! Why this matters more than a default: the OPTIMAL cap is set by the largest slot that
+        ! fits, and slot volume goes as cap**num_dims - so the best cap measured 1024 in 2D and 64
+        ! in 3D, a 16x difference, while the SLOT VOLUMES agreed to 1.7x. One number cannot serve
+        ! both dimensions; the volume is the invariant. Exceeding it aborts inside
+        ! __tgt_target_data_begin_mapper, which PRESENTS AS A HANG (one rank dies, the rest block in
+        ! MPI), so a silent over-large cap is expensive to diagnose.
+        if (proc_rank == 0) then
+            block
+                real(wp) :: slot_gib, cells
+                cells = real(mbuf1_hi - mbuf1_lo + 1, wp)
+                if (n_glb > 0) cells = cells*real(mbuf2_hi - mbuf2_lo + 1, wp)
+                if (p_glb > 0) cells = cells*real(mbuf3_hi - mbuf3_lo + 1, wp)
+                slot_gib = cells*real(sys_size, wp)*6._wp*real(storage_size(1._wp)/8, wp)/1024._wp**3
+                print '(A,I0,A,ES10.3,A,F8.3,A)', ' [amr] per-block slot: ', nint(cells), ' cells x sys_size x 6 fields = ', &
+                    & cells*real(sys_size, wp)*6._wp, ' words (', slot_gib, ' GiB per owned block)'
+                print '(A,F9.2,A,I0,A)', ' [amr]   worst case if one rank owned every block: ', slot_gib*real(amr_max_blocks, &
+                    & wp), ' GiB (amr_max_blocks = ', amr_max_blocks, '). Typical is amr_max_blocks/num_procs blocks per rank.'
+            end block
+        end if
 
         ! bounce buffers for copy-based coord swap (GPU-safe; same bounds as the base-level global arrays, which are sized on
         ! *_alloc - these are whole-array assigned to/from x_cb etc., so the shapes must agree)
