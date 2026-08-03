@@ -537,6 +537,60 @@ validate it against `00EB793A` specifically. Note `GPU_ENTER_DATA(attach=)` has 
 `m_rhs.fpp`/`m_igr.fpp`, so its expansion cannot be changed casually - they currently rely on the
 `always,to` behaviour.
 
+### HOW THE FIELD SOLVES THIS, and the plan to match it (2026-08-03)
+
+This is a named, solved problem elsewhere, and the consensus answer is the one this note originally
+proposed as increment 3.
+
+- **AMReX** fuses across boxes: *"If there are 512 patches of 32^3 cells each, only one GPU kernel is
+  launched to work on all 512 patches, which enables it to achieve similar performance as if operating
+  on a single patch of 256^3 cells."* They quantify the problem on OUR hardware: *"a simple kernel
+  running on an AMD MI250X will only achieve ~10% of its peak memory bandwidth on small boxes of 32^3
+  cells."* They apply the same fusion to halo pack/unpack, where *"the dominant cost was kernel launch
+  latency"*, reducing it to ONE launch per rank. (arXiv 2403.12179)
+- **Parthenon** does the same via `MeshBlockPack`, with the pack size *"hardware and problem dependent,
+  and so may be set at runtime."* (arXiv 2202.12309)
+- **Castro/AMReX gridding guidance**: *"Best performance is obtained with bigger boxes, so setting
+  `amr.max_grid_size = 128` and `amr.blocking_factor = 32` can give good performance"*; *"too small
+  max_grid_size may ruin the code performance."* This independently corroborates the cap finding.
+- **OpenMP offload specifically** carries higher per-region overhead than CUDA/HIP because of its device
+  runtime layer; LLVM offers a reduced "bare-metal" kernel mode. MFC pays more per operation than an
+  equivalent HIP code would, which raises the value of reducing operation COUNT.
+
+**MEASURED HERE (`amr-bench/attach/serial/batch.f90`), the same mechanism, same arithmetic, 64 blocks:**
+
+| | span | operations | copies/kernel |
+|---|---|---|---|
+| one launch PER BLOCK (MFC today) | 433.5 ms | 15370 | 0.0 |
+| one launch over ALL BLOCKS (AMReX/Parthenon) | **35.0 ms** | **250** | 0.0 |
+
+**12.4x, with byte-identical results.** Note BOTH rows show 0 copies per kernel because the store is a
+PLAIN CONTIGUOUS ARRAY. That resolves a contradiction earlier in this note: the per-region map traffic
+is not about module-scope versus dummy argument, it is about **plain array versus derived type with a
+pointer component**. Module-scope `scalar_field` measured 32.8 copies/kernel; a plain module array
+measures 0. AMReX's MultiFab is precisely the plain-contiguous-across-boxes layout.
+
+**PLAN TO MATCH THEM.** Three pieces, in dependency order, each golden-gated:
+
+1. **Flat contiguous backing store** - `real(stp) :: store(cell, var, block)` for the per-block field
+   families, replacing per-slot `scalar_field` allocations. This is the enabler for 2 and it removes
+   the descriptor traffic by itself. Sizing must come from max live blocks per rank, NOT
+   `amr_max_blocks` (1024 would OOM).
+2. **Batched block kernels** - one launch over the block list instead of per block, for the RHS and RK
+   paths. This is the 12.4x above and it is what `amr_max_grid_size` is currently substituting for.
+3. **Fused halo pack/unpack** - AMReX reduced this to one launch per rank; MFC's seam/ghost fills are
+   the same shape of work.
+
+Target, from the 60%-of-GCD profile: busy is 8.2 s of a 28.4 s span, so eliminating serialization is
+worth **~3.5x on that case** before counting the bandwidth gain AMReX reports from larger effective
+kernels. Expect more where blocks are smaller, since the penalty scales with block count.
+
+**RETRACTION.** Earlier in this session I wrote that batching "attacks dispatch count, not the
+per-dispatch tax" and set it aside. The profile then showed dispatch count IS the governing quantity,
+and AMReX and Parthenon both converge on exactly this mechanism. Increment 3 below was right and the
+dismissal was wrong. Note the separate "packing is disproved" result concerns MFC's SLOT-based packing
+into one working slot - a different mechanism from cross-block fusion, and only the former is dead.
+
 ### THE GOVERNING LAW (2026-08-03, profiled): wall time is set by GPU OPERATION COUNT
 
 Gap analysis of a real AMR run (`rocprofv3`, kernel + copy traces, np=1 2D, 6 steps):
