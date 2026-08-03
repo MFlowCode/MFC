@@ -53,6 +53,29 @@ penalty is still 15x at 512^2.
 per RK stage, not work — dominated by per-block kernel launch count plus the per-swap device
 syncs, none of which shrink as blocks shrink.
 
+**Confirmed 2026-08-02 with AMR ACTIVE (the sweeps above are uniform-only / one fine block).**
+2D 4096x2048, np=2, corner-refined so each rank already advances 16 fine blocks, varying only
+`l0_ntile`. The right independent variable is TOTAL block advances per rank, \f$I = 16 + T\f$
+with \f$T = \texttt{l0\_ntile}^{2}\f$ — not the tile count alone:
+
+| `l0_ntile` | \f$T\f$ | advances \f$I\f$ | \f$I/I(1)\f$ | measured | agreement |
+|---|---|---|---|---|---|
+| 0 | 1 | 17 | 1.000 | 1.000 | — |
+| 2 | 4 | 20 | 1.176 | 1.362 | +16% |
+| 3 | 9 | 25 | 1.471 | 1.610 | +9% |
+| 4 | 16 | 32 | **1.882** | **1.932** | **+3%** |
+
+Cost tracks total block advances, converging to 3% at the largest point. The excess at small
+\f$T\f$ is expected: an L0 tile starts far larger than a fine block and costs more per advance,
+converging as it shrinks toward fine-block size — i.e. per-advance cost is *weakly* size-dependent,
+not perfectly flat.
+
+> **Recorded because I got it wrong.** Fitting the same law on \f$T\f$ ALONE — ignoring the 16
+> fine-block advances already in the step — predicts 2.77x at \f$T=16\f$ against 1.932x measured, a
+> 30% overprediction, and briefly looked like a falsification of the per-block floor itself. The floor
+> is real; the fit used the wrong variable. Any future sweep of this kind must count EVERY block advance
+> in the step, not just the ones being varied.
+
 > **SCOPE LIMIT added 2026-08-01: the launch-count premise below holds only at LOW block counts.**
 > Profiling a 320-block 3D case (`rocprofv3`, kernels + memory copies, np=2) puts kernel execution at
 > 8.5% of the span, device-to-device copies at 23.5% (2937729 of them, 20.5 per kernel), and the GPU
@@ -129,8 +152,10 @@ cost directly (2048x1024, 20 steps, `amr_regrid_int=2`, so 10 regrid calls):
 
 Most regrid calls are cheap: 8 of 10 find the box set unchanged and return after tagging
 (~0.028 s at np=1, ~0.007 s at np=8), so only the two full rebuilds cost anything. Regrid is
-therefore **not** comparable to the block advance, and the packed super-grid remains the
-dominant lever rather than one of two equal halves.
+therefore **not** comparable to the block advance, which remains the dominant lever rather than
+one of two equal halves. (This sentence originally named the *packed super-grid* as that lever.
+Packing is DISPROVED below - the lever is the per-invocation cost of the advance itself, which
+packing cannot remove.)
 
 Where a full rebuild's time actually goes differs with rank count:
 
@@ -162,8 +187,10 @@ Same case, same steps, varying only rank count: the regrid produces 14 boxes at 
 ranks shrink the cap until boxes that fit at np<=4 must be tiled. Total boxes rise 50% while
 per-rank boxes fall only 25% (3.5 -> 2.6), and every per-box collective in the rebuild loop
 runs over *all* boxes on *all* ranks. This is a concrete, previously unattributed mechanism
-for the np=8 turnover, and it ties that turnover to the same base-subdomain scratch cap the
-packed super-grid has to address — not to MPI collective volume.
+for the np=8 turnover, and it ties that turnover to the same base-subdomain scratch cap — not to
+MPI collective volume. (Originally "the cap the packed super-grid has to address"; packing is
+DISPROVED below, and the cap was instead addressed directly by pinning `amr_max_grid_size`, which
+is what the "Resolved" note immediately following records.)
 
 **Resolved (2026-08-01): that was the DERIVED cap, and with `amr_max_grid_size` pinned the AMR
 machinery is exactly rank-invariant.** Measured on a 3D sharp-interface case (128^3, two slabs at

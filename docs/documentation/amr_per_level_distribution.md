@@ -226,6 +226,76 @@ to match, and it is the same flat-backing-store restructuring @ref amr_block_bat
 but justified by the LARGE-SCALE argument above rather than by the packing rationale, which was
 disproved (see "the packed super-grid cannot work").
 
+### Open work to finish the AMR + load-balancing plan
+
+Scored against the three tracks' own "done when" criteria, 2026-08-02.
+
+**Track 2 (multi-level at np>1): COMPLETE.** Towers no longer co-locate (see the per-level
+distribution comment in `s_amr_assign_block_owners`), P2P parent<->child landed, and the L2 seam
+abort is gone - `s_amr_check_seam_topology` now rejects only genuinely illegal geometry.
+
+**Track 3 (batch per-rank block advances): CLOSE AS SUPERSEDED.** Its criterion was a strong-scaling
+curve showing blocks no longer serialize through one slot. Strong scaling reached **0.790 at np=8
+(from 0.426) with the single-slot model untouched** - the limiter was a loop-invariant coarse-halo
+exchange. Packing is disproved; the flat backing store measures ~1.13x at the cap the code should run
+at. The mechanism was never built and no longer needs to be.
+
+**OPEN 1 - ANSWERED, negatively: the coarse-grid balancer does not pay for itself.** Every earlier
+measurement in this document ran `l0_ntile = 0`, so **every balance figure here (1.000-1.010, zero idle
+ranks, to 32 ranks on 4 nodes) is a FINE-LEVEL result only**; the coarse level was a fixed Cartesian
+decomposition. That path has now been benchmarked on a corner-concentrated 2D case (4096x2048, blob IC
+so refinement sits entirely in one rank's half, np=2, `l0_ntile = 2` -> 8 tiles / 2 ranks, 40 steps,
+3 reps):
+
+| arm | `l0_ntile` | `l0_rebalance_interval` | med s/step | spread | vs A |
+|---|---|---|---|---|---|
+| A monolithic | 0 | - | 0.8892 | 0.9% | 1.000x |
+| B tiled, no rebalance | 2 | 0 | 1.2045 | 0.8% | **0.738x** |
+| D tiled + rebalance | 2 | 4 | 1.1991 | **11.3%** | 0.742x |
+
+**Tiling costs 35%; rebalancing recovers 0.4% of it - inside D's own spread.** The rebalancer was live
+(9 invocations, confirmed in-log, not a wiring failure). It migrated exactly once in 40 steps, and that
+migration made the load gap **6.8x worse** and never recovered:
+
+```
+t_step=32  load-gap 5.738E-02 -> 3.898E-01  (1 migrations)
+t_step=36  load-gap 3.488E-01 -> 3.488E-01  (0 migrations)
+```
+
+The cause is structural, not tuning. The deadband admits gaps above 5% of mean load, but the SFC re-cut
+is restricted to CONTIGUOUS Morton ranges, so its finest correction is one whole tile - **25% of a
+rank's load at 4 tiles/rank**. A correction quantum 5x larger than the smallest gap worth correcting can
+only overshoot. The escape is self-defeating: correcting at the 5% scale needs ~20+ tiles/rank, and
+tiles are exactly what cost the 35%. **The granularity required for useful coarse balancing costs more
+than the imbalance it corrects.**
+
+Fixed in passing: the re-cut committed its partition unconditionally, never comparing the resulting gap
+to the current one. It now evaluates into a temporary and commits only on strict improvement (the cut
+array must move with the owner map - `f_amr_owner` resolves tile ownership against `amr_owner_cut`, so
+refreshing one without the other splits ownership silently).
+
+**Scope limit - what this does NOT disprove.** One case class: 2D, single refinement level (the blob
+tags level 1 only, confirmed in-log), hydro with uniform per-cell coarse cost, 2 ranks. Coarse work is
+near-uniform there by construction, which is *why* there was nothing to recover. Cases where per-cell
+coarse cost genuinely varies - IB ghost points, chemistry stiffness, Lagrangian bubbles - are untested
+and remain the only place this feature could still pay. The burden of proof has moved: it costs 35% and
+has no demonstrated benefit.
+
+**OPEN 2 - DEMOTED by OPEN 1's answer.** It was gated on coarse rebalancing being worth having; it is
+not, on the evidence above. Recorded for the case that an imbalanced-coarse-cost case revives it.
+`amr_tile_l0_owner` is fixed to the
+Cartesian init owner and stays fixed under migration, while COMPUTE ownership follows the cut. Every
+migrated tile therefore pays a scatter-back each step through four routines that branch on
+`bown == lown`: `s_l0_fill_tiles_from_coarse`, `s_l0_scatter_tiles_to_coarse`,
+`s_l0_add_reflux_to_tiles`, `s_l0_restrict_to_tiles`. This is the plan's own product claim - the
+coarse grid cannot yet rebalance in production. The `l0_ntile > 0 .and. amr` gate IS lifted, so the
+feature runs for dynamic regrid, subcycle, and multi-level.
+
+**A sequencing claim in the original goal is falsified.** It recorded as verified fact that Track 1's
+remaining gate and Track 3's redesign were "ONE blocker" and that "Track 1/2 cannot finish underneath
+the single-working-slot model". Track 2 finished under exactly that model, and strong scaling improved
+1.85x without Track 3.
+
 ### Queue
 
 1. **Multi-node weak scaling (8/16/32 ranks, 1/2/4 nodes).** The open exascale question. Nothing
