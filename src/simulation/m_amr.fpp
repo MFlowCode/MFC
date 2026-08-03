@@ -102,7 +102,15 @@ module m_amr
     integer, allocatable :: amr_loc_free(:)    !< stack of recycled local indices
     integer              :: amr_loc_n = 0      !< high-water mark of local indices handed out
     integer              :: amr_loc_nfree = 0  !< depth of the recycle stack
-    integer              :: amr_maxc(3)        !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
+
+    !> FLAT PER-BLOCK FIELD STORE, indexed (x, y, z, var, LOCAL slot) by the dense index above. One contiguous module array
+    !! replacing a per-slot vector of independently allocated scalar_fields: the layout AMReX's MultiFab uses, and the prerequisite
+    !! for running ONE kernel over every live block instead of one kernel per block. Every slot's arrays carry the same mbuf
+    !! extents, so a single array serves them all. The ghost pair exists only under amr_subcycle. Sized by s_amr_st_reserve.
+    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cons_st, amr_gst_a, amr_gst_b
+    $:GPU_DECLARE(create='[amr_cons_st, amr_gst_a, amr_gst_b]')
+    integer :: amr_st_cap = 0  !< local slots the store is sized for; grows geometrically and never shrinks
+    integer :: amr_maxc(3)     !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
     !> Per-slot field-array sizing (module-scope, used by s_amr_alloc_slot/s_amr_free_slot): max fine cells per dim (2*maxc_loc-1)
     !! and the buffered array bounds. amr_slot_live(k) tracks whether slot k's field arrays are allocated - lazy owned-only sizing
@@ -5167,6 +5175,57 @@ contains
 
     end subroutine s_amr_loc_index_init
 
+    !> Size the flat store for at least nloc local slots, doubling and never shrinking, so a run pays O(log) reallocations no matter
+    !! how the block count churns. Growth must PRESERVE the live blocks' fields, and those live on the device, so each array makes a
+    !! device -> host -> larger array -> device round trip. Growth events are rare (7 for a 128-slot rank), so the trip is free.
+    impure subroutine s_amr_st_reserve(nloc)
+
+        integer, intent(in)    :: nloc
+        integer                :: oldcap, newcap
+        logical                :: want(3)
+        real(stp), allocatable :: tmp(:,:,:,:,:)
+
+        if (nloc <= amr_st_cap) return
+        oldcap = amr_st_cap
+        newcap = max(2*oldcap, nloc)
+        want = [.true., amr_subcycle, amr_subcycle]
+
+        #:for ST, IDX in [('amr_cons_st', 1), ('amr_gst_a', 2), ('amr_gst_b', 3)]
+            if (want(${IDX}$)) then
+                if (oldcap > 0) then
+                    $:GPU_UPDATE(host='[' + ST + ']')
+                    allocate (tmp(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi,1:sys_size,1:oldcap))
+                    tmp = ${ST}$
+                    @:DEALLOCATE(${ST}$)
+                end if
+                @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
+                ${ST}$ = 0._stp
+                if (oldcap > 0) then
+                    ${ST}$(:,:,:,:,1:oldcap) = tmp
+                    deallocate (tmp)
+                end if
+                $:GPU_UPDATE(device='[' + ST + ']')
+            end if
+        #:endfor
+
+        amr_st_cap = newcap
+
+    end subroutine s_amr_st_reserve
+
+    !> Free the flat store and the dense-index maps. Mirrors s_amr_loc_index_init: called from BOTH finalize paths, because either
+    !! pool-allocation site can have created them. Idempotent.
+    impure subroutine s_amr_st_finalize()
+
+        if (allocated(amr_loc_of)) deallocate (amr_loc_of, amr_loc_free)
+        #:for ST in ['amr_cons_st', 'amr_gst_a', 'amr_gst_b']
+            if (allocated(${ST}$)) then
+                @:DEALLOCATE(${ST}$)
+            end if
+        #:endfor
+        amr_st_cap = 0
+
+    end subroutine s_amr_st_finalize
+
     impure subroutine s_amr_alloc_slot(islot)
 
         integer, intent(in) :: islot
@@ -5225,6 +5284,7 @@ contains
             end if
         end if
         amr_slot_live(islot) = .true.
+        call s_amr_st_reserve(amr_loc_n)
 
     end subroutine s_amr_alloc_slot
 
@@ -6497,6 +6557,7 @@ contains
         ! TILE-ONLY and always freed here.
         if (.not. amr) then
             deallocate (amr_slot_live)
+            call s_amr_st_finalize()
             if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
             if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
             deallocate (amr_ovl_gather_n, amr_ovl_scatter_n)
@@ -6531,7 +6592,7 @@ contains
             @:DEALLOCATE(amr_cg_mv)
         end if
         deallocate (amr_slot_live)
-        if (allocated(amr_loc_of)) deallocate (amr_loc_of, amr_loc_free)
+        call s_amr_st_finalize()
         if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
