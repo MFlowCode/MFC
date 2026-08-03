@@ -580,6 +580,30 @@ an MFC failure, where the same questions cost ~20 minutes each in-tree.
 M2's divergence requirement is not optional: uniform host/device data hid a data-movement defect through
 seven passing variants in the session that produced this note.
 
+#### MWE RESULTS (2026-08-03, `amr-bench/attach/promote/`): correctness de-risked, 5/5
+
+| phase | de-risks | result |
+|---|---|---|
+| S1 | promotion through a 3-deep call chain, cross-TU, over a sub-range | PASS |
+| S2 | POISONED halo beyond the block untouched - no out-of-range write | PASS |
+| S3 | 25 advances with host/device DELIBERATELY diverged, plus unrelated target regions between them | PASS |
+| S4 | 48 blocks of VARYING extents cycled through one shared working set | PASS |
+| S5 | working set REALLOCATED mid-run | PASS |
+
+**Mechanism detail that matters for implementation.** A module-scope deep type needs the parent
+descriptor mapped AND its members mapped; `map(to:)` on the parent alone leaves `%%sf` null on device
+and the first kernel faults at a nil address. With promotion this setup runs **once at init** and the
+working set is never re-pointed - which is exactly why promotion sidesteps the attach problem that
+killed the view-based design.
+
+**Timing could NOT be measured cleanly and no speedup is claimed here.** The node showed a ~134 us
+per-region launch floor, uniform across all 8 GCDs (129-135 us) with the GPUs otherwise idle, against
+~20 us for the same construct earlier the same day. Within-program A/B gave 448 vs 501 us/region: 53 us
+saved for 2 dummy arrays, ~26 us per array per region. Extrapolating instead from MFC's own profile
+(485 copies / 24 regions = 20 maps per region, 2.0 s / 696 invocations = ~6 us per map = ~120 us per
+region, against a 69 us mean kernel) implies roughly a **2-3x per-region reduction**. Treat the 4.4x
+from the earlier quiet-node reproducer as an UPPER BOUND and re-measure on an idle node before quoting.
+
 #### Phases, each golden-gated and independently revertible
 
 1. **`s_amr_fine_rk_update`** - AMR-only, one file, three arrays. Smallest in-tree proof of the pattern.
