@@ -570,7 +570,33 @@ how many regions the work is split into gives:
 Net of ~29 ms fixed startup the variable time falls **20x for a 19x reduction in operations**, and the
 median gap is ~18 us at every point. So:
 
-> **span = fixed + (operations x ~18 us).** The per-operation gap is irreducible; only the COUNT moves.
+> **span = busy + (operations x ~18 us).** The per-operation gap is irreducible; the COUNT moves, and
+> so does the WORK each operation carries.
+
+**The count is only half of it - WORK PER KERNEL decides which regime you are in.** Holding the operation
+count fixed at 721 kernels / 5834 copies and varying only kernel duration:
+
+| mean kernel | busy % | regime |
+|---|---|---|
+| 14 us | 20.5 | latency-bound |
+| 16 us | 21.1 | latency-bound |
+| 37 us | 25.6 | latency-bound |
+| **201 us** | **51.2** | **crossover** |
+| 763 us | 77.4 | work-bound |
+
+Crossover is ~200 us of kernel work per ~8 copies. Scaled to MFC's ~20 copies per kernel that is
+**~500 us**, and MFC's mean kernel is **109 us** - so MFC runs **4-5x below** the point where work
+begins to dominate latency. Separately, raising work per region 256x at small sizes (16 -> 4096 cells)
+changed the span by 5%: down in that regime the work is free and only the operation count matters.
+
+So the governing relation is two-dimensional:
+
+> **efficiency = kernel work / (kernel work + operations x ~21 us)**
+
+This is why `amr_max_grid_size` is worth ~20x (70.3 s/step at cap 128 versus 8.5-9.5 at cap 1024) and
+it is not a mysterious constant: a larger cap puts more cells under each kernel, moving the solver from
+the latency-bound regime toward the work-bound one. It also upgrades kernel fusion, which improves BOTH
+terms at once - a fused region carries more work and costs fewer operations.
 
 **`nowait` is REFUTED as a lever.** Enqueuing the same dependent regions with `nowait` + `depend` and one
 `taskwait` per advance measured 213 ms against 202 ms baseline, with the median gap unchanged (18.6 vs
