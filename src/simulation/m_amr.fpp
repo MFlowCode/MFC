@@ -6031,14 +6031,30 @@ contains
         ! preserved. Deadband kept: skip the re-cut while the load gap is already within tol (no churn on sub-5% imbalance).
         if (gap0 > tol) then
             block
-                integer(kind=8) :: tkey(l0_ntiles_tot)
+                integer(kind=8) :: tkey(l0_ntiles_tot), cut_try(0:num_procs - 1)
+                integer         :: newo_try(l0_ntiles_tot)
+                real(wp)        :: load_try(0:num_procs - 1)
                 do k = 1, l0_ntiles_tot
                     tkey(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
                 end do
-                ! shared SFC cut: cumulative-split the smoothed cost into num_procs contiguous Morton ranges and REFRESH
-                ! amr_owner_cut
-                ! so f_amr_owner keeps reproducing the tile owner after a re-cut (same partition as s_l0_tiles_init / the assigner).
-                call s_amr_sfc_cut(tkey, cost, l0_ntiles_tot, amr_owner_cut, newo)
+                ! shared SFC cut: cumulative-split the smoothed cost into num_procs contiguous Morton ranges. Because the cut is
+                ! restricted to CONTIGUOUS ranges, the finest correction it can make is one whole tile; when tiles-per-rank is small
+                ! that quantum exceeds the gap the deadband admits, and the re-cut can return a partition WORSE than the current one
+                ! (measured 5.738E-02 -> 3.898E-01 at 8 tiles / 2 ranks, and it never recovered). Evaluate into a temporary and
+                ! reject only a STRICT WORSENING. Not "accept only a strict improvement": with near-uniform tile costs the Morton
+                ! partition and the cartesian one have EQUAL gaps, and rejecting those would silently kill the migration that
+                ! golden "L0 tiles -> 2D -> SFC re-cut rebalance np=2" exists to cover (it would still PASS, because migration is
+                ! bit-neutral - the coverage would just be gone). amr_owner_cut must move WITH newo: f_amr_owner resolves tile
+                ! ownership against it, so refreshing it without migrating would leave it disagreeing with amr_block_owner.
+                call s_amr_sfc_cut(tkey, cost, l0_ntiles_tot, cut_try, newo_try)
+                load_try = 0._wp
+                do k = 1, l0_ntiles_tot
+                    load_try(newo_try(k)) = load_try(newo_try(k)) + cost(k)
+                end do
+                if (maxval(load_try) - minval(load_try) <= gap0) then
+                    amr_owner_cut = cut_try
+                    newo = newo_try
+                end if
             end block
         end if
         load = 0._wp
@@ -6054,8 +6070,11 @@ contains
                 nmig = nmig + 1
             end if
         end do
-        if (proc_rank == 0) print '(A,I0,A,ES10.3,A,ES10.3,A,I0,A)', ' [l0 rebalance] t_step=', t_step, ' load-gap ', gap0, &
-            & ' -> ', gap1, ' (', nmig, ' migrations)'
+        ! tol is printed because without it "deadband skipped the re-cut" (gap0 <= tol) and "the re-cut ran and was REJECTED for not
+        ! improving the gap" (gap0 > tol, guard above) emit byte-identical output - gap0 -> gap0, 0 migrations. Those are different
+        ! behaviours and one of them is the guard doing its job; a verification run cannot tell them apart otherwise.
+        if (proc_rank == 0) print '(A,I0,A,ES10.3,A,ES10.3,A,ES10.3,A,I0,A)', ' [l0 rebalance] t_step=', t_step, ' load-gap ', &
+            & gap0, ' -> ', gap1, ' (deadband ', tol, ', ', nmig, ' migrations)'
 
         amr_tile_cost = 0._wp  ! reset the measurement window
 
