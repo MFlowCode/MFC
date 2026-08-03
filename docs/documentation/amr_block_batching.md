@@ -537,6 +537,67 @@ validate it against `00EB793A` specifically. Note `GPU_ENTER_DATA(attach=)` has 
 `m_rhs.fpp`/`m_igr.fpp`, so its expansion cannot be changed casually - they currently rely on the
 `always,to` behaviour.
 
+### PLAN (2026-08-03): promote the RHS working set from dummy arguments to module scope
+
+**The insight that removes the blocker.** The attach hunt was solving the wrong problem. The tax is not
+"pointers are slow" - it is that *fields arrive as dummy arguments*, so every target region re-maps their
+deep members. Nothing needs to be aliased, attached, or flattened: the fields simply need to BE module
+state. `m_rhs` already declares ~12 module-scope `GPU_DECLARE`'d derived-type arrays (`q_cons_qp`,
+`q_prim_qp`, `flux_n`, `flux_src_n`, `qL_prim`/`qR_prim`, `tau_Re_vf`) and those kernels measure ZERO
+maps per dispatch. Only `q_cons_vf`, `q_prim_vf`, `rhs_vf` arrive as dummies - exactly the ones taxed.
+
+**The change, per routine: declarations and call sites only. Loop bodies are untouched.** Promote the
+dummy to a module variable OF THE SAME NAME, so `q_cons_vf(i)%%sf(j,k,l)` still resolves - now to module
+state. This is what makes the change tractable and what makes it safe for a bit-identical requirement:
+the arithmetic is not edited at all. (Contrast the flat-store design, which threads a slot index through
+every reference - a genuine 500-loop rewrite.)
+
+**How AMR then feeds it.** The monolithic path pays NOTHING: the module arrays simply are its arrays.
+The AMR path copies block *k*'s fields into them before the advance and `rhs` back after -
+device-to-device, ~1.3 MB for a 128^2 2D block at `sys_size=5`, about **1.3 us**, against the measured
+**~2.9 ms** of argument mapping per `s_compute_rhs` invocation (2.0 s / 696). Roughly a 2000:1 trade.
+This is the `s_amr_swap_to_fine` idiom already used for grid state, extended from geometry to fields.
+
+**Re-entrancy: VERIFIED SAFE, and it was the risk that could have killed the design.** Module-scope state
+is only sound if no two block advances overlap. `s_amr_advance_children` is `recursive`, but the
+recursion sits OUTSIDE the stage loop - every level-`clev` block completes all three stages, and only
+then does the routine recurse into level `clev+1`. `s_l0_advance_stage_rhs` and the fine-advance loops
+are likewise serial over blocks. No nesting, so no working-set stack is required.
+
+#### De-risking MWEs, each run BEFORE the matching phase
+
+Build them as one matrix in a single compile (`amr-bench/attach/mtu/`), not one hypothesis per MFC
+rebuild - a 6-phase matrix compiled in ~20 s eliminated four hypotheses at once and correctly predicted
+an MFC failure, where the same questions cost ~20 minutes each in-tree.
+
+| MWE | de-risks | pass condition |
+|---|---|---|
+| M1 promotion, multi-TU | module state referenced from a DIFFERENT translation unit than it is declared in | correct result; per-region time at the ~22 us module level, not the ~110 us dummy level |
+| M2 copy-in/advance/copy-out | the AMR feed path, with host and device data DELIBERATELY DIVERGED | correct result; copy cost measured and compared against the mapping it replaces |
+| M3 serial reuse, varying extents | one shared working set reused by many blocks of DIFFERENT sizes | correct for every block, in any order |
+| M4 sub-block extents | working arrays sized at `mbuf` max while a block uses a sub-range | no read/write outside the block's own range |
+
+M2's divergence requirement is not optional: uniform host/device data hid a data-movement defect through
+seven passing variants in the session that produced this note.
+
+#### Phases, each golden-gated and independently revertible
+
+1. **`s_amr_fine_rk_update`** - AMR-only, one file, three arrays. Smallest in-tree proof of the pattern.
+   Gate: all AMR goldens byte-identical AND its copies/dispatch measured 54 -> ~0.
+2. **`s_compute_rhs`'s three field dummies** - 5 call sites. Benefits the uniform solver too (it pays
+   18.6 copies/launch to AMR's 19.2). Gate: FULL suite byte-identical, plus a uniform-case timing.
+3. **Walk the call chain** - `m_riemann_solver_hllc` (44 maps/dispatch), `m_riemann_state` (33),
+   `m_viscous`, `m_weno`; ~57 call sites pass these three arrays. Gate: full suite, per-stage.
+
+Stop after any phase whose measured gain does not survive its own run-to-run spread, and say so.
+
+#### What would falsify this plan
+
+- M1 shows promotion does not remove the maps once the reference crosses a TU boundary.
+- The copy-in/out is not device-to-device (a host round trip would cost far more than the tax).
+- Phase 1 changes any golden. This is a storage-location change with identical arithmetic; a diff means
+  the model is wrong, not that the goldens need regenerating.
+
 ### Remaining increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
