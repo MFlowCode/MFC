@@ -480,6 +480,63 @@ Even at the best measured cap the residual is ~7.3x uniform per cell (11.4 vs 1.
 so per-block overhead remains the target — but it must be attacked by making each block's advance
 cheaper (launch fusion, increments 1–3 below), not by combining blocks.
 
+### MEASURED 2026-08-02: the per-block tax is DUMMY ARGUMENTS, not launch count or descriptors
+
+Attributing 337,431 device copies to 16,698 dispatches (rocprofv3, temporal attribution, np=1 2D AMR):
+
+| kernel | dispatches | copies/dispatch |
+|---|---|---|
+| `m_amr::fine_rk_update` | 678 | 54.0 |
+| `m_riemann_solver_hllc` | 696 | 44.0 |
+| `m_rhs::compute_rhs` | 696 | 37.7 |
+| **`m_amr_registers::capture_boundary_flux`** | **1356** | **0.0** |
+| **`m_amr_registers::apply_reflux`** | 240 | **0.0** |
+
+Kernels reading MODULE-LEVEL `GPU_DECLARE`'d state (`freg`/`creg`, `m_amr_registers.fpp:56-57`) pay
+ZERO; kernels taking fields as DUMMY ARGUMENTS pay 33-54. Copy count matches the deep-member count
+exactly (`3*sys_size + q_T_sf + bc_type(2,2)` = 20 at `sys_size=5`, measured 20.2/dispatch). Total copy
+time 2.0 s against ~1.5 s of kernel time - a first-order cost.
+
+A 4-translation-unit reproducer (`amr-bench/attach/mtu/`) isolates the penalty at **4.3-4.7x per
+region**, including per-advance re-attach, and confirms cross-TU `declare target` residency, runtime
+slot indexing on device, and alternating attach targets all work.
+
+**Two hypotheses this KILLS.** Flattening the `scalar_field` interface (3,840 `%%sf` sites across
+`common/`) buys nothing - flat-array dummies measure the same as deep-allocatable ones. And batching
+attacks dispatch COUNT while the tax is per-dispatch argument mapping.
+
+**Conversion attempted on `s_amr_fine_rk_update` and REVERTED at 74/76.** Four failures, in order:
+`GPU_EXIT_DATA(detach=)` emitted `map(always,from:)` (copies back, drops residency -> NaNs);
+`GPU_ENTER_DATA(attach=)` emitted `map(always,to:)` (clobbers live device state with stale host values
+-> wrong answers); allocating the views behind `.not. amr` (pure-L0 reaches the routine via
+`s_l0_advance_stage_rk` -> segfault). The first two were real MFC bugs in clauses with ZERO in-tree
+users, now fixed to `map(always,alloc:)` / `map(release:)`.
+
+**THE OPEN BLOCKER, isolated by a control experiment: there is no correct ATTACH primitive for this
+backend.** Keeping the attach calls but reverting the kernel to read its dummy arguments fails
+*byte-identically* (`icfl Inf` on `00EB793A`, `8.357478479233075E+22` on `EF58E377`), so the kernel
+change is innocent and **the attach operation itself corrupts the slot's device data**:
+
+- `map(always,to:)` copies the STALE HOST array over live device state.
+- `map(always,alloc:)` forces a fresh, uninitialised device allocation, orphaning the live data.
+
+A device-side probe comparing the view against the dummy inside one kernel reads exactly zero
+difference, which is consistent rather than contradictory: both resolve to the same *wrong* buffer.
+That probe is worth keeping in mind - "the view resolves correctly" and "the view resolves to the right
+memory" are different questions.
+
+Only the multi-level cases fail because they regrid *and* advance most often; the static multi-level
+np=2 golden `09E0D257` passes. A standalone 6-phase reproducer
+(`amr-bench/attach/mtu/f_lifetime.f90`: attach-only, attach+detach, slot recycling, varying extents,
+realloc-at-new-extent) passes every phase, so this is an INTEGRATION property, not a property of the
+technique - an MWE de-risks the mechanism, not the integration.
+
+Before retrying: establish an attach primitive that neither copies nor reallocates on already-present
+data (candidates: `map(to:)` / `map(alloc:)` WITHOUT `always`, or `omp_target_associate_ptr`), and
+validate it against `00EB793A` specifically. Note `GPU_ENTER_DATA(attach=)` has 8 existing users in
+`m_rhs.fpp`/`m_igr.fpp`, so its expansion cannot be changed casually - they currently rely on the
+`always,to` behaviour.
+
 ### Remaining increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
