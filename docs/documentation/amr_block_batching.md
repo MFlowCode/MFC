@@ -575,7 +575,24 @@ measures 0. AMReX's MultiFab is precisely the plain-contiguous-across-boxes layo
 1. **Flat contiguous backing store** - `real(stp) :: store(cell, var, block)` for the per-block field
    families, replacing per-slot `scalar_field` allocations. This is the enabler for 2 and it removes
    the descriptor traffic by itself. Sizing must come from max live blocks per rank, NOT
-   `amr_max_blocks` (1024 would OOM).
+   `amr_max_blocks` (1024 would OOM) - **step 1a landed this as `amr_loc_of`/`amr_loc_n`, byte-identical
+   across 76 goldens (`905e9d7c`)**.
+
+   **SCOPING CONSTRAINT, found by attempting it: a field family cannot be migrated independently if it
+   shares a consumer routine with a family that is not migrating.** `q_ghost_a`/`q_ghost_b` look like
+   the smallest possible first conversion - 9 references, one file, two consumers - but
+   `s_amr_fill_fine_ghosts` is not ghost-specific: it is a general prolong-coarse-into-fine routine
+   whose THIRD caller targets `q_cons` (`m_amr.fpp:4597`). Branching inside the routine does not help,
+   because a dummy referenced in ANY branch of a target region is still mapped, so the migrated path
+   would keep paying the tax and the conversion would buy nothing. **The natural conversion unit is
+   therefore `{q_cons, q_ghost_a, q_ghost_b}` together.** Counting references to a family NAME
+   understates its blast radius; count the consumers and then the consumers' other targets.
+
+   Separately confirmed while scoping: `q_ghost_a/b` are allocated UNCONDITIONALLY while their only
+   consumers sit on subcycle-only paths (`s_amr_subcycle_setup_block`, `s_amr_advance_fine_subcycle_all`,
+   `s_amr_advance_children`), and their `pb`/`mv` twins already carry an `if (amr_subcycle)` guard.
+   Adding the matching guard frees roughly `2 x sys_size x mbuf x live_slots` of device memory on every
+   non-subcycle run - memory that competes directly with `amr_max_grid_size`, the ~20x lever.
 2. **Batched block kernels** - one launch over the block list instead of per block, for the RHS and RK
    paths. This is the 12.4x above and it is what `amr_max_grid_size` is currently substituting for.
 3. **Fused halo pack/unpack** - AMReX reduced this to one launch per rank; MFC's seam/ghost fills are
