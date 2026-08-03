@@ -589,6 +589,26 @@ Crossover is ~200 us of kernel work per ~8 copies. Scaled to MFC's ~20 copies pe
 begins to dominate latency. Separately, raising work per region 256x at small sizes (16 -> 4096 cells)
 changed the span by 5%: down in that regime the work is free and only the operation count matters.
 
+**CHECKED AT PRODUCTION OCCUPANCY - the regime does NOT change with problem size.** Every measurement
+above ran at ~15% of one GCD, so the obvious objection is that short kernels are an artifact of a toy
+problem. Re-profiled at 4x the cells (8.4M -> 33.6M, ~60% of a 64 GB GCD):
+
+| | 15% of GCD | 60% of GCD |
+|---|---|---|
+| span | 13516.7 ms | 28389.8 ms |
+| busy | 28.3% | **28.9%** |
+| GPU idle | 71.7% | **71.1%** |
+| operations | 354,129 | 639,276 |
+| median gap | 15.4 us | **15.5 us** |
+| copies/kernel | 20.2 | 21.8 |
+
+Busy fraction and per-operation gap are INVARIANT to problem size. The reason matters: under AMR the
+work per kernel is set by `amr_max_grid_size`, **not** by the global grid - a larger domain yields MORE
+BLOCKS OF THE SAME SIZE, so it moves along the operation-count axis while leaving work-per-kernel
+untouched. Scaling up does not walk you out of the latency-bound regime; only raising the cap does.
+(The 60% run exited 134 on the same `getTargetPointer returned null` mapping abort seen at 15% after
+producing 28 s of trace; the ratios match the smaller run, but that abort is worth chasing on its own.)
+
 So the governing relation is two-dimensional:
 
 > **efficiency = kernel work / (kernel work + operations x ~21 us)**
