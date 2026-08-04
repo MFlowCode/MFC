@@ -27,7 +27,7 @@ contains
         n_file_access_delay_iterations = (process_rank/N_PROCESSES_FILE_ACCESS)*FILE_ACCESS_DELAY_UNIT
 
         do i = 1, n_file_access_delay_iterations
-            call random_num(num)
+            call random_number(num)
             dummy = num*num
         end do
 
