@@ -833,7 +833,7 @@ their `scalar_field` interfaces untouched.
 already uses for its per-direction stencil variants. Branching on the target inside a single region is
 not an option: a dummy referenced in ANY branch is still mapped.
 
-**2b - `q_cons` + the copy bridge. NOT STARTED. It is ATOMIC and bigger than the original plan said.**
+**2b - `q_cons` + the copy bridge. LANDED (see the results subsection below). It was ATOMIC and bigger than the original plan said.**
 
 - **70 code sites** (not 59), across `m_amr.fpp` 47, `m_amr_regrid.fpp` 17, `m_amr_restart.fpp` 6,
   `m_time_steppers.fpp` 1.
@@ -861,6 +861,64 @@ launch share**. Quote the 25-30%.
 
 **Harness note:** the session scratchpad rotates and ate a UUID list mid-run (the failure looks like a
 kill, not a missing file). Keep test lists and logs under `amr-bench/logs/store/`.
+
+#### 2b RESULT (2026-08-03): the store is authoritative for `q_cons`
+
+Converted in dependency order, one build per group, goldens once at the end. Net **+86 lines** across
+three files (`m_amr.fpp`, `m_amr_regrid.fpp`, `m_amr_restart.fpp`); `t_level%%q_cons` and its
+`@:ALLOCATE`/`ACC_SETUP_SFs`/`@:DEALLOCATE` are gone.
+
+**The site count was 80, not 70.** The earlier inventory grepped `%%q_cons` and filtered out lines
+containing `q_cons_stor` - which also dropped every line carrying BOTH, hiding `s_amr_copy_fine_fields`
+and `s_amr_fine_rk_update` (4 sites, 2 signatures). When inventorying a rename, filter on the token, not
+on the line.
+
+**Three callees turned out to be polymorphic** over "a block" and "the level-0 monolithic field", so they
+became two Fypp-generated variants from one body rather than one converted routine:
+
+| routine | `_st` (flat store) | `_sf` (scalar_field) |
+|---|---|---|
+| `s_l0_pack_unpack_block` | migration / scatter of a block | `q_cons_vf`, `coarse_tgt`, `rhs_delta` |
+| `s_amr_restrict_overwrite_device` | fold a child into a parent BLOCK | fold into level-0 |
+| `f_amr_rho_tot` | fine sensor on a block | coarse sensor on `q_cons_base` |
+
+`s_amr_gather_from_parent_field` (and its two callees) needed the same split for a different reason: it
+is called once with the parent's `q_cons` (store) and once with its `q_cons_stor` (still a
+`scalar_field`), which is the subcycle's two-bracket gather.
+
+**`s_amr_fill_fine_ghosts`'s `_sf` variant DISAPPEARED**, folding into the `_gsta`/`_gstb` pattern from
+2a - all three targets are now `(q_coarse, loc)`. Same for `s_amr_lerp_fine_ghosts`, which lost its
+`q_tgt` argument entirely. That is where most of the deleted lines came from.
+
+**The bridge is 6 crossings, not 8**, because the two `s_compute_rhs` sites and the two
+`s_ibm_correct_state` sites are if/else arms - the load/store hoists around the branch, so one round trip
+per stage, not per arm. The sixth is `s_amr_reflux_apply_faces`, which is NOT one of the four shared
+solver routines: it lives in `m_amr_registers`, which `m_amr` already `use`s, so reaching the store from
+it would be a circular dependency. The bridge solved that at zero extra design cost.
+
+**Bridge invariant: crossings must not nest.** `amr_cons_br` is a single shared buffer, so a load inside
+a load would silently clobber the outer block's state. None of the six call chains re-enters AMR code;
+check that before adding a seventh.
+
+**Two traps hit:**
+
+- ``#:for DIR, LHS, RHS in [('load', A, B), ('store', B, A)]`` fails `lint_source.py` - it reads the
+  flattened list and reports `A` and `B` as duplicate entries. Make the direction a flag and derive the
+  operands (``#:set LHS = BR if DIR == 'load' else ST``), which is clearer anyway.
+- `./mfc.sh build ... | grep error:` reports GREP's exit code, not the build's. Redirect to a log and
+  echo `$?` on its own line. (Same class as the `--only` comma trap already recorded.)
+
+**Confirmation that 2b was the right prerequisite:** `s_amr_fine_seam_exchange`'s own comment named this
+change as its blocker - *"Batching further, across PAIRS, is NOT possible without a flat per-slot backing
+array: each slot's `q_cons(i)%%sf` is an independent allocation and `amr_slots` is not `GPU_DECLARE`'d, so
+a runtime slot index inside a kernel is a null deref."* Both blocks are now addressed by a plain integer
+subscript into a `GPU_DECLARE`'d module array. Same for `s_l0_pack_unpack_block` and
+`s_l0_fill_ghost_corners`, whose dummies existed only to dodge that null deref.
+
+**2b is a toll, not a win.** It adds two whole-block device copies per crossing and, per the attach/map
+measurements, saves none of the ~20 argument maps at the crossing itself. All of its value is unlocking
+step 2. Measure step 2's operation count with `amr-bench/attach/serial/gaps.py` before believing any of
+the projected 25-30%.
 
 #### EXECUTION PLAN for 1b + 2 (written 2026-08-03, SUPERSEDED IN PART - read the section above first)
 
