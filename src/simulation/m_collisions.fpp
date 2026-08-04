@@ -323,7 +323,7 @@ contains
             ! and if it is not, append it to the list of pairs
             if (.not. already_found) then
                 num_considered_collisions = num_considered_collisions + 1
-                @:PROHIBIT(num_considered_collisions > size(num_considered_collisions, 1) , &
+                @:PROHIBIT(num_considered_collisions > size(collision_lookup, 1) , &
                            & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
 
                 collision_lookup(num_considered_collisions, 1) = decoded_pairs(1)
