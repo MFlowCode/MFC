@@ -1263,6 +1263,53 @@ SAME invalid harness - 320-element kernels, wrong flags. The conclusion may well
 result looked marginal), but it has NOT been re-verified at realistic size and should be before anyone
 relies on it. Re-running it is cheap: add a `nowait`/per-block-token variant to `fuse.f90`.
 
+### THE MEASUREMENT THAT OVERTURNS THIS DOCUMENT (2026-08-04): AMReX head-to-head on the same node
+
+AMReX built from source with the SAME AFAR drop (`clang++`, HIP, `--offload-arch=gfx90a`) and the same
+OpenMPI as MFC, running `Tests/Amr/Advection_AmrCore` at MATCHED AMR settings - 400^3 base, max_level 2,
+ref_ratio 2, max_grid_size 32, regrid_int 2, no subcycling, reflux on, np=8 - measured with the SAME
+instruments (`rocprofv3`, and a PMPI shim; `amr-bench/mpiprof/` has a Fortran-symbol shim for MFC and a
+C-symbol one for AMReX).
+
+| per rank per step | MFC AMR | AMReX | |
+|---|---|---|---|
+| kernel launches | 7,270 | **57,585** | AMReX launches **7.9x MORE** |
+| **argument-map copies** | **143,586** | **54** | |
+| **copies per launch** | **19.75** | **0.00** | |
+| total GPU operations | **150,856** | 57,639 | MFC 2.6x more |
+| MPI calls | 1,258 | **166** | MFC 7.6x more |
+| MPI time | 2.73 s | **0.318 s** | MFC 8.6x more |
+
+**KERNEL COUNT IS NOT THE PROBLEM, AND MOST OF THIS DOCUMENT ASSUMED IT WAS.** AMReX launches EIGHT
+TIMES as many kernels as MFC and is still faster, because it pays essentially nothing per launch. Every
+projection above that prices a change by how many REGIONS it removes - the 14.9% weno+riemann figure,
+the 33% "3x tree reduction", the 46% "tree to 1 region", the 74% full programme, and the governing law
+"wall ~ regions x constant" - optimises the wrong variable. Treat them as historical.
+
+**The variable that matters is COST PER LAUNCH: 19.75 argument-map copies versus 0.00.** That is not a
+hardware limit, not an AMR limit, and not a ROCm limit - it is a property of MFC's OpenMP-target
+interface. A `target` region taking `type(scalar_field), dimension(sys_size)` re-maps every deep `%%sf`
+member on entry. AMReX passes device-resident `Array4` views BY VALUE into HIP kernels, so there is
+nothing to map. The ten refuted mechanisms in this document all tried to make OpenMP mapping cheaper;
+AMReX's answer is to have no mapping inside the loop at all.
+
+**This re-prices the flat store.** Migrating `q_cons` to `amr_cons_st` - a plain `GPU_DECLARE`'d module
+array indexed by a dense slot, replacing per-slot `scalar_field`s - was recorded as "a toll, not a win"
+because it did not reduce region count. Region count was the wrong metric. It is the only change so far
+that moves MFC toward the layout that gives AMReX 0.00 copies per launch, and it should be read as the
+first step of the fix rather than as overhead paid for batching.
+
+**Our MPI is independently worse**: 7.6x the calls and 8.6x the time per step. AMReX aggregates its
+FillPatch/FillBoundary communication across all boxes of a level into one phase; MFC's coarse-patch
+gather is per block (measured: `WAITALL` ~116 times per rank per step).
+
+**Caveats that must travel with these numbers.** AMReX tiles level 0 into 32^3 boxes (~1953 of them)
+while MFC keeps L0 monolithic - that is WHY they launch more kernels, so launch count is not
+like-for-like. Their advection carries one scalar; MFC carries sys_size = 6. Wall-clock is NOT
+comparable (linear advection vs compressible multiphase) and no wall-clock ratio appears above.
+**Copies per launch is the robust figure**: it is a per-launch property, independent of decomposition
+and variable count.
+
 ### Remaining increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
