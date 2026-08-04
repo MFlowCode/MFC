@@ -18,8 +18,9 @@ module m_amr_restart
     use m_constants, only: amr_restart_blk_hdr_ints
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min
-    use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_seam_pairs_dirty, s_amr_alloc_slot, s_amr_reconcile_slots, &
-        & s_amr_assign_block_owners, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_set_amr_fine_geometry
+    use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_cons_st, amr_loc_of, amr_seam_pairs_dirty, s_amr_alloc_slot, &
+        & s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
+        & s_set_amr_fine_geometry
     use m_amr_regrid, only: s_amr_check_seam_topology
 
     implicit none
@@ -56,9 +57,7 @@ contains
         ! host consumer: fine state is device-current during stepping (pull every owned slot)
         do k = 1, amr_num_blocks
             if (amr_owns_all(k)) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_slots(k)%q_cons(i)%sf]')
-                end do
+                $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(k))]')
             end if
         end do
 
@@ -74,7 +73,7 @@ contains
                        & amr_slots(k)%p
                 if (amr_owns_all(k)) then
                     do i = 1, sys_size
-                        write (2) amr_slots(k)%q_cons(i)%sf(0:amr_slots(k)%m,0:amr_slots(k)%n,0:amr_slots(k)%p)
+                        write (2) amr_cons_st(0:amr_slots(k)%m,0:amr_slots(k)%n,0:amr_slots(k)%p,i, amr_loc_of(k))
                     end do
                 end if
             end do
@@ -145,7 +144,7 @@ contains
                             do fj = 0, amr_slots(k)%n
                                 do fi = 0, amr_slots(k)%m
                                     idx = idx + 1
-                                    buf(idx) = amr_slots(k)%q_cons(i)%sf(fi, fj, fk)
+                                    buf(idx) = amr_cons_st(fi, fj, fk, i, amr_loc_of(k))
                                 end do
                             end do
                         end do
@@ -272,8 +271,13 @@ contains
                     ! serial (same rank count): had_data == this run's ownership, so this is the owned slot
                     call s_amr_alloc_slot(k)
                     do i = 1, sys_size
-                        read (2) amr_slots(k)%q_cons(i)%sf(0:rm,0:rn,0:rp)
+                        read (2) amr_cons_st(0:rm,0:rn,0:rp,i, amr_loc_of(k))
                     end do
+                    ! Push THIS block before the next s_amr_alloc_slot: allocating a slot can grow the shared flat store, and
+                    ! s_amr_st_reserve preserves the growth by pulling device->host first - which would overwrite the blocks read
+                    ! above with the device copy that has not been written yet (restored fine state becomes NaN). The store is
+                    ! device-authoritative at every alloc point; a host writer must close that gap itself.
+                    $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(k))]')
                 end if
             end do
             close (2)
@@ -407,7 +411,7 @@ contains
                         do fj = 0, amr_slots(k)%n
                             do fi = 0, amr_slots(k)%m
                                 idx = idx + 1
-                                amr_slots(k)%q_cons(i)%sf(fi, fj, fk) = buf(idx)
+                                amr_cons_st(fi, fj, fk, i, amr_loc_of(k)) = buf(idx)
                             end do
                         end do
                     end do
@@ -429,9 +433,7 @@ contains
         ! push restored fine state to the device (mirrors s_populate_amr_fine's push; host reads above)
         do k = 1, amr_num_blocks
             if (amr_owns_all(k)) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[amr_slots(k)%q_cons(i)%sf]')
-                end do
+                $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(k))]')
             end if
         end do
         ! non-polytropic QBMM: the restart file carries q_cons only; re-prolong each block's side-state from the restored coarse
