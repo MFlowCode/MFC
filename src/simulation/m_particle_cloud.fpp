@@ -24,7 +24,9 @@ contains
 
     !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Each packing
     !! method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice / s_particle_cloud_random_box) and
-    !! hands back only the entries that fall within this rank's IB neighborhood
+    !! hands back only the entries that fall within this rank's IB neighborhood. Only the first num_particle_cloud_ibs of them are
+    !! actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is left
+    !! uninitialized.
     impure subroutine s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs

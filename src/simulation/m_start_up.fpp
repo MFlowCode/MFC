@@ -1265,8 +1265,6 @@ contains
 
         call s_compute_ib_neighbor_ranks()
 
-        num_gbl_ibs = num_namelist_ibs + num_bed_ibs
-
 #ifdef MFC_MPI
         if (num_procs == 1) then
             ! single-rank: all patches are local; append particle bed entries directly into patch_ib.
@@ -1275,6 +1273,7 @@ contains
             do i = 1, num_particle_cloud_ibs
                 patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
             end do
+            num_gbl_ibs = num_namelist_ibs + num_particle_cloud_ibs
             num_ibs = num_gbl_ibs
             num_local_ibs = num_gbl_ibs
             do i = 1, num_gbl_ibs
@@ -1284,6 +1283,7 @@ contains
             ! multi-rank: compact namelist patches in-place (write_idx <= read_idx, no aliasing), then append local particle beds.
             num_ibs = 0
             num_local_ibs = 0
+            num_gbl_ibs = num_namelist_ibs + num_bed_ibs
             do i = 1, num_namelist_ibs
                 centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
@@ -1322,6 +1322,7 @@ contains
         do i = 1, num_particle_cloud_ibs
             patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
         end do
+        num_gbl_ibs = num_namelist_ibs + num_particle_cloud_ibs
         num_ibs = num_gbl_ibs
         num_local_ibs = num_gbl_ibs
         do i = 1, num_gbl_ibs

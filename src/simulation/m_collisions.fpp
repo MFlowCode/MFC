@@ -252,7 +252,7 @@ contains
         integer                        :: num_raw, local_num_raw
 
         num_raw = 0
-        z_bound = 0; if (num_dims == 3) z_bound = 1
+        z_bound = 0; if (num_dims == 3) z_bound = 2
 
         $:GPU_PARALLEL_LOOP(private='[gp_idx, gp_patch_id, neighbor_patch_id, local_num_raw, i, j, k, ii, jj, kk]', &
                             & copy='[raw_pairs, num_raw]', copyin='[z_bound]')
@@ -263,8 +263,8 @@ contains
             gp_patch_id = ib_markers%sf(i, j, k)
 
             ! search in a cube around the BG for Ib markers belonging to another patch
-            neighbor_search: do ii = i - 1, i + 1
-                do jj = j - 1, j + 1
+            neighbor_search: do ii = i - 2, i + 2
+                do jj = j - 2, j + 2
                     do kk = k - z_bound, k + z_bound
                         neighbor_patch_id = ib_markers%sf(ii, jj, kk)
 
@@ -323,6 +323,9 @@ contains
             ! and if it is not, append it to the list of pairs
             if (.not. already_found) then
                 num_considered_collisions = num_considered_collisions + 1
+                @:PROHIBIT(num_considered_collisions > size(num_considered_collisions, 1) , &
+                           & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
+
                 collision_lookup(num_considered_collisions, 1) = decoded_pairs(1)
                 collision_lookup(num_considered_collisions, 2) = decoded_pairs(2)
                 collision_lookup(num_considered_collisions, 3) = raw_pairs(pair_idx, 1)
