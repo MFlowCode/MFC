@@ -47,8 +47,8 @@ module m_amr
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
-    public :: amr_slots, amr_cons_st, amr_loc_of, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
-        & s_amr_reconcile_slots, s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
+    public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, &
+        & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
         & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
         & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, f_l0_slot
 
@@ -72,9 +72,9 @@ module m_amr
         real(wp), allocatable :: y_cb(:), y_cc(:), dy(:)
         real(wp), allocatable :: z_cb(:), z_cc(:), dz(:)
         !> conserved state lives in the FLAT STORE amr_cons_st, indexed by this slot's dense local index amr_loc_of - not here.
-        type(scalar_field), allocatable :: q_cons_stor(:)  !< stage storage (fine advance, same bounds as the store's block box)
-        type(scalar_field), allocatable :: q_prim(:)       !< primitive stage (fine advance, same bounds)
-        type(scalar_field), allocatable :: rhs(:)          !< RHS (fine interior only: 0:m, 0:n, 0:p)
+        !> SSP-RK stage storage lives in the FLAT STORE amr_stor_st, indexed by this slot's amr_loc_of.
+        type(scalar_field), allocatable :: q_prim(:)  !< primitive stage (fine advance, same bounds)
+        type(scalar_field), allocatable :: rhs(:)     !< RHS (fine interior only: 0:m, 0:n, 0:p)
         !> non-polytropic QBMM quadrature side-state on the block (nnode x nb per cell). pb/mv evolve cell-locally (their rhs reads
         !! only the local cell + the block's own moment fluxes), so the fine treatment is prolong -> advance -> restrict with no
         !! reflux; ghosts feed the widened-idwint conversions and are prolonged piecewise-constant (CHyQMOM realizability, like the
@@ -106,8 +106,8 @@ module m_amr
     !! replacing a per-slot vector of independently allocated scalar_fields: the layout AMReX's MultiFab uses, and the prerequisite
     !! for running ONE kernel over every live block instead of one kernel per block. Every slot's arrays carry the same mbuf
     !! extents, so a single array serves them all. The ghost pair exists only under amr_subcycle. Sized by s_amr_st_reserve.
-    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cons_st, amr_gst_a, amr_gst_b
-    $:GPU_DECLARE(create='[amr_cons_st, amr_gst_a, amr_gst_b]')
+    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cons_st, amr_stor_st, amr_gst_a, amr_gst_b
+    $:GPU_DECLARE(create='[amr_cons_st, amr_stor_st, amr_gst_a, amr_gst_b]')
     integer :: amr_st_cap = 0  !< local slots the store is sized for; grows geometrically and never shrinks
 
     !> COPY BRIDGE to the shared solver. s_compute_rhs, s_ibm_correct_state, s_pressure_relaxation_procedure and
@@ -1154,7 +1154,7 @@ contains
         ! runtime (pull_host=T) reads amr_cg on the device in the C/F ghost-fill, so skip the device->host copy.
         if (amr_block_owner(pblk) == proc_rank) then
             ! parent owner: local device copy when it also owns the block, otherwise pack and send.
-            call s_amr_gather_from_parent_field_st(pblk, amr_loc_of(pblk), .not. pull_host)
+            call s_amr_gather_from_parent_field_cons(pblk, amr_loc_of(pblk), .not. pull_host)
         else if (amr_rank_owns_block) then
             ! block owner only: receive. Deliberately does NOT take the parent field - amr_slots(pblk) is unallocated here.
             call s_amr_recv_parent_patch(pblk, .not. pull_host)
@@ -1168,16 +1168,11 @@ contains
     !! ghost-lerp sources. np=1 = a local copy on the owner (which also owns the parent); np>=2 P2P (parent owner -> block owner) is
     !! future work. Two sources, one body: the parent's conserved state lives in the flat store (`_st`, keyed by its slot), its
     !! SSP-RK stage backup q_cons_stor is still a per-slot scalar_field array (`_sf`).
-    #:for GSFX in ['st', 'sf']
+    #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
         impure subroutine s_amr_gather_from_parent_field_${GSFX}$(pblk, qp, to_host)
 
-            integer, intent(in) :: pblk
-
-            #:if GSFX == 'st'
-                integer, intent(in) :: qp  !< parent's flat-store slot
-            #:else
-                type(scalar_field), dimension(sys_size), intent(in) :: qp
-            #:endif
+            integer, intent(in)   :: pblk
+            integer, intent(in)   :: qp       !< parent's flat-store slot
             logical, intent(in)   :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
             integer               :: w1, w2, w3, powner, cowner, boxsz, ierr
             real(wp), allocatable :: xbuf(:)
@@ -1251,16 +1246,11 @@ contains
 
     !> DEVICE pack of the parent's fine patch into a flat buffer. Same index map as s_amr_copy_parent_patch, writing the send buffer
     !! instead of amr_cg, so the two sides of the P2P gather cannot drift apart.
-    #:for GSFX in ['st', 'sf']
-        #:set QP = (lambda ix: 'amr_cons_st(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)') if GSFX == 'st' else (lambda ix: 'qp(' &
-                    & + ix + ')%sf(g1 + o1, g2 + o2, g3 + o3)')
+    #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
+        #:set QP = lambda ix: GARR + '(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)'
         impure subroutine s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, buf)
 
-            #:if GSFX == 'st'
-                integer, intent(in) :: qp
-            #:else
-                type(scalar_field), dimension(sys_size), intent(in) :: qp
-            #:endif
+            integer, intent(in)                 :: qp  !< parent's flat-store slot
             integer, intent(in)                 :: w1, w2, w3
             real(wp), intent(inout), contiguous :: buf(:)
             integer                             :: i, g1, g2, g3, o1, o2, o3, n1, n2, n3
@@ -1314,16 +1304,11 @@ contains
     !> Device kernel for s_amr_gather_from_parent: copy the parent block's fine patch into amr_cg over [amr_cpat_off : + w]. amr_cg
     !! is then synced to host for host consumers (init self-test's restrict-prolong check). Two sources, one body - see
     !! s_amr_gather_from_parent_field_st/_sf.
-    #:for GSFX in ['st', 'sf']
-        #:set QP = (lambda ix: 'amr_cons_st(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)') if GSFX == 'st' else (lambda ix: 'qp(' &
-                    & + ix + ')%sf(g1 + o1, g2 + o2, g3 + o3)')
+    #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
+        #:set QP = lambda ix: GARR + '(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)'
         impure subroutine s_amr_copy_parent_patch_${GSFX}$(qp, w1, w2, w3, to_host)
 
-            #:if GSFX == 'st'
-                integer, intent(in) :: qp
-            #:else
-                type(scalar_field), dimension(sys_size), intent(in) :: qp
-            #:endif
+            integer, intent(in) :: qp  !< parent's flat-store slot
             integer, intent(in) :: w1, w2, w3
             !> .true. only for the init/regrid HOST consumers (whole-block host prolong + restrict-prolong self-test). The runtime
             !! C/F ghost-fill reads amr_cg on the DEVICE (filled by the kernel below), so no device->host copy is needed.
@@ -4243,19 +4228,18 @@ contains
 
     !> Device copy q_src -> q_dst over [b1:e1, b2:e2, b3:e3] for all sys_size fields (RK step-entry backup). TWIN s_amr_backup_pbmv
     !! (q<->pb/mv): pb/mv sibling of this step-entry backup; keep lockstep.
-    impure subroutine s_amr_copy_fine_fields(loc, q_dst, b1, e1, b2, e2, b3, e3)
+    impure subroutine s_amr_copy_fine_fields(loc, b1, e1, b2, e2, b3, e3)
 
-        integer, intent(in)                                    :: loc  !< flat-store slot of the source block
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_dst
-        integer, intent(in)                                    :: b1, e1, b2, e2, b3, e3
-        integer                                                :: i, fi, fj, fk
+        integer, intent(in) :: loc  !< flat-store slot: source (amr_cons_st) and destination (amr_stor_st) are the same block
+        integer, intent(in) :: b1, e1, b2, e2, b3, e3
+        integer             :: i, fi, fj, fk
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do fk = b3, e3
                 do fj = b2, e2
                     do fi = b1, e1
-                        q_dst(i)%sf(fi, fj, fk) = amr_cons_st(fi, fj, fk, i, loc)
+                        amr_stor_st(fi, fj, fk, i, loc) = amr_cons_st(fi, fj, fk, i, loc)
                     end do
                 end do
             end do
@@ -4267,10 +4251,10 @@ contains
     !> Device RK stage update over the fine interior: q = (c1*q + c2*q_stor + c3*dt_in*rhs)/c4 (compute in wp, store stp). Mirrors
     !! the coarse non-IGR rk_coef form in s_tvd_rk. TWIN s_amr_fine_rk_update_pbmv + s_tvd_rk (m_time_steppers): same SSP-RK stage
     !! combination; keep all three lockstep.
-    impure subroutine s_amr_fine_rk_update(loc, q_stor, q_rhs, c1, c2, c3, c4, dt_in)
+    impure subroutine s_amr_fine_rk_update(loc, q_rhs, c1, c2, c3, c4, dt_in)
 
         integer, intent(in)                                 :: loc  !< flat-store slot of the updated block
-        type(scalar_field), dimension(sys_size), intent(in) :: q_stor, q_rhs
+        type(scalar_field), dimension(sys_size), intent(in) :: q_rhs
         real(wp), intent(in)                                :: c1, c2, c3, c4, dt_in
         integer                                             :: i, fi, fj, fk, fm, fn, fp
 
@@ -4280,8 +4264,8 @@ contains
             do fk = 0, fp
                 do fj = 0, fn
                     do fi = 0, fm
-                        amr_cons_st(fi, fj, fk, i, loc) = (c1*real(amr_cons_st(fi, fj, fk, i, loc), &
-                                    & wp) + c2*real(q_stor(i)%sf(fi, fj, fk), wp) + c3*dt_in*real(q_rhs(i)%sf(fi, fj, fk), wp))/c4
+                        amr_cons_st(fi, fj, fk, i, loc) = (c1*real(amr_cons_st(fi, fj, fk, i, loc), wp) + c2*real(amr_stor_st(fi, &
+                                    & fj, fk, i, loc), wp) + c3*dt_in*real(q_rhs(i)%sf(fi, fj, fk), wp))/c4
                     end do
                 end do
             end do
@@ -4744,7 +4728,7 @@ contains
 
         ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
-            call s_amr_copy_fine_fields(amr_loc_of(amr_cur), amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%idwbuff(1)%beg, &
+            call s_amr_copy_fine_fields(amr_loc_of(amr_cur), amr_slots(amr_cur)%idwbuff(1)%beg, &
                                         & amr_slots(amr_cur)%idwbuff(1)%end, amr_slots(amr_cur)%idwbuff(2)%beg, &
                                         & amr_slots(amr_cur)%idwbuff(2)%end, amr_slots(amr_cur)%idwbuff(3)%beg, &
                                         & amr_slots(amr_cur)%idwbuff(3)%end)
@@ -4787,8 +4771,8 @@ contains
         call s_phase_tic(PH_RK)
         ! RK stage update (device kernel; mirror of the coarse form - under IGR the rhs already embeds dt, matching the coarse igr
         ! update, so the dt factor is 1)
-        call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
-                                  & coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
+        call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_slots(amr_cur)%rhs, coefs(1), coefs(2), coefs(3), coefs(4), &
+                                  & merge(1._wp, dt, igr))
         if (qbmm .and. .not. polytropic) call s_amr_fine_rk_update_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
             & amr_slots(amr_cur)%pb_stor%sf, amr_slots(amr_cur)%mv_stor%sf, amr_rhs_pb_f, amr_rhs_mv_f, coefs(1), coefs(2), &
             & coefs(3), coefs(4), dt)
@@ -4939,8 +4923,8 @@ contains
 
         ! substep-entry backup for the SSP-RK combination (device copy, interior only)
         if (s == 1) then
-            call s_amr_copy_fine_fields(amr_loc_of(amr_cur), amr_slots(amr_cur)%q_cons_stor, 0, amr_slots(amr_cur)%m, 0, &
-                                        & amr_slots(amr_cur)%n, 0, amr_slots(amr_cur)%p)
+            call s_amr_copy_fine_fields(amr_loc_of(amr_cur), 0, amr_slots(amr_cur)%m, 0, amr_slots(amr_cur)%n, 0, &
+                                        & amr_slots(amr_cur)%p)
             if (qbmm .and. .not. polytropic) call s_amr_backup_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
                 & amr_slots(amr_cur)%pb_stor%sf, amr_slots(amr_cur)%mv_stor%sf)
         end if
@@ -4982,8 +4966,8 @@ contains
         amr_in_fine_advance = .false.
 
         ! RK stage update at the FINE time step (device kernel)
-        call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(s, 1), &
-                                  & coefs(s, 2), coefs(s, 3), coefs(s, 4), dt_sub)
+        call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_slots(amr_cur)%rhs, coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, &
+                                  & 4), dt_sub)
         if (qbmm .and. .not. polytropic) then
             call s_amr_fine_rk_update_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, amr_slots(amr_cur)%pb_stor%sf, &
                                            & amr_slots(amr_cur)%mv_stor%sf, amr_rhs_pb_f, amr_rhs_mv_f, coefs(s, 1), coefs(s, 2), &
@@ -5041,13 +5025,13 @@ contains
             ! unallocated there. Co-located (np=1, or parent and child on one rank) takes the local device-copy path unchanged.
             ! Both sends carry tag amr_cur; MPI non-overtaking on a fixed (source, tag, comm) keeps t_a ahead of t_b.
             if (amr_block_owner(pblk) == proc_rank) then
-                call s_amr_gather_from_parent_field_sf(pblk, amr_slots(pblk)%q_cons_stor, .false.)  ! parent @ t_a (device C/F fill)
+                call s_amr_gather_from_parent_field_stor(pblk, amr_loc_of(pblk), .false.)  ! parent @ t_a (device C/F fill)
             else
                 call s_amr_recv_parent_patch(pblk, .false.)
             end if
             if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gsta(amr_cg, amr_loc_of(kc))
             if (amr_block_owner(pblk) == proc_rank) then
-                call s_amr_gather_from_parent_field_st(pblk, amr_loc_of(pblk), .false.)  ! parent @ t_b (device C/F fill)
+                call s_amr_gather_from_parent_field_cons(pblk, amr_loc_of(pblk), .false.)  ! parent @ t_b (device C/F fill)
             else
                 call s_amr_recv_parent_patch(pblk, .false.)
             end if
@@ -5309,7 +5293,7 @@ contains
 
         integer, intent(in)    :: nloc
         integer                :: oldcap, newcap, i
-        logical                :: want(3)
+        logical                :: want(4)
         real(stp), allocatable :: tmp(:,:,:,:,:)
 
         ! CONTRACT: the store is DEVICE-authoritative at every call, because growth preserves the old contents by pulling
@@ -5320,9 +5304,9 @@ contains
         if (nloc <= amr_st_cap) return
         oldcap = amr_st_cap
         newcap = max(2*oldcap, nloc)
-        want = [.true., amr_subcycle, amr_subcycle]
+        want = [.true., .true., amr_subcycle, amr_subcycle]
 
-        #:for ST, IDX in [('amr_cons_st', 1), ('amr_gst_a', 2), ('amr_gst_b', 3)]
+        #:for ST, IDX in [('amr_cons_st', 1), ('amr_stor_st', 2), ('amr_gst_a', 3), ('amr_gst_b', 4)]
             if (want(${IDX}$)) then
                 if (oldcap > 0) then
                     $:GPU_UPDATE(host='[' + ST + ']')
@@ -5387,7 +5371,7 @@ contains
         integer :: i
 
         if (allocated(amr_loc_of)) deallocate (amr_loc_of, amr_loc_free)
-        #:for ST in ['amr_cons_st', 'amr_gst_a', 'amr_gst_b']
+        #:for ST in ['amr_cons_st', 'amr_stor_st', 'amr_gst_a', 'amr_gst_b']
             if (allocated(${ST}$)) then
                 @:DEALLOCATE(${ST}$)
             end if
@@ -5422,11 +5406,9 @@ contains
         allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
         if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), amr_slots(islot)%dy(0:max_f2))
         if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), amr_slots(islot)%dz(0:max_f3))
-        @:ALLOCATE(amr_slots(islot)%q_cons_stor(1:sys_size))
         @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
         @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
         do i = 1, sys_size
-            @:ALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
             @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
             ! rhs is ghost-inclusive (mbuf); igr widens to -1:+1 per dim including collapsed ones (coarse rhs_vf is -1:m+1 etc.)
             if (igr) then
@@ -5437,7 +5419,6 @@ contains
             end if
             @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
             @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
-            @:ACC_SETUP_SFs(amr_slots(islot)%q_cons_stor(i))
         end do
         if (qbmm .and. .not. polytropic) then
             #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
@@ -5474,14 +5455,11 @@ contains
         ! address is later reused (e.g. by Gs_rs at restart), tripping a Cray "Error placing / already present" present-table crash
         ! (gpu-acc).
         do i = 1, sys_size
-            @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_cons_stor(i))
-            @:DEALLOCATE(amr_slots(islot)%q_cons_stor(i)%sf)
             @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_prim(i))
             @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
             @:ACC_TEARDOWN_SFs(amr_slots(islot)%rhs(i))
             @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
         end do
-        @:DEALLOCATE(amr_slots(islot)%q_cons_stor)
         @:DEALLOCATE(amr_slots(islot)%q_prim)
         @:DEALLOCATE(amr_slots(islot)%rhs)
         if (qbmm .and. .not. polytropic) then
