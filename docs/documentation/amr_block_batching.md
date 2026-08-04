@@ -1028,6 +1028,69 @@ Stop after any phase whose measured gain does not survive its own run-to-run spr
 - Phase 1 changes any golden. This is a storage-location change with identical arithmetic; a diff means
   the model is wrong, not that the goldens need regenerating.
 
+### SETTLED 2026-08-03: concurrency (option C) is DEAD; fusion (option B) is MEASURED
+
+Both settled on one harness, `amr-bench/attach/serial/conc.f90` (wall clock via `omp_get_wtime`;
+`NBLK` blocks x `NREG=15` dependent regions x `NADV=30`, deep-allocatable dummies = the MFC interface).
+
+**Option C - concurrent block advances - produces ZERO overlap and is slower.** Each block was given
+its OWN `a/b/c/d` arrays AND its own `depend` token, so the `NBLK` chains were genuinely independent:
+the best possible case, with nothing to serialize on.
+
+| NBLK | serial | conc | |
+|---|---|---|---|
+| 1 | 0.059 s | 0.072 s | 1.23x SLOWER |
+| 4 | 0.235 | 0.262 | 1.11x slower |
+| 16 | 0.948 | 1.031 | 1.09x slower |
+| 64 | 3.91 | 4.13 | 1.06x slower |
+
+Both scale perfectly linearly in `NBLK` - no hint of overlap - and a `rocprofv3` trace of the `conc`
+variant confirms it directly: **7201 kernels, 0.0% overlapped**. `nowait` plus independent per-block
+`depend` tokens produce no device-side concurrency at all on this backend (amdflang/AFAR, gfx90a).
+
+**This is NOT a repeat of the earlier `nowait` result.** `s.f90`'s `k_nowait` put `depend(inout: d)` on
+ONE shared token, serializing every region into a single chain; it asked whether a SERIAL chain
+pipelines. The question of whether SEPARATE chains overlap was open until now. It is now closed.
+
+Corollary: the ~17 module-scope `GPU_DECLARE`'d families in `m_rhs` that would have to be replicated
+per stream are MOOT - concurrency fails before sharing ever becomes the constraint. **Do not re-attempt
+concurrency, streams, or async task graphs.** With this, TEN mechanisms for reducing or hiding
+per-region cost have been measured and all ten failed.
+
+**Option B - fewer regions - is the whole game, and wall time is LINEAR in region count.** Same
+arithmetic in every variant (`result=21.00`), only the region count differs:
+
+| regions/advance | wall | vs 15 regions | s per region |
+|---|---|---|---|
+| 15 (= serial) | 0.945-0.955 s | 1.00x | 0.063 |
+| 5 | 0.313-0.429 | 3.0x | 0.074 |
+| 3 | 0.188-0.190 | 5.0x | 0.063 |
+| 1 | 0.064 | 14.8x | 0.064 |
+
+`wall ~ 0.064 s x regions`, flat to +-15% across a 15x range (the 5-region point is the one noisy
+sample: 0.313 and 0.429 on two runs). `FUSE=1` reproduces `serial` (0.955 vs 0.945), which is the
+harness checking itself.
+
+**Re-pricing option B against the real profile.** The harness is 97.5% idle with ~6 us kernels; the real
+AMR run is 72% idle with 91 us average kernels, so fusion helps proportionally less there. Using the
+real split - the `s_compute_rhs` tree is 55.5% of launches at ~14.7 regions per block-stage - a 3x
+region reduction inside it removes ~37% of all operations, i.e. **~26% of wall**. That is roughly 2.5x
+the ENTIRE remaining step-2 batching programme (~10% across three 2b-sized field migrations), and it
+also benefits uniform runs, which AMR-local batching does not.
+
+**What this means for the plan.** Every surviving lever is the same lever: FEWER REGIONS. Fusion (B),
+batching (A), and bigger blocks (`amr_max_grid_size`, shipped, ~20x) are three applications of it.
+Nothing that reduces per-region COST works, and nothing that OVERLAPS regions works. Rank by measured
+value: B ~26% > A-remainder ~10% > C = 0. The concrete next target is `m_weno` + `m_riemann_state` -
+3216 launches each, ~4.2 regions per block-stage apiece, adjacent in the pipeline with a direct
+producer/consumer dependency.
+
+Method notes worth keeping: `cpu_time` is WRONG for this measurement (it sums CPU across threads and
+made `conc` look merely 2-16% slow when the wall-clock gap was different); use `omp_get_wtime`.
+`rocprofv3` needs `--output-format csv` or it writes only a `.db`. And the pre-existing `k_fused` in
+`s.f90` is NOT arithmetically equivalent to its `k_base` (`result=12` vs `30`), so its timings cannot
+be used to price fusion - `conc.f90`'s variant was written to be equivalent and checks it.
+
 ### Remaining increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
