@@ -4409,34 +4409,78 @@ contains
     !! - a block's seam GHOST lies outside its own interior, and the two reads are from different slots than the two writes - so
     !! neither direction can observe the other's store. Both blocks are now addressed by their flat-store slot, so batching across
     !! PAIRS is no longer structurally blocked (a runtime slot index into the module store is a plain subscript, not the null deref
-    !! the per-slot scalar_field layout forced). Index order matches s_amr_fine_slice.
-    impure subroutine s_amr_fine_seam_exchange(lx, ly, d, xhi, ndep, fm)
+    !! the per-slot scalar_field layout forced). Index order matches s_amr_fine_slice. BATCHED over pairs: one kernel for every
+    !! same-rank seam pair on this rank, instead of one per pair (measured 546 of the 7134 AMR-local launches per run). Both blocks
+    !! of a pair are addressed by their flat-store slot, so a runtime pair index is now a plain subscript - the per-slot
+    !! scalar_field layout is what used to make this a null deref. The per-pair seam dim varies, so the index decode is a runtime
+    !! select rather than the Fypp per-dim unroll the single-pair version used. Threads are launched over the MAX pair extent and
+    !! masked, rather than prefix-summed: pair sizes are equal under uniform tiling, so the waste is ~0 and it avoids an O(npair)
+    !! per-thread offset search.
+    impure subroutine s_amr_fine_seam_exchange(npair, plx, ply, pd, pxhi, pfm, ndep)
 
-        integer, intent(in) :: lx, ly  !< flat-store slots of the two blocks
-        integer, intent(in) :: d, xhi, ndep, fm(3)
-        integer             :: i, a, b, t, na, nb
+        integer, intent(in) :: npair
+        integer, intent(in) :: plx(:), ply(:), pd(:), pxhi(:), pfm(:,:)  !< per-pair: slots, seam dim, high extent, fine extents
+        integer, intent(in) :: ndep
+        integer             :: i, a, b, t, na, nb, pr, g, gmax, lx, ly, d, xhi, cnt
+        integer             :: ix1, ix2, ix3, iy1, iy2, iy3
 
-        #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
-            #:set XI = {1: 'xhi - ndep + 1 + t, a, b', 2: 'a, xhi - ndep + 1 + t, b', 3: 'a, b, xhi - ndep + 1 + t'}[D]
-            #:set YG = {1: '-ndep + t, a, b', 2: 'a, -ndep + t, b', 3: 'a, b, -ndep + t'}[D]
-            #:set YI = {1: 't, a, b', 2: 'a, t, b', 3: 'a, b, t'}[D]
-            #:set XG = {1: 'xhi + 1 + t, a, b', 2: 'a, xhi + 1 + t, b', 3: 'a, b, xhi + 1 + t'}[D]
-            if (d == ${D}$) then
-                na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1  ! scalars, not fm(..), inside the kernel - see s_amr_fine_slice
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do t = 0, ndep - 1
-                        do b = 0, nb - 1
-                            do a = 0, na - 1
-                                amr_cons_st(${YG}$, i, ly) = amr_cons_st(${XI}$, i, lx)
-                                amr_cons_st(${XG}$, i, lx) = amr_cons_st(${YI}$, i, ly)
-                            end do
-                        end do
-                    end do
+        ! max thread extent over the pairs on this rank (transverse product x seam depth)
+
+        gmax = 0
+        do pr = 1, npair
+            select case (pd(pr))
+            case (1); na = pfm(2, pr) + 1; nb = pfm(3, pr) + 1
+            case (2); na = pfm(1, pr) + 1; nb = pfm(3, pr) + 1
+            case default; na = pfm(1, pr) + 1; nb = pfm(2, pr) + 1
+            end select
+            gmax = max(gmax, na*nb*ndep)
+        end do
+
+        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[plx, ply, pd, pxhi, pfm]', private='[lx, ly, d, xhi, na, nb, cnt, a, b, t, ix1, &
+                            & ix2, ix3, iy1, iy2, iy3]')
+        do pr = 1, npair
+            do i = 1, sys_size
+                do g = 0, gmax - 1
+                    d = pd(pr)
+                    if (d == 1) then
+                        na = pfm(2, pr) + 1; nb = pfm(3, pr) + 1
+                    else if (d == 2) then
+                        na = pfm(1, pr) + 1; nb = pfm(3, pr) + 1
+                    else
+                        na = pfm(1, pr) + 1; nb = pfm(2, pr) + 1
+                    end if
+                    cnt = na*nb*ndep
+                    if (g < cnt) then
+                        lx = plx(pr); ly = ply(pr); xhi = pxhi(pr)
+                        a = mod(g, na); b = mod(g/na, nb); t = g/(na*nb)
+                        ! (a, b) are the transverse indices, t the depth into the seam; place them per the pair's seam dim
+                        if (d == 1) then
+                            ix1 = xhi - ndep + 1 + t; ix2 = a; ix3 = b
+                            iy1 = -ndep + t; iy2 = a; iy3 = b
+                        else if (d == 2) then
+                            ix1 = a; ix2 = xhi - ndep + 1 + t; ix3 = b
+                            iy1 = a; iy2 = -ndep + t; iy3 = b
+                        else
+                            ix1 = a; ix2 = b; ix3 = xhi - ndep + 1 + t
+                            iy1 = a; iy2 = b; iy3 = -ndep + t
+                        end if
+                        ! xb high interior -> yb low ghost, then yb low interior -> xb high ghost. All four slabs are disjoint (a
+                        ! block's seam ghost lies outside its own interior, and the reads are from different slots than the
+                        ! writes), so fusing the two directions cannot let one observe the other's store.
+                        amr_cons_st(iy1, iy2, iy3, i, ly) = amr_cons_st(ix1, ix2, ix3, i, lx)
+                        if (d == 1) then
+                            ix1 = xhi + 1 + t; iy1 = t
+                        else if (d == 2) then
+                            ix2 = xhi + 1 + t; iy2 = t
+                        else
+                            ix3 = xhi + 1 + t; iy3 = t
+                        end if
+                        amr_cons_st(ix1, ix2, ix3, i, lx) = amr_cons_st(iy1, iy2, iy3, i, ly)
+                    end if
                 end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        #:endfor
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_fine_seam_exchange
 
@@ -4540,6 +4584,9 @@ contains
         !! seams: it runs inside one of the parent's substeps, when the level-1 blocks are mid-substep and must not be touched.
         integer, intent(in) :: lev_only
         integer             :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul, idx
+        !> same-rank pairs are collected here and exchanged in ONE kernel; cross-rank pairs stay serial (each is an MPI_SENDRECV)
+        integer              :: nsame
+        integer, allocatable :: plx(:), ply(:), pd(:), pxhi(:), pfm(:,:)
 
         if (.not. amr .and. l0_ntile == 0) return
         if (amr_num_blocks < 2) return
@@ -4551,6 +4598,9 @@ contains
         ! device<->host of the fine state is done per-seam inside s_amr_fine_slice, moving only the buff_size-deep near-seam slab
         ! each
         ! pack/unpack touches (not the whole block) - a large PCIe saving since this runs per stage (6x per fine step)
+        allocate (plx(amr_num_seam_pairs), ply(amr_num_seam_pairs), pd(amr_num_seam_pairs), pxhi(amr_num_seam_pairs), pfm(3, &
+                  & amr_num_seam_pairs))
+        nsame = 0
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
             if (lev_only > 0 .and. amr_block_level(xb) /= lev_only) cycle  ! pairs are same-level, so xb's level is the pair's
@@ -4574,8 +4624,10 @@ contains
             if (d /= 2 .and. n_glb > 0) tsz = tsz*(xm(2) + 1)
             if (d /= 3 .and. p_glb > 0) tsz = tsz*(xm(3) + 1)
             cnt = sys_size*buff_size*tsz
-            if (rX == rY) then  ! same rank owns both: exchange both directions in ONE device kernel, no host buffer
-                call s_amr_fine_seam_exchange(amr_loc_of(xb), amr_loc_of(yb), d, xm(d), buff_size, xm)
+            if (rX == rY) then  ! same rank owns both: defer to the ONE batched kernel below (no host buffer, no per-pair launch)
+                nsame = nsame + 1
+                plx(nsame) = amr_loc_of(xb); ply(nsame) = amr_loc_of(yb)
+                pd(nsame) = d; pxhi(nsame) = xm(d); pfm(:,nsame) = xm
             else if (proc_rank == rX) then
                 ! send xb high interior
                 call s_amr_fine_slice(xb, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
@@ -4596,6 +4648,13 @@ contains
                 call s_amr_fine_slice(yb, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)
             end if
         end do
+        ! Every same-rank pair in ONE launch. Two things make this safe. Fusing ACROSS pairs: the four slabs of a pair are disjoint
+        ! and no pair writes another's source. DEFERRING past the MPI pairs above (a reordering the per-pair loop did not do):
+        ! every seam operation reads only INTERIOR cells and writes only GHOST cells - the packs read [xhi-buff+1:xhi] / [0:buff-1]
+        ! and the unpacks write [xhi+1:xhi+buff] / [-buff:-1] - so no seam operation can observe another's write, in either path.
+        if (nsame > 0) call s_amr_fine_seam_exchange(nsame, plx(1:nsame), ply(1:nsame), pd(1:nsame), pxhi(1:nsame), pfm(:, &
+            & 1:nsame), buff_size)
+        deallocate (plx, ply, pd, pxhi, pfm)
         call s_amr_select_slot(1)
 
     end subroutine s_amr_fine_fine_halo
