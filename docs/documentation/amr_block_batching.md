@@ -1214,6 +1214,55 @@ GPU - misread twice as a real memory ceiling before the input file was checked. 
 uses `mktemp -d` per arm for exactly this reason. Multi-rank profiling also needs a per-rank `-d`
 directory (a wrapper keyed on `$SLURM_PROCID`), or the 8 ranks collide on one output prefix.
 
+### RETRACTED 2026-08-04: "fuse weno+riemann_state, ~26%" IS WRONG. Fusion pays only for LIGHT kernels.
+
+**The MWE that produced the linear-in-regions law was invalid in two ways, both load-bearing.**
+
+1. **Problem size.** It used `NS=5 x nxr=64` = **320 elements per kernel**. A real region spans a whole
+   fine block: 72^3 x sys_size ~= **2.2M elements**. 320 elements cannot fill ONE compute unit of a
+   110-CU GCD, so occupancy - the exact effect being tested - was structurally unable to appear.
+2. **Compile flags.** It used bare `-O2 -fopenmp`. MFC builds with `-O3 -march=native` plus
+   `-fopenmp-assume-threads-oversubscription`, `-fopenmp-assume-teams-oversubscription` and
+   `-fopenmp-assume-no-nested-parallelism` - precisely the flags that steer team scheduling.
+
+**Re-measured at realistic size with MFC's exact flags** (`amr-bench/attach/serial/fuse.f90`: 78 blocks
+x 72^3 x sys_size 6, NREG=15, ~68 MiB and ~55 us per region - the same regime as MFC's 27-91 us
+kernels). Total arithmetic is held IDENTICAL on both sides, so the only variable is region count:
+
+| live registers | split (15 regions) | f=3 (5) | f=5 (3) | f=15 (1) | **fusion gain** |
+|---|---|---|---|---|---|
+| 1 | 2.413 | 1.269 | 0.714 | 0.517 | **5.81x** |
+| 8 | 4.831 | 4.088 | 3.234 | 2.417 | **1.89x** |
+| 32 | 8.145 | 11.403 | 10.208 | 7.673 | **0.92x - a LOSS** |
+
+**Register pressure kills fusion.** The earlier toy said fusion still gave 8x at 48 live accumulators;
+at real size it goes NEGATIVE by 32. The first sweep was reassuring me about the one risk I had
+identified as load-bearing, and it was an artifact.
+
+**CONSEQUENCE: DO NOT FUSE `weno` + `riemann_state` (or any arithmetic-heavy pair).** WENO holds a
+5-point stencil x sys_size; the HLLC solve holds L/R states plus wave speeds - easily 30-60 live
+doubles, i.e. the wgt=32 column, where fusing LOSES. That refactor would have been a net slowdown
+discovered only after touching numerics-adjacent shared solver code.
+
+**The program splits in two:**
+
+- **LIGHT kernels (data movement, copies, reshapes) - FUSE.** Near-zero live set, the 5.8x regime.
+  `s_finalize_riemann_solver` (7344 launches, pure copies) is the type case and is now fused 6 -> 3
+  regions per block-stage. `weno::pack_weno_input_arr` (3672, marshalling) is the next candidate.
+- **HEAVY kernels (`weno` 3672, `riemann_solver_hllc` 3672) - DO NOT FUSE.** They are where the launches
+  are, and they are exactly where fusion costs more than it saves.
+
+**Revised prize.** The realistically fusable set is the light kernels, ~25% of launches, of which fusion
+can remove perhaps half -> **~11% of wall, NOT the 46% (tree->1) or 74% (full program) projected
+earlier.** Those projections assumed every region fuses equally; they do not. The 6.6x per-region
+overhead is real, but kernel fusion cannot recover most of it - only reducing the NUMBER OF BLOCK
+ADVANCES or the per-region map traffic can, and both of those are already refuted or exhausted.
+
+**This also puts a caveat on the concurrency disproof above.** That measurement (0.0% overlap) used the
+SAME invalid harness - 320-element kernels, wrong flags. The conclusion may well stand (nothing in the
+result looked marginal), but it has NOT been re-verified at realistic size and should be before anyone
+relies on it. Re-running it is cheap: add a `nowait`/per-block-token variant to `fuse.f90`.
+
 ### Remaining increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
