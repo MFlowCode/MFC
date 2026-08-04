@@ -8,6 +8,7 @@
 !> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
 
+    use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_REGRID
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
@@ -71,6 +72,7 @@ module m_start_up
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
+    real(wp)                                      :: ph_wall_total = 0._wp  !< TEMP: accumulated step-loop wall for the phase budget
 
 contains
 
@@ -579,7 +581,9 @@ contains
         real(wp), intent(inout) :: time_avg
         integer                 :: i, eta_hh, eta_mm, eta_ss
         real(wp)                :: eta_sec
+        integer(8)              :: ph_c0, ph_c1, ph_rate
 
+        call system_clock(ph_c0)
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
@@ -657,9 +661,14 @@ contains
                 ! BOTH tags off L0 and prolongs each new block's seed from it, so a stale L0 moves the boxes and seeds them wrong.
                 ! Same just-in-time refresh s_save_data does before it consumes L0; no-op without tiles.
                 if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
+                call s_phase_tic(PH_REGRID)
                 call s_amr_regrid(q_cons_ts(1)%vf)
+                call s_phase_toc(PH_REGRID)
             end if
         end if
+
+        call system_clock(ph_c1, ph_rate)
+        ph_wall_total = ph_wall_total + real(ph_c1 - ph_c0, wp)/real(ph_rate, wp)
 
     end subroutine s_perform_time_step
 
@@ -1158,6 +1167,10 @@ contains
         call s_finalize_amr_registers()
         call s_finalize_amr_module()
         call s_l0_tiles_finalize()  ! L0-as-blocks spike; no-op otherwise
+        block
+            use m_phase_timing, only: s_phase_report
+            call s_phase_report(ph_wall_total)
+        end block
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
         call s_finalize_derived_variables_module()

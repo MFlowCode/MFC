@@ -8,6 +8,7 @@
 !> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
 
+    use m_phase_timing
     use m_derived_types
     use m_global_parameters
     use m_rhs
@@ -502,8 +503,10 @@ contains
             ! (s_populate_variables_buffers), captures the c/f-face creg in the fixed L0 frame, and produces the L0 rhs the fine
             ! reflux corrects; the cross-rank copy-back then routes that corrected rhs back to the tile compute-owners.
             if (l0_ntile == 0 .or. amr) then
+                call s_phase_tic(PH_COARSE)
                 call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                    & t_step, s)
+                call s_phase_toc(PH_COARSE)
             end if
 
             ! Coexist: the tiles carry their OWN rhs, so the L0 rhs above is not consumed by the coarse RK - repurpose it as the
@@ -559,14 +562,18 @@ contains
                 ! valid coarse CONS ghosts for every block's ghost prolongation, ONCE for the whole loop (ALL ranks call: pairwise
                 ! halo). q_cons_ts(1)%vf is read by the fills below and never written by them, so one exchange serves every block;
                 ! doing it inside s_amr_fine_stage_fill repeated it amr_num_blocks times per stage.
+                call s_phase_tic(PH_HALO)
                 if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
+                call s_phase_toc(PH_HALO)
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                     call s_amr_fine_stage_fill(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 end do
                 ! Phase 2 - block-to-block fine-fine halo: overwrite adjacent-sub-block seam ghosts with neighbour fine interior.
+                call s_phase_tic(PH_SEAM)
                 call s_amr_fine_fine_halo(0)  ! all levels: the lock-step driver advances every level together
+                call s_phase_toc(PH_SEAM)
                 ! Phase 3 - ADVANCE every block (RHS + RK update). Runs with the block's grid globals swapped in.
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
@@ -588,8 +595,10 @@ contains
                     if (amr_block_level(islot) >= 2) cycle
                     call s_amr_select_slot(islot)
                     ! freg slices of the block faces move to the coarse-outside-owners (ALL ranks call; no-op at np=1)
+                    call s_phase_tic(PH_REFLUX)
                     call s_amr_p2p_reflux_faces()
                     call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
+                    call s_phase_toc(PH_REFLUX)
                 end do
                 call s_amr_select_slot(1)
             end if
