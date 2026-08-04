@@ -18,7 +18,7 @@ module m_amr_regrid
     use m_constants, only: mapCells
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
-    use m_amr, only: amr_slots, amr_cons_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, &
+    use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, &
         & amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
         & s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
         & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
@@ -1213,10 +1213,13 @@ contains
             old_owns(k) = amr_owns_all(ks)
             if (old_owns(k)) then
                 $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(ks))]')
-                do i = 1, sys_size
-                    amr_slots(ks)%q_cons_stor(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k)) = amr_cons_st(0:old_ext(1, &
-                              & k),0:old_ext(2, k),0:old_ext(3, k),i, amr_loc_of(ks))
-                end do
+                amr_stor_st(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,amr_loc_of(ks)) = amr_cons_st(0:old_ext(1, k), &
+                            & 0:old_ext(2, k),0:old_ext(3, k),:,amr_loc_of(ks))
+                ! Push the stash before any later s_amr_alloc_slot: allocating a slot can grow the shared
+                ! store, and s_amr_st_reserve preserves growth by pulling device->host, which would
+                ! overwrite this host-written stash with an unwritten device copy. Same hazard that made
+                ! restart return NaN; see the contract on s_amr_st_reserve.
+                $:GPU_UPDATE(device='[amr_stor_st(:, :, :, :, amr_loc_of(ks))]')
                 ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like q_cons (both stors are dead between
                 ! steps)
                 if (qbmm .and. .not. polytropic) then
@@ -1323,7 +1326,7 @@ contains
                             do gj = 0, old_ext(2, kk)
                                 do gi = 0, old_ext(1, kk)
                                     idx2 = idx2 + 1
-                                    spack(idx2, kk) = real(amr_slots(f_l0_slot(kk))%q_cons_stor(ii)%sf(gi, gj, gk), wp)
+                                    spack(idx2, kk) = real(amr_stor_st(gi, gj, gk, ii, amr_loc_of(f_l0_slot(kk))), wp)
                                 end do
                             end do
                         end do
@@ -1343,7 +1346,7 @@ contains
                             do gj = 0, old_ext(2, kk)
                                 do gi = 0, old_ext(1, kk)
                                     idx2 = idx2 + 1
-                                    amr_slots(f_l0_slot(kk))%q_cons_stor(ii)%sf(gi, gj, gk) = real(rpack(idx2, kk), stp)
+                                    amr_stor_st(gi, gj, gk, ii, amr_loc_of(f_l0_slot(kk))) = real(rpack(idx2, kk), stp)
                                 end do
                             end do
                         end do
@@ -1405,7 +1408,7 @@ contains
                                 do fi = 0, amr_slots(ks)%m
                                     ofi = fi + sh(1)
                                     if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                    amr_cons_st(fi, fj, fk, i, amr_loc_of(ks)) = amr_slots(kks)%q_cons_stor(i)%sf(ofi, ofj, ofk)
+                                    amr_cons_st(fi, fj, fk, i, amr_loc_of(ks)) = amr_stor_st(ofi, ofj, ofk, i, amr_loc_of(kks))
                                 end do
                             end do
                         end do
