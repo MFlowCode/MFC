@@ -1167,6 +1167,53 @@ an ABSOLUTE case path (it `cd`s to the tree first, so a relative path resolves t
 shell script while an instance of it is executing (bash reads scripts incrementally, so the running copy
 then fails to parse, at a line number that no longer means anything). `mfcrun.sh` now enforces the first three.
 
+### PROPER 3D PROFILE (2026-08-04): the 9.1x penalty is 1.38x arithmetic and 6.6x overhead
+
+Profiled the REAL case - 400^3, np=8, cap 32, all 8 ranks under rocprofv3 - and, critically, computed
+idle as `1 - (kernel busy from the trace) / (wall from a CLEAN unprofiled run)`, so the profiler's own
+overhead is excluded from the idle figure. Uniform 400^3 profiled identically.
+
+| | uniform 400^3 | AMR cap 32 |
+|---|---|---|
+| kernels / rank / step | **600** | **44,174** |
+| kernel busy | 0.552 s/step | 1.207 s/step |
+| **GPU idle** | **21.9%** | **88.2%** |
+| kernel work per cell | **8.62 ns** | **11.89 ns** |
+| wall per cell | 11.05 ns | 100.9 ns |
+| copies per launch | - | 19.5 |
+
+**The 9.1x per-cell penalty decomposes as 1.38x arithmetic + 6.6x pure per-region overhead.** AMR's
+kernels are only 38% less efficient per cell than the monolithic solver's; everything else is idle.
+**AMR runs 73.6x more kernels for 1.59x the work.** That single ratio is the whole problem - it is not
+load balance (0.98, state of the art), not the block cap (exhausted, optimum = default), and not
+arithmetic.
+
+Region mix (rank 0): compute_rhs tree 56.1%, AMR-local 34.8%; `m_weno` and `m_riemann_state` are 7344
+launches EACH. Pricing at the measured 88.2% idle:
+
+| change | d_ops | **d_wall** |
+|---|---|---|
+| fuse `weno`+`riemann_state` (1:1, adjacent producer/consumer) | 16.8% | **14.9%** |
+| 3x reduction across the tree | 37.4% | **33.0%** |
+| tree -> ~1 region | 52.3% | **46.1%** |
+| tree->1 + all AMR-local batched | 83.7% | **73.8% (3.8x)** |
+
+**What the prize really is.** Removing per-region overhead entirely would take AMR from 9.1x uniform
+per cell to **1.38x**, and from delivering 4.4x of its 40.4x geometric potential (**11%**) to ~29x
+(**72%**). The full program above reaches ~17x (**42%**). The earlier 2D-derived "~26%" was not wrong in
+magnitude but priced the wrong change: 26% described a 3x tree reduction, which measures 33% here.
+
+An earlier proxy profile (128^3, np=1) gave 84.2% idle and 12-15% / 28-33% for the same two changes -
+close enough to validate the method, but the real case is worth MORE, not less. Region mix is set by
+`num_dims`/`weno_order`/`riemann_solver`, not by problem size; the IDLE FRACTION is what needs the real
+case, and it must be computed against an unprofiled wall.
+
+**Harness: never profile or run in the shared `cases/` directory.** `-t pre_process` alone does NOT
+regenerate `simulation.inp`, so a stale 400^3 input silently ran under a 128^3 case name and OOM'd on one
+GPU - misread twice as a real memory ceiling before the input file was checked. `blocksize_sweep.sh`
+uses `mktemp -d` per arm for exactly this reason. Multi-rank profiling also needs a per-rank `-d`
+directory (a wrapper keyed on `$SLURM_PROCID`), or the 8 ranks collide on one output prefix.
+
 ### Remaining increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
