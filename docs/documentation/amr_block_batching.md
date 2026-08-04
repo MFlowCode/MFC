@@ -1091,6 +1091,82 @@ made `conc` look merely 2-16% slow when the wall-clock gap was different); use `
 `s.f90` is NOT arithmetically equivalent to its `k_base` (`result=12` vs `30`), so its timings cannot
 be used to price fusion - `conc.f90`'s variant was written to be equivalent and checks it.
 
+### MEASURED 2026-08-03 AT PRODUCTION SIZE (3D, 400^3): the cap is exhausted, balance is state of
+### the art, and AMR captures ~11% of its own potential
+
+Everything below is on `amr-bench/cases/sc3dx_amr.py` - 400^3 = 64M base cells, np=8, ~48% of a 64 GB
+GCD per rank at the ~1M points / 2 GB rule. **All prior AMR pricing in this document came from a 2D case
+at ~4% of GCD capacity and should not be trusted where it disagrees with this section.**
+
+**`amr_max_grid_size` is EXHAUSTED in 3D.** Clean U-curve with the optimum exactly at the shipped
+default, walled off above by device OOM rather than by tuning:
+
+| cap | boxes | boxes/rank | s/step | ns/cell |
+|---|---|---|---|---|
+| 12 | 1089 | 136 | 22.18 | 258.2 |
+| 16 | 2401 | 300 | 27.34 | 299.5 |
+| 24 | 1089 | 136 | 16.76 | 171.3 |
+| **32** | **625** | **78** | **9.5-9.8** | **93.9-96.1** |
+| 48 | 324 | 40 | 16.73 | 158.5 |
+| 64, 96, 128 | - | - | **OOM** | - |
+
+cap 32 reproduced across two independent sweeps to 2%. cap 16 is anomalous (2401 boxes, MORE than
+cap 12's 1089) - the clusterer tiles pathologically there; an oddity, not a trend.
+
+**This OVERTURNS the recorded 2D conclusion** that bigger blocks are "by far the largest available win"
+(~20x, cap 128 -> 1024). That is a 2D result. In 3D the cap costs memory as cap^3 (the validator says so
+explicitly: solver scratch is sized to the cap, "growing as the cap raised to the dimension count"), so
+the base problem and the cap compete for the same memory and the ceiling arrives immediately.
+
+**CORRECTION: OOM does NOT present as a hang.** It aborts at exit 134 with
+`HSA_STATUS_ERROR_OUT_OF_RESOURCES` and an explicit message. The wrapper's `rc=143` is the OUTER
+timeout, two layers up - reading it as a timeout was wrong.
+
+**AMR vs uniform, both converged.** Uniform 400^3 needed ~100 steps to converge (Time Avg 0.493 at 21
+steps -> **0.7068** converged, a 43% error); AMR needed ~60 (9.54 single-sample -> **~10.24** Time Avg,
+still drifting down). **20-step runs are NOT converged - the cap table above therefore holds as a
+RELATIVE comparison (identical protocol per arm) but its absolute ns/cell understates AMR by ~7%.**
+
+| | cell-updates/step | s/step | ns/cell |
+|---|---|---|---|
+| uniform 400^3 | 64.0M | 0.7068 | **11.05** |
+| AMR cap 32 | 101.5M (64.0M base + 37.5M fine) | ~10.24 | **~100.9** |
+
+- **AMR per-cell penalty = ~9.1x** - NOT the ~31x on record, which came from the small 2D case.
+- Matching AMR's finest resolution uniformly is 1600^3 = 4.096e9 cells: a **40.4x** cell-update saving.
+- AMR converts that into **~4.4x** of wall clock, i.e. it captures **~11% of its own geometric
+  potential**. The missing ~9x IS the per-region cost.
+- AMR is unambiguously WINNING here (an earlier worry that it might be a net loss is retracted), and
+  1600^3 uniform would need ~8.2 TB against 512 GB available - it does not merely lose, it does not fit.
+
+**LOAD BALANCING IS NOT THE PROBLEM - it is state of the art.** Measured on this case:
+`max/mean 1.016-1.018, ranks_with_no_fine_block 0` -> **efficiency 0.982-0.984** on AMReX's own metric
+(mean load / max load). Published AMReX values: knapsack 0.97-1.00, Painter's SFC 0.92-1.00, original
+SFC 0.80-0.95 (arXiv 2505.15122). **We match knapsack and beat their original SFC.** That paper also
+explicitly declines to claim production wall-clock savings for ANY algorithm - so our own 0.4% recovery
+from rebalancing is not a sign of being behind, it is what converting a good epsilon into seconds looks
+like. Do not spend effort here: the remaining 2% of balance is noise against 72% idle.
+
+**THE REAL GAP vs state of the art is BLOCK COUNT.** AMReX operates at 4-16 boxes per rank ("at least 4
+... more than 16 starts to cause performance issues"). Our OPTIMUM is 78 boxes/rank, and every cheaper
+cap is worse (300/rank at cap 16). We are ~5x outside their regime at our best setting and cannot move
+toward it, because per-block memory is cap^3 x ~17 module scratch families where their MultiFab is ONE
+contiguous array per level. Same root cause as the 19.5 copies/launch: per-block replication instead of
+a packed representation.
+
+**What this means for priorities.** Fusion (~26%) and the step-2 batching remainder (~10%) are margin
+work against a ~9x gap between AMR and its own potential. Both of those numbers are also 2D-derived and
+must be re-priced here before they are quoted. The axis that matters is per-block overhead and block
+count - which is what the flat store began.
+
+**Harness rules this cost four self-inflicted failures to learn** (three already documented and hit
+anyway): never run a benchmark while another `mfc.sh run` is live (they contend for the same GPUs and
+the control silently never starts); never `pgrep -f` a pattern that appears in the poller's own command
+line (an `until ! pgrep` loop then never exits - three stalled monitors and counting); pass `mfcrun.sh`
+an ABSOLUTE case path (it `cd`s to the tree first, so a relative path resolves there); and never edit a
+shell script while an instance of it is executing (bash reads scripts incrementally, so the running copy
+then fails to parse, at a line number that no longer means anything). `mfcrun.sh` now enforces the first three.
+
 ### Remaining increments
 
 1. **Per-slot derived tables.** Give each slot its own WENO/FD coefficient storage so a swap
