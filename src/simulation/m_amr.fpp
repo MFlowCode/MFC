@@ -25,6 +25,7 @@ module m_amr
     use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
     use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
+    use m_phase_timing
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps, ib_markers
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
@@ -4679,7 +4680,9 @@ contains
         call s_amr_check_lag_clear()
         ! fine-level distribution: gather the block's coarse patch onto its owner (collective - ALL ranks, before the owner-only
         ! return). The device ghost-fill below then reads the gathered patch amr_cg instead of local coarse.
+        call s_phase_tic(PH_GATHER)
         call s_amr_gather_coarse_patch(q_cons_coarse, .true.)
+        call s_phase_toc(PH_GATHER)
         ! non-polytropic QBMM: gather the coarse pb/mv patch too (collective - ALL ranks, before the owner return; owners fill
         ! below)
         if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_in, mv_in, .true.)
@@ -4690,7 +4693,9 @@ contains
         ! pair
         ! nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
+        call s_phase_tic(PH_GFILL)
         call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
+        call s_phase_toc(PH_GFILL)
         ! the coarse-prolonged ghost shell is the final ghost state EXCEPT at faces shared with an adjacent sub-block (tiling),
         ! which
         ! the block-to-block fine-fine halo overwrites with the neighbour's fine interior after this fill.
@@ -4751,6 +4756,7 @@ contains
         call s_amr_swap_to_fine()
         idwint = amr_slots(amr_cur)%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
         $:GPU_UPDATE(device='[idwint]')
+        call s_phase_tic(PH_RHS)
         call s_amr_br_load(amr_loc_of(amr_cur))
         if (qbmm .and. .not. polytropic) then
             ! the block's OWN side-state and rhs scratch: the coarse pb_in/rhs_pb must not be touched at fine indices (the coarse
@@ -4764,6 +4770,7 @@ contains
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
+        call s_phase_toc(PH_RHS)
 
     end subroutine s_amr_fine_stage_rhs
 
@@ -4777,6 +4784,7 @@ contains
         if (.not. amr .and. l0_ntile == 0) return
         if (.not. amr_rank_owns_block) return
 
+        call s_phase_tic(PH_RK)
         ! RK stage update (device kernel; mirror of the coarse form - under IGR the rhs already embeds dt, matching the coarse igr
         ! update, so the dt factor is 1)
         call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_slots(amr_cur)%q_cons_stor, amr_slots(amr_cur)%rhs, coefs(1), &
@@ -4790,6 +4798,7 @@ contains
         if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(-1._wp)
         ! IB state correction on the fine block (mirrors the coarse per-stage correct-state; no-op unless ib)
         call s_amr_ib_correct_fine()
+        call s_phase_toc(PH_RK)
         if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_amr_fine_stage_rk
