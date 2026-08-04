@@ -18,11 +18,11 @@ module m_amr_regrid
     use m_constants, only: mapCells
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
-    use m_amr, only: amr_slots, amr_maxc_fit, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
-        & s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
-        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
-        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
-        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
+    use m_amr, only: amr_slots, amr_cons_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, &
+        & amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
+        & s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
+        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
+        & f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -658,12 +658,12 @@ contains
                 do ci = tg_lo(1), tg_hi(1)
                     ! total density gradient (sum of the continuity variables): degenerates to the single-fluid tagger, immune to
                     ! trace-fluid noise. Matched-density composition-only interfaces are invisible (documented limit).
-                    r0 = max(abs(f_amr_rho_tot(q_cons_base, ci, cj, ck)), 1.e-30_wp)
-                    g = abs(f_amr_rho_tot(q_cons_base, ci + 1, cj, ck) - f_amr_rho_tot(q_cons_base, ci - 1, cj, ck))
-                    if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj + 1, ck) - f_amr_rho_tot(q_cons_base, ci, &
-                        & cj - 1, ck)))
-                    if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(q_cons_base, ci, cj, ck + 1) - f_amr_rho_tot(q_cons_base, ci, cj, &
-                        & ck - 1)))
+                    r0 = max(abs(f_amr_rho_tot_sf(q_cons_base, ci, cj, ck)), 1.e-30_wp)
+                    g = abs(f_amr_rho_tot_sf(q_cons_base, ci + 1, cj, ck) - f_amr_rho_tot_sf(q_cons_base, ci - 1, cj, ck))
+                    if (n_glb > 0) g = max(g, abs(f_amr_rho_tot_sf(q_cons_base, ci, cj + 1, ck) - f_amr_rho_tot_sf(q_cons_base, &
+                        & ci, cj - 1, ck)))
+                    if (p_glb > 0) g = max(g, abs(f_amr_rho_tot_sf(q_cons_base, ci, cj, ck + 1) - f_amr_rho_tot_sf(q_cons_base, &
+                        & ci, cj, ck - 1)))
                     ! 2*r0 normalizes the 2-cell central difference (rho at i+1..i-1); the 2 is the stencil span, NOT amr_ref_ratio
                     if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
                     ! the acoustic source support stays coarse (its spatials are coarse cell indices): suppress tags there so
@@ -873,14 +873,12 @@ contains
                 integer, allocatable :: rcnt(:), rdsp(:)
 #endif
 
-                ! host-refresh the live (old) blocks' continuity fields: the fine sensor below reads amr_slots(ob)%q_cons on the
-                ! host, but the step-5 stash's GPU_UPDATE(host) runs AFTER this nesting - so the host copy is stale here
+                ! host-refresh the live (old) blocks' conserved state: the fine sensor below reads the flat store on the host,
+                ! but the step-5 stash's GPU_UPDATE(host) runs AFTER this nesting - so the host copy is stale here
                 do ob = 1, amr_num_blocks
                     if (amr_block_level(ob) == 0) cycle  ! L0 tiles are not regrid-managed and carry no fine sensor
-                    if (.not. amr_owns_all(ob)) cycle  ! np>1: only the owner holds this old block's fine q_cons
-                    do obi = eqn_idx%cont%beg, eqn_idx%cont%end
-                        $:GPU_UPDATE(host='[amr_slots(ob)%q_cons(obi)%sf]')
-                    end do
+                    if (.not. amr_owns_all(ob)) cycle  ! np>1: only the owner holds this old block's fine state
+                    $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(ob))]')
                 end do
                 ! Fine-sensor tags accumulate in a GLOBAL L0 frame: at np>1 an old block is read only by its owner, but its tag
                 ! footprint can fall in ANOTHER rank's subdomain. Each parent's nesting window [mlo:mhi] is small vs the global
@@ -1214,12 +1212,10 @@ contains
             old_level(k) = amr_block_level(ks)
             old_owns(k) = amr_owns_all(ks)
             if (old_owns(k)) then
+                $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(ks))]')
                 do i = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_slots(ks)%q_cons(i)%sf]')
-                end do
-                do i = 1, sys_size
-                    amr_slots(ks)%q_cons_stor(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, &
-                              & k)) = amr_slots(ks)%q_cons(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k))
+                    amr_slots(ks)%q_cons_stor(i)%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k)) = amr_cons_st(0:old_ext(1, &
+                              & k),0:old_ext(2, k),0:old_ext(3, k),i, amr_loc_of(ks))
                 end do
                 ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like q_cons (both stors are dead between
                 ! steps)
@@ -1409,16 +1405,14 @@ contains
                                 do fi = 0, amr_slots(ks)%m
                                     ofi = fi + sh(1)
                                     if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                    amr_slots(ks)%q_cons(i)%sf(fi, fj, fk) = amr_slots(kks)%q_cons_stor(i)%sf(ofi, ofj, ofk)
+                                    amr_cons_st(fi, fj, fk, i, amr_loc_of(ks)) = amr_slots(kks)%q_cons_stor(i)%sf(ofi, ofj, ofk)
                                 end do
                             end do
                         end do
                     end do
                 end do
             end if
-            do i = 1, sys_size
-                $:GPU_UPDATE(device='[amr_slots(ks)%q_cons(i)%sf]')
-            end do
+            $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(ks))]')
             ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant), then overwrite the overlap with the
             ! old blocks' fine data (same index shift)
             if (qbmm .and. .not. polytropic) then
@@ -1495,13 +1489,13 @@ contains
                             fj = (cj - olo(2))*rr + d2
                             do d1 = 0, rr - 1
                                 fi = (ci - olo(1))*rr + d1
-                                r0 = max(abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, fk)), 1.e-30_wp)
-                                g = abs(f_amr_rho_tot(amr_slots(ob)%q_cons, min(fi + 1, fm1), fj, &
-                                        & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, max(fi - 1, 0), fj, fk))
-                                if (n_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, min(fj + 1, fm2), &
-                                    & fk) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, max(fj - 1, 0), fk)))
-                                if (p_glb > 0) g = max(g, abs(f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, min(fk + 1, &
-                                    & fm3)) - f_amr_rho_tot(amr_slots(ob)%q_cons, fi, fj, max(fk - 1, 0))))
+                                r0 = max(abs(f_amr_rho_tot_st(amr_loc_of(ob), fi, fj, fk)), 1.e-30_wp)
+                                g = abs(f_amr_rho_tot_st(amr_loc_of(ob), min(fi + 1, fm1), fj, &
+                                        & fk) - f_amr_rho_tot_st(amr_loc_of(ob), max(fi - 1, 0), fj, fk))
+                                if (n_glb > 0) g = max(g, abs(f_amr_rho_tot_st(amr_loc_of(ob), fi, min(fj + 1, fm2), &
+                                    & fk) - f_amr_rho_tot_st(amr_loc_of(ob), fi, max(fj - 1, 0), fk)))
+                                if (p_glb > 0) g = max(g, abs(f_amr_rho_tot_st(amr_loc_of(ob), fi, fj, min(fk + 1, &
+                                    & fm3)) - f_amr_rho_tot_st(amr_loc_of(ob), fi, fj, max(fk - 1, 0))))
                                 ! 2*r0 normalizes the 2-cell central difference; the 2 is the stencil span, NOT amr_ref_ratio
                                 if (g/(2._wp*r0) > amr_tag_eps) tagged = .true.
                             end do
@@ -1517,19 +1511,29 @@ contains
 
     end subroutine s_amr_tag_child_from_fine
 
-    !> Total density (sum of the continuity variables) at one cell: the regrid tag field. Reduces to variable 1 for one fluid.
-    pure function f_amr_rho_tot(q, ci, cj, ck) result(r)
+    !> Total density (sum of the continuity variables) at one cell: the regrid tag field. Reduces to variable 1 for one fluid. Two
+    !! sources, one body: `_st` reads a refined block out of the flat store, `_sf` the level-0 monolithic field.
+    #:for RSFX, RSRC in [('st', 'amr_cons_st'), ('sf', '')]
+        pure function f_amr_rho_tot_${RSFX}$(${'loc' if RSRC else 'q'}$, ci, cj, ck) result(r)
 
-        type(scalar_field), dimension(:), intent(in) :: q
-        integer, intent(in)                          :: ci, cj, ck
-        real(wp)                                     :: r
-        integer                                      :: f
+            #:if RSRC
+                integer, intent(in) :: loc  !< flat-store slot
+            #:else
+                type(scalar_field), dimension(:), intent(in) :: q
+            #:endif
+            integer, intent(in) :: ci, cj, ck
+            real(wp)            :: r
+            integer             :: f
 
-        r = 0._wp
-        do f = eqn_idx%cont%beg, eqn_idx%cont%end
-            r = r + real(q(f)%sf(ci, cj, ck), wp)
-        end do
+            r = 0._wp
+            do f = eqn_idx%cont%beg, eqn_idx%cont%end
+                #:if RSRC
+                    r = r + real(amr_cons_st(ci, cj, ck, f, loc), wp)
+                #:else
+                    r = r + real(q(f)%sf(ci, cj, ck), wp)
+                #:endif
+            end do
 
-    end function f_amr_rho_tot
-
+        end function f_amr_rho_tot_${RSFX}$
+    #:endfor
 end module m_amr_regrid
