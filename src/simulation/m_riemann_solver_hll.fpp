@@ -542,22 +542,14 @@ contains
                             end if
 
                             if (.not. hll_u_interface) then  ! HLL Method 1: per-fluid alpha interface flux
+                                ! Branchless: s_M/s_P fold the upwinding, so signs of s_L/s_R need no
+                                ! per-thread branches (which diverge across GPU warps)
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                    if (0._wp <= s_L .or. s_R <= 0._wp) then
-                                        flux_rsx_vf(${SF('')}$, i) = 0._wp
-                                    else
-                                        flux_rsx_vf(${SF('')}$, i) = s_M*s_P*(qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                    & i) - qL_prim_rsx_vf(${SF('')}$, i))/(s_R - s_L)
-                                    end if
-                                    if (0._wp <= s_L) then
-                                        flux_src_rsx_vf(${SF('')}$, i) = qL_prim_rsx_vf(${SF('')}$, i)
-                                    else if (s_R <= 0._wp) then
-                                        flux_src_rsx_vf(${SF('')}$, i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                    else
-                                        flux_src_rsx_vf(${SF('')}$, i) = (s_R*qL_prim_rsx_vf(${SF('')}$, &
-                                                        & i) - s_L*qR_prim_rsx_vf(${SF(' + 1')}$, i))/(s_R - s_L)
-                                    end if
+                                    flux_rsx_vf(${SF('')}$, i) = (qL_prim_rsx_vf(${SF('')}$, i) - qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                & i))*s_M*s_P/(s_M - s_P)
+                                    flux_src_rsx_vf(${SF('')}$, i) = (s_M*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                    & i) - s_P*qL_prim_rsx_vf(${SF('')}$, i))/(s_M - s_P)
                                 end do
                             else  ! HLL Method 2: shared velocity interface flux
                                 $:GPU_LOOP(parallelism='[seq]')
