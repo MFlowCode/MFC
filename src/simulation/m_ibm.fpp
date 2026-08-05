@@ -251,7 +251,7 @@ contains
         ! a fresh cell takes the same inverse-distance neighbour average as alpha.
         if (moving_immersed_boundary_flag) then
             z_stencil = 0; if (p > 0) z_stencil = 1
-            $:GPU_PARALLEL_LOOP(private='[j, k, l, q, di, dj, dk, jn, kn, ln, wsum, w, rho, gamma, pi_inf, qv_K, Re_K, G_K, &
+            $:GPU_PARALLEL_LOOP(private='[j, k, l, q, di, dj, dk, jn, kn, ln, wsum, w, rho, gamma, pi_inf, qv_K, Re_K, G_K, Gs, &
                                 & Y_jwl, e_mix_jwl, dyn_pres, alpha_rho_IP, alpha_IP, vel_IP, pres_IP, b_IP, lam_IP]', collapse=3)
             do l = 0, p
                 do k = 0, n
