@@ -27,8 +27,8 @@ contains
     !> Dispatch to the subroutines that are utilized to compute the Riemann problem solution. For additional information please
     !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_lf_riemann_solver 4) s_hlld_riemann_solver
     subroutine s_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, &
-                                & flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_src_vf, norm_dir, &
+                                & ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -36,7 +36,7 @@ contains
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
@@ -44,7 +44,7 @@ contains
             if (riemann_solver == ${NUM}$) then
                 call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
                                                & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
-                                               & q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                               & q_prim_vf, flux_src_vf, norm_dir, ix, iy, iz)
             end if
         #:endfor
 
@@ -55,7 +55,7 @@ contains
 
         ! Allocating the variables that will be utilized to formulate the left, right, and average states of the Riemann problem, as
         ! well the Riemann problem solution
-        integer :: i, j
+        integer :: i, j, k, l
 
         @:ALLOCATE(Gs_rs(1:num_fluids))
 
@@ -86,6 +86,21 @@ contains
         @:ALLOCATE(flux_gsrc_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
         @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, eqn_idx%adv%beg:sys_size))
         @:ALLOCATE(vel_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_vels))
+
+        ! The geometric source flux is written only on the axisymmetric/cylindrical paths, and only for the components the active
+        ! solver touches; its consumers in m_rhs read the whole band. flux_gsrc_n used to carry this zero from its own allocation,
+        ! so zero the buffer that replaced it here or those components read uninitialised memory on the first step.
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = -1, p_alloc
+                do k = -1, n_alloc
+                    do j = -1, m_alloc
+                        flux_gsrc_rsx_vf(j, k, l, i) = 0._wp
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
         if (qbmm) then
             @:ALLOCATE(mom_sp_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:4))
         end if

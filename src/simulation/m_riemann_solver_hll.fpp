@@ -26,8 +26,8 @@ contains
 
     !> HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                    & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &
-                                    & flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                    & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_src_vf, &
+                                    & norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -36,7 +36,7 @@ contains
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
 
         ! Intercell fluxes
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         real(wp)                                               :: flux_tau_L, flux_tau_R
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
@@ -659,7 +659,7 @@ contains
             end if
         end if
 
-        call s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir)
+        call s_finalize_riemann_solver(flux_src_vf, norm_dir)
 
     end subroutine s_hll_riemann_solver
 

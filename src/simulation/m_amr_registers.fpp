@@ -11,7 +11,7 @@
 !! block at np=1); freg uses 0-based LOCAL fine (fine children of isect cell t are 2*t and 2*t+1). All arrays are preallocated at
 !! max size, so regrid needs no reallocation.
 !!
-!! Multi-fluid (5-eq HLLC, amr-gated path): the volume-fraction ADVECTIVE flux alpha_i*u_star travels through flux_n (the
+!! Multi-fluid (5-eq HLLC, amr-gated path): the volume-fraction ADVECTIVE flux alpha_i*u_star travels through flux_rsx_vf (the
 !! "VOLUME FRACTION FLUX" block of m_riemann_solver_hllc, same form as the mass flux), so the uniform 1:sys_size capture below
 !! refluxes per-fluid masses, momentum, energy, AND alpha's advective part with no extra registers. The non-conservative remainder
 !! (the +alpha*d(u_star)/dx compression term m_rhs assembles from flux_src_n = u_star) is deliberately NOT captured: alpha is
@@ -20,7 +20,7 @@
 !!
 !! Viscous (SP11): the viscous stress/work face fluxes travel through flux_src_n for mom and energy (m_rhs
 !! s_compute_additional_physics_rhs: rhs += (flux_src_n(j-1) - flux_src_n(j))/dx, identical face indexing and sign to advective
-!! flux_n). Captured into the SAME registers (added on top of advective flux for mom..E) so the c/f reflux matches the TOTAL
+!! flux_rsx_vf). Captured into the SAME registers (added on top of advective flux for mom..E) so the c/f reflux matches the TOTAL
 !! advective+viscous flux; energy conservation thus includes viscous work. Fine-ghost velocity gradients at the c/f boundary come
 !! from the conservative-linear cons prolongation (no special gradient reconstruction) - like the alpha K-term, that inconsistency
 !! is bounded, and conservation is enforced by the flux-register matching.
@@ -35,6 +35,7 @@ module m_amr_registers
 
     use m_derived_types
     use m_global_parameters
+    use m_riemann_state, only: flux_rsx_vf
 
     implicit none
 
@@ -208,17 +209,22 @@ contains
     !! 0 with no arithmetic, so a stage-1 overwrite reads no uninitialized creg). bclo/bchi gate the low/high face (unowned coarse
     !! faces off; child faces always on). The device kernel collapses (slot, t2, t1, eq) over the rectangular caps
     !! [0:maxt2]x[0:maxt1] (max over slots) and cycles inactive slots / out-of-window cells - one launch replaces O(blocks) per-slot
-    !! launches. Per-slot geometry (bjlo etc.) is host-filled and GPU_UPDATE'd by the caller. Used for the advective (flux_dir,
+    !! launches. Per-slot geometry (bjlo etc.) is host-filled and GPU_UPDATE'd by the caller. Used for the advective (flat=T,
     !! eqb=1..sys_size) and viscous (flux_src, eqb=mom..E) captures on BOTH the coarse-self and child sides.
-    impure subroutine s_amr_capture_creg_dense_batch(nb, id, flux, cf, acc, maxt1, maxt2, eqb, eqe)
+    impure subroutine s_amr_capture_creg_dense_batch(nb, id, flux, flat, cf, acc, maxt1, maxt2, eqb, eqe)
 
         integer, intent(in)            :: nb, id, maxt1, maxt2, eqb, eqe
         type(vector_field), intent(in) :: flux
-        real(wp), intent(in)           :: cf
-        logical, intent(in)            :: acc
-        integer                        :: eq, t1, t2, slot
+        !> Read the advective flux from the flat Riemann buffer and ignore `flux`. The viscous capture cannot: flux_src_n allocates
+        !! only mom..E, so touching `flux` over the full 1:sys_size advective band would dereference null %sf pointers - which is
+        !! why this is a branch and not a merge (merge would evaluate both arms).
+        logical, intent(in)  :: flat
+        real(wp), intent(in) :: cf
+        logical, intent(in)  :: acc
+        integer              :: eq, t1, t2, slot, i1, i2, i3, j1, j2, j3
+        real(wp)             :: v_lo, v_hi
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[i1, i2, i3, j1, j2, j3, v_lo, v_hi]')
         do slot = 1, nb
             do t2 = 0, maxt2
                 do t1 = 0, maxt1
@@ -227,21 +233,44 @@ contains
                         if (t1 < bt1lo(slot) .or. t1 > bt1hi(slot) .or. t2 < bt2lo(slot) .or. t2 > bt2hi(slot)) cycle
                         select case (id)
                         case (1)
-                            if (bclo(slot)) creg(1)%lo(eq, t1, t2, slot) = merge(creg(1)%lo(eq, t1, t2, slot), 0._wp, &
-                                & acc) + cf*real(flux%vf(eq)%sf(bjlo(slot), bo1(slot) + t1, bo2(slot) + t2), wp)
-                            if (bchi(slot)) creg(1)%hi(eq, t1, t2, slot) = merge(creg(1)%hi(eq, t1, t2, slot), 0._wp, &
-                                & acc) + cf*real(flux%vf(eq)%sf(bjhi(slot), bo1(slot) + t1, bo2(slot) + t2), wp)
+                            i1 = bjlo(slot); i2 = bo1(slot) + t1; i3 = bo2(slot) + t2
+                            j1 = bjhi(slot); j2 = i2; j3 = i3
                         case (2)
-                            if (bclo(slot)) creg(2)%lo(eq, t1, t2, slot) = merge(creg(2)%lo(eq, t1, t2, slot), 0._wp, &
-                                & acc) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bjlo(slot), bo2(slot) + t2), wp)
-                            if (bchi(slot)) creg(2)%hi(eq, t1, t2, slot) = merge(creg(2)%hi(eq, t1, t2, slot), 0._wp, &
-                                & acc) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bjhi(slot), bo2(slot) + t2), wp)
+                            i1 = bo1(slot) + t1; i2 = bjlo(slot); i3 = bo2(slot) + t2
+                            j1 = i1; j2 = bjhi(slot); j3 = i3
                         case (3)
-                            if (bclo(slot)) creg(3)%lo(eq, t1, t2, slot) = merge(creg(3)%lo(eq, t1, t2, slot), 0._wp, &
-                                & acc) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bo2(slot) + t2, bjlo(slot)), wp)
-                            if (bchi(slot)) creg(3)%hi(eq, t1, t2, slot) = merge(creg(3)%hi(eq, t1, t2, slot), 0._wp, &
-                                & acc) + cf*real(flux%vf(eq)%sf(bo1(slot) + t1, bo2(slot) + t2, bjhi(slot)), wp)
+                            i1 = bo1(slot) + t1; i2 = bo2(slot) + t2; i3 = bjlo(slot)
+                            j1 = i1; j2 = i2; j3 = bjhi(slot)
                         end select
+                        ! The flux reads MUST stay inside the bclo/bchi guards. A slot goes active when EITHER face is owned
+                        ! (s_amr_capture_boundary_flux: cap_lo .or. cap_hi), and the UNOWNED face's index is still computed - it
+                        ! then points a whole block width outside this rank's subdomain (jlo down to -amr_max_grid_size). Reading
+                        ! it unguarded is an out-of-bounds device access against flux_rsx_vf's tight (-1:m_alloc) bounds. It hides
+                        ! at np=1, where the intersection IS the block and both flags hold, so goldens do not catch it.
+                        if (bclo(slot)) then
+                            if (flat) then
+                                v_lo = flux_rsx_vf(i1, i2, i3, eq)
+                            else
+                                v_lo = real(flux%vf(eq)%sf(i1, i2, i3), wp)
+                            end if
+                            select case (id)
+                            case (1); creg(1)%lo(eq, t1, t2, slot) = merge(creg(1)%lo(eq, t1, t2, slot), 0._wp, acc) + cf*v_lo
+                            case (2); creg(2)%lo(eq, t1, t2, slot) = merge(creg(2)%lo(eq, t1, t2, slot), 0._wp, acc) + cf*v_lo
+                            case (3); creg(3)%lo(eq, t1, t2, slot) = merge(creg(3)%lo(eq, t1, t2, slot), 0._wp, acc) + cf*v_lo
+                            end select
+                        end if
+                        if (bchi(slot)) then
+                            if (flat) then
+                                v_hi = flux_rsx_vf(j1, j2, j3, eq)
+                            else
+                                v_hi = real(flux%vf(eq)%sf(j1, j2, j3), wp)
+                            end if
+                            select case (id)
+                            case (1); creg(1)%hi(eq, t1, t2, slot) = merge(creg(1)%hi(eq, t1, t2, slot), 0._wp, acc) + cf*v_hi
+                            case (2); creg(2)%hi(eq, t1, t2, slot) = merge(creg(2)%hi(eq, t1, t2, slot), 0._wp, acc) + cf*v_hi
+                            case (3); creg(3)%hi(eq, t1, t2, slot) = merge(creg(3)%hi(eq, t1, t2, slot), 0._wp, acc) + cf*v_hi
+                            end select
+                        end if
                     end do
                 end do
             end do
@@ -318,10 +347,9 @@ contains
     !> Capture the c/f boundary-face fluxes for direction id from the just-finalized flux array. Runs INSIDE s_compute_rhs: coarse
     !! call (amr_in_fine_advance false, coarse globals) fills creg at block boundary faces; fine call (flag true, globals swapped to
     !! the fine block) fills freg at fine faces -1 and m/n/p. creg uses relative 0-based transverse; freg uses 0-based fine.
-    impure subroutine s_amr_capture_boundary_flux(id, flux_dir, flux_src, stage)
+    impure subroutine s_amr_capture_boundary_flux(id, flux_src, stage)
 
         integer, intent(in)            :: id
-        type(vector_field), intent(in) :: flux_dir
         type(vector_field), intent(in) :: flux_src
         integer, intent(in)            :: stage
         integer                        :: eq, t1, t2, jlo, jhi, t1_lo, t1_hi, t2_lo, t2_hi, o1, o2, islot, save_cur
@@ -371,33 +399,27 @@ contains
                         select case (id)
                         case (1)
                             if (accum) then
-                                freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(jlo, &
-                                     & t1, t2), wp)
-                                freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(jhi, &
-                                     & t1, t2), wp)
+                                freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(jlo, t1, t2, eq)
+                                freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(jhi, t1, t2, eq)
                             else
-                                freg(1)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jlo, t1, t2), wp)
-                                freg(1)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(jhi, t1, t2), wp)
+                                freg(1)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(jlo, t1, t2, eq)
+                                freg(1)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(jhi, t1, t2, eq)
                             end if
                         case (2)
                             if (accum) then
-                                freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(t1, &
-                                     & jlo, t2), wp)
-                                freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(t1, &
-                                     & jhi, t2), wp)
+                                freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(t1, jlo, t2, eq)
+                                freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(t1, jhi, t2, eq)
                             else
-                                freg(2)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(t1, jlo, t2), wp)
-                                freg(2)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(t1, jhi, t2), wp)
+                                freg(2)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(t1, jlo, t2, eq)
+                                freg(2)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(t1, jhi, t2, eq)
                             end if
                         case (3)
                             if (accum) then
-                                freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(t1, &
-                                     & t2, jlo), wp)
-                                freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*real(flux_dir%vf(eq)%sf(t1, &
-                                     & t2, jhi), wp)
+                                freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(t1, t2, jlo, eq)
+                                freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(t1, t2, jhi, eq)
                             else
-                                freg(3)%lo(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(t1, t2, jlo), wp)
-                                freg(3)%hi(eq, t1, t2, islot) = coef*real(flux_dir%vf(eq)%sf(t1, t2, jhi), wp)
+                                freg(3)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(t1, t2, jlo, eq)
+                                freg(3)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(t1, t2, jhi, eq)
                             end if
                         end select
                     end do
@@ -486,9 +508,9 @@ contains
             end if
             ! multi-level lock-step: this fine block (amr_cur) is the COARSE side (parent) of its level+1 children. Capture creg for
             ! each child from THIS block's fine flux at the child's footprint faces - the child's amr_isect_lo/hi is already in this
-            ! parent's fine frame, so it indexes flux_dir directly (face jlo=isect_lo-1, jhi=isect_hi; transverse origin o1/o2).
+            ! parent's fine frame, so it indexes flux_rsx_vf directly (face jlo=isect_lo-1, jhi=isect_hi; transverse origin o1/o2).
             ! creg holds the rk3_w-weighted step-integral flux for the once-per-step STATE reflux into this parent
-            ! (s_amr_reflux_to_parent). Captures the TOTAL flux - advective (flux_dir), then viscous (flux_src, mom..E), then
+            ! (s_amr_reflux_to_parent). Captures the TOTAL flux - advective (flux_rsx_vf), then viscous (flux_src, mom..E), then
             ! chemistry species+energy - mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves (no
             ! checker gate). creg is the PARENT's OWN flux, so the parent owner captures it for EVERY child of this block -
             ! including children owned by another rank, which supply only the matching freg (s_amr_p2p_freg_to_parent). Framing
@@ -527,14 +549,15 @@ contains
             if (any(bactive(1:amr_num_blocks))) then
                 $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
                 ! shared capture into each CHILD's creg (parent-fine frame): advective, then total-flux viscous, then chemistry
-                call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_dir, ccoef, cacc, maxt1, maxt2, 1, sys_size)
-                if (viscous) call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, ccoef, .true., maxt1, maxt2, &
-                    & eqn_idx%mom%beg, eqn_idx%E)
+                call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, .true., ccoef, cacc, maxt1, maxt2, 1, sys_size)
+                if (viscous) call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, .false., ccoef, .true., maxt1, &
+                    & maxt2, eqn_idx%mom%beg, eqn_idx%E)
                 if (chemistry .and. chem_params%diffusion) call s_amr_capture_creg_chem_batch(amr_num_blocks, id, flux_src, &
                     & ccoef, maxt1, maxt2)
             end if
         else
-            ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its flux_n covers that face;
+            ! coarse branch: a face's capture runs on the rank owning the coarse cells just OUTSIDE it (its flux_rsx_vf covers that
+            ! face;
             ! at a rank-interior face the same rank also holds the inside cells). jlo/jhi = LOCAL flux indices of the block's
             ! low/high faces; t1/t2 = 0-based transverse indices relative to this rank's block INTERSECTION (o1/o2 = local
             ! transverse origins), aligned with the fine registers: fine children of isect-relative cell t are faces 2*t and 2*t+1.
@@ -574,9 +597,9 @@ contains
                 $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
                 ! shared capture into each coarse block's creg (region/sidx frame, per-face ownership gating): advective, then
                 ! total-flux viscous, then chemistry species+energy
-                call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_dir, coef, accum, maxt1, maxt2, 1, sys_size)
-                if (viscous) call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, coef, .true., maxt1, maxt2, &
-                    & eqn_idx%mom%beg, eqn_idx%E)
+                call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, .true., coef, accum, maxt1, maxt2, 1, sys_size)
+                if (viscous) call s_amr_capture_creg_dense_batch(amr_num_blocks, id, flux_src, .false., coef, .true., maxt1, &
+                    & maxt2, eqn_idx%mom%beg, eqn_idx%E)
                 if (chemistry .and. chem_params%diffusion) call s_amr_capture_creg_chem_batch(amr_num_blocks, id, flux_src, coef, &
                     & maxt1, maxt2)
             end if
