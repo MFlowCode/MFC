@@ -689,7 +689,6 @@ contains
                     ! state is only an IBM seed/ghost state, so it must not limit
                     ! the fluid CFL timestep.
                     if (ib .and. ib_markers%sf(j, k, l) /= 0) then
-                        max_dt(j, k, l) = huge(1._wp)
                         cycle
                     end if
 

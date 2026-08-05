@@ -341,11 +341,11 @@ contains
                                         q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_mix_jwl + dyn_pres
                                     else
                                     #:endif
-                                    if (elasticity) then
-                                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                            & alpha_rho_IP, Re_K, G_K, fluid_pp(:)%G)
+                                    if (hypoelasticity) then
+                                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                            & alpha_rho_IP, Re_K, G_K, Gs)
                                     else
-                                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, &
                                             & alpha_rho_IP, Re_K)
                                     end if
                                     if (bubbles_euler) then
