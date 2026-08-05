@@ -1146,15 +1146,18 @@ contains
 
     end function f_compute_hllc_star_momentum_flux
 
-    !> Deallocation and/or disassociation procedures that are needed to finalize the selected Riemann problem solver FUSED
-    !! (2026-08-04): each norm_dir branch used to emit 2-4 separate device regions - flux, the optional geometric source, the
-    !! advection source, and the optional hll/hlld source band - over an IDENTICAL iteration space. They are now one region per
-    !! direction, with the non-universal writes guarded on `i`. Measured at 6 of 44,174 kernels per rank-step (16.8% of all
-    !! launches) in the 3D profile; this halves them. Pure copies, no arithmetic, so output is bit-identical - a golden diff here
-    !! means the index mapping is wrong, not that the goldens need regenerating.
-    subroutine s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir)
+    !> Copy the advection-source band out of the flat Riemann work buffer into flux_src_vf.
+    !!
+    !! The flux and geometric-source copies that used to live here are gone (2026-08-05). flux_rsx_vf and flux_gsrc_rsx_vf are
+    !! already flat, natural-order (x, y, z, var) module arrays allocated once for all three directions, with exactly the reuse
+    !! lifetime flux_n/flux_gsrc_n had - so their consumers now read them directly and the copies were pure waste. What remains
+    !! is the advection band, which cannot follow yet: flux_src_rsx_vf spans adv%beg:sys_size only, so flux_src_n's viscous
+    !! mom..E components have no flat counterpart.
+    !!
+    !! Pure copies, no arithmetic - a golden diff here means the index mapping is wrong, not that the goldens need regenerating.
+    subroutine s_finalize_riemann_solver(flux_src_vf, norm_dir)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         integer, intent(in)                                    :: norm_dir
         integer                                                :: i, j, k, l  !< Generic loop iterators
         logical                                                :: src_band  !< hll/hlld write the whole adv band, not just its first
@@ -1169,18 +1172,13 @@ contains
             #:set IV = {1: 'j', 2: 'k', 3: 'l'}[ND]
             #:set IB = {1: 'is1', 2: 'is2', 3: 'is3'}[ND]
             #:set IDX = {1: 'j, k, l', 2: 'k, j, l', 3: 'l, k, j'}[ND]
-            #:set GCOND = {1: '', 2: 'cyl_coord', 3: 'grid_geometry == 3'}[ND]
             if (norm_dir == ${ND}$) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
+                do i = eqn_idx%adv%beg, eqn_idx%adv%end
                     do ${OV}$ = ${OB}$%beg, ${OB}$%end
                         do ${MV}$ = ${MB}$%beg, ${MB}$%end
                             do ${IV}$ = ${IB}$%beg, ${IB}$%end
-                                flux_vf(i)%sf(${IDX}$) = flux_rsx_vf(${IDX}$, i)
-                                #:if GCOND
-                                    if (${GCOND}$) flux_gsrc_vf(i)%sf(${IDX}$) = flux_gsrc_rsx_vf(${IDX}$, i)
-                                #:endif
-                                if (i == eqn_idx%adv%beg .or. (src_band .and. i > eqn_idx%adv%beg .and. i <= eqn_idx%adv%end)) then
+                                if (i == eqn_idx%adv%beg .or. src_band) then
                                     flux_src_vf(i)%sf(${IDX}$) = flux_src_rsx_vf(${IDX}$, i)
                                 end if
                             end do

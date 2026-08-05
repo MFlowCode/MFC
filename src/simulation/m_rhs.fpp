@@ -19,6 +19,7 @@ module m_rhs
         & recon_type_muscl
     use m_muscl
     use m_riemann_solvers
+    use m_riemann_state, only: flux_rsx_vf, flux_gsrc_rsx_vf
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
@@ -73,17 +74,17 @@ module m_rhs
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
     $:GPU_DECLARE(create='[tau_Re_vf]')
 
-    !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical source). These are computed by applying the
-    !! chosen Riemann problem solver on the left and right cell-boundary values of the primitive variables
-    !> @{
-    type(vector_field), allocatable, dimension(:) :: flux_n
+    !> The cell-boundary values of the source fluxes, computed by applying the chosen Riemann problem solver on the left and right
+    !! cell-boundary values of the primitive variables. The advective flux and the geometrical source flux used to live here too, as
+    !! flux_n/flux_gsrc_n; they were deleted (2026-08-05) because flux_rsx_vf/flux_gsrc_rsx_vf in m_riemann_state already hold
+    !! exactly the same data in the same flat, natural-order (x, y, z, var) layout, allocated once for all three directions - the
+    !! copy out of them was vestigial. flux_src_n cannot follow yet: flux_src_rsx_vf spans adv%beg:sys_size only, so the viscous
+    !! mom..E components have no flat counterpart.
     type(vector_field), allocatable, dimension(:) :: flux_src_n
-    type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
 
 #if defined(MFC_OpenACC)
-    $:GPU_DECLARE(create='[flux_n, flux_src_n, flux_gsrc_n]')
+    $:GPU_DECLARE(create='[flux_src_n]')
 #endif
-    !> @}
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
 #if defined(MFC_OpenACC)
@@ -193,23 +194,12 @@ contains
         end if
 
         if (.not. igr) then
-            @:ALLOCATE(flux_n(1:num_dims))
             @:ALLOCATE(flux_src_n(1:num_dims))
-            @:ALLOCATE(flux_gsrc_n(1:num_dims))
 
             do i = 1, num_dims
-                @:ALLOCATE(flux_n(i)%vf(1:sys_size))
                 @:ALLOCATE(flux_src_n(i)%vf(1:sys_size))
-                @:ALLOCATE(flux_gsrc_n(i)%vf(1:sys_size))
 
                 if (i == 1) then
-                    do l = 1, sys_size
-                        @:ALLOCATE(flux_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
-                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
-                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
-                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
-                    end do
-
                     if (viscous .or. surface_tension) then
                         do l = eqn_idx%mom%beg, eqn_idx%E
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
@@ -237,15 +227,9 @@ contains
                                        & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end if
                     end if
-                else
-                    do l = 1, sys_size
-                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
-                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
-                    end do
                 end if
 
-                @:ACC_SETUP_VFs(flux_n(i))
-                @:ACC_SETUP_VFs(flux_src_n(i), flux_gsrc_n(i))
+                @:ACC_SETUP_VFs(flux_src_n(i))
 
                 if (i == 1) then
                     if (riemann_solver /= riemann_solver_hll) then
@@ -256,8 +240,6 @@ contains
                     end if
                 else
                     do l = 1, sys_size
-                        flux_n(i)%vf(l)%sf => flux_n(1)%vf(l)%sf
-                        $:GPU_ENTER_DATA(attach='[flux_n(i)%vf(l)%sf]')
                         flux_src_n(i)%vf(l)%sf => flux_src_n(1)%vf(l)%sf
                         $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
                     end do
@@ -421,20 +403,6 @@ contains
                     end if
                 end do
             end if
-
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, id]', collapse=4)
-            do id = 1, num_dims
-                do i = 1, sys_size
-                    do l = idwbuff(3)%beg, idwbuff(3)%end
-                        do k = idwbuff(2)%beg, idwbuff(2)%end
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                flux_gsrc_n(id)%vf(i)%sf(j, k, l) = 0._wp
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (qbmm) then
@@ -803,8 +771,7 @@ contains
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
                 call s_riemann_solver(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, dqR_prim_dz_n(id)%vf, &
                                       & qR_prim(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, &
-                                      & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_n(id)%vf, flux_src_n(id)%vf, &
-                                      & flux_gsrc_n(id)%vf, id, irx, iry, irz)
+                                      & dqL_prim_dz_n(id)%vf, qL_prim(id)%vf, q_prim_qp%vf, flux_src_n(id)%vf, id, irx, iry, irz)
                 call nvtxEndRange
 
                 ! Additional physics and source terms RHS addition for advection source
@@ -822,10 +789,10 @@ contains
                 end if
 
                 ! AMR refluxing: record the c/f boundary-face fluxes exactly as the assembly above used
-                ! them (after s_cbc may have modified flux_n in the advection source call, and after all
-                ! flux_src contributions - viscous and species diffusion - are in place); must run before
-                ! the next direction's sweep reuses the aliased flux_n storage.
-                if (amr) call s_amr_capture_boundary_flux(id, flux_n(id), flux_src_n(id), stage)
+                ! them (after s_cbc may have modified flux_rsx_vf in the advection source call, and after
+                ! all flux_src contributions - viscous and species diffusion - are in place); must run
+                ! before the next direction's sweep overwrites flux_rsx_vf, which all directions share.
+                if (amr) call s_amr_capture_boundary_flux(id, flux_src_n(id), stage)
 
                 ! RHS additions for hypoelasticity
                 call nvtxStartRange("RHS-HYPOELASTICITY")
@@ -850,7 +817,7 @@ contains
                 ! RHS additions for qbmm bubbles
                 if (qbmm) then
                     call nvtxStartRange("RHS-QBMM")
-                    call s_compute_qbmm_rhs(id, q_cons_qp%vf, q_prim_qp%vf, rhs_vf, flux_n(id)%vf, pb_in, rhs_pb)
+                    call s_compute_qbmm_rhs(id, q_cons_qp%vf, q_prim_qp%vf, rhs_vf, pb_in, rhs_pb)
                     call nvtxEndRange
                 end if
                 ! END: Additional physics and source terms
@@ -1018,10 +985,10 @@ contains
         select case (idir)
         case (1)  ! x-direction
             if (bc_x%beg <= BC_CHAR_SLIP_WALL .and. bc_x%beg >= BC_CHAR_SUP_OUTFLOW) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, -1, irx, iry, irz)
+                call s_cbc(q_prim_vf%vf, flux_src_n_vf%vf, idir, -1, irx, iry, irz)
             end if
             if (bc_x%end <= BC_CHAR_SLIP_WALL .and. bc_x%end >= BC_CHAR_SUP_OUTFLOW) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
+                call s_cbc(q_prim_vf%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
             $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k_loop, l_loop, q_loop, inv_ds, flux_face1, flux_face2]')
@@ -1030,8 +997,8 @@ contains
                     do l_loop = aby_lo, aby_hi
                         do k_loop = abx_lo, abx_hi
                             inv_ds = 1._wp/dx(k_loop)
-                            flux_face1 = flux_n(1)%vf(j)%sf(k_loop - 1, l_loop, q_loop)
-                            flux_face2 = flux_n(1)%vf(j)%sf(k_loop, l_loop, q_loop)
+                            flux_face1 = flux_rsx_vf(k_loop - 1, l_loop, q_loop, j)
+                            flux_face2 = flux_rsx_vf(k_loop, l_loop, q_loop, j)
                             rhs_vf(j)%sf(k_loop, l_loop, q_loop) = inv_ds*(flux_face1 - flux_face2)
                         end do
                     end do
@@ -1064,10 +1031,10 @@ contains
             call s_add_directional_advection_source_terms(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, Kterm)
         case (2)  ! y-direction
             if (bc_y%beg <= BC_CHAR_SLIP_WALL .and. bc_y%beg >= BC_CHAR_SUP_OUTFLOW) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, -1, irx, iry, irz)
+                call s_cbc(q_prim_vf%vf, flux_src_n_vf%vf, idir, -1, irx, iry, irz)
             end if
             if (bc_y%end <= BC_CHAR_SLIP_WALL .and. bc_y%end >= BC_CHAR_SUP_OUTFLOW) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
+                call s_cbc(q_prim_vf%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
             $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1, flux_face2]')
@@ -1076,8 +1043,8 @@ contains
                     do k = aby_lo, aby_hi
                         do q = abx_lo, abx_hi
                             inv_ds = 1._wp/dy(k)
-                            flux_face1 = flux_n(2)%vf(j)%sf(q, k - 1, l)
-                            flux_face2 = flux_n(2)%vf(j)%sf(q, k, l)
+                            flux_face1 = flux_rsx_vf(q, k - 1, l, j)
+                            flux_face2 = flux_rsx_vf(q, k, l, j)
                             rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) + inv_ds*(flux_face1 - flux_face2)
                         end do
                     end do
@@ -1118,8 +1085,8 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do q = 0, m
-                                flux_face1 = flux_gsrc_n(2)%vf(j)%sf(q, k - 1, l)
-                                flux_face2 = flux_gsrc_n(2)%vf(j)%sf(q, k, l)
+                                flux_face1 = flux_gsrc_rsx_vf(q, k - 1, l, j)
+                                flux_face2 = flux_gsrc_rsx_vf(q, k, l, j)
                                 rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) - 5.e-1_wp/y_cc(k)*(flux_face1 + flux_face2)
                             end do
                         end do
@@ -1131,10 +1098,10 @@ contains
             call s_add_directional_advection_source_terms(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, Kterm)
         case (3)  ! z-direction
             if (bc_z%beg <= BC_CHAR_SLIP_WALL .and. bc_z%beg >= BC_CHAR_SUP_OUTFLOW) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, -1, irx, iry, irz)
+                call s_cbc(q_prim_vf%vf, flux_src_n_vf%vf, idir, -1, irx, iry, irz)
             end if
             if (bc_z%end <= BC_CHAR_SLIP_WALL .and. bc_z%end >= BC_CHAR_SUP_OUTFLOW) then
-                call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
+                call s_cbc(q_prim_vf%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
             if (grid_geometry == 3) then  ! Cylindrical Coordinates
@@ -1145,8 +1112,8 @@ contains
                             do l = 0, m
                                 inv_ds = 1._wp/(dz(k)*y_cc(q))
                                 velocity_val = q_prim_vf%vf(eqn_idx%cont%end + idir)%sf(l, q, k)
-                                flux_face1 = flux_n(3)%vf(j)%sf(l, q, k - 1)
-                                flux_face2 = flux_n(3)%vf(j)%sf(l, q, k)
+                                flux_face1 = flux_rsx_vf(l, q, k - 1, j)
+                                flux_face2 = flux_rsx_vf(l, q, k, j)
                                 rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) + inv_ds*velocity_val*(flux_face1 - flux_face2)
                             end do
                         end do
@@ -1158,8 +1125,8 @@ contains
                     do k = 0, p
                         do q = 0, n
                             do l = 0, m
-                                flux_face1 = flux_gsrc_n(3)%vf(j)%sf(l, q, k - 1)
-                                flux_face2 = flux_gsrc_n(3)%vf(j)%sf(l, q, k)
+                                flux_face1 = flux_gsrc_rsx_vf(l, q, k - 1, j)
+                                flux_face2 = flux_gsrc_rsx_vf(l, q, k, j)
                                 rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) - 5.e-1_wp/y_cc(q)*(flux_face1 + flux_face2)
                             end do
                         end do
@@ -1173,8 +1140,8 @@ contains
                         do q = aby_lo, aby_hi
                             do l = abx_lo, abx_hi
                                 inv_ds = 1._wp/dz(k)
-                                flux_face1 = flux_n(3)%vf(j)%sf(l, q, k - 1)
-                                flux_face2 = flux_n(3)%vf(j)%sf(l, q, k)
+                                flux_face1 = flux_rsx_vf(l, q, k - 1, j)
+                                flux_face2 = flux_rsx_vf(l, q, k, j)
                                 rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) + inv_ds*(flux_face1 - flux_face2)
                             end do
                         end do
@@ -1938,16 +1905,9 @@ contains
             do i = num_dims, 1, -1
                 if (i /= 1) then
                     do l = 1, sys_size
-                        nullify (flux_n(i)%vf(l)%sf)
                         nullify (flux_src_n(i)%vf(l)%sf)
-                        @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                     end do
                 else
-                    do l = 1, sys_size
-                        @:DEALLOCATE(flux_n(i)%vf(l)%sf)
-                        @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
-                    end do
-
                     if (viscous) then
                         do l = eqn_idx%mom%beg, eqn_idx%E
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
@@ -1971,10 +1931,10 @@ contains
                     @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf)
                 end if
 
-                @:DEALLOCATE(flux_n(i)%vf, flux_src_n(i)%vf, flux_gsrc_n(i)%vf)
+                @:DEALLOCATE(flux_src_n(i)%vf)
             end do
 
-            @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
+            @:DEALLOCATE(flux_src_n)
             do i = 1, num_dims
                 do l = eqn_idx%mom%beg, eqn_idx%mom%end
                     @:DEALLOCATE(qL_prim(i)%vf(l)%sf)
