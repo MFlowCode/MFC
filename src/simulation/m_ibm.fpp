@@ -33,11 +33,9 @@ module m_ibm
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
-    ! Snapshot of ib_markers taken just before each body move. Used ONLY on JWL
-    ! moving-IB cases to detect fresh (solid->fluid) cells so they can be rebuilt
-    ! through the JWL closure instead of being left at the p=1 Pa solid seed
-    ! (a near-vacuum at detonation pressures). Allocated only when jwl_idx > 0,
-    ! so base moving-IB behaviour is bit-identical.
+    ! Snapshot of ib_markers taken just before each body move. Moving-IB cases use
+    ! it to detect fresh (solid->fluid) cells so they can be rebuilt instead of
+    ! being left at the p=1 Pa solid seed.
     type(integer_field) :: ib_markers_prev
     $:GPU_DECLARE(create='[ib_markers_prev]')
 
@@ -70,15 +68,15 @@ contains
 
         @:ACC_SETUP_SFs(ib_markers)
 
-        ! JWL moving-IB fresh-cell repopulation needs the pre-move marker state.
-        if (jwl_idx > 0) then
-            if (p > 0) then
-                @:ALLOCATE(ib_markers_prev%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
-            else
-                @:ALLOCATE(ib_markers_prev%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
-            end if
-            @:ACC_SETUP_SFs(ib_markers_prev)
+        ! Moving-IB fresh-cell repopulation needs the pre-move marker state.
+        ! moving_immersed_boundary_flag is set later by s_reduce_ib_patch_array,
+        ! so this allocation must not be guarded by that flag here.
+        if (p > 0) then
+            @:ALLOCATE(ib_markers_prev%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
+        else
+            @:ALLOCATE(ib_markers_prev%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
         end if
+        @:ACC_SETUP_SFs(ib_markers_prev)
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
 
@@ -241,123 +239,146 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! JWL moving-IB fresh-cell repopulation: a cell that just changed from
+        ! Moving-IB fresh-cell repopulation: a cell that just changed from
         ! solid to fluid (prev marker /= 0, current marker == 0) is otherwise left
         ! holding the p=1 Pa solid seed set above, which is a near-vacuum at
         ! detonation pressures and drives a spurious rarefaction at the body's
         ! trailing edge. Rebuild it by inverse-distance extrapolation from
-        ! established-fluid neighbours (fluid now AND before the move) and recover
-        ! energy through the JWL closure. Guarded on jwl_idx so base moving-IB
-        ! cases keep the p=1 seed bit-identically. The %abn/%rxn reaction-progress
+        ! established-fluid neighbours (fluid now AND before the move). JWL uses
+        ! its EOS closure below; ideal/stiffened-gas cases use the same closure as
+        ! the ghost-point path. The %abn/%rxn reaction-progress
         ! variables are material scalars (prim = cons, like the color function), so
         ! a fresh cell takes the same inverse-distance neighbour average as alpha.
-        #:if not MFC_CASE_OPTIMIZATION or jwl_active
-            if (jwl_idx > 0 .and. moving_immersed_boundary_flag) then
-                z_stencil = 0; if (p > 0) z_stencil = 1
-                $:GPU_PARALLEL_LOOP(private='[j, k, l, q, di, dj, dk, jn, kn, ln, wsum, w, rho, Y_jwl, e_mix_jwl, dyn_pres, &
-                                    & alpha_rho_IP, alpha_IP, vel_IP, pres_IP, b_IP, lam_IP]', collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            if (ib_markers_prev%sf(j, k, l) /= 0 .and. ib_markers%sf(j, k, l) == 0) then
-                                wsum = 0._wp
-                                pres_IP = 0._wp
-                                b_IP = 0._wp
-                                lam_IP = 0._wp
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do q = 1, num_fluids
-                                    alpha_rho_IP(q) = 0._wp
-                                    alpha_IP(q) = 0._wp
-                                end do
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do q = 1, 3
-                                    vel_IP(q) = 0._wp
-                                end do
-                                ! inverse-distance average over the 1-cell neighbourhood,
-                                ! established-fluid neighbours only (no solid, no other fresh cells)
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do dk = -z_stencil, z_stencil
-                                    do dj = -1, 1
-                                        do di = -1, 1
-                                            jn = j + di; kn = k + dj; ln = l + dk
-                                            if ((di /= 0 .or. dj /= 0 .or. dk /= 0) .and. ib_markers%sf(jn, kn, &
-                                                & ln) == 0 .and. ib_markers_prev%sf(jn, kn, ln) == 0) then
-                                                w = 1._wp/sqrt(real(di*di + dj*dj + dk*dk, wp))
-                                                wsum = wsum + w
-                                                do q = 1, num_fluids
-                                                    alpha_rho_IP(q) = alpha_rho_IP(q) + w*q_prim_vf(eqn_idx%cont%beg + q &
-                                                                 & - 1)%sf(jn, kn, ln)
-                                                    alpha_IP(q) = alpha_IP(q) + w*q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(jn, kn, ln)
-                                                end do
-                                                do q = 1, num_dims
-                                                    vel_IP(q) = vel_IP(q) + w*q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(jn, kn, ln)
-                                                end do
-                                                pres_IP = pres_IP + w*q_prim_vf(eqn_idx%E)%sf(jn, kn, ln)
+        if (moving_immersed_boundary_flag) then
+            z_stencil = 0; if (p > 0) z_stencil = 1
+            $:GPU_PARALLEL_LOOP(private='[j, k, l, q, di, dj, dk, jn, kn, ln, wsum, w, rho, gamma, pi_inf, qv_K, Re_K, G_K, &
+                                & Y_jwl, e_mix_jwl, dyn_pres, alpha_rho_IP, alpha_IP, vel_IP, pres_IP, b_IP, lam_IP]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ib_markers_prev%sf(j, k, l) /= 0 .and. ib_markers%sf(j, k, l) == 0) then
+                            wsum = 0._wp
+                            pres_IP = 0._wp
+                            b_IP = 0._wp
+                            lam_IP = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = 1, num_fluids
+                                alpha_rho_IP(q) = 0._wp
+                                alpha_IP(q) = 0._wp
+                            end do
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = 1, 3
+                                vel_IP(q) = 0._wp
+                            end do
+                            ! inverse-distance average over the 1-cell neighbourhood,
+                            ! established-fluid neighbours only (no solid, no other fresh cells)
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do dk = -z_stencil, z_stencil
+                                do dj = -1, 1
+                                    do di = -1, 1
+                                        jn = j + di; kn = k + dj; ln = l + dk
+                                        if ((di /= 0 .or. dj /= 0 .or. dk /= 0) .and. ib_markers%sf(jn, kn, &
+                                            & ln) == 0 .and. ib_markers_prev%sf(jn, kn, ln) == 0) then
+                                            w = 1._wp/sqrt(real(di*di + dj*dj + dk*dk, wp))
+                                            wsum = wsum + w
+                                            do q = 1, num_fluids
+                                                alpha_rho_IP(q) = alpha_rho_IP(q) + w*q_prim_vf(eqn_idx%cont%beg + q - 1)%sf(jn, &
+                                                             & kn, ln)
+                                                alpha_IP(q) = alpha_IP(q) + w*q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(jn, kn, ln)
+                                            end do
+                                            do q = 1, num_dims
+                                                vel_IP(q) = vel_IP(q) + w*q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(jn, kn, ln)
+                                            end do
+                                            pres_IP = pres_IP + w*q_prim_vf(eqn_idx%E)%sf(jn, kn, ln)
+                                            #:if not MFC_CASE_OPTIMIZATION or jwl_active
                                                 if (jwl_afterburn) b_IP = b_IP + w*q_prim_vf(eqn_idx%abn)%sf(jn, kn, ln)
                                                 if (jwl_reactive) lam_IP = lam_IP + w*q_prim_vf(eqn_idx%rxn)%sf(jn, kn, ln)
-                                            end if
-                                        end do
+                                            #:endif
+                                        end if
                                     end do
                                 end do
+                            end do
 
-                                ! wsum == 0 (fully surrounded by solid/fresh) is unreachable under
-                                ! the acoustic CFL since the body moves << 1 cell/stage; if it ever
-                                ! happens the cell keeps the p=1 seed (no worse than base).
-                                if (wsum > 0._wp) then
-                                    rho = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, num_fluids
-                                        alpha_rho_IP(q) = alpha_rho_IP(q)/wsum
-                                        alpha_IP(q) = alpha_IP(q)/wsum
-                                        rho = rho + alpha_rho_IP(q)
-                                    end do
-                                    pres_IP = pres_IP/wsum
-                                    dyn_pres = 0._wp
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, num_dims
-                                        vel_IP(q) = vel_IP(q)/wsum
-                                        dyn_pres = dyn_pres + 0.5_wp*rho*vel_IP(q)*vel_IP(q)
-                                    end do
+                            ! wsum == 0 (fully surrounded by solid/fresh) is unreachable under
+                            ! the acoustic CFL since the body moves << 1 cell/stage; if it ever
+                            ! happens the cell keeps the p=1 seed (no worse than base).
+                            if (wsum > 0._wp) then
+                                rho = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, num_fluids
+                                    alpha_rho_IP(q) = alpha_rho_IP(q)/wsum
+                                    alpha_IP(q) = alpha_IP(q)/wsum
+                                    rho = rho + alpha_rho_IP(q)
+                                end do
+                                pres_IP = pres_IP/wsum
+                                dyn_pres = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, num_dims
+                                    vel_IP(q) = vel_IP(q)/wsum
+                                    dyn_pres = dyn_pres + 0.5_wp*rho*vel_IP(q)*vel_IP(q)
+                                end do
 
+                                #:if not MFC_CASE_OPTIMIZATION or jwl_active
                                     if (jwl_afterburn) then
                                         b_IP = min(max(b_IP/wsum, 0._wp), 1._wp)
                                         q_cons_vf(eqn_idx%abn)%sf(j, k, l) = b_IP
                                         q_prim_vf(eqn_idx%abn)%sf(j, k, l) = b_IP
                                     end if
                                     if (jwl_reactive) lam_IP = min(max(lam_IP/wsum, 0._wp), 1._wp)
+                                #:endif
 
-                                    Y_jwl = alpha_rho_IP(jwl_idx)/max(rho, sgm_eps)
-                                    if (jwl_reactive) then
-                                        ! The delta_e Hugoniot offset makes the inverse lambda-dependent.
-                                        call s_jwl_mix_energy_pr(rho, pres_IP, Y_jwl, jwl_idx, e_mix_jwl, lam_IP)
-                                        q_cons_vf(eqn_idx%rxn)%sf(j, k, l) = lam_IP
-                                        q_prim_vf(eqn_idx%rxn)%sf(j, k, l) = lam_IP
+                                #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                                    if (jwl_idx > 0) then
+                                        Y_jwl = alpha_rho_IP(jwl_idx)/max(rho, sgm_eps)
+                                        if (jwl_reactive) then
+                                            ! The delta_e Hugoniot offset makes the inverse lambda-dependent.
+                                            call s_jwl_mix_energy_pr(rho, pres_IP, Y_jwl, jwl_idx, e_mix_jwl, lam_IP)
+                                            q_cons_vf(eqn_idx%rxn)%sf(j, k, l) = lam_IP
+                                            q_prim_vf(eqn_idx%rxn)%sf(j, k, l) = lam_IP
+                                        else
+                                            call s_jwl_mix_energy_pr(rho, pres_IP, Y_jwl, jwl_idx, e_mix_jwl)
+                                        end if
+                                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_mix_jwl + dyn_pres
                                     else
-                                        call s_jwl_mix_energy_pr(rho, pres_IP, Y_jwl, jwl_idx, e_mix_jwl)
+                                    #:endif
+                                    if (elasticity) then
+                                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                            & alpha_rho_IP, Re_K, G_K, fluid_pp(:)%G)
+                                    else
+                                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                            & alpha_rho_IP, Re_K)
                                     end if
+                                    if (bubbles_euler) then
+                                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1._wp - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
+                                    else if (model_eqns /= model_eqns_4eq) then
+                                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
+                                    else
+                                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
+                                    end if
+                                    #:if not MFC_CASE_OPTIMIZATION or jwl_active
+                                    end if
+                                #:endif
 
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, num_fluids
-                                        q_cons_vf(eqn_idx%cont%beg + q - 1)%sf(j, k, l) = alpha_rho_IP(q)
-                                        q_prim_vf(eqn_idx%cont%beg + q - 1)%sf(j, k, l) = alpha_rho_IP(q)
-                                        q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
-                                        q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
-                                    end do
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, num_dims
-                                        q_cons_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l) = rho*vel_IP(q)
-                                        q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l) = vel_IP(q)
-                                    end do
-                                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_mix_jwl + dyn_pres
-                                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
-                                end if
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, num_fluids
+                                    q_cons_vf(eqn_idx%cont%beg + q - 1)%sf(j, k, l) = alpha_rho_IP(q)
+                                    q_prim_vf(eqn_idx%cont%beg + q - 1)%sf(j, k, l) = alpha_rho_IP(q)
+                                    q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
+                                    q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
+                                end do
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, num_dims
+                                    q_cons_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l) = rho*vel_IP(q)
+                                    q_prim_vf(eqn_idx%mom%beg + q - 1)%sf(j, k, l) = vel_IP(q)
+                                end do
+                                q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
                             end if
-                        end do
+                        end if
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        #:endif
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
@@ -1125,15 +1146,12 @@ contains
         ! Clears the existing immersed boundary indices
         z_gp_layers = 0; if (p /= 0) z_gp_layers = gp_layers + 1
 
-        ! JWL only: snapshot markers before they are cleared/recomputed so
-        ! s_ibm_correct_state can find cells that just changed solid->fluid.
-        if (jwl_idx > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k]')
-            do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -z_gp_layers, p + z_gp_layers
-                ib_markers_prev%sf(i, j, k) = ib_markers%sf(i, j, k)
-            end do; end do; end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        ! Snapshot markers before they are cleared/recomputed so s_ibm_correct_state can find cells that just changed solid->fluid.
+        $:GPU_PARALLEL_LOOP(private='[i, j, k]')
+        do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -z_gp_layers, p + z_gp_layers
+            ib_markers_prev%sf(i, j, k) = ib_markers%sf(i, j, k)
+        end do; end do; end do
+        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k]')
         do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -z_gp_layers, p + z_gp_layers
@@ -1779,9 +1797,7 @@ contains
         integer :: i
 
         @:DEALLOCATE(ib_markers%sf)
-        if (jwl_idx > 0) then
-            @:DEALLOCATE(ib_markers_prev%sf)
-        end if
+        @:DEALLOCATE(ib_markers_prev%sf)
         @:DEALLOCATE(ib_gbl_idx_lookup)
         do i = 1, num_ib_airfoils_max
             if (allocated(ib_airfoil_grids(i)%upper)) then

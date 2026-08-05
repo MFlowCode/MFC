@@ -685,6 +685,14 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+                    ! A covered cell is not part of the fluid domain. Its interior
+                    ! state is only an IBM seed/ghost state, so it must not limit
+                    ! the fluid CFL timestep.
+                    if (ib .and. ib_markers%sf(j, k, l) /= 0) then
+                        max_dt(j, k, l) = huge(1._wp)
+                        cycle
+                    end if
+
                     if (igr) then
                         call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
                     else
