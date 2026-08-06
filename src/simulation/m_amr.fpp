@@ -49,8 +49,9 @@ module m_amr
     !! module). State stays HERE - only the drivers moved.
     public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, &
         & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
-        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
-        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, f_l0_slot
+        & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
+        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
+        & f_amr_boxes_overlap, f_l0_slot
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -232,9 +233,23 @@ module m_amr
     !! (identity for stp coarse), so at np=1 (owner copies its own coarse) the patch equals the local coarse read bit-for-bit. Sized
     !! to the largest block.
     type(scalar_field), allocatable :: amr_cg(:)
-    integer                         :: amr_cpat_mar = 0     !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
-    integer                         :: amr_cpat_hi(3) = 0   !< amr_cg upper local bounds per dim (0 in collapsed dims)
-    integer                         :: amr_cpat_off(3) = 0  !< GLOBAL coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar)
+    integer                         :: amr_cpat_mar = 0    !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
+    integer                         :: amr_cpat_hi(3) = 0  !< amr_cg upper local bounds per dim (0 in collapsed dims)
+
+    !> Deferred-send pool for the per-box coarse-patch gather.
+    !!
+    !! The gather is called once per BOX (794 of them at 400^3) and the non-owner side used a BLOCKING MPI_SEND, so every rank had
+    !! to rendezvous with the owner 794 times per rebuild, in lockstep. That serialisation was measured at 45% of regrid and ~25%
+    !! of total runtime across this routine's two call sites. Sends are now non-blocking and completed in batches, so a rank that
+    !! only contributes data can run ahead instead of blocking on each box.
+    !!
+    !! The pool owns the buffers because MPI_ISEND requires them to stay live until completion - the old code deallocated sbuf
+    !! immediately after the blocking send, which is exactly what must NOT happen here.
+    integer, parameter    :: amr_gsnd_max = 64    !< pending sends before a forced drain (bounds pool memory)
+    real(wp), allocatable :: amr_gsnd_pool(:,:)
+    integer, allocatable  :: amr_gsnd_req(:)
+    integer               :: amr_gsnd_n = 0
+    integer               :: amr_cpat_off(3) = 0  !< GLOBAL coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar)
     !> Gathered coarse pb/mv patch for non-polytropic QBMM (analogue of amr_cg): the block's coarse-side pb/mv side-state,
     !! P2P-gathered from the coarse-cell owners into the block owner in the amr_cg patch-local frame (cell 0 == amr_cpat_off). Read
     !! by the pb/mv prolong + ghost-fill so np>=2 couples to the correct coarse rank. Allocated only for non-polytropic QBMM.
@@ -788,6 +803,38 @@ contains
     !! block's fine array; the C<->F prolong/restrict/gather routines all operate in the parent-fine frame, not the L0 frame. TWIN
     !! s_amr_gather_coarse_patch_pbmv (q<->pb/mv): same P2P skeleton (rank-range, intersection, pack/send/recv/unpack) and
     !! patch-local frame - keep lockstep.
+    !> Make room for one more pending gather send, draining the pool first if it is full. Draining is a WAITALL, so the pool size
+    !! sets how far a contributing rank may run ahead of the owners.
+    impure subroutine s_amr_gsnd_reserve(slotsz)
+
+        integer, intent(in) :: slotsz
+
+        if (.not. allocated(amr_gsnd_pool)) then
+            allocate (amr_gsnd_pool(slotsz, amr_gsnd_max), amr_gsnd_req(amr_gsnd_max))
+            amr_gsnd_n = 0
+        else if (size(amr_gsnd_pool, 1) < slotsz) then
+            call s_amr_gather_send_flush()  ! outstanding sends reference the old buffer - complete them before resizing
+            deallocate (amr_gsnd_pool)
+            allocate (amr_gsnd_pool(slotsz, amr_gsnd_max))
+        end if
+        if (amr_gsnd_n >= amr_gsnd_max) call s_amr_gather_send_flush()
+
+    end subroutine s_amr_gsnd_reserve
+
+    !> Complete every pending gather send. MUST be called before the send buffers are reused or the routine returns to a caller that
+    !! will free them - an ISEND whose buffer is overwritten in flight silently corrupts the receiver's patch.
+    impure subroutine s_amr_gather_send_flush()
+
+        integer :: ierr
+
+        if (amr_gsnd_n == 0) return
+#ifdef MFC_MPI
+        call MPI_WAITALL(amr_gsnd_n, amr_gsnd_req(1:amr_gsnd_n), MPI_STATUSES_IGNORE, ierr)
+#endif
+        amr_gsnd_n = 0
+
+    end subroutine s_amr_gather_send_flush
+
     impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -914,26 +961,30 @@ contains
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                allocate (sbuf(boxsz))
+                call s_amr_gsnd_reserve(maxsz)
+                amr_gsnd_n = amr_gsnd_n + 1
                 if (pull_host) then
-                    ! runtime: pack the overlap box on the device straight into sbuf (only the box crosses PCIe)
-                    call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, sbuf)
+                    ! runtime: pack the overlap box on the device straight into the pool slot (only the box crosses PCIe)
+                    call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, amr_gsnd_pool(:,amr_gsnd_n))
                 else
                     idx = 0
                     do i = 1, sys_size
                         do g3 = bl(3), bh(3)
                             do g2 = bl(2), bh(2)
                                 do g1 = bl(1), bh(1)
-                                    idx = idx + 1; sbuf(idx) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
+                                    idx = idx + 1
+                                    amr_gsnd_pool(idx, amr_gsnd_n) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
                                 end do
                             end do
                         end do
                     end do
                 end if
 #ifdef MFC_MPI
-                call MPI_SEND(sbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
+                ! NON-BLOCKING: the owner's per-box IRECV/WAITALL still orders the data correctly, but this rank no longer
+                ! rendezvouses on every box. Completed by s_amr_gather_send_flush (caller) or the drain in s_amr_gsnd_reserve.
+                call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, &
+                               & amr_gsnd_req(amr_gsnd_n), ierr)
 #endif
-                deallocate (sbuf)
             end if
         end if
 
@@ -2509,6 +2560,7 @@ contains
         do islot = f_l0_slot(1), amr_num_blocks
             call s_amr_select_slot(islot)
             call s_amr_gather_coarse_patch(q_cons_base, .false.)
+            call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
             ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners prolong from it below)
             if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (amr_rank_owns_block) then
@@ -2577,6 +2629,7 @@ contains
         call s_set_amr_fine_geometry(amr_region_lo_all(:,L2), amr_region_hi_all(:,L2))
         call s_amr_reduce_xchg_flag()
         call s_amr_gather_coarse_patch(q_cons_base, .false.)  ! q_coarse ignored for level>=2 (reads the parent block); pass the
+        call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
         ! always-allocated base field, not amr_slots(1) (the parent slot is unallocated on a non-owner rank at np>1)
         if (amr_rank_owns_block) then
             call s_interpolate_coarse_to_fine()
@@ -2594,6 +2647,7 @@ contains
         ! coefficient tables off the wrong bounds and faulted in __tgt_target_data_begin_mapper.
         call s_amr_select_slot(f_l0_slot(1))
         call s_amr_gather_coarse_patch(q_cons_base, .false.)
+        call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
 
     end subroutine s_amr_build_static_multilevel
 
@@ -4666,6 +4720,7 @@ contains
         ! return). The device ghost-fill below then reads the gathered patch amr_cg instead of local coarse.
         call s_phase_tic(PH_GATHER)
         call s_amr_gather_coarse_patch(q_cons_coarse, .true.)
+        call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
         call s_phase_toc(PH_GATHER)
         ! non-polytropic QBMM: gather the coarse pb/mv patch too (collective - ALL ranks, before the owner return; owners fill
         ! below)
@@ -4812,11 +4867,13 @@ contains
         ! q_cons so the single amr_cg_pb/mv buffer is consumed by each fill before the next gather overwrites it. Gathers collective
         ! (ALL ranks - P2P); fills owner-only.
         call s_amr_gather_coarse_patch(q_old, .true.)
+        call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
         if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_old, mv_old, .true.)
         if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gsta(amr_cg, amr_loc_of(amr_cur))
         if (amr_rank_owns_block .and. qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &
             & amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf)
         call s_amr_gather_coarse_patch(q_new, .true.)
+        call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
         if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_in, mv_in, .true.)
         if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gstb(amr_cg, amr_loc_of(amr_cur))
         if (amr_rank_owns_block .and. qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &

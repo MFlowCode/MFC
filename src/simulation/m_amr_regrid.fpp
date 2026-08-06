@@ -20,9 +20,9 @@ module m_amr_regrid
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, &
         & amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
-        & s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
-        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
-        & f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
+        & s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
+        & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
+        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -1447,6 +1447,10 @@ contains
             end if
             ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
         end do
+
+        ! Drain the deferred gather sends now that every box has been posted: one WAITALL per rebuild instead of
+        ! a per-box rendezvous. MUST happen before the send buffers are reused or freed.
+        call s_amr_gather_send_flush()
         call s_amr_reduce_xchg_flag()  ! ONE allreduce for the whole loop; sets amr_xchg_coarse_ghosts if ANY block needs it
         ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
         ! new-owned slots were allocated in the build loop, so this only frees - a rank keeps just its owned blocks' fine arrays
