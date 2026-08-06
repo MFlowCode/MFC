@@ -12,7 +12,7 @@ module m_cbc
     use m_global_parameters
     use m_variables_conversion
     use m_compute_cbc
-    use m_riemann_state, only: flux_rsx_vf
+    use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf
     use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
@@ -462,18 +462,17 @@ contains
     end subroutine s_associate_cbc_coefficients_pointers
 
     !> Apply characteristic boundary conditions by modifying fluxes near domain boundaries
-    subroutine s_cbc(q_prim_vf, flux_src_vf, cbc_dir_norm, cbc_loc_norm, ix, iy, iz)
+    subroutine s_cbc(q_prim_vf, cbc_dir_norm, cbc_loc_norm, ix, iy, iz)
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        integer, intent(in)                                    :: cbc_dir_norm, cbc_loc_norm
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
-        real(wp)                                               :: drho_dt
-        real(wp)                                               :: dpres_dt
-        real(wp)                                               :: dgamma_dt
-        real(wp)                                               :: dpi_inf_dt
-        real(wp)                                               :: dqv_dt
-        real(wp)                                               :: dpres_ds
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer, intent(in)                                 :: cbc_dir_norm, cbc_loc_norm
+        type(int_bounds_info), intent(in)                   :: ix, iy, iz
+        real(wp)                                            :: drho_dt
+        real(wp)                                            :: dpres_dt
+        real(wp)                                            :: dgamma_dt
+        real(wp)                                            :: dpi_inf_dt
+        real(wp)                                            :: dqv_dt
+        real(wp)                                            :: dpres_ds
 
         #:if USING_AMD
             real(wp), dimension(20) :: L
@@ -520,7 +519,7 @@ contains
 
         $:GPU_UPDATE(device='[cbc_dir, cbc_loc]')
 
-        call s_initialize_cbc(q_prim_vf, flux_src_vf, ix, iy, iz)
+        call s_initialize_cbc(q_prim_vf, ix, iy, iz)
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
 
@@ -921,15 +920,14 @@ contains
 
         ! The reshaping of outputted data and disssociation of the FD and PI coefficients, or CBC coefficients, respectively, based
         ! on selected CBC coordinate direction.
-        call s_finalize_cbc(flux_src_vf)
+        call s_finalize_cbc()
 
     end subroutine s_cbc
 
     !> Set up the selected CBC for the current boundary
-    subroutine s_initialize_cbc(q_prim_vf, flux_src_vf, ix, iy, iz)
+    subroutine s_initialize_cbc(q_prim_vf, ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: flux_src_vf
         type(int_bounds_info), intent(in)                   :: ix, iy, iz
         integer                                             :: i, j, k, r  !< Generic loop iterators
         ! Configuring the coordinate direction indexes and flags
@@ -1006,7 +1004,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_rsx_vf_l(j, k, r, i) = flux_src_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)
+                                flux_src_rsx_vf_l(j, k, r, i) = flux_src_rsx_vf(dj*((m - 1) - 2*j) + j, k, r, i)
                             end do
                         end do
                     end do
@@ -1017,8 +1015,8 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_rsx_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(dj*((m - 1) - 2*j) + j, &
-                                              & k, r)*sign(1._wp, -1._wp*cbc_loc)
+                            flux_src_rsx_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_rsx_vf(dj*((m - 1) - 2*j) + j, k, r, &
+                                              & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1080,7 +1078,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_rsy_vf_l(j, k, r, i) = flux_src_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)
+                                flux_src_rsy_vf_l(j, k, r, i) = flux_src_rsx_vf(k, dj*((n - 1) - 2*j) + j, r, i)
                             end do
                         end do
                     end do
@@ -1091,8 +1089,8 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_rsy_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(k, &
-                                              & dj*((n - 1) - 2*j) + j, r)*sign(1._wp, -1._wp*cbc_loc)
+                            flux_src_rsy_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_rsx_vf(k, dj*((n - 1) - 2*j) + j, r, &
+                                              & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1154,7 +1152,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_rsz_vf_l(j, k, r, i) = flux_src_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)
+                                flux_src_rsz_vf_l(j, k, r, i) = flux_src_rsx_vf(r, k, dj*((p - 1) - 2*j) + j, i)
                             end do
                         end do
                     end do
@@ -1165,8 +1163,8 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_rsz_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(r, k, &
-                                              & dj*((p - 1) - 2*j) + j)*sign(1._wp, -1._wp*cbc_loc)
+                            flux_src_rsz_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_rsx_vf(r, k, dj*((p - 1) - 2*j) + j, &
+                                              & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1181,10 +1179,9 @@ contains
     end subroutine s_initialize_cbc
 
     !> Deallocation and/or the disassociation procedures that are necessary in order to finalize the CBC application
-    subroutine s_finalize_cbc(flux_src_vf)
+    subroutine s_finalize_cbc()
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        integer                                                :: i, j, k, r  !< Generic loop iterators
+        integer :: i, j, k, r  !< Generic loop iterators
         ! Determining the indicial shift based on CBC location
 
         dj = max(0, cbc_loc)
@@ -1219,7 +1216,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, i)
+                                flux_src_rsx_vf(dj*((m - 1) - 2*j) + j, k, r, i) = flux_src_rsx_vf_l(j, k, r, i)
                             end do
                         end do
                     end do
@@ -1230,8 +1227,8 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_vf(eqn_idx%adv%beg)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, &
-                                        & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
+                            flux_src_rsx_vf(dj*((m - 1) - 2*j) + j, k, r, eqn_idx%adv%beg) = flux_src_rsx_vf_l(j, k, r, &
+                                            & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1269,7 +1266,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, i)
+                                flux_src_rsx_vf(k, dj*((n - 1) - 2*j) + j, r, i) = flux_src_rsy_vf_l(j, k, r, i)
                             end do
                         end do
                     end do
@@ -1280,8 +1277,8 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_vf(eqn_idx%adv%beg)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, &
-                                        & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
+                            flux_src_rsx_vf(k, dj*((n - 1) - 2*j) + j, r, eqn_idx%adv%beg) = flux_src_rsy_vf_l(j, k, r, &
+                                            & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do
@@ -1320,7 +1317,7 @@ contains
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = -1, buff_size
-                                flux_src_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, i)
+                                flux_src_rsx_vf(r, k, dj*((p - 1) - 2*j) + j, i) = flux_src_rsz_vf_l(j, k, r, i)
                             end do
                         end do
                     end do
@@ -1331,8 +1328,8 @@ contains
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = -1, buff_size
-                            flux_src_vf(eqn_idx%adv%beg)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, &
-                                        & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
+                            flux_src_rsx_vf(r, k, dj*((p - 1) - 2*j) + j, eqn_idx%adv%beg) = flux_src_rsz_vf_l(j, k, r, &
+                                            & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
                         end do
                     end do
                 end do

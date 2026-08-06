@@ -17,6 +17,7 @@ module m_surface_tension
     use m_muscl
     use m_helper
     use m_boundary_common
+    use m_riemann_state, only: flux_src_rsx_vf
 
     implicit none
 
@@ -61,12 +62,11 @@ contains
     end subroutine s_initialize_surface_tension_module
 
     !> Compute the capillary source flux from reconstructed color-gradient fields
-    subroutine s_compute_capillary_source_flux(vSrc_rsx_vf, flux_src_vf, id, isx, isy, isz)
+    subroutine s_compute_capillary_source_flux(vSrc_rsx_vf, id, isx, isy, isz)
 
-        real(wp), dimension(-1:,-1:,-1:,1:), intent(in)        :: vSrc_rsx_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        integer, intent(in)                                    :: id
-        type(int_bounds_info), intent(in)                      :: isx, isy, isz
+        real(wp), dimension(-1:,-1:,-1:,1:), intent(in) :: vSrc_rsx_vf
+        integer, intent(in)                             :: id
+        type(int_bounds_info), intent(in)               :: isx, isy, isz
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3, 3) :: Omega
@@ -104,16 +104,16 @@ contains
                             @:compute_capillary_stress_tensor()
 
                             do i = 1, num_dims
-                                flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
-                                            & l) + Omega(1, i)
+                                flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1) = flux_src_rsx_vf(j, k, l, &
+                                                & eqn_idx%mom%beg + i - 1) + Omega(1, i)
 
-                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + Omega(1, &
-                                            & i)*vSrc_rsx_vf(j, k, l, i)
+                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, eqn_idx%E) + Omega(1, &
+                                                & i)*vSrc_rsx_vf(j, k, l, i)
                             end do
 
                             ! Continuum surface force capillary stress, Schmidmayer et al. JCP (2017)
-                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                        & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
+                            flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                            & eqn_idx%E) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
                         end if
                     end do
                 end do
@@ -147,15 +147,15 @@ contains
                                 @:compute_capillary_stress_tensor()
 
                                 do i = 1, num_dims
-                                    flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, &
-                                                & k, l) + Omega(2, i)
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + i - 1) + Omega(2, i)
 
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + Omega(2, &
-                                                & i)*vSrc_rsx_vf(j, k, l, i)
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, eqn_idx%E) + Omega(2, &
+                                                    & i)*vSrc_rsx_vf(j, k, l, i)
                                 end do
 
-                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                            & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 2)
+                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                & eqn_idx%E) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 2)
                             end if
                         end do
                     end do
@@ -190,15 +190,15 @@ contains
                                 @:compute_capillary_stress_tensor()
 
                                 do i = 1, num_dims
-                                    flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, &
-                                                & k, l) + Omega(3, i)
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + i - 1) + Omega(3, i)
 
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) + Omega(3, &
-                                                & i)*vSrc_rsx_vf(j, k, l, i)
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, eqn_idx%E) + Omega(3, &
+                                                    & i)*vSrc_rsx_vf(j, k, l, i)
                                 end do
 
-                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                            & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 3)
+                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                & eqn_idx%E) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 3)
                             end if
                         end do
                     end do
