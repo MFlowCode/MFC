@@ -27,8 +27,7 @@ contains
     !> Dispatch to the subroutines that are utilized to compute the Riemann problem solution. For additional information please
     !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_lf_riemann_solver 4) s_hlld_riemann_solver
     subroutine s_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_src_vf, norm_dir, &
-                                & ix, iy, iz)
+                                & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -36,15 +35,14 @@ contains
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
+        integer, intent(in)               :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         #:for NAME, NUM in [('hll', 1), ('hllc', 2), ('hlld', 4), ('lf', 5)]
             if (riemann_solver == ${NUM}$) then
                 call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
                                                & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
-                                               & q_prim_vf, flux_src_vf, norm_dir, ix, iy, iz)
+                                               & q_prim_vf, norm_dir, ix, iy, iz)
             end if
         #:endfor
 
@@ -55,7 +53,7 @@ contains
 
         ! Allocating the variables that will be utilized to formulate the left, right, and average states of the Riemann problem, as
         ! well the Riemann problem solution
-        integer :: i, j, k, l
+        integer :: i, j, k, l, src_lo
 
         @:ALLOCATE(Gs_rs(1:num_fluids))
 
@@ -83,24 +81,44 @@ contains
         is1%end = m; is2%end = n; is3%end = p
 
         @:ALLOCATE(flux_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
-        @:ALLOCATE(flux_gsrc_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
-        @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, eqn_idx%adv%beg:sys_size))
         @:ALLOCATE(vel_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_vels))
 
-        ! The geometric source flux is written only on the axisymmetric/cylindrical paths, and only for the components the active
-        ! solver touches; its consumers in m_rhs read the whole band. flux_gsrc_n used to carry this zero from its own allocation,
-        ! so zero the buffer that replaced it here or those components read uninitialised memory on the first step.
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do l = -1, p_alloc
-                do k = -1, n_alloc
-                    do j = -1, m_alloc
-                        flux_gsrc_rsx_vf(j, k, l, i) = 0._wp
+        ! Size the source-flux buffer to the band that is actually written. These are FULL-DOMAIN arrays, so each unused component
+        ! costs (m_alloc+2)(n_alloc+2)(p_alloc+2) reals per rank - 0.37 GB/rank of waste at 400^3 for the five components an
+        ! inviscid Cartesian run never touches.
+        !   chemistry diffusion : from 1, because m_chemistry lives in src/common, cannot use m_riemann_state, and so takes a flat
+        !                         dummy declared `dimension(-1:, -1:, -1:, 1:)` - the lower bounds must agree or every species
+        !                         index silently shifts. It is only ever passed this array when diffusion is on.
+        !   viscous / surf.tens.: from mom%beg (the viscous stress and work fluxes occupy mom..E)
+        !   otherwise           : from adv%beg (the advection source band alone)
+        if (chemistry .and. chem_params%diffusion) then
+            src_lo = 1
+        else if (viscous .or. surface_tension) then
+            src_lo = eqn_idx%mom%beg
+        else
+            src_lo = eqn_idx%adv%beg
+        end if
+        @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, src_lo:sys_size))
+
+        ! The geometric source flux exists only on the cylindrical/axisymmetric paths - every write in the four solvers and both
+        ! reads in m_rhs sit under `cyl_coord` or `grid_geometry == 3`, and grid_geometry == 3 implies cyl_coord
+        ! (m_global_parameters). A Cartesian run therefore never touches it, so do not pay 6 full-domain arrays for it. It is
+        ! zeroed on allocation because the solvers write only the components they touch while m_rhs reads the whole band.
+        if (cyl_coord) then
+            @:ALLOCATE(flux_gsrc_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = -1, p_alloc
+                    do k = -1, n_alloc
+                        do j = -1, m_alloc
+                            flux_gsrc_rsx_vf(j, k, l, i) = 0._wp
+                        end do
                     end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
         if (qbmm) then
             @:ALLOCATE(mom_sp_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:4))
         end if
@@ -121,7 +139,9 @@ contains
         @:DEALLOCATE(vel_src_rsx_vf)
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
-        @:DEALLOCATE(flux_gsrc_rsx_vf)
+        if (cyl_coord) then
+            @:DEALLOCATE(flux_gsrc_rsx_vf)
+        end if
         @:DEALLOCATE(Gs_rs)
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsx_vf)

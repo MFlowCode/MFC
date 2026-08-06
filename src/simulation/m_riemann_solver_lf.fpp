@@ -23,8 +23,7 @@ contains
 
     !> Lax-Friedrichs (Rusanov) approximate Riemann solver
     subroutine s_lf_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                   & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_src_vf, &
-                                   & norm_dir, ix, iy, iz)
+                                   & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -33,9 +32,8 @@ contains
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
 
         ! Intercell fluxes
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
+        integer, intent(in)               :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)    :: alpha_rho_L, alpha_rho_R
@@ -99,7 +97,7 @@ contains
             & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
-        call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+        call s_initialize_riemann_solver(norm_dir)
         Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
@@ -570,110 +568,124 @@ contains
                             end do
 
                             if (norm_dir == 1) then
-                                flux_src_vf(eqn_idx%mom%beg)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                            & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                            & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(1) + vel_grad_R(1, 1)*vel_R(1))
+                                flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg) = flux_src_rsx_vf(j, k, l, &
+                                                & eqn_idx%mom%beg) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                & eqn_idx%E) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(1) + vel_grad_R(1, &
+                                                & 1)*vel_R(1))
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                     if (num_dims > 1) then
-                                        flux_src_vf(eqn_idx%mom%beg)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                                    & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                        flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                    & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(1) + vel_grad_R(2, &
-                                                    & 2)*vel_R(1))
+                                        flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg) = flux_src_rsx_vf(j, k, l, &
+                                                        & eqn_idx%mom%beg) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, &
+                                                        & 2) + vel_grad_R(2, 2))
+                                        flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                        & eqn_idx%E) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, &
+                                                        & 2)*vel_L(1) + vel_grad_R(2, 2)*vel_R(1))
 
-                                        flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                                    & l) - 0.5_wp*(vel_grad_L(1, 2) + vel_grad_R(1, 2)) - 0.5_wp*(vel_grad_L(2, &
-                                                    & 1) + vel_grad_R(2, 1))
-                                        flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                    & l) - 0.5_wp*(vel_grad_L(1, 2)*vel_L(2) + vel_grad_R(1, &
-                                                    & 2)*vel_R(2)) - 0.5_wp*(vel_grad_L(2, 1)*vel_L(2) + vel_grad_R(2, 1)*vel_R(2))
+                                        flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1) = flux_src_rsx_vf(j, k, l, &
+                                                        & eqn_idx%mom%beg + 1) - 0.5_wp*(vel_grad_L(1, 2) + vel_grad_R(1, &
+                                                        & 2)) - 0.5_wp*(vel_grad_L(2, 1) + vel_grad_R(2, 1))
+                                        flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                        & eqn_idx%E) - 0.5_wp*(vel_grad_L(1, 2)*vel_L(2) + vel_grad_R(1, &
+                                                        & 2)*vel_R(2)) - 0.5_wp*(vel_grad_L(2, 1)*vel_L(2) + vel_grad_R(2, &
+                                                        & 1)*vel_R(2))
                                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                             if (num_dims > 2) then
-                                                flux_src_vf(eqn_idx%mom%beg)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                                            & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                            & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, &
-                                                            & 3)*vel_L(1) + vel_grad_R(3, 3)*vel_R(1))
+                                                flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg) = flux_src_rsx_vf(j, k, l, &
+                                                                & eqn_idx%mom%beg) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, &
+                                                                & 3) + vel_grad_R(3, 3))
+                                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                                & eqn_idx%E) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, &
+                                                                & 3)*vel_L(1) + vel_grad_R(3, 3)*vel_R(1))
 
-                                                flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
-                                                            & l) = flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
-                                                            & l) - 0.5_wp*(vel_grad_L(1, 3) + vel_grad_R(1, &
-                                                            & 3)) - 0.5_wp*(vel_grad_L(3, 1) + vel_grad_R(3, 1))
-                                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                            & l) - 0.5_wp*(vel_grad_L(1, 3)*vel_L(3) + vel_grad_R(1, &
-                                                            & 3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3, 1)*vel_L(3) + vel_grad_R(3, &
-                                                            & 1)*vel_R(3))
+                                                flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 2) = flux_src_rsx_vf(j, k, l, &
+                                                                & eqn_idx%mom%beg + 2) - 0.5_wp*(vel_grad_L(1, 3) + vel_grad_R(1, &
+                                                                & 3)) - 0.5_wp*(vel_grad_L(3, 1) + vel_grad_R(3, 1))
+                                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                                & eqn_idx%E) - 0.5_wp*(vel_grad_L(1, 3)*vel_L(3) + vel_grad_R(1, &
+                                                                & 3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3, &
+                                                                & 1)*vel_L(3) + vel_grad_R(3, 1)*vel_R(3))
                                             end if
                                         #:endif
                                     end if
                                 #:endif
                             else if (norm_dir == 2) then
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                                    flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                                & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(2) + vel_grad_R(1, 1)*vel_R(2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 1) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, &
+                                                    & 1) + vel_grad_R(1, 1))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, &
+                                                    & 1)*vel_L(2) + vel_grad_R(1, 1)*vel_R(2))
 
-                                    flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                                & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(2) + vel_grad_R(2, 2)*vel_R(2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 1) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2, &
+                                                    & 2) + vel_grad_R(2, 2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(2, &
+                                                    & 2)*vel_L(2) + vel_grad_R(2, 2)*vel_R(2))
 
-                                    flux_src_vf(eqn_idx%mom%beg)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(1, 2) + vel_grad_R(1, 2)) - 0.5_wp*(vel_grad_L(2, &
-                                                & 1) + vel_grad_R(2, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(1, 2)*vel_L(1) + vel_grad_R(1, &
-                                                & 2)*vel_R(1)) - 0.5_wp*(vel_grad_L(2, 1)*vel_L(1) + vel_grad_R(2, 1)*vel_R(1))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg) - 0.5_wp*(vel_grad_L(1, 2) + vel_grad_R(1, &
+                                                    & 2)) - 0.5_wp*(vel_grad_L(2, 1) + vel_grad_R(2, 1))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - 0.5_wp*(vel_grad_L(1, 2)*vel_L(1) + vel_grad_R(1, &
+                                                    & 2)*vel_R(1)) - 0.5_wp*(vel_grad_L(2, 1)*vel_L(1) + vel_grad_R(2, 1)*vel_R(1))
                                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                         if (num_dims > 2) then
-                                            flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, &
-                                                        & k, l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                        & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3)*vel_L(2) + vel_grad_R(3, &
-                                                        & 3)*vel_R(2))
+                                            flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1) = flux_src_rsx_vf(j, k, l, &
+                                                            & eqn_idx%mom%beg + 1) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, &
+                                                            & 3) + vel_grad_R(3, 3))
+                                            flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                            & eqn_idx%E) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(3, &
+                                                            & 3)*vel_L(2) + vel_grad_R(3, 3)*vel_R(2))
 
-                                            flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, &
-                                                        & k, l) - 0.5_wp*(vel_grad_L(2, 3) + vel_grad_R(2, &
-                                                        & 3)) - 0.5_wp*(vel_grad_L(3, 2) + vel_grad_R(3, 2))
-                                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                        & l) - 0.5_wp*(vel_grad_L(2, 3)*vel_L(3) + vel_grad_R(2, &
-                                                        & 3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3, 2)*vel_L(3) + vel_grad_R(3, &
-                                                        & 2)*vel_R(3))
+                                            flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 2) = flux_src_rsx_vf(j, k, l, &
+                                                            & eqn_idx%mom%beg + 2) - 0.5_wp*(vel_grad_L(2, 3) + vel_grad_R(2, &
+                                                            & 3)) - 0.5_wp*(vel_grad_L(3, 2) + vel_grad_R(3, 2))
+                                            flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                            & eqn_idx%E) - 0.5_wp*(vel_grad_L(2, 3)*vel_L(3) + vel_grad_R(2, &
+                                                            & 3)*vel_R(3)) - 0.5_wp*(vel_grad_L(3, 2)*vel_L(3) + vel_grad_R(3, &
+                                                            & 2)*vel_R(3))
                                         end if
                                     #:endif
                                 #:endif
                             else
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                                    flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
-                                                & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, 1)*vel_L(3) + vel_grad_R(1, 1)*vel_R(3))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 2) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 2) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, &
+                                                    & 1) + vel_grad_R(1, 1))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(1, &
+                                                    & 1)*vel_L(3) + vel_grad_R(1, 1)*vel_R(3))
 
-                                    flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
-                                                & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, 2)*vel_L(3) + vel_grad_R(2, 2)*vel_R(3))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 2) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 2) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, &
+                                                    & 2) + vel_grad_R(2, 2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - (-2._wp/3._wp)*0.5_wp*(vel_grad_L(2, &
+                                                    & 2)*vel_L(3) + vel_grad_R(2, 2)*vel_R(3))
 
-                                    flux_src_vf(eqn_idx%mom%beg)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(1, 3) + vel_grad_R(1, 3)) - 0.5_wp*(vel_grad_L(3, &
-                                                & 1) + vel_grad_R(3, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(1, 3)*vel_L(1) + vel_grad_R(1, &
-                                                & 3)*vel_R(1)) - 0.5_wp*(vel_grad_L(3, 1)*vel_L(1) + vel_grad_R(3, 1)*vel_R(1))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg) - 0.5_wp*(vel_grad_L(1, 3) + vel_grad_R(1, &
+                                                    & 3)) - 0.5_wp*(vel_grad_L(3, 1) + vel_grad_R(3, 1))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - 0.5_wp*(vel_grad_L(1, 3)*vel_L(1) + vel_grad_R(1, &
+                                                    & 3)*vel_R(1)) - 0.5_wp*(vel_grad_L(3, 1)*vel_L(1) + vel_grad_R(3, 1)*vel_R(1))
 
-                                    flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
-                                                & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3, 3)*vel_L(3) + vel_grad_R(3, 3)*vel_R(3))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 2) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 2) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3, &
+                                                    & 3) + vel_grad_R(3, 3))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - (4._wp/3._wp)*0.5_wp*(vel_grad_L(3, &
+                                                    & 3)*vel_L(3) + vel_grad_R(3, 3)*vel_R(3))
 
-                                    flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(2, 3) + vel_grad_R(2, 3)) - 0.5_wp*(vel_grad_L(3, &
-                                                & 2) + vel_grad_R(3, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(2, 3)*vel_L(2) + vel_grad_R(2, &
-                                                & 3)*vel_R(2)) - 0.5_wp*(vel_grad_L(3, 2)*vel_L(2) + vel_grad_R(3, 2)*vel_R(2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 1) - 0.5_wp*(vel_grad_L(2, 3) + vel_grad_R(2, &
+                                                    & 3)) - 0.5_wp*(vel_grad_L(3, 2) + vel_grad_R(3, 2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - 0.5_wp*(vel_grad_L(2, 3)*vel_L(2) + vel_grad_R(2, &
+                                                    & 3)*vel_R(2)) - 0.5_wp*(vel_grad_L(3, 2)*vel_L(2) + vel_grad_R(3, 2)*vel_R(2))
                                 #:endif
                             end if
                         end if
@@ -701,64 +713,67 @@ contains
                             end do
 
                             if (norm_dir == 1) then
-                                flux_src_vf(eqn_idx%mom%beg)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                            & l) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, l) - 0.5_wp*(vel_grad_L(1, &
-                                            & 1)*vel_L(1) + vel_grad_R(1, 1)*vel_R(1))
+                                flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg) = flux_src_rsx_vf(j, k, l, &
+                                                & eqn_idx%mom%beg) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, eqn_idx%E) - 0.5_wp*(vel_grad_L(1, &
+                                                & 1)*vel_L(1) + vel_grad_R(1, 1)*vel_R(1))
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                                     if (num_dims > 1) then
-                                        flux_src_vf(eqn_idx%mom%beg)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                                    & l) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                        flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                    & l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(1) + vel_grad_R(2, 2)*vel_R(1))
+                                        flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg) = flux_src_rsx_vf(j, k, l, &
+                                                        & eqn_idx%mom%beg) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                        flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                        & eqn_idx%E) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(1) + vel_grad_R(2, &
+                                                        & 2)*vel_R(1))
 
                                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                             if (num_dims > 2) then
-                                                flux_src_vf(eqn_idx%mom%beg)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                                            & l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                                flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                            & l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(1) + vel_grad_R(3, 3)*vel_R(1))
+                                                flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg) = flux_src_rsx_vf(j, k, l, &
+                                                                & eqn_idx%mom%beg) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                                flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                                & eqn_idx%E) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(1) + vel_grad_R(3, &
+                                                                & 3)*vel_R(1))
                                             end if
                                         #:endif
                                     end if
                                 #:endif
                             else if (norm_dir == 2) then
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                                    flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(2) + vel_grad_R(1, 1)*vel_R(2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 1) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(2) + vel_grad_R(1, 1)*vel_R(2))
 
-                                    flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(2) + vel_grad_R(2, 2)*vel_R(2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 1) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(2) + vel_grad_R(2, 2)*vel_R(2))
 
                                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                                         if (num_dims > 2) then
-                                            flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 1)%sf(j, &
-                                                        & k, l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                        & l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(2) + vel_grad_R(3, 3)*vel_R(2))
+                                            flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1) = flux_src_rsx_vf(j, k, l, &
+                                                            & eqn_idx%mom%beg + 1) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                            flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                            & eqn_idx%E) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(2) + vel_grad_R(3, &
+                                                            & 3)*vel_R(2))
                                         end if
                                     #:endif
                                 #:endif
                             else
                                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                                    flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(3) + vel_grad_R(1, 1)*vel_R(3))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 2) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 2) - 0.5_wp*(vel_grad_L(1, 1) + vel_grad_R(1, 1))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - 0.5_wp*(vel_grad_L(1, 1)*vel_L(3) + vel_grad_R(1, 1)*vel_R(3))
 
-                                    flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(3) + vel_grad_R(2, 2)*vel_R(3))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 2) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 2) - 0.5_wp*(vel_grad_L(2, 2) + vel_grad_R(2, 2))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - 0.5_wp*(vel_grad_L(2, 2)*vel_L(3) + vel_grad_R(2, 2)*vel_R(3))
 
-                                    flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + 2)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
-                                    flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                                & l) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(3) + vel_grad_R(3, 3)*vel_R(3))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 2) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%mom%beg + 2) - 0.5_wp*(vel_grad_L(3, 3) + vel_grad_R(3, 3))
+                                    flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                                    & eqn_idx%E) - 0.5_wp*(vel_grad_L(3, 3)*vel_L(3) + vel_grad_R(3, 3)*vel_R(3))
                                 #:endif
                             end if
                         end if
@@ -767,8 +782,6 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-
-        call s_finalize_riemann_solver(flux_src_vf, norm_dir)
 
     end subroutine s_lf_riemann_solver
 

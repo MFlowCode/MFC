@@ -19,8 +19,7 @@ contains
 
     !> HLLD Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
     subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_src_vf, &
-                                     & norm_dir, ix, iy, iz)
+                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
@@ -28,7 +27,6 @@ contains
 
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)          :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout)       :: flux_src_vf
         integer, intent(in)                                          :: norm_dir
         type(int_bounds_info), intent(in)                            :: ix, iy, iz
 
@@ -64,7 +62,7 @@ contains
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
             & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
-        call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+        call s_initialize_riemann_solver(norm_dir)
 
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
@@ -266,8 +264,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         #:endfor
-
-        call s_finalize_riemann_solver(flux_src_vf, norm_dir)
 
     end subroutine s_hlld_riemann_solver
 

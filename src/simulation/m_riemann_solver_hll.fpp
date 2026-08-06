@@ -26,8 +26,7 @@ contains
 
     !> HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                    & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_src_vf, &
-                                    & norm_dir, ix, iy, iz)
+                                    & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -36,10 +35,9 @@ contains
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
 
         ! Intercell fluxes
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        real(wp)                                               :: flux_tau_L, flux_tau_R
-        integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
+        real(wp)                          :: flux_tau_L, flux_tau_R
+        integer, intent(in)               :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)  :: alpha_rho_L, alpha_rho_R
@@ -103,7 +101,7 @@ contains
             & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
         ! Reshaping inputted data based on dimensional splitting direction
-        call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+        call s_initialize_riemann_solver(norm_dir)
         Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
@@ -644,8 +642,8 @@ contains
                                                    & qR_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, &
-                                                   & norm_dir, ix, iy, iz)
+                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_vf, norm_dir, ix, &
+                                                   & iy, iz)
             else
                 call s_compute_viscous_source_flux(q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqL_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
@@ -654,12 +652,10 @@ contains
                                                    & q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, &
-                                                   & norm_dir, ix, iy, iz)
+                                                   & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_vf, norm_dir, ix, &
+                                                   & iy, iz)
             end if
         end if
-
-        call s_finalize_riemann_solver(flux_src_vf, norm_dir)
 
     end subroutine s_hll_riemann_solver
 
