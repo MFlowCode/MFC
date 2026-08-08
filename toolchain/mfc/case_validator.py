@@ -41,6 +41,17 @@ PHYSICS_DOCS = {
         "explanation": ("MFC uses the transformed stiffened gas parameter. A common mistake is entering the physical gamma (e.g., 1.4 for air) instead of the transformed value 1/(gamma-1) = 2.5."),
         "references": ["Wilfong26", "Allaire02"],
     },
+    "check_eos": {
+        "title": "Equation of State Selection",
+        "category": "Thermodynamic Constraints",
+        "explanation": (
+            "The per-fluid eos selector exposes only the backends with a thermodynamics adapter: "
+            "'stiffened_gas' (default) and 'ideal_gas_mixture' (chemistry, Pyrometheus). A single run "
+            "uses one family for every fluid, so intra-cell EOS mixing is rejected, as are values "
+            "outside the enumeration."
+        ),
+        "references": ["Wilfong26"],
+    },
     "check_patch_physics": {
         "title": "Patch Initial Condition Constraints",
         "category": "Thermodynamic Constraints",
@@ -746,6 +757,28 @@ class CaseValidator:
             if model_eqns == 1:
                 self.prohibit(gamma is not None, f"model_eqns = 1 does not support fluid_pp({i})%gamma")
                 self.prohibit(pi_inf is not None, f"model_eqns = 1 does not support fluid_pp({i})%pi_inf")
+
+    def check_eos(self):
+        """Restricts the per-fluid EOS selector to the currently supported adapters"""
+        chemistry = self.get("chemistry", "F") == "T"
+
+        eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
+        eos_ideal_gas_mixture = eos_names["ideal_gas_mixture"]
+        eos_values = set(eos_names.values())
+
+        # Every fluid_pp slot is default-assigned and MPI-broadcast up to num_fluids_max, so
+        # validate all of them rather than stopping at num_fluids: a selector left on an unused
+        # slot still reaches the solver. This is input-time only, so the wider loop costs nothing.
+        num_fluids_max = get_fortran_constants().get("num_fluids_max", 10)
+        for i in range(1, num_fluids_max + 1):
+            eos = self.get(f"fluid_pp({i})%eos")
+            if eos is None:
+                continue
+            # The "choices" constraint is enforced by validate_constraints, a separate layer from
+            # CaseValidator, so membership is re-checked here rather than assumed.
+            self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas' or 'ideal_gas_mixture'")
+            self.prohibit(chemistry and eos != eos_ideal_gas_mixture, f"fluid_pp({i})%eos must be 'ideal_gas_mixture' when chemistry is enabled")
+            self.prohibit(not chemistry and eos == eos_ideal_gas_mixture, f"fluid_pp({i})%eos = 'ideal_gas_mixture' requires a chemistry build")
 
     def check_surface_tension(self):
         """Checks constraints on surface tension"""
@@ -2309,6 +2342,7 @@ class CaseValidator:
         self.check_phase_change()
         self.check_ibm()
         self.check_stiffened_eos()
+        self.check_eos()
         self.check_eos_parameter_sanity()
         self.check_surface_tension()
         self.check_mhd()
