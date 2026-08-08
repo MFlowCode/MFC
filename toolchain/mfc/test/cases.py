@@ -1785,6 +1785,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                     cases.append(define_case_d(stack, "", {}))
 
+                    # Regression guard for issue #1706: the Lagrange bubble initial gas
+                    # pressure open-coded the stiffened-gas inversion and dropped the qv
+                    # term, so seeding qv /= 0 is the only way to catch it. Every other
+                    # lag-bubble case leaves qv at its 0 default, which is why the bug
+                    # survived. Restricted to one configuration to add a single golden.
+                    if len(dimInfo[0]) == 2 and couplingMethod == 1 and adap_dt == "F":
+                        stack.push("qv_nonzero", {"fluid_pp(1)%qv": 0.01})
+                        cases.append(define_case_d(stack, "", {}))
+                        stack.pop()
+
                     if len(dimInfo[0]) == 3 and couplingMethod == 2:
                         stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
                         cases.append(define_case_d(stack, "", {}))
