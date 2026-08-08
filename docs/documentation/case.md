@@ -463,7 +463,7 @@ The parameters define material's property of compressible fluids that are used i
 
 - `fluid_pp(i)%%gamma` and `fluid_pp(i)%%pi_inf` define \f$\Gamma\f$ and \f$\Pi\f$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
-- `fluid_pp(i)%%eos` selects the equation of state of the $i$-th fluid. Only `stiffened_gas` (the default) and `ideal_gas_mixture` (requires a chemistry build, backed by Pyrometheus) are currently supported; the enumeration reserves `mie_gruneisen`, `jwl`, and `table` for future backends. Every fluid in a run must use the same family. For a non-chemistry ideal gas, use `stiffened_gas` with `pi_inf = 0`; `ideal_gas_mixture` is the Pyrometheus mixture backend and is only valid in a chemistry build.
+- `fluid_pp(i)%%eos` selects the equation of state of the $i$-th fluid. The accepted values are `stiffened_gas` (the default) and `ideal_gas_mixture` (requires a chemistry build, backed by Pyrometheus). Every fluid in a run must use the same family. For a non-chemistry ideal gas, use `stiffened_gas` with `pi_inf = 0`; `ideal_gas_mixture` is the Pyrometheus mixture backend and is only valid in a chemistry build.
 
 - `fluid_pp(i)%%Re(1)` and `fluid_pp(i)%%Re(2)` define the shear and volume viscosities of $i$-th fluid, respectively.
 

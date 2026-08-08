@@ -121,10 +121,9 @@ module m_constants
     ! Enum values are auto-generated from "names" in definitions.py by the include below, except
     ! compound keys ("%" or "("), which generate_constants_fpp silently skips. So eos_* is
     ! hand-written here and must match _EOS_NAMES in definitions.py (see common-pitfalls.md).
+    ! test_eos_selector.py::test_fortran_and_python_enums_agree guards the two against drift.
+    ! Only backends with a thermodynamics adapter belong here; add a value when its backend lands.
     integer, parameter :: eos_stiffened_gas = 1
     integer, parameter :: eos_ideal_gas_mixture = 2
-    integer, parameter :: eos_mie_gruneisen = 3
-    integer, parameter :: eos_jwl = 4
-    integer, parameter :: eos_table = 5
     #:include 'generated_constants.fpp'
 end module m_constants

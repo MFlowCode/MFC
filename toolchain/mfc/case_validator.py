@@ -47,7 +47,8 @@ PHYSICS_DOCS = {
         "explanation": (
             "The per-fluid eos selector exposes only the backends with a thermodynamics adapter: "
             "'stiffened_gas' (default) and 'ideal_gas_mixture' (chemistry, Pyrometheus). A single run "
-            "uses one family for every fluid; unimplemented values and intra-cell EOS mixing are rejected."
+            "uses one family for every fluid, so intra-cell EOS mixing is rejected, as are values "
+            "outside the enumeration."
         ),
         "references": ["Wilfong26"],
     },
@@ -759,27 +760,23 @@ class CaseValidator:
 
     def check_eos(self):
         """Restricts the per-fluid EOS selector to the currently supported adapters"""
-        num_fluids = self.get("num_fluids")
         chemistry = self.get("chemistry", "F") == "T"
-        bubbles_euler = self.get("bubbles_euler", "F") == "T"
-
-        if num_fluids is None:
-            return
 
         eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
-        eos_stiffened_gas, eos_ideal_gas_mixture = eos_names["stiffened_gas"], eos_names["ideal_gas_mixture"]
+        eos_ideal_gas_mixture = eos_names["ideal_gas_mixture"]
+        eos_values = set(eos_names.values())
 
-        # Allow one extra fluid property slot when using bubbles_euler
-        bub_fac = 1 if (bubbles_euler) else 0
-
-        for i in range(1, num_fluids + 1 + bub_fac):
+        # Every fluid_pp slot is default-assigned and MPI-broadcast up to num_fluids_max, so
+        # validate all of them rather than stopping at num_fluids: a selector left on an unused
+        # slot still reaches the solver. This is input-time only, so the wider loop costs nothing.
+        num_fluids_max = get_fortran_constants().get("num_fluids_max", 10)
+        for i in range(1, num_fluids_max + 1):
             eos = self.get(f"fluid_pp({i})%eos")
             if eos is None:
                 continue
-            self.prohibit(
-                eos not in (eos_stiffened_gas, eos_ideal_gas_mixture),
-                f"fluid_pp({i})%eos selects an equation of state that is not yet implemented; " "only 'stiffened_gas' and 'ideal_gas_mixture' are available",
-            )
+            # The "choices" constraint is enforced by validate_constraints, a separate layer from
+            # CaseValidator, so membership is re-checked here rather than assumed.
+            self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas' or 'ideal_gas_mixture'")
             self.prohibit(chemistry and eos != eos_ideal_gas_mixture, f"fluid_pp({i})%eos must be 'ideal_gas_mixture' when chemistry is enabled")
             self.prohibit(not chemistry and eos == eos_ideal_gas_mixture, f"fluid_pp({i})%eos = 'ideal_gas_mixture' requires a chemistry build")
 
