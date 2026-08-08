@@ -135,6 +135,13 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
                 lines = content.splitlines()
                 content = "\n".join(lines[1:])  # Skip the first line
                 doubles = _extract_doubles(content)
+            elif "probe" in short_filepath:
+                # Probe output is a multi-column time series, not a spatial field: each
+                # column is a distinct physical quantity (rho, vel, pres, gamma, pi_inf,
+                # qv, c, accel, ...) and the set varies by configuration. Treating it as
+                # <x> <y> <z> <value> would keep only the last column and silently drop
+                # the rest, so every column is retained. No header line to skip.
+                doubles = _extract_doubles(content)
             else:
                 # Every line is <x> <y> <z> <value> (<y> and <z> are optional). So the
                 # number of dimensions is the number of doubles in the first line minus 1.
