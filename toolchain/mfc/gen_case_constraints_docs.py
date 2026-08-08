@@ -50,6 +50,9 @@ class PlaybookEntry:
     tags: List[str]
 
 
+LEVEL_EMOJI = {"Beginner": "🟢", "Intermediate": "🟡", "Advanced": "🔴"}
+
+
 # Curated list of hero examples
 PLAYBOOK_EXAMPLES = [
     PlaybookEntry(
@@ -156,7 +159,7 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:
     lines = []
 
     tags_str = " · ".join(entry.tags)
-    level_emoji = {"Beginner": "🟢", "Intermediate": "🟡", "Advanced": "🔴"}.get(entry.level, "")
+    level_emoji = LEVEL_EMOJI.get(entry.level, "")
 
     lines.append("<details>")
     lines.append(f"<summary><b>{entry.title}</b> {level_emoji} <i>{entry.level}</i> · <code>{entry.case_dir}</code></summary>\n")
@@ -264,7 +267,7 @@ def generate_playbook() -> str:
         if not level_entries:
             continue
 
-        level_emoji = {"Beginner": "🟢", "Intermediate": "🟡", "Advanced": "🔴"}.get(level, "")
+        level_emoji = LEVEL_EMOJI.get(level, "")
         lines.append(f"\n### {level_emoji} {level} Examples\n")
 
         for entry in level_entries:
