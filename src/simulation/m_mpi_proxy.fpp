@@ -232,10 +232,6 @@ contains
             #:for VAR in [ 'x','y','z' ]
                 call MPI_BCAST(probe(j)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-
-            #:for VAR in [ 'xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax' ]
-                call MPI_BCAST(integral(j)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
         end do
 
         ! manual: spatial-support body-force derived-type members (the bf_spatial_support toggle is broadcast by

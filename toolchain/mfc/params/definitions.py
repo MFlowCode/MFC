@@ -379,7 +379,6 @@ CONSTRAINTS = {
     "ib_neighborhood_radius": {"min": 1},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
-    "num_integrals": {"min": 1},
     "nb": {"min": 1},
     "m": {"min": 0},
     "n": {"min": 0},
@@ -507,11 +506,6 @@ DEPENDENCIES = {
     "cfl_dt": {
         "when_true": {
             "recommends": ["cfl_target"],
-        }
-    },
-    "integral_wrt": {
-        "when_true": {
-            "requires": ["fd_order"],
         }
     },
 }
@@ -649,10 +643,8 @@ def _load():
     _r("many_ib_patch_parallelism", LOG, {"ib"})
 
     # Probes
-    for n in ["num_probes", "num_integrals"]:
-        _r(n, INT, {"probes"})
+    _r("num_probes", INT, {"probes"})
     _r("probe_wrt", LOG, {"output", "probes"})
-    _r("integral_wrt", LOG, {"output", "probes"})
 
     # Output
     _r("precision", INT, {"output"})
@@ -1033,12 +1025,6 @@ def _load():
         for d in ["x", "y", "z"]:
             _r(f"probe({i})%{d}", REAL, {"probes"})
 
-    # integrals (5 integral regions)
-    for i in range(1, 6):
-        for d in ["x", "y", "z"]:
-            _r(f"integral({i})%{d}min", REAL, {"probes"})
-            _r(f"integral({i})%{d}max", REAL, {"probes"})
-
     # Extended BC
     for d in ["x", "y", "z"]:
         px = f"bc_{d}%"
@@ -1334,9 +1320,6 @@ _nv(
     "probe_wrt",
     "num_probes",
     "probe",
-    "integral_wrt",
-    "num_integrals",
-    "integral",
     "acoustic_source",
     "num_source",
     "acoustic",

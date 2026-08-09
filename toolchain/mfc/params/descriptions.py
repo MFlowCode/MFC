@@ -114,7 +114,6 @@ DESCRIPTIONS = {
     "prim_vars_wrt": "Write primitive variables",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",
-    "integral_wrt": "Write integral data",
     "parallel_io": "Enable parallel I/O",
     "file_per_process": "Write separate file per MPI process",
     "format": "Output format",
@@ -142,7 +141,6 @@ DESCRIPTIONS = {
     "num_source": "Number of acoustic sources",
     # Probes and integrals
     "num_probes": "Number of probe points",
-    "num_integrals": "Number of integral regions",
     # MPI/GPU
     "rdma_mpi": "Enable RDMA for MPI communication (GPUs)",
     # Misc

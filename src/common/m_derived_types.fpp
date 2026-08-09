@@ -428,16 +428,6 @@ module m_derived_types
         type(vec3_dt), allocatable, dimension(:) :: var
     end type mpi_io_airfoil_ib_var
 
-    !> Derived type annexing integral regions
-    type integral_parameters
-        real(wp) :: xmin  !< Min. boundary first coordinate direction
-        real(wp) :: xmax  !< Max. boundary first coordinate direction
-        real(wp) :: ymin  !< Min. boundary second coordinate direction
-        real(wp) :: ymax  !< Max. boundary second coordinate direction
-        real(wp) :: zmin  !< Min. boundary third coordinate direction
-        real(wp) :: zmax  !< Max. boundary third coordinate direction
-    end type integral_parameters
-
     !> Parameters for body force with spatial support
     type spbf_parameters
         real(wp)               :: amp
