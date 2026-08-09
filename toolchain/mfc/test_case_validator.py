@@ -9,7 +9,7 @@ exercises configurations that are meant to pass).
 
 import unittest
 
-from .case_validator import CaseValidator
+from .case_validator import CaseConstraintError, CaseValidator
 
 # A minimal 1D case that passes simulation validation.
 BASE = {
@@ -80,23 +80,34 @@ class ConstraintTestCase(unittest.TestCase):
     """Base class providing assertions over simulation-stage validation."""
 
     def errors_for(self, params) -> str:
-        """Return all simulation-stage validation errors for params, joined."""
+        """Return the constraint violations for params, or "" if it validates.
+
+        Only CaseConstraintError is caught. Anything else -- a KeyError or
+        TypeError from a regression in the validator -- propagates and fails
+        the test, rather than being stringified into something an assertion
+        might accept.
+        """
         validator = CaseValidator(dict(params))
         try:
             validator.validate("simulation")
-        except Exception as exc:  # CaseConstraintError
+        except CaseConstraintError as exc:
             return str(exc)
         return ""
 
     def assertRejects(self, params, expected: str):
-        """params must fail validation with expected in the message."""
+        """params must fail validation, and expected must name the reason."""
         errors = self.errors_for(params)
+        self.assertNotEqual(errors, "", f"expected validation to fail with {expected!r}, but the case was accepted")
         self.assertIn(expected, errors)
 
-    def assertAccepts(self, params, unexpected: str):
-        """params must not trip the check identified by unexpected."""
-        errors = self.errors_for(params)
-        self.assertNotIn(unexpected, errors)
+    def assertAccepts(self, params):
+        """params must validate cleanly -- no violations at all.
+
+        Asserting full validity rather than the absence of one message means a
+        fixture that breaks for an unrelated reason fails here instead of
+        silently satisfying a narrower check.
+        """
+        self.assertEqual(self.errors_for(params), "")
 
 
 class TestImmersedBoundaryFlags(ConstraintTestCase):
@@ -106,7 +117,7 @@ class TestImmersedBoundaryFlags(ConstraintTestCase):
         self.assertRejects({**BASE, "many_ib_patch_parallelism": "T"}, self.MSG)
 
     def test_not_tripped_when_disabled(self):
-        self.assertAccepts(BASE, self.MSG)
+        self.assertAccepts(BASE)
 
 
 class TestBodyForceSpatialSupport(ConstraintTestCase):
@@ -119,7 +130,7 @@ class TestBodyForceSpatialSupport(ConstraintTestCase):
         self.assertRejects({**BASE_2D, "p": 50, "bf_spatial_support": "T"}, self.MSG)
 
     def test_accepts_2d(self):
-        self.assertAccepts({**BASE_2D, "bf_spatial_support": "T"}, self.MSG)
+        self.assertAccepts({**BASE_2D, "bf_spatial_support": "T"})
 
 
 class TestChemistrySubstepping(ConstraintTestCase):
@@ -145,14 +156,14 @@ class TestChemistrySubstepping(ConstraintTestCase):
         self.assertRejects({**CHEMISTRY, "chem_params%adap_substeps": "T", "chem_params%reaction_substeps": 5}, "reaction_substeps_max must be >=")
 
     def test_accepts_no_substepping(self):
-        self.assertAccepts(CHEMISTRY, "reaction_substeps")
+        self.assertAccepts(CHEMISTRY)
 
     def test_accepts_valid_adaptive_substepping(self):
         params = {**CHEMISTRY, "chem_params%adap_substeps": "T", "chem_params%reaction_substeps": 2, "chem_params%reaction_substeps_max": 8}
-        self.assertAccepts(params, "reaction_substeps")
+        self.assertAccepts(params)
 
     def test_accepts_igr_without_substepping(self):
-        self.assertAccepts({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0}, "not supported with igr")
+        self.assertAccepts({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0})
 
 
 class TestReactiveBurnFluidPairing(ConstraintTestCase):
@@ -177,7 +188,7 @@ class TestReactiveBurnFluidPairing(ConstraintTestCase):
         self.assertRejects(params, "fluid_pp(1)%qv > fluid_pp(2)%qv")
 
     def test_accepts_valid_configuration(self):
-        self.assertEqual(self.errors_for(REACTIVE_BURN), "")
+        self.assertAccepts(REACTIVE_BURN)
 
 
 class TestSyntheticTurbulence(ConstraintTestCase):
@@ -212,15 +223,13 @@ class TestSyntheticTurbulence(ConstraintTestCase):
         self.assertRejects({**self.ENABLED, "synth_L(1,2)": 0.0}, "synth_L(1,2) must be positive")
 
     def test_accepts_fully_specified_zone(self):
-        self.assertEqual(self.errors_for(self.ENABLED), "")
-
-    def test_third_dimension_not_required_in_2d(self):
-        """The Fortran loops d = 1, num_dims, so a 2D case needs no z components."""
-        self.assertAccepts(self.ENABLED, "turb_pos(1,3)")
-        self.assertAccepts(self.ENABLED, "synth_L(1,3)")
+        """ENABLED sets d = 1, 2 only. The Fortran loops d = 1, num_dims, so a 2D
+        case needs no z components -- accepting it proves turb_pos(1,3) and
+        synth_L(1,3) are not required."""
+        self.assertAccepts(self.ENABLED)
 
     def test_not_checked_when_disabled(self):
-        self.assertAccepts(BASE_2D, "num_turbulent_sources")
+        self.assertAccepts(BASE_2D)
 
 
 class TestTimeStepPositivity(ConstraintTestCase):
@@ -233,7 +242,7 @@ class TestTimeStepPositivity(ConstraintTestCase):
         self.assertRejects({**BASE, "dt": 0.0}, self.MSG)
 
     def test_accepts_positive_dt(self):
-        self.assertAccepts(BASE, self.MSG)
+        self.assertAccepts(BASE)
 
 
 if __name__ == "__main__":
