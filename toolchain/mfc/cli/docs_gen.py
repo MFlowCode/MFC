@@ -244,7 +244,7 @@ def generate_cli_reference(schema: CLISchema) -> str:
     utility_commands = ["new", "viz", "params", "packer", "completion", "generate", "help"]
     dev_commands = ["lint", "format", "spelling", "precheck", "count", "count_diff"]
     ci_commands = ["bench", "bench_diff"]
-    other_commands = ["load", "interactive"]
+    other_commands = ["load"]
 
     # Core workflow commands first (no header, directly under Commands)
     for cmd in schema.commands:

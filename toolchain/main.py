@@ -178,10 +178,6 @@ def __run():
         from mfc import init
 
         init.init()
-    elif cmd == "interactive":
-        from mfc.user_guide import interactive_mode
-
-        interactive_mode()
     elif cmd == "completion":
         from mfc import completion
 

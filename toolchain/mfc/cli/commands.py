@@ -721,20 +721,7 @@ COMPLETION_COMMAND = Command(
 
 HELP_COMMAND = Command(
     name="help",
-    help="Show help on a topic.",
-    positionals=[
-        Positional(
-            name="topic",
-            help="Help topic: gpu, clusters, batch, debugging, performance",
-            nargs="?",
-            default=None,
-            choices=["gpu", "clusters", "batch", "debugging", "performance"],
-            completion=Completion(
-                type=CompletionType.CHOICES,
-                choices=["gpu", "clusters", "batch", "debugging", "performance"],
-            ),
-        ),
-    ],
+    help="List the HPC clusters MFC ships module sets for.",
 )
 
 # Simple commands (shell scripts, minimal arguments)
@@ -813,12 +800,6 @@ PRECHECK_COMMAND = Command(
     key_options=[
         ("-j, --jobs N", "Number of parallel jobs for formatting"),
     ],
-)
-
-INTERACTIVE_COMMAND = Command(
-    name="interactive",
-    help="Launch interactive menu-driven interface.",
-    description="Launch an interactive menu for MFC operations.",
 )
 
 GENERATE_COMMAND = Command(
@@ -1494,7 +1475,6 @@ started, run `./mfc.sh build -h`.""",
         FORMAT_COMMAND,
         SPELLING_COMMAND,
         PRECHECK_COMMAND,
-        INTERACTIVE_COMMAND,
         BENCH_COMMAND,
         BENCH_DIFF_COMMAND,
         COUNT_COMMAND,
