@@ -56,10 +56,11 @@ contains
         ! normal velocity, and x is the normal direction Note: Bx is omitted as the magnetic flux is always zero in the normal
         ! direction
 
-        real(wp) :: sqrt_rhoL_star, sqrt_rhoR_star, denom_ds, sign_Bx
-        real(wp) :: vL_star, vR_star, wL_star, wR_star
-        real(wp) :: v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR, E_double
-        integer  :: i, j, k, l
+        real(wp)        :: sqrt_rhoL_star, sqrt_rhoR_star, denom_ds, sign_Bx
+        real(wp)        :: vL_star, vR_star, wL_star, wR_star
+        real(wp)        :: v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR, E_double
+        integer         :: i, j, k, l
+        type(eos_state) :: eos_s_L, eos_s_R
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
             & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
@@ -78,7 +79,7 @@ contains
                                     & U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, s_L, s_R, s_M, s_starL, s_starR, &
                                     & pTot_L, pTot_R, p_star, rhoL_star, rhoR_star, E_starL, E_starR, sqrt_rhoL_star, &
                                     & sqrt_rhoR_star, denom_ds, sign_Bx, vL_star, vR_star, wL_star, wR_star, v_double, w_double, &
-                                    & By_double, Bz_double, E_doubleL, E_doubleR, E_double]', copyin='[norm_dir]')
+                                    & By_double, Bz_double, E_doubleL, E_doubleR, E_double, eos_s_L, eos_s_R]', copyin='[norm_dir]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -147,10 +148,10 @@ contains
                             H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R
 
                             ! (2) Compute fast wave speeds
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha_L, vel_rms%L, &
-                                                          & 0._wp, c%L, qv%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H_no_mag%R, alpha_R, vel_rms%R, &
-                                                          & 0._wp, c%R, qv%R)
+                            call s_eos_state_roe(eos_s_L, pres%L, rho%L, gamma%L, pi_inf%L, qv%L, vel_rms%L, H_no_mag%L)
+                            call s_compute_speed_of_sound(eos_s_L, alpha_L, c%L)
+                            call s_eos_state_roe(eos_s_R, pres%R, rho%R, gamma%R, pi_inf%R, qv%R, vel_rms%R, H_no_mag%R)
+                            call s_compute_speed_of_sound(eos_s_R, alpha_R, c%R)
                             call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, norm_dir, c_fast%L, H_no_mag%L)
                             call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)
 

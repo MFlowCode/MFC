@@ -187,10 +187,11 @@ contains
              & -offset_z%beg:p + offset_z%end) :: liutex_mag
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end, &
              & 3) :: liutex_axis
-        integer       :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
-        character(50) :: filename
-        logical       :: file_exists
-        integer       :: x_beg, x_end, y_beg, y_end, z_beg, z_end
+        integer         :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
+        character(50)   :: filename
+        logical         :: file_exists
+        integer         :: x_beg, x_end, y_beg, y_end, z_beg, z_end
+        type(eos_state) :: eos_s
 
         if (output_partial_domain) then
             call s_define_output_region
@@ -533,8 +534,9 @@ contains
 
                         H = ((gamma_sf(i, j, k) + 1._wp)*pres + pi_inf_sf(i, j, k) + qv_sf(i, j, k))/rho_sf(i, j, k)
 
-                        call s_compute_speed_of_sound(pres, rho_sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, k), H, adv, &
-                                                      & 0._wp, 0._wp, c, qv_sf(i, j, k))
+                        call s_eos_state_roe(eos_s, pres, rho_sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, k), qv_sf(i, j, k), &
+                                             & 0._wp, H)
+                        call s_compute_speed_of_sound(eos_s, adv, c)
 
                         out%q_sf(i, j, k) = c
                     end do

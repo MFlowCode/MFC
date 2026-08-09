@@ -97,6 +97,7 @@ contains
         type(riemann_states_vec3) :: cm        !< Conservative momentum variables
         integer :: i, j, k, l                  !< Generic loop iterators
         integer :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
+        type(eos_state) :: eos_s_L, eos_s_R, eos_s_avg
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -120,8 +121,8 @@ contains
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
                                     & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, damage_R, &
                                     & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, &
-                                    & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', &
-                                    & copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, eos_s_L, &
+                                    & eos_s_R, eos_s_avg]', copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -318,17 +319,18 @@ contains
 
                             @:compute_average_state()
 
-                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, vel_L_rms, 0._wp, c_L, &
-                                                          & qv_L)
+                            call s_eos_state_roe(eos_s_L, pres_L, rho_L, gamma_L, pi_inf_L, qv_L, vel_L_rms, H_L)
+                            call s_compute_speed_of_sound(eos_s_L, alpha_L, c_L)
 
-                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, vel_R_rms, 0._wp, c_R, &
-                                                          & qv_R)
+                            call s_eos_state_roe(eos_s_R, pres_R, rho_R, gamma_R, pi_inf_R, qv_R, vel_R_rms, H_R)
+                            call s_compute_speed_of_sound(eos_s_R, alpha_R, c_R)
 
                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                             ! variables are placeholders to call the subroutine.
 
-                            call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, vel_avg_rms, &
-                                                          & c_sum_Yi_Phi, c_avg, qv_avg)
+                            call s_eos_state_roe(eos_s_avg, pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, H_avg, &
+                                                 & c_sum_Yi_Phi)
+                            call s_compute_speed_of_sound(eos_s_avg, alpha_R, c_avg)
 
                             if (mhd) then
                                 call s_compute_fast_magnetosonic_speed(rho_L, c_L, B%L, norm_dir, c_fast%L, H_L)

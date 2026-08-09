@@ -1243,6 +1243,7 @@ contains
         real(wp), dimension(num_vels) :: vel
         real(wp), dimension(num_fluids) :: adv
         integer :: i, j, k, l, s  !< looping indices
+        type(eos_state) :: eos_s
 
         Egk = 0._wp
         Elp = 0._wp
@@ -1288,7 +1289,8 @@ contains
 
                     H = ((gamma + 1._wp)*pres + pi_inf + qv)/rho
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, 0._wp, 0._wp, c, qv)
+                    call s_eos_state(eos_s, pres, rho, gamma, pi_inf, qv, 0._wp)
+                    call s_compute_speed_of_sound(eos_s, adv, c)
 
                     Ma = maxvel/c
                     if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then

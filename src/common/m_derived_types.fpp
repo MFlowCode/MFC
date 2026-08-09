@@ -121,6 +121,29 @@ module m_derived_types
         type(int_bounds_info) :: x, y, z
     end type bc_xyz_info
 
+    !> Thermodynamic state handed to the equation-of-state routines.
+    !>
+    !> Carries scalars only. The volume-fraction array `adv` stays a separate argument: a derived-type
+    !> component cannot have a runtime extent, and `num_fluids` is a parameter only under case
+    !> optimization, so `dimension(num_fluids)` will not compile in a general build. Padding to
+    !> num_fluids_max would compile but put ten reals into a per-cell private struct on device.
+    !>
+    !> `H` is the specific total enthalpy and must include `qv`, because the sound-speed relation
+    !> subtracts `qv/rho`. Build states with f_eos_state so that invariant holds by construction
+    !> rather than by convention; f_eos_state_roe exists for the Roe-averaged paths, which supply an
+    !> `H` that is deliberately not the exact state enthalpy.
+    !> Contains no allocatable members - safe to use inside device routines.
+    type eos_state
+        real(wp) :: rho      !< Mixture density
+        real(wp) :: pres     !< Pressure
+        real(wp) :: gamma    !< Stiffened-gas gamma (1/(Gamma-1))
+        real(wp) :: pi_inf   !< Stiffened-gas stiffness
+        real(wp) :: qv       !< Heat of formation (volumetric)
+        real(wp) :: vel_sum  !< |u|^2
+        real(wp) :: H        !< Specific total enthalpy, including qv
+        real(wp) :: c_c      !< Roe-averaged chemistry sound-speed term (0 when unused)
+    end type eos_state
+
     !> QBMM moment index mappings - separate from bub beg/end so eqn_idx contains no allocatables.
     type qbmm_idx_info
         integer, dimension(:), allocatable     :: rs       !< R moment indices per bubble bin

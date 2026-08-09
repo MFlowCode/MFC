@@ -93,6 +93,7 @@ contains
         integer :: i, j, k, l  !< Generic loop iterators
         integer :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
         integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
+        type(eos_state) :: eos_s_L, eos_s_R
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -116,7 +117,7 @@ contains
                                     & c_avg, pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, &
                                     & c_R, E_L, E_R, H_L, H_R, ptilde_L, ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, &
                                     & eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, &
-                                    & Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & Y_R, eos_s_L, eos_s_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -291,11 +292,11 @@ contains
                                 H_R = (E_R + pres_R)/rho_R
                             end if
 
-                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, vel_L_rms, 0._wp, c_L, &
-                                                          & qv_L)
+                            call s_eos_state_roe(eos_s_L, pres_L, rho_L, gamma_L, pi_inf_L, qv_L, vel_L_rms, H_L)
+                            call s_compute_speed_of_sound(eos_s_L, alpha_L, c_L)
 
-                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, vel_R_rms, 0._wp, c_R, &
-                                                          & qv_R)
+                            call s_eos_state_roe(eos_s_R, pres_R, rho_R, gamma_R, pi_inf_R, qv_R, vel_R_rms, H_R)
+                            call s_compute_speed_of_sound(eos_s_R, alpha_R, c_R)
 
                             if (mhd) then
                                 call s_compute_fast_magnetosonic_speed(rho_L, c_L, B%L, norm_dir, c_fast%L, H_L)
