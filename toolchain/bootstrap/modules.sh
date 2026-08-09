@@ -40,10 +40,11 @@ done
 # Get computer (if not supplied in command line)
 if [ -v $u_c ]; then
     log   "Select a system:"
-    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Summit (s) | Wombat (w)"
+    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Wombat (w)"
     log   "$B""LLNL $W:   Tuolumne   (tuo)"
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d) | DeltaAI (dai)"
-    log   "$Y""Gatech$W:  Phoenix    (p)"
+    log   "$Y""Gatech$W:  Phoenix    (p) | Phoenix IFX (pifx)"
+    log   "$C""CSCS$W:    Santis     (san)"
     log   "$R""Caltech$W: Richardson (r)"
     log   "$BR""Brown$W: Oscar (o)"
     log   "$BR""Purdue$W: Anvil (pa)"
@@ -52,7 +53,7 @@ if [ -v $u_c ]; then
     log   "$OR""Florida$W: HiPerGator (h)"
     log   "$C""WPI $W:   Turing   (t)"
     log   "$R""AMD$W:     HPCFund  (amdfund)"
-    log_n "(${G}a${W}/${G}f${W}/${G}s${W}/${G}w${W}/${B}tuo${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${BR}pa${CR}/${OR}i${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
+    log_n "(${G}a${W}/${G}f${W}/${G}famd${W}/${G}w${W}/${B}tuo${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${Y}pifx${CR}/${C}san${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${BR}pa${CR}/${OR}i${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
     read u_c
     log
 fi

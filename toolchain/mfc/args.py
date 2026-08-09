@@ -15,7 +15,6 @@ from .common import MFCException
 from .state import MFCConfig
 from .user_guide import (
     is_first_time_user,
-    print_clusters_help,
     print_command_help,
     print_help,
     print_welcome,
@@ -93,11 +92,6 @@ def parse(config: MFCConfig):
     # Handle --help at top level
     if args.get("help") and args["command"] is None:
         print_help()
-        sys.exit(0)
-
-    # Handle 'help' command
-    if args["command"] == "help":
-        print_clusters_help()
         sys.exit(0)
 
     # Resolve command aliases

@@ -508,6 +508,48 @@ def check_checker_input_constraints(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_cluster_menu_slugs(repo_root: Path) -> list[str]:
+    """Keep the ``./mfc.sh load`` cluster menu in sync with toolchain/modules.
+
+    The menu in toolchain/bootstrap/modules.sh is hand-written so it can be
+    grouped and coloured by organisation. That is fine, but it drifts: it used
+    to offer Summit, which has no module set, and omitted Phoenix IFX and
+    Santis, which do. Compare the advertised slugs against the data file.
+    """
+    modules = repo_root / "toolchain" / "modules"
+    script = repo_root / "toolchain" / "bootstrap" / "modules.sh"
+    if not modules.exists() or not script.exists():
+        return []
+
+    # Cluster definitions in toolchain/modules are "<slug> <System Name>". The
+    # "<slug>-{all,cpu,gpu}[-unload] <modules...>" lines carry the module lists.
+    module_list_line = re.compile(r"-(all|cpu|gpu)(-unload)?$")
+    defined = set()
+    for raw_line in modules.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        slug = line.split()[0]
+        if not module_list_line.search(slug):
+            defined.add(slug)
+
+    # The menu block runs from "Select a system:" to the answer prompt.
+    text = script.read_text()
+    try:
+        block = text[text.index("Select a system:") : text.index("read u_c")]
+    except ValueError:
+        return [f"{script.relative_to(repo_root)}: could not locate the cluster menu block"]
+    advertised = set(re.findall(r"\((\w[\w-]*)\)", block))
+
+    errors = []
+    rel = script.relative_to(repo_root)
+    for slug in sorted(advertised - defined):
+        errors.append(f"{rel}: cluster menu offers '{slug}', which has no entry in toolchain/modules (selecting it loads nothing)")
+    for slug in sorted(defined - advertised):
+        errors.append(f"{rel}: toolchain/modules defines '{slug}', but the cluster menu does not offer it (users cannot discover it)")
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -522,6 +564,7 @@ def main():
     all_errors.extend(check_hardcoded_byte_size(repo_root))
     all_errors.extend(check_manual_registry_bcasts(repo_root))
     all_errors.extend(check_checker_input_constraints(repo_root))
+    all_errors.extend(check_cluster_menu_slugs(repo_root))
 
     if all_errors:
         print("Source lint failed:")

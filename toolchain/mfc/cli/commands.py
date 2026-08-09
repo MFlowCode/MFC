@@ -719,11 +719,6 @@ COMPLETION_COMMAND = Command(
     ],
 )
 
-HELP_COMMAND = Command(
-    name="help",
-    help="List the HPC clusters MFC ships module sets for.",
-)
-
 # Simple commands (shell scripts, minimal arguments)
 LOAD_COMMAND = Command(
     name="load",
@@ -1468,7 +1463,6 @@ started, run `./mfc.sh build -h`.""",
         PARAMS_COMMAND,
         PACKER_COMMAND,
         COMPLETION_COMMAND,
-        HELP_COMMAND,
         GENERATE_COMMAND,
         LOAD_COMMAND,
         LINT_COMMAND,
