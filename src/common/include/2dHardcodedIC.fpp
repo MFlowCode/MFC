@@ -112,13 +112,13 @@
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = (1._wp - alph)*rhoL
-            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pRef + rhoH*9.81_wp*(1.2_wp - y_cc(j))
         else
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, 0) = alph
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = (1._wp - alph)*rhoL
-            pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
+            pInt = pRef + rhoH*9.81_wp*(1.2_wp - intH)
             q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
     case (205)  ! 2D lung wave interaction problem

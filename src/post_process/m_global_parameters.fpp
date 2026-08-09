@@ -386,40 +386,6 @@ contains
             end if
         end if
 
-        if (model_eqns == model_eqns_4eq .and. bubbles_euler) then
-            allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-            allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-            allocate (weight(nb), R0(nb))
-
-            do i = 1, nb
-                if (polytropic .neqv. .true.) then
-                    fac = 4
-                else
-                    fac = 2
-                end if
-
-                qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
-                qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
-
-                if (polytropic .neqv. .true.) then
-                    qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
-                    qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
-                end if
-            end do
-
-            if (nb == 1) then
-                weight(:) = 1._wp
-                R0(:) = 1._wp
-            else if (nb < 1) then
-                stop 'Invalid value of nb'
-            end if
-
-            if (polytropic) then
-                rhoref = 1._wp
-                pref = 1._wp
-            end if
-        end if
-
         if (output_partial_domain) then
             x_output_idx%beg = 0
             x_output_idx%end = 0

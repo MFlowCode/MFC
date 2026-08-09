@@ -134,8 +134,6 @@ feature, detecting GPU pointers and performing RDMA accordingly.
 | `m`                      | Integer | Number of grid cells in the $x$-coordinate direction |
 | `n`                      | Integer | Number of grid cells in the $y$-coordinate direction |
 | `p`                      | Integer | Number of grid cells in the $z$-coordinate direction |
-| `pref`                   | Real    | Reference pressure                                   |
-| `rhoref`                 | Real    | Reference density                                    |
 
 The parameters define the boundaries of the spatial and temporal domains, and their discretization that are used in simulation.
 
@@ -489,7 +487,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `bc_[x,y,z]%%beg[end]`     | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
 | `bc_[x,y,z]%%vb[1,2,3]`‡   | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
 | `bc_[x,y,z]%%ve[1,2,3]`‡   | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
-| `model_eqns`               | Integer | Multicomponent model: [1] \f$\Gamma/\Pi_\infty\f$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
+| `model_eqns`               | Integer | Multicomponent model: [1] \f$\Gamma/\Pi_\infty\f$; [2] 5-equation; [3] 6-equation |
 | `alt_soundspeed` *         | Logical | Alternate sound speed and \f$K \nabla \cdot u\f$ for 5-equation model |
 | `adv_n`   	               | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
 | `mpp_lim`	                 | Logical | Mixture physical parameters limits |
@@ -873,8 +871,6 @@ Details of the transducer acoustic source model can be found in \cite Maeda17.
 | `Ca`               | Real    | Cavitation number |
 | `Web`              | Real    | Weber number |
 | `Re_inv`           | Real    | Inverse Reynolds number |
-| `pref`             | Real    | Reference pressure for bubble models |
-| `rhoref`           | Real    | Reference density for bubble models |
 | `fluid_rho`        | Real    | Reference fluid density |
 | `bub_pp%%R0ref`*†‡  | Real    | Reference bubble radius |
 | `bub_pp%%p0ref`*†‡  | Real    | Reference pressure |

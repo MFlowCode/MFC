@@ -337,9 +337,9 @@ CONSTRAINTS = {
     },
     # Model equations
     "model_eqns": {
-        "choices": [1, 2, 3, 4],
-        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation", 4: "4-Equation"},
-        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3, "4eq": 4},
+        "choices": [1, 2, 3],
+        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation"},
+        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3},
     },
     # Bubbles
     "bubble_model": {
@@ -392,7 +392,7 @@ DEPENDENCIES = {
         "when_true": {
             "recommends": ["nb", "polytropic"],
             "requires_value": {
-                "model_eqns": [2, 4],
+                "model_eqns": [2],
                 "riemann_solver": [2],
                 "avg_state": [2],
             },
@@ -402,7 +402,6 @@ DEPENDENCIES = {
         "when_value": {
             2: {"requires": ["num_fluids"]},
             3: {"requires_value": {"riemann_solver": [2], "avg_state": [2], "wave_speeds": [1]}},
-            4: {"requires": ["rhoref", "pref"], "requires_value": {"num_fluids": [1]}},
         }
     },
     "viscous": {
@@ -736,9 +735,7 @@ def _load():
         "flux_lim",
     ]:
         _r(n, INT)
-    _r("pref", REAL, math=r"\f$p_\text{ref}\f$")
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
-    _r("rhoref", REAL, math=r"\f$\rho_\text{ref}\f$")
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
@@ -1255,8 +1252,6 @@ _nv(
     "relax_model",
     "fluid_pp",
     "bub_pp",
-    "rhoref",
-    "pref",
     "bubbles_euler",
     "bubbles_lagrange",
     "R0ref",
