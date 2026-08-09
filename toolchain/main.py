@@ -227,11 +227,6 @@ if __name__ == "__main__":
 
         lock.switch(state.MFCConfig.from_dict(state.gARG))
 
-        # Ensure IDE configuration is up to date (lightweight check)
-        from mfc.ide import ensure_vscode_settings
-
-        ensure_vscode_settings()
-
         # Auto-regenerate completion scripts if source files changed
         __ensure_generated_files()
 
