@@ -148,9 +148,9 @@ contains
                             H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R
 
                             ! (2) Compute fast wave speeds
-                            call s_eos_state_roe(eos_s_L, pres%L, rho%L, gamma%L, pi_inf%L, qv%L, vel_rms%L, H_no_mag%L)
+                            eos_s_L = eos_state(rho%L, pres%L, gamma%L, pi_inf%L, qv%L, vel_rms%L, H_no_mag%L, 0._wp)
                             call s_compute_speed_of_sound(eos_s_L, alpha_L, c%L)
-                            call s_eos_state_roe(eos_s_R, pres%R, rho%R, gamma%R, pi_inf%R, qv%R, vel_rms%R, H_no_mag%R)
+                            eos_s_R = eos_state(rho%R, pres%R, gamma%R, pi_inf%R, qv%R, vel_rms%R, H_no_mag%R, 0._wp)
                             call s_compute_speed_of_sound(eos_s_R, alpha_R, c%R)
                             call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, norm_dir, c_fast%L, H_no_mag%L)
                             call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)

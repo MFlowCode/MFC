@@ -292,10 +292,10 @@ contains
                                 H_R = (E_R + pres_R)/rho_R
                             end if
 
-                            call s_eos_state_roe(eos_s_L, pres_L, rho_L, gamma_L, pi_inf_L, qv_L, vel_L_rms, H_L)
+                            eos_s_L = eos_state(rho_L, pres_L, gamma_L, pi_inf_L, qv_L, vel_L_rms, H_L, 0._wp)
                             call s_compute_speed_of_sound(eos_s_L, alpha_L, c_L)
 
-                            call s_eos_state_roe(eos_s_R, pres_R, rho_R, gamma_R, pi_inf_R, qv_R, vel_R_rms, H_R)
+                            eos_s_R = eos_state(rho_R, pres_R, gamma_R, pi_inf_R, qv_R, vel_R_rms, H_R, 0._wp)
                             call s_compute_speed_of_sound(eos_s_R, alpha_R, c_R)
 
                             if (mhd) then

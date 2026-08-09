@@ -319,17 +319,16 @@ contains
 
                             @:compute_average_state()
 
-                            call s_eos_state_roe(eos_s_L, pres_L, rho_L, gamma_L, pi_inf_L, qv_L, vel_L_rms, H_L)
+                            eos_s_L = eos_state(rho_L, pres_L, gamma_L, pi_inf_L, qv_L, vel_L_rms, H_L, 0._wp)
                             call s_compute_speed_of_sound(eos_s_L, alpha_L, c_L)
 
-                            call s_eos_state_roe(eos_s_R, pres_R, rho_R, gamma_R, pi_inf_R, qv_R, vel_R_rms, H_R)
+                            eos_s_R = eos_state(rho_R, pres_R, gamma_R, pi_inf_R, qv_R, vel_R_rms, H_R, 0._wp)
                             call s_compute_speed_of_sound(eos_s_R, alpha_R, c_R)
 
                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                             ! variables are placeholders to call the subroutine.
 
-                            call s_eos_state_roe(eos_s_avg, pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, H_avg, &
-                                                 & c_sum_Yi_Phi)
+                            eos_s_avg = eos_state(rho_avg, pres_R, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, H_avg, c_sum_Yi_Phi)
                             call s_compute_speed_of_sound(eos_s_avg, alpha_R, c_avg)
 
                             if (mhd) then
