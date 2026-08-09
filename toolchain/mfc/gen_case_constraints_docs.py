@@ -133,25 +133,11 @@ def summarize_case_params(params: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def get_model_name(model_eqns: int | None) -> str:
-    """Get human-friendly model name from schema."""
-    if model_eqns is None:
+def _named(param: str, value: int | None) -> str:
+    """Get the name from a schema (i.e. model name, Riemann solver name, time stepper name)."""
+    if value is None:
         return "Not specified"
-    return get_value_label("model_eqns", model_eqns) or "Not specified"
-
-
-def get_riemann_solver_name(solver: int | None) -> str:
-    """Get Riemann solver name from schema."""
-    if solver is None:
-        return "Not specified"
-    return get_value_label("riemann_solver", solver) or "Not specified"
-
-
-def get_time_stepper_name(stepper: int | None) -> str:
-    """Get time stepper name from schema."""
-    if stepper is None:
-        return "Not specified"
-    return get_value_label("time_stepper", stepper) or "Not specified"
+    return get_value_label(param, value) or "Not specified"
 
 
 def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:
@@ -167,7 +153,7 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:
     lines.append(f"**Tags:** {tags_str}\n")
 
     lines.append("**Physics Configuration:**\n")
-    lines.append(f"- **Model:** {get_model_name(summary['model_eqns'])} (`model_eqns = {summary['model_eqns']}`)")
+    lines.append(f"- **Model:** {_named('model_eqns', summary['model_eqns'])} (`model_eqns = {summary['model_eqns']}`)")
 
     if summary["num_fluids"] is not None:
         lines.append(f"- **Number of fluids:** {summary['num_fluids']}")
@@ -219,11 +205,11 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:
         lines.append(f"- **Reconstruction:** MUSCL (order {summary['muscl_order']})")
 
     if summary["riemann_solver"]:
-        solver_name = get_riemann_solver_name(summary["riemann_solver"])
+        solver_name = _named("riemann_solver", summary["riemann_solver"])
         lines.append(f"- **Riemann solver:** {solver_name} (`riemann_solver = {summary['riemann_solver']}`)")
 
     if summary["time_stepper"]:
-        stepper_name = get_time_stepper_name(summary["time_stepper"])
+        stepper_name = _named("time_stepper", summary["time_stepper"])
         lines.append(f"- **Time stepping:** {stepper_name}")
 
     # Links
