@@ -15,8 +15,8 @@ module m_global_parameters_common
 
     use m_derived_types
     use m_thermochem, only: num_species
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, recon_type_weno, &
-        & recon_type_muscl, name_len, dflt_int, dflt_real
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, recon_type_weno, recon_type_muscl, name_len, &
+        & dflt_int, dflt_real
 
     implicit none
 
@@ -190,26 +190,6 @@ contains
             eqn_idx%int_en%beg = eqn_idx%adv%end + 1
             eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
             sys_size = eqn_idx%int_en%end
-        else if (model_eqns == model_eqns_4eq) then
-            ! 4-equation model with subgrid bubbles
-            eqn_idx%cont%beg = 1
-            eqn_idx%cont%end = 1
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1
-            eqn_idx%adv%beg = eqn_idx%E + 1
-            eqn_idx%adv%end = eqn_idx%adv%beg
-            eqn_idx%alf = eqn_idx%adv%end
-            sys_size = eqn_idx%adv%end
-
-            if (bubbles_euler) then
-                eqn_idx%bub%beg = sys_size + 1
-                eqn_idx%bub%end = sys_size + 2*nb_in
-                if (.not. polytropic) then
-                    eqn_idx%bub%end = sys_size + 4*nb_in
-                end if
-                sys_size = eqn_idx%bub%end
-            end if
         end if
 
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
@@ -374,8 +354,6 @@ contains
         riemann_solver = dflt_int
 
         ! Tait EOS
-        rhoref = dflt_real
-        pref = dflt_real
 
         ! Bubble modeling flags and parameters
         R0ref = dflt_real

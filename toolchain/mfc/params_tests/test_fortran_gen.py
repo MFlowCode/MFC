@@ -432,9 +432,9 @@ def test_generate_bcast_fpp_class_a_real_scalars():
     assert "call MPI_BCAST(dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in sim
     assert "call MPI_BCAST(dt, " not in pre and "call MPI_BCAST(dt, " not in post
 
-    # pref is in all three
+    # poly_sigma is in all three
     for out, target in [(pre, "pre"), (sim, "sim"), (post, "post")]:
-        assert "call MPI_BCAST(pref, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: pref missing"
+        assert "call MPI_BCAST(poly_sigma, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: poly_sigma missing"
 
 
 def test_generate_bcast_fpp_class_a_str_scalars():

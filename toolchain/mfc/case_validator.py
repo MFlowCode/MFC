@@ -349,12 +349,11 @@ class CaseValidator:
         cyl_coord = self.get("cyl_coord", "F") == "T"
         p = self.get("p", 0)
 
-        self.prohibit(model_eqns is not None and model_eqns not in [1, 2, 3, 4], "model_eqns must be 1, 2, 3, or 4")
+        self.prohibit(model_eqns is not None and model_eqns not in [1, 2, 3], "model_eqns must be 1, 2, or 3")
         self.prohibit(num_fluids is not None and num_fluids < 1, "num_fluids must be positive")
         self.prohibit(model_eqns == 1 and num_fluids is not None, "num_fluids is not supported for model_eqns = 1")
         self.prohibit(model_eqns == 2 and num_fluids is None, "5-equation model (model_eqns = 2) requires num_fluids to be set")
         self.prohibit(model_eqns == 3 and num_fluids is None, "6-equation model (model_eqns = 3) requires num_fluids to be set")
-        self.prohibit(model_eqns == 4 and num_fluids is None, "4-equation model (model_eqns = 4) requires num_fluids to be set")
         self.prohibit(model_eqns == 1 and mpp_lim, "model_eqns = 1 does not support mpp_lim")
         self.prohibit(num_fluids == 1 and mpp_lim, "num_fluids = 1 does not support mpp_lim")
         self.prohibit(model_eqns == 3 and cyl_coord and p != 0, "6-equation model (model_eqns = 3) does not support cylindrical coordinates (cyl_coord = T and p != 0)")
@@ -502,9 +501,6 @@ class CaseValidator:
         thermal = self.get("thermal")
         model_eqns = self.get("model_eqns")
         cyl_coord = self.get("cyl_coord", "F") == "T"
-        rhoref = self.get("rhoref")
-        pref = self.get("pref")
-        num_fluids = self.get("num_fluids")
 
         self.prohibit(nb is None or nb < 1, "The Ensemble-Averaged Bubble Model requires nb >= 1")
         self.prohibit(polydisperse and nb == 1, "Polydisperse bubble dynamics requires nb > 1")
@@ -512,11 +508,6 @@ class CaseValidator:
         self.prohibit(thermal is not None and thermal > 3, "thermal must be <= 3")
         self.prohibit(model_eqns == 3, "Bubble models untested with 6-equation model (model_eqns = 3)")
         self.prohibit(model_eqns == 1, "Bubble models untested with pi-gamma model (model_eqns = 1)")
-        self.prohibit(model_eqns == 4 and rhoref is None, "rhoref must be set if using bubbles_euler with model_eqns = 4")
-        self.prohibit(rhoref is not None and rhoref <= 0, "rhoref (reference density) must be positive")
-        self.prohibit(model_eqns == 4 and pref is None, "pref must be set if using bubbles_euler with model_eqns = 4")
-        self.prohibit(pref is not None and pref <= 0, "pref (reference pressure) must be positive")
-        self.prohibit(model_eqns == 4 and num_fluids != 1, "4-equation model (model_eqns = 4) is single-component and requires num_fluids = 1")
         self.prohibit(cyl_coord, "Bubble models untested in cylindrical coordinates")
 
         # BUBBLE PHYSICS PARAMETERS
@@ -2016,14 +2007,14 @@ class CaseValidator:
     def check_volume_fraction_sum(self):
         """Warns if volume fractions do not sum to 1 for multi-component models.
 
-        For model_eqns in [2, 3, 4], the mixture constraint sum(alpha_j) = 1
+        For model_eqns in [2, 3], the mixture constraint sum(alpha_j) = 1
         must hold. Skips patches with analytical expressions, alter_patch,
         hcid, bubbles_euler single-fluid cases (where alpha represents
         the void fraction, not a partition of unity), and bubbles_lagrange
         cases (where the Lagrangian phase is not tracked on the Euler grid).
         """
         model_eqns = self.get("model_eqns")
-        if model_eqns not in [2, 3, 4]:
+        if model_eqns not in [2, 3]:
             return
 
         num_patches = self.get("num_patches", 0)

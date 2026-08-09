@@ -26,7 +26,7 @@ module m_start_up
     use m_checker
     use m_thermochem, only: num_species, species_names
     use m_finite_differences
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, model_eqns_4eq, format_silo
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo
     use m_chemistry
 
 #ifdef MFC_MPI
@@ -235,14 +235,10 @@ contains
             call s_compute_finite_difference_coefficients(p, z_cc, fd%fd_coeff_z, buff_size, fd_number, fd_order, offset_z)
         end if
 
-        if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq) .or. (model_eqns == model_eqns_4eq)) then
+        if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
             do i = 1, num_fluids
                 if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                    if (model_eqns /= model_eqns_4eq) then
-                        write (varname, '(A,I0)') 'alpha_rho', i
-                    else
-                        write (varname, '(A,I0)') 'rho', i
-                    end if
+                    write (varname, '(A,I0)') 'alpha_rho', i
                     call s_write_field(varname, t_step, q_cons_vf(i), x_beg, x_end, y_beg, y_end, z_beg, z_end)
                 end if
             end do
