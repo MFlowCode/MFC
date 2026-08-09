@@ -51,18 +51,8 @@ SLUG_NAME_OVERRIDE = {
     "h": "HiPerGator",  # Proper capitalization
 }
 
-# Display order and colors for organizations
+# Display order for organizations
 ORG_ORDER = ["ORNL", "LLNL", "ACCESS", "Georgia Tech", "Caltech", "Brown", "DoD", "Florida", "CSCS"]
-ORG_COLORS = {
-    "ORNL": "yellow",
-    "LLNL": "yellow",
-    "ACCESS": "yellow",
-    "Georgia Tech": "yellow",
-    "Caltech": "yellow",
-    "Brown": "yellow",
-    "DoD": "yellow",
-    "Florida": "yellow",
-}
 
 
 def _parse_modules_file():
@@ -142,8 +132,7 @@ def _generate_clusters_content():
             continue
         # Format: "  [yellow]ORG:[/yellow]  [cyan]slug[/cyan]=Name  [cyan]slug2[/cyan]=Name2"
         entries = [f"[cyan]{slug}[/cyan]={_get_cluster_short_name(slug, name)}" for slug, name in org_clusters[org]]
-        color = ORG_COLORS.get(org, "yellow")
-        cluster_lines.append(f"  [{color}]{org}:[/{color}]    " + "  ".join(entries))
+        cluster_lines.append(f"  [yellow]{org}:[/yellow]    " + "  ".join(entries))
 
     # Handle "Other" if any
     if org_clusters.get("Other"):
