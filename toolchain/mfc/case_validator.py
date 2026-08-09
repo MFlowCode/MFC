@@ -814,7 +814,6 @@ class CaseValidator:
         """Checks time stepping parameters (simulation/post-process)"""
         cfl_dt = self.get("cfl_dt", "F") == "T"
         cfl_adap_dt = self.get("cfl_adap_dt", "F") == "T"
-        adap_dt = self.get("adap_dt", "F") == "T"
         time_stepper = self.get("time_stepper")
 
         # Check time_stepper bounds
@@ -853,10 +852,13 @@ class CaseValidator:
         )
 
         if not variable_dt:
-            # dt is required in pure fixed dt mode (not cfl_dt, not cfl_adap_dt)
-            # adap_dt mode uses dt as initial value, so it's optional
+            # dt is required whenever stepping is not CFL-driven. adap_dt is not an
+            # exemption: it uses dt as its initial value, and the Fortran checked
+            # `if (.not. cfl_dt) dt <= 0`, which fired on the dflt_real sentinel when
+            # dt was left unset. Cases that genuinely need no dt set cfl_adap_dt
+            # instead, which lands in the variable_dt branch above.
             uses_fixed_stepping = self.is_set("t_step_start") or self.is_set("t_step_stop")
-            self.prohibit(uses_fixed_stepping and not adap_dt and not self.is_set("dt"), "dt must be set when using fixed time stepping (t_step_start/t_step_stop)")
+            self.prohibit(uses_fixed_stepping and not self.is_set("dt"), "dt must be set when using fixed time stepping (t_step_start/t_step_stop)")
 
     def check_finite_difference(self):
         """Checks constraints on finite difference parameters"""
@@ -1631,19 +1633,26 @@ class CaseValidator:
         reactive_burn = self.get("reactive_burn", "F") == "T"
         if not reactive_burn:
             return
+        # These mirror Fortran checks that compared against the dflt_real / dflt_int
+        # sentinels, so an unset parameter was a violation there. A bare
+        # "is not None" guard would silently pass the unset case instead.
         model_eqns = self.get("model_eqns")
         # Supported on the 5-equation (pressure-equilibrium) and 6-equation multi-fluid models.
-        self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "reactive_burn requires model_eqns = 2 or 3 (5- or 6-equation multi-fluid model)")
+        self.prohibit(model_eqns not in (2, 3), "reactive_burn requires model_eqns = 2 or 3 (5- or 6-equation multi-fluid model) to be set")
 
         # Exactly two fluids (reactant = 1, product = 2) sharing the stiffened-gas EOS and
         # differing only in qv; violating these silently corrupts the mass/energy balance.
-        num_fluids = self.get("num_fluids")
-        self.prohibit(num_fluids is not None and num_fluids != 2, "reactive_burn requires num_fluids = 2 (reactant then product)")
+        self.prohibit(self.get("num_fluids") != 2, "reactive_burn requires num_fluids = 2 (reactant then product) to be set")
         for prop in ("gamma", "pi_inf"):
             v1 = self.get(f"fluid_pp(1)%{prop}")
             v2 = self.get(f"fluid_pp(2)%{prop}")
+            if not self._is_numeric(v1) or not self._is_numeric(v2):
+                # Unset defaults to dflt_real in the solver, so a missing value is
+                # either a negative EOS or a mismatch against the fluid that is set.
+                self.prohibit(True, f"reactive_burn requires both fluid_pp(1)%{prop} and fluid_pp(2)%{prop} to be set (reactant and product share the EOS)")
+                continue
             self.prohibit(
-                self._is_numeric(v1) and self._is_numeric(v2) and not math.isclose(v1, v2, rel_tol=1e-10),
+                not math.isclose(v1, v2, rel_tol=1e-10),
                 f"reactive_burn requires fluid_pp(1)%{prop} == fluid_pp(2)%{prop} (reactant and product share the EOS)",
             )
         # qv defaults to 0 in the Fortran, so an unset value is treated as 0 here to match.
