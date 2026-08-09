@@ -12,6 +12,7 @@ Based on the constraints enforced in:
 - src/post_process/m_checker.fpp
 """
 
+import math
 import re
 from functools import lru_cache
 from typing import Any, Dict, List, Set
@@ -611,6 +612,7 @@ class CaseValidator:
         num_particle_clouds = self.get("num_particle_clouds", 0) or 0
 
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
+        many_ib_patch_parallelism = self.get("many_ib_patch_parallelism", "F") == "T"
 
         fd_order = self.get("fd_order")
         self.prohibit(ib and fd_order is None, "fd_order must be specified for ib")
@@ -627,6 +629,7 @@ class CaseValidator:
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
+        self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
@@ -940,6 +943,13 @@ class CaseValidator:
 
     def check_body_forces(self):
         """Checks constraints on body forces parameters"""
+        # Spatially supported forcing writes mom%beg and mom%beg+1 directly, so it is
+        # only defined for a 2D domain (n > 0 with p == 0).
+        bf_spatial_support = self.get("bf_spatial_support", "F") == "T"
+        n = self.get("n", 0) or 0
+        p = self.get("p", 0) or 0
+        self.prohibit(bf_spatial_support and (n == 0 or p != 0), "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
+
         for dir in ["x", "y", "z"]:
             bf = self.get(f"bf_{dir}", "F") == "T"
 
@@ -1516,6 +1526,31 @@ class CaseValidator:
         qbmm = self.get("qbmm", "F") == "T"
         self.prohibit(chemistry and (bubbles_euler or qbmm), "chemistry is not currently supported with Euler bubbles (bubbles_euler / qbmm)")
 
+        # Operator-split reaction sub-stepping. The Fortran defaults are
+        # reaction_substeps = reaction_substeps_max = 0 and adap_substeps = F, so an
+        # unset value is treated as 0 here to match.
+        igr = self.get("igr", "F") == "T"
+        adap_substeps = self.get("chem_params%adap_substeps", "F") == "T"
+        reaction_substeps = self.get("chem_params%reaction_substeps", 0) or 0
+        reaction_substeps_max = self.get("chem_params%reaction_substeps_max", 0) or 0
+
+        self.prohibit(
+            chemistry and reaction_substeps < 0,
+            "chem_params%reaction_substeps must be >= 0 (0 = reaction source in the flow RHS; > 0 = operator-split sub-stepping)",
+        )
+        self.prohibit(
+            chemistry and igr and reaction_substeps > 0,
+            "operator-split reaction sub-stepping (reaction_substeps > 0) is not supported with igr: the reactor reads the post-flow (rho, e, T) state, which the IGR update path does not guarantee",
+        )
+        self.prohibit(
+            chemistry and adap_substeps and reaction_substeps < 1,
+            "chem_params%adap_substeps requires reaction_substeps >= 1 (the operator-split floor)",
+        )
+        self.prohibit(
+            chemistry and adap_substeps and reaction_substeps_max < reaction_substeps,
+            "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
+        )
+
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
@@ -1559,6 +1594,25 @@ class CaseValidator:
         model_eqns = self.get("model_eqns")
         # Supported on the 5-equation (pressure-equilibrium) and 6-equation multi-fluid models.
         self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "reactive_burn requires model_eqns = 2 or 3 (5- or 6-equation multi-fluid model)")
+
+        # Exactly two fluids (reactant = 1, product = 2) sharing the stiffened-gas EOS and
+        # differing only in qv; violating these silently corrupts the mass/energy balance.
+        num_fluids = self.get("num_fluids")
+        self.prohibit(num_fluids is not None and num_fluids != 2, "reactive_burn requires num_fluids = 2 (reactant then product)")
+        for prop in ("gamma", "pi_inf"):
+            v1 = self.get(f"fluid_pp(1)%{prop}")
+            v2 = self.get(f"fluid_pp(2)%{prop}")
+            self.prohibit(
+                self._is_numeric(v1) and self._is_numeric(v2) and not math.isclose(v1, v2, rel_tol=1e-10),
+                f"reactive_burn requires fluid_pp(1)%{prop} == fluid_pp(2)%{prop} (reactant and product share the EOS)",
+            )
+        # qv defaults to 0 in the Fortran, so an unset value is treated as 0 here to match.
+        qv1 = self.get("fluid_pp(1)%qv", 0.0)
+        qv2 = self.get("fluid_pp(2)%qv", 0.0)
+        self.prohibit(
+            self._is_numeric(qv1) and self._is_numeric(qv2) and qv1 <= qv2,
+            "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)",
+        )
         # The rate uses rburn%k, %pign, %pref, %n directly; an unset value defaults to a negative
         # sentinel in the solver and silently corrupts the burn, so require each to be set.
         rk = self.get("rburn%k")
