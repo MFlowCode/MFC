@@ -377,9 +377,6 @@ contains
 
         ! Initial particle pressure
         gas_p(bub_id, 1) = pliq + 2._wp*(1._wp/Web)/bub_R0(bub_id)
-        if (.not. f_approx_equal((1._wp/Web), 0._wp)) then
-            pref = gas_p(bub_id, 1)
-        end if
 
         ! Initial particle mass
         volparticle = 4._wp/3._wp*pi*bub_R0(bub_id)**3._wp  ! volume

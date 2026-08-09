@@ -14,7 +14,7 @@ module m_variables_conversion
     use m_helper_basic
     use m_helper
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, &
-        & model_eqns_4eq, avg_state_roe
+        & avg_state_roe
     use m_thermochem, only: num_species, get_temperature, get_pressure, gas_constant, get_mixture_molecular_weight, &
         & get_mixture_energy_mass
 
@@ -94,15 +94,12 @@ contains
             if (mhd) then
                 ! MHD pressure: subtract magnetic pressure from total energy
                 pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
-            else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
+            else if (bubbles_euler .neqv. .true.) then
                 ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002): p from mixture EOS
                 pres = (energy - dyn_p - pi_inf - qv)/gamma
-            else if ((model_eqns /= model_eqns_4eq) .and. bubbles_euler) then
+            else
                 ! Bubble-augmented pressure with void fraction correction
                 pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
-            else
-                ! Four-equation model (Kapila et al. PoF 2001): Tait EOS inversion
-                pres = (pref + pi_inf)*(energy/(rhoref*(1 - alf)))**(1/gamma + 1) - pi_inf
             end if
 
             if (hypoelasticity .and. present(G)) then
@@ -469,26 +466,24 @@ contains
 
                     call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
 
-                    if (model_eqns /= model_eqns_4eq) then
 #ifdef MFC_GPU
-                        ! Device regions call the device-compiled scalar kernel directly.
-                        if (hypoelasticity) then
-                            call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                & alpha_rho_K, Re_K, G_K, Gs_vc)
-                        else
-                            call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                & alpha_rho_K, Re_K)
-                        end if
-#else
-                        ! Host execution uses the wrapper, which also stores requested diagnostics.
-                        if (hypoelasticity) then
-                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, &
-                                                                & fluid_pp(:)%G)
-                        else
-                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K)
-                        end if
-#endif
+                    ! Device regions call the device-compiled scalar kernel directly.
+                    if (hypoelasticity) then
+                        call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
+                            & Re_K, G_K, Gs_vc)
+                    else
+                        call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
+                            & Re_K)
                     end if
+#else
+                    ! Host execution uses the wrapper, which also stores requested diagnostics.
+                    if (hypoelasticity) then
+                        call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, &
+                                                            & fluid_pp(:)%G)
+                    else
+                        call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K)
+                    end if
+#endif
 
                     ! Relativistic MHD primitive variable recovery, Mignone & Bodo A&A (2006)
                     if (relativity) then
@@ -597,13 +592,8 @@ contains
                     ! Recover velocity from momentum: u = rho*u / rho, and accumulate dynamic pressure 0.5*rho*|u|^2
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
-                        if (model_eqns /= model_eqns_4eq) then
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
-                            dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l)*qK_prim_vf(i)%sf(j, k, l)
-                        else
-                            ! Four-equation model (Kapila et al. PoF 2001): divide by total density q_cons(1)
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/qK_cons_vf(1)%sf(j, k, l)
-                        end if
+                        qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                        dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l)*qK_prim_vf(i)%sf(j, k, l)
                     end do
 
                     if (chemistry) then
@@ -868,16 +858,13 @@ contains
                             ! MHD energy includes magnetic pressure contribution
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, &
                                       & l) + dyn_pres + pres_mag + pi_inf + qv
-                        else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler .neqv. .true.)) then
+                        else if (bubbles_euler .neqv. .true.) then
                             ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
-                        else if ((model_eqns /= model_eqns_4eq) .and. (bubbles_euler)) then
+                        else
                             ! Bubble-augmented energy with void fraction correction
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + (1._wp - q_prim_vf(eqn_idx%alf)%sf(j, k, &
                                       & l))*(gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + pi_inf)
-                        else
-                            ! Four-equation model (Kapila et al. PoF 2001): Tait EOS, no conserved energy variable
-                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
                         end if
                     end if
 
@@ -1215,7 +1202,7 @@ contains
                     c = c + adv(q)*gs_min(q)*(pres + pi_infs(q)/(gammas(q) + 1._wp))
                 end do
                 c = c/rho
-            else if (((model_eqns == model_eqns_4eq) .or. (model_eqns == model_eqns_5eq .and. bubbles_euler))) then
+            else if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
                 ! Sound speed for bubble mixture to order O(\alpha)
 
                 if (mpp_lim .and. (num_fluids > 1)) then

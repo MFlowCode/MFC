@@ -19,7 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
-    use m_constants, only: model_eqns_5eq, model_eqns_4eq, precision_single
+    use m_constants, only: model_eqns_5eq, precision_single
 
     implicit none
 
@@ -1242,9 +1242,7 @@ contains
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                     end if
 
-                    if (model_eqns == model_eqns_4eq) then
-                        lit_gamma = gammas(1)
-                    else if (hypoelasticity) then
+                    if (hypoelasticity) then
                         tau_e(1) = q_cons_vf(eqn_idx%stress%end)%sf(j - 2, k, l)/rho
                     end if
 
@@ -1346,9 +1344,7 @@ contains
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                         end if
 
-                        if (model_eqns == model_eqns_4eq) then
-                            lit_gamma = gs_min(1)
-                        else if (hypoelasticity) then
+                        if (hypoelasticity) then
                             do s = 1, 3
                                 tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
                             end do

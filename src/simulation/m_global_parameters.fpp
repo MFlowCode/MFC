@@ -767,27 +767,6 @@ contains
             end if
         end if
 
-        if (model_eqns == model_eqns_4eq .and. bubbles_euler) then
-            @:ALLOCATE(qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-            @:ALLOCATE(qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-
-            do i = 1, nb
-                if (polytropic) then
-                    fac = 2
-                else
-                    fac = 4
-                end if
-
-                qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
-                qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
-
-                if (.not. polytropic) then
-                    qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
-                    qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
-                end if
-            end do
-        end if
-
         ! sim-only: Re_idx (non-gamma-law models only)
         if (model_eqns /= model_eqns_gamma_law) then
             ! Count fluids with non-negligible viscous effects (Re > 0)
@@ -914,8 +893,8 @@ contains
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
-        $:GPU_UPDATE(device='[dt, sys_size, buff_size, pref, rhoref, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, &
-                     & alt_soundspeed, avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach]')
+        $:GPU_UPDATE(device='[dt, sys_size, buff_size, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, &
+                     & avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach]')
 
         $:GPU_UPDATE(device='[Bx0]')
 
