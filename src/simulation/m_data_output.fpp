@@ -1145,7 +1145,6 @@ contains
         integer                         :: i, j, k, l, s, d  !< Generic loop iterator
         real(wp)                        :: nondim_time       !< Non-dimensional time
         real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
-        integer                         :: npts              !< Number of included integral points
         real(wp)                        :: rhoYks(1:num_species)
 
         T = dflt_T_guess
