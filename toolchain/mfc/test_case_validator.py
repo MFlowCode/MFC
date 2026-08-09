@@ -180,6 +180,49 @@ class TestReactiveBurnFluidPairing(ConstraintTestCase):
         self.assertEqual(self.errors_for(REACTIVE_BURN), "")
 
 
+class TestSyntheticTurbulence(ConstraintTestCase):
+    """A 2D case with one fully specified forcing zone."""
+
+    ENABLED = {
+        **BASE_2D,
+        "synthetic_turbulence": "T",
+        "num_turbulent_sources": 1,
+        "turb_pos(1,1)": 0.5,
+        "turb_pos(1,2)": 0.5,
+        "synth_L(1,1)": 1.0,
+        "synth_L(1,2)": 1.0,
+    }
+
+    def test_rejects_zero_sources(self):
+        self.assertRejects({**self.ENABLED, "num_turbulent_sources": 0}, "num_turbulent_sources must be > 0")
+
+    def test_rejects_unset_sources(self):
+        params = {k: v for k, v in self.ENABLED.items() if k != "num_turbulent_sources"}
+        self.assertRejects(params, "num_turbulent_sources must be > 0")
+
+    def test_rejects_missing_position(self):
+        params = {k: v for k, v in self.ENABLED.items() if k != "turb_pos(1,2)"}
+        self.assertRejects(params, "turb_pos(1,2) must be specified")
+
+    def test_rejects_missing_extent(self):
+        params = {k: v for k, v in self.ENABLED.items() if k != "synth_L(1,2)"}
+        self.assertRejects(params, "synth_L(1,2) must be positive")
+
+    def test_rejects_nonpositive_extent(self):
+        self.assertRejects({**self.ENABLED, "synth_L(1,2)": 0.0}, "synth_L(1,2) must be positive")
+
+    def test_accepts_fully_specified_zone(self):
+        self.assertEqual(self.errors_for(self.ENABLED), "")
+
+    def test_third_dimension_not_required_in_2d(self):
+        """The Fortran loops d = 1, num_dims, so a 2D case needs no z components."""
+        self.assertAccepts(self.ENABLED, "turb_pos(1,3)")
+        self.assertAccepts(self.ENABLED, "synth_L(1,3)")
+
+    def test_not_checked_when_disabled(self):
+        self.assertAccepts(BASE_2D, "num_turbulent_sources")
+
+
 class TestTimeStepPositivity(ConstraintTestCase):
     MSG = "dt must be positive"
 

@@ -33,6 +33,29 @@ PRECISION_EXCLUDE_PATTERNS = {"nvtx", "precision_select"}
 # MPI proxy source directory -> params-registry target key
 MPI_PROXY_TARGETS = {"pre_process": "pre", "simulation": "sim", "post_process": "post"}
 
+# Checker subroutines allowed to hold @:PROHIBIT. Every one of these depends on
+# state the Python validator cannot see at case-validation time: the MPI
+# decomposition, per-rank grid extents, the active compiler, or a value Cantera
+# fills in at runtime. Constraints between input parameters belong in
+# toolchain/mfc/case_validator.py instead -- see check_checker_input_constraints.
+RUNTIME_CHECKER_SUBROUTINES = {
+    # Compiler conditionals (#ifdef / #if guarded).
+    "s_check_amd",
+    "s_check_inputs_compilers",
+    "s_check_inputs_nvidia_uvm",
+    # MPI decomposition: n_global, num_procs_y/z.
+    "s_check_total_cells",
+    "s_check_inputs_fft",
+    # Per-rank grid extents m/n/p, which differ from the case-file values.
+    "s_check_inputs_weno",
+    "s_check_inputs_muscl",
+    # num_species is populated by Cantera at runtime.
+    "s_check_inputs_ib_injection",
+}
+
+# Opt out of check_checker_input_constraints for a single @:PROHIBIT.
+RUNTIME_CHECK_MARKER = "lint: runtime-check"
+
 
 def _is_comment_or_blank(stripped: str) -> bool:
     """True if stripped line is blank, a Fortran comment, or a Fypp directive."""
@@ -437,6 +460,54 @@ def check_manual_registry_bcasts(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_checker_input_constraints(repo_root: Path) -> list[str]:
+    """Keep input-only constraints out of the Fortran m_checker files.
+
+    Constraints between case-file parameters are enforced in
+    toolchain/mfc/case_validator.py, which runs before any binary is invoked.
+    Adding them to Fortran as well means the same rule is written twice, in two
+    languages, and the copies drift.
+
+    A @:PROHIBIT is allowed only inside a subroutine in
+    RUNTIME_CHECKER_SUBROUTINES, or on a line preceded by a
+    "! lint: runtime-check <reason>" comment.
+    """
+    errors = []
+
+    for path in sorted((repo_root / SRC_DIR).rglob("m_checker*.fpp")):
+        rel = path.relative_to(repo_root)
+        subroutine = None
+        exempt_next = False
+
+        for lineno, line in enumerate(path.read_text().splitlines(), 1):
+            stripped = line.strip()
+
+            match = re.match(r"(?:impure\s+|pure\s+)?subroutine\s+(\w+)", stripped)
+            if match:
+                subroutine = match.group(1)
+            elif stripped.startswith("end subroutine"):
+                subroutine = None
+
+            if stripped.startswith("!"):
+                exempt_next = RUNTIME_CHECK_MARKER in stripped
+                continue
+
+            if "@:PROHIBIT" in stripped and not exempt_next:
+                if subroutine not in RUNTIME_CHECKER_SUBROUTINES:
+                    where = f"in {subroutine}" if subroutine else "at module scope"
+                    errors.append(
+                        f"{rel}:{lineno}: @:PROHIBIT {where} looks like an input-only constraint. "
+                        f"Add it to a check_* method in toolchain/mfc/case_validator.py instead. "
+                        f"If it genuinely needs runtime or compiler state, add {subroutine!r} to "
+                        f"RUNTIME_CHECKER_SUBROUTINES in {Path(__file__).name}, or mark the line with "
+                        f"'! {RUNTIME_CHECK_MARKER} <reason>'."
+                    )
+
+            exempt_next = False
+
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -450,6 +521,7 @@ def main():
     all_errors.extend(check_duplicate_lines(repo_root))
     all_errors.extend(check_hardcoded_byte_size(repo_root))
     all_errors.extend(check_manual_registry_bcasts(repo_root))
+    all_errors.extend(check_checker_input_constraints(repo_root))
 
     if all_errors:
         print("Source lint failed:")

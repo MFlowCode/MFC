@@ -205,6 +205,16 @@ PHYSICS_DOCS = {
         "references": ["Papanastasiou87"],
         "docs_section": "sec-non-newtonian",
     },
+    # Forcing
+    "check_synthetic_turbulence": {
+        "title": "Synthetic Turbulence Forcing",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "num_turbulent_sources must be > 0 and <= num_turb_sources_max. Each active forcing zone i needs "
+            "turb_pos(i,d) set and synth_L(i,d) > 0 for every active dimension d (d = 1..num_dims); components "
+            "beyond num_dims are unused and not required."
+        ),
+    },
     # Acoustic Sources
     "check_acoustic_source": {
         "title": "Acoustic Sources",
@@ -940,6 +950,36 @@ class CaseValidator:
         self.prohibit(riemann_solver is not None and riemann_solver != 2, "Bubble modeling requires HLLC Riemann solver (riemann_solver = 2)")
         self.prohibit(avg_state is not None and avg_state != 2, "Bubble modeling requires arithmetic average (avg_state = 2)")
         self.prohibit(model_eqns == 2 and bubble_model == 1, "The 5-equation bubbly flow model does not support bubble_model = 1 (Gilmore)")
+
+    def check_synthetic_turbulence(self):
+        """Checks constraints on synthetic-turbulence forcing zones (simulation)"""
+        if self.get("synthetic_turbulence", "F") != "T":
+            return
+
+        num_turbulent_sources = self.get("num_turbulent_sources", 0) or 0
+        self.prohibit(num_turbulent_sources <= 0, "num_turbulent_sources must be > 0 when synthetic_turbulence is enabled")
+
+        num_turb_sources_max = get_fortran_constants().get("num_turb_sources_max", 10)
+        self.prohibit(
+            num_turbulent_sources > num_turb_sources_max,
+            f"num_turbulent_sources must be <= {num_turb_sources_max} (num_turb_sources_max in m_constants.fpp)",
+        )
+
+        # Each active zone needs a position and a positive extent in every active
+        # dimension; the Fortran loops d = 1, num_dims, so trailing components of a
+        # lower-dimensional case are not required.
+        num_dims = 3 if (self.get("p", 0) or 0) > 0 else (2 if (self.get("n", 0) or 0) > 0 else 1)
+        for i in range(1, min(num_turbulent_sources, num_turb_sources_max) + 1):
+            for d in range(1, num_dims + 1):
+                self.prohibit(
+                    not self.is_set(f"turb_pos({i},{d})"),
+                    f"turb_pos({i},{d}) must be specified for all num_dims when synthetic_turbulence is enabled",
+                )
+                synth_l = self.get(f"synth_L({i},{d})")
+                self.prohibit(
+                    synth_l is None or (self._is_numeric(synth_l) and synth_l <= 0),
+                    f"synth_L({i},{d}) must be positive for all num_dims when synthetic_turbulence is enabled",
+                )
 
     def check_body_forces(self):
         """Checks constraints on body forces parameters"""
@@ -2373,6 +2413,7 @@ class CaseValidator:
         self.check_model_eqns_simulation()
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
+        self.check_synthetic_turbulence()
         self.check_viscosity()
         self.check_non_newtonian()
         self.check_mhd_simulation()
