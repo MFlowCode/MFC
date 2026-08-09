@@ -140,17 +140,17 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Optional[typi
             # headless: milestone notifications at 2, 10, 30 minutes
             else:
                 # 2 minutes
-                if (not holder.notified_2m) and elapsed >= 2 * 60:
+                if (not holder.notified_2m) and elapsed >= HEADLESS_THRESHOLDS[0][0]:
                     cons.print(f"  {HEADLESS_THRESHOLDS[0][1]} [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
                     holder.notified_2m = True
 
                 # 10 minutes
-                if (not holder.notified_10m) and elapsed >= 10 * 60:
+                if (not holder.notified_10m) and elapsed >= HEADLESS_THRESHOLDS[1][0]:
                     cons.print(f"  {HEADLESS_THRESHOLDS[1][1]} [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
                     holder.notified_10m = True
 
                 # 30 minutes
-                if (not holder.notified_30m) and elapsed >= 30 * 60:
+                if (not holder.notified_30m) and elapsed >= HEADLESS_THRESHOLDS[2][0]:
                     cons.print(f"  {HEADLESS_THRESHOLDS[2][1]} [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
                     holder.notified_30m = True
 
