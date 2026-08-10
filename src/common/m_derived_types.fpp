@@ -129,8 +129,8 @@ module m_derived_types
     !> num_fluids_max would compile but put ten reals into a per-cell private struct on device.
     !>
     !> `H` is the specific total enthalpy and must include `qv`, because the sound-speed relation
-    !> subtracts `qv/rho`. Build states with f_eos_state so that invariant holds by construction
-    !> rather than by convention; f_eos_state_roe exists for the Roe-averaged paths, which supply an
+    !> subtracts `qv/rho`. Build states with s_eos_state so that invariant holds by construction
+    !> rather than by convention; s_eos_state_roe exists for the Roe-averaged paths, which supply an
     !> `H` that is deliberately not the exact state enthalpy.
     !> Contains no allocatable members - safe to use inside device routines.
     type eos_state

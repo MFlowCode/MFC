@@ -1163,7 +1163,6 @@ contains
 
     end subroutine s_finalize_variables_conversion_module
 
-    !> Compute the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
     !> Build an exact thermodynamic state. The specific total enthalpy is derived here rather than supplied, so it cannot disagree
     !! with qv: H = (E + p)/rho with E = gamma*p + pi_inf + qv + rho*|u|^2/2. Every caller that previously open-coded the closed
     !! form should use this, which makes the defect in #1707 unrepresentable.
@@ -1187,13 +1186,12 @@ contains
 
     !> Build a state whose enthalpy is supplied by the caller. The Roe-averaged Riemann paths, the chemistry Roe branch and the
     !! relativistic branch all pass an H that is deliberately not the exact enthalpy of the state, so they cannot use s_eos_state.
-    subroutine s_eos_state_roe(s, pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c)
+    subroutine s_eos_state_roe(s, pres, rho, gamma, pi_inf, qv, vel_sum, H)
 
         $:GPU_ROUTINE(function_name='s_eos_state_roe', parallelism='[seq]', cray_inline=True)
 
-        type(eos_state), intent(out)   :: s
-        real(wp), intent(in)           :: pres, rho, gamma, pi_inf, qv, vel_sum, H
-        real(wp), intent(in), optional :: c_c
+        type(eos_state), intent(out) :: s
+        real(wp), intent(in)         :: pres, rho, gamma, pi_inf, qv, vel_sum, H
 
         s%pres = pres
         s%rho = rho
@@ -1203,10 +1201,10 @@ contains
         s%vel_sum = vel_sum
         s%H = H
         s%c_c = 0._wp
-        if (present(c_c)) s%c_c = c_c
 
     end subroutine s_eos_state_roe
 
+    !> Compute the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
     subroutine s_compute_speed_of_sound(s, adv, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
