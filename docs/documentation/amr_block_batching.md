@@ -1333,3 +1333,594 @@ Re-measure with the `l0_ntile` sweep above after each increment: it is cheap, by
 checked, and needs no new instrumentation. Two harness traps: the LAST `Time Avg` line in a
 run log is a "Saving" line reporting 0.0 (parse the `Time step` lines), and `D/` is only
 populated by post_process (checksum `restart_data/` instead).
+
+### 2026-08-06: the retraction above is HALF WRONG, and promotion works when the target is FLAT
+
+The 2026-08-03 table retired promotion on the row *"module state - static, allocatable, or the exact
+`freg` pattern | 32.8 | 3.5x WORSE"*. That row is real but it measured **derived types at module
+scope**, which are indeed the worst case. It does not describe a **flat array at module scope**, which
+is the cheapest form available. Retiring "promotion" on that row retired two different things under
+one name.
+
+Re-measured from scratch (`amr-bench/mwe/desc.f90`, 12 variants, one per PROCESS under `rocprofv3` so
+no attribution is needed, built with the EXACT solver flags scraped from `flags.make`):
+
+| what the KERNEL sees | copies/launch | us/launch |
+|---|---|---|
+| flat array, MODULE scope (2 arrays or 12 - same) | **0.63** | 32-55 |
+| flat array, DUMMY (2 arrays) | 4.61 | 89 |
+| flat array, DUMMY (12 arrays) | **24.51** | **391** |
+| derived-type components, module scope | 24.51 | 387 |
+| derived-type components, DUMMY | 28.10 | 446 |
+
+Identical arithmetic in every variant, so every difference is per-region mapping. **Flat-as-dummy costs
+exactly what derived-type-as-module costs**; only a flat array at module scope is free. Cost is ~2 copies
+and ~14 us per descriptor the kernel must materialize per launch, additive across arrays. That single
+model fits all 12 variants, the 08-03 table, and MFC in situ (16.39 copies/launch ~= 8.2 descriptors x 2,
+against the runtime trace's measured 9.75 attaches/kernel).
+
+**Confirmed IN SITU, not just in an MWE.** `s_hllc_riemann_solver`'s hot kernel (`:1013`, **756 of 7,609
+launches/rank-step**) referenced `qL_prim_rsx_vf`/`qR_prim_rsx_vf` 17x each as dummies. Moving their
+actuals (`qL_rsx_vf`/`qR_rsx_vf`) from `m_rhs` to `m_riemann_state` and reading them module-direct:
+
+| | copies/rank-step | copies/launch |
+|---|---|---|
+| baseline `107695df` | 124,749 | **16.39** |
+| predicted | ~121,300 | ~15.9 |
+| measured | **121,729** | **16.00** |
+
+Launches identical (7,609). 3,020/756 = **4.0 copies removed per launch** against 4.6 predicted. The MWE
+constant transfers. **This un-retires promotion for the flat case** - and note it needs no attach
+primitive at all, which is what killed the 08-02 attempt: the arrays are simply DECLARED somewhere both
+sides can see.
+
+**Do NOT read this as "flatten the interface".** Flat *dummies* measure the same as deep dummies (08-03
+row 2, and V12 above). The variable is module-vs-dummy, not flat-vs-deep. Flatness matters only because
+a module-scope derived type is also expensive.
+
+#### Open contradiction, unresolved - read before trusting the model
+
+Flattening `freg` from `type(t_face_reg) :: freg(3)` to six flat `declare target` module arrays should
+have been free-to-free at worst. It measured **WORSE**: copies 16.39 -> 16.61, and a `LIBOMPTARGET_INFO`
+diff on the same case showed attaches **4,027 -> 4,203 (+176)** at identical kernel count. Six flat
+module arrays cost more than one module derived type with six components. The MWE says the opposite
+(V11: 12 flat module arrays = 0.63). The only structural difference found is that `freg_lo*` are PUBLIC
+and USE-associated into `m_amr`, while the MWE's are same-module. **Untested.** Until it is explained,
+predict promotion gains only for arrays that stay within one module, and measure every conversion.
+
+`freg` was also the wrong target for a second reason the 08-02 table already recorded:
+`s_amr_capture_boundary_flux(id, stage)` takes **two scalars and no array dummies**. It was at the floor
+already. Enumerate a kernel's array dummies before converting it.
+
+#### The second penalty, not previously recorded: OCCUPANCY
+
+A 32^3 block is 32,768 work items. An MI250X GCD wants ~1e5-1e6 in flight. **Every fine-block kernel runs
+about an order of magnitude underfilled**, while uniform (8M cells/rank) saturates - consistent with the
+88.2% idle figure. Measured directly by the block-size sweep at constant physics:
+
+| `amr_max_grid_size` | cells/block | fine cells | wall |
+|---|---|---|---|
+| 16 | 4,096 | 27.29 M | **128.58 s** |
+| 32 | 32,768 | 37.53 M | 75.36 s |
+
+Smaller blocks advanced **27% fewer cells in 71% more wall**. So small blocks cost twice: the fixed
+per-invocation cost amortizes badly AND the arithmetic itself runs at a fraction of peak. Batching fixes
+both with one change (32 blocks batched ~= 1M work items = full occupancy), which makes the batching
+prize larger than the `C` analysis alone implies.
+
+There is currently **no minimum block size and no occupancy floor** in the code - only `amr_max_grid_size`
+(a cap) and `amr_cluster_eff`. From the payoff data (overhead 235x at 0.30M cells/GCD, 38x at 2.13M, ~9x
+at production, against a ~40x geometric potential) **breakeven is ~2M fine cells per GCD**; below that,
+refining is a net loss versus running uniform.
+
+### THE PLAN (2026-08-06). Root cause, increments, audits, MWEs
+
+**ROOT CAUSE.** Block identity is a *state reconfiguration* (`s_amr_swap_to_fine` overwrites global grid
+state), not a *data dimension*. Everything follows: the swap, the geometry sync, `C` paid 963x/step, the
+per-box gather, per-box reflux, and the occupancy deficit. The fix is to make the block index an argument
+to the index space rather than a mutation of module state.
+
+**THREE FACTS THAT MAKE IT CHEAPER THAN IT LOOKS.**
+1. At a given level every block shares `dx` and extents; only the ORIGIN shifts. Geometry
+   de-globalization is one integer offset per block per dimension, not a rewrite of every kernel that
+   touches `dx`.
+2. The flat store `amr_cons_st(x,y,z,var,slot)` already exists and already pads every slot to identical
+   `mbuf` extents - ragged blocks are already solved in storage.
+3. It chunks. Batch `B` blocks at a time, `B` traded against scratch memory. `B=2` proves the mechanism,
+   `B=32` captures the win.
+
+**HARD CONSTRAINT.** Batched kernels must read FLAT MODULE arrays with a slot dimension, never dummies
+and never module-scope derived types. Violating this reintroduces exactly the tax the batching removes.
+
+#### Increment B1 - slot dimension on the RHS working set
+
+- Add a trailing slot dimension to the RHS scratch (`q_cons_qp`, `q_prim_qp`, `flux_rs*_vf`,
+  `qL/qR_rsx_vf`, `dq*`): `(..., 1:B)`. TRAILING, matching `amr_cons_st`, so each block's cells stay
+  contiguous.
+- Outer loop over `b = 1, B` collapsed with the spatial loops, so occupancy rises with `B`.
+- Per-block origin offsets in a small `declare target` integer array; `dx`/extents stay global per level.
+- Blocks smaller than `mbuf` compute on pad cells that nobody reads. **AUDIT:** confirm no NaN/Inf
+  escapes the pad region into a reduction - there are no global reductions in the RHS, but verify rather
+  than assume.
+- **MWE first** (`amr-bench/mwe/batch.f90`): one kernel over `(b, k, j, i)` against `B` sequential
+  kernels, identical arithmetic, measuring copies/launch AND wall. Establishes the achievable `B` before
+  any solver edit, and prices the pad waste.
+- **AUDIT:** copies/launch (expect ~1/B of the per-invocation share), `rhs` phase, and occupancy via
+  `rocprofv3` grid size. Goldens after each `B`.
+
+#### Increment B2 - aggregate the gather per level
+
+Gated on the substage measurement now running. Replace the per-box `s_amr_gather_coarse_patch` with one
+per-level phase (AMReX's FillPatch model). **AUDIT:** `gather` phase and `g:box`/`g:mpi`/`g:dev`/`g:alloc`
+substages; the box set must stay byte-identical (`[amr-balance] fine_work`).
+
+#### Increment B3 - batch reflux. #### Increment B4 - regrid, gated on the `rg:*` substage sweep.
+
+#### Standing measurement protocol
+
+1. `copies_per_launch.sh` FIRST - it resolves ~1% and is not noise-limited. Wall time on `prof_amr` has
+   a **+-10% run-to-run spread** (71.26 vs 78.21 s for an identical binary; `reflux` 7.53 vs 10.60),
+   so no sub-10% wall A/B is callable from one rep per arm.
+2. State the predicted number BEFORE running. Every mechanism refuted this campaign was refuted by a
+   prediction that missed.
+3. Goldens for anything touching shared solver code. Copy counts are blind to wrong answers - the L/R
+   swap at `m_rhs.fpp:714` (`qR_rsx_vf` is passed into the `qL_prim_rsx_vf` slot) makes a same-name
+   rename silently transpose the Riemann states.
+4. `ls -t` on build dirs picks the CHEMISTRY variant; scrape the binary MFC actually ran. `ls -t` on
+   `/tmp/mfcrun.*.log` returns a STALE log when a run is refused by the contention guard.
+
+#### Refuted this campaign - do not retry without new evidence
+
+| mechanism | result |
+|---|---|
+| `rhs` module-level bridge (change the ACTUAL argument) | copies **+4.8%**. The callee's dummy declaration sets the cost; the actual is irrelevant. |
+| `freg` derived type -> 6 flat module arrays | copies **+1.3%**, attaches **+176**. See the open contradiction above. |
+| USM (`-fopenmp-force-usm` + `xnack+`) | builds, runs, **65x SLOWER** on MI250X. "Unified" here is host DRAM over the bus; it targets MI300A APUs. Did confirm the tax is 100% mapping: flat and derived-type converge under USM. |
+| `map(alloc:)` vs `map(to:)` at enter-data | no effect, either kind |
+| literal vs loop-variable component indexing | no effect |
+| static vs allocatable derived-type container | no effect |
+
+### 2026-08-07/08 PROFILED (rocprof-sys, not brackets): the straggler is GATHER OWNERSHIP
+
+Switched from hand-placed timers to `rocprof-sys-sample` (`amr-bench/scratch/sysprof.sh`, no code
+changes). It found in ~20 minutes a 14% line item that ~30 timer brackets had folded silently into
+"reflux", and it audited the brackets themselves.
+
+**A 1-integer `MPI_ALLREDUCE` (`s_amr_reduce_xchg_flag`) is 12.23 s = 14.4% of the step loop.** PMPI
+agrees: 27 calls / 11.56 s = **~428 ms per call** for an integer max that should cost tens of
+microseconds. It does no work - it is a pure skew meter, and it says the ranks are ~0.4 s out of
+step at every global sync.
+
+**Per-rank, late ranks (5,6,7) vs early (0,1):**
+
+| routine | late | early | diff |
+|---|---|---|---|
+| **amr_gather_coarse_patch** | **13.12** | **5.45** | **+7.67** |
+| amr_fine_stage_fill | 15.34 | 8.63 | +6.71 |
+| **amr_recv_parent_patch** | **6.04** | **2.56** | **+3.48** |
+| compute_rhs | 25.91 | 24.80 | +1.11 |
+| mpi_allreduce (WAITING) | 0.10 | 10.55 | -10.46 |
+
+**Ranks 5-7 do ~2.4x the GATHER work; compute is nearly equal.** The parent->child ownership mapping
+is asymmetric, so high ranks carry 2.4x the `recv_parent_patch` burden, block there, arrive last, and
+the other five ranks sit in the allreduce.
+
+**It follows the RANK, not the GPU.** Re-ran with `ROCR_VISIBLE_DEVICES=7,6,5,4,3,2,1,0` (MFC picks
+`dev = mod(local_rank, devNum)`, `m_start_up.fpp:1043`): straggler set unchanged, values within ~5%.
+That exonerates GPU placement *and* host/GPU locality (rank 7 drove GCD 0 with identical timing), and
+proves the pattern is not noise - 8 per-rank values reproduced across two independent runs.
+
+**Why the balancer misses it:** it equalizes `fine_work` (CELLS) to 1.018. It does not equalize
+COMMUNICATION burden, and gather cost is per-block and per-ownership-crossing. "Load balance is state
+of the art" is true for cells and false for the gather.
+
+**Clean negative:** no MFC host routine carries meaningful self-time - the host sits in
+`WaitAcquire` (GPU) and `opal_progress` (MPI). Every "expensive host work" theory dies at once.
+Bracket audit: rhs/regrid/reflux agree within a point; `seam` was 2.5x off; `save_data` (9.2%) was
+never instrumented.
+
+#### REVISED PRIORITY (supersedes the increment order above)
+
+1. **Co-locate children with parents** in the ownership assignment - the code already has a
+   "tower co-location" path where the gather degenerates to a local device copy. Attacks the 2.4x
+   directly; changes assignment logic, not the solver.
+2. **`rebuild_slots`** - still 93% of the regrid anomaly (16.0 -> 36.0 s at gs=64), still unexplained.
+   Fixing it makes gs=64 viable, worth ~-15% of wall with no solver change.
+3. **Aggregate the gather per level** (B2) - makes the burden collective instead of per-rank and
+   removes the per-block synchronization together.
+
+**DOWNGRADED:** the per-kernel descriptor conversion (2.4% of the tax per edit, ~40 edits for the
+whole prize, and batching subsumes it - keep only its design CONSTRAINT that batched kernels must read
+flat module arrays). **Non-blocking MPI as a standalone fix** - the receives are asymmetric in COUNT,
+so overlapping helps the loaded ranks but does not remove the asymmetry.
+
+**`hllc` module-direct is HELD, not committed**: correct (706/706), non-regressing on both arms
+(uniform +0.7%, AMR -2.9%, both inside a +-10% noise floor), but worth only ~0.6% of wall and it
+leaves two unreferenced dummies in the signature shared by all four Riemann solvers. Fold it into B1,
+where flat module arrays are load-bearing rather than cosmetic.
+
+## 2026-08-08 MEASURED: co-location is REFUTED, and the parent gather is SKEW not communication
+
+The previous section made "co-locate children with parents" the top priority, on the profiled finding
+that ranks 5-7 do 2.4x the gather work. **That priority is now withdrawn, and the 2.4x attribution with
+it.** Both were settled by measurement before any assignment logic was written.
+
+### The instrument
+
+`s_amr_report_gather_burden` (scaffolding, `mfc-amr-dev`): rank 0 only, gated on `load_weight_wrt`, and
+built entirely from REPLICATED metadata (`amr_block_owner`, `amr_region_*_all`, `f_amr_parent_block`,
+`s_amr_rank_coarse_range` + `s_amr_box_isect`). No hot-path timers, no MPI, no collective added to the
+assigner. It counts exact ownership crossings for both gather paths and - the decisive part - computes
+the COUNTERFACTUAL balance that co-location would produce, so the fix could be priced without being
+built, and without a golden cycle to revert.
+
+### Result 1: co-location is admissible
+
+| level-2 weight balance (max/mean) | value |
+|---|---|
+| actual (independent per-level SFC cuts) | 1.010 / 1.012 |
+| if every L2 block follows its parent | **1.028 / 1.026** |
+| ranks left idle if co-located | **0** |
+
+The stated reason co-location was removed - pinning a subtree to one rank caps granularity at depth -
+does not bite at this configuration. 625 level-2 boxes over 8 ranks leaves ample slack.
+
+### Result 2: co-location is nevertheless worthless
+
+Measured at 400^3 / np=8 / `amr_max_grid_size` 32, from the barrier probe (`PH_P_BAR`) that splits
+"waiting for the peer to arrive" from "the exchange once it has":
+
+| bracket | mean s | % wall |
+|---|---|---|
+| `p:all` - whole level>=2 parent gather | 30.433 | 37.0% |
+| `p:bar` - skew before the exchange | **29.562** | **36.0%** |
+| `p:mpi` - the exchange itself | **0.185** | **0.2%** |
+| `p:pack` / `p:copy` | 0.306 / 0.375 | 0.4% / 0.5% |
+
+`p:mpi` moves 106.6 MB in 0.185 s over 189 calls/rank = **4.46 GB/s, near fabric speed**. The parent
+exchange is not slow; it is negligible. Co-location removes 261 of 625 crossings, so its entire ceiling
+is `p:mpi` + `p:pack` ~= **0.49 s of 82 s = 0.6%** - against the 1.8% balance cost above. **Plausibly a
+net loss.** A 160:1 barrier-to-transfer ratio says the parent gather is SKEW; removing messages cannot
+touch skew.
+
+### Result 3: the 2.4x was wait misread as work
+
+Measured crossing counts, ranks 5-7 vs ranks 0-1: **1.23x**, not 2.4x. The heaviest rank is **3**
+(L1recv 53, L2recv 60), which is not in the profiled straggler set at all. `s_amr_gather_coarse_patch`
+receives with `IRECV` + `WAITALL`, so its INCLUSIVE time absorbs skew - the profile's "gather work" is
+substantially "waiting for peers." This is the same inclusive-time trap already recorded once in this
+campaign, re-entered from the other side: last time ranking by SELF time hid a real cost, this time
+ranking by INCLUSIVE time invented one.
+
+The cells-vs-communication mismatch is nonetheless real and worth keeping: cell balance **1.016** while
+`L1recv` imbalance is **1.50x** and `L2recv` **1.84x**. It is simply not what makes ranks late.
+
+Burden at the same configuration: L1 169 boxes with 109 local / **283 wire** contributor pairs; L2+ 625
+boxes at co-located fraction **0.582**, rising to 0.795 at the next regrid.
+
+### TRAP: this build's phase budget is not a production number
+
+`PH_P_BAR` inserts a global barrier PER BOX. A per-box barrier partly manufactures the serialization it
+measures - each one waits for that box's slowest rank, and 625 boxes accumulate an artifact rather than
+a cost. So `p:bar`, and the 82.2 / 88.2 s wall from this build, must not be used to price anything
+absolute. `p:mpi` is exempt for a specific reason: the barrier sits immediately BEFORE it, which is what
+makes it measure pure transfer. Quote `p:mpi`; do not quote `p:bar` as a cost.
+
+### Revised priority
+
+1. **`rebuild_slots`** - `rg:rebld` is 31.6% of wall and its `rg:gpatc` leaf is 27.4%, while the gather's
+   own instrumented internals (`g:mpi` 3.63, `g:dev` 0.77, `g:box`/`g:alloc` ~0.00) account for a small
+   fraction of it. That gap is the largest unexplained block in the budget and is a COST, not a skew
+   artifact. Measure it on a build WITHOUT the probe barrier.
+2. **Find the skew source.** Cells balance to 1.016, box counts to 1.136/1.024, and messages cost 0.185 s
+   - none of these explain ranks arriving milliseconds apart, thousands of times per run.
+3. **Aggregate the gather per level** (AMReX FillPatch) - unchanged, still the structural answer.
+
+**DEAD (do not re-propose):** co-locating children with parents, and any cost model that balances
+ownership crossings - the crossings cost 0.185 s in total.
+
+## 2026-08-08 CONTROLLED EXPERIMENT: the AMR tax, MFC vs AMReX, on clean binaries
+
+Everything above this line was measured with in-code instrumentation that, in at least three cases,
+distorted what it measured. This section is the controlled replacement: an uninstrumented binary, all
+timing external, arms interleaved, repeats, and one estimator applied identically to both codes.
+
+Configuration: hpcfund np=8, 400^3, `amr_max_grid_size` 32, `amr_ref_ratio` 2, subcycle off, reflux on.
+MFC at `107695df` built clean (hllc stashed, no phase timers, no probe barrier). AMReX `amrex-ref`
+Advection_AmrCore 3d with `run/inputs.match`. Harness and raw logs: `amr-bench/expt/`.
+
+### Result
+
+| tax, per cell advanced, vs that code's OWN uniform arm | MFC | AMReX | excess |
+|---|---|---|---|
+| max_level 1 | **5.9x** | **1.26x** | **4.7x** |
+| max_level 2 | **15.4x** | **1.31x** | **11.8x** |
+
+Absolute ns per cell-update -- MFC 4.38 / 26.0 / 67.4, AMReX 0.711 / 0.896 / 0.932 -- are NOT
+comparable across codes (AMReX advects one linear scalar, MFC solves 6-equation multiphase). Only the
+within-code ratio is, which is why the tax is defined that way.
+
+### The shape, not the magnitude, is the finding
+
+AMReX's tax is FLAT with refinement depth (1.26 -> 1.31, +4%). MFC's nearly TRIPLES (5.9 -> 15.4,
++161%). Adding a level multiplies BLOCK count at roughly fixed cells per block, so a cost that grows
+with depth is per-BLOCK and one that does not is per-CELL. This is the per-block thesis measured
+directly rather than inferred from a profile.
+
+The block counts sharpen it. MFC runs **794 boxes** (169 at L1 + 625 at L2, printed by the code).
+AMReX advances 572.3M cells/step at L2 against MFC's 88.0M; its box count is not printed, but at
+`max_grid_size` 32 the cell counts floor it at 99.1M/32^3 + 393.6M/32^3 = **>= 15,000 boxes**. That is
+a DERIVED LOWER BOUND, shown so it can be audited -- do not quote it as a measurement. AMReX therefore
+carries on the order of 19x the blocks for roughly 1/12 the tax.
+
+### Estimator, and the evidence it is sound
+
+    marginal s/step = (A_last*n_last - A_first*n_first) / (n_last - n_first)
+
+from MFC's cumulative `Time Avg` prints and from AMReX's `Total Time:` at two step counts. This removes
+startup and the early transient without having to estimate either.
+
+It validates internally: two independent MFC windows -- steps 11-31 of a 40-step run and steps 26-76 of
+a 100-step run -- agree to **0.4%** (5.84 vs 5.94 at L1, 15.42 vs 15.40 at L2). The window dependence
+that plagued the first pass is gone.
+
+### Four methodology bugs, each of which changed a number
+
+1. `Coarse STEP n ends. TIME =` is SIMULATION time, not wall. `amr-bench/amrex_tax.sh` regexes it.
+2. `Total Time` / steps includes setup, which inflates the CHEAPER arm proportionally more and so
+   DEFLATES the measured tax -- biasing the comparison in MFC's favour.
+3. Measuring one code in its transient and the other in steady state. Both codes have transients and
+   they run in OPPOSITE directions (MFC L2 falls 6.506 -> 6.032 over 100 steps; MFC uniform RISES
+   0.247 -> 0.276; AMReX per-cell falls 23% between the 20-40 and 50-200 windows). This alone moved
+   the MFC L2 tax from **19.1x to 15.4x -- a 24% error**.
+4. Interval `Time/step` is a 3-sample-per-run estimator that fluctuates **38% within a single run**.
+   Its noise was initially mistaken for machine noise: on the uniform arm, interval rates spread 22.7%
+   across reps while cumulative averages spread 4.2% -- same runs, same machine, different sample size.
+
+### Reproducibility is itself a result
+
+Spread across reps, on BIT-IDENTICAL work (`fine_work` was identical to the digit for every rep of an
+arm, so the grid is deterministic): uniform **0.9%**, L1 **~3%**, L2 **7.7%** at 100 steps and **19.9%**
+at 40. Only the deepest AMR arm fails to reproduce, and longer runs tighten it -- consistent with
+skew-dominated execution rather than deterministic compute. Note also that the +-10% noise floor quoted
+earlier in this document is a property of the INSTRUMENTED build, not of the machine.
+
+Peak VRAM 36.5 GiB/GCD, 5.7x above the starvation floor, so none of this is a starved-GPU artifact.
+
+## 2026-08-08 CORRECTION: the excess is ~2x, not ~12x -- the denominator was wrong
+
+The section above reported an MFC-vs-AMReX AMR excess of 4.7x (L1) and 11.8x (L2). **Both numbers are
+wrong, by about 5x.** The controlled experiment was sound; the BASELINE was not.
+
+**A tax ratio is only as good as its denominator.** MFC's uniform arm is MONOLITHIC -- 400^3 over 8
+ranks, 200^3 per rank. AMReX's uniform arm at `max_grid_size 32` is decomposed into ~1953 boxes, and
+that decomposition costs it **5.4x** (0.7109 ns/cell at cap 32 vs **0.1312** at `max_grid_size 200`,
+which gives 8 boxes -- one per rank, MFC's exact decomposition). That box cost sits in BOTH of AMReX's
+arms and cancels out of its own ratio. So the original comparison set "MFC vs a fast monolithic
+baseline" against "AMReX vs an already-slow boxed baseline" and attributed the difference to AMR
+machinery.
+
+### The settled comparison
+
+Both codes against a structurally identical monolithic baseline, and with AMReX additionally given
+MFC's per-level structure (`amr.max_grid_size = 200 32 32`: L0 monolithic, fine levels at 32):
+
+| tax vs monolithic baseline | MFC | AMReX structure-matched | excess |
+|---|---|---|---|
+| max_level 1 | 5.94x | **5.43x** | **1.09x -- parity** |
+| max_level 2 | 15.40x | **7.01x** | **2.20x** |
+
+Making AMReX's L0 monolithic barely moved its L2 tax (7.10 -> 7.01), which confirms per-level structure
+was not the distortion -- the denominator was.
+
+### What this redirects
+
+MFC's tax nearly TRIPLES from one refinement level to two (5.94 -> 15.40) while AMReX's grows 1.29x
+(5.43 -> 7.01). The gap is therefore specific to **what the SECOND level adds** -- the parent<->child
+gather, nesting, the level>=2 path -- and NOT to per-block cost in general, where MFC is at parity.
+Any future work aimed at "block overhead" writ large is aimed at the wrong place; at one level MFC
+already matches AMReX.
+
+Raw logs: `amr-bench/expt/amrex_mono` (baseline), `amr-bench/expt/amrex_matched` (structure-matched),
+`amr-bench/expt/logs` (MFC). 3 reps each, marginal-slope estimator throughout.
+
+## 2026-08-08 ROOT CAUSE: the GPU is idle 85% of the time, and it is NOT MPI
+
+Everything above diagnosed AMR's cost by attribution -- brackets, ratios, inference. This section is
+the direct measurement, on a clean uninstrumented binary with external profilers only.
+
+### The time budget (amr_l2, 400^3, np=8, cap 32; wall 6.665 s/step/rank)
+
+| component | s/step | % of wall |
+|---|---|---|
+| kernel execution | 0.694 | **10.4%** |
+| memory copies | 0.850 | 12.8% |
+| **neither -- GPU idle** | **5.12** | **76.8%** |
+
+The uniform arm is the control and validates the instrument: in-kernel 0.2279 s against a 0.2145 s
+wall = **106%**, i.e. the method reads ~100% when the GPU really is busy (the 6% overshoot bounds its
+accuracy). So AMR's 10.4% is a real reading, not an artifact.
+
+### It is NOT MPI -- the decisive discriminator
+
+The same AMR case at 200^3, run at np=1 (no MPI at all) and at np=8:
+
+| | in-kernel | GPU idle |
+|---|---|---|
+| **np=1, zero MPI** | 14.7% | **85.3%** |
+| np=8 | 7.8% | 92.2% |
+
+**85 points of idle survive with a single rank.** Inter-rank effects add ~7 points on top. This
+**retires the skew narrative as the primary cause**: the 12.23 s allreduce, the 160:1
+barrier-to-transfer ratio, gather ownership, co-location and load balance are all real, all measured,
+and all live inside those ~7 points.
+
+### The mechanism
+
+Per rank-step MFC issues **6,146 kernel dispatches + 101,400 memory copies = ~107,546 GPU operations**,
+and blocks in **51,822 `hsa_signal_wait_scacquire`** calls -- roughly one wait per two operations, and
+**92% of all HSA API time**.
+
+| per rank-step | uniform | amr_l2 | ratio |
+|---|---|---|---|
+| kernel dispatches | 82 | 6,146 | 75x |
+| memory copies | 1,318 | 101,400 | 77x |
+| blocking signal waits | 826 | 51,822 | 63x |
+| **waits per dispatch** | **10.1** | **8.4** | **the same** |
+| **copies per dispatch** | **16.07** | **16.50** | **the same** |
+| **seconds per kernel** | **2.8 ms** | **95 us** | **1/30** |
+
+**The per-dispatch toll is identical in both arms** -- slightly higher in uniform, in fact. What
+differs is the work inside: uniform's 2.8 ms kernels hide a ~55 us per-operation host toll completely;
+AMR's 95 us kernels cannot. **AMR issues 77x the GPU operations to advance 1.375x the cells.**
+
+### Ruled out by direct measurement
+
+- ~~**host<->device transfers**: none exist. Every copy is `MEMORY_COPY_DEVICE_TO_DEVICE`.~~
+  **RETRACTED - this was an instrument artifact, and it was the exact opposite of the truth.**
+  `hsa_amd_memory_lock` pins the host buffer, after which rocprofv3 labels a genuine host<->device
+  transfer `MEMORY_COPY_DEVICE_TO_DEVICE`. Byte accounting and call-stack sampling
+  (`targetDataEnd -> retrieveData -> pushMemoryCopyD2HAsync`) independently put ~11.6 GB/step on the
+  link at 1.5-4.9 GB/s against ~50 GB/s: **~75% of AMR wall**. Host<->device traffic is not ruled
+  out, it is THE root cause. Lesson: a negative result from a single instrument is a claim about the
+  instrument until a second method agrees.
+- **occupancy / slow kernels**: AMR in-kernel is 7.9 ns/cell vs uniform's 3.6 -- only **2.2x**, not 54x.
+  The arithmetic is fine.
+- **the descriptor tax as THE mechanism**: uniform pays the same ~16 copies per launch.
+- **MPI, skew, distribution, block size**: see above; block size is separately exhausted (cap 32 is the
+  knee, cap 128 OOMs).
+
+Copies are nonetheless real and numerous: 1.48M on rank 0 over 12 steps, 83% of them 5-10 us with a
+4.64 us floor -- fixed-overhead dominated, the descriptor-attach signature. **They are 94% of the
+OPERATION COUNT even though only 12.8% of wall time**, and since the cost is per-operation host
+synchronisation rather than per-byte transfer, that is the denominator that matters.
+
+### Consequences for the plan
+
+Prize: taking the GPU from 23% busy to saturated is wall 6.665 -> ~1.0-1.5 s/step, a **4-6x** on the
+AMR arm, which would put MFC's tax near 3x against AMReX's 6.33x.
+
+Levers, ordered by operation-count reduction (operations = dispatches x (1 + copies/dispatch)):
+1. **Batch kernels across blocks** (~68x fewer dispatches). Blocked by block identity being a STATE
+   RECONFIGURATION (`s_amr_swap_to_fine` rewrites global grid state) rather than a data dimension.
+2. **Eliminate descriptor copies** (~17x fewer operations) -- now motivated by operation count.
+3. **Async `nowait`/`depend`** -- keep the dispatches, remove the blocking waits. Cheapest to test.
+
+**Pilot discipline:** batching one kernel family removes ~200 of 6,146 dispatches = ~3% of wall, which
+is BELOW this arm's ~8% run-to-run spread. Measure a pilot by **dispatches per rank-step and idle
+fraction**, never by wall -- wall would return a false negative and kill a correct mechanism.
+
+## Removing the regrid host<->device round trip (attempt 4: the A/B split)
+
+### Why attempt 3's NaN could not be attributed
+
+Attempt 3 cut the recurring regrid traffic hard -- slot copies 486 -> 14, H2D 24,251 -> 724 MB -- and
+then NaN'd at a base-grid index. It changed three things at once, so nothing was attributable:
+
+  (a) the `GPU_UPDATE(device=amr_cons_st)` moved BEFORE the overlap, leaving HOST `amr_cons_st`
+      carrying prolong-only data;
+  (b) `s_amr_st_reserve` growth interacting with a now-device-only stash;
+  (c) the overlap bounds rewritten from three per-dimension `cycle`s to one guarded assignment.
+
+### The coupling that forces the split
+
+The stash and the overlap-copy cannot be separated by traffic, because **both the prolong
+(`s_prolong_one_var`) and the overlap-copy are HOST loops**. The stash's D2H of `amr_cons_st` exists
+to feed a host overlap loop that reads host `amr_stor_st`; drop it while the overlap is still on the
+host and the overlap reads nothing. So the win only lands once BOTH move -- which is why attempt 3
+moved both, and why it could not be bisected after the fact.
+
+The split is therefore by **what each step can prove**, not by what each step saves:
+
+| Step | Change | Traffic | Isolates |
+|---|---|---|---|
+| A | overlap-copy -> device kernel (`s_amr_overlap_fine_fields`); push moved ahead of the loop; all existing `GPU_UPDATE`s kept | neutral by construction | (a) and (c) |
+| B | stash -> `s_amr_copy_fine_fields` (device) + conditional host pull | the win | (b) |
+
+If A is clean, a NaN in B is attributable to (b) alone. That is the entire purpose of A.
+
+### Two things the code review found before any run
+
+- **`s_amr_copy_fine_fields` (`m_amr.fpp`) already is the device stash B needs.** B is a deletion plus
+  a call, not new code.
+- **An np>1 bug in A, found by reading rather than by testing.** A migrated block is unpacked into
+  HOST `amr_stor_st` only. Once the overlap reads the stash on the device, those blocks feed garbage.
+  **np=1 cannot see this** -- same shape as attempt 1's failure. A now pushes received slots to the
+  device in the unpack loop.
+
+### Verification gates (`amr-bench/stepA.sbatch`)
+
+Ordered by what each can actually see:
+
+1. **golden suite** -- the only HEAD-independent reference; catches the bounds rewrite (c).
+2. **3D np=1** -- device residency (a), which the goldens do not exercise.
+3. **3D np=8** -- the migration path. Non-optional: goldens cannot see memory-safety bugs (706/706
+   once passed while a 400^3 np=8 run died of an OOB read).
+
+**Harness note.** The build/run variant is STICKY: a bare `--gpu mp` inherited `--no-mpi` from the
+previous session and silently produced a serial binary, on which the np=8 gate would have proven
+nothing while looking like a pass. The job now asserts the binary is MPI-linked and newer than the
+source before trusting any gate.
+
+### Measured: paired HEAD vs Step B (job 367662, 4-step census + 3 timed reps, interleaved)
+
+Both arms prebuilt and saved, installed per run, on the same node, same case, same parser. Necessary
+because both builds land on the SAME variant hash and would otherwise overwrite each other; the job
+aborts if the two arms hash identically.
+
+| np | H2D | D2H | total |
+|---|---|---|---|
+| 1 | 53,668 -> 48,166 MB (-10.3%) | 37,975 -> 32,473 MB (-14.5%) | **-12.0%** |
+| 8 | 59,991 -> 55,172 MB (-8.0%)  | 41,981 -> 37,162 MB (-11.5%) | **-9.5%**  |
+
+Both directions fall by EXACTLY 5,501.7 MB - the signature of removing one D2H of `cons` plus one
+H2D of `stor` of equal size. Predicted from the copy count 322 x 17.09 MB = 5,503.0 MB; measured
+5,501.7 MB, **0.02% agreement**. Attribution by `Name=` confirms it: every other source file is
+byte-identical between arms and the whole delta is `m_amr.fpp` (644 copies = 322 x 2).
+
+**Wall clock is a SPLIT result and must be reported as one:**
+
+- np=8: **-5.0%**, triplicates non-overlapping (head 3.132-3.184 vs stepB 3.008-3.031). Real.
+- np=1: **-0.1%**. No effect - despite removing proportionally MORE traffic there.
+
+That asymmetry is the interesting part: 12% fewer bytes bought 0% wall at np=1, so the removed
+transfers were not on the critical path. "~75% of wall is host<->device traffic" does NOT convert
+linearly into wall-clock, and any future estimate that assumes it does is unfounded.
+
+**This is NOT attempt 3.** Attempt 3 reported 486 -> 14 slot copies (-97%); Step B cuts bulk slot
+copies 1932 -> 1288 (-33%). A second, independent confirmation that attempt 3 carried a fourth and
+larger change - the one that NaN'd.
+
+### Where the remaining bulk bytes are (stepB, np=1, 4 steps, m_amr.fpp)
+
+| size | count | total | what |
+|---|---|---|---|
+| 17.09 MB | 1288 | 22,007 MB | per-slot copies - the RECURRING cost |
+| 34 -> 8748 MB (doubling) | 26 | ~47,431 MB | `s_amr_st_reserve` growth - a startup transient that amortises away |
+
+Next increment: the surviving 17.09 MB copies are the host-side prolong push and the tag pull. Both
+are the same pattern this step removed - a HOST loop over fine data forcing a full-slot round trip -
+so moving `s_prolong_one_var` to the device is the direct continuation. Note the wall-clock lesson
+above before pricing it: bytes removed != wall saved.
+
+### Harness bugs found this round (all of which produced confident wrong numbers)
+
+- **awk `substr()` returns a STRING.** `n >= 10000000` compared LEXICOGRAPHICALLY, so "5000" > "10000000"
+  and the census reported all 946,278 copies as bulk. Force numeric with `+0`.
+- **The census piped its raw output away**, leaving nothing to attribute. Bulk lines are now kept
+  gzipped - which is the only reason the per-file attribution above exists.
+- **The build/run variant is STICKY**: a bare `--gpu mp` inherited `--no-mpi` from a previous session
+  and silently produced a serial binary. An np=8 gate on it proves nothing while looking like a pass.
+- **``grep -cE '^ *Time step'`` reported steps=0** on runs that had advanced fine, because the line is
+  indented differently than assumed. A gate whose own counter reads zero is not a pass.
+- **LTO builds here are NOT reproducible** (`.text` differs across identical-source rebuilds), so
+  binary identity cannot be used to skip a re-test.
+
+### Unrelated repo bug: running the test suite breaks precheck
+
+The chemistry TESTS write into the EXAMPLES' gitignored `IC/` caches with smaller parameters
+(`lines` 32 vs 160, and 1024 vs 19200). The resulting cache-key mismatch sends
+`./mfc.sh validate` down the IC regeneration path, which aborts in TensorFlow's thread pool
+(`pthread_create` EAGAIN). So `./mfc.sh test` followed by `./mfc.sh precheck` fails on a clean tree.
+Observed twice, restored both times from a clean worktree. The fix is for the tests to use their own
+IC directory rather than the examples'.
