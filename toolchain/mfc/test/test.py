@@ -86,7 +86,8 @@ def _assert_particle_cloud_ib_state(case: TestCase):
     if num_particle_clouds <= 0 or case.params.get("ib_state_wrt", "F") != "T":
         return
 
-    records = _read_ib_state_records(os.path.join(case.get_dirpath(), "restart_data", "ib_state_0.dat"), case.params.get("precision", 2))
+    ib_state_precision = 1 if ARG("single") or ARG("mixed") else case.params.get("precision", 2)
+    records = _read_ib_state_records(os.path.join(case.get_dirpath(), "restart_data", "ib_state_0.dat"), ib_state_precision)
     start = case.params.get("num_ibs", 0) or 0
     num_dims = 3 if (case.params.get("p", 0) or 0) > 0 else 2 if (case.params.get("n", 0) or 0) > 0 else 1
 
