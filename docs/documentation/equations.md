@@ -23,7 +23,7 @@ where:
 - \f$\mathbf{h}(\mathbf{q})\,\nabla \cdot \mathbf{u}\f$ contains non-conservative terms (volume fraction advection),
 - \f$\mathbf{s}(\mathbf{q})\f$ is the source vector (bubbles, body forces, chemistry, etc.).
 
-The parameter `model_eqns` (1, 2, 3, or 4) selects the governing equation set.
+The parameter `model_eqns` (1, 2, or 3) selects the governing equation set.
 
 **Key source files:** `src/simulation/m_rhs.fpp` (RHS evaluation), `src/common/m_variables_conversion.fpp` (EOS and variable conversion).
 
@@ -299,7 +299,6 @@ See Section 8 (Phase Change) below for details.
 ### 2.3 Other Model Variants
 
 - `model_eqns = 1`: **Gamma/pi_inf model** — simplified single-fluid formulation using mixture \f$\gamma\f$ and \f$\pi_\infty\f$ directly without tracking individual volume fractions (\cite Johnsen08).
-- `model_eqns = 4`: **Four-equation model** — reduced model from the six-equation system after full pressure-temperature equilibrium relaxation (Tait-like compressible liquid).
 
 ---
 

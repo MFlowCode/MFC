@@ -105,8 +105,6 @@ BASE_CFG = {
     "fluid_pp(1)%qv": 0.0,
     "fluid_pp(1)%qvp": 0.0,
     "bubbles_euler": "F",
-    "pref": 101325.0,
-    "rhoref": 1000.0,
     "bubble_model": 3,
     "polytropic": "T",
     "polydisperse": "F",

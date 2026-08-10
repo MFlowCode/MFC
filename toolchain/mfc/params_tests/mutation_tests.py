@@ -88,9 +88,6 @@ MUTATIONS = {
     "bub_pp%mu_g": [-1, -1e-3],
     # Surface tension must be non-negative
     "bub_pp%ss": [-1, -0.01],
-    # Global bubble reference values
-    "rhoref": [0, -1, -1000],
-    "pref": [0, -1, -1e5],
     # PHYSICS: ACOUSTICS
     # Frequency/wavelength must be positive
     "acoustic(1)%frequency": [0, -1],

@@ -155,13 +155,13 @@
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = (1._wp - alph)*rhoL
-            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pRef + rhoH*9.81_wp*(1.2_wp - y_cc(j))
         else
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = alph
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = (1._wp - alph)*rhoL
-            pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
+            pInt = pRef + rhoH*9.81_wp*(1.2_wp - intH)
             q_prim_vf(eqn_idx%E)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
     case (301)  ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
