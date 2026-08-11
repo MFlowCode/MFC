@@ -218,6 +218,8 @@ contains
                    & "HLLD hypoelasticity does not support chemistry")
         @:PROHIBIT(riemann_solver == riemann_solver_hlld .and. (.not. mhd) .and. (.not. hypoelasticity), &
                    & "HLLD is only available for MHD or hypoelasticity")
+        @:PROHIBIT(mhd .and. riemann_solver /= riemann_solver_hll .and. riemann_solver /= riemann_solver_hlld, &
+                   & "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
 
         ! Feature flag prerequisites
         @:PROHIBIT(riemann_hypo_ADC .and. .not. hypoelasticity, "riemann_hypo_ADC requires hypoelasticity = T")
