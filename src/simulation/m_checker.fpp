@@ -55,11 +55,14 @@ contains
         character(len=5) :: numStr  !< for int to string conversion
 
         call s_int_to_str(num_stcls_min*weno_order, numStr)
+        ! lint: runtime-check m/n/p are per-rank extents after MPI decomposition, not the case-file values
         @:PROHIBIT(m + 1 < num_stcls_min*weno_order, &
                    & "m must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " // trim(numStr))
+        ! lint: runtime-check per-rank n
         @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*weno_order, &
                    & "For 2D simulation, n must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " &
                    & // trim(numStr))
+        ! lint: runtime-check per-rank p
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*weno_order, &
                    & "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is " &
                    & // trim(numStr))
@@ -72,11 +75,14 @@ contains
         character(len=5) :: numStr  !< for int to string conversion
 
         call s_int_to_str(num_stcls_min*muscl_order, numStr)
+        ! lint: runtime-check m/n/p are per-rank extents after MPI decomposition, not the case-file values
         @:PROHIBIT(m + 1 < num_stcls_min*muscl_order, &
                    & "m must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " // trim(numStr))
+        ! lint: runtime-check per-rank n
         @:PROHIBIT(n + 1 < min(1, n)*num_stcls_min*muscl_order, &
                    & "For 2D simulation, n must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " &
                    & // trim(numStr))
+        ! lint: runtime-check per-rank p
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, &
                    & "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is " &
                    & // trim(numStr))

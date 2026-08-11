@@ -1413,28 +1413,6 @@ PARAMS_COMMAND = Command(
 )
 
 
-# HELP TOPICS
-
-HELP_TOPICS = {
-    "gpu": {
-        "title": "GPU Configuration",
-        "description": "How to configure GPU builds and runs",
-    },
-    "clusters": {
-        "title": "Cluster Configuration",
-        "description": "How to configure MFC for different HPC clusters",
-    },
-    "batch": {
-        "title": "Batch Job Submission",
-        "description": "How to submit batch jobs with MFC",
-    },
-    "debugging": {
-        "title": "Debugging & Troubleshooting",
-        "description": "Tips for debugging MFC issues",
-    },
-}
-
-
 # COMPLETE CLI SCHEMA
 
 MFC_CLI_SCHEMA = CLISchema(
@@ -1483,7 +1461,6 @@ started, run `./mfc.sh build -h`.""",
         COMMON_GPUS,
         COMMON_MFC_CONFIG,
     ],
-    help_topics=HELP_TOPICS,
 )
 
 

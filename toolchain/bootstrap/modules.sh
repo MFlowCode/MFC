@@ -33,6 +33,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Get computer (if not supplied in command line)
+# The slugs advertised below must match the cluster definitions in
+# toolchain/modules; check_cluster_menu_slugs in toolchain/mfc/lint_source.py
+# enforces that and keys on these two markers.
+# lint: cluster-menu-begin
 if [ -v $u_c ]; then
     log   "Select a system:"
     log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Wombat (w)"
@@ -52,6 +56,7 @@ if [ -v $u_c ]; then
     read u_c
     log
 fi
+# lint: cluster-menu-end
 
 # Get CPU/GPU (if not supplied in command-line)
 if [ -v $u_cg ]; then

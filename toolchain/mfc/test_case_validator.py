@@ -222,6 +222,22 @@ class TestReactiveBurnFluidPairing(ConstraintTestCase):
         params = {k: v for k, v in REACTIVE_BURN.items() if not k.endswith("%qv")}
         self.assertRejects(params, "fluid_pp(1)%qv > fluid_pp(2)%qv")
 
+    def test_rejects_unset_fluid2_eos(self):
+        """Unset gamma/pi_inf defaults to dflt_real in the solver, so fluid 2 would
+        carry a negative stiffened-gas EOS. The Fortran caught this by comparing
+        against the sentinel; an `is not None` guard would silently pass it."""
+        for prop in ("gamma", "pi_inf"):
+            params = {k: v for k, v in REACTIVE_BURN.items() if k != f"fluid_pp(2)%{prop}"}
+            self.assertRejects(params, f"both fluid_pp(1)%{prop} and fluid_pp(2)%{prop} to be set")
+
+    def test_rejects_unset_num_fluids(self):
+        params = {k: v for k, v in REACTIVE_BURN.items() if k != "num_fluids"}
+        self.assertRejects(params, "reactive_burn requires num_fluids = 2")
+
+    def test_rejects_unset_model_eqns(self):
+        params = {k: v for k, v in REACTIVE_BURN.items() if k != "model_eqns"}
+        self.assertRejects(params, "reactive_burn requires model_eqns = 2 or 3")
+
     def test_accepts_valid_configuration(self):
         self.assertAccepts(REACTIVE_BURN)
 
@@ -267,14 +283,32 @@ class TestSyntheticTurbulence(ConstraintTestCase):
         self.assertAccepts(BASE_2D)
 
 
-class TestTimeStepPositivity(ConstraintTestCase):
-    MSG = "dt must be positive"
+class TestTimeStep(ConstraintTestCase):
+    """The Fortran checked `if (.not. cfl_dt) dt <= 0`, which fired both on an
+    explicitly bad dt and on the dflt_real sentinel left by an unset one."""
 
     def test_rejects_negative_dt(self):
-        self.assertRejects({**BASE, "dt": -1.0}, self.MSG)
+        self.assertRejects({**BASE, "dt": -1.0}, "dt must be positive")
 
     def test_rejects_zero_dt(self):
-        self.assertRejects({**BASE, "dt": 0.0}, self.MSG)
+        self.assertRejects({**BASE, "dt": 0.0}, "dt must be positive")
+
+    def test_rejects_unset_dt_under_fixed_stepping(self):
+        params = {k: v for k, v in BASE.items() if k != "dt"}
+        self.assertRejects(params, "dt must be set when using fixed time stepping")
+
+    def test_rejects_unset_dt_with_adap_dt(self):
+        """adap_dt is not an exemption -- it uses dt as its initial value, and the
+        Fortran aborted on the sentinel regardless of adap_dt."""
+        params = {k: v for k, v in BASE.items() if k != "dt"}
+        params.update({"adap_dt": "T", "bubbles_euler": "T", "polytropic": "T", "adv_n": "T", "nb": 1})
+        self.assertRejects(params, "dt must be set when using fixed time stepping")
+
+    def test_accepts_cfl_adap_dt_without_dt(self):
+        """CFL-driven stepping genuinely needs no dt (e.g. 2D_lagrange_rising_bubble)."""
+        params = {k: v for k, v in BASE.items() if k not in ("dt", "t_step_start", "t_step_stop", "t_step_save")}
+        params.update({"cfl_adap_dt": "T", "cfl_target": 0.5, "t_stop": 1.0, "t_save": 0.1, "n_start": 0})
+        self.assertAccepts(params)
 
     def test_accepts_positive_dt(self):
         self.assertAccepts(BASE)

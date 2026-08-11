@@ -33,11 +33,17 @@ PRECISION_EXCLUDE_PATTERNS = {"nvtx", "precision_select"}
 # MPI proxy source directory -> params-registry target key
 MPI_PROXY_TARGETS = {"pre_process": "pre", "simulation": "sim", "post_process": "post"}
 
-# Checker subroutines allowed to hold @:PROHIBIT. Every one of these depends on
-# state the Python validator cannot see at case-validation time: the MPI
-# decomposition, per-rank grid extents, the active compiler, or a value Cantera
-# fills in at runtime. Constraints between input parameters belong in
+# Checker subroutines whose every @:PROHIBIT depends on state the Python
+# validator cannot see: the active compiler, the MPI decomposition, or a value
+# Cantera fills in at runtime. Constraints between input parameters belong in
 # toolchain/mfc/case_validator.py instead -- see check_checker_input_constraints.
+#
+# Subroutines that mix runtime and input-only checks are deliberately NOT listed.
+# s_check_inputs_weno and s_check_inputs_muscl are the case in point: their
+# grid-extent checks need per-rank m/n/p, but the muscl_order/int_comp check that
+# used to sit alongside them was pure input, and allowlisting the subroutine would
+# have let its replacement back in unnoticed. Those lines carry an explicit
+# RUNTIME_CHECK_MARKER instead, so anything new added there is still flagged.
 RUNTIME_CHECKER_SUBROUTINES = {
     # Compiler conditionals (#ifdef / #if guarded).
     "s_check_amd",
@@ -46,15 +52,16 @@ RUNTIME_CHECKER_SUBROUTINES = {
     # MPI decomposition: n_global, num_procs_y/z.
     "s_check_total_cells",
     "s_check_inputs_fft",
-    # Per-rank grid extents m/n/p, which differ from the case-file values.
-    "s_check_inputs_weno",
-    "s_check_inputs_muscl",
     # num_species is populated by Cantera at runtime.
     "s_check_inputs_ib_injection",
 }
 
 # Opt out of check_checker_input_constraints for a single @:PROHIBIT.
 RUNTIME_CHECK_MARKER = "lint: runtime-check"
+
+# Fortran subroutine declaration, allowing any order of the prefixes MFC uses
+# (impure/pure/elemental/recursive/module) before the `subroutine` keyword.
+_SUBROUTINE_DECL = re.compile(r"(?:(?:impure|pure|elemental|recursive|module|non_recursive)\s+)*subroutine\s+(\w+)")
 
 
 def _is_comment_or_blank(stripped: str) -> bool:
@@ -469,41 +476,48 @@ def check_checker_input_constraints(repo_root: Path) -> list[str]:
     languages, and the copies drift.
 
     A @:PROHIBIT is allowed only inside a subroutine in
-    RUNTIME_CHECKER_SUBROUTINES, or on a line preceded by a
-    "! lint: runtime-check <reason>" comment.
+    RUNTIME_CHECKER_SUBROUTINES, or under a "! lint: runtime-check <reason>"
+    comment. The marker applies to the next @:PROHIBIT, so blank lines, Fypp
+    directives, and further comments may sit between the two.
     """
     errors = []
 
     for path in sorted((repo_root / SRC_DIR).rglob("m_checker*.fpp")):
         rel = path.relative_to(repo_root)
         subroutine = None
-        exempt_next = False
+        exempt = False
 
         for lineno, line in enumerate(path.read_text().splitlines(), 1):
             stripped = line.strip()
 
-            match = re.match(r"(?:impure\s+|pure\s+)?subroutine\s+(\w+)", stripped)
+            match = _SUBROUTINE_DECL.match(stripped)
             if match:
                 subroutine = match.group(1)
             elif stripped.startswith("end subroutine"):
                 subroutine = None
 
             if stripped.startswith("!"):
-                exempt_next = RUNTIME_CHECK_MARKER in stripped
+                exempt = exempt or RUNTIME_CHECK_MARKER in stripped
+                continue
+            if not stripped or stripped.startswith("#"):
+                # Blank lines and Fypp/preprocessor directives do not consume the marker.
                 continue
 
-            if "@:PROHIBIT" in stripped and not exempt_next:
-                if subroutine not in RUNTIME_CHECKER_SUBROUTINES:
-                    where = f"in {subroutine}" if subroutine else "at module scope"
+            if "@:PROHIBIT" in stripped:
+                if not exempt and subroutine not in RUNTIME_CHECKER_SUBROUTINES:
+                    if subroutine:
+                        where = f"in {subroutine}"
+                        allowlist_hint = f"add '{subroutine}' to RUNTIME_CHECKER_SUBROUTINES in {Path(__file__).name}"
+                    else:
+                        where = "at module scope"
+                        allowlist_hint = f"put it in a subroutine listed in RUNTIME_CHECKER_SUBROUTINES in {Path(__file__).name}"
                     errors.append(
                         f"{rel}:{lineno}: @:PROHIBIT {where} looks like an input-only constraint. "
                         f"Add it to a check_* method in toolchain/mfc/case_validator.py instead. "
-                        f"If it genuinely needs runtime or compiler state, add {subroutine!r} to "
-                        f"RUNTIME_CHECKER_SUBROUTINES in {Path(__file__).name}, or mark the line with "
-                        f"'! {RUNTIME_CHECK_MARKER} <reason>'."
+                        f"If it genuinely needs runtime or compiler state, {allowlist_hint}, "
+                        f"or mark it with '! {RUNTIME_CHECK_MARKER} <reason>'."
                     )
-
-            exempt_next = False
+                exempt = False
 
     return errors
 
@@ -533,13 +547,15 @@ def check_cluster_menu_slugs(repo_root: Path) -> list[str]:
         if not module_list_line.search(slug):
             defined.add(slug)
 
-    # The menu block runs from "Select a system:" to the answer prompt.
+    # The menu is delimited by explicit markers rather than by prose, so rewording
+    # the prompt or the read cannot silently disable this check.
     text = script.read_text()
-    try:
-        block = text[text.index("Select a system:") : text.index("read u_c")]
-    except ValueError:
-        return [f"{script.relative_to(repo_root)}: could not locate the cluster menu block"]
-    advertised = set(re.findall(r"\((\w[\w-]*)\)", block))
+    block = re.search(r"# lint: cluster-menu-begin\n(.*?)# lint: cluster-menu-end", text, re.S)
+    if block is None:
+        return [f"{script.relative_to(repo_root)}: cluster-menu-begin/end markers are missing; check_cluster_menu_slugs cannot verify the menu against toolchain/modules"]
+    # Slugs are advertised as "Name (slug)"; require the closing paren to be
+    # followed by a separator so shell fragments like ${G} are not picked up.
+    advertised = set(re.findall(r"\((\w[\w-]*)\)(?=[\s|\"']|$)", block.group(1), re.M))
 
     errors = []
     rel = script.relative_to(repo_root)
