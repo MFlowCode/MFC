@@ -1397,10 +1397,15 @@ class CaseValidator:
         alpha_bar = self.get("alpha_bar")
         model_eqns = self.get("model_eqns")
         alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
 
+        self.prohibit(not hypoelasticity, "cont_damage requires hypoelasticity = T")
         self.prohibit(tau_star is None, "tau_star must be specified for cont_damage")
         self.prohibit(cont_damage_s is None, "cont_damage_s must be specified for cont_damage")
         self.prohibit(alpha_bar is None, "alpha_bar must be specified for cont_damage")
+        self.prohibit(tau_star is not None and tau_star < 0, "tau_star must be nonnegative (tensile damage threshold)")
+        self.prohibit(cont_damage_s is not None and cont_damage_s <= 0, "cont_damage_s must be positive")
+        self.prohibit(alpha_bar is not None and alpha_bar < 0, "alpha_bar must be nonnegative")
         self.prohibit(model_eqns is not None and model_eqns != 2, "cont_damage requires model_eqns = 2")
         self.prohibit(alt_soundspeed, "Continuum damage does not support alt_soundspeed")
 

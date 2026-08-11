@@ -233,6 +233,12 @@ contains
         @:PROHIBIT(alt_soundspeed .and. num_fluids /= 2, &
                    & "alt_soundspeed requires exactly 2 fluid components (the Kapila K coefficient is a two-fluid closure)")
         @:PROHIBIT(cont_damage .and. alt_soundspeed, "Continuum damage does not support alt_soundspeed")
+        @:PROHIBIT(cont_damage .and. .not. hypoelasticity, "cont_damage requires hypoelasticity = T")
+        @:PROHIBIT(cont_damage .and. .not. f_is_default(tau_star) .and. tau_star < 0._wp, &
+                   & "tau_star must be nonnegative (tensile damage threshold)")
+        @:PROHIBIT(cont_damage .and. .not. f_is_default(cont_damage_s) .and. cont_damage_s <= 0._wp, &
+                   & "cont_damage_s must be positive")
+        @:PROHIBIT(cont_damage .and. .not. f_is_default(alpha_bar) .and. alpha_bar < 0._wp, "alpha_bar must be nonnegative")
         @:PROHIBIT(hypoelasticity .and. igr, "Hypoelasticity is not compatible with IGR")
         @:PROHIBIT(hypoelasticity .and. fd_order /= 1 .and. fd_order /= 2 .and. fd_order /= 4, &
                    & "hypoelasticity requires fd_order to be set to 1, 2, or 4 (the finite-difference coefficients are initialized unconditionally)")
