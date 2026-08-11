@@ -681,14 +681,14 @@ contains
                         if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(eqn_idx%damage)%sf(j, k, l)), 0._wp)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                            ! subtracting elastic contribution for pressure calculation
+                            ! Elastic energy subtraction (guard skips when G near zero from alpha undershoot)
                             if (G_K > verysmall) then
                                 qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, l) - ((qK_prim_vf(i)%sf(j, k, &
-                                           & l)**2._wp)/(4._wp*G_K))/gamma_K
+                                           & l)**2._wp)/max(4._wp*G_K, verysmall))/gamma_K
                                 ! Double for shear stresses
                                 if (any(i == shear_indices)) then
                                     qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, l) - ((qK_prim_vf(i)%sf(j, &
-                                               & k, l)**2._wp)/(4._wp*G_K))/gamma_K
+                                               & k, l)**2._wp)/max(4._wp*G_K, verysmall))/gamma_K
                                 end if
                             end if
                         end do
@@ -922,14 +922,14 @@ contains
                     if (hypoelasticity) then
                         if (cont_damage) G = G*max((1._wp - q_prim_vf(eqn_idx%damage)%sf(j, k, l)), 0._wp)
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                            ! adding elastic contribution
+                            ! Elastic energy addition (guard skips when G near zero from alpha undershoot)
                             if (G > verysmall) then
                                 q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
-                                          & l)**2._wp)/(4._wp*G)
+                                          & l)**2._wp)/max(4._wp*G, verysmall)
                                 ! Double for shear stresses
                                 if (any(i == shear_indices)) then
                                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
-                                              & l)**2._wp)/(4._wp*G)
+                                              & l)**2._wp)/max(4._wp*G, verysmall)
                                 end if
                             end if
                         end do
@@ -949,13 +949,15 @@ contains
     end subroutine s_convert_primitive_to_conservative_variables
 
     !> Convert primitive variables to Eulerian flux variables.
-    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b, dir_idx_in, dir_flg_in)
+    subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, FK_vf, FK_src_vf, is1, is2, is3, s2b, s3b, dir_idx_in, &
+        & dir_flg_in, hll_u_interface_in)
 
         integer, intent(in) :: s2b, s3b
         !> Working-direction mapping, passed explicitly: it is simulation state (m_global_parameters), and use-associating it into
         !! this common kernel spills registers on AMD OpenMP offload.
         integer, dimension(3), intent(in)                                                       :: dir_idx_in
         real(wp), dimension(3), intent(in)                                                      :: dir_flg_in
+        logical, intent(in)                                                                     :: hll_u_interface_in
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in)                  :: qK_prim_vf
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout)               :: FK_vf
         real(wp), dimension(0:,idwbuff(2)%beg:,idwbuff(3)%beg:,eqn_idx%adv%beg:), intent(inout) :: FK_src_vf
@@ -984,6 +986,7 @@ contains
         real(wp)               :: qv_K
         real(wp), dimension(2) :: Re_K
         real(wp)               :: G_K
+        real(wp)               :: blkmod1_K, blkmod2_K, K_K
         real(wp)               :: T_K, mix_mol_weight, R_gas
         integer                :: i, j, k, l  !< Generic loop iterators
 
@@ -996,7 +999,8 @@ contains
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, dir_flg_in]')
+                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, &
+                            & dir_flg_in, hll_u_interface_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1072,7 +1076,42 @@ contains
                         end do
                     end if
 
-                    if (riemann_solver == riemann_solver_hll .or. riemann_solver == riemann_solver_hlld) then
+                    ! Match the volume-fraction flux representation exported by the Riemann solver. HLL Method 1: zero alpha
+                    ! flux plus per-fluid interface-alpha source traces. Hypoelastic HLLD folds every non-conservative term
+                    ! into its augmented flux (adv_src_mode_none), so its source trace is zero; for this cell-local conversion
+                    ! the fold collapses exactly to -/+ K*u_n on the two volume-fraction rows (K = 0 without alt_soundspeed),
+                    ! with the same two-fluid longitudinal-modulus K as the HLLD kernel (num_fluids = 2 is checker-enforced).
+                    ! MHD HLLD keeps the per-fluid-trace representation it has always used. HLL Method 2, HLLC, and LF use the
+                    ! shared-velocity representation below.
+                    if (riemann_solver == riemann_solver_hlld) then
+                        if (hypoelasticity) then
+                            K_K = 0._wp
+                            ! The fluid-2 subscripts must not be compiled when case optimization
+                            ! bakes num_fluids = 1 (amdflang rejects them at compile time); the
+                            ! checker prohibits hypoelastic HLLD there, so the block is dead code.
+                            #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
+                                if (alt_soundspeed) then
+                                    blkmod1_K = ((gammas(1) + 1._wp)*pres_K + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_vc(1)
+                                    blkmod2_K = ((gammas(2) + 1._wp)*pres_K + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_vc(2)
+                                    K_K = alpha_K(1)*alpha_K(2)*(blkmod2_K - blkmod1_K)/(alpha_K(1)*blkmod2_K + alpha_K(2) &
+                                                  & *blkmod1_K + verysmall)
+                                end if
+                            #:endif
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                FK_vf(j, k, l, i) = 0._wp
+                                FK_src_vf(j, k, l, i) = 0._wp
+                            end do
+                            FK_vf(j, k, l, eqn_idx%adv%beg) = -K_K*vel_K(dir_idx_in(1))
+                            FK_vf(j, k, l, eqn_idx%adv%end) = K_K*vel_K(dir_idx_in(1))
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                FK_vf(j, k, l, i) = 0._wp
+                                FK_src_vf(j, k, l, i) = alpha_K(i - eqn_idx%E)
+                            end do
+                        end if
+                    else if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface_in) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
                             FK_vf(j, k, l, i) = 0._wp
