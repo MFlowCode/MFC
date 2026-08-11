@@ -1301,6 +1301,7 @@ contains
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, &
                                                   & 0._wp, c, qv)
+                    if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1384,6 +1385,7 @@ contains
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
                                                       & 0._wp, 0._wp, c, qv)
+                        if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
                     end if
                 end if
             else
@@ -1444,9 +1446,16 @@ contains
                                                         & rho, qv, rhoYks, pres, T)
                             end if
 
+                            if (hypoelasticity) then
+                                do s = 1, 6
+                                    tau_e(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k - 2, l - 2)/rho
+                                end do
+                            end if
+
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
                                                           & 0._wp, 0._wp, c, qv)
+                            if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
@@ -1511,6 +1520,8 @@ contains
                                & 0, 0), q_cons_vf(4)%sf(j - 2, 0, 0), q_cons_vf(5)%sf(j - 2, 0, 0), q_cons_vf(6)%sf(j - 2, 0, 0), &
                                & q_cons_vf(7)%sf(j - 2, 0, 0), q_cons_vf(8)%sf(j - 2, 0, 0), q_cons_vf(9)%sf(j - 2, 0, 0), &
                                & q_cons_vf(10)%sf(j - 2, 0, 0), nbub, R(1), Rdot(1)
+                    else if (hypoelasticity) then
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8)') nondim_time, rho, vel(1), pres, tau_e(1)
                     else
                         write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') nondim_time, rho, vel(1), pres
                     end if
@@ -1531,9 +1542,14 @@ contains
                     end if
                 else
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                        write (i + 30, &
-                               & '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8,F24.8,F24.8,' // 'F24.8)') &
-                               & nondim_time, rho, vel(1), vel(2), vel(3), pres, gamma, pi_inf, qv, c, accel
+                        if (hypoelasticity) then
+                            write (i + 30, '(6X,F12.6,16F24.8)') nondim_time, rho, vel(1), vel(2), vel(3), pres, gamma, pi_inf, &
+                                   & qv, c, accel, tau_e(1), tau_e(2), tau_e(3), tau_e(4), tau_e(5), tau_e(6)
+                        else
+                            write (i + 30, &
+                                   & '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8,F24.8,F24.8,' // 'F24.8)') &
+                                   & nondim_time, rho, vel(1), vel(2), vel(3), pres, gamma, pi_inf, qv, c, accel
+                        end if
                     #:endif
                 end if
             end if
