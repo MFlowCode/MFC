@@ -7,7 +7,7 @@ from mfc import common
 
 from ..state import ARG
 from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
-from .convergence import ConvergenceSpec, run_dt_sweep, run_h_sweep, run_sod_l1
+from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_sod_l1
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -159,6 +159,27 @@ def add_convergence_cases(cases):
                     num_ranks=num_ranks,
                 ),
                 ppn=num_ranks,
+            )
+        )
+
+    # Hypoelastic shear-contact amplitude order (see examples/2D_hypo_shear_contact):
+    # HLLD's paired tangential momentum/energy star fluxes give a quadratic pressure
+    # response to a tau_xy jump; HLLC's mismatched weights give linear. The
+    # HLLC leg is the control that the case still discriminates (with v0 = 0 both
+    # solvers are quadratic, so a drifted case would silently pass HLLD alone).
+    for label, solver, expected, tol in [("HLLD", "hlld", 2.0, 0.1), ("HLLC", "hllc", 1.0, 0.2)]:
+        cases.append(
+            define_convergence_case(
+                f"Convergence -> HypoShearContact -> {label}",
+                spec=ConvergenceSpec(
+                    runner=run_amp_sweep,
+                    case_path="examples/2D_hypo_shear_contact/case.py",
+                    extra_args=["--solver", solver],
+                    expected_order=expected,
+                    tol=tol,
+                    amps=[1.0e-3, 2.0e-3, 4.0e-3, 8.0e-3, 1.6e-2],
+                ),
+                ppn=1,
             )
         )
 
@@ -530,6 +551,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def add_hll_u_interface_cases(trace_prefix: str, u_interface_mods: typing.Optional[dict] = None):
+        cases.append(
+            define_case_d(
+                stack,
+                f"{trace_prefix} -> u-interface",
+                {"riemann_solver": 1, "hll_u_interface": "T", **(u_interface_mods or {})},
+            )
+        )
+        cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface -> alt_soundspeed", {"riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T", **(u_interface_mods or {})}))
+
     def alter_low_Mach_correction():
         stack.push("", {"fluid_pp(1)%gamma": 0.16, "fluid_pp(1)%pi_inf": 3515.0, "dt": 1e-7})
 
@@ -621,6 +652,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     alter_capillary()
 
             alter_riemann_solvers(num_fluids)
+            if num_fluids == 2 and len(dimInfo[0]) > 1:
+                # The existing 2D fluid-only HLL Method-2 row also guards the characteristic-CBC shared-velocity representation.
+                cbc_mods = {"bc_y%end": -6} if len(dimInfo[0]) == 2 else None
+                add_hll_u_interface_cases("riemann_solver=1", cbc_mods)
             alter_low_Mach_correction()
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
@@ -771,6 +806,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "model_eqns=2", {"model_eqns": 2}))
         cases.append(define_case_d(stack, "model_eqns=3", {"model_eqns": 3}))
         cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
+        add_hll_u_interface_cases("HLL")
 
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-11, "viscous": "T"})
 
@@ -1291,6 +1327,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if num_fluids == 1:
                 cases.append(define_case_d(stack, "cont_damage", {"cont_damage": "T", "tau_star": 0.0, "cont_damage_s": 2.0, "alpha_bar": 1e-4}))
+                if len(dimInfo[0]) == 2:
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "cont_damage -> HLLC -> nonuniform stress",
+                            {
+                                "riemann_solver": 2,
+                                "cont_damage": "T",
+                                "tau_star": 0.0,
+                                "cont_damage_s": 2.0,
+                                "alpha_bar": 1e-4,
+                                "patch_icpp(1)%tau_e(1)": 100.0,
+                                "patch_icpp(1)%tau_e(2)": 25.0,
+                                "patch_icpp(1)%tau_e(3)": -100.0,
+                                "patch_icpp(2)%tau_e(1)": 200.0,
+                                "patch_icpp(2)%tau_e(2)": 50.0,
+                                "patch_icpp(2)%tau_e(3)": -200.0,
+                                "patch_icpp(3)%tau_e(1)": 300.0,
+                                "patch_icpp(3)%tau_e(2)": 75.0,
+                                "patch_icpp(3)%tau_e(3)": -300.0,
+                            },
+                        )
+                    )
                 if len(dimInfo[0]) >= 2:
                     cases.append(define_case_d(stack, "bc=-2", reflective_params))
                 if len(dimInfo[0]) == 2:
@@ -1935,6 +1994,638 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for name, path, param in case_specs:
             cases.append(define_case_f(name, path, mods=param))
 
+    def hypo_example_cases():
+        # Inline Riemann problem configs for hypoelastic solver regression testing.
+        # Two-material pressure discontinuity: liquid (fluid 1) vs solid (fluid 2).
+        # Enriched ICs: non-zero transverse velocity and initial stress to exercise
+        # all solver code paths including shear and geometry source terms.
+        _eps = 1e-8
+        _fl_g = 1.0e00 / (4.4e00 - 1.0e00)
+        _fl_p = 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00)
+        _fluids = {
+            "fluid_pp(1)%gamma": _fl_g,
+            "fluid_pp(1)%pi_inf": _fl_p,
+            "fluid_pp(1)%G": 0.0,
+            "fluid_pp(2)%gamma": _fl_g,
+            "fluid_pp(2)%pi_inf": _fl_p,
+            "fluid_pp(2)%G": 1e7,
+        }
+        _common = {
+            "run_time_info": "T",
+            "t_step_start": 0,
+            "t_step_stop": 10,
+            "t_step_save": 10,
+            "num_patches": 2,
+            "model_eqns": 2,
+            "alt_soundspeed": "F",
+            "num_fluids": 2,
+            "mpp_lim": "T",
+            "mixture_err": "F",
+            "time_stepper": 1,
+            "weno_order": 1,
+            "weno_eps": 1.0e-20,
+            "null_weights": "F",
+            "mp_weno": "F",
+            "riemann_solver": 4,
+            "wave_speeds": 1,
+            "avg_state": 2,
+            "format": 1,
+            "precision": 2,
+            "prim_vars_wrt": "T",
+            "rho_wrt": "T",
+            "parallel_io": "T",
+            "hypoelasticity": "T",
+            "fd_order": 4,
+            **_fluids,
+        }
+        _patch1_2d = {
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 10.0,
+            "patch_icpp(1)%pres": 1e6,
+            "patch_icpp(1)%tau_e(1)": 1e4,
+            "patch_icpp(1)%alpha_rho(1)": 1000 * (1.0 - _eps),
+            "patch_icpp(1)%alpha(1)": 1.0 - _eps,
+            "patch_icpp(1)%alpha_rho(2)": 1000 * _eps,
+            "patch_icpp(1)%alpha(2)": _eps,
+        }
+        _patch2_2d = {
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": -10.0,
+            "patch_icpp(2)%pres": 1e5,
+            "patch_icpp(2)%tau_e(1)": -1e4,
+            "patch_icpp(2)%alpha_rho(1)": 1000 * _eps,
+            "patch_icpp(2)%alpha(1)": _eps,
+            "patch_icpp(2)%alpha_rho(2)": 1000 * (1.0 - _eps),
+            "patch_icpp(2)%alpha(2)": 1.0 - _eps,
+        }
+        base_configs = {
+            "2D -> Hypoelasticity": {
+                **_common,
+                "m": 24,
+                "n": 24,
+                "p": 0,
+                "dt": 6.0e-6,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                **_patch1_2d,
+                **_patch2_2d,
+            },
+            "2D -> Axisymmetric -> Hypoelasticity": {
+                **_common,
+                "m": 24,
+                "n": 24,
+                "p": 0,
+                "dt": 4.0e-6,
+                "cyl_coord": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -2,
+                "bc_x%end": -2,
+                "bc_y%beg": -2,
+                "bc_y%end": -2,
+                **_patch1_2d,
+                **_patch2_2d,
+                # Axis regularity: vel(2) is the radial velocity here, and a nonzero
+                # value at r = 0 is not a smooth axisymmetric state (v_r must be O(r)).
+                # Move the two-stream dynamics to the axial component instead.
+                "patch_icpp(1)%vel(1)": 10.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(2)%vel(1)": -10.0,
+                "patch_icpp(2)%vel(2)": 0.0,
+            },
+            "3D -> Hypoelasticity": {
+                **_common,
+                "m": 24,
+                "n": 24,
+                "p": 24,
+                "dt": 6.0e-6,
+                "cyl_coord": "F",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "z_domain%beg": 0.0,
+                "z_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "bc_z%beg": -3,
+                "bc_z%end": -3,
+                "patch_icpp(1)%geometry": 9,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%z_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%length_z": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 10.0,
+                "patch_icpp(1)%vel(3)": 5.0,
+                "patch_icpp(1)%pres": 1e6,
+                "patch_icpp(1)%tau_e(1)": 1e4,
+                "patch_icpp(1)%alpha_rho(1)": 1000 * (1.0 - _eps),
+                "patch_icpp(1)%alpha(1)": 1.0 - _eps,
+                "patch_icpp(1)%alpha_rho(2)": 1000 * _eps,
+                "patch_icpp(1)%alpha(2)": _eps,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%geometry": 9,
+                "patch_icpp(2)%x_centroid": 0.75,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%z_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%length_y": 1.0,
+                "patch_icpp(2)%length_z": 1.0,
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": -10.0,
+                "patch_icpp(2)%vel(3)": -5.0,
+                "patch_icpp(2)%pres": 1e5,
+                "patch_icpp(2)%tau_e(1)": -1e4,
+                "patch_icpp(2)%alpha_rho(1)": 1000 * _eps,
+                "patch_icpp(2)%alpha(1)": _eps,
+                "patch_icpp(2)%alpha_rho(2)": 1000 * (1.0 - _eps),
+                "patch_icpp(2)%alpha(2)": 1.0 - _eps,
+            },
+        }
+
+        solver_specs = [
+            {"trace": "HLLD", "mods": {"riemann_solver": 4}},
+            {"trace": "HLLD -> ADC", "mods": {"riemann_solver": 4, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}},
+            {"trace": "HLLC", "mods": {"riemann_solver": 2}},
+            {"trace": "HLLC -> ADC", "mods": {"riemann_solver": 2, "riemann_hypo_ADC": "T", "ADC_kappa": 1.0}},
+            {"trace": "HLL -> Interface RHS", "mods": {"riemann_solver": 1, "hypo_hll_interface_rhs": "T"}},
+            {"trace": "HLL -> u-interface -> Interface RHS", "mods": {"riemann_solver": 1, "hypo_hll_interface_rhs": "T", "hll_u_interface": "T"}},
+        ]
+
+        def apply_solver(case: dict, base_cfg: dict, solver_mods: dict, alt_soundspeed: str):
+            case.update(base_cfg)
+            for key in ["riemann_hypo_ADC", "ADC_kappa", "hypo_hll_interface_rhs", "hll_u_interface"]:
+                case.pop(key, None)
+            case["alt_soundspeed"] = alt_soundspeed
+            case.update(solver_mods)
+
+        for base_trace, base_cfg in base_configs.items():
+            for solver_spec in solver_specs:
+                solver_trace = solver_spec["trace"]
+                solver_mods = solver_spec["mods"]
+                for alt_soundspeed in ["F", "T"]:
+                    # 2D axisymmetric HLL Method 1 + alt_soundspeed remains intentionally unsupported.
+                    if base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLL -> Interface RHS" and alt_soundspeed == "T":
+                        continue
+
+                    # The shear-stress rows of this case stay near zero, so the absolute
+                    # tolerance is the binding comparison there and compiler/backend roundoff
+                    # can exceed the suite default. override_tol is case-wide.
+                    is_axisym_hlld_no_alt_soundspeed = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace in {"HLLD", "HLLD -> ADC"} and alt_soundspeed == "F"
+                    tol = 1e-5 if is_axisym_hlld_no_alt_soundspeed else None
+
+                    trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
+                    cases.append(
+                        define_case_f(
+                            trace,
+                            "",
+                            mods={},
+                            override_tol=tol,
+                            functor=lambda case, bc=base_cfg, sm=solver_mods, alt_ss=alt_soundspeed: apply_solver(case, bc, sm, alt_ss),
+                        )
+                    )
+
+        multifluid_cfg = {
+            **base_configs["2D -> Hypoelasticity"],
+            "num_fluids": 3,
+            "alt_soundspeed": "F",
+            "fluid_pp(3)%gamma": _fl_g,
+            "fluid_pp(3)%pi_inf": _fl_p,
+            "fluid_pp(3)%G": 5e6,
+            "patch_icpp(1)%alpha_rho(1)": 600.0,
+            "patch_icpp(1)%alpha(1)": 0.6,
+            "patch_icpp(1)%alpha_rho(2)": 300.0,
+            "patch_icpp(1)%alpha(2)": 0.3,
+            "patch_icpp(1)%alpha_rho(3)": 100.0,
+            "patch_icpp(1)%alpha(3)": 0.1,
+            "patch_icpp(2)%alpha_rho(1)": 100.0,
+            "patch_icpp(2)%alpha(1)": 0.1,
+            "patch_icpp(2)%alpha_rho(2)": 300.0,
+            "patch_icpp(2)%alpha(2)": 0.3,
+            "patch_icpp(2)%alpha_rho(3)": 600.0,
+            "patch_icpp(2)%alpha(3)": 0.6,
+        }
+        multifluid_solvers = [
+            ("HLL -> u-interface -> Interface RHS", {"riemann_solver": 1, "hypo_hll_interface_rhs": "T", "hll_u_interface": "T"}),
+            ("HLLC", {"riemann_solver": 2}),
+        ]
+        for solver_trace, solver_mods in multifluid_solvers:
+            cases.append(
+                define_case_f(
+                    f"2D -> Hypoelasticity -> 3 Fluid(s) -> {solver_trace} -> alt_soundspeed=F",
+                    "",
+                    mods={**multifluid_cfg, **solver_mods},
+                )
+            )
+
+        edge_common = {
+            "run_time_info": "F",
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "n": 7,
+            "p": 0,
+            "t_step_start": 0,
+            "t_step_stop": 1,
+            "t_step_save": 1,
+            "num_patches": 2,
+            "model_eqns": 2,
+            "alt_soundspeed": "F",
+            "num_fluids": 2,
+            "mpp_lim": "F",
+            "mixture_err": "F",
+            "time_stepper": 1,
+            "recon_type": 1,
+            "weno_order": 1,
+            "weno_eps": 1.0e-16,
+            "riemann_solver": 4,
+            "wave_speeds": 1,
+            "avg_state": 2,
+            "riemann_hypo_ADC": "F",
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -1,
+            "bc_y%end": -1,
+            "format": 1,
+            "precision": 2,
+            "parallel_io": "F",
+            "hypoelasticity": "T",
+            "fd_order": 4,
+        }
+
+        # A solid-anchored, light-gas face puts the raw right shear wave outside
+        # the outer fan. Tangential slip makes HLL fallback differ from clipping.
+        gamma = 1.4
+        p0 = 1.0
+        G_solid = 1.0
+        rho_solid = 1.0
+        rho_gas = 1.0e-2
+        eps_alpha = 1.0e-12
+        nx = 32
+        dx = 1.0 / nx
+        c_outer = math.sqrt(gamma * p0 / rho_gas)
+        fan_order_cfg = {
+            **edge_common,
+            "m": nx - 1,
+            "dt": 0.2 * dx / c_outer,
+            "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+            "fluid_pp(1)%pi_inf": 0.0,
+            "fluid_pp(1)%G": G_solid,
+            "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
+            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%G": 0.0,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%pres": p0,
+            "patch_icpp(1)%tau_e(1)": 0.0,
+            "patch_icpp(1)%tau_e(2)": 0.0,
+            "patch_icpp(1)%tau_e(3)": 0.0,
+            "patch_icpp(1)%alpha_rho(1)": rho_solid * (1.0 - eps_alpha),
+            "patch_icpp(1)%alpha(1)": 1.0 - eps_alpha,
+            "patch_icpp(1)%alpha_rho(2)": rho_solid * eps_alpha,
+            "patch_icpp(1)%alpha(2)": eps_alpha,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": 1.0,
+            "patch_icpp(2)%pres": p0,
+            "patch_icpp(2)%tau_e(1)": 0.0,
+            "patch_icpp(2)%tau_e(2)": 0.0,
+            "patch_icpp(2)%tau_e(3)": 0.0,
+            "patch_icpp(2)%alpha_rho(1)": rho_gas * eps_alpha,
+            "patch_icpp(2)%alpha(1)": eps_alpha,
+            "patch_icpp(2)%alpha_rho(2)": rho_gas * (1.0 - eps_alpha),
+            "patch_icpp(2)%alpha(2)": 1.0 - eps_alpha,
+        }
+        cases.append(
+            define_case_f(
+                "2D -> Hypoelasticity -> HLLD -> Fan-order fallback",
+                "",
+                mods=fan_order_cfg,
+            )
+        )
+
+        # Exercise the two changed G_eff = G_hat + tau_nn_hat outcomes: resolved
+        # positive HLLD and negative-state HLL fallback. The exact-zero HLLC
+        # limit is unchanged by this patch.
+
+        def make_shear_guard_cfg(regime):
+            gamma = 1.4
+            if regime == "positive":
+                G = 1.0e-8
+                rho0 = 1.0e-5
+                p0 = 1.0e-5
+                tau_xx = 0.0
+            else:
+                G = 1.0
+                rho0 = 1.0
+                p0 = 1.0
+                tau_xx = -1.1 * G
+            tau_yy = -tau_xx
+
+            nx = 16
+            dx = 1.0 / nx
+            c_outer = math.sqrt((gamma * p0 + 4.0 * G / 3.0 + tau_xx) / rho0)
+            return {
+                **edge_common,
+                "m": nx - 1,
+                "dt": 0.2 * dx / c_outer,
+                "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%G": G,
+                "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%G": G,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 1.0,
+                "patch_icpp(1)%pres": p0,
+                "patch_icpp(1)%tau_e(1)": tau_xx,
+                "patch_icpp(1)%tau_e(2)": 0.0,
+                "patch_icpp(1)%tau_e(3)": tau_yy,
+                "patch_icpp(1)%alpha_rho(1)": 0.5 * rho0,
+                "patch_icpp(1)%alpha(1)": 0.5,
+                "patch_icpp(1)%alpha_rho(2)": 0.5 * rho0,
+                "patch_icpp(1)%alpha(2)": 0.5,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%geometry": 3,
+                "patch_icpp(2)%x_centroid": 0.75,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%length_y": 1.0,
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": 2.0,
+                "patch_icpp(2)%pres": p0,
+                "patch_icpp(2)%tau_e(1)": tau_xx,
+                "patch_icpp(2)%tau_e(2)": 0.0,
+                "patch_icpp(2)%tau_e(3)": tau_yy,
+                "patch_icpp(2)%alpha_rho(1)": 0.5 * rho0,
+                "patch_icpp(2)%alpha(1)": 0.5,
+                "patch_icpp(2)%alpha_rho(2)": 0.5 * rho0,
+                "patch_icpp(2)%alpha(2)": 0.5,
+            }
+
+        for label, regime, override_tol in [
+            # The positive-case signal is O(1e-8), below the generic hypoelastic
+            # absolute tolerance; 1e-9 keeps the regression discriminating while
+            # remaining loose relative to single-precision roundoff at O(1e-5).
+            ("Resolved positive", "positive", 1e-9),
+            ("Negative fallback", "negative", None),
+        ]:
+            cases.append(
+                define_case_f(
+                    f"2D -> Hypoelasticity -> HLLD -> Shear guard -> {label}",
+                    "",
+                    mods=make_shear_guard_cfg(regime),
+                    override_tol=override_tol,
+                )
+            )
+
+        # Axisymmetric fallback-face trace consistency: tau_rr = -1.1*G makes the
+        # radial-sweep fan invalid everywhere (G_eff < 0), so the radial geometric
+        # source and NC velocity traces must come from the HLL/one-sided face state
+        # that matches the fallback flux -- not from the rejected fan's contact
+        # speed and star states. The stress IC is deviatoric with tau_rr = tau_qq
+        # (axis-regular); the radial band contrast (rho, p, axial velocity) makes
+        # the two trace families measurably different at the band interface. The
+        # ADC twin pins that ADC on/off is identical on fallback-selected faces.
+        def make_axisym_fallback_cfg(adc):
+            G = 1.0
+            cfg = {
+                **edge_common,
+                "m": 15,
+                "cyl_coord": "T",
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -2,
+                "bc_y%end": -3,
+                "dt": 2.0e-3,
+                "fluid_pp(1)%gamma": 2.5,
+                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%G": G,
+                "fluid_pp(2)%gamma": 2.5,
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%G": G,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%tau_e(1)": 2.2 * G,
+                "patch_icpp(1)%tau_e(2)": 0.0,
+                "patch_icpp(1)%tau_e(3)": -1.1 * G,
+                "patch_icpp(1)%tau_e(4)": -1.1 * G,
+                "patch_icpp(1)%alpha_rho(1)": 0.5,
+                "patch_icpp(1)%alpha(1)": 0.5,
+                "patch_icpp(1)%alpha_rho(2)": 0.5,
+                "patch_icpp(1)%alpha(2)": 0.5,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%geometry": 3,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.75,
+                "patch_icpp(2)%length_x": 1.0,
+                "patch_icpp(2)%length_y": 0.5,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%pres": 1.5,
+                "patch_icpp(2)%tau_e(1)": 2.2 * G,
+                "patch_icpp(2)%tau_e(2)": 0.0,
+                "patch_icpp(2)%tau_e(3)": -1.1 * G,
+                "patch_icpp(2)%tau_e(4)": -1.1 * G,
+                "patch_icpp(2)%alpha_rho(1)": 0.25,
+                "patch_icpp(2)%alpha(1)": 0.5,
+                "patch_icpp(2)%alpha_rho(2)": 0.25,
+                "patch_icpp(2)%alpha(2)": 0.5,
+            }
+            if adc:
+                cfg.update({"riemann_hypo_ADC": "T", "ADC_kappa": 1.0})
+            return cfg
+
+        for label, adc in [("", False), (" -> ADC", True)]:
+            cases.append(
+                define_case_f(
+                    f"2D -> Axisymmetric -> Hypoelasticity -> HLLD -> Fallback traces{label}",
+                    "",
+                    mods=make_axisym_fallback_cfg(adc),
+                )
+            )
+
+        # Uniform-state preservation across a characteristic boundary: the CBC flux
+        # rebuild must reproduce HLLD's folded volume-fraction representation
+        # (adv_src_mode_none; -/+ K*u_n under alt_soundspeed). The WENO5 path is the
+        # one that calls the primitive-to-flux converter at the boundary. Pre-fix,
+        # this alt_soundspeed case drifted alpha by O(1e-3) within five steps; the
+        # golden pins exact uniformity. A uniform 50/50 mixture makes K large enough
+        # for a robust regression. In simulations, HLLD characteristic boundaries
+        # are limited to fluid regions; material interfaces must remain away.
+        def make_cbc_uniform_cfg(alt_soundspeed):
+            nx, ny = 64, 32
+            alpha_w = 0.5
+            return {
+                **edge_common,
+                "m": nx - 1,
+                "n": ny - 1,
+                "t_step_stop": 5,
+                "dt": 1.0e-6,
+                "time_stepper": 3,
+                "weno_order": 5,
+                "mapped_weno": "T",
+                "alt_soundspeed": alt_soundspeed,
+                "num_patches": 1,
+                "bc_x%beg": -6,
+                "bc_x%end": -6,
+                "fluid_pp(1)%gamma": 1.0 / (4.4 - 1.0),
+                "fluid_pp(1)%pi_inf": 4.4 * 6.0e8 / (4.4 - 1.0),
+                "fluid_pp(1)%G": 0.0,
+                "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%G": 0.0,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 10.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0e5,
+                "patch_icpp(1)%tau_e(1)": 0.0,
+                "patch_icpp(1)%tau_e(2)": 0.0,
+                "patch_icpp(1)%tau_e(3)": 0.0,
+                "patch_icpp(1)%alpha_rho(1)": alpha_w * 1000.0,
+                "patch_icpp(1)%alpha(1)": alpha_w,
+                "patch_icpp(1)%alpha_rho(2)": (1.0 - alpha_w) * 1.2,
+                "patch_icpp(1)%alpha(2)": 1.0 - alpha_w,
+            }
+
+        cases.append(
+            define_case_f(
+                "2D -> Hypoelasticity -> HLLD -> CBC uniform preservation -> alt_soundspeed",
+                "",
+                mods=make_cbc_uniform_cfg("T"),
+            )
+        )
+
+        # Pins the recommended WENO5-M + RK3 configuration on interior two-patch
+        # dynamics (the CBC cases share the discretization but test the boundary).
+        weno5_cfg = {
+            **make_cbc_uniform_cfg("T"),
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "t_step_stop": 10,
+            "num_patches": 2,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 10.0,
+            "patch_icpp(2)%vel(2)": 0.0,
+            "patch_icpp(2)%pres": 2.0e5,
+            "patch_icpp(2)%tau_e(1)": 1.0e3,
+            "patch_icpp(2)%tau_e(2)": 5.0e2,
+            "patch_icpp(2)%tau_e(3)": -1.0e3,
+            "patch_icpp(2)%alpha_rho(1)": 0.9 * 1000.0,
+            "patch_icpp(2)%alpha(1)": 0.9,
+            "patch_icpp(2)%alpha_rho(2)": 0.1 * 1.2,
+            "patch_icpp(2)%alpha(2)": 0.1,
+            "fluid_pp(1)%G": 1.0e6,
+            "fluid_pp(2)%G": 0.0,
+        }
+        cases.append(
+            define_case_f(
+                "2D -> Hypoelasticity -> HLLD -> WENO5 RK3",
+                "",
+                mods=weno5_cfg,
+            )
+        )
+
+        # Rigid axial translation in axisymmetric coordinates: every stress rate must
+        # vanish identically (the pre-repair operator produced d(tau_xr)/dt = G*U0/r).
+        # The golden pins the invariant as a permanent semantic regression.
+        rigid_cfg = {
+            **edge_common,
+            "m": 23,
+            "n": 23,
+            "t_step_stop": 10,
+            "dt": 1.0e-6,
+            "cyl_coord": "T",
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -2,
+            "bc_y%end": -2,
+            "num_patches": 1,
+            "fluid_pp(1)%gamma": 1.0 / (4.4 - 1.0),
+            "fluid_pp(1)%pi_inf": 4.4 * 6.0e8 / (4.4 - 1.0),
+            "fluid_pp(1)%G": 1.0e6,
+            "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
+            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%G": 1.0e6,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 10.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%pres": 1.0e5,
+            "patch_icpp(1)%tau_e(1)": 0.0,
+            "patch_icpp(1)%tau_e(2)": 0.0,
+            "patch_icpp(1)%tau_e(3)": 0.0,
+            "patch_icpp(1)%alpha_rho(1)": 0.5 * 1000.0,
+            "patch_icpp(1)%alpha(1)": 0.5,
+            "patch_icpp(1)%alpha_rho(2)": 0.5 * 1.2,
+            "patch_icpp(1)%alpha(2)": 0.5,
+        }
+        cases.append(
+            define_case_f(
+                "2D -> Axisymmetric -> Hypoelasticity -> HLLD -> Rigid axial translation",
+                "",
+                mods=rigid_cfg,
+            )
+        )
+
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
@@ -2008,6 +2699,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_sod_convergence",
                 "2D_advection_convergence",
                 "3D_advection_convergence",
+                "2D_hypo_shear_contact",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",
@@ -2024,6 +2716,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
+                "2D_hypo_hlld",  # acoustic demo case, not a regression test
+                "3D_hypo_hlld",  # acoustic demo case, not a regression test
+                "2D_axisym_hypo_hlld",  # acoustic demo case, not a regression test
                 "2D_lagrange_rising_bubble",
                 "2D_lagrange_in_crossflow",
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
@@ -2316,6 +3011,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     foreach_dimension()
 
     mhd_cases()
+    hypo_example_cases()
 
     foreach_example()
 

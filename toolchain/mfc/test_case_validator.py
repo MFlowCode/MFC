@@ -75,6 +75,41 @@ REACTIVE_BURN = {
 
 CHEMISTRY = {**BASE, "chemistry": "T", "cantera_file": "h2o2.yaml"}
 
+# Two-fluid variants, which alt_soundspeed requires (the Kapila K coefficient is a
+# two-fluid closure).
+TWO_FLUID = {
+    **BASE,
+    "num_fluids": 2,
+    "fluid_pp(2)%gamma": 0.4,
+    "fluid_pp(2)%pi_inf": 0.0,
+    "patch_icpp(1)%alpha_rho(2)": 0.0,
+    "patch_icpp(1)%alpha(2)": 0.0,
+}
+
+# 2D axisymmetric (p = 0) and 3D cylindrical (p > 0, odd) two-fluid cases.
+CYL_2D = {
+    **BASE_2D,
+    **{k: v for k, v in TWO_FLUID.items() if k not in BASE},
+    "num_fluids": 2,
+    "cyl_coord": "T",
+    "bc_y%beg": -2,
+    "bc_y%end": -2,
+    "y_domain%beg": 0.0,
+}
+
+CYL_3D = {
+    **CYL_2D,
+    "p": 49,
+    "bc_y%beg": -14,
+    "bc_z%beg": -1,
+    "bc_z%end": -1,
+    "z_domain%beg": 0.0,
+    "z_domain%end": 6.28,
+    "patch_icpp(1)%z_centroid": 3.14,
+    "patch_icpp(1)%length_z": 6.28,
+    "patch_icpp(1)%vel(3)": 0.0,
+}
+
 
 class ConstraintTestCase(unittest.TestCase):
     """Base class providing assertions over simulation-stage validation."""
@@ -243,6 +278,49 @@ class TestTimeStepPositivity(ConstraintTestCase):
 
     def test_accepts_positive_dt(self):
         self.assertAccepts(BASE)
+
+
+class TestHllMethodTwoGeometry(ConstraintTestCase):
+    MSG = "HLL Method 2 is not supported for 3D cylindrical geometry"
+
+    def test_rejects_3d_cylindrical(self):
+        self.assertRejects({**CYL_3D, "riemann_solver": 1, "hll_u_interface": "T"}, self.MSG)
+
+    def test_accepts_2d_axisymmetric(self):
+        self.assertAccepts({**CYL_2D, "riemann_solver": 1, "hll_u_interface": "T"})
+
+    def test_accepts_3d_cylindrical_without_method_two(self):
+        self.assertAccepts({**CYL_3D, "riemann_solver": 1})
+
+
+class TestAltSoundspeedGeometry(ConstraintTestCase):
+    """alt_soundspeed with HLL has no cylindrical geometric-source treatment."""
+
+    AXISYM_MSG = "alt_soundspeed with HLL Method 1 is not supported for 2D axisymmetric geometry"
+    CYL_3D_MSG = "alt_soundspeed with HLL is not currently supported for 3D cylindrical geometry"
+
+    def test_rejects_hll_method_one_2d_axisymmetric(self):
+        self.assertRejects({**CYL_2D, "riemann_solver": 1, "alt_soundspeed": "T"}, self.AXISYM_MSG)
+
+    def test_accepts_hll_method_two_2d_axisymmetric(self):
+        """Method 2 carries the shared interface velocity the source term needs."""
+        self.assertAccepts({**CYL_2D, "riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T"})
+
+    def test_rejects_hll_3d_cylindrical(self):
+        self.assertRejects({**CYL_3D, "riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T"}, self.CYL_3D_MSG)
+
+    def test_accepts_hllc_cartesian(self):
+        self.assertAccepts({**TWO_FLUID, "riemann_solver": 2, "alt_soundspeed": "T"})
+
+
+class TestAltSoundspeedHlld(ConstraintTestCase):
+    MSG = "alt_soundspeed with HLLD requires hypoelasticity = T"
+
+    def test_rejects_hlld_without_hypoelasticity(self):
+        self.assertRejects({**TWO_FLUID, "riemann_solver": 4, "alt_soundspeed": "T"}, self.MSG)
+
+    def test_not_tripped_without_alt_soundspeed(self):
+        self.assertNotIn(self.MSG, self.errors_for({**TWO_FLUID, "riemann_solver": 4}))
 
 
 if __name__ == "__main__":
