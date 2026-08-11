@@ -85,23 +85,56 @@ __extract() {
     __combine "$(grep -E "^$1\s+" toolchain/modules | sed "s/^$1\s\+//")"
 }
 
-# Export the KEY=value assignments on one toolchain/modules line.
+# A toolchain/modules line is a list of module names optionally followed by
+# KEY=value assignments. Two shapes pull in opposite directions:
 #
-# A line may carry several assignments (CC=nvc CXX=nvc++ FC=nvfortran), and a
-# value may itself contain spaces (linker/compiler flags). Splitting on
-# whitespace would truncate the latter; splitting on the first '=' would merge
-# the former. So start a new assignment only at a word shaped like an
-# identifier followed by '=', and treat every other word as a continuation of
-# the current value.
+#   * several assignments on one line -- CC=nvc CXX=nvc++ FC=nvfortran
+#   * a single value that itself contains spaces -- linker/compiler flags
+#
+# Splitting on whitespace truncates the latter; splitting on the first '='
+# merges the former. Both readers below therefore share one rule: a word shaped
+# like an identifier followed by '=' opens a new assignment, and every word
+# after it belongs to that assignment's value until the next such word. Words
+# ahead of the first assignment are module names.
+
+# Suppress globbing while a line is word-split, so a value such as -Wl,* cannot
+# pick up filenames from the working directory. Records the caller's setting.
+__noglob_push() {
+    __noglob_prev=0
+    case "$-" in *f*) __noglob_prev=1 ;; esac
+    set -f
+}
+
+__noglob_pop() {
+    [ "$__noglob_prev" -eq 0 ] && set +f
+    unset __noglob_prev
+    return 0
+}
+
+# Echo only the module names on a line, dropping assignments and their values.
+__module_words() {
+    local _word _out="" _in_assignment=0
+
+    __noglob_push
+    for _word in $1; do
+        if [[ "$_word" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+            _in_assignment=1
+        fi
+        [ "$_in_assignment" -eq 0 ] && _out="$_out $_word"
+    done
+    __noglob_pop
+
+    echo "${_out# }"
+}
+
+# Export the KEY=value assignments on one toolchain/modules line.
 #
 # Values are still passed through eval so that "$VAR" references to previously
 # exported variables keep expanding, as they always have.
 __export_assignments() {
-    local _entry="$1" _word _acc="" _key _val _noglob=0
+    local _entry="$1" _word _acc="" _key _val
 
-    # Word-splitting below must not glob values such as -Wl,*.
-    case "$-" in *f*) _noglob=1 ;; esac
-    set -f
+    __noglob_push
 
     __flush() {
         [ -z "$_acc" ] && return 0
@@ -109,8 +142,11 @@ __export_assignments() {
         _val="${_acc#*=}"
         # One round of expansion (so "$VAR" references still work), then export
         # the result directly -- re-evaluating it would word-split the value
-        # again, which is the bug this function exists to avoid.
-        _val="$(eval "echo \"$_val\"")"
+        # again, which is the bug this function exists to avoid. The expansion
+        # goes through the positional parameters rather than echo, so a value
+        # such as -n or -e is not mistaken for an option to echo.
+        eval "set -- $_val"
+        _val="$*"
         log " \$ export $_key=$_val"
         export "$_key=$_val"
         _acc=""
@@ -125,8 +161,9 @@ __export_assignments() {
         fi
     done
     __flush
+    unset -f __flush
 
-    [ "$_noglob" -eq 0 ] && set +f
+    __noglob_pop
 }
 
 COMPUTER="$(__extract "$u_c")"
@@ -151,8 +188,18 @@ else
     module purge > /dev/null 2>&1
 fi
 
-ELEMENTS="$(__extract "$u_c-all") $(__extract "$u_c-$cg")"
-MODULES=`echo "$ELEMENTS" | tr ' ' '\n' | grep -v = | xargs`
+# Collect the module names a line at a time. __extract() concatenates every
+# matching line, which would let one line's assignments swallow the next line's
+# module names, so the assignment-aware split has to happen per line.
+MODULES=""
+for _suffix in "all" "$cg"; do
+    while IFS= read -r _entry; do
+        _entry="$(__module_words "$_entry")"
+        [ -n "$_entry" ] && MODULES="$MODULES $_entry"
+    done < <(grep -E "^$u_c-$_suffix\s+" toolchain/modules | sed "s/^$u_c-$_suffix\s\+//")
+done
+MODULES="$(echo "$MODULES" | xargs)"
+unset _suffix _entry
 
 log " $ module load $MODULES"
 if ! module load $MODULES; then
