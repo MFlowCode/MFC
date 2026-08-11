@@ -671,78 +671,103 @@ contains
 
     end subroutine s_finalize_hypoelastic_module
 
-    !> Compute the continuum damage source term from the principal stress state
-    subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
+    !> Maximum eigenvalue of the symmetric 2x2 matrix [[a, b], [b, c]]
+    pure function f_max_eig_sym2x2(a, b, c) result(eig_max)
+
+        $:GPU_ROUTINE(function_name='f_max_eig_sym2x2', parallelism='[seq]')
+        real(wp), intent(in) :: a, b, c
+        real(wp)             :: eig_max
+
+        eig_max = 0.5_wp*(a + c) + sqrt((0.5_wp*(a - c))**2._wp + b*b)
+
+    end function f_max_eig_sym2x2
+
+    !> Maximum eigenvalue of a symmetric 3x3 matrix via the trigonometric closed form on its invariants; the acos argument is
+    !! clamped and hydrostatic/repeated-eigenvalue states fall back to I1/3 to avoid 0/0
+    pure function f_max_eig_sym3x3(t_xx, t_xy, t_yy, t_xz, t_yz, t_zz) result(eig_max)
+
+        $:GPU_ROUTINE(function_name='f_max_eig_sym3x3', parallelism='[seq]')
+        real(wp), intent(in) :: t_xx, t_xy, t_yy, t_xz, t_yz, t_zz
+        real(wp)             :: eig_max
+        real(wp)             :: I1, I2, I3, sqrt_term, argument
+
+        I1 = t_xx + t_yy + t_zz
+        I2 = t_xx*t_yy + t_xx*t_zz + t_yy*t_zz - (t_xy**2._wp + t_xz**2._wp + t_yz**2._wp)
+        I3 = t_xx*t_yy*t_zz + 2._wp*t_xy*t_xz*t_yz - t_xx*t_yz**2._wp - t_yy*t_xz**2._wp - t_zz*t_xy**2._wp
+
+        sqrt_term = sqrt(max(I1*I1 - 3._wp*I2, 0._wp))
+        if (sqrt_term > verysmall) then
+            argument = (2._wp*I1*I1*I1 - 9._wp*I1*I2 + 27._wp*I3)/(2._wp*sqrt_term*sqrt_term*sqrt_term)
+            if (argument > 1._wp) argument = 1._wp
+            if (argument < -1._wp) argument = -1._wp
+            eig_max = I1/3._wp + (2._wp/3._wp)*sqrt_term*cos(acos(argument)/3._wp)
+        else
+            eig_max = I1/3._wp
+        end if
+
+    end function f_max_eig_sym3x3
+
+    !> Accumulate the continuum damage source: the overstress rate on the maximum principal Cauchy stress sigma = -p I + tau_e (full
+    !! 3D principal set in every dimensionality), weighted by the damageable-solid partial mass
+    subroutine s_compute_damage_state(q_cons_vf, q_prim_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp)                                               :: tau_p  !< principal stress
-        real(wp)                                               :: tau_xx, tau_xy, tau_yy, tau_zz, tau_yz, tau_xz
-        real(wp)                                               :: I1, I2, I3, argument, phi, sqrt_term_1, sqrt_term_2, temp
-        integer                                                :: q, l, k
+        real(wp)                                               :: sigma_p  !< maximum principal Cauchy stress
+        real(wp)                                               :: pres, ms_K
+        real(wp)                                               :: tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz
+        integer                                                :: q, l, k, i
 
-        if (n == 0) then
-            l = 0; q = 0
-            $:GPU_PARALLEL_LOOP()
-            do k = 0, m
-                rhs_vf(eqn_idx%damage)%sf(k, l, q) = (alpha_bar*max(abs(real(q_cons_vf(eqn_idx%stress%beg)%sf(k, l, q), &
-                       & kind=wp)) - tau_star, 0._wp))**cont_damage_s
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (p == 0) then
-            q = 0
-            $:GPU_PARALLEL_LOOP(collapse=2, private='[tau_p]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[sigma_p, pres, ms_K, tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz]')
+        do q = 0, p
             do l = 0, n
                 do k = 0, m
-                    ! Maximum principal stress
-                    tau_p = 0.5_wp*(q_cons_vf(eqn_idx%stress%beg)%sf(k, l, q) + q_cons_vf(eqn_idx%stress%beg + 2)%sf(k, l, &
-                                    & q)) + sqrt((q_cons_vf(eqn_idx%stress%beg)%sf(k, l, &
-                                    & q) - q_cons_vf(eqn_idx%stress%beg + 2)%sf(k, l, &
-                                    & q))**2.0_wp + 4._wp*q_cons_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
+                    ! Damageable-solid partial mass
+                    ms_K = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        if (Gs_hypo(i) > verysmall) then
+                            ms_K = ms_K + q_cons_vf(eqn_idx%cont%beg + i - 1)%sf(k, l, q)
+                        end if
+                    end do
 
-                    rhs_vf(eqn_idx%damage)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz, I1, I2, I3, temp, &
-                                & sqrt_term_1, sqrt_term_2, argument, phi, tau_p]')
-            do q = 0, p
-                do l = 0, n
-                    do k = 0, m
-                        tau_xx = q_cons_vf(eqn_idx%stress%beg)%sf(k, l, q)
-                        tau_xy = q_cons_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)
-                        tau_yy = q_cons_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)
-                        tau_xz = q_cons_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)
-                        tau_yz = q_cons_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)
-                        tau_zz = q_cons_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)
+                    if (ms_K > verysmall .and. q_prim_vf(eqn_idx%damage)%sf(k, l, q) < 1._wp) then
+                        pres = q_prim_vf(eqn_idx%E)%sf(k, l, q)
+                        tau_xx = q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)
 
-                        ! Invariants of the stress tensor
-                        I1 = tau_xx + tau_yy + tau_zz
-                        I2 = tau_xx*tau_yy + tau_xx*tau_zz + tau_yy*tau_zz - (tau_xy**2.0_wp + tau_xz**2.0_wp + tau_yz**2.0_wp)
-                        I3 = tau_xx*tau_yy*tau_zz + 2.0_wp*tau_xy*tau_xz*tau_yz - tau_xx*tau_yz**2.0_wp - tau_yy*tau_xz**2.0_wp &
-                            & - tau_zz*tau_xy**2.0_wp
-
-                        ! Maximum principal stress
-                        temp = I1**2.0_wp - 3.0_wp*I2
-                        sqrt_term_1 = sqrt(max(temp, 0.0_wp))
-                        if (sqrt_term_1 > verysmall) then  ! Avoid 0/0
-                            argument = (2.0_wp*I1*I1*I1 - 9.0_wp*I1*I2 + 27.0_wp*I3)/(2.0_wp*sqrt_term_1*sqrt_term_1*sqrt_term_1)
-                            if (argument > 1.0_wp) argument = 1.0_wp
-                            if (argument < -1.0_wp) argument = -1.0_wp
-                            phi = acos(argument)
-                            sqrt_term_2 = sqrt(max(I1**2.0_wp - 3.0_wp*I2, 0.0_wp))
-                            tau_p = I1/3.0_wp + 2.0_wp/sqrt(3.0_wp)*sqrt_term_2*cos(phi/3.0_wp)
+                        if (n == 0) then
+                            ! Transverse deviatoric components are -tau_xx/2 (traceless closure)
+                            sigma_p = -pres + max(tau_xx, -0.5_wp*tau_xx)
+                        else if (p == 0) then
+                            tau_xy = q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)
+                            tau_yy = q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)
+                            if (cyl_coord) then
+                                ! Out-of-plane principal component is the stored hoop stress
+                                tau_zz = q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)
+                            else
+                                ! Out-of-plane deviatoric component from the traceless closure
+                                tau_zz = -(tau_xx + tau_yy)
+                            end if
+                            sigma_p = -pres + max(f_max_eig_sym2x2(tau_xx, tau_xy, tau_yy), tau_zz)
                         else
-                            tau_p = I1/3.0_wp
+                            tau_xy = q_prim_vf(eqn_idx%stress%beg + 1)%sf(k, l, q)
+                            tau_yy = q_prim_vf(eqn_idx%stress%beg + 2)%sf(k, l, q)
+                            tau_xz = q_prim_vf(eqn_idx%stress%beg + 3)%sf(k, l, q)
+                            tau_yz = q_prim_vf(eqn_idx%stress%beg + 4)%sf(k, l, q)
+                            tau_zz = q_prim_vf(eqn_idx%stress%beg + 5)%sf(k, l, q)
+                            sigma_p = -pres + f_max_eig_sym3x3(tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz)
                         end if
 
-                        rhs_vf(eqn_idx%damage)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
-                    end do
+                        if (sigma_p > tau_star) then
+                            rhs_vf(eqn_idx%damage)%sf(k, l, q) = rhs_vf(eqn_idx%damage)%sf(k, l, &
+                                   & q) + ms_K*(alpha_bar*(sigma_p - tau_star))**cont_damage_s
+                        end if
+                    end if
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_damage_state
 

@@ -75,6 +75,7 @@ contains
         real(wp), dimension(6) :: tau_e_L, tau_e_R
         real(wp) :: G_L, G_R
         real(wp) :: damage_L, damage_R
+        real(wp) :: msol_L, msol_R
         real(wp), dimension(2) :: Re_L, Re_R
         real(wp) :: rho_avg
         real(wp) :: H_avg
@@ -119,9 +120,9 @@ contains
                                     & pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, &
                                     & Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, &
                                     & gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, damage_R, &
-                                    & rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, &
-                                    & Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', &
-                                    & copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & msol_L, msol_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
+                                    & vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, &
+                                    & flux_tau_R]', copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -525,6 +526,22 @@ contains
                                 end do
                             end if
 
+                            ! Damage flux: U_D = m_s*D (damageable-solid partial mass)
+                            if (cont_damage) then
+                                msol_L = 0._wp; msol_R = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    if (Gs_rs(i) > verysmall) then
+                                        msol_L = msol_L + alpha_rho_L(i)
+                                        msol_R = msol_R + alpha_rho_R(i)
+                                    end if
+                                end do
+                                flux_rsx_vf(${SF('')}$, &
+                                            & eqn_idx%damage) = (s_M*(msol_R*vel_R(dir_idx(1))*damage_R) &
+                                            & - s_P*(msol_L*vel_L(dir_idx(1))*damage_L) + s_M*s_P*(msol_L*damage_L &
+                                            & - msol_R*damage_R))/(s_M - s_P)
+                            end if
+
                             ! Export interface velocity for NC RHS
                             if (hypo_nc_mode == hypo_nc_mode_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -666,6 +683,11 @@ contains
                                     do i = eqn_idx%stress%beg, eqn_idx%stress%end
                                         flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
                                     end do
+
+                                    ! Damage advects conservatively, so its geometric source is the advective flux
+                                    if (cont_damage) then
+                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%damage) = flux_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                    end if
                                 end if
                             #:endif
                         end do

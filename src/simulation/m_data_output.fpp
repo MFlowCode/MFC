@@ -1155,6 +1155,7 @@ contains
         real(wp)                        :: G_local
         real(wp)                        :: dyn_p, T
         real(wp)                        :: damage_state
+        real(wp)                        :: ms_probe          !< damageable-solid partial mass at the probe cell
         integer                         :: i, j, k, l, s, d  !< Generic loop iterator
         real(wp)                        :: nondim_time       !< Non-dimensional time
         real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
@@ -1236,8 +1237,14 @@ contains
 
                     if (hypoelasticity) then
                         if (cont_damage) then
-                            damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k, l)
-                            G_local = G_local*max((1._wp - damage_state), 0._wp)
+                            ! Recover D = U_D/m_s, clamped to [0, 1]
+                            ms_probe = 0._wp
+                            do s = 1, num_fluids
+                                if (fluid_pp(s)%G > verysmall) ms_probe = ms_probe + q_cons_vf(eqn_idx%cont%beg + s - 1)%sf(j &
+                                    & - 2, k, l)
+                            end do
+                            damage_state = min(max(real(q_cons_vf(eqn_idx%damage)%sf(j - 2, k, l), kind=wp)/max(ms_probe, &
+                                               & verysmall), 0._wp), 1._wp)
                         end if
 
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
@@ -1341,8 +1348,14 @@ contains
 
                         if (hypoelasticity) then
                             if (cont_damage) then
-                                damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l)
-                                G_local = G_local*max((1._wp - damage_state), 0._wp)
+                                ! Recover D = U_D/m_s, clamped to [0, 1]
+                                ms_probe = 0._wp
+                                do s = 1, num_fluids
+                                    if (fluid_pp(s)%G > verysmall) ms_probe = ms_probe + q_cons_vf(eqn_idx%cont%beg + s - 1)%sf(j &
+                                        & - 2, k - 2, l)
+                                end do
+                                damage_state = min(max(real(q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l), kind=wp)/max(ms_probe, &
+                                                   & verysmall), 0._wp), 1._wp)
                             end if
 
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
@@ -1429,8 +1442,14 @@ contains
 
                             if (hypoelasticity) then
                                 if (cont_damage) then
-                                    damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l - 2)
-                                    G_local = G_local*max((1._wp - damage_state), 0._wp)
+                                    ! Recover D = U_D/m_s, clamped to [0, 1]
+                                    ms_probe = 0._wp
+                                    do s = 1, num_fluids
+                                        if (fluid_pp(s)%G > verysmall) ms_probe = ms_probe + q_cons_vf(eqn_idx%cont%beg + s &
+                                            & - 1)%sf(j - 2, k - 2, l - 2)
+                                    end do
+                                    damage_state = min(max(real(q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l - 2), &
+                                                       & kind=wp)/max(ms_probe, verysmall), 0._wp), 1._wp)
                                 end if
 
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
