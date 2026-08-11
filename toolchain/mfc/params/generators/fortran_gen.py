@@ -32,6 +32,7 @@ _VALID_TARGETS = ("pre", "sim", "post")
 # Case-optimization parameters are emitted by generated_case_opt_decls.fpp; all
 # other names are emitted by generated_decls.fpp.
 SIM_GPU_DECL_VARS = {
+    "ADC_kappa",
     "Bx0",
     "Ca",
     "R0ref",
@@ -55,9 +56,11 @@ SIM_GPU_DECL_VARS = {
     "down_sample",
     "dt",
     "fd_order",
+    "hll_u_interface",
     "hyper_cleaning",
     "hyper_cleaning_speed",
     "hyper_cleaning_tau",
+    "hypo_hll_interface_rhs",
     "hypoelasticity",
     "ib",
     "ib_coefficient_of_friction",
@@ -99,6 +102,7 @@ SIM_GPU_DECL_VARS = {
     "relativity",
     "relax",
     "relax_model",
+    "riemann_hypo_ADC",
     "sigma",
     "surface_tension",
     "synth_U_inf",
