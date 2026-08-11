@@ -572,6 +572,48 @@ where \f$\mathbf{l} = \nabla \mathbf{u}\f$ is the velocity gradient and \f$\math
 
 This adds 6 additional transport equations in 3D (symmetric stress tensor: \f$\tau_{xx}^e, \tau_{xy}^e, \tau_{yy}^e, \tau_{xz}^e, \tau_{yz}^e, \tau_{zz}^e\f$).
 
+### 7.2 Continuum Damage (`cont_damage = .true.`) (\cite Cao19; \cite Spratt24 Sec. 4.1.2)
+
+**Source:** `src/simulation/m_hypoelastic.fpp` (damage source), Riemann solvers (transport)
+
+A scalar damage field \f$D \in [0,1]\f$ weakens the shear response of hypoelastic material.
+The model is a two-way hybrid of the hypoelastic formulation above with the
+Tuler–Butcher-type overstress law of \cite Cao19, in the shear-modulus form derived in
+\cite Spratt24: it is not a literal reproduction of Cao's constant-Poisson-ratio
+finite-element model (no element erosion, and the volumetric response remains governed
+by the equation of state).
+
+**Damage transport.** Damage is carried by the damageable-solid partial mass
+\f$m_s = \sum_{i:\,G_i > 0} \alpha_i \rho_i\f$ (a fluid is damageable if its `fluid_pp%%G`
+is positive):
+
+\f[\frac{\partial (m_s D)}{\partial t} + \nabla \cdot (m_s D\, \mathbf{u}) = m_s\,\dot{D}\f]
+
+so damage moves with the solid material, pure fluid can neither produce nor carry
+damage mass, and \f$D = m_s D / m_s\f$ is recovered clamped to \f$[0,1]\f$.
+
+**Damage rate.** Production is driven by the maximum principal value of the total
+Cauchy stress \f$\sigma = -p\,\mathbf{I} + \boldsymbol{\tau}^e\f$, evaluated in the full
+three-dimensional sense in every dimensionality (out-of-plane components follow from
+the traceless closure in 1D and plane 2D; the stored hoop stress enters in axisymmetry):
+
+\f[\dot{D} = \bigl(\bar{\alpha}\,\max(\sigma_1 - \tau^*,\, 0)\bigr)^{s}\f]
+
+Only tension beyond the threshold \f$\tau^*\f$ produces damage; production stops once
+\f$D = 1\f$. Note that 2D planar simulations are plane-strain by construction, so the
+out-of-plane constraint stress participates in \f$\sigma_1\f$.
+
+**Two-way coupling.** The damaged shear modulus \f$G = G_0(1 - D)\f$ enters the elastic
+stress evolution and the Riemann wave speeds (tangent-modulus interpretation: damage
+weakens subsequent stress growth but does not relax previously accumulated stress).
+The elastic energy in \f$E\f$ is booked with the undamaged modulus \f$G_0\f$, consistent
+with the tangent interpretation and bounded as \f$D \to 1\f$. The elastic energy released
+by softening is not separately tracked, and there is no failure/erosion mechanism: a
+fully damaged region behaves as a fluid with residual (frozen) deviatoric stress. This
+is a bounded damage-only model.
+
+Supported with the HLL and HLLC Riemann solvers.
+
 ## 8. Phase Change (`relax = .true.`) (\cite Wilfong26 Sec. 4.1.3)
 
 **Source:** `src/common/m_phase_change.fpp`
