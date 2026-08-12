@@ -1,6 +1,11 @@
 """Tests for the manual registry-bound broadcast lint in lint_source.py."""
 
-from mfc.lint_source import _extract_bcast_roots, check_manual_registry_bcasts
+from mfc.lint_source import (
+    _extract_bcast_roots,
+    check_double_precision,
+    check_integer_wp,
+    check_manual_registry_bcasts,
+)
 
 BCAST_TAIL = ", 1, mpi_p, 0, MPI_COMM_WORLD, ierr)"
 
@@ -43,10 +48,48 @@ def test_struct_members_and_loop_indices_skipped():
     assert _extract_bcast_roots(lines) == []
 
 
+def _write_src(tmp_path, rel: str, body: str):
+    """Write a source file under tmp_path/src/<rel> for a lint check to scan."""
+    path = tmp_path / "src" / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+
+
 def _write_proxy(tmp_path, target_dir: str, body: str):
-    proxy_dir = tmp_path / "src" / target_dir
-    proxy_dir.mkdir(parents=True)
-    (proxy_dir / "m_mpi_proxy.fpp").write_text(body, encoding="utf-8")
+    _write_src(tmp_path, f"{target_dir}/m_mpi_proxy.fpp", body)
+
+
+def test_double_precision_flags_signed_d_exponent(tmp_path):
+    _write_src(tmp_path, "simulation/m_x.fpp", "        if (x > 5.0d-11) then\n")
+    errors = check_double_precision(tmp_path)
+    assert len(errors) == 1
+    assert "5.0d-11" in errors[0]
+
+
+def test_double_precision_clean_cases(tmp_path):
+    body = "\n".join(
+        [
+            "    integer, dimension(2) :: cart2d12_coords, cart2d13_coords",  # identifier, not a literal
+            "        call MPI_CART_COORDS(comm, rank, 2, cart2d12_coords, ierr)",
+            "        x = 5.0e-11_wp",  # correct working-precision literal
+            "",
+        ]
+    )
+    _write_src(tmp_path, "simulation/m_y.fpp", body)
+    assert check_double_precision(tmp_path) == []
+
+
+def test_integer_wp_flagged(tmp_path):
+    _write_src(tmp_path, "simulation/m_z.fpp", "        integer(wp) :: i, j, k, l\n")
+    errors = check_integer_wp(tmp_path)
+    assert len(errors) == 1
+    assert "integer(wp)" in errors[0]
+
+
+def test_integer_wp_clean(tmp_path):
+    body = "        integer :: i\n        real(wp) :: x\n"
+    _write_src(tmp_path, "simulation/m_ok.fpp", body)
+    assert check_integer_wp(tmp_path) == []
 
 
 def test_manual_broadcast_of_registry_scalar_is_flagged(tmp_path):
