@@ -67,9 +67,9 @@
 #:enddef
 
 #:def OMP_NOCREATE_STR(no_create)
-    #:if no_create is not None
-        #:stop 'no_create is not supported yet'
-    #:endif
+    #! OpenMP has no no_create equivalent; OMP_DEFAULT_STR already maps
+    #! present-by-default, so emit nothing. Aborting here would also break
+    #! OpenACC builds, which expand both backends before #if selects one.
     #:set no_create_val = ''
     $:no_create_val
 #:enddef
