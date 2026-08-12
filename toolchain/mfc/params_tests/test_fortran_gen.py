@@ -365,6 +365,14 @@ def test_simulation_generated_scalars_own_gpu_declarations():
         assert generated.count(f"$:GPU_DECLARE(create='[{name}]')") == 1
 
 
+def test_hypo_riemann_controls_own_gpu_declarations():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp
+
+    generated = generate_decls_fpp("sim")
+    for name in ("riemann_hypo_ADC", "ADC_kappa", "hll_u_interface", "hypo_hll_interface_rhs"):
+        assert generated.count(f"$:GPU_DECLARE(create='[{name}]')") == 1
+
+
 # ── generate_bcast_fpp tests ──────────────────────────────────────────────────
 
 
@@ -432,9 +440,9 @@ def test_generate_bcast_fpp_class_a_real_scalars():
     assert "call MPI_BCAST(dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in sim
     assert "call MPI_BCAST(dt, " not in pre and "call MPI_BCAST(dt, " not in post
 
-    # pref is in all three
+    # poly_sigma is in all three
     for out, target in [(pre, "pre"), (sim, "sim"), (post, "post")]:
-        assert "call MPI_BCAST(pref, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: pref missing"
+        assert "call MPI_BCAST(poly_sigma, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: poly_sigma missing"
 
 
 def test_generate_bcast_fpp_class_a_str_scalars():

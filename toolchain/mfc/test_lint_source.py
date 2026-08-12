@@ -18,11 +18,11 @@ def test_extract_indexed_argument_keeps_root():
 def test_extract_fypp_list_with_continuation():
     lines = [
         "        #:for VAR in [ 'weno_eps', 'teno_CT', &",
-        "            & 'pref']",
+        "            & 'poly_sigma']",
         "            call MPI_BCAST(${VAR}$" + BCAST_TAIL,
         "        #:endfor",
     ]
-    assert _extract_bcast_roots(lines) == [(3, "weno_eps"), (3, "teno_CT"), (3, "pref")]
+    assert _extract_bcast_roots(lines) == [(3, "weno_eps"), (3, "teno_CT"), (3, "poly_sigma")]
 
 
 def test_struct_members_and_loop_indices_skipped():
@@ -50,11 +50,11 @@ def _write_proxy(tmp_path, target_dir: str, body: str):
 
 
 def test_manual_broadcast_of_registry_scalar_is_flagged(tmp_path):
-    _write_proxy(tmp_path, "simulation", f"        call MPI_BCAST(rhoref{BCAST_TAIL}\n")
+    _write_proxy(tmp_path, "simulation", f"        call MPI_BCAST(poly_sigma{BCAST_TAIL}\n")
 
     errors = check_manual_registry_bcasts(tmp_path)
     assert len(errors) == 1
-    assert "manual MPI_BCAST of registry-bound scalar 'rhoref'" in errors[0]
+    assert "manual MPI_BCAST of registry-bound scalar 'poly_sigma'" in errors[0]
     assert "m_mpi_proxy.fpp:1" in errors[0]
 
 
