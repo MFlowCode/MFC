@@ -1,5 +1,6 @@
 """Fail loudly if the committed coverage map is stale or under-covers. Used by coverage-health.yml."""
 import datetime
+import subprocess
 import sys
 from pathlib import Path
 
@@ -9,6 +10,26 @@ from mfc.test.cases import list_cases  # noqa: E402  (returns the current test l
 
 MAX_AGE_DAYS = 10
 MIN_FRACTION = 0.80
+
+# Must mirror the `paths:` trigger of coverage-refresh.yml. A superset would raise false
+# alarms (a change that never triggers a refresh would look like a missed refresh).
+COVERAGE_RELEVANT_PATHS = [":(glob)src/**/*.fpp", "toolchain/mfc/test/cases.py"]
+
+
+def built_after_last_change(git_sha):
+    """Was the map built at or after the last coverage-relevant commit? None if unknowable.
+
+    This is the direct question the wall-clock age check only approximated: it stays quiet
+    over a genuinely quiet repo (no refresh needed, so no heartbeat commit needed either)
+    and fires on the next relevant push after a refresh breaks, rather than 10 days later.
+    """
+    if not git_sha:
+        return None
+    last = subprocess.run(["git", "log", "-1", "--format=%H", "--", *COVERAGE_RELEVANT_PATHS], capture_output=True, text=True, check=False)
+    if last.returncode != 0 or not last.stdout.strip():
+        return None  # shallow clone or no such commit -> fall back to the age rule
+    ancestor = subprocess.run(["git", "merge-base", "--is-ancestor", last.stdout.strip(), git_sha], capture_output=True, check=False)
+    return {0: True, 1: False}.get(ancestor.returncode)  # anything else -> None (unknown sha, shallow history)
 
 entries, meta = load_map(COVERAGE_MAP_PATH)
 if entries is None:
@@ -37,6 +58,7 @@ ok, msg = map_health(
     now=datetime.datetime.now(datetime.timezone.utc).isoformat(),
     max_age_days=MAX_AGE_DAYS,
     min_fraction=MIN_FRACTION,
+    built_after_last_change=built_after_last_change(meta.get("git_sha")),
 )
 print(msg)
 sys.exit(0 if ok else 1)

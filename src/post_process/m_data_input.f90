@@ -84,7 +84,7 @@ contains
         integer(KIND=MPI_OFFSET_KIND), intent(out) :: WP_MOK, MOK, str_MOK, NVARS_MOK
 
         if (ib) then
-            call s_initialize_mpi_data(q_cons_vf, ib_markers)
+            call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA)
         else
             call s_initialize_mpi_data(q_cons_vf)
         end if
@@ -384,10 +384,10 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (down_sample) then
-                    call s_initialize_mpi_data_ds(q_cons_temp)
+                    call s_initialize_mpi_data_ds(m, n, p, q_cons_temp)
                 else
                     if (ib) then
-                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA)
                     else
                         call s_initialize_mpi_data(q_cons_vf)
                     end if
@@ -407,7 +407,7 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity .or. mhd) then
+                if (bubbles_euler .or. hypoelasticity .or. mhd) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)

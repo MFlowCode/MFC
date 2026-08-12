@@ -2,7 +2,6 @@
 MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
-This replaces the definitions/ directory.
 """
 
 import re
@@ -125,10 +124,11 @@ TAG_DISPLAY_NAMES = {
     "grid": "Grid",
     "weno": "WENO",
     "viscosity": "Viscosity",
-    "elasticity": "Elasticity",
+    "hypoelasticity": "Hypoelasticity",
     "surface_tension": "Surface tension",
     "acoustic": "Acoustic",
     "ib": "Immersed boundary",
+    "reactive_burn": "Reactive burn",
     "probes": "Probe/integral",
     "riemann": "Riemann solver",
     "relativity": "Relativity",
@@ -337,9 +337,9 @@ CONSTRAINTS = {
     },
     # Model equations
     "model_eqns": {
-        "choices": [1, 2, 3, 4],
-        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation", 4: "4-Equation"},
-        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3, "4eq": 4},
+        "choices": [1, 2, 3],
+        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation"},
+        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3},
     },
     # Bubbles
     "bubble_model": {
@@ -392,7 +392,7 @@ DEPENDENCIES = {
         "when_true": {
             "recommends": ["nb", "polytropic"],
             "requires_value": {
-                "model_eqns": [2, 4],
+                "model_eqns": [2],
                 "riemann_solver": [2],
                 "avg_state": [2],
             },
@@ -402,7 +402,6 @@ DEPENDENCIES = {
         "when_value": {
             2: {"requires": ["num_fluids"]},
             3: {"requires_value": {"riemann_solver": [2], "avg_state": [2], "wave_speeds": [1]}},
-            4: {"requires": ["rhoref", "pref"], "requires_value": {"num_fluids": [1]}},
         }
     },
     "viscous": {
@@ -493,6 +492,29 @@ DEPENDENCIES = {
     "relativity": {
         "when_true": {
             "requires": ["mhd"],
+        }
+    },
+    "riemann_hypo_ADC": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [2, 4],
+            },
+        }
+    },
+    "hypo_hll_interface_rhs": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
+    "hll_u_interface": {
+        "when_true": {
+            "requires_value": {
+                "riemann_solver": [1],
+            },
         }
     },
     "schlieren_wrt": {
@@ -617,9 +639,12 @@ def _load():
     # Viscosity
     _r("viscous", LOG, {"viscosity"})
 
-    # Elasticity
-    for n in ["hypoelasticity", "hyperelasticity"]:
-        _r(n, LOG, {"elasticity"})
+    # Hypoelasticity
+    _r("hypoelasticity", LOG, {"hypoelasticity"})
+    _r("riemann_hypo_ADC", LOG, {"hypoelasticity"})
+    _r("ADC_kappa", REAL, {"hypoelasticity"})
+    _r("hypo_hll_interface_rhs", LOG, {"hypoelasticity"})
+    _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
@@ -628,6 +653,11 @@ def _load():
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
     _r("chemistry", LOG, {"chemistry"})
+
+    # Condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)
+    _r("reactive_burn", LOG, {"reactive_burn"})
+    for a in ["k", "pign", "pref", "n", "ta"]:
+        _r(f"rburn%{a}", REAL, {"reactive_burn"})
 
     # Acoustic
     _r("num_source", INT, {"acoustic"})
@@ -732,9 +762,7 @@ def _load():
         "flux_lim",
     ]:
         _r(n, INT)
-    _r("pref", REAL, math=r"\f$p_\text{ref}\f$")
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
-    _r("rhoref", REAL, math=r"\f$\rho_\text{ref}\f$")
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
@@ -766,7 +794,6 @@ def _load():
         "mixlayer_perturb",
         "perturb_flow",
         "perturb_sph",
-        "pre_stress",
         "elliptic_smoothing",
         "simplex_perturb",
         "alt_soundspeed",
@@ -858,9 +885,9 @@ def _load():
         for f in range(1, NF + 1):
             _r(f"{px}alpha({f})", A_REAL, math=r"\f$\alpha_" + str(f) + r"\f$")
             _r(f"{px}alpha_rho({f})", A_REAL, math=r"\f$\alpha \rho\f$")
-        # Elasticity stress tensor
+        # Hypoelastic stress tensor
         for j in range(1, 7):
-            _r(f"{px}tau_e({j})", A_REAL, {"elasticity"}, math=r"\f$\tau_e\f$")
+            _r(f"{px}tau_e({j})", A_REAL, {"hypoelasticity"}, math=r"\f$\tau_e\f$")
         if i >= 2:
             for j in range(1, i):
                 _r(f"{px}alter_patch({j})", LOG)
@@ -884,7 +911,7 @@ def _load():
         px = f"fluid_pp({f})%"
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
-        _r(f"{px}G", REAL, {"elasticity"}, math=r"\f$G_k\f$")
+        _r(f"{px}G", REAL, {"hypoelasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
         _r(f"{px}non_newtonian", LOG, {"viscosity"}, math=r"\mathrm{non\text{-}Newtonian}_k")
@@ -926,9 +953,9 @@ def _load():
     # grow patch_ib beyond this at runtime, but those entries are never in the namelist.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
-    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id"]:
+    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -1154,6 +1181,11 @@ _init_registry()
 
 NAMELIST_VARS: dict[str, set[str]] = {}
 
+# Some common modules are compiled into every executable even though the
+# corresponding user input remains meaningful in only a subset of namelists.
+# Keep declaration visibility separate from input acceptance.
+DECLARATION_TARGETS: dict[str, set[str]] = {}
+
 # Maps indexed-family base names to their Fortran dimension expression.
 # The generator emits `{type}, dimension({dim}) :: {name}` for each entry.
 # Add here whenever a new array param needs no manual Fortran declaration.
@@ -1188,6 +1220,7 @@ TYPED_DECLS: dict[str, tuple] = {
     "integral": ("type(integral_parameters)", "num_probes_max", False, None),
     "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
     "chem_params": ("type(chemistry_parameters)", None, True, None),
+    "rburn": ("type(reactive_burn_parameters)", None, True, "Condensed-phase reactive-burn (programmed detonation) parameters"),
     "lag_params": ("type(bubbles_lagrange_parameters)", None, True, "Lagrange bubbles' parameters"),
     "particle_cloud": ("type(particle_cloud_parameters)", "num_particle_clouds_max", False, "Particle bed specifications"),
     "simplex_params": ("type(simplex_noise_params)", None, False, None),
@@ -1200,11 +1233,30 @@ def _nv(targets: set, *names: str) -> None:
         NAMELIST_VARS[n] = set(targets)
 
 
+def _decl(targets: set, *names: str) -> None:
+    for n in names:
+        DECLARATION_TARGETS[n] = set(targets)
+
+
 _ALL, _PRE_SIM, _SIM_POST = {"pre", "sim", "post"}, {"pre", "sim"}, {"sim", "post"}
 _PRE_POST = {"pre", "post"}
 _SIM = {"sim"}
 _PRE = {"pre"}
 _POST = {"post"}
+
+_decl(
+    _ALL,
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
+    "sigR",
+    "viscous",
+    "riemann_solver",
+    "stl_models",
+    "num_stl_models",
+    "palpha_eps",
+    "ptgalpha_eps",
+)
 
 _nv(
     _ALL,
@@ -1227,8 +1279,6 @@ _nv(
     "relax_model",
     "fluid_pp",
     "bub_pp",
-    "rhoref",
-    "pref",
     "bubbles_euler",
     "bubbles_lagrange",
     "R0ref",
@@ -1243,7 +1293,6 @@ _nv(
     "sigma",
     "adv_n",
     "hypoelasticity",
-    "hyperelasticity",
     "surface_tension",
     "relativity",
     "ib",
@@ -1264,12 +1313,12 @@ _nv(
     "t_stop",
     "t_save",
     "cfl_target",
-    "avg_state",
     "prim_vars_wrt",
-    "alt_soundspeed",
-    "mixture_err",
     "fd_order",
     "ib_state_wrt",
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
 )
 _nv(
     _PRE_SIM,
@@ -1279,7 +1328,8 @@ _nv(
     "patch_ib",
     "pi_fac",
 )
-_nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
+_nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "igr", "igr_order", "sigR")
+_nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
 _nv(
@@ -1301,7 +1351,10 @@ _nv(
     "int_comp",
     "ic_eps",
     "ic_beta",
-    "riemann_solver",
+    "riemann_hypo_ADC",
+    "ADC_kappa",
+    "hll_u_interface",
+    "hypo_hll_interface_rhs",
     "wave_speeds",
     "low_Mach",
     "hyper_cleaning_speed",
@@ -1366,6 +1419,7 @@ _nv(
     "nv_uvm_out_of_core",
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
+    "riemann_solver",
 )
 _nv(
     _PRE,
@@ -1394,7 +1448,6 @@ _nv(
     "sigV",
     "dist_type",
     "rhoRV",
-    "viscous",
     "old_grid",
     "old_ic",
     "perturb_flow",
@@ -1408,13 +1461,13 @@ _nv(
     "mixlayer_perturb",
     "mixlayer_perturb_nk",
     "mixlayer_perturb_k0",
-    "pre_stress",
     "elliptic_smoothing",
     "elliptic_smoothing_iters",
     "simplex_perturb",
     "simplex_params",
     "files_dir",
     "file_extension",
+    "viscous",
 )
 _nv(
     _POST,

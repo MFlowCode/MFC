@@ -26,6 +26,15 @@ jobs:
       actions: read
 
     steps:
+      # Check out with full history first. Without this, claude-code-action does its own
+      # shallow `git fetch --depth=20 pull/<n>/head`, which fails on fork PRs (the shallow
+      # base lacks the objects to reconcile), aborting the whole action. A fetch-depth: 0
+      # checkout gives the action the history it needs. Mirrors claude-code-review.yml.
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1

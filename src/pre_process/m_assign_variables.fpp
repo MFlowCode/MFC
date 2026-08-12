@@ -13,7 +13,7 @@ module m_assign_variables
     use m_variables_conversion
     use m_helper_basic
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight
-    use m_constants, only: model_eqns_gamma_law, model_eqns_6eq, model_eqns_4eq
+    use m_constants, only: model_eqns_gamma_law, model_eqns_6eq
 
     implicit none
 
@@ -222,7 +222,6 @@ contains
         ! Density, gamma, and liquid stiffness from current and smoothing patches
         real(wp)                       :: rho           !< density
         real(wp)                       :: gamma
-        real(wp)                       :: lit_gamma     !< specific heat ratio
         real(wp)                       :: pi_inf        !< stiffness from SEOS
         real(wp)                       :: qv            !< reference energy from SEOS
         real(wp)                       :: orig_rho
@@ -231,8 +230,6 @@ contains
         real(wp)                       :: orig_qv
         real(wp)                       :: muR, muV
         real(wp)                       :: R3bar
-        real(wp)                       :: rcoord, theta, phi, xi_sph
-        real(wp), dimension(3)         :: xi_cart
         real(wp)                       :: Ys(1:num_species)
         real(stp), dimension(sys_size) :: orig_prim_vf  !< Vector to hold original values of cell for smoothing purposes
         integer                        :: i
@@ -276,20 +273,16 @@ contains
             end do
         end if
 
-        if (model_eqns /= model_eqns_4eq) then
-            do i = 1, eqn_idx%cont%end
-                q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha_rho(i)
-            end do
-        end if
+        do i = 1, eqn_idx%cont%end
+            q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha_rho(i)
+        end do
 
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, patch_icpp(patch_id)%rho, patch_icpp(patch_id)%gamma, &
                                             & patch_icpp(patch_id)%pi_inf, patch_icpp(patch_id)%qv)
 
-        if (model_eqns /= model_eqns_4eq) then
-            do i = 1, eqn_idx%cont%end
-                q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha_rho(i)
-            end do
-        end if
+        do i = 1, eqn_idx%cont%end
+            q_prim_vf(i)%sf(j, k, l) = patch_icpp(smooth_patch_id)%alpha_rho(i)
+        end do
 
         if (.not. igr .or. num_fluids > 1) then
             do i = eqn_idx%adv%beg, eqn_idx%adv%end
@@ -376,32 +369,10 @@ contains
             end if
         end if
 
-        if (elasticity) then
+        if (hypoelasticity) then
             do i = 1, (eqn_idx%stress%end - eqn_idx%stress%beg) + 1
                 q_prim_vf(i + eqn_idx%stress%beg - 1)%sf(j, k, &
                           & l) = (eta*patch_icpp(patch_id)%tau_e(i) + (1._wp - eta)*orig_prim_vf(i + eqn_idx%stress%beg - 1))
-            end do
-        end if
-
-        if (hyperelasticity) then
-            if (pre_stress) then  ! pre stressed initial condition in spatial domain
-                rcoord = sqrt((x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2))
-                theta = atan2(y_cc(k), x_cc(j))
-                phi = atan2(sqrt(x_cc(j)**2 + y_cc(k)**2), z_cc(l))
-                ! spherical coord, assuming Rmax=1
-                xi_sph = (rcoord**3 - R0ref**3 + 1._wp)**(1._wp/3._wp)
-                xi_cart(1) = xi_sph*sin(phi)*cos(theta)
-                xi_cart(2) = xi_sph*sin(phi)*sin(theta)
-                xi_cart(3) = xi_sph*cos(phi)
-            else
-                xi_cart(1) = x_cc(j)
-                xi_cart(2) = y_cc(k)
-                xi_cart(3) = z_cc(l)
-            end if
-
-            ! assigning the reference map to the q_prim vector field
-            do i = 1, num_dims
-                q_prim_vf(i + eqn_idx%xi%beg - 1)%sf(j, k, l) = eta*xi_cart(i) + (1._wp - eta)*orig_prim_vf(i + eqn_idx%xi%beg - 1)
             end do
         end if
 
@@ -417,21 +388,10 @@ contains
             end do
         end if
 
-        if (model_eqns /= model_eqns_4eq) then
-            ! mixture density is an input
-            do i = 1, eqn_idx%cont%end
-                q_prim_vf(i)%sf(j, k, l) = eta*patch_icpp(patch_id)%alpha_rho(i) + (1._wp - eta)*orig_prim_vf(i)
-            end do
-        else
-            ! get mixture density from pressure via Tait EOS
-            pi_inf = pi_infs(1)
-            gamma = gammas(1)
-            lit_gamma = gs_min(1)
-
-            ! \rho = (( p_l + pi_inf)/( p_ref + pi_inf))**(1/little_gam) * rhoref(1-alf)
-            q_prim_vf(1)%sf(j, k, l) = (((q_prim_vf(eqn_idx%E)%sf(j, k, &
-                      & l) + pi_inf)/(pref + pi_inf))**(1/lit_gamma))*rhoref*(1 - q_prim_vf(eqn_idx%alf)%sf(j, k, l))
-        end if
+        ! mixture density is an input
+        do i = 1, eqn_idx%cont%end
+            q_prim_vf(i)%sf(j, k, l) = eta*patch_icpp(patch_id)%alpha_rho(i) + (1._wp - eta)*orig_prim_vf(i)
+        end do
 
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, rho, gamma, pi_inf, qv)
 

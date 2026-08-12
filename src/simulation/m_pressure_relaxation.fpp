@@ -160,8 +160,11 @@ contains
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
-                pres_K_init(i) = (q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l)/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                            & l) - pi_infs(i))/gammas(i)
+                ! Phasic internal energy carries the formation energy: alpha_rho_k*qv_k must be
+                ! removed before inverting the stiffened-gas EOS, or a nonzero qv inflates the
+                ! phasic pressure by rho_k*qv_k/gamma_k (this is what breaks the reactive burn).
+                pres_K_init(i) = ((q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, &
+                            & k, l)*qvs(i))/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
                 if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) pres_K_init(i) = -(1._wp - 1.e-8_wp)*ps_inf(i) &
                     & + 1.e-8_wp
             else
@@ -222,7 +225,7 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: alpha_rho, alpha
         #:endif
-        real(wp)               :: rho, dyn_pres, gamma, pi_inf, pres_relax, sum_alpha
+        real(wp)               :: rho, dyn_pres, gamma, pi_inf, pres_relax, sum_alpha, qv_mix
         real(wp), dimension(2) :: Re
         integer                :: i, q
 
@@ -297,12 +300,20 @@ contains
             dyn_pres = dyn_pres + 5.e-1_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
         end do
 
-        pres_relax = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+        ! Mixture formation energy: the relaxed mixture pressure is recovered from the
+        ! conserved total energy with the qv reference removed (consistent with s_compute_pressure).
+        qv_mix = 0._wp
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            qv_mix = qv_mix + alpha_rho(i)*qvs(i)
+        end do
+
+        pres_relax = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - qv_mix - pi_inf)/gamma
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                      & l)*(gammas(i)*pres_relax + pi_infs(i))
+                      & l)*(gammas(i)*pres_relax + pi_infs(i)) + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
         end do
 
     end subroutine s_correct_internal_energies

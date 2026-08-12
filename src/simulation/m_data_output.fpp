@@ -19,7 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
-    use m_constants, only: model_eqns_5eq, model_eqns_4eq, precision_single
+    use m_constants, only: model_eqns_5eq, precision_single
 
     implicit none
 
@@ -79,6 +79,10 @@ contains
         write (3, '(13X,A)') 'number and the cell Reynolds (Rc) ' // 'number. Please note that only'
         write (3, '(13X,A)') 'those stability conditions pertinent ' // 'to the physics included in'
         write (3, '(13X,A)') 'the current computation are displayed.'
+        if (hypoelasticity) then
+            write (3, '(13X,A)') 'NOTE: the reported ICFL uses the acoustic ' // 'sound speed only; it may'
+            write (3, '(13X,A)') 'underestimate the elastic characteristic ' // 'speeds.'
+        end if
 
         call date_and_time(DATE=file_date)
 
@@ -694,12 +698,13 @@ contains
             call s_int_to_str(t_step, t_step_string)
 
             if (down_sample) then
-                call s_initialize_mpi_data_ds(q_cons_temp_ds)
+                call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
             else
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                               & qbmm_mv=mv_ts(1))
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                 end if
             end if
 
@@ -714,7 +719,7 @@ contains
             call s_mpi_barrier()
             call DelayFileAccess(proc_rank)
 
-            call s_initialize_mpi_data(q_cons_vf)
+            call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
 
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
@@ -780,11 +785,12 @@ contains
             end if
         else
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                           & qbmm_mv=mv_ts(1))
             else if (present(beta)) then
-                call s_initialize_mpi_data(q_cons_vf, beta=beta)
+                call s_initialize_mpi_data(q_cons_vf, beta=beta, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
             end if
 
             write (file_loc, '(I0,A)') t_step, '.dat'
@@ -1213,7 +1219,7 @@ contains
                     end if
 
                     ! Computing/Sharing necessary state variables
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, rho, gamma, pi_inf, qv, Re, G_local, &
                                                             & fluid_pp(:)%G)
                     else
@@ -1222,17 +1228,20 @@ contains
                     do s = 1, num_vels
                         vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k, l)/rho
                     end do
+                    do s = 1, num_fluids
+                        alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k, l)
+                    end do
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
-                    if (elasticity) then
+                    if (hypoelasticity) then
                         if (cont_damage) then
                             damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k, l)
                             G_local = G_local*max((1._wp - damage_state), 0._wp)
                         end if
 
-                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), dyn_p, &
-                                                & pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
+                        call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
+                                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                                                 & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
                                                 & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
                     else
@@ -1240,9 +1249,7 @@ contains
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                     end if
 
-                    if (model_eqns == model_eqns_4eq) then
-                        lit_gamma = gammas(1)
-                    else if (elasticity) then
+                    if (hypoelasticity) then
                         tau_e(1) = q_cons_vf(eqn_idx%stress%end)%sf(j - 2, k, l)/rho
                     end if
 
@@ -1326,17 +1333,20 @@ contains
                         do s = 1, num_vels
                             vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
+                        do s = 1, num_fluids
+                            alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l)
+                        end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
-                        if (elasticity) then
+                        if (hypoelasticity) then
                             if (cont_damage) then
                                 damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l)
                                 G_local = G_local*max((1._wp - damage_state), 0._wp)
                             end if
 
-                            call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l), &
-                                                    & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
+                                                    & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
                                                     & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
                                                     & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
                         else
@@ -1344,11 +1354,9 @@ contains
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                         end if
 
-                        if (model_eqns == model_eqns_4eq) then
-                            lit_gamma = gs_min(1)
-                        else if (elasticity) then
+                        if (hypoelasticity) then
                             do s = 1, 3
-                                tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
+                                tau_e(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k - 2, l)/rho
                             end do
                         end if
 
@@ -1407,6 +1415,9 @@ contains
                             do s = 1, num_vels
                                 vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
+                            do s = 1, num_fluids
+                                alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l - 2)
+                            end do
 
                             dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
@@ -1416,16 +1427,17 @@ contains
                                 end do
                             end if
 
-                            if (elasticity) then
+                            if (hypoelasticity) then
                                 if (cont_damage) then
                                     damage_state = q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l - 2)
                                     G_local = G_local*max((1._wp - damage_state), 0._wp)
                                 end if
 
-                                call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l - 2), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
-                                                        & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                                        & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l - 2), &
-                                                        & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), G_local)
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
+                                                        & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
+                                                        & rho, qv, rhoYks, pres, T, q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, &
+                                                        & k - 2, l - 2), q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), &
+                                                        & G_local)
                             else
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
@@ -1466,7 +1478,7 @@ contains
                     end if
                 end if
 
-                if (elasticity) then
+                if (hypoelasticity) then
                     do s = 1, (num_dims*(num_dims + 1))/2
                         tmp = tau_e(s)
                         call s_mpi_allreduce_sum(tmp, tau_e(s))
@@ -1508,7 +1520,7 @@ contains
                             write (i + 30, '(6X,10F24.8)') nondim_time, rho, vel(1), vel(2), pres, alf, nR(1), nRdot(1), R(1), &
                                    & Rdot(1)
                         #:endif
-                    else if (elasticity) then
+                    else if (hypoelasticity) then
                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                             write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,' // 'F24.8,F24.8,F24.8)') nondim_time, rho, &
                                    & vel(1), vel(2), pres, tau_e(1), tau_e(2), tau_e(3)

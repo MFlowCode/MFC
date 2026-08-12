@@ -75,12 +75,18 @@ def _family_attr_error(name: str) -> Optional[str]:
             return f"Index {idx} exceeds maximum ({fam.max_index}) for {base}"
         return None  # Both attr and index look valid; shouldn't reach here
 
-    # Unknown attribute — provide targeted message
+    # Unknown attribute — provide targeted message. List valid attributes with the
+    # ones most similar to the typo first, so the intended attribute shows even when
+    # the family has many attributes and the list is truncated.
+    from .suggest import suggest_similar
+
     valid = sorted(fam.attrs.keys())
-    if len(valid) > 8:
-        shown = ", ".join(valid[:8]) + f", ... ({len(valid)} total)"
+    similar = suggest_similar(attr, valid, max_suggestions=len(valid))
+    ordered = similar + [v for v in valid if v not in similar] if similar else valid
+    if len(ordered) > 8:
+        shown = ", ".join(ordered[:8]) + f", ... ({len(ordered)} total)"
     else:
-        shown = ", ".join(valid)
+        shown = ", ".join(ordered)
     return f"Unknown attribute '{attr}' for {base}. Valid attributes: {shown}"
 
 
