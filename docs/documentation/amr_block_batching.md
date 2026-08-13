@@ -1924,3 +1924,131 @@ The chemistry TESTS write into the EXAMPLES' gitignored `IC/` caches with smalle
 (`pthread_create` EAGAIN). So `./mfc.sh test` followed by `./mfc.sh precheck` fails on a clean tree.
 Observed twice, restored both times from a clean worktree. The fix is for the tests to use their own
 IC directory rather than the examples'.
+
+## 2026-08-10: the tax is LAUNCH-PATH SERIALIZATION, and this REVERSES the 2026-08-02 conclusion
+
+The section above ("the per-block tax is DUMMY ARGUMENTS, not launch count or descriptors") ruled
+batching out. Measurement at production size says the opposite, and the earlier result has an
+identifiable methodological cause.
+
+Method, which is the reason to believe this over the earlier attempt. 3D 256^3, np=1 (no MPI), and
+crucially measured at STEADY STATE: spin up 30 steps uninstrumented, checkpoint, restart, discard
+the post-restart warm-up, and verify the regime by kernels per step (26,869 measured against 26,868
+extrapolated from an independent 8-to-32-step slope). Copies per launch and gaps per launch are
+taken from SEPARATE RUNS of the same window, because taking both from one timeline makes the
+regression circular. Argument lists come from joining LIBOMPTARGET_INFO to the kernel trace by
+ordinal, gated on an exact 1:1 correspondence (86,118 = 86,118) and on replicate consistency.
+
+Three instruments agree on the mechanism:
+
+- The device is genuinely idle. Clean wall 12.75 s/step against 2.09 s/step of kernel time, so the
+  GPU is busy 16.4% of wall. Intersecting the copy trace with the inter-kernel gaps, 85.9% of gap
+  time has neither a kernel nor a copy active - the idle is not hidden data movement.
+- The host is spinning, not blocked. perf on a run with 1.4% overhead (12.93 against 12.75 s/step)
+  puts 82.63% of host CPU inside libhsa-runtime64, 81.49% self. The cycles event samples only a
+  running CPU, so this is busy execution in the runtime.
+- The volume explains it: about 195.6 HSA calls PER KERNEL LAUNCH - 47 signal stores, 31 signal
+  loads, 17 system-info queries, 17 copies, 14 queue submissions, 9.4 blocking waits and 5.2 signal
+  creations. One OpenMP target region costs roughly 195 runtime calls and 14 HSA packets.
+
+### What this corrects in the section above
+
+- Kernels reading module-level state do NOT pay zero. `capture_boundary_flux` measures 8.73
+  copies per launch, not 0.0. The zero came from TEMPORAL attribution, which credits the following
+  kernel with copies emitted by intervening non-kernel data regions. The same method also made
+  `capture_creg_dense_batch` look like 33 copies per launch when it performs 2.67.
+- Copies are not a first-order cost of WALL time. Regressing gap on copies with the two quantities
+  taken from independent runs gives R-squared 0.283. The counterexamples are decisive: the three
+  advection-source regions perform 0.00 copies per launch and carry 545 to 812 microseconds of gap,
+  while `amr_copy_fine_fields` performs 34 copies and carries 120 microseconds.
+- Argument mapping does not predict the cost. Rank correlation between a region's total argument
+  count and its gap per launch is +0.067.
+- Therefore batching is NOT ruled out. The tax is charged per launch, so reducing launches is the
+  lever. Private ARRAY variables do predict COPIES well (rank correlation +0.771, and hllc's 23
+  private arrays give 53 copies per launch, a third of all copies), but copies do not predict wall,
+  so that is not a wall-time target.
+
+### Runtime configuration does not fix it (12 settings tested)
+
+Harmful: HSA_ENABLE_INTERRUPT=0 is 3.2x slower, NUM_INITIAL_HSA_SIGNALS=1024 is 1.8x slower, and
+HSA_QUEUE_BUSY_TRACKING=0 is worse than baseline. Unresolved: STREAM_BUSYWAIT, NUM_HSA_QUEUES,
+NUM_INITIAL_STREAMS, USE_MULTIPLE_SDMA_ENGINES and HSA_QUEUE_SIZE all land inside the baseline
+spread. The best candidate was re-tested with interleaved triplicates over a 16-step window
+(averaging the last 8 steps): baseline 13.490, 12.781, 13.368 against 13.375, 13.309, 13.534, an
+effect of -1.5% with fully overlapping ranges. That the harmful settings register at 1.8 to 3.2x is
+what makes this null meaningful rather than merely underpowered.
+
+Measurement caveats worth reusing: a post-restart window of 8 steps is too short, because the
+warm-up is about 4 steps and a last-4 average still contains it, inflating every value by roughly
+15 percent. Baselines must be interleaved with the treatment rather than grouped, or node drift
+reads as an effect - the first sweep showed two identical baselines differing by 7.6 percent.
+Instrument distortion must be measured rather than assumed: on the same window, settled seconds per
+step were 12.75 clean, 12.93 under perf, 16.77 under kernel tracing, 26.61 adding LIBOMPTARGET_INFO
+and 30.52 adding HSA tracing.
+
+## 2026-08-13: the per-entity mapping law, Step 1 landed, and the scope that follows
+
+### The law, measured in a controlled microbenchmark
+`amr-bench/scaling/` varies launch count and mapped-entity count INDEPENDENTLY (N target regions,
+M entities each, M swept 0..32, amdflang with MFC's exact flags, MI250X). Every fit below has
+R-squared 1.0000 on the HSA-call term and exactly 2.00 copies per entity.
+
+| construct | copies/entity | HSA calls/launch | wall/launch |
+|---|---|---|---|
+| private SCALARS | 0 | 6.2 constant | ~14 us constant |
+| module arrays referenced directly | 0 | 6.2 constant | free |
+| explicit-shape dummy arrays (bound from an argument OR from module state) | 0 | 6.2 constant | free |
+| BLOCK-scoped arrays inside the loop body | 0 | 6.2 constant | free |
+| private / local fixed-size ARRAYS (any size, with or without a private clause) | 2.00 | +27.9 per entity | +30.5 us per entity |
+| assumed-shape dummy arrays | 2.00 | +26.9 per entity | +34.3 us per entity |
+
+So the per-launch floor is only 6.2 HSA calls and about 11-14 microseconds. Everything above it is
+per-ENTITY, and an entity is expensive exactly when the compiler must materialise a runtime
+descriptor or a per-thread private copy. The cost is independent of the array's size.
+
+### Step 1, landed and measured
+One clause on one macro call at `src/simulation/m_riemann_solver_hllc.fpp:1013`, naming exactly the
+23 private ARRAYS and none of the 60 scalars (naming a scalar would demote it from pass-by-value to
+a real device allocation). Fypp propagates it to all three direction instantiations.
+
+- map-ops on the three regions: 66/70/71 becomes 43/47/48, exactly 23 fewer each
+- hllc copies per launch: 52.7 becomes 6.67, a drop of 87.3 percent
+- fleet copies per launch: 17.02 becomes 12.08, a drop of 29.0 percent
+- correctness: checkpoints after three steps are BYTE-IDENTICAL, both files
+- wall, interleaved triplicates on a 16-step window: 13.170 becomes 10.632 seconds per step,
+  **a drop of 19.3 percent**, ranges non-overlapping
+- AMR goldens 4 of 4, precheck 7 of 7
+
+**Implied cost per copy in situ: 19.1 microseconds.** The microbenchmark slope transferred; a
+review that assumed 9.6 to 10.1 microseconds predicted only 9.9 percent and was wrong by a factor
+of two. This also settles an older dispute: removing copy COUNT converts to wall even though
+removing 12 percent of BYTES did not. They are different currencies.
+
+### Remaining budget, measured after Step 1
+Of the 10.63 seconds per step that remain, 6.20 is copy cost (324,451 copies per step), 2.09 is
+kernel arithmetic, and 2.34 is residual non-copy overhead.
+
+| phase | target | seconds per step | risk |
+|---|---|---|---|
+| A | remaining private arrays: weno l1117 times three (6 arrays each), convert_conservative_to_primitive (6) | 1.75 | low, mechanical, proven pattern |
+| B | AMR kernel dummies: br_store, fine_rk_update, capture_boundary_flux, fill_fine_ghosts, br_load | 3.18 | high; these have no array privates, their cost is descriptor-bearing dummies, and fine_rk_update needs the flat store first |
+| C | rhs advection terms, entity class not yet classified | 1.26 | unknown |
+| D | the 2.34 second residual | measurement only | gates batching |
+
+Phase D matters more than its size suggests. The microbenchmark's per-launch floor predicts only
+0.3 to 0.4 seconds per step, so roughly 2 seconds is unaccounted for. Batching pays only if that
+residual is per-launch; if it is host-side AMR bookkeeping instead, batching cannot reach it. Run
+the measurement before committing to the refactor.
+
+Ceiling: phases A through C complete give about 4.4 seconds per step, roughly 3.0 times today's
+baseline. Removing the residual as well would give about 2.1 seconds, 6.3 times - which
+independently corroborates the 6.6 times per-region overhead measured on the production case.
+
+### Refuted, with the measurement that killed each
+Runtime environment tuning (twelve settings, all null under interleaved triplicates; two of them
+1.8 to 3.2 times slower). Byte reduction (12 percent removed, zero wall). `defaultmap` on the AMD
+branch (hard compile error, reproduced: Firstprivate is currently unsupported defaultmap
+behaviour). `nowait` (compile error for any region with a private clause). `has_device_addr`
+(memory access fault). `firstprivate` for arrays (18 map entries become 38). Interface flattening
+(flat dummies measure the same as deep). The chemistry Fypp guard (dominated by the map(alloc:)
+clause, which needs no semantic change).
