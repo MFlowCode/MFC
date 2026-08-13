@@ -1268,12 +1268,12 @@ contains
 #ifdef MFC_MPI
         if (num_procs == 1) then
             ! single-rank: all patches are local; append particle bed entries directly into patch_ib.
-            @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
-                       & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
             do i = 1, num_particle_cloud_ibs
                 patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
             end do
             num_gbl_ibs = num_namelist_ibs + num_particle_cloud_ibs
+            @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
+                       & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
             num_ibs = num_gbl_ibs
             num_local_ibs = num_gbl_ibs
             do i = 1, num_gbl_ibs
@@ -1317,12 +1317,12 @@ contains
         end if
 #else
         ! no-MPI: all patches are local; append particle bed entries directly into patch_ib.
-        @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
-                   & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
         do i = 1, num_particle_cloud_ibs
             patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
         end do
         num_gbl_ibs = num_namelist_ibs + num_particle_cloud_ibs
+        @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
+                   & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
         num_ibs = num_gbl_ibs
         num_local_ibs = num_gbl_ibs
         do i = 1, num_gbl_ibs
