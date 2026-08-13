@@ -1018,7 +1018,7 @@ contains
                                         & alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, &
                                         & vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, &
                                         & Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]', copyin='[is1, is2, &
-                                        & is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & is3]', firstprivate='[Re_size_loc1, Re_size_loc2]', extraOmpArgs='map(alloc: vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L,  alpha_rho_R, alpha_lim_L, alpha_lim_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR,  Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2)')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end

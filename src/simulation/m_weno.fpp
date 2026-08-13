@@ -1115,7 +1115,7 @@ contains
                     #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
                     if (weno_dir == ${WENO_DIR}$) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[dvd, poly, beta, alpha, omega, tau, delta, q, vp0, vm1, vm2, &
-                                            & vp1, vp2]')
+                                            & vp1, vp2]', extraOmpArgs='map(alloc: dvd, poly, beta, alpha, omega, delta)')
                         do l = ${Z_BND}$%beg, ${Z_BND}$%end
                             do k = ${Y_BND}$%beg, ${Y_BND}$%end
                                 do j = ${X_BND}$%beg, ${X_BND}$%end
