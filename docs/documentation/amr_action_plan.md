@@ -27,48 +27,59 @@ AMReX at cap 64** - a `sed` override in the harness of an inputs file whose comm
 At matched cap the excess is 2.0-4.2x. AMReX's tax is **not** flat in the cap either (5.84 -> 3.40),
 so per-box cost is not unique to MFC; ours is simply larger.
 
-**Cost model: `wall = a*cells + b*boxes` was REJECTED (2026-08-15).**
+**Cost model `wall = a*cells + b*boxes`: REJECTED, and now REPLACED BY DIRECT MEASUREMENT.**
 
-Residuals at 3 caps: +0.9% / -14.2% / +19.2%, **spread 33.5% against a ~12% noise floor**. The direct
-disproof needs no fit: **cap 40 -> cap 48 has BYTE-IDENTICAL cells (178,960,640 both), 11% fewer
-boxes, and 31% less wall.** With a constant `a` that is impossible.
+The fit failed its own residual test (spread 30.8% at 4 caps vs a ~12% noise floor), and the direct
+disproof needed no fit: cap 40 -> cap 48 has BYTE-IDENTICAL cells, 11% fewer boxes, 31% less wall.
+Both break-even numbers derived from it (113k and 573k cells/box) are VOID.
 
-| cap | s/step | boxes | cells | slot |
-|---|---|---|---|---|
-| 32 | 14.650 | 1207 | 207.1M | 68^3 |
-| 40 | 12.850 | 536 | 243.0M | 84^3 |
-| 48 | 8.900 | 478 | 243.0M | 100^3 |
+**MEASURED decomposition (clean protocol - see "How this is measured" below):**
 
-**The missing term: `a` depends on BLOCK SIZE.** Bigger blocks -> bigger kernels -> better occupancy
--> lower ns/cell. Measured independently: **15.7 ns/cell on 68^3 blocks vs 3.62 ns/cell on one
-monolithic grid**, a 4.3x penalty that shrinks as blocks grow. So bigger blocks help through TWO
-mechanisms - fewer boxes AND better per-cell efficiency - which is why cap 48 beat cap 40 on
-byte-identical work.
+| | cap 32 | cap 64 |
+|---|---|---|
+| step wall | 14.485 s | **6.238 s (2.32x faster)** |
+| kernel (trace union, differenced) | 1.278 s | 0.944 s |
+| **a** | **6.09 ns/cell** | **3.50 ns/cell** |
+| **b** | **6.29 ms/box** | **15.24 ms/box** |
+| residual | 5.613 s (39%) | 1.880 s (30%) |
+| boxes / cells | 1207 / 209.7M | 224 / 269.6M |
 
-**CONSEQUENCE: every break-even number is VOID**, not merely uncertain. `b/a` from two different cap
-pairs gave 113k and 573k cells/box (a differed 2.5x) because the fit was absorbing `a(cap)` into its
-constants. Any recommendation below that cites a break-even has **no valid number behind it in either
-direction**. Tier 0 does not depend on the model - it rests on directly measured wall, and this
-strengthens it.
+**`a` depends on block size - 1.74x across ONE cap step**, which is what broke the fit. And cap 64's
+a = 3.50 is essentially the UNIFORM arm's 3.63: **at 132^3 blocks the per-cell efficiency penalty of
+AMR vanishes.** At 68^3 it is 1.74x. So bigger blocks win on kernel efficiency, not only box count.
 
-**HOW COST IS ATTRIBUTED FROM NOW ON - measure the terms, never fit them:**
-- `a` <- kernel trace, **union of intervals** / cells
-- `b` <- phase budget, (gather + rgbuild + reflux + seam) / boxes
-- **residual = wall - kernel - per-box phases, reported explicitly** so what neither term explains is
-  visible instead of absorbed
-- wall NEVER from an instrumented run (rocprofv3 inflates MFC 1.3-2.4x)
-- two separate runs per cap: rocprofv3 inflates the interval the phase timers measure, and the phase
-  timers' GPU_WAIT perturbs the kernel timeline
+**`b` moves the WRONG WAY - 6.29 -> 15.24 ms/box.** Per-box cost is NOT a fixed toll; it scales with
+block volume, because packing, prolongation and ghost fills inside those phases are per-CELL work.
+Total per-box time still falls (7.594 -> 3.414 s/step) since 5.4x fewer boxes beats 2.4x more each.
+But "a fixed ~10 ms per box" was wrong, and the fitted model was wrong in BOTH terms.
 
-Runner: `amr-bench/expt/decompose.sh`. Cap 32 is already decomposed; cap 64 is the missing half.
+**The residual (30-39%)** is mostly phases excluded from the per-box bucket - chiefly `rhs`'s
+non-kernel time (25.5% of wall, and rhs is only ~5% kernel). The FULL top-level phase set covers
+91.9% of cap-32 wall with an 8.1% residual, so this is launch overhead inside the physics (Tier 2.1),
+not an unknown.
+
+**HOW THIS IS MEASURED (do not regress to the old way):**
+- wall = `ph_wall_total` ("step-loop wall", needs rank_time_wrt=T). It brackets only
+  s_perform_time_step, INCLUDES regrid, and excludes pre_process/init/finalize/checkpoint I/O.
+  `Total-time` differencing gave **34% spread on byte-identical work** and must not be used.
+- difference two FROM-SCRATCH runs. Do NOT warm-start: a restart restores a PARTIAL hierarchy and the
+  first regrid rebuilds it (level-2 boxes 342 -> 760 -> 792), moving preprocessing INTO the window.
+- sum only TOP-LEVEL phases; the nested rg*/rb*/gwait brackets are inside their parents and
+  double-count (the printed RESIDUAL goes to -55%).
+- kernel time by UNION of intervals, differenced between the two step counts so the transient cancels.
+- Runner: `amr-bench/expt/measure_clean.sh`. Reader: `amr-bench/fit_cost.py`.
 
 ---
 
 ## TIER 0 - configuration, no code
 
 ### 0.1 Raise `amr_max_grid_size` 32 -> 64
-**2.74x wall on the same physical problem** (18.400 -> 6.725 s/step), 4.9x fewer boxes
-(1103 -> 224), and **lower** peak memory (50.1 -> 43.1 GiB/GCD).
+**2.32x wall on the same physical problem** (14.485 -> 6.238 s/step, clean instrument), 5.4x fewer
+boxes (1207 -> 224), and **lower** peak memory (50.1 -> 43.1 GiB/GCD). Caps 96 and 128 genuinely OOM,
+so **64 is the maximum - which is exactly AMReX's block size.**
+The earlier "2.74x" came from Total-time differencing (34% noise) and is superseded.
+Bigger blocks win TWICE: 5.4x fewer boxes AND per-cell efficiency recovering to the uniform arm's
+(a 6.09 -> 3.50 vs uniform 3.63).
 
 This was blocked for weeks by a recorded claim that the cap was exhausted and larger caps OOM. That
 claim was a **checkpoint-restart confound**: restarting each cap from a cap-32 checkpoint freezes the
