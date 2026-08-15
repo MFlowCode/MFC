@@ -1,0 +1,176 @@
+# AMR performance: what to change, and what not to (2026-08-15)
+
+Companion to `amr_block_batching.md`, which is the chronological research log. This file is the
+**action list**: what to change in the code, in priority order, with the measurement behind each and
+an explicit list of things NOT to do. It supersedes the three-track plan appended to
+`amr_block_batching.md` earlier the same day — that plan was built on a configuration (cap 32) now
+known to be 2.74x off the achievable one, and on a headline gap (7.64x) now known to be an
+unmatched comparison.
+
+---
+
+## The numbers this rests on
+
+Matched case: 400^3, np=8, 2 levels, ref_ratio 2, volumetric Gaussian blob, `weno_order=1` +
+Lax-Friedrichs (chosen to sit as close to AMReX's linear advection as MFC can, which is the
+conservative choice for a tax ratio - see "Metric discipline" below).
+
+**Tax at MATCHED block size** (each code vs its OWN uniform baseline):
+
+| cap | MFC | AMReX | MFC excess |
+|---|---|---|---|
+| 32 | 24.24x | 5.84x | **4.15x** |
+| 64 | 6.89x | 3.40x | **2.03x** |
+
+The previously reported "MFC 23.92x vs AMReX 3.13x = 7.64x excess" compared **MFC at cap 32 against
+AMReX at cap 64** - a `sed` override in the harness of an inputs file whose committed value was 32.
+At matched cap the excess is 2.0-4.2x. AMReX's tax is **not** flat in the cap either (5.84 -> 3.40),
+so per-box cost is not unique to MFC; ours is simply larger.
+
+**Cost model**, fitted to cap-32/64 marginal slopes:
+
+```
+wall/step = a*cells + b*boxes
+a ~ 16 ns/cell      arithmetic x kernel efficiency
+b ~ 10 ms/box/step  PER-BOX OVERHEAD
+```
+
+Two consequences that drive everything below:
+- **Break-even = b/a = 625,000 cells per box.** One extra box costs as much as 625k cells of
+  over-covering. A cap-32 block is 64^3 = 262k cells - *less than one box costs*.
+- `a` is **16 ns/cell in the AMR arm vs 3.62 ns/cell uniform**: the identical physics is **4.3x more
+  expensive per cell** on 68^3 blocks than on one monolithic grid. That is a kernel-efficiency loss,
+  entirely separate from per-box overhead, and the tax ratio bundled the two together.
+
+CAVEAT: the fit had 2 points and 2 unknowns (zero degrees of freedom, residuals identically zero).
+A four-cap sweep was queued to give it a falsifiable residual. Re-check `a` and `b` before trusting
+the break-even to two significant figures.
+
+---
+
+## TIER 0 - configuration, no code
+
+### 0.1 Raise `amr_max_grid_size` 32 -> 64
+**2.74x wall on the same physical problem** (18.400 -> 6.725 s/step), 4.9x fewer boxes
+(1103 -> 224), and **lower** peak memory (50.1 -> 43.1 GiB/GCD).
+
+This was blocked for weeks by a recorded claim that the cap was exhausted and larger caps OOM. That
+claim was a **checkpoint-restart confound**: restarting each cap from a cap-32 checkpoint freezes the
+box count while enlarging every slot, so init allocated cap-64-sized slots for cap-32's 1250 boxes -
+a combination that exists in no real run. From scratch, caps 40/48/64 all run.
+
+**Gate before changing the default:** goldens, and settle whether cap 32 is *under-refining* level 2
+rather than cap 64 over-refining it. `fine_work` goes 139.6M -> 205.9M (+47%) with the cap, level-1
+coverage looks cap-independent (343 = 7^3 and 64 = 4^3 tile the same ~200-coarse-cell extent), and
+the nesting margin (`amr_cpat_mar` = 2 coarse cells at buff_size 2) predicts only 1.23x of a >=1.47x
+effect - **so the mechanism is NOT yet pinned**. If cap 32 under-refines, the two caps are not
+solving the same problem and part of the 2.74x is accuracy, not speed.
+
+---
+
+## TIER 1 - small, local, high confidence
+
+All four are verified in source, none touches the solver, and all attack `b` (per-box overhead).
+Sizes below come from cap-32 measurements and **must be re-measured at cap 64** before scoping.
+
+### 1.1 Skip ranks with no overlapping coarse data in the gather
+`s_amr_fine_stage_fill` calls `s_amr_gather_coarse_patch` **before** the
+`if (.not. amr_rank_owns_block) return`, so every rank enters it for all ~1250 boxes.
+
+**This is not simply "8x redundant"** - non-owners legitimately `MPI_ISEND` coarse data they hold, so
+they must participate. The correct early-out tests the **cached `amr_ovl_gather(:, amr_cur)` overlap
+list** (already O(1), replicated): a rank with no overlap for this box can skip the geometry, the
+allocations and the message entirely. Only ranks that actually contribute should do work.
+
+### 1.2 Hoist the per-call heap allocations; size `rbuf` correctly
+`m_amr.fpp:910` allocates `rbuf(maxsz, nsrc), reqs, srank` **per gather call** (~625 calls/step), and
+`maxsz` is the **whole patch** while each source contributes only its intersection box (~4x
+over-allocated). Hoist to a module-scope pool sized once per regrid; size at `boxsz`.
+
+### 1.3 Use GPU-aware MPI in the AMR gather
+`use_device_addr` appears **0 times** in `m_amr.fpp`, while the base halo already wraps its buffers in
+`GPU_HOST_DATA(use_device_addr=...)` under `use_rdma_transport` (`m_mpi_common.fpp:860`). Every AMR box
+currently goes device -> host (`copyout`) -> MPI -> host -> device (`copyin`). All 8 ranks are on one
+node over XGMI; device-to-device is the natural path. Per the mapped-entity law each `copyout`/`copyin`
+on a target region is itself a mapped array costing ~2 copies + ~27 HSA calls per launch.
+
+### 1.4 Cache the coarse-restore grid sync
+`s_amr_swap_to_fine` / `s_amr_restore_coarse` each end in `s_amr_sync_grid_state_to_device`: four
+`GPU_UPDATE(device=)` statements covering 14 entities, run **per block per RK stage** (~470 pairs per
+rank-step). The restore re-uploads **byte-identical coarse coordinates** every time. Cache the
+last-synced slot id and skip. Better but larger: hoist the restore out of the per-block loop entirely
+(swap b1 -> advance -> swap b2 -> ... -> restore once); `m_time_steppers.fpp:592` already identifies
+the swap/restore interleaving as what blocks batching.
+
+---
+
+## TIER 2 - larger, and one is not an AMR problem at all
+
+### 2.1 `convert_conservative_to_primitive` runs at 1.4% of memory bandwidth
+34.03 ms median for ~8M cells/rank - **11x slower than structurally similar kernels in the same code**
+(riemann/weno/tvd_rk all land near 15% of peak). It is **54.6% of all uniform-arm GPU time** and 33.2%
+of the AMR arm's.
+
+The ratio between MFC's own kernels needs no bandwidth assumption: same case, same cells, same rank.
+Suspected register spill - the kernel privatizes **16 variables including 5 arrays** per thread. Get
+`-Rpass-analysis=kernel-resource-usage` (or the ROCm equivalent) and confirm spilling before changing
+anything.
+
+**This lives in `src/common/`, runs in all three executables, and is independent of AMR.** It is
+probably the single largest non-AMR win available, and it partially undermines the claim that the
+27.6x per-cell gap vs AMReX's uniform arm "is physics, not a defect" - some of it is inefficiency.
+
+### 2.2 Per-level batching of the gather (the AMReX pattern)
+AMReX's `FillPatchTwoLevels` is called **2.23x/step** and services a whole level in one
+`ParallelCopy`; MFC's gather is called **~625x/step**, one box at a time, each with its own
+`MPI_WAITALL`. Call-count ratio **281x**.
+
+This is the structural fix, but it is now **much smaller than it looked**: at cap 64 there are 4.9x
+fewer boxes, so most of what batching would remove is already gone. Tiers 0+1 and this one overlap
+heavily and **must not be multiplied**.
+
+---
+
+## DO NOT DO
+
+- **Load balancing.** 0.98, matching AMReX's knapsack. `[amr-balance] max/mean` 1.003-1.009 and regrid
+  imbalance 1.003. Ruled out by measurement.
+- **Tighter clustering / adding the missing midpoint fallback to `s_amr_find_split`.**
+  The defect is real - the split finder tries a zero-signature hole, then a Laplacian inflection, and
+  gives up (`ok=.false.`) with **no midpoint fallback**, so a convex blob returns its bounding box
+  (~91% over-cover for a sphere) and `amr_cluster_eff` is unreachable dead code (verified: 0.7 / 0.9 /
+  0.98 give byte-identical box counts). **But the break-even says one box costs 625k cells and a
+  cap-32 block is only 262k**, so tightening the fit would add boxes and make MFC slower. Log the
+  defect; fix it only after `b` comes down. It will matter on non-convex features (shock fronts,
+  sheets) where holes exist and the finder does work.
+- **Descriptor-copy reduction.** 19.54 copies/launch, but the initiating HSA call is 0.9% of the gap.
+- **Reducing kernel/region count for its own sake.** AMReX launches 7.9x more kernels than MFC on one
+  case and 5.5x fewer on the matched one; per-launch cost dominates, not count.
+- **Anything scoped from cap-32 phase shares.** Regrid 38.0% / gather 12.4% / reflux 11.4% / seam 3.7%
+  were all measured with 4.9x more boxes than we would ship.
+
+---
+
+## Metric discipline (adopt these; they are why the numbers above are trustworthy)
+
+- **Perturb and regress; never decompose a residual.** Every retracted claim in this campaign was a
+  residual (`idle = wall - kernel`, `dead/launch = (wall - kernel)/launches`) that absorbed whatever
+  it did not understand and could never be falsified. `a` and `b` come from independent perturbations.
+- **A tax figure must carry its arithmetic intensity.** `tax = 1 + Overhead/(a*cells)`, so the metric
+  *structurally rewards doing more work per cell*. Switching to weno5+HLLC would lower our tax while
+  changing nothing about the overhead. Quote weno1+LF for the AMReX comparison (conservative), and
+  weno5+HLLC separately for production relevance.
+- **Judge cap changes by WALL on a fixed physical problem, not ns/cell.** A cap that over-covers
+  inflates its own denominator: cap 64 looks 3.5x better on ns/cell but is 2.74x better on wall.
+- **One clock per ratio.** GPU-busy computed as traced-kernel-time over untraced wall gave rank 4
+  **101.2%** - proof the terms came from different runs.
+- **Union-of-intervals for kernel busy time, never median x count.** MFC never overlaps kernels
+  (sum == union exactly); AMReX does (sum/union = 1.270). Under a consistent estimator the arithmetic
+  terms are **MFC 1.90x vs AMReX 1.92x - identical**, not the "1.60x vs 1.96x, our algorithm is
+  better" that median x count produced.
+- **Never take wall from an instrumented run.** rocprofv3 inflates MFC 1.3-2.4x; TinyProfiler inflates
+  AMReX 37%.
+- **Single runs on this node have a ~12% noise floor** (three byte-identical-work runs: 645/676/725 s).
+  Include a known-null setting in every sweep to measure it in-session.
+- **Every experiment needs an apparatus control.** A restart-based A/B silently pins the state the
+  parameter is supposed to redetermine; that one mistake cost weeks.
