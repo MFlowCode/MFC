@@ -79,6 +79,10 @@ contains
         write (3, '(13X,A)') 'number and the cell Reynolds (Rc) ' // 'number. Please note that only'
         write (3, '(13X,A)') 'those stability conditions pertinent ' // 'to the physics included in'
         write (3, '(13X,A)') 'the current computation are displayed.'
+        if (hypoelasticity) then
+            write (3, '(13X,A)') 'NOTE: the reported ICFL uses the acoustic ' // 'sound speed only; it may'
+            write (3, '(13X,A)') 'underestimate the elastic characteristic ' // 'speeds.'
+        end if
 
         call date_and_time(DATE=file_date)
 
@@ -1212,6 +1216,9 @@ contains
                     do s = 1, num_vels
                         vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k, l)/rho
                     end do
+                    do s = 1, num_fluids
+                        alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k, l)
+                    end do
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
@@ -1221,8 +1228,8 @@ contains
                             G_local = G_local*max((1._wp - damage_state), 0._wp)
                         end if
 
-                        call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), dyn_p, &
-                                                & pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
+                        call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
+                                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
                                                 & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
                                                 & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
                     else
@@ -1314,6 +1321,9 @@ contains
                         do s = 1, num_vels
                             vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
+                        do s = 1, num_fluids
+                            alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l)
+                        end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
@@ -1323,8 +1333,8 @@ contains
                                 G_local = G_local*max((1._wp - damage_state), 0._wp)
                             end if
 
-                            call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l), &
-                                                    & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
+                            call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
+                                                    & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
                                                     & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
                                                     & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
                         else
@@ -1334,7 +1344,7 @@ contains
 
                         if (hypoelasticity) then
                             do s = 1, 3
-                                tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
+                                tau_e(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k - 2, l)/rho
                             end do
                         end if
 
@@ -1393,6 +1403,9 @@ contains
                             do s = 1, num_vels
                                 vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
+                            do s = 1, num_fluids
+                                alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l - 2)
+                            end do
 
                             dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
@@ -1408,10 +1421,11 @@ contains
                                     G_local = G_local*max((1._wp - damage_state), 0._wp)
                                 end if
 
-                                call s_compute_pressure(q_cons_vf(1)%sf(j - 2, k - 2, l - 2), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
-                                                        & k - 2, l - 2), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                                        & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l - 2), &
-                                                        & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), G_local)
+                                call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
+                                                        & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
+                                                        & rho, qv, rhoYks, pres, T, q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, &
+                                                        & k - 2, l - 2), q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), &
+                                                        & G_local)
                             else
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &

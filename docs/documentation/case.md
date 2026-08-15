@@ -513,7 +513,8 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `flux_lim`                 | Integer | Flux limiter for post-process: [1] minmod; [2] MUSCL; [3] OSPRE; [4] SUPERBEE |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
-| `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
+| `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD (MHD or hypoelasticity) |
+| `hll_u_interface`          | Logical | HLL Method 2 (u-interface) for volume fraction advection (default F) |
 | `low_Mach`                 | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (\cite Chen22); [2] Velocity (\cite Thornber08)	 |
 | `avg_state`	               | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
 | `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (\cite Batten97); [2] Pressure-velocity* (\cite Toro09)	 |
@@ -534,6 +535,9 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `surface_tension`          | Logical | Activate surface tension |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
+| `riemann_hypo_ADC`         | Logical | Enable hypo anti-diffusion correction for HLLC/HLLD (default F) |
+| `ADC_kappa`                | Real    | ADC sensor scaling parameter (default 1.0) |
+| `hypo_hll_interface_rhs`   | Logical | HLL uses interface-consistent hypo RHS (default F) |
 | `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
@@ -567,7 +571,7 @@ Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%end = 
 The difference of the two models is assessed by (\cite Schmidmayer20).
 Note that some code parameters are only compatible with 5-equation model.
 
-- `alt_soundspeed` activates the source term in the advection equations for the volume fractions, \f$K\nabla\cdot \underline{u}\f$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
+- `alt_soundspeed` activates the source term in the advection equations for the volume fractions, \f$K\nabla\cdot \underline{u}\f$, that regularizes the speed of sound in the mixture region when the 5-equation model is used. Requires exactly two fluid components (\f$K\f$ is a two-fluid closure).
 The effect and use of the source term are assessed by \cite Schmidmayer20.
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
@@ -613,7 +617,11 @@ Setting `muscl_eps = 0` gives textbook limiter behavior where limiters activate 
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).
-`riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations (\cite Miyoshi05).
+`riemann_solver = 4` is the HLLD solver for MHD or hypoelasticity simulations. For MHD it resolves 5 of the full seven-wave structure of the MHD equations (\cite Miyoshi05).
+
+- `hll_u_interface`: Selects between two HLL discretizations of volume fraction advection (`riemann_solver = 1`):
+  - **Default** (``'F'``): \f$\partial_t \alpha_k + u\,\partial_x \alpha_k = 0\f$
+  - **u-interface** (``'T'``, consistent with HLLC): \f$\partial_t \alpha_k + \partial_x(\alpha_k\, u) = \alpha_k\,\partial_x u\f$
 
 - `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method (\cite Chen22) and the improved velocity reconstruction method (\cite Thornber08). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
 
@@ -633,7 +641,13 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
-- `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in the fluid material's parameters.
+- `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in `fluid_pp`, and `fd_order` to be set (1, 2, or 4). Compatible with HLL (`riemann_solver = 1`), HLLC (`riemann_solver = 2`), and HLLD (`riemann_solver = 4`). The Riemann solver choice determines how the elastic stress source term \f$\mathbf{S}^e\f$ is discretized:
+  - **HLL**: finite-difference velocity gradient (default), or interface-consistent velocity gradient when ``hypo_hll_interface_rhs = 'T'`` (matches HLLC).
+  - **HLLC**: interface-consistent velocity gradient from the Riemann solution.
+  - **HLLD**: dual-pass approach resolving the elastic wave structure. Requires 2D+ and exactly 2 fluid components.
+  - With hypoelastic HLLD, use characteristic boundary conditions (`bc_{x,y,z}%%beg/end` between -5 and -12) only where the domain boundary remains in a fluid region throughout the simulation. Keep material interfaces and solids out of the nearby cells used by the boundary calculation. A material present only at the numerical volume-fraction floor is allowed, even if it has nonzero `G`. These boundaries treat acoustic waves only. `alt_soundspeed` is supported.
+
+- `riemann_hypo_ADC`: Enables anti-diffusion correction (ADC) for hypoelastic HLLC or HLLD. Blends the HLLC/HLLD flux locally toward the more diffusive HLL flux where a jump sensor (total normal stress, tangential velocity, and tangential stress) detects a strong contact or material interface, improving robustness and reducing interfacial overshoots. This trades contact and shear resolution for robustness where the sensor activates. `ADC_kappa` (default 1.0) scales the reference jump the sensor is normalized by; smaller values blend more toward HLL (more diffusive and robust). Off by default and recommended off: in MFC's tested hypoelastic cases, including strong shock-interface interactions, HLLD is stable and accurate without ADC. The option is a robustness fallback intended for regimes with intense shocks and intense shear at material interfaces.
 
 #### Boundary Condition Patches {#boundary-condition-patches}
 
