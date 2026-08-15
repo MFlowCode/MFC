@@ -293,14 +293,12 @@ contains
                     end do
                 end if
 
-                if (model_eqns /= model_eqns_4eq) then
-                    ! If in simulation, use acc mixture subroutines
-                    if (hypoelasticity) then
-                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, &
-                            & Re_K, G_K, Gs)
-                    else
-                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
-                    end if
+                ! If in simulation, use acc mixture subroutines
+                if (hypoelasticity) then
+                    call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
+                        & G_K, Gs)
+                else
+                    call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                 end if
 
                 if (patch_ib(patch_id)%moving_ibm /= 0) then

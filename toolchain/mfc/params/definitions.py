@@ -337,9 +337,9 @@ CONSTRAINTS = {
     },
     # Model equations
     "model_eqns": {
-        "choices": [1, 2, 3, 4],
-        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation", 4: "4-Equation"},
-        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3, "4eq": 4},
+        "choices": [1, 2, 3],
+        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation"},
+        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3},
     },
     # Bubbles
     "bubble_model": {
@@ -392,7 +392,7 @@ DEPENDENCIES = {
         "when_true": {
             "recommends": ["nb", "polytropic"],
             "requires_value": {
-                "model_eqns": [2, 4],
+                "model_eqns": [2],
                 "riemann_solver": [2],
                 "avg_state": [2],
             },
@@ -402,7 +402,6 @@ DEPENDENCIES = {
         "when_value": {
             2: {"requires": ["num_fluids"]},
             3: {"requires_value": {"riemann_solver": [2], "avg_state": [2], "wave_speeds": [1]}},
-            4: {"requires": ["rhoref", "pref"], "requires_value": {"num_fluids": [1]}},
         }
     },
     "viscous": {
@@ -493,6 +492,29 @@ DEPENDENCIES = {
     "relativity": {
         "when_true": {
             "requires": ["mhd"],
+        }
+    },
+    "riemann_hypo_ADC": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [2, 4],
+            },
+        }
+    },
+    "hypo_hll_interface_rhs": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
+    "hll_u_interface": {
+        "when_true": {
+            "requires_value": {
+                "riemann_solver": [1],
+            },
         }
     },
     "schlieren_wrt": {
@@ -619,6 +641,10 @@ def _load():
 
     # Hypoelasticity
     _r("hypoelasticity", LOG, {"hypoelasticity"})
+    _r("riemann_hypo_ADC", LOG, {"hypoelasticity"})
+    _r("ADC_kappa", REAL, {"hypoelasticity"})
+    _r("hypo_hll_interface_rhs", LOG, {"hypoelasticity"})
+    _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
@@ -736,9 +762,7 @@ def _load():
         "flux_lim",
     ]:
         _r(n, INT)
-    _r("pref", REAL, math=r"\f$p_\text{ref}\f$")
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
-    _r("rhoref", REAL, math=r"\f$\rho_\text{ref}\f$")
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
@@ -1255,8 +1279,6 @@ _nv(
     "relax_model",
     "fluid_pp",
     "bub_pp",
-    "rhoref",
-    "pref",
     "bubbles_euler",
     "bubbles_lagrange",
     "R0ref",
@@ -1329,6 +1351,10 @@ _nv(
     "int_comp",
     "ic_eps",
     "ic_beta",
+    "riemann_hypo_ADC",
+    "ADC_kappa",
+    "hll_u_interface",
+    "hypo_hll_interface_rhs",
     "wave_speeds",
     "low_Mach",
     "hyper_cleaning_speed",
