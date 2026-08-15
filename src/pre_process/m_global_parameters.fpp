@@ -36,7 +36,6 @@ module m_global_parameters
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
-    real(wp) :: dx, dy, dz                             !< Minimum cell-widths in the x-, y- and z-coordinate directions
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
     !> Global (pre-decomposition) domain bounds, needed by s_generate_serial_grid to stretch the grid using the full domain length
     !! rather than a local processor's sub-domain length
@@ -182,7 +181,6 @@ contains
         ptgalpha_eps = dflt_real
         igr_order = dflt_int
         precision = 2
-        viscous = .false.
         mixlayer_vel_profile = .false.
         mixlayer_vel_coef = 1._wp
         mixlayer_perturb = .false.
@@ -316,7 +314,6 @@ contains
         Web = dflt_real
 
         nmom = 1
-        sigR = dflt_real
         sigV = dflt_real
         rhoRV = 0._wp
         dist_type = dflt_int
@@ -448,7 +445,7 @@ contains
         if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. qbmm .and. nnode == 4) nmom = 6
 
         ! Populate eqn_idx, sys_size, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom, nb)
+        call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.false.)
 
         ! Per-target (pre_process): qbmm_idx allocations and fills
         if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
@@ -487,40 +484,6 @@ contains
                         qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
                     end if
                 end do
-            end if
-        end if
-
-        if (model_eqns == model_eqns_4eq .and. bubbles_euler) then
-            allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-            allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-            allocate (weight(nb), R0(nb))
-
-            do i = 1, nb
-                if (.not. polytropic) then
-                    fac = 4
-                else
-                    fac = 2
-                end if
-
-                qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
-                qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
-
-                if (.not. polytropic) then
-                    qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
-                    qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
-                end if
-            end do
-
-            if (nb == 1) then
-                weight(:) = 1._wp
-                R0(:) = 1._wp
-            else if (nb < 1) then
-                stop 'Invalid value of nb'
-            end if
-
-            if (polytropic) then
-                rhoref = 1._wp
-                pref = 1._wp
             end if
         end if
 

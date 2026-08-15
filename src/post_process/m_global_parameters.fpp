@@ -190,10 +190,6 @@ contains
         t_save = dflt_real
         t_stop = dflt_real
 
-        ! Simulation algorithm parameters (post-specific)
-        mixture_err = .false.
-        alt_soundspeed = .false.
-
         bc_io = .false.
         num_bc_patches = dflt_int
 
@@ -298,11 +294,9 @@ contains
         schlieren_alpha = dflt_real
 
         fd_order = dflt_int
-        avg_state = dflt_int
 
         ! Bubble modeling (post-specific)
         nb = dflt_int
-        sigR = dflt_real
 
         ! Output partial domain (post-specific)
         output_partial_domain = .false.
@@ -324,6 +318,10 @@ contains
 
         if (n == 0) m_root = m_glb
 
+        ! Declared for the common conversion kernel but not a post_process input, so it is neither
+        ! defaulted on non-root ranks nor broadcast. Post-process never carries viscous stresses.
+        viscous = .false.
+
         ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
 
@@ -332,7 +330,7 @@ contains
         if (model_eqns == model_eqns_5eq .and. qbmm) nmom = 6
 
         ! Populate eqn_idx, sys_size, shear_* (shared logic)
-        call s_initialize_eqn_idx(nmom, nb)
+        call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.false.)
 
         ! post-only: 6eq alf is a dummy (no void fraction in 6eq)
         if (model_eqns == model_eqns_6eq) eqn_idx%alf = 1
@@ -385,40 +383,6 @@ contains
                         qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
                     end if
                 end do
-            end if
-        end if
-
-        if (model_eqns == model_eqns_4eq .and. bubbles_euler) then
-            allocate (qbmm_idx%rs(nb), qbmm_idx%vs(nb))
-            allocate (qbmm_idx%ps(nb), qbmm_idx%ms(nb))
-            allocate (weight(nb), R0(nb))
-
-            do i = 1, nb
-                if (polytropic .neqv. .true.) then
-                    fac = 4
-                else
-                    fac = 2
-                end if
-
-                qbmm_idx%rs(i) = eqn_idx%bub%beg + (i - 1)*fac
-                qbmm_idx%vs(i) = qbmm_idx%rs(i) + 1
-
-                if (polytropic .neqv. .true.) then
-                    qbmm_idx%ps(i) = qbmm_idx%vs(i) + 1
-                    qbmm_idx%ms(i) = qbmm_idx%ps(i) + 1
-                end if
-            end do
-
-            if (nb == 1) then
-                weight(:) = 1._wp
-                R0(:) = 1._wp
-            else if (nb < 1) then
-                stop 'Invalid value of nb'
-            end if
-
-            if (polytropic) then
-                rhoref = 1._wp
-                pref = 1._wp
             end if
         end if
 
