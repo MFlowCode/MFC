@@ -280,11 +280,11 @@ MFC computations have been run on many supercomputing systems. A partial list is
 ---
 
 <p align="center">
-  <a href="https://star-history.com/#MFlowCode/MFC&Date">
+  <a href="https://star-history.dera.page/#MFlowCode/MFC&Date">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" />
-      <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+      <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date" />
+      <img src="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
     </picture>
   </a>
 </p>
