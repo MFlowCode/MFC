@@ -27,7 +27,7 @@ AMReX at cap 64** - a `sed` override in the harness of an inputs file whose comm
 At matched cap the excess is 2.0-4.2x. AMReX's tax is **not** flat in the cap either (5.84 -> 3.40),
 so per-box cost is not unique to MFC; ours is simply larger.
 
-**Cost model**, fitted to cap-32/64 marginal slopes:
+**Cost model** (coefficients PROVISIONAL - see the caveat below; these are from the cap-32/64 pair):
 
 ```
 wall/step = a*cells + b*boxes
@@ -36,15 +36,20 @@ b ~ 10 ms/box/step  PER-BOX OVERHEAD
 ```
 
 Two consequences that drive everything below:
-- **Break-even = b/a = 625,000 cells per box.** One extra box costs as much as 625k cells of
-  over-covering. A cap-32 block is 64^3 = 262k cells - *less than one box costs*.
+- **Break-even = b/a ~ 113k-573k cells per box (RANGE, not a value - see the caveat below).** One
+  extra box costs as much as that many cells of over-covering. A cap-32 block is 64^3 = 262k cells,
+  which falls INSIDE that range - so whether splitting a block to tighten the fit pays is currently
+  UNDETERMINED, not settled.
 - `a` is **16 ns/cell in the AMR arm vs 3.62 ns/cell uniform**: the identical physics is **4.3x more
   expensive per cell** on 68^3 blocks than on one monolithic grid. That is a kernel-efficiency loss,
   entirely separate from per-box overhead, and the tax ratio bundled the two together.
 
-CAVEAT: the fit had 2 points and 2 unknowns (zero degrees of freedom, residuals identically zero).
-A four-cap sweep was queued to give it a falsifiable residual. Re-check `a` and `b` before trusting
-the break-even to two significant figures.
+**CAVEAT - THE FIT IS NOT YET VALID (2026-08-15).** Two points, two unknowns: zero degrees of
+freedom, residuals identically zero, nothing falsifiable. Worse, a second pair from the same sweep
+gives a = 42.34 ns/cell and b = 4.78 ms/box against the 16.65 / 9.54 above - **2.5x and 2x apart**.
+The break-even (`b/a`) therefore ranges **113k-573k cells per box**, straddling a cap-32 block
+(262k). **Every conclusion below that cites the break-even is PROVISIONAL until the four-cap sweep
+completes.** Tier 0 does not depend on the model at all - it rests on directly measured wall.
 
 ---
 
@@ -135,14 +140,27 @@ heavily and **must not be multiplied**.
 
 - **Load balancing.** 0.98, matching AMReX's knapsack. `[amr-balance] max/mean` 1.003-1.009 and regrid
   imbalance 1.003. Ruled out by measurement.
-- **Tighter clustering / adding the missing midpoint fallback to `s_amr_find_split`.**
+- **[PROVISIONAL - the number justifying this is UNSTABLE, see below] Tighter clustering / adding
+  the missing midpoint fallback to `s_amr_find_split`.**
   The defect is real - the split finder tries a zero-signature hole, then a Laplacian inflection, and
   gives up (`ok=.false.`) with **no midpoint fallback**, so a convex blob returns its bounding box
   (~91% over-cover for a sphere) and `amr_cluster_eff` is unreachable dead code (verified: 0.7 / 0.9 /
-  0.98 give byte-identical box counts). **But the break-even says one box costs 625k cells and a
-  cap-32 block is only 262k**, so tightening the fit would add boxes and make MFC slower. Log the
-  defect; fix it only after `b` comes down. It will matter on non-convex features (shock fronts,
-  sheets) where holes exist and the finder does work.
+  0.98 give byte-identical box counts). **The break-even argument that justified NOT fixing this is UNSOUND as of 2026-08-15.** `b/a` came
+  from one arbitrary pair of caps; a second pair from the same sweep disagrees badly:
+
+  | fitted from | a (ns/cell) | b (ms/box) | break-even |
+  |---|---|---|---|
+  | cap 32 + 64 | 16.65 | 9.54 | **573k cells/box** |
+  | cap 32 + 40 | 42.34 | 4.78 | **113k cells/box** |
+
+  `a` differs 2.5x, `b` 2x. Both fits are exact by construction (2 points, 2 unknowns, zero degrees
+  of freedom) so neither is testable - and **they STRADDLE the decision boundary**: a cap-32 block is
+  262k cells, BELOW 573k (do not split) but ABOVE 113k (splitting could pay). **Do not act on this
+  entry in either direction until caps 48 and 64 land.** If `fit_cost.py` then reports residuals
+  monotone in cap, the two-term model is missing a term and NEITHER break-even is meaningful.
+
+  Log the defect regardless - it makes `amr_cluster_eff` dead code, and it will matter on non-convex
+  features (shock fronts, sheets) where holes exist and the finder does work.
 - **Descriptor-copy reduction.** 19.54 copies/launch, but the initiating HSA call is 0.9% of the gap.
 - **Reducing kernel/region count for its own sake.** AMReX launches 7.9x more kernels than MFC on one
   case and 5.5x fewer on the matched one; per-launch cost dominates, not count.
