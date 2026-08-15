@@ -2052,3 +2052,113 @@ behaviour). `nowait` (compile error for any region with a private clause). `has_
 (memory access fault). `firstprivate` for arrays (18 map entries become 38). Interface flattening
 (flat dummies measure the same as deep). The chemistry Fypp guard (dominated by the map(alloc:)
 clause, which needs no semantic change).
+
+
+## 2026-08-15: the matched AMReX decomposition answers Phase D, and the plan that follows
+
+Phase D above asked whether the unaccounted residual is per-launch (batching reaches it) or
+host-side AMR bookkeeping (batching cannot). **It is host-side AMR bookkeeping**, and the shape of it
+is now measured on both codes.
+
+### What is established
+Matched case (400^3, np=8, 2 levels, ref_ratio 2, volumetric blob, refined fraction matched to 1%),
+warm-started, wall from untraced marginal slopes:
+
+| | tax | arithmetic | idle | busy uniform -> l2 | launches/step | dead/launch |
+|---|---|---|---|---|---|---|
+| AMReX | 3.13x | **1.96x** | **1.59x** | 85.7% -> 53.7% | 36 -> 2,582 | **15.3 us** |
+| MFC | 23.92x | **1.60x** | **14.91x** | 80.7% -> 5.4% | 81 -> 14,091 | **1,237 us** |
+
+**Our arithmetic multiplier is BETTER than AMReX's (1.60x vs 1.96x): the AMR algorithm is not what is
+wrong.** The entire deficit is idle - 81x more dead time per launch, 443x more total dead time/step.
+
+**THE STRUCTURAL DIFFERENCE, from call counts (exact, unperturbed by instrumentation):**
+
+| operation both codes must do | AMReX | MFC | ratio |
+|---|---|---|---|
+| coarse->fine patch fill | 2.23/step (`FillPatchTwoLevels`: whole LEVEL per call, all boxes in one `ParallelCopy`) | 625/step (`s_amr_gather_coarse_patch`: ONE BOX per call, own `MPI_WAITALL` each) | **281x** |
+| all MPI exchanges | 16.6/step | >=625/step (regrid alone) | **>=38x** |
+| regrid box generation | 0.57/step | 0.5/step | ~1x |
+| tagging | 1.10/step | 0.5/step | ~0.5x |
+
+**AMReX batches per LEVEL; MFC loops per BOX.** Everything else is comparable. That one design choice
+produces the 81x dead time, the host spinning in Open MPI progress (~51% of host CPU, vader 39.7%),
+and the 94.6% GPU idle.
+
+Device data resident: **AMReX 2.8 GB/rank vs MFC ~50 GB/rank (17x)** - which is why AMReX affords
+64^3 blocks and we are pinned at 32^3 (caps 40/48/64 all OOM at 77-87% VRAM).
+
+### The budget, and why no single fix reaches the target
+To BEAT AMReX's 3.13x we need 18.43 -> 2.41 s/step: **remove 87% of wall.**
+
+| item | % wall | s/step | pattern |
+|---|---|---|---|
+| gather (rbgath 17.4% + gather 13.7%) | 31.1% | 5.73 | per-box |
+| physics dead time inside rhs | 21.0% | 3.87 | per-launch mapped entities |
+| reflux | 10.3% | 1.90 | per-box (expected, NOT measured internally) |
+| rgmig fine-state migration | 7.8% | 1.44 | per-box |
+| rgbuild tail (reconcile + IB + seam revalidate) | 6.9% | 1.27 | per-box |
+| seam halo | 4.7% | 0.87 | serial cross-rank SENDRECV |
+| residual (unbracketed) | 7.1% | 1.31 | unattributed |
+
+Removing the top TWO alone leaves 8.83 s/step = tax 11.46x - still far short. **This is a campaign,
+not a patch.** The kernel floor is 1.00 s/step (tax 1.29x at 100% busy).
+
+### The plan
+
+**Gate 0 - measure the device-memory split (cheap, unblocks Track C).** ~50 GB/rank is spread across
+per-slot `%%q_prim`/`%%rhs` (sized to the CAP, ~56 MB/block), the shared store (`amr_cons_st` etc.,
+grown by DOUBLING - up to 2x overshoot), and O(cap^3) per-rank solver scratch. The split is inferred
+from source, never measured. Instrument the three allocation sites and print at init. Until this
+exists, Track C is guesswork.
+
+**Track C - reduce per-block footprint so the cap can rise (highest leverage per unit work).**
+Cap 32 -> 64 is 8x fewer boxes, which divides EVERY per-box row above by ~8: the four per-box rows
+are 56% of wall today and would become ~7%. That is a larger win than batching, for less
+restructuring - IF the memory can be found. The suspect is the O(cap^3) scratch, which grows 8x with
+no compensating reduction (per-slot storage stays ~constant: 8x bigger blocks, 8x fewer). Sizing the
+fine advance's scratch to the actual block rather than the cap is the specific change to evaluate.
+Blocked on Gate 0.
+
+**Track A - per-box -> per-level batching (the AMReX pattern).** Restructure
+`s_amr_gather_coarse_patch` and its callers so one call services a whole level: post every box's
+IRECV/ISEND, then ONE WAITALL, and hoist the four per-call heap allocations
+(`rbuf`/`sbuf`/`reqs`/`srank`, m_amr.fpp:910) out of the loop. Then apply the same shape to reflux,
+rgmig and the rgbuild tail. Addresses the four per-box rows = 56% of wall (10.34 s/step).
+NOTE the measured split: of the ~31% in gather, only 7.2% of wall is the WAITALL itself; ~24% is
+per-call host work. **So batching the exchange alone is worth ~7%; the allocation/geometry/pack
+hoist is the larger half.** Do the hoist first - it is mechanical and independently valuable.
+
+**Track B - per-launch mapped-entity cost in the physics.** `rhs` is 22.1% of wall and only ~22%
+busy. This is the proven `map(alloc:)` pattern (-26.4% measured at np=1) plus the remaining phases A
+to C above. Independent of Tracks A and C; can proceed in parallel.
+
+### Sequencing and gates
+1. Gate 0 (memory split) - hours, unblocks C.
+2. Track A step 1: hoist the per-call allocations out of the gather. Mechanical, low risk,
+   independently valuable. Measure before and after with the phase budget (`rank_time_wrt = T`).
+3. Track C if Gate 0 says the scratch is the bulk - highest leverage.
+4. Track A step 2: batch the exchange per level.
+5. Track B in parallel throughout.
+
+Every step validates the same way: `./mfc.sh test` for correctness, then the phase budget plus the
+untraced marginal slope on the matched case for wall. **Never take wall from an instrumented run** -
+rocprofv3 inflates MFC 1.3-2.4x and TinyProfiler inflates AMReX 37%.
+
+### Caveats carried forward
+The matched case runs `riemann_solver = 5` (LF) and `weno_order = 1` - the cheapest numerics, chosen
+to match AMReX's linear advection - so neither landed `map(alloc:)` clause is active on it and 23.92x
+is an UPPER bound on the tax for production numerics. The 7.64x excess is NOT decomposition-matched
+(MFC 32^3 vs AMReX 64^3) and cannot be, since MFC cannot allocate 64^3 here; read it as "MFC at its
+memory-forced decomposition vs AMReX at 64^3". MFC phase timers GPU_WAIT at every bracket (phases
+include GPU execution); AMReX TinyProfiler does not (host regions, async kernels) - **share-vs-share
+between the two codes is invalid; call counts are the honest comparison.**
+
+### SUPERSEDED 2026-08-15: the three-track plan above, and the 7.64x it was built on
+The action list now lives in `amr_action_plan.md`. Two things invalidated the plan above:
+1. **The 7.64x excess was an unmatched comparison** - MFC at cap 32 against AMReX at cap 64 (a `sed`
+   override of an inputs file whose committed value was 32). At MATCHED cap the excess is 2.03x
+   (cap 64) or 4.15x (cap 32), and AMReX's tax is not flat in the cap either (5.84 -> 3.40).
+2. **"The cap is exhausted / larger caps OOM" was a checkpoint-restart confound.** Cap 64 runs, gives
+   4.9x fewer boxes and 2.74x less wall at LOWER memory. Every phase share in the plan above was
+   measured with 4.9x more boxes than we would ship with, so all of its sizing is stale.
