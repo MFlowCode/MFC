@@ -27,29 +27,40 @@ AMReX at cap 64** - a `sed` override in the harness of an inputs file whose comm
 At matched cap the excess is 2.0-4.2x. AMReX's tax is **not** flat in the cap either (5.84 -> 3.40),
 so per-box cost is not unique to MFC; ours is simply larger.
 
-**Cost model** (coefficients PROVISIONAL - see the caveat below; these are from the cap-32/64 pair):
+**Cost model: `wall = a*cells + b*boxes` was REJECTED (2026-08-15).**
 
-```
-wall/step = a*cells + b*boxes
-a ~ 16 ns/cell      arithmetic x kernel efficiency
-b ~ 10 ms/box/step  PER-BOX OVERHEAD
-```
+Residuals at 3 caps: +0.9% / -14.2% / +19.2%, **spread 33.5% against a ~12% noise floor**. The direct
+disproof needs no fit: **cap 40 -> cap 48 has BYTE-IDENTICAL cells (178,960,640 both), 11% fewer
+boxes, and 31% less wall.** With a constant `a` that is impossible.
 
-Two consequences that drive everything below:
-- **Break-even = b/a ~ 113k-573k cells per box (RANGE, not a value - see the caveat below).** One
-  extra box costs as much as that many cells of over-covering. A cap-32 block is 64^3 = 262k cells,
-  which falls INSIDE that range - so whether splitting a block to tighten the fit pays is currently
-  UNDETERMINED, not settled.
-- `a` is **16 ns/cell in the AMR arm vs 3.62 ns/cell uniform**: the identical physics is **4.3x more
-  expensive per cell** on 68^3 blocks than on one monolithic grid. That is a kernel-efficiency loss,
-  entirely separate from per-box overhead, and the tax ratio bundled the two together.
+| cap | s/step | boxes | cells | slot |
+|---|---|---|---|---|
+| 32 | 14.650 | 1207 | 207.1M | 68^3 |
+| 40 | 12.850 | 536 | 243.0M | 84^3 |
+| 48 | 8.900 | 478 | 243.0M | 100^3 |
 
-**CAVEAT - THE FIT IS NOT YET VALID (2026-08-15).** Two points, two unknowns: zero degrees of
-freedom, residuals identically zero, nothing falsifiable. Worse, a second pair from the same sweep
-gives a = 42.34 ns/cell and b = 4.78 ms/box against the 16.65 / 9.54 above - **2.5x and 2x apart**.
-The break-even (`b/a`) therefore ranges **113k-573k cells per box**, straddling a cap-32 block
-(262k). **Every conclusion below that cites the break-even is PROVISIONAL until the four-cap sweep
-completes.** Tier 0 does not depend on the model at all - it rests on directly measured wall.
+**The missing term: `a` depends on BLOCK SIZE.** Bigger blocks -> bigger kernels -> better occupancy
+-> lower ns/cell. Measured independently: **15.7 ns/cell on 68^3 blocks vs 3.62 ns/cell on one
+monolithic grid**, a 4.3x penalty that shrinks as blocks grow. So bigger blocks help through TWO
+mechanisms - fewer boxes AND better per-cell efficiency - which is why cap 48 beat cap 40 on
+byte-identical work.
+
+**CONSEQUENCE: every break-even number is VOID**, not merely uncertain. `b/a` from two different cap
+pairs gave 113k and 573k cells/box (a differed 2.5x) because the fit was absorbing `a(cap)` into its
+constants. Any recommendation below that cites a break-even has **no valid number behind it in either
+direction**. Tier 0 does not depend on the model - it rests on directly measured wall, and this
+strengthens it.
+
+**HOW COST IS ATTRIBUTED FROM NOW ON - measure the terms, never fit them:**
+- `a` <- kernel trace, **union of intervals** / cells
+- `b` <- phase budget, (gather + rgbuild + reflux + seam) / boxes
+- **residual = wall - kernel - per-box phases, reported explicitly** so what neither term explains is
+  visible instead of absorbed
+- wall NEVER from an instrumented run (rocprofv3 inflates MFC 1.3-2.4x)
+- two separate runs per cap: rocprofv3 inflates the interval the phase timers measure, and the phase
+  timers' GPU_WAIT perturbs the kernel timeline
+
+Runner: `amr-bench/expt/decompose.sh`. Cap 32 is already decomposed; cap 64 is the missing half.
 
 ---
 
@@ -140,8 +151,8 @@ heavily and **must not be multiplied**.
 
 - **Load balancing.** 0.98, matching AMReX's knapsack. `[amr-balance] max/mean` 1.003-1.009 and regrid
   imbalance 1.003. Ruled out by measurement.
-- **[PROVISIONAL - the number justifying this is UNSTABLE, see below] Tighter clustering / adding
-  the missing midpoint fallback to `s_amr_find_split`.**
+- **[UNDECIDED - the number justifying this is VOID] Tighter clustering / adding the missing
+  midpoint fallback to `s_amr_find_split`.**
   The defect is real - the split finder tries a zero-signature hole, then a Laplacian inflection, and
   gives up (`ok=.false.`) with **no midpoint fallback**, so a convex blob returns its bounding box
   (~91% over-cover for a sphere) and `amr_cluster_eff` is unreachable dead code (verified: 0.7 / 0.9 /
