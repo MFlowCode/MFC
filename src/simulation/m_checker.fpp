@@ -12,7 +12,8 @@ module m_checker
     use m_mpi_proxy
     use m_helper
     use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order
+    use m_constants, only: model_eqns_5eq, riemann_solver_hll, riemann_solver_hllc, riemann_solver_hlld, recon_type_weno, &
+        & recon_type_muscl, muscl_order_first_order, riemann_solver_lax_friedrichs, wave_speeds_pressure
 
     implicit none
 
@@ -36,6 +37,10 @@ contains
         end if
 
         call s_check_inputs_time_stepping
+
+        call s_check_inputs_hll_non_conservative
+
+        call s_check_inputs_hypo_branch
 
         @:PROHIBIT(chemistry .and. chem_params%reaction_substeps < 0, &
                    & "chem_params%reaction_substeps must be >= 0 (0 = reaction source in the flow RHS; > 0 = operator-split sub-stepping)")
@@ -168,6 +173,81 @@ contains
 #endif
 
     end subroutine s_check_inputs_nvidia_uvm
+
+    impure subroutine s_check_inputs_hll_non_conservative
+
+        @:PROHIBIT((riemann_solver == riemann_solver_hll) .and. hll_u_interface .and. cyl_coord .and. p > 0, &
+                   & "HLL Method 2 is not supported for 3D cylindrical geometry")
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == riemann_solver_hll .and. (.not. hll_u_interface) .and. cyl_coord &
+                   & .and. p == 0, "alt_soundspeed with HLL Method 1 is not supported for 2D axisymmetric geometry")
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == riemann_solver_hll .and. cyl_coord .and. p > 0, &
+                   & "alt_soundspeed with HLL is not currently supported for 3D cylindrical geometry")
+        @:PROHIBIT(hll_u_interface .and. riemann_solver /= riemann_solver_hll, &
+                   & "hll_u_interface requires the HLL Riemann solver (riemann_solver = 1)")
+        @:PROHIBIT(hll_u_interface .and. mhd, &
+                   & "HLL Method 2 does not support MHD (the MHD path zeroes the shared interface-velocity trace)")
+        @:PROHIBIT(surface_tension .and. riemann_solver == riemann_solver_hll .and. (.not. hll_u_interface), &
+                   & "surface_tension requires a shared interface-velocity representation (HLL Method 2 or HLLC)")
+        @:PROHIBIT(surface_tension .and. riemann_solver == riemann_solver_lax_friedrichs, &
+                   & "surface_tension requires a shared interface-velocity representation (HLL Method 2 or HLLC)")
+
+    end subroutine s_check_inputs_hll_non_conservative
+
+    impure subroutine s_check_inputs_hypo_branch
+
+        @:PROHIBIT(hypoelasticity .and. cyl_coord .and. p > 0, "3D cylindrical hypoelasticity is not supported")
+
+        ! Hypoelasticity solver restrictions
+        @:PROHIBIT(hypoelasticity .and. model_eqns /= model_eqns_5eq, "hypoelasticity requires model_eqns = 2")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver /= riemann_solver_hll .and. riemann_solver /= riemann_solver_hllc &
+                   & .and. riemann_solver /= riemann_solver_hlld, &
+                   & "hypoelasticity requires HLL (1), HLLC (2), or HLLD (4) Riemann solver")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == riemann_solver_hlld .and. n == 0, &
+                   & "HLLD hypoelasticity requires at least 2D (n must be > 0)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == riemann_solver_hlld .and. num_fluids /= 2, &
+                   & "HLLD hypoelasticity currently requires exactly 2 fluid components")
+        @:PROHIBIT(hypoelasticity .and. mhd, "MHD and hypoelasticity cannot be enabled together")
+        @:PROHIBIT(hypoelasticity .and. bubbles_euler, "Hypoelasticity does not support Euler-Euler bubbles")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == riemann_solver_hlld .and. viscous, &
+                   & "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == riemann_solver_hlld .and. surface_tension, &
+                   & "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == riemann_solver_hlld .and. cont_damage, &
+                   & "HLLD hypoelasticity does not support continuum damage (the dual-pass does not damage-scale the shear modulus)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == riemann_solver_hlld .and. chemistry, &
+                   & "HLLD hypoelasticity does not support chemistry")
+        @:PROHIBIT(riemann_solver == riemann_solver_hlld .and. (.not. mhd) .and. (.not. hypoelasticity), &
+                   & "HLLD is only available for MHD or hypoelasticity")
+
+        ! Feature flag prerequisites
+        @:PROHIBIT(riemann_hypo_ADC .and. .not. hypoelasticity, "riemann_hypo_ADC requires hypoelasticity = T")
+        @:PROHIBIT(riemann_hypo_ADC .and. riemann_solver /= riemann_solver_hllc .and. riemann_solver /= riemann_solver_hlld, &
+                   & "riemann_hypo_ADC only applies to hypo HLLC/HLLD")
+        @:PROHIBIT(riemann_hypo_ADC .and. (bubbles_euler .or. surface_tension .or. chemistry .or. cont_damage), &
+                   & "riemann_hypo_ADC does not support bubbles, surface tension, chemistry, or continuum damage (the ADC HLL blend omits their flux components)")
+        @:PROHIBIT(hypo_hll_interface_rhs .and. .not. hypoelasticity, "hypo_hll_interface_rhs requires hypoelasticity = T")
+        @:PROHIBIT(hypo_hll_interface_rhs .and. riemann_solver /= riemann_solver_hll, &
+                   & "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == riemann_solver_hlld .and. .not. hypoelasticity, &
+                   & "alt_soundspeed with HLLD requires hypoelasticity = T")
+        @:PROHIBIT(alt_soundspeed .and. num_fluids /= 2, &
+                   & "alt_soundspeed requires exactly 2 fluid components (the Kapila K coefficient is a two-fluid closure)")
+        @:PROHIBIT(cont_damage .and. alt_soundspeed, "Continuum damage does not support alt_soundspeed")
+        @:PROHIBIT(hypoelasticity .and. igr, "Hypoelasticity is not compatible with IGR")
+        @:PROHIBIT(hypoelasticity .and. fd_order /= 1 .and. fd_order /= 2 .and. fd_order /= 4, &
+                   & "hypoelasticity requires fd_order to be set to 1, 2, or 4 (the finite-difference coefficients are initialized unconditionally)")
+        @:PROHIBIT(hypoelasticity .and. wave_speeds == wave_speeds_pressure, &
+                   & "Pressure-based wave speeds (wave_speeds = 2) omit the elastic longitudinal speed and are not supported with hypoelasticity")
+        @:PROHIBIT(riemann_solver == riemann_solver_hlld .and. wave_speeds == wave_speeds_pressure, &
+                   & "HLLD uses its own direct wave-speed estimates; wave_speeds = 2 is not supported")
+        @:PROHIBIT(riemann_solver == riemann_solver_hlld .and. low_Mach > 0, "low_Mach corrections are not implemented for HLLD")
+        @:PROHIBIT(riemann_hypo_ADC .and. low_Mach > 0, &
+                   & "riemann_hypo_ADC does not support low_Mach (the ADC HLL reference flux uses pre-correction velocities)")
+        @:PROHIBIT(riemann_hypo_ADC .and. ADC_kappa <= 0._wp, "ADC_kappa must be positive")
+        @:PROHIBIT(hypoelasticity .and. (cfl_const_dt .or. cfl_adap_dt), &
+                   & "Automatic CFL time stepping uses the acoustic sound speed only and does not bound the elastic characteristic speed; set dt explicitly for hypoelastic runs")
+
+    end subroutine s_check_inputs_hypo_branch
 
     !> Validates that each burning immersed-boundary patch injects a species index within the mechanism. inj_species indexes the
     !! image-point mass-fraction array Ys_IP(1:num_species) in m_ibm; an out-of-range value is an out-of-bounds write (silent

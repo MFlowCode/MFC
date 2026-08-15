@@ -91,3 +91,25 @@
         end if
     end if
 #:enddef compute_low_Mach_correction
+
+#:def compute_hypo_elastic_energy(EL, ER, shear_cond)
+    if (G_L > verysmall) then
+        ${EL}$ = ${EL}$ + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+        if (${shear_cond}$) then
+            ${EL}$ = ${EL}$ + (tau_e_L(i)*tau_e_L(i))/max(4._wp*G_L, verysmall)
+        end if
+    end if
+    if (G_R > verysmall) then
+        ${ER}$ = ${ER}$ + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
+        if (${shear_cond}$) then
+            ${ER}$ = ${ER}$ + (tau_e_R(i)*tau_e_R(i))/max(4._wp*G_R, verysmall)
+        end if
+    end if
+#:enddef compute_hypo_elastic_energy
+
+#:def compute_elastic_wave_speeds_lr()
+    s_L = min(vel_L(dir_idx(1)) - sqrt(max(verysmall, c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)), &
+              & vel_R(dir_idx(1)) - sqrt(max(verysmall, c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)))
+    s_R = max(vel_R(dir_idx(1)) + sqrt(max(verysmall, c_R*c_R + (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R)), &
+              & vel_L(dir_idx(1)) + sqrt(max(verysmall, c_L*c_L + (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L)))
+#:enddef compute_elastic_wave_speeds_lr
