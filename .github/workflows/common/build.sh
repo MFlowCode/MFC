@@ -34,9 +34,16 @@ source .github/scripts/retry-build.sh
 
 # Phoenix: smoke-test the syscheck binary to catch architecture mismatches
 # (SIGILL from binaries compiled on a different compute node).
+#
+# Launch under mpirun rather than directly. Phoenix's openmpi/4.1.5 predates the
+# PMIx 4.2.6 that came with the Slurm 26.05.2 upgrade, so an MPI binary started
+# bare inside an allocation misreads the PMIx environment as an srun launch and
+# aborts in MPI_Init ("OPAL ERROR: Unreachable in file ext3x_client.c"). mpirun
+# is unaffected, and it is how MFC launches every binary anyway. Output is left
+# on stdout so a future failure is diagnosable from the CI log.
 validate_cmd=""
 if [ "$job_cluster" = "phoenix" ]; then
-    validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || "$syscheck_bin" > /dev/null 2>&1'
+    validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || mpirun -np 1 "$syscheck_bin"'
 fi
 
 # --- Variant selection ---
