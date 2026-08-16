@@ -130,7 +130,7 @@ contains
 
         call s_mpi_barrier()
 
-        call DelayFileAccess(proc_rank)
+        call s_delay_file_access(proc_rank)
 
         write (proc_rank_str, '(I7.7)') proc_rank
         file_path = trim(file_loc) // '/bc_' // trim(proc_rank_str) // '.dat'
@@ -233,7 +233,7 @@ contains
 
         call s_mpi_barrier()
 
-        call DelayFileAccess(proc_rank)
+        call s_delay_file_access(proc_rank)
 
         write (proc_rank_str, '(I7.7)') proc_rank
         file_path = trim(file_loc) // '/bc_' // trim(proc_rank_str) // '.dat'

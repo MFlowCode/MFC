@@ -27,7 +27,7 @@ def _fc(name: str, default: int) -> int:
 
 
 NF = _fc("num_fluids_max", 10)  # fluid_pp
-NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
+NPR = _fc("num_probes_max", 10)  # probe, acoustic
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max_namelist", 54000)  # patch_ib namelist array bound
@@ -129,7 +129,7 @@ TAG_DISPLAY_NAMES = {
     "acoustic": "Acoustic",
     "ib": "Immersed boundary",
     "reactive_burn": "Reactive burn",
-    "probes": "Probe/integral",
+    "probes": "Probe",
     "riemann": "Riemann solver",
     "relativity": "Relativity",
     "output": "Output",
@@ -379,7 +379,6 @@ CONSTRAINTS = {
     "ib_neighborhood_radius": {"min": 1},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
-    "num_integrals": {"min": 1},
     "nb": {"min": 1},
     "m": {"min": 0},
     "n": {"min": 0},
@@ -532,11 +531,6 @@ DEPENDENCIES = {
             "recommends": ["cfl_target"],
         }
     },
-    "integral_wrt": {
-        "when_true": {
-            "requires": ["fd_order"],
-        }
-    },
 }
 
 
@@ -676,10 +670,8 @@ def _load():
     _r("many_ib_patch_parallelism", LOG, {"ib"})
 
     # Probes
-    for n in ["num_probes", "num_integrals"]:
-        _r(n, INT, {"probes"})
+    _r("num_probes", INT, {"probes"})
     _r("probe_wrt", LOG, {"output", "probes"})
-    _r("integral_wrt", LOG, {"output", "probes"})
 
     # Output
     _r("precision", INT, {"output"})
@@ -1063,12 +1055,6 @@ def _load():
         for d in ["x", "y", "z"]:
             _r(f"probe({i})%{d}", REAL, {"probes"})
 
-    # integrals (5 integral regions)
-    for i in range(1, 6):
-        for d in ["x", "y", "z"]:
-            _r(f"integral({i})%{d}min", REAL, {"probes"})
-            _r(f"integral({i})%{d}max", REAL, {"probes"})
-
     # Extended BC
     for d in ["x", "y", "z"]:
         px = f"bc_{d}%"
@@ -1217,7 +1203,6 @@ TYPED_DECLS: dict[str, tuple] = {
     "ib_airfoil": ("type(ib_airfoil_parameters)", "num_ib_airfoils_max", True, "Per-airfoil NACA user inputs"),
     "stl_models": ("type(ib_stl_parameters)", "num_stl_models_max", True, "Per-STL model parameters"),
     "probe": ("type(vec3_dt)", "num_probes_max", False, None),
-    "integral": ("type(integral_parameters)", "num_probes_max", False, None),
     "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
     "chem_params": ("type(chemistry_parameters)", None, True, None),
     "rburn": ("type(reactive_burn_parameters)", None, True, "Condensed-phase reactive-burn (programmed detonation) parameters"),
@@ -1365,9 +1350,6 @@ _nv(
     "probe_wrt",
     "num_probes",
     "probe",
-    "integral_wrt",
-    "num_integrals",
-    "integral",
     "acoustic_source",
     "num_source",
     "acoustic",
