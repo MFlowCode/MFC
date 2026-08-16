@@ -106,6 +106,21 @@ solving the same problem and part of the 2.32x is accuracy, not speed.
 
 ## TIER 1 - SUPERSEDED 2026-08-16: MPI is the SYMPTOM, not the cause
 
+> **PARTLY RETRACTED THE SAME DAY - read this before the table below.** Re-parsing the SAME run with
+> a checkable parser (`amr-bench/balance_ceiling.py`), rooted at the step loop rather than the whole
+> run, gives per-rank work of 66.8/74.9/80.9/95.8/92.2/92.7/78.3/73.8 s. Three corrections:
+> **(a)** the skew is **16.9%** (max/mean), not 33.7% - the old figure came from an extraction
+> covering ~330 s of a 633 s run whose scope I cannot reconstruct, while this parse reconciles
+> against wall on every rank; **(b)** a PERFECT balancer is worth **5.1% of step-loop wall**, so the
+> rebalancing question is closed negatively (see Open question 2); **(c)** most importantly, **skew
+> explains only 7.6% of MPI time** - if every rank waited solely for the straggler, total waiting
+> would be 111.0 s against 1456.7 s measured. The mirror-image correlation below is real but is a
+> MINOR term, so it cannot by itself carry "MPI is merely a symptom", and the step loop is ~69% MPI
+> on every rank skewed or not. **What that remaining ~92% is remains OPEN.** Consequently the
+> conclusion that 1.1-1.3 are worthless is no longer established - they were retired on the strength
+> of the skew story, and that story is now much smaller than reported. Re-open them only on evidence
+> from the PMPI interposer (`amr-bench/mpiprof.c`), which separates blocking from posting.
+
 **rocprof-sys per-rank measurement (cap 64, np=8, 30 steps) kills the premise of 1.1-1.3.**
 
 | rank | non-MPI (work) | MPI (waiting) | Allreduce |
@@ -138,7 +153,18 @@ Open questions, in order:
 1. WHY does per-box time vary 33.7% when box counts match to 1.008? Candidates: heterogeneous box
    contents (level-1 vs level-2 mix), ghost/seam work proportional to a rank's surface rather than its
    volume, or per-rank differences in how many boxes need cross-rank gathers.
-2. Would a time-based (measured, not modelled) rebalance close it?
+2. ~~Would a time-based (measured, not modelled) rebalance close it?~~ **ANSWERED NO, 2026-08-16.**
+   A load-balance counterfactual is closed-form - a step ends when the last rank finishes, so
+   `wall = max_r work_r` and an ORACLE balancer (free migration, infinitely divisible work, zero
+   overhead) saves exactly `max - mean`. Re-parsing the existing rocprof-sys run rooted at the step
+   loop gives per-rank work of 66.8/74.9/80.9/95.8/92.2/92.7/78.3/73.8 s, so the ceiling is
+   **13.9 s of 271.2 s = 5.1% of step-loop wall** (the work-share, 14.5%, overstates the prize 3x -
+   balancing removes only the straggler's excess, real communication is still paid). A real balancer
+   moves whole boxes and must beat its own cost, so it returns less than 5.1%. **Do not build it.**
+   This also corrects the skew figure to 16.9% (max/mean), not 33.7%, and shows the skew is a MINOR
+   term overall: if every rank waited only for the straggler, total waiting would be 111.0 s against
+   1456.7 s of measured MPI, so **skew explains just 7.6% of MPI time**. The step loop is ~69% MPI on
+   every rank regardless of skew, and what that is remains OPEN. Tool: `amr-bench/balance_ceiling.py`.
 3. ~~`rocprof-sys-causal` measures what a virtual speedup of a region ACTUALLY buys.~~
    **RUN 2026-08-16, AND IT CANNOT PROFILE THIS CODE.** Two independent disqualifications:
 
