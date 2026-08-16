@@ -708,7 +708,7 @@ contains
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
-            call DelayFileAccess(proc_rank)
+            call s_delay_file_access(proc_rank)
 
             call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
 
@@ -893,6 +893,10 @@ contains
 
         write (file_loc, '(A)') 'ib.dat'
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+
+        call s_mpi_barrier()
+        call s_delay_file_access(proc_rank)
+
         call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
 
         var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
@@ -952,7 +956,7 @@ contains
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
-            call DelayFileAccess(proc_rank)
+            call s_delay_file_access(proc_rank)
 
             write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
