@@ -153,15 +153,6 @@ contains
             end if
         end do
 
-        if (integral_wrt) then
-            do i = 1, num_integrals
-                write (file_path, '(A,I0,A)') '/D/integral', i, '_prim.dat'
-                file_path = trim(case_dir) // trim(file_path)
-
-                open (i + 70, FILE=trim(file_path), form='formatted', POSITION='append', STATUS='unknown')
-            end do
-        end if
-
     end subroutine s_open_probe_files
 
     !> Write stability criteria extrema to the run-time information file at the given time step
@@ -1158,9 +1149,6 @@ contains
         integer                         :: i, j, k, l, s, d  !< Generic loop iterator
         real(wp)                        :: nondim_time       !< Non-dimensional time
         real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
-        integer                         :: npts              !< Number of included integral points
-        real(wp)                        :: rad, thickness    !< For integral quantities
-        logical                         :: trigger           !< For integral quantities
         real(wp)                        :: rhoYks(1:num_species)
 
         T = dflt_T_guess
@@ -1538,125 +1526,6 @@ contains
                 end if
             end if
         end do
-
-        if (integral_wrt .and. bubbles_euler) then
-            if (n == 0) then
-                do i = 1, num_integrals
-                    int_pres = 0._wp
-                    max_pres = 0._wp
-                    k = 0; l = 0
-                    npts = 0
-                    do j = 1, m
-                        pres = 0._wp
-                        do s = 1, num_vels
-                            vel(s) = 0._wp
-                        end do
-                        rho = 0._wp
-                        pres = 0._wp
-                        gamma = 0._wp
-                        pi_inf = 0._wp
-                        qv = 0._wp
-
-                        if ((integral(i)%xmin <= x_cb(j)) .and. (integral(i)%xmax >= x_cb(j))) then
-                            npts = npts + 1
-                            call s_convert_to_mixture_variables(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
-                            do s = 1, num_vels
-                                vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j, k, l)/rho
-                            end do
-
-                            pres = ((q_cons_vf(eqn_idx%E)%sf(j, k, l) - 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                    & l)**2._wp)/rho)/(1._wp - q_cons_vf(eqn_idx%alf)%sf(j, k, l)) - pi_inf - qv)/gamma
-                            int_pres = int_pres + (pres - 1._wp)**2._wp
-                        end if
-                    end do
-                    int_pres = sqrt(int_pres/(1._wp*npts))
-
-                    if (num_procs > 1) then
-                        tmp = int_pres
-                        call s_mpi_allreduce_sum(tmp, int_pres)
-                    end if
-
-                    if (proc_rank == 0) then
-                        if (bubbles_euler .and. (num_fluids <= 2)) then
-                            write (i + 70, '(6x,f12.6,f24.8)') nondim_time, int_pres
-                        end if
-                    end if
-                end do
-            else if (p == 0) then
-                if (num_integrals /= 3) then
-                    call s_mpi_abort('Incorrect number of integrals')
-                end if
-
-                rad = integral(1)%xmax
-                thickness = integral(1)%xmin
-
-                do i = 1, num_integrals
-                    int_pres = 0._wp
-                    max_pres = 0._wp
-                    l = 0
-                    npts = 0
-                    do j = 1, m
-                        do k = 1, n
-                            trigger = .false.
-                            if (i == 1) then
-                                ! inner portion
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) < (rad - 0.5_wp*thickness)) trigger = .true.
-                            else if (i == 2) then
-                                ! net region
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad - 0.5_wp*thickness) .and. sqrt(x_cb(j)**2._wp &
-                                    & + y_cb(k)**2._wp) < (rad + 0.5_wp*thickness)) trigger = .true.
-                            else if (i == 3) then
-                                ! everything else
-                                if (sqrt(x_cb(j)**2._wp + y_cb(k)**2._wp) > (rad + 0.5_wp*thickness)) trigger = .true.
-                            end if
-
-                            pres = 0._wp
-                            do s = 1, num_vels
-                                vel(s) = 0._wp
-                            end do
-                            rho = 0._wp
-                            pres = 0._wp
-                            gamma = 0._wp
-                            pi_inf = 0._wp
-                            qv = 0._wp
-
-                            if (trigger) then
-                                npts = npts + 1
-                                call s_convert_to_mixture_variables(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv, Re)
-                                do s = 1, num_vels
-                                    vel(s) = q_cons_vf(eqn_idx%cont%end + s)%sf(j, k, l)/rho
-                                end do
-
-                                pres = ((q_cons_vf(eqn_idx%E)%sf(j, k, l) - 0.5_wp*(q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                        & l)**2._wp)/rho)/(1._wp - q_cons_vf(eqn_idx%alf)%sf(j, k, l)) - pi_inf - qv)/gamma
-                                int_pres = int_pres + abs(pres - 1._wp)
-                                max_pres = max(max_pres, abs(pres - 1._wp))
-                            end if
-                        end do
-                    end do
-
-                    if (npts > 0) then
-                        int_pres = int_pres/(1._wp*npts)
-                    else
-                        int_pres = 0._wp
-                    end if
-
-                    if (num_procs > 1) then
-                        tmp = int_pres
-                        call s_mpi_allreduce_sum(tmp, int_pres)
-
-                        tmp = max_pres
-                        call s_mpi_allreduce_max(tmp, max_pres)
-                    end if
-
-                    if (proc_rank == 0) then
-                        if (bubbles_euler .and. (num_fluids <= 2)) then
-                            write (i + 70, '(6x,f12.6,f24.8,f24.8)') nondim_time, int_pres, max_pres
-                        end if
-                    end if
-                end do
-            end if
-        end if
 
     end subroutine s_write_probe_files
 
