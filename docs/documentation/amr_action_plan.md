@@ -139,8 +139,32 @@ Open questions, in order:
    contents (level-1 vs level-2 mix), ghost/seam work proportional to a rank's surface rather than its
    volume, or per-rank differences in how many boxes need cross-rank gathers.
 2. Would a time-based (measured, not modelled) rebalance close it?
-3. `rocprof-sys-causal` measures what a virtual speedup of a region ACTUALLY buys - the one tool that
-   answers "if X were free, how much faster" rather than "where time is". NOT YET RUN.
+3. ~~`rocprof-sys-causal` measures what a virtual speedup of a region ACTUALLY buys.~~
+   **RUN 2026-08-16, AND IT CANNOT PROFILE THIS CODE.** Two independent disqualifications:
+
+   - *It rejects our code and accepts data.* In its default `function` mode on the shipped Release
+     binary, every AMR scope yields **0 eligible address ranges** - `gather_coarse_patch` (even under
+     its exact mangled name `_QMm_amrPs_amr_gather_coarse_patch`), `exchange_coarse_cons_halo`,
+     `amr_regrid` - which aborts every rank with SIGABRT at startup. Only `compute_rhs` produced any
+     (16), and those are **spurious**: all are `.offloading.entry.*` / `*.region_id` symbols, which
+     `readelf -sW` confirms are `OBJECT` symbols in a *data* section, never executed, so no
+     instruction-pointer sample can land in them. The real `_QMm_amrPs_amr_gather_coarse_patch` is
+     `FUNC`, 6464 bytes, in `.text` - and was rejected. The AMR routines are pure host Fortran with no
+     OpenMP target regions, so they have no offloading entries for the analysis to latch onto.
+   - *Its inserted delay is not reproducible.* On a purpose-built known-answer program (hot=80%,
+     `amr-bench/causal_gate.c`), two sweeps with identical settings on an idle node, stable baselines,
+     one experiment record each, gave critical-path ratios of 2.02/1.15/1.00 and then 1.09/2.02/2.01 -
+     the delay at s=0.75 was 13.43 s once and 26.96 s the next time. The tool's *sampling* is exact
+     (4.007:1 against a true 4:1); its *delay* is not.
+
+   Reviving it needs a DWARF build. `--reldebug` is the wrong vehicle - it compiles `-DMFC_DEBUG`, so
+   it is not the code we measure, and it emitted no `-g` anyway. Release + `-gline-tables-only` changes
+   no codegen and is the right one, but note **editing `CMakeCache.txt` and re-running `./mfc.sh build`
+   does nothing**: mfc.sh skips the cmake configure step, so the generator never sees the new flag
+   (0 objects rebuilt, exit 0, binary untouched). A clean reconfigure is required, and even then the
+   reproducibility defect remains. Full record: `rocprof-sys-causal-cannot-profile-mfc` memory.
+
+   **So open questions 1 and 2 must be answered by direct measurement, not by causal profiling.**
 
 ### Tooling
 `rocprof-sys` (formerly Omnitrace) ships with ROCm and puts MPI + GPU + CPU on ONE timeline, which
