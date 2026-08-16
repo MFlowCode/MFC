@@ -104,7 +104,56 @@ solving the same problem and part of the 2.32x is accuracy, not speed.
 
 ---
 
-## TIER 1 - small, local, high confidence
+## TIER 1 - SUPERSEDED 2026-08-16: MPI is the SYMPTOM, not the cause
+
+**rocprof-sys per-rank measurement (cap 64, np=8, 30 steps) kills the premise of 1.1-1.3.**
+
+| rank | non-MPI (work) | MPI (waiting) | Allreduce |
+|---|---|---|---|
+| 0 | **126.4 s** | 203.8 s | 43.5 s |
+| 3 | **176.6 s** | **153.3 s** | 17.7 s |
+| 7 | 134.6 s | 195.4 s | **5.0 s** |
+
+Every rank's simulation time is ~330 s. **Non-MPI work is skewed 33.7%, and MPI time is its EXACT
+MIRROR IMAGE**: the rank doing the most work has the least MPI, and vice versa. `Allreduce` spans
+43.5 s to 5.0 s across ranks on a COLLECTIVE, where every rank performs identical communication -
+that is pure arrival-time skew, not communication cost.
+
+**Ranks are waiting for the straggler.** Making MPI faster moves time from the MPI column to the idle
+column and buys nothing. An independent PMPI interposer agrees on the size (MPI = 50% of step at cap
+64, 47% at cap 32) and adds that **POSTING (Isend/Irecv) is 0.004 s/step - essentially zero**: all MPI
+time is in calls that BLOCK. Not message volume, not call count. Waiting.
+
+So **1.1 (skip non-participating ranks), 1.2 (hoist per-call allocations) and 1.3 (GPU-aware MPI) all
+target MPI cost and would buy little.** They are not wrong as code hygiene; they are the wrong target.
+1.4 (cache the coarse-restore grid sync) is unaffected - it is host work, not MPI.
+
+### THE REAL TARGET: per-box TIME varies 33.7% by rank
+**This is NOT the load balance previously ruled out.** `[amr-balance]` reports box-count and weight
+balance at **1.008** - essentially perfect - and the earlier conclusion "load balancing would buy
+nothing" was correct ON THAT EVIDENCE. But boxes are distributed evenly while the TIME to process them
+is not. **The balancer models box count and a static weight; it does not model actual per-box time.**
+
+Open questions, in order:
+1. WHY does per-box time vary 33.7% when box counts match to 1.008? Candidates: heterogeneous box
+   contents (level-1 vs level-2 mix), ghost/seam work proportional to a rank's surface rather than its
+   volume, or per-rank differences in how many boxes need cross-rank gathers.
+2. Would a time-based (measured, not modelled) rebalance close it?
+3. `rocprof-sys-causal` measures what a virtual speedup of a region ACTUALLY buys - the one tool that
+   answers "if X were free, how much faster" rather than "where time is". NOT YET RUN.
+
+### Tooling
+`rocprof-sys` (formerly Omnitrace) ships with ROCm and puts MPI + GPU + CPU on ONE timeline, which
+removes the cross-instrument composition problem that invalidated earlier mechanism claims.
+`rocprof-sys-run` SEGFAULTS on this binary; **`rocprof-sys-sample` works**, and the wrapper must go
+INSIDE srun (`srun -n N rocprof-sys-sample -- app`). `ROCPROFSYS_PROFILE=true` emits per-rank
+`wall_clock-N.json`.
+
+---
+
+## TIER 1 (ORIGINAL - retained for the source analysis, but see above)
+
+### small, local, high confidence
 
 All four are verified in source, none touches the solver, and all attack `b` (per-box overhead).
 Sizes below come from cap-32 measurements and **must be re-measured at cap 64** before scoping.
