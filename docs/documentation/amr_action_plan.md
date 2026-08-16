@@ -4,8 +4,8 @@ Companion to `amr_block_batching.md`, which is the chronological research log. T
 **action list**: what to change in the code, in priority order, with the measurement behind each and
 an explicit list of things NOT to do. It supersedes the three-track plan appended to
 `amr_block_batching.md` earlier the same day — that plan was built on a configuration (cap 32) now
-known to be 2.74x off the achievable one, and on a headline gap (7.64x) now known to be an
-unmatched comparison.
+known to be 2.32x off the achievable one, and on a headline gap (7.64x) now known to be an
+unmatched comparison (2.03x at matched block size).
 
 ---
 
@@ -29,9 +29,10 @@ so per-box cost is not unique to MFC; ours is simply larger.
 
 **Cost model `wall = a*cells + b*boxes`: REJECTED, and now REPLACED BY DIRECT MEASUREMENT.**
 
-The fit failed its own residual test (spread 30.8% at 4 caps vs a ~12% noise floor), and the direct
-disproof needed no fit: cap 40 -> cap 48 has BYTE-IDENTICAL cells, 11% fewer boxes, 31% less wall.
-Both break-even numbers derived from it (113k and 573k cells/box) are VOID.
+The fit failed its own residual test (spread 30.8% at 4 caps vs a ~12% noise floor) - though that
+test used the NOISY Total-time instrument, so it is weaker than first stated. What actually kills it
+is the failed pre-registered prediction described below. Both break-even numbers derived from it
+(113k and 573k cells/box) are VOID.
 
 **MEASURED at FOUR caps, one clean instrument** (`ph_wall_total`, from scratch, differenced):
 
@@ -99,7 +100,7 @@ rather than cap 64 over-refining it. `fine_work` goes 139.6M -> 205.9M (+47%) wi
 coverage looks cap-independent (343 = 7^3 and 64 = 4^3 tile the same ~200-coarse-cell extent), and
 the nesting margin (`amr_cpat_mar` = 2 coarse cells at buff_size 2) predicts only 1.23x of a >=1.47x
 effect - **so the mechanism is NOT yet pinned**. If cap 32 under-refines, the two caps are not
-solving the same problem and part of the 2.74x is accuracy, not speed.
+solving the same problem and part of the 2.32x is accuracy, not speed.
 
 ---
 
