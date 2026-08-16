@@ -33,30 +33,38 @@ The fit failed its own residual test (spread 30.8% at 4 caps vs a ~12% noise flo
 disproof needed no fit: cap 40 -> cap 48 has BYTE-IDENTICAL cells, 11% fewer boxes, 31% less wall.
 Both break-even numbers derived from it (113k and 573k cells/box) are VOID.
 
-**MEASURED decomposition (clean protocol - see "How this is measured" below):**
+**MEASURED at FOUR caps, one clean instrument** (`ph_wall_total`, from scratch, differenced):
 
-| | cap 32 | cap 64 |
-|---|---|---|
-| step wall | 14.485 s | **6.238 s (2.32x faster)** |
-| kernel (trace union, differenced) | 1.278 s | 0.944 s |
-| **a** | **6.09 ns/cell** | **3.50 ns/cell** |
-| **b** | **6.29 ms/box** | **15.24 ms/box** |
-| residual | 5.613 s (39%) | 1.880 s (30%) |
-| boxes / cells | 1207 / 209.7M | 224 / 269.6M |
+| cap | block | s/step | kernel | **a** ns/cell | boxes | **b** ms/box | GPU busy | tax |
+|---|---|---|---|---|---|---|---|---|
+| 32 | 68^3 | 14.485 | 1.278 | **6.09** | 1207 | **6.29** | 8.8% | 19.01x |
+| 40 | 84^3 | 10.986 | 1.144 | **4.71** | 536 | **12.21** | 10.4% | 12.44x |
+| 48 | 100^3 | 10.126 | 1.055 | **4.34** | 478 | **13.11** | 10.4% | 11.47x |
+| 64 | 132^3 | 6.238 | 0.944 | **3.50** | 224 | **15.24** | 15.1% | 6.37x |
 
-**`a` depends on block size - 1.74x across ONE cap step**, which is what broke the fit. And cap 64's
-a = 3.50 is essentially the UNIFORM arm's 3.63: **at 132^3 blocks the per-cell efficiency penalty of
-AMR vanishes.** At 68^3 it is 1.74x. So bigger blocks win on kernel efficiency, not only box count.
+uniform arm: 0.2325 s/step over 64.0M cells = **3.633 ns/cell** (same node, same protocol).
 
-**`b` moves the WRONG WAY - 6.29 -> 15.24 ms/box.** Per-box cost is NOT a fixed toll; it scales with
-block volume, because packing, prolongation and ghost fills inside those phases are per-CELL work.
-Total per-box time still falls (7.594 -> 3.414 s/step) since 5.4x fewer boxes beats 2.4x more each.
-But "a fixed ~10 ms per box" was wrong, and the fitted model was wrong in BOTH terms.
+**Both coefficients are monotone and move in OPPOSITE directions.**
+- **`a` falls 6.09 -> 3.50 and REACHES the uniform arm's 3.63 at 132^3 blocks.** The per-cell
+  efficiency penalty of AMR is a pure block-size effect and VANISHES at cap 64. Three independent
+  differenced kernel traces; the one relationship that survived every test in this campaign.
+- **`b` RISES 6.29 -> 15.24 ms/box.** Per-box cost is NOT a fixed toll - it grows with block volume,
+  because packing, prolongation and ghost fills inside those phases are per-CELL work misfiled as
+  per-box. **So "fewer boxes" and "cheaper boxes" are NOT independent levers.**
 
-**The residual (30-39%)** is mostly phases excluded from the per-box bucket - chiefly `rhs`'s
-non-kernel time (25.5% of wall, and rhs is only ~5% kernel). The FULL top-level phase set covers
-91.9% of cap-32 wall with an 8.1% residual, so this is launch overhead inside the physics (Tier 2.1),
-not an unknown.
+That opposition is why every model failed: the two terms trade off, and a two-point fit can
+attribute the trade-off either way and still pass through both points exactly.
+
+**BOTH COST MODELS ARE DEAD.** `wall = a*cells + b*boxes`, and its successor
+`non-kernel = boxes*(F + c*volume)` (fitted to caps 32/64: F = 8.93 ms/box, c = 6.39 ns/cell), which
+predicted cap 40's non-kernel time at 6.82 s/step against a **measured 9.84 - a 31% miss on a point
+that INTERPOLATES between the two it was fitted to.** The prediction was written down before the run,
+which is the only reason the failure was legible rather than absorbable.
+
+**RETRACTED: the "direct disproof" of the first model.** I claimed cap 40 -> cap 48 had
+byte-identical cells, 11% fewer boxes and 31% less wall - impossible under a constant `a`. On the
+clean instrument that gap is **7.8%, not 31%**, and 11% fewer boxes buying 7.8% less wall at
+identical cells is exactly what a per-box cost PREDICTS. Stop citing that comparison.
 
 **HOW THIS IS MEASURED (do not regress to the old way):**
 - wall = `ph_wall_total` ("step-loop wall", needs rank_time_wrt=T). It brackets only
@@ -175,11 +183,11 @@ heavily and **must not be multiplied**.
   | cap 32 + 64 | 16.65 | 9.54 | **573k cells/box** |
   | cap 32 + 40 | 42.34 | 4.78 | **113k cells/box** |
 
-  `a` differs 2.5x, `b` 2x. Both fits are exact by construction (2 points, 2 unknowns, zero degrees
-  of freedom) so neither is testable - and **they STRADDLE the decision boundary**: a cap-32 block is
-  262k cells, BELOW 573k (do not split) but ABOVE 113k (splitting could pay). **Do not act on this
-  entry in either direction until caps 48 and 64 land.** If `fit_cost.py` then reports residuals
-  monotone in cap, the two-term model is missing a term and NEITHER break-even is meaningful.
+  **RESOLVED 2026-08-15, negatively: there is no valid break-even, because `b` is not a constant.**
+  It rises 6.29 -> 15.24 ms/box across caps 32-64, so a single "cost per box" does not exist and
+  neither does a single cells-per-box break-even. Both cost models that could have supplied one are
+  dead (see above). This entry stays UNDECIDED, and deciding it would need a direct experiment -
+  change the clustering, measure the wall - not a model.
 
   Log the defect regardless - it makes `amr_cluster_eff` dead code, and it will matter on non-convex
   features (shock fronts, sheets) where holes exist and the finder does work.
