@@ -210,7 +210,9 @@ heavily and **must not be multiplied**.
   changing nothing about the overhead. Quote weno1+LF for the AMReX comparison (conservative), and
   weno5+HLLC separately for production relevance.
 - **Judge cap changes by WALL on a fixed physical problem, not ns/cell.** A cap that over-covers
-  inflates its own denominator: cap 64 looks 3.5x better on ns/cell but is 2.74x better on wall.
+  inflates its own denominator: on the clean instrument cap 64 looks 2.99x better on ns/cell
+  (69.08 -> 23.14) but is only 2.32x better on WALL (14.485 -> 6.238), because it advances 29% more
+  cells. The wall number is the honest one for a cap change.
 - **One clock per ratio.** GPU-busy computed as traced-kernel-time over untraced wall gave rank 4
   **101.2%** - proof the terms came from different runs.
 - **Union-of-intervals for kernel busy time, never median x count.** MFC never overlaps kernels
