@@ -731,8 +731,6 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `chem_wrt_T`            | Logical | Write temperature field for chemistry output |
 | `fft_wrt`               | Logical | Enable FFT output |
 | `sim_data`              | Logical | Write interface and energy data files (post_process) |
-| `integral_wrt`          | Logical | Write integral data |
-| `num_integrals`         | Integer | Number of integral regions |
 | `down_sample`           | Logical | Enable output downsampling |
 | `fd_order`              | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)`    | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |

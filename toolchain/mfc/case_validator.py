@@ -1422,16 +1422,12 @@ class CaseValidator:
             if grcbc_vel_out:
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow Velocity (grcbc_vel_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
 
-    def check_probe_integral_output(self):
-        """Checks probe and integral output requirements (simulation)"""
+    def check_probe_output(self):
+        """Checks probe output requirements (simulation)"""
         probe_wrt = self.get("probe_wrt", "F") == "T"
-        integral_wrt = self.get("integral_wrt", "F") == "T"
         fd_order = self.get("fd_order")
-        bubbles_euler = self.get("bubbles_euler", "F") == "T"
 
         self.prohibit(probe_wrt and fd_order is None, "fd_order must be specified for probe_wrt")
-        self.prohibit(integral_wrt and fd_order is None, "fd_order must be specified for integral_wrt")
-        self.prohibit(integral_wrt and not bubbles_euler, "integral_wrt requires bubbles_euler to be enabled")
 
     # Pre-Process Specific Checks
 
@@ -2385,7 +2381,7 @@ class CaseValidator:
         self.check_bubbles_lagrange()
         self.check_continuum_damage()
         self.check_grcbc()
-        self.check_probe_integral_output()
+        self.check_probe_output()
 
     def validate_pre_process(self):
         """Validate pre-process-specific parameters"""
