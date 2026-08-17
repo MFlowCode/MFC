@@ -214,7 +214,7 @@ module m_global_parameters
     !> @}
     $:GPU_DECLARE(create='[fd_coeff_x, fd_coeff_y, fd_coeff_z]')
 
-    ! probe, integral: auto-generated in generated_decls.fpp
+    ! probe: auto-generated in generated_decls.fpp
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
@@ -572,23 +572,12 @@ contains
 
         fd_order = dflt_int
         probe_wrt = .false.
-        integral_wrt = .false.
         num_probes = dflt_int
-        num_integrals = dflt_int
 
         do i = 1, num_probes_max
             probe(i)%x = dflt_real
             probe(i)%y = dflt_real
             probe(i)%z = dflt_real
-        end do
-
-        do i = 1, num_probes_max
-            integral(i)%xmin = dflt_real
-            integral(i)%xmax = dflt_real
-            integral(i)%ymin = dflt_real
-            integral(i)%ymax = dflt_real
-            integral(i)%zmin = dflt_real
-            integral(i)%zmax = dflt_real
         end do
 
         ! GRCBC flags
