@@ -41,34 +41,6 @@ contains
 
     end function f_compute_filtered_dtheta
 
-    !> Computes inviscid CFL terms for multi-dimensional cases (2D/3D only)
-    function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(num_vels), intent(in) :: vel
-        real(wp), intent(in)                      :: c
-        integer, intent(in)                       :: j, k, l
-        real(wp)                                  :: cfl_terms
-        real(wp)                                  :: fltr_dtheta
-
-        fltr_dtheta = f_compute_filtered_dtheta(k, l)
-
-        if (p > 0) then
-            ! 3D
-            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                if (grid_geometry == 3) then
-                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
-                else
-                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
-                end if
-            #:endif
-        else
-            ! 2D
-            cfl_terms = min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
-        end if
-
-    end function f_compute_multidim_cfl_terms
-
     !> Computes enthalpy
     subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
@@ -96,10 +68,10 @@ contains
 
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
-        if (elasticity) then
-            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs)
+        if (hypoelasticity) then
+            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs)
         else
-            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
+            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
         if (igr) then
@@ -128,11 +100,6 @@ contains
             E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
         end if
 
-        ! Adjust energy for hyperelasticity
-        if (hyperelasticity) then
-            E = E + G_local*q_prim_vf(eqn_idx%xi%end + 1)%sf(j, k, l)
-        end if
-
         H = (E + pres)/rho
 
     end subroutine s_compute_enthalpy
@@ -150,8 +117,21 @@ contains
         real(wp)                                  :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then
-            icfl = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
+        ! The multi-dimensional CFL terms are written out here rather than
+        ! obtained from a shared helper procedure: NVHPC 25.5's fort2 segfaults
+        ! when a routine containing a call to that helper is cross-file inlined
+        ! by -Minline (the IPO setup in cmake/MFCTargets.cmake).
+        if (p > 0) then
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                    icfl = dt/min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
+                else
+                    icfl = dt/min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
+                end if
+            #:endif
+        else if (n > 0) then
+            icfl = dt/min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         else
             icfl = (dt/dx(j))*(abs(vel(1)) + c)
         end if
@@ -211,8 +191,21 @@ contains
         real(wp)                                  :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then
-            max_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
+        ! The multi-dimensional CFL terms are written out here rather than
+        ! obtained from a shared helper procedure: NVHPC 25.5's fort2 segfaults
+        ! when a routine containing a call to that helper is cross-file inlined
+        ! by -Minline (the IPO setup in cmake/MFCTargets.cmake).
+        if (p > 0) then
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                    max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
+                else
+                    max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
+                end if
+            #:endif
+        else if (n > 0) then
+            max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         else
             max_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if

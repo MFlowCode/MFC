@@ -28,7 +28,6 @@ module m_start_up
     use m_qbmm
     use m_derived_variables
     use m_hypoelastic
-    use m_hyperelastic
     use m_phase_change
     use m_viscous
     use m_bubbles_EE
@@ -144,7 +143,7 @@ contains
             call s_mpi_abort(trim(file_path) // ' is missing. Exiting.')
         end if
 
-        call s_check_inputs_common()
+        call s_check_inputs_common(check_total_cells=.false., n_global=0_8)
         call s_check_inputs()
 
     end subroutine s_check_input_file
@@ -234,7 +233,7 @@ contains
             end if
         end do
 
-        if (bubbles_euler .or. elasticity) then
+        if (bubbles_euler .or. hypoelasticity) then
             ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
@@ -367,12 +366,13 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (down_sample) then
-                    call s_initialize_mpi_data_ds(q_cons_vf)
+                    call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
                 else
                     if (ib) then
-                        call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                        call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, &
+                                                   & qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                     else
-                        call s_initialize_mpi_data(q_cons_vf)
+                        call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                     end if
                 end if
 
@@ -394,7 +394,7 @@ contains
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
@@ -443,9 +443,10 @@ contains
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
+                                               & qbmm_mv=mv_ts(1))
                 else
-                    call s_initialize_mpi_data(q_cons_vf)
+                    call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
                 end if
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
@@ -456,7 +457,7 @@ contains
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
 
-                if (bubbles_euler .or. elasticity) then
+                if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
@@ -814,9 +815,9 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module()
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi)
         call s_initialize_mpi_proxy_module()
-        call s_initialize_variables_conversion_module()
+        call s_initialize_variables_conversion_module(enforce_density_floor=.true., preserve_qbmm_number=.true.)
         if (grid_geometry == 3) call s_initialize_fftw_module()
 
         if (bubbles_euler) call s_initialize_bubbles_EE_module()
@@ -843,7 +844,7 @@ contains
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
 
-        call s_initialize_boundary_common_module()
+        call s_initialize_boundary_common_module(use_dirichlet_buffers=.true.)
 
         if (down_sample) then
             m_ds = int((m + 1)/3) - 1
@@ -870,25 +871,49 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
-        call s_populate_grid_variables_buffers()
+        block
+            type(int_bounds_info), dimension(3) :: grid_offsets
+
+            grid_offsets(:)%beg = buff_size
+            grid_offsets(:)%end = buff_size
+            if (n == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), &
+                                                       & global_bounds=glb_bounds)
+            else if (p == 0) then
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), y_cb, &
+                                                       & y_cc, dy, global_bounds=glb_bounds)
+            else
+                call s_populate_grid_variables_buffers(x_cb, x_cc, dx, grid_offsets(1), grid_offsets(2), grid_offsets(3), y_cb, &
+                                                       & y_cc, dy, z_cb, z_cc, dz, glb_bounds)
+            end if
+        end block
+        $:GPU_UPDATE(device='[glb_bounds]')
+        dx_min = minval(dx)
+        if (n > 0) dy_min = minval(dy)
+        if (p > 0) dz_min = minval(dz)
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
             block
                 type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
+                integer                                :: num_particle_cloud_ibs
+
+                call get_neighbor_bounds()
 
                 if (cfl_dt .and. n_start > 0) then
                     call s_read_ib_restart_data(n_start)
                     allocate (particle_cloud_ibs(0))
+                    num_particle_cloud_ibs = 0
                 else if (t_step_start > 0) then
                     call s_read_ib_restart_data(t_step_start)
                     allocate (particle_cloud_ibs(0))
+                    num_particle_cloud_ibs = 0
                 else
-                    call s_generate_particle_clouds(particle_cloud_ibs)
+                    call s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
                 end if
                 call s_instantiate_STL_models()
                 call s_initialize_ib_airfoils()
-                call s_reduce_ib_patch_array(particle_cloud_ibs)
+                call s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
                 deallocate (particle_cloud_ibs)
             end block
             call s_ibm_setup()
@@ -922,7 +947,6 @@ contains
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
-        if (hyperelasticity) call s_initialize_hyperelastic_module()
 
     end subroutine s_initialize_modules
 
@@ -997,7 +1021,7 @@ contains
 
         call s_initialize_parallel_io()
 
-        call s_mpi_decompose_computational_domain()
+        call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=.false., adjust_local_domains=.false.)
 
         bc = bc_xyz_info(bc_x, bc_y, bc_z)
 
@@ -1022,6 +1046,8 @@ contains
         end if
 
         $:GPU_UPDATE(device='[chem_params]')
+
+        $:GPU_UPDATE(device='[rburn]')
 
         $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
                      & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, &
@@ -1078,7 +1104,6 @@ contains
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
-        if (hyperelasticity) call s_finalize_hyperelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()
@@ -1201,12 +1226,16 @@ contains
 
     end subroutine s_read_ib_restart_data
 
-    !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_cloud_ibs (CPU-only, exact
-    !! size) and reduces to only the patches in or near the local computational domain. patch_ib is never reallocated; the local
-    !! subset is written in-place from the front. particle_cloud_ibs is owned by the caller and freed there after this returns.
-    subroutine s_reduce_ib_patch_array(particle_cloud_ibs)
+    !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_cloud_ibs (already filtered by
+    !! s_generate_particle_clouds to this rank's IB neighborhood, each entry already tagged with its final, absolute gbl_patch_id)
+    !! and reduces to only the patches in or near the local computational domain. patch_ib is never reallocated; the local subset is
+    !! written in-place from the front. particle_cloud_ibs is owned by the caller and freed there after this returns.
+    !! num_particle_cloud_ibs is the number of entries s_generate_particle_clouds actually wrote into particle_cloud_ibs - it may be
+    !! allocated to a larger worst-case capacity, so size() of it must never be used as the valid-entry count.
+    subroutine s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(ib_patch_parameters), intent(in), dimension(:) :: particle_cloud_ibs
+        integer, intent(in)                                 :: num_particle_cloud_ibs
         real(wp), dimension(3)                              :: centroid
         integer                                             :: i
         integer                                             :: num_namelist_ibs, num_bed_ibs
@@ -1217,7 +1246,7 @@ contains
             num_bed_ibs = num_bed_ibs + particle_cloud(i)%num_particles
         end do
 
-        ! Check for moving IBs across both namelist and particle bed patches.
+        ! Check for moving IBs across both namelist and particle cloud patches.
         moving_immersed_boundary_flag = .false.
         do i = 1, num_namelist_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
@@ -1226,28 +1255,25 @@ contains
             end if
         end do
         if (.not. moving_immersed_boundary_flag) then
-            do i = 1, num_bed_ibs
-                if (particle_cloud_ibs(i)%moving_ibm /= 0) then
+            do i = 1, num_particle_clouds
+                if (particle_cloud(i)%moving_ibm /= 0) then
                     moving_immersed_boundary_flag = .true.
                     exit
                 end if
             end do
         end if
 
-        call get_neighbor_bounds()
         call s_compute_ib_neighbor_ranks()
-
-        num_gbl_ibs = num_namelist_ibs + num_bed_ibs
 
 #ifdef MFC_MPI
         if (num_procs == 1) then
             ! single-rank: all patches are local; append particle bed entries directly into patch_ib.
+            do i = 1, num_particle_cloud_ibs
+                patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
+            end do
+            num_gbl_ibs = num_namelist_ibs + num_particle_cloud_ibs
             @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
                        & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-            do i = 1, num_bed_ibs
-                patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
-                patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + i
-            end do
             num_ibs = num_gbl_ibs
             num_local_ibs = num_gbl_ibs
             do i = 1, num_gbl_ibs
@@ -1257,6 +1283,7 @@ contains
             ! multi-rank: compact namelist patches in-place (write_idx <= read_idx, no aliasing), then append local particle beds.
             num_ibs = 0
             num_local_ibs = 0
+            num_gbl_ibs = num_namelist_ibs + num_bed_ibs
             do i = 1, num_namelist_ibs
                 centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
@@ -1266,36 +1293,36 @@ contains
                     patch_ib(num_ibs)%gbl_patch_id = i
                     if (f_local_rank_owns_location(centroid)) then
                         num_local_ibs = num_local_ibs + 1
+                        @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
+                                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
                         local_ib_patch_ids(num_local_ibs) = num_ibs
                     end if
                 end if
             end do
-            do i = 1, num_bed_ibs
+            ! particle_cloud_ibs entries already passed the neighborhood check at generation time so no need to recheck it here.
+            do i = 1, num_particle_cloud_ibs
                 centroid = [particle_cloud_ibs(i)%x_centroid, particle_cloud_ibs(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = particle_cloud_ibs(i)%z_centroid
-                if (f_neighborhood_ranks_own_location(centroid)) then
-                    num_ibs = num_ibs + 1
-                    @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
-                               & "Local IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-                    patch_ib(num_ibs) = particle_cloud_ibs(i)
-                    patch_ib(num_ibs)%gbl_patch_id = num_namelist_ibs + i
-                    if (f_local_rank_owns_location(centroid)) then
-                        num_local_ibs = num_local_ibs + 1
-                        local_ib_patch_ids(num_local_ibs) = num_ibs
-                    end if
+                num_ibs = num_ibs + 1
+                @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
+                           & "Local IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+                patch_ib(num_ibs) = particle_cloud_ibs(i)
+                if (f_local_rank_owns_location(centroid)) then
+                    num_local_ibs = num_local_ibs + 1
+                    @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
+                               & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
+                    local_ib_patch_ids(num_local_ibs) = num_ibs
                 end if
             end do
-            @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
-                       & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
         end if
 #else
         ! no-MPI: all patches are local; append particle bed entries directly into patch_ib.
+        do i = 1, num_particle_cloud_ibs
+            patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
+        end do
+        num_gbl_ibs = num_namelist_ibs + num_particle_cloud_ibs
         @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
                    & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-        do i = 1, num_bed_ibs
-            patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
-            patch_ib(num_namelist_ibs + i)%gbl_patch_id = num_namelist_ibs + i
-        end do
         num_ibs = num_gbl_ibs
         num_local_ibs = num_gbl_ibs
         do i = 1, num_gbl_ibs

@@ -101,9 +101,13 @@ DESCRIPTIONS = {
     "Re_inv": "Inverse Reynolds number",
     "viscous": "Enable viscous effects",
     "hypoelasticity": "Enable hypoelastic model",
-    "hyperelasticity": "Enable hyperelastic model",
+    "riemann_hypo_ADC": "Enable hypo anti-diffusion correction for HLLC/HLLD",
+    "ADC_kappa": "ADC sensor scaling parameter",
+    "hypo_hll_interface_rhs": "HLL uses interface-consistent hypo RHS",
+    "hll_u_interface": "HLL Method 2 (u-interface) selector",
     "surface_tension": "Enable surface tension effects",
     "chemistry": "Enable chemical reactions",
+    "reactive_burn": "Enable condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)",
     "mhd": "Enable magnetohydrodynamics",
     "hyper_cleaning": "Enable hyperbolic divergence cleaning for MHD",
     "hyper_cleaning_speed": "Wave speed for hyperbolic divergence cleaning",
@@ -114,7 +118,6 @@ DESCRIPTIONS = {
     "prim_vars_wrt": "Write primitive variables",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",
-    "integral_wrt": "Write integral data",
     "parallel_io": "Enable parallel I/O",
     "file_per_process": "Write separate file per MPI process",
     "format": "Output format",
@@ -140,9 +143,8 @@ DESCRIPTIONS = {
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",
-    # Probes and integrals
+    # Probes
     "num_probes": "Number of probe points",
-    "num_integrals": "Number of integral regions",
     # MPI/GPU
     "rdma_mpi": "Enable RDMA for MPI communication (GPUs)",
     # Misc
@@ -158,9 +160,7 @@ DESCRIPTIONS = {
     "thermal": "Thermal model selection",
     "relax_model": "Relaxation model type",
     "igr_order": "Implicit gradient reconstruction order",
-    "pref": "Reference pressure",
     "poly_sigma": "Polydisperse distribution standard deviation",
-    "rhoref": "Reference density",
     "sigma": "Surface tension coefficient",
     "Bx0": "Background magnetic field in x-direction",
     "relax": "Enable relaxation terms",
@@ -185,7 +185,6 @@ DESCRIPTIONS = {
     "perturb_flow": "Enable flow perturbation",
     "perturb_sph": "Enable spherical perturbation",
     "cfl_dt": "Enable CFL-based time stepping",
-    "pre_stress": "Enable pre-stress initialization",
     "elliptic_smoothing": "Enable elliptic smoothing",
     "simplex_perturb": "Enable simplex noise perturbation",
     "n_start_old": "Starting index from previous simulation",
@@ -432,13 +431,6 @@ PATTERNS = [
     (r"probe\((\d+)\)%x", "X-coordinate of probe {0}"),
     (r"probe\((\d+)\)%y", "Y-coordinate of probe {0}"),
     (r"probe\((\d+)\)%z", "Z-coordinate of probe {0}"),
-    # integral patterns
-    (r"integral\((\d+)\)%xmin", "X-min of integral region {0}"),
-    (r"integral\((\d+)\)%xmax", "X-max of integral region {0}"),
-    (r"integral\((\d+)\)%ymin", "Y-min of integral region {0}"),
-    (r"integral\((\d+)\)%ymax", "Y-max of integral region {0}"),
-    (r"integral\((\d+)\)%zmin", "Z-min of integral region {0}"),
-    (r"integral\((\d+)\)%zmax", "Z-max of integral region {0}"),
     # bub_pp patterns
     (r"bub_pp%R0ref", "Reference bubble radius"),
     (r"bub_pp%p0ref", "Reference pressure for bubbles"),
@@ -530,6 +522,13 @@ PATTERNS = [
     (r"chem_params%gamma_method", "Gamma calculation method (1=formulation, 2=cp/cv ratio)"),
     (r"chem_params%transport_model", "Transport model selection for chemistry"),
     (r"chem_params%(\w+)", "Chemistry parameter: {0}"),
+    # rburn (reactive-burn) patterns - specific fields first
+    (r"rburn%k", "Reactive-burn rate coefficient [1/s]"),
+    (r"rburn%pign", "Reactive-burn ignition pressure threshold [Pa]"),
+    (r"rburn%pref", "Reactive-burn reference pressure for the pressure drive [Pa]"),
+    (r"rburn%n", "Reactive-burn pressure-drive exponent"),
+    (r"rburn%ta", "Reactive-burn activation temperature [K] (0 = pure pressure-driven; >0 adds an Arrhenius exp(-ta/T) factor)"),
+    (r"rburn%(\w+)", "Reactive-burn parameter: {0}"),
     # fluid_rho patterns
     (r"fluid_rho\((\d+)\)", "Reference density for fluid {0}"),
 ]
@@ -566,6 +565,7 @@ def _infer_from_naming(param_name: str) -> str:
             "simplex_params": "Simplex noise",
             "lag_params": "Lagrangian tracking",
             "chem_params": "Chemistry",
+            "rburn": "Reactive burn",
             "bub_pp": "Bubble",
             "x_output": "X-direction output",
             "y_output": "Y-direction output",
@@ -691,13 +691,13 @@ FEATURE_DESCRIPTIONS = {
     "time": "Time stepping and integration",
     "output": "Output and visualization",
     "chemistry": "Chemical reactions and species transport",
-    "elasticity": "Elastic and hyperelastic materials",
+    "hypoelasticity": "Hypoelastic materials",
     "acoustic": "Acoustic sources and wave generation",
     "ib": "Immersed boundary method",
     "grid": "Computational grid and domain",
     "bc": "Boundary conditions",
     "riemann": "Riemann solver settings",
-    "probes": "Probe points and integral regions",
+    "probes": "Probe points",
     "surface_tension": "Surface tension and interface",
     "relativity": "Special relativity",
 }

@@ -16,7 +16,7 @@ module m_icpp_patches
     use m_model  ! Subroutine(s) related to STL files
     use m_derived_types  ! Definitions of the derived types
     use m_global_parameters
-    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius, model_eqns_4eq
+    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
     use m_helper_basic
     use m_helper
     use m_mpi_common
@@ -177,14 +177,10 @@ contains
         integer :: i, j, k
 
         ! Placeholders for the cell boundary values
-        real(wp) :: pi_inf, gamma, lit_gamma
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
 
-        pi_inf = pi_infs(1)
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
         j = 0
         k = 0
 
@@ -320,8 +316,8 @@ contains
             do i = 0, m
                 if (patch_icpp(patch_id)%smoothen) then
                     ! Smooth Heaviside via hyperbolic tangent; smooth_coeff controls interface sharpness
-                    eta = tanh(smooth_coeff/min(dx, &
-                               & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
+                    eta = tanh(smooth_coeff/min(dx_min, &
+                               & dy_min)*(sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                 end if
 
                 if ((f_is_inside_cylinder(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, radius, &
@@ -493,8 +489,8 @@ contains
         do j = 0, n
             do i = 0, m
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = tanh(smooth_coeff/min(dx, &
-                               & dy)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2) - 1._wp))*(-0.5_wp) &
+                    eta = tanh(smooth_coeff/min(dx_min, &
+                               & dy_min)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2) - 1._wp))*(-0.5_wp) &
                                & + 0.5_wp
                 end if
 
@@ -563,8 +559,8 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = tanh(smooth_coeff/min(dx, dy, &
-                                   & dz)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z &
+                        eta = tanh(smooth_coeff/min(dx_min, dy_min, &
+                                   & dz_min)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z &
                                    & - z_centroid)/c)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
                     end if
 
@@ -602,15 +598,10 @@ contains
         integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k                   !< generic loop iterators
-        real(wp)                                                 :: pi_inf, gamma, lit_gamma  !< Equation of state parameters
+        integer                                                  :: i, j, k  !< generic loop iterators
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
-
-        pi_inf = pi_infs(1)
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
 
         ! Transferring the rectangle's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -638,13 +629,6 @@ contains
 
                         if (patch_icpp(patch_id)%hcid /= dflt_int) then
                             @:Hardcoded2D()
-                        end if
-
-                        if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == model_eqns_4eq)) then
-                            ! zero density, reassign according to Tait EOS
-                            q_prim_vf(1)%sf(i, j, 0) = (((q_prim_vf(eqn_idx%E)%sf(i, j, &
-                                      & 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))*rhoref*(1._wp &
-                                      & - q_prim_vf(eqn_idx%alf)%sf(i, j, 0))
                         end if
 
                         ! Updating the patch identities bookkeeping variable
@@ -695,7 +679,7 @@ contains
         do j = 0, n
             do i = 0, m
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy)*(a*x_cc(i) + b*y_cc(j) + c)/sqrt(a**2 + b**2))
+                    eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx_min, dy_min)*(a*x_cc(i) + b*y_cc(j) + c)/sqrt(a**2 + b**2))
                 end if
 
                 if ((a*x_cc(i) + b*y_cc(j) + c >= 0._wp .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, &
@@ -728,16 +712,11 @@ contains
         integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k                   !< generic loop iterators
-        real(wp)                                                 :: pi_inf, gamma, lit_gamma  !< equation of state parameters
-        real(wp)                                                 :: L0, U0                    !< Taylor Green Vortex parameters
+        integer                                                  :: i, j, k  !< generic loop iterators
+        real(wp)                                                 :: L0, U0   !< Taylor Green Vortex parameters
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
-
-        pi_inf = pi_infs(1)
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -803,14 +782,9 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
         ! Placeholders for the cell boundary values
-        real(wp) :: pi_inf, gamma, lit_gamma
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
-
-        pi_inf = pi_infs(1)
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -885,7 +859,7 @@ contains
                     end if
                 end if
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(dx, dy)*(R_boundary - r))
+                    eta = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(dx_min, dy_min)*(R_boundary - r))
                 end if
                 if ((r <= R_boundary .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
                     & 0) == smooth_patch_id) then
@@ -947,7 +921,7 @@ contains
                         end do
                     end do
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta_local = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(dx, dy, dz)*(R_surface - r))
+                        eta_local = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(dx_min, dy_min, dz_min)*(R_surface - r))
                     end if
                     if ((r <= R_surface .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
@@ -1005,9 +979,9 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = tanh(smooth_coeff/min(dx, dy, &
-                                   & dz)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) &
-                                   & - radius))*(-0.5_wp) + 0.5_wp
+                        eta = tanh(smooth_coeff/min(dx_min, dy_min, &
+                                   & dz_min)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid) &
+                                   & **2) - radius))*(-0.5_wp) + 0.5_wp
                     end if
 
                     if ((f_is_inside_sphere(x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, &
@@ -1153,16 +1127,16 @@ contains
 
                     if (patch_icpp(patch_id)%smoothen) then
                         if (.not. f_is_default(length_x)) then
-                            eta = tanh(smooth_coeff/min(dy, &
-                                       & dz)*(sqrt((cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
+                            eta = tanh(smooth_coeff/min(dy_min, &
+                                       & dz_min)*(sqrt((cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
                                        & + 0.5_wp
                         else if (.not. f_is_default(length_y)) then
-                            eta = tanh(smooth_coeff/min(dx, &
-                                       & dz)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
+                            eta = tanh(smooth_coeff/min(dx_min, &
+                                       & dz_min)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
                                        & + 0.5_wp
                         else
-                            eta = tanh(smooth_coeff/min(dx, &
-                                       & dy)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2) - radius))*(-0.5_wp) &
+                            eta = tanh(smooth_coeff/min(dx_min, &
+                                       & dy_min)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2) - radius))*(-0.5_wp) &
                                        & + 0.5_wp
                         end if
                     end if
@@ -1240,8 +1214,8 @@ contains
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx, dy, &
-                                                       & dz)*(a*x_cc(i) + b*cart_y + c*cart_z + d)/sqrt(a**2 + b**2 + c**2))
+                        eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx_min, dy_min, &
+                                                       & dz_min)*(a*x_cc(i) + b*cart_y + c*cart_z + d)/sqrt(a**2 + b**2 + c**2))
                     end if
 
                     if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0._wp .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, &

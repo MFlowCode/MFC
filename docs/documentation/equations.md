@@ -23,7 +23,7 @@ where:
 - \f$\mathbf{h}(\mathbf{q})\,\nabla \cdot \mathbf{u}\f$ contains non-conservative terms (volume fraction advection),
 - \f$\mathbf{s}(\mathbf{q})\f$ is the source vector (bubbles, body forces, chemistry, etc.).
 
-The parameter `model_eqns` (1, 2, 3, or 4) selects the governing equation set.
+The parameter `model_eqns` (1, 2, or 3) selects the governing equation set.
 
 **Key source files:** `src/simulation/m_rhs.fpp` (RHS evaluation), `src/common/m_variables_conversion.fpp` (EOS and variable conversion).
 
@@ -299,7 +299,6 @@ See Section 8 (Phase Change) below for details.
 ### 2.3 Other Model Variants
 
 - `model_eqns = 1`: **Gamma/pi_inf model** — simplified single-fluid formulation using mixture \f$\gamma\f$ and \f$\pi_\infty\f$ directly without tracking individual volume fractions (\cite Johnsen08).
-- `model_eqns = 4`: **Four-equation model** — reduced model from the six-equation system after full pressure-temperature equilibrium relaxation (Tait-like compressible liquid).
 
 ---
 
@@ -572,34 +571,6 @@ where \f$\mathbf{l} = \nabla \mathbf{u}\f$ is the velocity gradient and \f$\math
 \f[\hat{\boldsymbol{\tau}}^e = \frac{D\boldsymbol{\tau}^e}{Dt} - \mathbf{l} \cdot \boldsymbol{\tau}^e - \boldsymbol{\tau}^e \cdot \mathbf{l}^T + \boldsymbol{\tau}^e\,\text{tr}(\mathbf{D}) = 2G\,\mathbf{D}^d\f]
 
 This adds 6 additional transport equations in 3D (symmetric stress tensor: \f$\tau_{xx}^e, \tau_{xy}^e, \tau_{yy}^e, \tau_{xz}^e, \tau_{yz}^e, \tau_{zz}^e\f$).
-
-### 7.2 Hyperelastic Model (`hyperelasticity = .true.`) (\cite Kamrin12; \cite Wilfong26 Sec. 4.1.6)
-
-**Source:** `src/simulation/m_hyperelastic.fpp`
-
-**Reference map evolution:**
-
-\f[\frac{\partial (\rho\,\boldsymbol{\xi})}{\partial t} + \nabla \cdot (\rho\,\boldsymbol{\xi} \otimes \mathbf{u}) = 0\f]
-
-**Deformation gradient from reference map:**
-
-\f[\mathbf{F} = (\nabla \boldsymbol{\xi})^{-1}\f]
-
-**Left Cauchy-Green tensor:**
-
-\f[\mathbf{b} = \mathbf{F}\,\mathbf{F}^T\f]
-
-**Neo-Hookean Cauchy stress:**
-
-\f[\boldsymbol{\tau}^e = \frac{G}{J}\left(\mathbf{b} - \frac{\text{tr}(\mathbf{b})}{3}\,\mathbf{I}\right)\f]
-
-where \f$J = \det(\mathbf{F})\f$.
-
-**Hyperelastic energy:**
-
-\f[e^e = \frac{G}{2}\bigl(I_{\mathbf{b}} - 3\bigr), \qquad I_{\mathbf{b}} = \text{tr}(\mathbf{b})\f]
-
----
 
 ## 8. Phase Change (`relax = .true.`) (\cite Wilfong26 Sec. 4.1.3)
 
@@ -902,15 +873,32 @@ Four-state solver resolving the contact discontinuity. Star-state satisfies:
 
 Iterative exact Riemann solver.
 
-#### HLLD (`riemann_solver = 4`, MHD only)
+#### HLLD (`riemann_solver = 4`, MHD or hypoelasticity)
 
-Seven-state solver for ideal MHD resolving fast magnetosonic, Alfven, and contact waves (\cite Miyoshi05). The Riemann fan is divided by outer wave speeds \f$S_L\f$, \f$S_R\f$, Alfven speeds \f$S_L^*\f$, \f$S_R^*\f$, and a middle contact \f$S_M\f$:
+**MHD HLLD.** Seven-state solver for ideal MHD resolving fast magnetosonic, Alfven, and contact waves (\cite Miyoshi05). The Riemann fan is divided by outer wave speeds \f$S_L\f$, \f$S_R\f$, Alfven speeds \f$S_L^*\f$, \f$S_R^*\f$, and a middle contact \f$S_M\f$:
 
 \f[S_M = \frac{(S_R - u_R)\rho_R u_R - (S_L - u_L)\rho_L u_L - p_{T,R} + p_{T,L}}{(S_R - u_R)\rho_R - (S_L - u_L)\rho_L}\f]
 
 \f[S_L^* = S_M - \frac{|B_x|}{\sqrt{\rho_L^*}}, \qquad S_R^* = S_M + \frac{|B_x|}{\sqrt{\rho_R^*}}\f]
 
 where \f$p_T = p + |\mathbf{B}|^2/2\f$ is the total (thermal + magnetic) pressure. Continuity of normal velocity and total pressure is enforced across the Riemann fan.
+
+**Hypoelastic HLLD.** Shares the five-wave Riemann fan structure with MHD HLLD, but differs substantially in formulation. Elastic shear waves play the role of Alfven waves, with total pressure \f$p_T = p - \tau_{nn}\f$ and shear wave impedance \f$C = \hat{\rho}(\hat{G} + \hat{\tau}_{nn})\f$. However, the non-conservative nature of the multi-component elastic stress equations — particularly at material interfaces where \f$G\f$ is discontinuous — requires a dedicated treatment distinct from the MHD solver.
+
+The solver uses an **anchored dual-pass** formulation. Each Riemann solve at interface \f$j{+}1/2\f$ requires cell-centered quantities for the non-conservative products; these are taken as cell-centered values from the cell that the flux will update, rather than from the reconstructed interface states:
+
+\f[\mathbf{F}_{j+1/2}^{\text{left}} = \text{HLLD}\!\left(\mathbf{q}_{j+1/2}^L,\;\mathbf{q}_{j+1/2}^R;\;\mathbf{q}_{\text{cell},\,j}\right), \qquad \mathbf{F}_{j-1/2}^{\text{right}} = \text{HLLD}\!\left(\mathbf{q}_{j-1/2}^L,\;\mathbf{q}_{j-1/2}^R;\;\mathbf{q}_{\text{cell},\,j}\right)\f]
+
+\f[\frac{d\mathbf{U}_j}{dt} = \frac{1}{\Delta x}\!\left(\mathbf{F}_{j-1/2}^{\text{right}} - \mathbf{F}_{j+1/2}^{\text{left}}\right)\f]
+
+This formulation enables HLLD to be used with the non-conservative terms that affect the eigenstructure of the quasi-linear Jacobian. Volume fraction advection is built into the HLLD flux rather than treated as a separate non-conservative step.
+
+#### Developer Notes on Non-Conservative Term Implementation
+
+For details on how the Riemann solvers discretize non-conservative terms (volume fraction advection, Kapila \f$K\,\nabla\!\cdot\!\mathbf{u}\f$, and hypoelastic velocity gradients) and hand off interface quantities to the RHS, see the notes in `misc/dev_notes/`:
+
+- `HLL_HLLC_non_conservative_terms_derivations.md` — Mathematical derivation of HLL Method 1 (alpha-interface), Method 2 (u-interface), and HLLC transport traces, including the \f$S_M\zeta_K\f$ star-branch construction and ADC blending.
+- `Riemann_and_RHS_source_terms_explanations.md` — Code dataflow: which arrays carry what between m_riemann_solvers and m_rhs, overloading of flux_src, the three NC advection modes (adv_src_mode_alpha_iface, adv_src_mode_vel_iface, adv_src_mode_none), and the nc_iface_vel second export channel.
 
 ### 15.3 Time Integration
 

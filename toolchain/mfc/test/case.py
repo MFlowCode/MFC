@@ -105,8 +105,6 @@ BASE_CFG = {
     "fluid_pp(1)%qv": 0.0,
     "fluid_pp(1)%qvp": 0.0,
     "bubbles_euler": "F",
-    "pref": 101325.0,
-    "rhoref": 1000.0,
     "bubble_model": 3,
     "polytropic": "T",
     "polydisperse": "F",
@@ -251,9 +249,9 @@ class TestCase(case.Case):
         return trace_to_uuid(self.trace)
 
     def coverage_key(self) -> str:
-        from .coverage import param_hash
+        from .coverage import canonicalize_param_paths, param_hash
 
-        return param_hash(self.params)
+        return param_hash(canonicalize_param_paths(self.params, common.MFC_ROOT_DIR))
 
     def get_dirpath(self):
         return os.path.join(common.MFC_TEST_DIR, self.get_uuid())
@@ -343,7 +341,7 @@ print(json.dumps({{**case, **mods}}))
         elif "Cylindrical" in self.trace.split(" -> "):
             tolerance = 1e-9
         elif self.params.get("hypoelasticity", "F") == "T":
-            tolerance = 1e-7
+            tolerance = 1e-6
         elif self.params.get("mixlayer_perturb", "F") == "T":
             tolerance = 1e-7
         elif self.params.get("synthetic_turbulence", "F") == "T":

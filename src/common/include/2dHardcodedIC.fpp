@@ -112,13 +112,13 @@
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = (1._wp - alph)*rhoL
-            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pRef + rhoH*9.81_wp*(1.2_wp - y_cc(j))
         else
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, 0) = alph
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = (1._wp - alph)*rhoL
-            pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
+            pInt = pRef + rhoH*9.81_wp*(1.2_wp - intH)
             q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
     case (205)  ! 2D lung wave interaction problem
@@ -161,7 +161,7 @@
         ! Smoothening function to smooth out sharp discontinuity in the interface
         if (x_cc(i) <= 0.7_wp*lam) then
             d = x_cc(i) - lam*(0.4_wp - 0.1_wp*sin(2.0_wp*pi*(y_cc(j)/lam + 0.25_wp)))
-            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx*dy))))
+            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx_min*dy_min))))
             alpha_air = eps + (1.0_wp - 2.0_wp*eps)*fsm
             alpha_sf6 = 1.0_wp - alpha_air
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alpha_sf6*5.04_wp
@@ -441,6 +441,21 @@
                           & v) + interp_wt*stored_values(idx_hi, 1, v)
             end do
             q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = 0.0_wp
+        end if
+    case (275)  ! reactive shock-flame: sinusoidal (burned | fresh) flame interface
+        ! Applied on the burned patch; cells AHEAD of the wavy interface are reset to the fresh
+        ! reactant state (patch 1), giving a finite-amplitude flame front for a shock to wrinkle
+        ! (Richtmyer-Meshkov). a(2) = mean interface x, a(3) = amplitude, a(4) = transverse wavenumber.
+        d = patch_icpp(patch_id)%a(2) + patch_icpp(patch_id)%a(3)*sin(2._wp*pi*patch_icpp(patch_id)%a(4)*y_cc(j)/(y_domain%end &
+                       & - y_domain%beg))
+        if (x_cc(i) > d) then
+            q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(1)%pres
+            q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = patch_icpp(1)%vel(1)
+            q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, 0) = patch_icpp(1)%vel(2)
+            do v = eqn_idx%species%beg, eqn_idx%species%end
+                q_prim_vf(v)%sf(i, j, 0) = patch_icpp(1)%Y(v - eqn_idx%species%beg + 1)
+            end do
         end if
     case (280)  ! Isentropic vortex
         ! This is patch is hard-coded for test suite optimization used in the 2D_isentropicvortex case: This analytic patch uses
