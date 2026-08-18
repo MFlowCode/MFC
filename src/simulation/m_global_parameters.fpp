@@ -479,7 +479,7 @@ contains
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
         ! Immersed Boundaries (sim-specific extras)
-        ib_neighborhood_radius = 1
+        ib_neighborhood_radius = 0
         collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real

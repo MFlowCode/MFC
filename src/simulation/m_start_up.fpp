@@ -1310,32 +1310,54 @@ contains
     !! neighbors are known from bc_*, edge neighbors are obtained in round 1, and (3D) corner neighbors in round 2.
     subroutine s_compute_ib_neighbor_ranks()
 
-        integer                :: ax, k, nbr_idx, nreqs, sx, sy, sz, dx, dy, dz
-        integer, allocatable   :: send_table(:,:,:), recv_tables(:,:,:,:)
+        integer                :: i, j, k, nbr_idx, nreqs, sx, sy, sz, dx, dy, dz
+        integer, allocatable   :: send_table(:,:,:), recv_tables(:,:,:,:), temporary_neighbors
         integer, dimension(52) :: requests
 
 #ifdef MFC_MPI
         integer               :: ierr
         integer, dimension(4) :: buf4, rbuf4
         integer, dimension(2) :: buf2, rbuf2
+        logical               :: automatic_neighborhood_radius
+        real(wp)              :: maximum_ib_bound
 
-        ax = ib_neighborhood_radius
+        ! perform setup if we are doing automatic radius checking
+        if (ib_neighborhood_radius < 1) then
+            ! set up a temporary radius array to hold the indices
+            automatic_neighborhood_radius = .true.
+            temporary_radius = max(num_procs_x - 1, 1)  ! ensure that we get at least 1 neighbor rank
+            if (num_dims > 1) temporary_radius = max(temporary_radius, num_procs_y - 1)
+            if (num_dims > 2) temporary_radius = max(temporary_radius, num_procs_z - 1)
 
-        if (allocated(ib_neighbor_ranks)) deallocate (ib_neighbor_ranks)
-        allocate (ib_neighbor_ranks(-ax:ax,-ax:ax,-ax:ax))
-        ib_neighbor_ranks = MPI_PROC_NULL
-        ib_neighbor_ranks(0, 0, 0) = proc_rank
+            ! determine the maximum length of space that needs to be contained by the neighborhood
+            maximum_ib_bound = -1._wp
+            do i = 1, num_ibs
+                call s_get_ib_bound(patch_ib(i), bound)
+                maximum_ib_bound = max(maximum_ib_bound, bound)
+            end do
+            do i = 1, num_particle_clouds
+                maximum_ib_bound = max(maximum_ib_bound, particle_cloud(i)%radius)
+            end do
+        else
+            automatic_neighborhood_radius = .false.
+            temporary_radius = ib_neighborhood_radius
+        end if
+
+        allocate (temporary_neighbors(-ib_neighborhood_radius:ib_neighborhood_radius, &
+                  & -ib_neighborhood_radius:ib_neighborhood_radius,-ib_neighborhood_radius:ib_neighborhood_radius))
+        temporary_neighbors = MPI_PROC_NULL
+        temporary_neighbors(0, 0, 0) = proc_rank
 
         ! Fill radius-1 entries: face neighbors are known from domain decomposition
-        ib_neighbor_ranks(-1, 0, 0) = bc_x%beg
-        ib_neighbor_ranks(+1, 0, 0) = bc_x%end
+        temporary_neighbors(-1, 0, 0) = bc_x%beg
+        temporary_neighbors(+1, 0, 0) = bc_x%end
         if (num_dims >= 2) then
-            ib_neighbor_ranks(0, -1, 0) = bc_y%beg
-            ib_neighbor_ranks(0, +1, 0) = bc_y%end
+            temporary_neighbors(0, -1, 0) = bc_y%beg
+            temporary_neighbors(0, +1, 0) = bc_y%end
         end if
         if (num_dims == 3) then
-            ib_neighbor_ranks(0, 0, -1) = bc_z%beg
-            ib_neighbor_ranks(0, 0, +1) = bc_z%end
+            temporary_neighbors(0, 0, -1) = bc_z%beg
+            temporary_neighbors(0, 0, +1) = bc_z%end
         end if
 
         if (num_dims >= 2) then
@@ -1346,19 +1368,19 @@ contains
             call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 310, rbuf4, 4, MPI_INTEGER, &
                               & merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 310, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
             if (bc_x%end >= 0) then
-                ib_neighbor_ranks(+1, -1, 0) = rbuf4(1)
-                ib_neighbor_ranks(+1, +1, 0) = rbuf4(2)
-                ib_neighbor_ranks(+1, 0, -1) = rbuf4(3)
-                ib_neighbor_ranks(+1, 0, +1) = rbuf4(4)
+                temporary_neighbors(+1, -1, 0) = rbuf4(1)
+                temporary_neighbors(+1, +1, 0) = rbuf4(2)
+                temporary_neighbors(+1, 0, -1) = rbuf4(3)
+                temporary_neighbors(+1, 0, +1) = rbuf4(4)
             end if
 
             call MPI_SENDRECV(buf4, 4, MPI_INTEGER, merge(bc_x%end, MPI_PROC_NULL, bc_x%end >= 0), 311, rbuf4, 4, MPI_INTEGER, &
                               & merge(bc_x%beg, MPI_PROC_NULL, bc_x%beg >= 0), 311, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
             if (bc_x%beg >= 0) then
-                ib_neighbor_ranks(-1, -1, 0) = rbuf4(1)
-                ib_neighbor_ranks(-1, +1, 0) = rbuf4(2)
-                ib_neighbor_ranks(-1, 0, -1) = rbuf4(3)
-                ib_neighbor_ranks(-1, 0, +1) = rbuf4(4)
+                temporary_neighbors(-1, -1, 0) = rbuf4(1)
+                temporary_neighbors(-1, +1, 0) = rbuf4(2)
+                temporary_neighbors(-1, 0, -1) = rbuf4(3)
+                temporary_neighbors(-1, 0, +1) = rbuf4(4)
             end if
         end if
 
@@ -1369,41 +1391,43 @@ contains
             call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(bc_y%beg, MPI_PROC_NULL, bc_y%beg >= 0), 312, rbuf2, 2, MPI_INTEGER, &
                               & merge(bc_y%end, MPI_PROC_NULL, bc_y%end >= 0), 312, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
             if (bc_y%end >= 0) then
-                ib_neighbor_ranks(0, +1, -1) = rbuf2(1)
-                ib_neighbor_ranks(0, +1, +1) = rbuf2(2)
+                temporary_neighbors(0, +1, -1) = rbuf2(1)
+                temporary_neighbors(0, +1, +1) = rbuf2(2)
             end if
 
             call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(bc_y%end, MPI_PROC_NULL, bc_y%end >= 0), 313, rbuf2, 2, MPI_INTEGER, &
                               & merge(bc_y%beg, MPI_PROC_NULL, bc_y%beg >= 0), 313, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
             if (bc_y%beg >= 0) then
-                ib_neighbor_ranks(0, -1, -1) = rbuf2(1)
-                ib_neighbor_ranks(0, -1, +1) = rbuf2(2)
+                temporary_neighbors(0, -1, -1) = rbuf2(1)
+                temporary_neighbors(0, -1, +1) = rbuf2(2)
             end if
 
             ! Round 2: exchange z face ranks with xy-diagonal edge neighbors -> corner ranks. Each of the 4 xy diagonals gives 2
             ! corners (the +/-z variants). Pattern: send buf2 to mirror diagonal, receive from this diagonal -> that edge's z face
             ! ranks.
             #:for DX, DY, MDX, MDY, TAG in [(1,1,-1,-1,320), (1,-1,-1,1,321), (-1,1,1,-1,322), (-1,-1,1,1,323)]
-                call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(ib_neighbor_ranks(${MDX}$, ${MDY}$, 0), MPI_PROC_NULL, &
-                                  & ib_neighbor_ranks(${MDX}$, ${MDY}$, 0) >= 0), ${TAG}$, rbuf2, 2, MPI_INTEGER, &
-                                  & merge(ib_neighbor_ranks(${DX}$, ${DY}$, 0), MPI_PROC_NULL, ib_neighbor_ranks(${DX}$, ${DY}$, &
-                                  & 0) >= 0), ${TAG}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                if (ib_neighbor_ranks(${DX}$, ${DY}$, 0) >= 0) then
-                    ib_neighbor_ranks(${DX}$, ${DY}$, -1) = rbuf2(1)
-                    ib_neighbor_ranks(${DX}$, ${DY}$, +1) = rbuf2(2)
+                call MPI_SENDRECV(buf2, 2, MPI_INTEGER, merge(temporary_neighbors(${MDX}$, ${MDY}$, 0), MPI_PROC_NULL, &
+                                  & temporary_neighbors(${MDX}$, ${MDY}$, 0) >= 0), ${TAG}$, rbuf2, 2, MPI_INTEGER, &
+                                  & merge(temporary_neighbors(${DX}$, ${DY}$, 0), MPI_PROC_NULL, temporary_neighbors(${DX}$, &
+                                  & ${DY}$, 0) >= 0), ${TAG}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                if (temporary_neighbors(${DX}$, ${DY}$, 0) >= 0) then
+                    temporary_neighbors(${DX}$, ${DY}$, -1) = rbuf2(1)
+                    temporary_neighbors(${DX}$, ${DY}$, +1) = rbuf2(2)
                 end if
             #:endfor
         end if
 
         ! For radius > 1: extend the table by iterative 26-neighbor full-table exchanges. In each round, every rank broadcasts its
         ! current table to all 26 immediate neighbors. Their entry at offset (dx,dy,dz) from them = our entry at
-        ! (dx+sx,dy+sy,dz+sz). One extension round fills the entire next shell, so ax-1 rounds suffice.
-        if (ax > 1) then
-            allocate (send_table(-ax:ax,-ax:ax,-ax:ax))
-            allocate (recv_tables(-ax:ax,-ax:ax,-ax:ax,1:26))
+        ! (dx+sx,dy+sy,dz+sz). One extension round fills the entire next shell, so ib_neighborhood_radius-1 rounds suffice.
+        if (ib_neighborhood_radius > 1) then
+            allocate (send_table(-ib_neighborhood_radius:ib_neighborhood_radius,-ib_neighborhood_radius:ib_neighborhood_radius, &
+                      & -ib_neighborhood_radius:ib_neighborhood_radius))
+            allocate (recv_tables(-ib_neighborhood_radius:ib_neighborhood_radius,-ib_neighborhood_radius:ib_neighborhood_radius, &
+                      & -ib_neighborhood_radius:ib_neighborhood_radius,1:26))
 
-            do k = 2, ax
-                send_table = ib_neighbor_ranks
+            do k = 2, ib_neighborhood_radius
+                send_table = temporary_neighbors
 
                 nreqs = 0
                 nbr_idx = 0
@@ -1412,10 +1436,10 @@ contains
                         do sx = -1, 1
                             if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
                             nbr_idx = nbr_idx + 1
-                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
+                            if (temporary_neighbors(sx, sy, sz) < 0) cycle
                             nreqs = nreqs + 1
-                            call MPI_IRECV(recv_tables(:,:,:,nbr_idx), (2*ax + 1)**3, MPI_INTEGER, ib_neighbor_ranks(sx, sy, sz), &
-                                           & 400, MPI_COMM_WORLD, requests(nreqs), ierr)
+                            call MPI_IRECV(recv_tables(:,:,:,nbr_idx), (2*ib_neighborhood_radius + 1)**3, MPI_INTEGER, &
+                                           & temporary_neighbors(sx, sy, sz), 400, MPI_COMM_WORLD, requests(nreqs), ierr)
                         end do
                     end do
                 end do
@@ -1424,10 +1448,10 @@ contains
                     do sy = -1, 1
                         do sx = -1, 1
                             if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
-                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
+                            if (temporary_neighbors(sx, sy, sz) < 0) cycle
                             nreqs = nreqs + 1
-                            call MPI_ISEND(send_table, (2*ax + 1)**3, MPI_INTEGER, ib_neighbor_ranks(sx, sy, sz), 400, &
-                                           & MPI_COMM_WORLD, requests(nreqs), ierr)
+                            call MPI_ISEND(send_table, (2*ib_neighborhood_radius + 1)**3, MPI_INTEGER, temporary_neighbors(sx, &
+                                           & sy, sz), 400, MPI_COMM_WORLD, requests(nreqs), ierr)
                         end do
                     end do
                 end do
@@ -1440,16 +1464,16 @@ contains
                         do sx = -1, 1
                             if (sx == 0 .and. sy == 0 .and. sz == 0) cycle
                             nbr_idx = nbr_idx + 1
-                            if (ib_neighbor_ranks(sx, sy, sz) < 0) cycle
-                            do dz = -ax, ax
-                                do dy = -ax, ax
-                                    do dx = -ax, ax
+                            if (temporary_neighbors(sx, sy, sz) < 0) cycle
+                            do dz = -ib_neighborhood_radius, ib_neighborhood_radius
+                                do dy = -ib_neighborhood_radius, ib_neighborhood_radius
+                                    do dx = -ib_neighborhood_radius, ib_neighborhood_radius
                                         if (recv_tables(dx, dy, dz, nbr_idx) == MPI_PROC_NULL) cycle
-                                        if (dx + sx < -ax .or. dx + sx > ax) cycle
-                                        if (dy + sy < -ax .or. dy + sy > ax) cycle
-                                        if (dz + sz < -ax .or. dz + sz > ax) cycle
-                                        if (ib_neighbor_ranks(dx + sx, dy + sy, dz + sz) /= MPI_PROC_NULL) cycle
-                                        ib_neighbor_ranks(dx + sx, dy + sy, dz + sz) = recv_tables(dx, dy, dz, nbr_idx)
+                                        if (dx + sx < -ib_neighborhood_radius .or. dx + sx > ib_neighborhood_radius) cycle
+                                        if (dy + sy < -ib_neighborhood_radius .or. dy + sy > ib_neighborhood_radius) cycle
+                                        if (dz + sz < -ib_neighborhood_radius .or. dz + sz > ib_neighborhood_radius) cycle
+                                        if (temporary_neighbors(dx + sx, dy + sy, dz + sz) /= MPI_PROC_NULL) cycle
+                                        temporary_neighbors(dx + sx, dy + sy, dz + sz) = recv_tables(dx, dy, dz, nbr_idx)
                                     end do
                                 end do
                             end do
@@ -1460,6 +1484,13 @@ contains
 
             deallocate (send_table, recv_tables)
         end if
+
+        if (allocated(ib_neighbor_ranks)) deallocate (ib_neighbor_ranks)
+        allocate (ib_neighbor_ranks(-ib_neighborhood_radius:ib_neighborhood_radius,-ib_neighborhood_radius:ib_neighborhood_radius, &
+                  & -ib_neighborhood_radius:ib_neighborhood_radius))
+        ib_neighbor_ranks = temporary_neighbors(-ib_neighborhood_radius, ib_neighborhood_radius, -ib_neighborhood_radius, &
+                                                & ib_neighborhood_radius, -ib_neighborhood_radius, ib_neighborhood_radius)
+        deallocate (temporary_neighbors)
 #endif
 
     end subroutine s_compute_ib_neighbor_ranks
