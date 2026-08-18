@@ -157,7 +157,7 @@ __export_assignments() {
         if [[ "$_word" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
             __flush
             _acc="$_word"
-        else
+        elif [ -n "$_acc" ]; then
             _acc="$_acc $_word"
         fi
     done

@@ -83,6 +83,26 @@ def _module_words(entry):
     return proc.stdout.strip()
 
 
+def _load_with_stderr(entry):
+    """Run one entry through the exporter, returning its environment and stderr."""
+    script = textwrap.dedent(
+        """\
+        log() {{ :; }}          # modules.sh logging stub
+        {function_src}
+        __export_assignments {entry}
+        env
+        """
+    ).format(function_src=_helpers("__export_assignments"), entry=_quote(entry))
+
+    proc = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=True)
+    env = {}
+    for line in proc.stdout.splitlines():
+        key, sep, value = line.partition("=")
+        if sep:
+            env[key] = value
+    return env, proc.stderr.strip()
+
+
 def _quote(value):
     """Single-quote a string for safe interpolation into the bash script."""
     return "'" + value.replace("'", "'\\''") + "'"
@@ -158,6 +178,20 @@ def test_value_that_looks_like_an_echo_option_survives(value):
     """
     env = _load(f"MYVAR={value}")
     assert env["MYVAR"] == value
+
+
+def test_module_names_ahead_of_the_first_assignment_are_not_exported():
+    """A line may carry module names before its assignments; only the latter are exported.
+
+    The names are not identifiers, so handing them to ``export`` fails. Nothing
+    reads that failure -- ``. ./mfc.sh load`` output is routinely redirected --
+    which is the same silence the multi-word bug hid behind, so assert on it.
+    """
+    env, stderr = _load_with_stderr("python cmake CC=nvc CXX=nvc++")
+
+    assert env["CC"] == "nvc"
+    assert env["CXX"] == "nvc++"
+    assert stderr == ""
 
 
 def test_return_status_is_zero_when_the_caller_already_set_noglob():
