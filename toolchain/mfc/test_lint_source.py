@@ -66,6 +66,30 @@ def test_double_precision_flags_signed_d_exponent(tmp_path):
     assert "5.0d-11" in errors[0]
 
 
+def test_double_precision_flags_whole_mantissa(tmp_path):
+    """A multi-digit mantissa is caught, and the message quotes the whole literal."""
+    body = "\n".join(
+        [
+            "        p0 = 101325.d0",
+            "        x = 1013.25d3",
+            "        y = .5d0",
+            "",
+        ]
+    )
+    _write_src(tmp_path, "simulation/m_w.fpp", body)
+    errors = check_double_precision(tmp_path)
+    assert len(errors) == 3
+    assert "101325.d0" in errors[0]
+    assert "1013.25d3" in errors[1]
+    assert ".5d0" in errors[2]
+
+
+def test_double_precision_ignores_d_edit_descriptor(tmp_path):
+    """A 'D' edit descriptor with a repeat count is not a literal."""
+    _write_src(tmp_path, "simulation/m_v.fpp", "        write (*, '(1D12.4)') x\n")
+    assert check_double_precision(tmp_path) == []
+
+
 def test_double_precision_clean_cases(tmp_path):
     body = "\n".join(
         [
@@ -86,8 +110,16 @@ def test_integer_wp_flagged(tmp_path):
     assert "integer(wp)" in errors[0]
 
 
+def test_integer_wp_flags_explicit_kind_keyword(tmp_path):
+    """integer(kind=wp) is the same defect, spelled the way real(kind=wp) is."""
+    _write_src(tmp_path, "simulation/m_k.fpp", "        integer(kind=wp) :: i, j, k, l\n")
+    errors = check_integer_wp(tmp_path)
+    assert len(errors) == 1
+    assert "integer(kind=wp)" in errors[0]
+
+
 def test_integer_wp_clean(tmp_path):
-    body = "        integer :: i\n        real(wp) :: x\n"
+    body = "        integer :: i\n        real(wp) :: x\n        integer(KIND=MPI_OFFSET_KIND) :: disp\n"
     _write_src(tmp_path, "simulation/m_ok.fpp", body)
     assert check_integer_wp(tmp_path) == []
 

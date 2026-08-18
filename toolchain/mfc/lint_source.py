@@ -187,14 +187,15 @@ def check_double_precision(repo_root: Path) -> list[str]:
     """
     errors: list[str] = []
     src_dir = repo_root / SRC_DIR
-    # The d-literal alternative catches double-precision literals with signed or
-    # multi-digit exponents (e.g. 5.0d-11, 2.5d+3, 1.0d12), not just '[0-9]d0'.
-    # The identifier boundaries keep it from matching inside names like cart2d12_coords.
+    # The d-literal alternative catches double-precision literals with a full
+    # mantissa and a signed or multi-digit exponent (5.0d-11, 101325.d0, .5d0,
+    # 1013.25d3), not just '[0-9]d0'. The boundaries keep it out of identifiers
+    # like cart2d12_coords and out of 'D' edit descriptors like (1D12.4).
     precision_re = re.compile(
         r"\b(?:double_precision|double\s+precision|dsqrt|dexp|dlog|dble|dabs|"
         r"dprod|dmin|dmax|dfloat|dreal|dcos|dsin|dtan|dsign|dtanh|dsinh|dcosh)\b|"
         r"\breal\s*\(\s*[48]\s*\)|"
-        r"(?<![A-Za-z0-9_])[0-9]\.?[0-9]*[dD][-+]?[0-9]+(?![A-Za-z0-9_])",
+        r"(?<![A-Za-z0-9_.])(?:[0-9]+\.?[0-9]*|\.[0-9]+)[dD][-+]?[0-9]+(?![A-Za-z0-9_.])",
         re.IGNORECASE,
     )
 
@@ -271,14 +272,14 @@ def check_false_integers(repo_root: Path) -> list[str]:
 
 
 def check_integer_wp(repo_root: Path) -> list[str]:
-    """Flag ``integer(wp)`` declarations.
+    """Flag ``integer(wp)`` and ``integer(kind=wp)`` declarations.
 
     ``wp`` is a floating-point kind parameter; using it as an integer kind is a
     copy-paste error. Integers take the default kind: plain ``integer``.
     """
     errors: list[str] = []
     src_dir = repo_root / SRC_DIR
-    integer_wp_re = re.compile(r"\binteger\s*\(\s*wp\s*\)", re.IGNORECASE)
+    integer_wp_re = re.compile(r"\binteger\s*\(\s*(?:kind\s*=\s*)?wp\s*\)", re.IGNORECASE)
 
     for src in _fortran_fpp_files(src_dir):
         lines = src.read_text(encoding="utf-8").splitlines()
@@ -288,8 +289,9 @@ def check_integer_wp(repo_root: Path) -> list[str]:
             stripped = line.strip()
             if _is_comment_or_blank(stripped):
                 continue
-            if integer_wp_re.search(stripped.split("!")[0]):
-                errors.append(f"  {rel}:{i + 1} 'integer(wp)' uses a floating-point kind. Fix: use plain 'integer'")
+            match = integer_wp_re.search(stripped.split("!")[0])
+            if match:
+                errors.append(f"  {rel}:{i + 1} '{match.group()}' uses a floating-point kind. Fix: use plain 'integer'")
 
     return errors
 
