@@ -1468,7 +1468,6 @@ contains
 
         real(wp) :: beg_val, end_val, recv_val, bound, max_ib_bound, local_rank_width, max_rank_width
         integer  :: k, send_neighbor, recv_neighbor, ierr, temporary_radius
-        logical  :: automatic_neighborhood_radius
 
         ! Default: unbounded in all directions (covers single-rank and no-MPI cases)
 
@@ -1484,30 +1483,25 @@ contains
         if (ib_neighborhood_radius < 1) then
             ib_neighborhood_radius = 0  ! ensure we are starting with 0 neighborhood radius
 
-            ! set up a temporary radius array to hold the indices
-            automatic_neighborhood_radius = .true.
-
             ! determine the maximum length of space that needs to be contained by the neighborhood
             max_ib_bound = -1._wp
-            do i = 1, num_ibs
-                call s_get_ib_bound(patch_ib(i), bound)
+            do k = 1, num_ibs
+                call s_get_ib_bound(patch_ib(k), bound)
                 max_ib_bound = max(max_ib_bound, bound)
             end do
-            do i = 1, num_particle_clouds
-                max_ib_bound = max(max_ib_bound, particle_cloud(i)%radius)
+            do k = 1, num_particle_clouds
+                max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
             end do
 
             ! determine the upper bound on the size
             local_rank_width = -1._wp
-            #:for X, ID, DIM [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
-                local_rank_width = max(local_rank_width, abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)))
+            #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
+                if (num_dims >= ${ID}$) local_rank_width = max(local_rank_width, abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)))
             #:endfor
             call s_mpi_allreduce_max(local_rank_width, max_rank_width)
 
-            ! approximate the size of the neighborhood with a local 1.1x fudge factor for safety
-            ib_neighborhood_radius = floor(0.5_wp*max_rank_width/(1.1_wp*max_ib_bound))
-        else
-            automatic_neighborhood_radius = .false.
+            ! approximate the size of the neighborhood with a local 1.1x fudge factor for safety, lower bound of 1
+            ib_neighborhood_radius = max(1, floor(1.1_wp*max_ib_bound/(0.5_wp*max_rank_width)))
         end if
 
         ! For each direction, propagate the left/right boundary edges outward ib_neighborhood_radius hops. After k rounds: beg_val =
