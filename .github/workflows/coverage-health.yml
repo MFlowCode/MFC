@@ -13,6 +13,15 @@ jobs:
       # commit touching src/**/*.fpp or cases.py, which a shallow clone cannot answer.
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
+      - name: Fetch the coverage-map verification ref
+        # actions/checkout fetches only refs/heads and refs/tags, and refs/coverage-map/
+        # verified deliberately lives outside both so that updating it fires no `push`
+        # workflow trigger. Absent on a fork and in the window before the first refresh
+        # after it was introduced, so this must not fail the job: the check treats a
+        # missing ref as undeterminable and falls back to the wall-clock age rule.
+        run: |
+          git fetch --no-tags origin '+refs/coverage-map/verified:refs/coverage-map/verified' \
+            || echo "::notice::No coverage-map verification ref yet; using the wall-clock age rule."
       - uses: actions/setup-python@v6
         with: { python-version: '3.12' }
       - name: Initialize MFC
