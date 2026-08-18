@@ -71,7 +71,7 @@
     #! left to whatever mapping the enclosing region already applies to it. Note that is
     #! NOT equivalent to no_create on most targets -- OMP_DEFAULT_STR emits nothing unless
     #! the caller passes default='present', and even then only CCE maps present; NVHPC/PGI
-    #! and the fallback emit defaultmap(tofrom:...), which copies rather than reuses.
+    #! and the fallback emit a defaultmap(tofrom:scalar) clause, which copies rather than reuses.
     #! Do NOT #:stop here: GPU_DATA expands both backends before #if selects one, so
     #! aborting would break OpenACC builds, where no_create is supported natively.
     #:set no_create_val = ''
@@ -281,7 +281,7 @@
         & default_val.strip('\n')
     #! An OpenMP `target data` region must carry at least one map, use_device_ptr or
     #! use_device_addr clause. no_create contributes none (it is a no-op here), and
-    #! `default` is None by default, so GPU_DATA(no_create=...) with no other clause left
+    #! `default` is None by default, so GPU_DATA(no_create=x) with no other clause left
     #! clause_val empty and emitted a bare `!$omp target data` that no compiler accepts.
     #! Emit the body alone in that case -- a data region with nothing to map has nothing
     #! to do, which is what GPU_DATA's own #else branch already does when neither backend
