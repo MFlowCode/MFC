@@ -8,12 +8,7 @@ show_help() {
   echo "Options:"
   echo "  -h, --help                  Display this help message and exit."
   echo "  -c, --computer COMPUTER     Configures for COMPUTER environment."
-  echo "                 Options:     Ascent (a) | Frontier (f) | Frontier_amd (famd) | Summit (s) | Wombat (w)"
-  echo "                              AMD HPCFund (amdfund)"
-  echo "                              Bridges2 (b) | Expanse (e) | Delta (d) | DeltaAI (dai)"
-  echo "                              Phoenix (p) | Richardson (r) | Oscar (o)"
-  echo "                              Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
-  echo "                              Isaac (i)"
+  echo "                              Omit to be shown the list of supported systems."
   echo "  -m, --mode MODE             Configures into MODE."
   echo "                 Options:     gpu (g) | cpu (c)"
   echo ""
@@ -38,12 +33,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Get computer (if not supplied in command line)
+# The slugs advertised below must match the cluster definitions in
+# toolchain/modules; check_cluster_menu_slugs in toolchain/mfc/lint_source.py
+# enforces that and keys on these two markers.
+# lint: cluster-menu-begin
 if [ -v $u_c ]; then
     log   "Select a system:"
-    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Summit (s) | Wombat (w)"
+    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Wombat (w)"
     log   "$B""LLNL $W:   Tuolumne   (tuo)"
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d) | DeltaAI (dai)"
-    log   "$Y""Gatech$W:  Phoenix    (p)"
+    log   "$Y""Gatech$W:  Phoenix    (p) | Phoenix IFX (pifx)"
+    log   "$C""CSCS$W:    Santis     (san)"
     log   "$R""Caltech$W: Richardson (r)"
     log   "$BR""Brown$W: Oscar (o)"
     log   "$BR""Purdue$W: Anvil (pa)"
@@ -52,10 +52,11 @@ if [ -v $u_c ]; then
     log   "$OR""Florida$W: HiPerGator (h)"
     log   "$C""WPI $W:   Turing   (t)"
     log   "$R""AMD$W:     HPCFund  (amdfund)"
-    log_n "(${G}a${W}/${G}f${W}/${G}s${W}/${G}w${W}/${B}tuo${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${BR}pa${CR}/${OR}i${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
+    log_n "(${G}a${W}/${G}f${W}/${G}famd${W}/${G}w${W}/${B}tuo${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${Y}pifx${CR}/${C}san${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${BR}pa${CR}/${OR}i${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
     read u_c
     log
 fi
+# lint: cluster-menu-end
 
 # Get CPU/GPU (if not supplied in command-line)
 if [ -v $u_cg ]; then

@@ -406,7 +406,6 @@ def generate_parameter_docs() -> str:
         "bc_y": "Y-direction boundary conditions",
         "bc_z": "Z-direction boundary conditions",
         "probe": "Probe/monitoring point parameters",
-        "integral": "Integral region parameters",
         "simplex_params": "Simplex noise perturbation parameters",
         "chem_wrt_Y": "Chemistry species output parameters",
         "bub_pp": "Bubble property parameters",
