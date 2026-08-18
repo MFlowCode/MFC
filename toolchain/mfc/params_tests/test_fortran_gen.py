@@ -117,6 +117,54 @@ def test_decls_dt_for_sim():
     assert "real(wp)                :: dt" in generate_decls_fpp("sim")
 
 
+def test_common_module_decls_do_not_expand_namelists():
+    from mfc.params.definitions import NAMELIST_VARS
+    from mfc.params.generators.fortran_gen import generate_decls_fpp, generate_namelist_fpp
+
+    common_decls = ("avg_state", "alt_soundspeed", "mixture_err", "sigR", "riemann_solver")
+    for target in ("pre", "sim", "post"):
+        declarations = generate_decls_fpp(target)
+        for name in common_decls:
+            assert f":: {name}" in declarations
+
+    # Viscous is a case-optimization parameter, so simulation declares it in
+    # generated_case_opt_decls.fpp instead of generated_decls.fpp.
+    assert ":: viscous" in generate_decls_fpp("pre")
+    assert ":: viscous" in generate_decls_fpp("post")
+
+    assert "riemann_solver" not in generate_namelist_fpp("pre")
+    assert "riemann_solver" not in generate_namelist_fpp("post")
+    assert NAMELIST_VARS["avg_state"] == {"sim", "post"}
+    assert NAMELIST_VARS["alt_soundspeed"] == {"sim", "post"}
+    assert NAMELIST_VARS["mixture_err"] == {"sim", "post"}
+    assert NAMELIST_VARS["sigR"] == {"pre", "post"}
+    assert NAMELIST_VARS["viscous"] == {"pre", "sim"}
+    assert NAMELIST_VARS["riemann_solver"] == {"sim"}
+
+
+def test_stl_model_declarations_do_not_expand_post_namelist():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp, generate_namelist_fpp
+
+    post_declarations = generate_decls_fpp("post")
+    post_namelist = generate_namelist_fpp("post")
+
+    assert ":: num_stl_models" in post_declarations
+    assert ":: stl_models" in post_declarations
+    assert "num_stl_models" not in post_namelist
+    assert "stl_models" not in post_namelist
+
+
+def test_phase_change_declarations_do_not_expand_post_namelist():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp, generate_namelist_fpp
+
+    post_declarations = generate_decls_fpp("post")
+    post_namelist = generate_namelist_fpp("post")
+
+    for name in ("palpha_eps", "ptgalpha_eps"):
+        assert f":: {name}" in post_declarations
+        assert name not in post_namelist
+
+
 def test_decls_no_percent_vars():
     from mfc.params.generators.fortran_gen import generate_decls_fpp
 
@@ -298,6 +346,33 @@ def test_generate_case_opt_decls_fpp():
     assert "AUTO-GENERATED" in out
 
 
+def test_common_computed_scalars_are_declared_for_every_target():
+    from pathlib import Path
+
+    from mfc.params.generators.fortran_gen import get_generated_files
+
+    files = {path.parent.name: content for path, content in get_generated_files(Path("/build")) if path.name == "generated_case_opt_decls.fpp"}
+    for target in ("pre_process", "simulation", "post_process"):
+        for name in ("num_dims", "num_vels", "weno_polyn", "muscl_polyn"):
+            assert f":: {name}" in files[target]
+
+
+def test_simulation_generated_scalars_own_gpu_declarations():
+    from mfc.params.generators.fortran_gen import SIM_GPU_DECL_VARS, generate_case_opt_decls_fpp, generate_decls_fpp
+
+    generated = generate_decls_fpp("sim") + generate_case_opt_decls_fpp()
+    for name in SIM_GPU_DECL_VARS:
+        assert generated.count(f"$:GPU_DECLARE(create='[{name}]')") == 1
+
+
+def test_hypo_riemann_controls_own_gpu_declarations():
+    from mfc.params.generators.fortran_gen import generate_decls_fpp
+
+    generated = generate_decls_fpp("sim")
+    for name in ("riemann_hypo_ADC", "ADC_kappa", "hll_u_interface", "hypo_hll_interface_rhs"):
+        assert generated.count(f"$:GPU_DECLARE(create='[{name}]')") == 1
+
+
 # ── generate_bcast_fpp tests ──────────────────────────────────────────────────
 
 
@@ -365,9 +440,9 @@ def test_generate_bcast_fpp_class_a_real_scalars():
     assert "call MPI_BCAST(dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in sim
     assert "call MPI_BCAST(dt, " not in pre and "call MPI_BCAST(dt, " not in post
 
-    # pref is in all three
+    # poly_sigma is in all three
     for out, target in [(pre, "pre"), (sim, "sim"), (post, "post")]:
-        assert "call MPI_BCAST(pref, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: pref missing"
+        assert "call MPI_BCAST(poly_sigma, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)" in out, f"{target}: poly_sigma missing"
 
 
 def test_generate_bcast_fpp_class_a_str_scalars():

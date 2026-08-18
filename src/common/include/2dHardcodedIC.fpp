@@ -112,13 +112,13 @@
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = (1._wp - alph)*rhoL
-            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pRef + rhoH*9.81_wp*(1.2_wp - y_cc(j))
         else
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, 0) = alph
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = (1._wp - alph)*rhoL
-            pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
+            pInt = pRef + rhoH*9.81_wp*(1.2_wp - intH)
             q_prim_vf(eqn_idx%E)%sf(i, j, 0) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
     case (205)  ! 2D lung wave interaction problem
@@ -161,7 +161,7 @@
         ! Smoothening function to smooth out sharp discontinuity in the interface
         if (x_cc(i) <= 0.7_wp*lam) then
             d = x_cc(i) - lam*(0.4_wp - 0.1_wp*sin(2.0_wp*pi*(y_cc(j)/lam + 0.25_wp)))
-            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx*dy))))
+            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx_min*dy_min))))
             alpha_air = eps + (1.0_wp - 2.0_wp*eps)*fsm
             alpha_sf6 = 1.0_wp - alpha_air
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alpha_sf6*5.04_wp

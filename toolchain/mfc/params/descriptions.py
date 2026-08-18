@@ -101,6 +101,10 @@ DESCRIPTIONS = {
     "Re_inv": "Inverse Reynolds number",
     "viscous": "Enable viscous effects",
     "hypoelasticity": "Enable hypoelastic model",
+    "riemann_hypo_ADC": "Enable hypo anti-diffusion correction for HLLC/HLLD",
+    "ADC_kappa": "ADC sensor scaling parameter",
+    "hypo_hll_interface_rhs": "HLL uses interface-consistent hypo RHS",
+    "hll_u_interface": "HLL Method 2 (u-interface) selector",
     "surface_tension": "Enable surface tension effects",
     "chemistry": "Enable chemical reactions",
     "reactive_burn": "Enable condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)",
@@ -114,7 +118,6 @@ DESCRIPTIONS = {
     "prim_vars_wrt": "Write primitive variables",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",
-    "integral_wrt": "Write integral data",
     "parallel_io": "Enable parallel I/O",
     "file_per_process": "Write separate file per MPI process",
     "format": "Output format",
@@ -140,9 +143,8 @@ DESCRIPTIONS = {
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",
-    # Probes and integrals
+    # Probes
     "num_probes": "Number of probe points",
-    "num_integrals": "Number of integral regions",
     # MPI/GPU
     "rdma_mpi": "Enable RDMA for MPI communication (GPUs)",
     # Misc
@@ -158,9 +160,7 @@ DESCRIPTIONS = {
     "thermal": "Thermal model selection",
     "relax_model": "Relaxation model type",
     "igr_order": "Implicit gradient reconstruction order",
-    "pref": "Reference pressure",
     "poly_sigma": "Polydisperse distribution standard deviation",
-    "rhoref": "Reference density",
     "sigma": "Surface tension coefficient",
     "Bx0": "Background magnetic field in x-direction",
     "relax": "Enable relaxation terms",
@@ -431,13 +431,6 @@ PATTERNS = [
     (r"probe\((\d+)\)%x", "X-coordinate of probe {0}"),
     (r"probe\((\d+)\)%y", "Y-coordinate of probe {0}"),
     (r"probe\((\d+)\)%z", "Z-coordinate of probe {0}"),
-    # integral patterns
-    (r"integral\((\d+)\)%xmin", "X-min of integral region {0}"),
-    (r"integral\((\d+)\)%xmax", "X-max of integral region {0}"),
-    (r"integral\((\d+)\)%ymin", "Y-min of integral region {0}"),
-    (r"integral\((\d+)\)%ymax", "Y-max of integral region {0}"),
-    (r"integral\((\d+)\)%zmin", "Z-min of integral region {0}"),
-    (r"integral\((\d+)\)%zmax", "Z-max of integral region {0}"),
     # bub_pp patterns
     (r"bub_pp%R0ref", "Reference bubble radius"),
     (r"bub_pp%p0ref", "Reference pressure for bubbles"),
@@ -704,7 +697,7 @@ FEATURE_DESCRIPTIONS = {
     "grid": "Computational grid and domain",
     "bc": "Boundary conditions",
     "riemann": "Riemann solver settings",
-    "probes": "Probe points and integral regions",
+    "probes": "Probe points",
     "surface_tension": "Surface tension and interface",
     "relativity": "Special relativity",
 }

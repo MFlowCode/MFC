@@ -155,13 +155,13 @@
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = (1._wp - alph)*rhoL
-            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pref + rhoH*9.81_wp*(1.2_wp - y_cc(j))
+            q_prim_vf(eqn_idx%E)%sf(i, j, k) = pRef + rhoH*9.81_wp*(1.2_wp - y_cc(j))
         else
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = alph
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - alph
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, k) = alph*rhoH
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, k) = (1._wp - alph)*rhoL
-            pInt = pref + rhoH*9.81_wp*(1.2_wp - intH)
+            pInt = pRef + rhoH*9.81_wp*(1.2_wp - intH)
             q_prim_vf(eqn_idx%E)%sf(i, j, k) = pInt + rhoL*9.81_wp*(intH - y_cc(j))
         end if
     case (301)  ! (3D lung geometry in X direction, |sin(*)+sin(*)|)
@@ -233,7 +233,7 @@
 
         q_prim_vf(eqn_idx%E)%sf(i, j, k) = p_th*rcut*xcut + p_am
     case (304)  ! 3D Interface from file cartesian
-        alph = 0.5_wp*(1 + (1._wp - 2._wp*eps)*tanh((ih(start_idx(2) + j, start_idx(3) + k) - x_cc(i))*(0.5_wp/dx)))
+        alph = 0.5_wp*(1 + (1._wp - 2._wp*eps)*tanh((ih(start_idx(2) + j, start_idx(3) + k) - x_cc(i))*(0.5_wp/dx_min)))
 
         q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = alph
         q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - alph
@@ -246,7 +246,7 @@
 
         if (surface_tension) q_prim_vf(eqn_idx%c)%sf(i, j, k) = alph
     case (305)  ! 3D Interface from file axisymmetric
-        alph = 0.5_wp*(1 + (1._wp - 2._wp*eps)*tanh((ih(start_idx(2) + j, 0) - x_cc(i))*(0.01_wp/dx)))
+        alph = 0.5_wp*(1 + (1._wp - 2._wp*eps)*tanh((ih(start_idx(2) + j, 0) - x_cc(i))*(0.01_wp/dx_min)))
 
         q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k) = alph
         q_prim_vf(eqn_idx%adv%end)%sf(i, j, k) = 1._wp - alph

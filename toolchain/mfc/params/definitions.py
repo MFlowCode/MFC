@@ -2,7 +2,6 @@
 MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
-This replaces the definitions/ directory.
 """
 
 import re
@@ -28,7 +27,7 @@ def _fc(name: str, default: int) -> int:
 
 
 NF = _fc("num_fluids_max", 10)  # fluid_pp
-NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
+NPR = _fc("num_probes_max", 10)  # probe, acoustic
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max_namelist", 54000)  # patch_ib namelist array bound
@@ -130,7 +129,7 @@ TAG_DISPLAY_NAMES = {
     "acoustic": "Acoustic",
     "ib": "Immersed boundary",
     "reactive_burn": "Reactive burn",
-    "probes": "Probe/integral",
+    "probes": "Probe",
     "riemann": "Riemann solver",
     "relativity": "Relativity",
     "output": "Output",
@@ -338,9 +337,9 @@ CONSTRAINTS = {
     },
     # Model equations
     "model_eqns": {
-        "choices": [1, 2, 3, 4],
-        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation", 4: "4-Equation"},
-        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3, "4eq": 4},
+        "choices": [1, 2, 3],
+        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation"},
+        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3},
     },
     # Bubbles
     "bubble_model": {
@@ -380,7 +379,6 @@ CONSTRAINTS = {
     "ib_neighborhood_radius": {"min": 0},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
-    "num_integrals": {"min": 1},
     "nb": {"min": 1},
     "m": {"min": 0},
     "n": {"min": 0},
@@ -393,7 +391,7 @@ DEPENDENCIES = {
         "when_true": {
             "recommends": ["nb", "polytropic"],
             "requires_value": {
-                "model_eqns": [2, 4],
+                "model_eqns": [2],
                 "riemann_solver": [2],
                 "avg_state": [2],
             },
@@ -403,7 +401,6 @@ DEPENDENCIES = {
         "when_value": {
             2: {"requires": ["num_fluids"]},
             3: {"requires_value": {"riemann_solver": [2], "avg_state": [2], "wave_speeds": [1]}},
-            4: {"requires": ["rhoref", "pref"], "requires_value": {"num_fluids": [1]}},
         }
     },
     "viscous": {
@@ -496,6 +493,29 @@ DEPENDENCIES = {
             "requires": ["mhd"],
         }
     },
+    "riemann_hypo_ADC": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [2, 4],
+            },
+        }
+    },
+    "hypo_hll_interface_rhs": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
+    "hll_u_interface": {
+        "when_true": {
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
     "schlieren_wrt": {
         "when_true": {
             "requires": ["fd_order"],
@@ -509,11 +529,6 @@ DEPENDENCIES = {
     "cfl_dt": {
         "when_true": {
             "recommends": ["cfl_target"],
-        }
-    },
-    "integral_wrt": {
-        "when_true": {
-            "requires": ["fd_order"],
         }
     },
 }
@@ -620,6 +635,10 @@ def _load():
 
     # Hypoelasticity
     _r("hypoelasticity", LOG, {"hypoelasticity"})
+    _r("riemann_hypo_ADC", LOG, {"hypoelasticity"})
+    _r("ADC_kappa", REAL, {"hypoelasticity"})
+    _r("hypo_hll_interface_rhs", LOG, {"hypoelasticity"})
+    _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
@@ -651,10 +670,8 @@ def _load():
     _r("many_ib_patch_parallelism", LOG, {"ib"})
 
     # Probes
-    for n in ["num_probes", "num_integrals"]:
-        _r(n, INT, {"probes"})
+    _r("num_probes", INT, {"probes"})
     _r("probe_wrt", LOG, {"output", "probes"})
-    _r("integral_wrt", LOG, {"output", "probes"})
 
     # Output
     _r("precision", INT, {"output"})
@@ -737,9 +754,7 @@ def _load():
         "flux_lim",
     ]:
         _r(n, INT)
-    _r("pref", REAL, math=r"\f$p_\text{ref}\f$")
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
-    _r("rhoref", REAL, math=r"\f$\rho_\text{ref}\f$")
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
@@ -1037,12 +1052,6 @@ def _load():
         for d in ["x", "y", "z"]:
             _r(f"probe({i})%{d}", REAL, {"probes"})
 
-    # integrals (5 integral regions)
-    for i in range(1, 6):
-        for d in ["x", "y", "z"]:
-            _r(f"integral({i})%{d}min", REAL, {"probes"})
-            _r(f"integral({i})%{d}max", REAL, {"probes"})
-
     # Extended BC
     for d in ["x", "y", "z"]:
         px = f"bc_{d}%"
@@ -1158,6 +1167,11 @@ _init_registry()
 
 NAMELIST_VARS: dict[str, set[str]] = {}
 
+# Some common modules are compiled into every executable even though the
+# corresponding user input remains meaningful in only a subset of namelists.
+# Keep declaration visibility separate from input acceptance.
+DECLARATION_TARGETS: dict[str, set[str]] = {}
+
 # Maps indexed-family base names to their Fortran dimension expression.
 # The generator emits `{type}, dimension({dim}) :: {name}` for each entry.
 # Add here whenever a new array param needs no manual Fortran declaration.
@@ -1189,7 +1203,6 @@ TYPED_DECLS: dict[str, tuple] = {
     "ib_airfoil": ("type(ib_airfoil_parameters)", "num_ib_airfoils_max", True, "Per-airfoil NACA user inputs"),
     "stl_models": ("type(ib_stl_parameters)", "num_stl_models_max", True, "Per-STL model parameters"),
     "probe": ("type(vec3_dt)", "num_probes_max", False, None),
-    "integral": ("type(integral_parameters)", "num_probes_max", False, None),
     "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
     "chem_params": ("type(chemistry_parameters)", None, True, None),
     "rburn": ("type(reactive_burn_parameters)", None, True, "Condensed-phase reactive-burn (programmed detonation) parameters"),
@@ -1205,11 +1218,30 @@ def _nv(targets: set, *names: str) -> None:
         NAMELIST_VARS[n] = set(targets)
 
 
+def _decl(targets: set, *names: str) -> None:
+    for n in names:
+        DECLARATION_TARGETS[n] = set(targets)
+
+
 _ALL, _PRE_SIM, _SIM_POST = {"pre", "sim", "post"}, {"pre", "sim"}, {"sim", "post"}
 _PRE_POST = {"pre", "post"}
 _SIM = {"sim"}
 _PRE = {"pre"}
 _POST = {"post"}
+
+_decl(
+    _ALL,
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
+    "sigR",
+    "viscous",
+    "riemann_solver",
+    "stl_models",
+    "num_stl_models",
+    "palpha_eps",
+    "ptgalpha_eps",
+)
 
 _nv(
     _ALL,
@@ -1232,8 +1264,6 @@ _nv(
     "relax_model",
     "fluid_pp",
     "bub_pp",
-    "rhoref",
-    "pref",
     "bubbles_euler",
     "bubbles_lagrange",
     "R0ref",
@@ -1268,12 +1298,12 @@ _nv(
     "t_stop",
     "t_save",
     "cfl_target",
-    "avg_state",
     "prim_vars_wrt",
-    "alt_soundspeed",
-    "mixture_err",
     "fd_order",
     "ib_state_wrt",
+    "avg_state",
+    "alt_soundspeed",
+    "mixture_err",
 )
 _nv(
     _PRE_SIM,
@@ -1283,7 +1313,7 @@ _nv(
     "patch_ib",
     "pi_fac",
 )
-_nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "sigR", "igr", "igr_order")
+_nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "igr", "igr_order", "sigR")
 _nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
@@ -1306,7 +1336,10 @@ _nv(
     "int_comp",
     "ic_eps",
     "ic_beta",
-    "riemann_solver",
+    "riemann_hypo_ADC",
+    "ADC_kappa",
+    "hll_u_interface",
+    "hypo_hll_interface_rhs",
     "wave_speeds",
     "low_Mach",
     "hyper_cleaning_speed",
@@ -1317,9 +1350,6 @@ _nv(
     "probe_wrt",
     "num_probes",
     "probe",
-    "integral_wrt",
-    "num_integrals",
-    "integral",
     "acoustic_source",
     "num_source",
     "acoustic",
@@ -1371,6 +1401,7 @@ _nv(
     "nv_uvm_out_of_core",
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
+    "riemann_solver",
 )
 _nv(
     _PRE,
@@ -1399,7 +1430,6 @@ _nv(
     "sigV",
     "dist_type",
     "rhoRV",
-    "viscous",
     "old_grid",
     "old_ic",
     "perturb_flow",
@@ -1419,6 +1449,7 @@ _nv(
     "simplex_params",
     "files_dir",
     "file_extension",
+    "viscous",
 )
 _nv(
     _POST,

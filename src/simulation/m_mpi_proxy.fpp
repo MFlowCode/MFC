@@ -209,7 +209,7 @@ contains
             call MPI_BCAST(particle_cloud(i)%packing_method, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do
 
-        ! manual: acoustic/probe/integral (combined loop; complex acoustic member set)
+        ! manual: acoustic/probe (combined loop; complex acoustic member set)
         do j = 1, num_probes_max
             do i = 1, 3
                 call MPI_BCAST(acoustic(j)%loc(i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -231,10 +231,6 @@ contains
 
             #:for VAR in [ 'x','y','z' ]
                 call MPI_BCAST(probe(j)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-
-            #:for VAR in [ 'xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax' ]
-                call MPI_BCAST(integral(j)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
 

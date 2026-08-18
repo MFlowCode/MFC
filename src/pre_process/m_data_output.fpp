@@ -454,12 +454,12 @@ contains
                 call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
-            call DelayFileAccess(proc_rank)
+            call s_delay_file_access(proc_rank)
 
             if (down_sample) then
-                call s_initialize_mpi_data_ds(q_cons_temp)
+                call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
             else
-                call s_initialize_mpi_data(q_cons_vf)
+                call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb, qbmm_mv=mv)
             end if
 
             if (cfl_dt) then
@@ -544,7 +544,7 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         else
-            call s_initialize_mpi_data(q_cons_vf)
+            call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb, qbmm_mv=mv)
 
             if (cfl_dt) then
                 write (file_loc, '(I0,A)') n_start, '.dat'

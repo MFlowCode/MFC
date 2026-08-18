@@ -18,7 +18,6 @@ from .common import MFCException, create_directory, debug, delete_directory, for
 from .printer import cons
 from .run import input
 from .state import ARG, CFG, gpuConfigOptions
-from .user_guide import Tips
 
 # Regex to parse build progress
 # Ninja format: [42/156] Building Fortran object ...
@@ -367,9 +366,38 @@ class MFCTarget:
         return os.sep.join([self.get_install_dirpath(case), "bin", self.name])
 
     def is_configured(self, case: Case) -> bool:
-        # We assume that if the CMakeCache.txt file exists, then the target is
-        # configured. (this isn't perfect, but it's good enough for now)
-        return os.path.isfile(os.sep.join([self.get_staging_dirpath(case), "CMakeCache.txt"]))
+        # CMake writes CMakeCache.txt before it generates the build system, so the
+        # cache alone does not mean the target is ready to build: a configure that
+        # was interrupted leaves the cache behind with no Makefile, and skipping
+        # configure on that basis fails later with "No rule to make target".
+        # Require the generator's build file too, asking the cache which generator
+        # it is rather than guessing. An unrecognized generator falls back to the
+        # cache alone, so this is never stricter than the old behaviour.
+        staging_dirpath = self.get_staging_dirpath(case)
+        cache_filepath = os.sep.join([staging_dirpath, "CMakeCache.txt"])
+        if not os.path.isfile(cache_filepath):
+            return False
+
+        generator = ""
+        with open(cache_filepath, "r") as f:
+            for line in f:
+                if line.startswith("CMAKE_GENERATOR:"):
+                    generator = line.split("=", 1)[-1].strip()
+                    break
+
+        if "Ninja" in generator:
+            return os.path.isfile(os.sep.join([staging_dirpath, "build.ninja"]))
+        if "Makefiles" in generator:
+            return os.path.isfile(os.sep.join([staging_dirpath, "Makefile"]))
+
+        return True
+
+    def is_installed(self, case: Case) -> bool:
+        # CMake writes an install manifest only after a successful install, so unlike
+        # CMakeCache.txt it is not left behind by a build that crashed. Multi-config
+        # generators name it install_manifest_<config>.txt, so match either form.
+        staging_dirpath = self.get_staging_dirpath(case)
+        return any(name.startswith("install_manifest") and name.endswith(".txt") for name in os.listdir(staging_dirpath)) if os.path.isdir(staging_dirpath) else False
 
     def get_configuration_txt(self, case: Case) -> typing.Optional[dict]:
         if not self.is_configured(case):
@@ -477,7 +505,6 @@ class MFCTarget:
             cons.print(f"  [bold red]✗[/bold red] Configuration failed for [magenta]{self.name}[/magenta]")
             if verbosity < 2:
                 _show_build_error(result, "Configuration")
-            Tips.after_build_failure()
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
 
         cons.print(f"  [bold green]✓[/bold green] Configured [magenta]{self.name}[/magenta]")
@@ -524,7 +551,6 @@ class MFCTarget:
             cons.print(f"  [bold red]✗[/bold red] Build failed for [magenta]{self.name}[/magenta]")
             if verbosity < 2:
                 _show_build_error(result, "Build")
-            Tips.after_build_failure()
             raise MFCException(f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
 
         cons.print(f"  [bold green]✓[/bold green] Built [magenta]{self.name}[/magenta]")
@@ -593,10 +619,12 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
 
     history.add(target.name)
 
-    # Dependencies are pinned to fixed versions. If already configured
-    # (built & installed by a prior --deps-only step), skip entirely
-    # to avoid re-entering the superbuild (which may access the network).
-    if target.isDependency and target.is_configured(case):
+    # Dependencies are pinned to fixed versions, so skip one that a prior
+    # --deps-only step already installed, avoiding a re-entry into the superbuild
+    # (which may access the network). Gate on the install, not on the configure:
+    # a dependency build that crashed leaves CMakeCache.txt behind, and skipping
+    # on that would point CMAKE_PREFIX_PATH at an empty install tree forever.
+    if target.isDependency and target.is_installed(case):
         return
 
     for dep in target.requires.compute():

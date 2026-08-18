@@ -77,15 +77,17 @@ covered in `docs/documentation/contributing.md`.
   garbage `v_blow` failed Frontier AMD with `ICFL is NaN` while every NVIDIA lane and all
   local CPU/GPU runs passed. A platform-only NaN is the signature of this class.
 - Shared-state pattern: namelist declarations (`#:include 'generated_decls.fpp'`), the
-  `eqn_idx`/`sys_size`/`b_size`/`tensor_size` state variables, and the common defaults
+  `eqn_idx`/`sys_size` state variables, and the common defaults
   core all live in `src/common/m_global_parameters_common.fpp`. Each per-target
   `m_global_parameters.fpp` does `use m_global_parameters_common` (default-public), so
   `use m_global_parameters` continues to work for all downstream modules without change.
-  Sim-only declarations (GPU_DECLARE, Re_idx allocation) stay in
-  `m_global_parameters_common` behind `#ifdef MFC_SIMULATION`. Generated includes
-  (`generated_decls.fpp`, `generated_bcast.fpp`, `generated_case_opt_decls.fpp`) must exist for every target — the build
-  emits stubs where the content is sim-only, so a common file that includes one will
-  compile for pre/post too.
+  `src/common/` carries no `MFC_PRE_PROCESS`/`MFC_SIMULATION`/`MFC_POST_PROCESS` guards:
+  stage-varying behavior is passed in as an explicit argument or initialization policy, and
+  device residency for generated simulation scalars is emitted from `SIM_GPU_DECL_VARS`
+  (`toolchain/mfc/params/generators/fortran_gen.py`). Generated includes
+  (`generated_decls.fpp`, `generated_bcast.fpp`, `generated_case_opt_decls.fpp`) must exist for every target — pre/post
+  get the common computed scalars (`num_dims`, `num_vels`, `weno_polyn`, `muscl_polyn`), so
+  a common file that includes one will compile for pre/post too.
 - Runtime checks (`@:PROHIBIT`) go where they run: shared →
   `src/common/m_checker_common.fpp`; simulation-only → `src/simulation/m_checker.fpp`;
   pre/post-only → `src/{pre,post}_process/m_checker.fpp` (their `s_check_inputs` are
