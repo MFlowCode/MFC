@@ -91,6 +91,10 @@ jobs:
           # either -- the warning lands in the run summary, and a ref that stops advancing
           # drops coverage-health.yml back to its wall-clock rule, which goes red within
           # MAX_AGE_DAYS.
+          # $GITHUB_SHA, not HEAD: when the entries changed, HEAD is the bot's new map
+          # commit, one past the commit this refresh actually rebuilt from. Either answers
+          # the health check's ancestry question, but only $GITHUB_SHA names the same thing
+          # in both branches -- the source state the map was built against.
           git push "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git" \
-            --force HEAD:refs/coverage-map/verified \
+            --force "$GITHUB_SHA:refs/coverage-map/verified" \
             || echo "::warning::Could not update refs/coverage-map/verified; coverage-health.yml falls back to the age rule."

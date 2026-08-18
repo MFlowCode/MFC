@@ -64,11 +64,14 @@ def main():
     entries, meta = load_map(COVERAGE_MAP_PATH)
     if entries is None:
         sys.exit("Coverage map missing or corrupt.")
-    # Compute each current test's coverage key. Loading a case executes its case
-    # file; some (e.g. chemistry examples) import optional deps like cantera that are
-    # not installed in this lightweight job. Skip any case that fails to load instead
-    # of crashing -- map_health measures the fraction of *loadable* current tests that
-    # are mapped, so a smaller current_keys cannot produce a false "stale" result.
+    # Compute each current test's coverage key. Loading a case runs its case file as a
+    # subprocess, so anything that file imports must resolve. Keep skipping the ones that
+    # do not rather than crashing -- map_health measures the fraction of *loadable*
+    # current tests that are mapped, so a smaller current_keys cannot produce a false
+    # "stale" result -- but the skip is a safety net, not the expected path: every case
+    # here is meant to load. The 16 chemistry cases that used to land in this list did so
+    # because get_py_program_output ran them under PATH's python3 while this job invokes
+    # build/venv/bin/python3 directly, leaving the venv's cantera out of reach.
     current_keys = set()
     unloadable = []
     for b in list_cases():
