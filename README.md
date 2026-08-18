@@ -109,7 +109,6 @@ And a high-amplitude acoustic wave reflecting and emerging through a circular or
 | `./mfc.sh validate case.py` | Check a case file for errors before running |
 | `./mfc.sh new my_case` | Create a new case from a template |
 | `./mfc.sh clean` | Remove build artifacts |
-| `./mfc.sh interactive` | Launch interactive menu-driven interface |
 
 Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`new` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/examples.html)).
 
