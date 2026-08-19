@@ -28,23 +28,88 @@ module m_phase_timing
 
     private
     public :: s_phase_tic, s_phase_toc, s_phase_report, PH_N, PH_HALO, PH_GATHER, PH_GFILL, PH_SEAM, PH_RHS, PH_RK, PH_REFLUX, &
-        & PH_REGRID, PH_L0, PH_COARSE
+        & PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, PH_REGRID, PH_L0, PH_COARSE
+    public :: PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBWAIT, PH_RBALLOC, PH_RBUNPK
+    public :: PH_SWAP, PH_RBOWN, PH_RBUPD, PH_RBPACK, PH_RBRSV
+    public :: PH_RBSEAM, PH_RBPOST, PH_RBGEO, PH_RBSLOT, PH_RBTAIL
+    public :: PH_RBSEND, PH_RBFLUSH, PH_RBXCHG, PH_RBREC, PH_RBTOPO
+    public :: PH_PGALL, PH_PGSEND, PH_PGRECV
 
-    integer, parameter          :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
-    integer, parameter          :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
-    integer, parameter          :: PH_GFILL = 3    !< ghost prolongation from the gathered patch
-    integer, parameter          :: PH_SEAM = 4     !< fine-fine seam halo
-    integer, parameter          :: PH_RHS = 5      !< fine-block s_compute_rhs
-    integer, parameter          :: PH_RK = 6       !< fine-block RK update + relax + IB
-    integer, parameter          :: PH_REFLUX = 7   !< reflux (p2p faces + apply)
-    integer, parameter          :: PH_REGRID = 8   !< regrid / reassignment
-    integer, parameter          :: PH_L0 = 9       !< L0 tile advance
-    integer, parameter          :: PH_COARSE = 10  !< coarse (non-AMR) solver work
-    integer, parameter          :: PH_N = 10
+    integer, parameter :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
+    integer, parameter :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
+    integer, parameter :: PH_GFILL = 3    !< ghost prolongation from the gathered patch
+    integer, parameter :: PH_SEAM = 4     !< fine-fine seam halo
+    integer, parameter :: PH_RHS = 5      !< fine-block s_compute_rhs
+    integer, parameter :: PH_RK = 6       !< fine-block RK update + relax + IB
+    integer, parameter :: PH_REFLUX = 7   !< reflux (p2p faces + apply)
+    integer, parameter :: PH_REGRID = 8   !< regrid / reassignment
+    integer, parameter :: PH_L0 = 9       !< L0 tile advance
+    integer, parameter :: PH_COARSE = 10  !< coarse (non-AMR) solver work
+    !> Regrid sub-phases. NESTED inside PH_REGRID, so they must NOT be summed with the top-level phases - the report prints them as
+    !! a separate breakdown. Added because regrid measured 42% of wall at amr_regrid_int=2 while the optimisation effort was aimed
+    !! at rhs (19%).
+    integer, parameter :: PH_RGHALO = 11   !< coarse cons halo before tagging
+    integer, parameter :: PH_RGTAG = 12    !< tag cells
+    integer, parameter :: PH_RGCLUS = 13   !< cluster tags into boxes
+    integer, parameter :: PH_RGSHAPE = 14  !< shape/nest/cap/unchanged checks
+    integer, parameter :: PH_RGMIG = 15    !< stash + migrate old blocks
+    integer, parameter :: PH_RGBUILD = 16  !< rebuild slots (per-box gather lives here)
+    !> rg:build internals. The three candidate costs inside s_amr_regrid_rebuild_slots' per-box loop. Needed because cap32-vs-cap64
+    !! scaling (cost ~ N^0.39) fits NONE of them alone: the O(N^2) old-box scan predicts 29x, the per-box rendezvous 5.4x, the
+    !! volume-driven H2D copy the WRONG SIGN.
+    integer, parameter :: PH_RBGATH = 17  !< (a) per-box collective gather
+    integer, parameter :: PH_RBOVL = 18   !< (b) interpolate + O(old_np) overlap carry-forward
+    integer, parameter :: PH_RBPUSH = 19  !< (c) per-box full-slot host->device update
+    !> The MPI_WAITALL inside the REGRID-path gather only (gated by amr_rg_gather, since the same routine also serves the per-step
+    !! path). rb:gath MINUS this is the gather's HOST work.
+    integer, parameter :: PH_RBWAIT = 20
+    !> Splitting the gather's HOST half. rb:wait was measured; the rest was attributed to the per-box allocate by CODE READING only,
+    !! and the byte-proportional scaling fits the unpack equally well. These two brackets discriminate.
+    integer, parameter :: PH_RBALLOC = 21  !< allocate/deallocate of rbuf,reqs,srank
+    integer, parameter :: PH_RBUNPK = 22   !< post-wait unpack of rbuf into amr_cg
+    !> Per-block grid-state reconfiguration: s_amr_swap_to_fine + the idwint push + s_amr_restore_coarse. TOP-LEVEL (parallel to
+    !! rhs), not nested. This is what level-batching removes; it was previously unbracketed, and s_amr_restore_coarse used to sit
+    !! inside PH_RHS, so the rhs bracket was charged half a swap pair.
+    integer, parameter :: PH_SWAP = 23
+    !> Splitting the gather's remaining HOST work (rb:gath minus wait/mem/unpk). The per-box allocate and the unpack were both
+    !! REFUTED by measurement (0.002-0.010 s and 0.026-0.104 s), so these four cover what is actually left.
+    integer, parameter :: PH_RBOWN = 24   !< owner's own-box local unpack (s_amr_unpack_patch)
+    integer, parameter :: PH_RBUPD = 25   !< owner's per-box sys_size host->device push of amr_cg
+    integer, parameter :: PH_RBPACK = 26  !< non-owner host pack loop into the send pool
+    integer, parameter :: PH_RBRSV = 27   !< s_amr_gsnd_reserve - includes its force-drain MPI_WAITALL and pool resize
+    !> Round 2: round 1 accounted for only 46.9%% of rb:gath and 70.0%% of rg:build, leaving 18.1%% of wall unexplained inside
+    !! regrid. These five cover every remaining region on that path.
+    integer, parameter :: PH_RBSEAM = 28  !< s_amr_build_seam_pairs (O(nblocks^2)) called from inside the gather
+    integer, parameter :: PH_RBPOST = 29  !< the nsrc count + IRECV posting loop (per-(box,source) geometry)
+    integer, parameter :: PH_RBGEO = 30   !< s_set_amr_fine_geometry - per box on EVERY rank
+    integer, parameter :: PH_RBSLOT = 31  !< s_amr_alloc_slot (owner only)
+    integer, parameter :: PH_RBTAIL = 32  !< post-loop tail: send flush, xchg reduce, reconcile, seam topology check
+    !> Round 3. Round 2 closed rg:build to 100.0%% but left 11.9%% of wall inside rb:gath unexplained after SEVEN refuted code-read
+    !! candidates; the only unbracketed code left in that routine is the non-owner ISEND and two scalar geometry calls. rb:tail
+    !! (8.8%% of wall, imbalance 2.6) is split into its four collectives to separate barrier skew from work.
+    integer, parameter :: PH_RBSEND = 33   !< the non-owner MPI_ISEND (rendezvous-sized: 1.5-3 MB)
+    integer, parameter :: PH_RBFLUSH = 34  !< s_amr_gather_send_flush - one WAITALL over all deferred sends
+    integer, parameter :: PH_RBXCHG = 35   !< s_amr_reduce_xchg_flag - MPI_ALLREDUCE, i.e. a barrier
+    integer, parameter :: PH_RBREC = 36    !< s_amr_reconcile_slots
+    integer, parameter :: PH_RBTOPO = 37   !< s_amr_check_seam_topology
+    !> THE LEVEL>=2 PATH. `s_amr_gather_coarse_patch` returns at its FIRST branch for any block with level >= 2, into
+    !! `s_amr_gather_from_parent` - so every rb:* bracket above instruments only the level-1 path, which is 64 of 224 boxes. The
+    !! other 160 (71%%) were never measured. That is why EIGHT successive candidates each came back at ~0.
+    integer, parameter          :: PH_PGALL = 38   !< s_amr_gather_from_parent (the whole level>=2 path)
+    integer, parameter          :: PH_PGSEND = 39  !< parent owner: s_amr_gather_from_parent_field_cons (pack + send)
+    integer, parameter          :: PH_PGRECV = 40  !< block owner: s_amr_recv_parent_patch
+    integer, parameter          :: PH_N = 40
     character(len=8), parameter :: PH_NAME(PH_N) = [character(len=8)::'halo','gather', 'gfill', 'seam', 'rhs', 'rk', 'reflux', &
-              & 'regrid', 'L0', 'coarse']
+              & 'regrid', 'L0', 'coarse', 'rg:halo', 'rg:tag', 'rg:clus', 'rg:shape', 'rg:mig', 'rg:build', 'rb:gath', 'rb:ovl', &
+              & 'rb:push', 'rb:wait', 'rb:mem', 'rb:unpk', 'swap', 'rb:own', 'rb:upd', 'rb:pack', 'rb:rsv', 'rb:seam', 'rb:post', &
+              & 'rb:geo', 'rb:slot', 'rb:tail', 'rb:send', 'rb:flush', 'rb:xchg', 'rb:rec', 'rb:topo', 'pg:all', 'pg:send', &
+              & 'pg:recv']
 
-    real(wp)   :: acc(PH_N) = 0._wp
+    real(wp) :: acc(PH_N) = 0._wp
+    !> Entry count per phase. Time alone cannot distinguish "this region is slow" from "this region runs far more often than
+    !! assumed"; eight code-read attributions were refuted by brackets before this column existed, and the ninth candidate had no
+    !! code left to blame. ms/call is what tells the two apart.
+    integer(8) :: ncall(PH_N) = 0
     integer(8) :: tic_c(PH_N) = 0
     integer    :: depth(PH_N) = 0
     real(wp)   :: t_wall0 = -1._wp
@@ -62,6 +127,7 @@ contains
         $:GPU_WAIT()
         call system_clock(c, rate)
         tic_c(id) = c
+        ncall(id) = ncall(id) + 1
         if (t_wall0 < 0._wp) t_wall0 = real(c, wp)/real(rate, wp)
 
     end subroutine s_phase_tic
@@ -87,6 +153,7 @@ contains
 
         real(wp), intent(in) :: wall
         real(wp)             :: tot, gmax(PH_N), gsum(PH_N)
+        integer(8)           :: gcall(PH_N)
         integer              :: i, ierr
 
         if (.not. rank_time_wrt) return
@@ -94,17 +161,20 @@ contains
 #ifdef MFC_MPI
         call MPI_ALLREDUCE(acc, gmax, PH_N, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
         call MPI_ALLREDUCE(acc, gsum, PH_N, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(ncall, gcall, PH_N, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
-        gmax = acc; gsum = acc*real(num_procs, wp)
+        gmax = acc; gsum = acc*real(num_procs, wp); gcall = ncall*int(num_procs, 8)
 #endif
         if (proc_rank /= 0) return
         print '(A)', '[phase] PHASE BUDGET'
         print '(A,F10.3,A)', '[phase] step-loop wall = ', wall, ' s'
-        print '(A)', '[phase] name        mean s   max s    % wall   imbalance(max/mean)'
+        print '(A)', '[phase] name        mean s   max s    % wall   imbalance  calls/rank    ms/call'
         do i = 1, PH_N
             if (gsum(i) <= 0._wp) cycle
-            print '(A,A8,F10.3,F9.3,F9.1,A,F8.3)', '[phase] ', PH_NAME(i), gsum(i)/real(num_procs, wp), gmax(i), &
-                & 100._wp*(gsum(i)/real(num_procs, wp))/wall, '%', gmax(i)/max(gsum(i)/real(num_procs, wp), tiny(1._wp))
+            print '(A,A8,F10.3,F9.3,F9.1,A,F8.3,I12,F11.4)', '[phase] ', PH_NAME(i), gsum(i)/real(num_procs, wp), gmax(i), &
+                & 100._wp*(gsum(i)/real(num_procs, wp))/wall, '%', gmax(i)/max(gsum(i)/real(num_procs, wp), tiny(1._wp)), &
+                & gcall(i)/int(num_procs, 8), 1000._wp*(gsum(i)/real(num_procs, wp))/max(real(gcall(i)/int(num_procs, 8), wp), &
+                & 1._wp)
         end do
         print '(A,F10.3,F19.1,A)', '[phase] RESIDUAL', wall - sum(gsum)/real(num_procs, wp), &
             & 100._wp*(wall - sum(gsum)/real(num_procs, wp))/wall, '%'

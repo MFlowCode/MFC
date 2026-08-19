@@ -47,6 +47,7 @@ module m_amr
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
+    public :: s_amr_br_load_all, s_amr_br_store_all, amr_br_w, amr_br_batch, amr_rg_gather
     public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, &
         & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
         & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
@@ -118,7 +119,21 @@ module m_amr
     !! store it back. All four dummies are intent(inout) - s_compute_rhs writes the buffer region through
     !! s_populate_variables_buffers - so BOTH directions are required at every crossing.
     type(scalar_field), allocatable :: amr_cons_br(:)
-    integer                         :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
+    !> Batched-bridge geometry. amr_br_w is one block's buffered k-width; block loc of a batch sits at k-offset (loc-1)*amr_br_w,
+    !! carrying its own ghost shell, so consecutive blocks are separated by TWO ghost shells and no block's stencil can reach
+    !! another's interior - the property the batched advance's correctness rests on.
+    integer :: amr_br_w = 0, amr_br_nblk = 0
+    !> True only while the REGRID path is inside s_amr_gather_coarse_patch, so the WAITALL bracket attributes to rb:wait rather than
+    !! mixing in the per-step gather that shares this routine.
+    logical :: amr_rg_gather = .false.
+    !> Blocks per batched call. BOUNDED on purpose. Sizing the bridge per-block (one slot for every block) OOMed the device on the
+    !! 400^3 case: a buffered block is ~110 MB at cap 64 and the slot cap grows geometrically and never shrinks, so the bridge alone
+    !! reached multiple GB against a working set already near 43 GiB/GCD. A fixed window keeps bridge memory O(1) in the block count
+    !! - which the exascale goal requires anyway - and still collapses launches by this factor.
+    !> 1 = the batched path is DORMANT. G0.2 measured PH_RHS at 54-57%% GPU-busy, so batching the fine advance is a ~1.09x item
+    !! (plan rule: >50%% -> Track B waits for Track R); a batch >1 would allocate 8x the bridge for nothing.
+    integer, parameter :: amr_br_batch = 1
+    integer            :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
     !> Per-slot field-array sizing (module-scope, used by s_amr_alloc_slot/s_amr_free_slot): max fine cells per dim (2*maxc_loc-1)
     !! and the buffered array bounds. amr_slot_live(k) tracks whether slot k's field arrays are allocated - lazy owned-only sizing
@@ -851,7 +866,9 @@ contains
         ! local copy; the np>=2 P2P version (parent owner -> block owner, mirroring the L0 path) is future work.
 
         if (amr_block_level(amr_cur) >= 2) then
+            if (amr_rg_gather) call s_phase_tic(PH_PGALL)
             call s_amr_gather_from_parent(pull_host)
+            if (amr_rg_gather) call s_phase_toc(PH_PGALL)
             return
         end if
 
@@ -888,7 +905,9 @@ contains
         ! host buffers). Init/regrid (.not. pull_host): host is truth, so the host pack/unpack paths below read it directly.
 
         ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
+        if (amr_rg_gather) call s_phase_tic(PH_RBSEAM)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
+        if (amr_rg_gather) call s_phase_toc(PH_RBSEAM)
 
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own box), then receive the rest from the other coarse-owners
@@ -898,16 +917,23 @@ contains
                 ! runtime: q_coarse is device-current - copy the own box on the device (same index map/assignment as the host path)
                 call s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
             else
+                if (amr_rg_gather) call s_phase_tic(PH_RBOWN)
                 call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
+                if (amr_rg_gather) call s_phase_toc(PH_RBOWN)
             end if
             ! count + post recvs from every OTHER rank whose owned range overlaps the patch (cached list; every listed rank
             ! overlaps by construction)
+            if (amr_rg_gather) call s_phase_tic(PH_RBPOST)
             nsrc = 0
             do idx = 1, amr_ovl_gather_n(amr_cur)
                 if (amr_ovl_gather(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
+            if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
             if (nsrc > 0) then
+                if (amr_rg_gather) call s_phase_tic(PH_RBALLOC)
                 allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc))
+                if (amr_rg_gather) call s_phase_toc(PH_RBALLOC)
+                if (amr_rg_gather) call s_phase_tic(PH_RBPOST)
                 nsrc = 0
                 do idx = 1, amr_ovl_gather_n(amr_cur)
                     r = amr_ovl_gather(idx, amr_cur)
@@ -920,9 +946,13 @@ contains
                     call MPI_IRECV(rbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
                 end do
+                if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
 #ifdef MFC_MPI
+                if (amr_rg_gather) call s_phase_tic(PH_RBWAIT)
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+                if (amr_rg_gather) call s_phase_toc(PH_RBWAIT)
 #endif
+                if (amr_rg_gather) call s_phase_tic(PH_RBUNPK)
                 do idx = 1, nsrc
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
@@ -946,14 +976,19 @@ contains
                         end do
                     end do
                 end do
+                if (amr_rg_gather) call s_phase_toc(PH_RBUNPK)
+                if (amr_rg_gather) call s_phase_tic(PH_RBALLOC)
                 deallocate (rbuf, reqs, srank)
+                if (amr_rg_gather) call s_phase_toc(PH_RBALLOC)
             end if
             ! host path only: the runtime device path wrote amr_cg on the device directly (host amr_cg stays stale, as at np=1 -
             ! runtime consumers read the device copy)
             if (.not. pull_host) then
+                if (amr_rg_gather) call s_phase_tic(PH_RBUPD)
                 do i = 1, sys_size
                     $:GPU_UPDATE(device='[amr_cg(i)%sf]')
                 end do
+                if (amr_rg_gather) call s_phase_toc(PH_RBUPD)
             end if
         else
             ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
@@ -961,12 +996,15 @@ contains
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                if (amr_rg_gather) call s_phase_tic(PH_RBRSV)
                 call s_amr_gsnd_reserve(maxsz)
+                if (amr_rg_gather) call s_phase_toc(PH_RBRSV)
                 amr_gsnd_n = amr_gsnd_n + 1
                 if (pull_host) then
                     ! runtime: pack the overlap box on the device straight into the pool slot (only the box crosses PCIe)
                     call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, amr_gsnd_pool(:,amr_gsnd_n))
                 else
+                    if (amr_rg_gather) call s_phase_tic(PH_RBPACK)
                     idx = 0
                     do i = 1, sys_size
                         do g3 = bl(3), bh(3)
@@ -978,12 +1016,15 @@ contains
                             end do
                         end do
                     end do
+                    if (amr_rg_gather) call s_phase_toc(PH_RBPACK)
                 end if
 #ifdef MFC_MPI
                 ! NON-BLOCKING: the owner's per-box IRECV/WAITALL still orders the data correctly, but this rank no longer
                 ! rendezvouses on every box. Completed by s_amr_gather_send_flush (caller) or the drain in s_amr_gsnd_reserve.
+                if (amr_rg_gather) call s_phase_tic(PH_RBSEND)
                 call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, &
                                & amr_gsnd_req(amr_gsnd_n), ierr)
+                if (amr_rg_gather) call s_phase_toc(PH_RBSEND)
 #endif
             end if
         end if
@@ -1205,10 +1246,14 @@ contains
         ! runtime (pull_host=T) reads amr_cg on the device in the C/F ghost-fill, so skip the device->host copy.
         if (amr_block_owner(pblk) == proc_rank) then
             ! parent owner: local device copy when it also owns the block, otherwise pack and send.
+            if (amr_rg_gather) call s_phase_tic(PH_PGSEND)
             call s_amr_gather_from_parent_field_cons(pblk, amr_loc_of(pblk), .not. pull_host)
+            if (amr_rg_gather) call s_phase_toc(PH_PGSEND)
         else if (amr_rank_owns_block) then
             ! block owner only: receive. Deliberately does NOT take the parent field - amr_slots(pblk) is unallocated here.
+            if (amr_rg_gather) call s_phase_tic(PH_PGRECV)
             call s_amr_recv_parent_patch(pblk, .not. pull_host)
+            if (amr_rg_gather) call s_phase_toc(PH_PGRECV)
         end if
 
     end subroutine s_amr_gather_from_parent
@@ -4792,9 +4837,11 @@ contains
         end if
 
         amr_in_fine_advance = .true.
+        call s_phase_tic(PH_SWAP)
         call s_amr_swap_to_fine()
         idwint = amr_slots(amr_cur)%idwbuff  ! widen the conversion range to the ghost shell (restored by s_amr_restore_coarse)
         $:GPU_UPDATE(device='[idwint]')
+        call s_phase_toc(PH_SWAP)
         call s_phase_tic(PH_RHS)
         call s_amr_br_load(amr_loc_of(amr_cur))
         if (qbmm .and. .not. polytropic) then
@@ -4807,9 +4854,11 @@ contains
                                & mv_in, rhs_mv, t_step, s)
         end if
         call s_amr_br_store(amr_loc_of(amr_cur))
-        call s_amr_restore_coarse()
-        amr_in_fine_advance = .false.
         call s_phase_toc(PH_RHS)
+        call s_phase_tic(PH_SWAP)  ! the other half of the swap pair - keep the bracket symmetric
+        call s_amr_restore_coarse()
+        call s_phase_toc(PH_SWAP)
+        amr_in_fine_advance = .false.
 
     end subroutine s_amr_fine_stage_rhs
 
@@ -5383,13 +5432,16 @@ contains
 
         amr_st_cap = newcap
 
-        ! the bridge is one block, not one per slot, so it is sized once on the first reserve and rides the same pool lifetime
+        ! the bridge spans a BOUNDED batch of blocks along k (see amr_br_batch), so one s_compute_rhs call can advance a
+        ! whole batch instead of one block; it rides the same pool lifetime and is rebuilt only if the window changes
+        amr_br_w = mbuf3_hi - mbuf3_lo + 1
         if (.not. allocated(amr_cons_br)) then
             @:ALLOCATE(amr_cons_br(1:sys_size))
             do i = 1, sys_size
-                @:ALLOCATE(amr_cons_br(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_cons_br(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_lo + amr_br_batch*amr_br_w - 1))
                 @:ACC_SETUP_SFs(amr_cons_br(i))
             end do
+            amr_br_nblk = amr_br_batch
         end if
 
     end subroutine s_amr_st_reserve
@@ -5419,6 +5471,39 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
         end subroutine s_amr_br_${DIR}$
+    #:endfor
+
+    !> BATCHED bridge move: a whole batch of blocks in ONE kernel instead of one kernel per block. This is what the flat store was
+    !! built for - its own comment calls a single contiguous array "the prerequisite for running ONE kernel over every live block
+    !! instead of one kernel per block". Block `loc` of the batch lands at k-offset (loc-1)*amr_br_w with its ghost shell intact, so
+    !! the bridge holds a concatenation of independent blocks two ghost shells apart. The per-block s_amr_br_load/store above are
+    !! KEPT unchanged: reflux and the relaxation paths still work one block at a time and read the bridge at offset 0.
+    #:set BRA = 'amr_cons_br(i)%sf(j, k, l + (loc - 1)*amr_br_w)'
+    #:set STA = 'amr_cons_st(j, k, l, i, base + loc)'
+    #:for DIR in ['load', 'store']
+        #:set LHS = BRA if DIR == 'load' else STA
+        #:set RHS = STA if DIR == 'load' else BRA
+        impure subroutine s_amr_br_${DIR}$_all(base, nblk)
+
+            integer, intent(in) :: base  !< dense local slot preceding this batch
+            integer, intent(in) :: nblk  !< blocks in this batch, <= amr_br_batch
+            integer             :: i, j, k, l, loc
+
+            $:GPU_PARALLEL_LOOP(collapse=5)
+            do loc = 1, nblk
+                do i = 1, sys_size
+                    do l = mbuf3_lo, mbuf3_hi
+                        do k = mbuf2_lo, mbuf2_hi
+                            do j = mbuf1_lo, mbuf1_hi
+                                ${LHS}$ = ${RHS}$
+                            end do
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+        end subroutine s_amr_br_${DIR}$_all
     #:endfor
 
     !> Free the flat store and the dense-index maps. Mirrors s_amr_loc_index_init: called from BOTH finalize paths, because either

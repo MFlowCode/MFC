@@ -18,11 +18,14 @@ module m_amr_regrid
     use m_constants, only: mapCells
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
-    use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, &
-        & amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
-        & s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
-        & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
+    use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
+        & PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, PH_RBREC, PH_RBTOPO
+    use m_amr, only: amr_rg_gather, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, &
+        & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
+        & s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, &
+        & s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
+        & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
+        & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -608,7 +611,7 @@ contains
         ! valid coarse CONS ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the rebuild prolongation
         ! reads past the new intersection (ALL ranks call: pairwise per-direction exchange; complete no-op at np=1).
 
-        call s_amr_exchange_coarse_cons_halo(q_cons_base)
+        call s_phase_tic(PH_RGHALO); call s_amr_exchange_coarse_cons_halo(q_cons_base); call s_phase_toc(PH_RGHALO)
         do i = 1, sys_size
             $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
         end do
@@ -617,17 +620,19 @@ contains
         ! margin until the next regrid (amr_buf)
         if (bubbles_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
 
-        call s_amr_regrid_tag_cells(q_cons_base, tag_grid, sidx)
-        call s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes)
+        call s_phase_tic(PH_RGTAG); call s_amr_regrid_tag_cells(q_cons_base, tag_grid, sidx); call s_phase_toc(PH_RGTAG)
+        call s_phase_tic(PH_RGCLUS); call s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes); call s_phase_toc(PH_RGCLUS)
         if (nboxes == 0) return  ! nothing tagged on any rank; keep the current blocks
-        call s_amr_regrid_shape_boxes(boxes, nboxes)
+        call s_phase_tic(PH_RGSHAPE); call s_amr_regrid_shape_boxes(boxes, nboxes); call s_phase_toc(PH_RGSHAPE)
         if (nboxes == 0) return  ! every box was confined to the domain margin
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
         call s_amr_check_box_caps(boxes, nboxes, box_level)  ! invariant: no box may exceed its level's slot cap
         call s_amr_regrid_boxes_unchanged(boxes, nboxes, box_level, same)
         if (same) return  ! identical box set and levels: keep the live slots
-        call s_amr_regrid_stash_migrate(boxes, nboxes, box_level, old_np, old_ilo, old_ext, old_level, old_owns)
-        call s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, old_level, old_owns)
+        call s_phase_tic(PH_RGMIG); call s_amr_regrid_stash_migrate(boxes, nboxes, box_level, old_np, old_ilo, old_ext, &
+                         & old_level, old_owns); call s_phase_toc(PH_RGMIG)
+        call s_phase_tic(PH_RGBUILD); call s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, &
+                         & old_level, old_owns); call s_phase_toc(PH_RGBUILD)
 
     end subroutine s_amr_regrid
 
@@ -1376,15 +1381,21 @@ contains
             ks = f_l0_slot(k)
             amr_cur = ks
             ! owned slot needs its arrays before geometry/prolong
+            call s_phase_tic(PH_RBSLOT)
             if (amr_block_owner(ks) == proc_rank) call s_amr_alloc_slot(ks)
+            call s_phase_toc(PH_RBSLOT)
+            call s_phase_tic(PH_RBGEO)
             call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
+            call s_phase_toc(PH_RBGEO)
             ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
             ! q_cons_base is host-current with valid ghosts from the exchange at the top of s_amr_regrid)
-            call s_amr_gather_coarse_patch(q_cons_base, .false.)
+            amr_rg_gather = .true.
+            call s_phase_tic(PH_RBGATH); call s_amr_gather_coarse_patch(q_cons_base, .false.); call s_phase_toc(PH_RBGATH)
+            amr_rg_gather = .false.
             ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners re-prolong from it below)
             if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (.not. amr_rank_owns_block) cycle
-            call s_interpolate_coarse_to_fine()
+            call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()
             ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy the
             ! overlap from EVERY covering old block regardless of owner - sh is the old->new LOCAL fine index shift. A level>=2
             ! block
@@ -1415,7 +1426,10 @@ contains
                     end do
                 end do
             end if
+            call s_phase_toc(PH_RBOVL)
+            call s_phase_tic(PH_RBPUSH)
             $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(ks))]')
+            call s_phase_toc(PH_RBPUSH)
             ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant), then overwrite the overlap with the
             ! old blocks' fine data (same index shift)
             if (qbmm .and. .not. polytropic) then
@@ -1450,16 +1464,19 @@ contains
 
         ! Drain the deferred gather sends now that every box has been posted: one WAITALL per rebuild instead of
         ! a per-box rendezvous. MUST happen before the send buffers are reused or freed.
-        call s_amr_gather_send_flush()
-        call s_amr_reduce_xchg_flag()  ! ONE allreduce for the whole loop; sets amr_xchg_coarse_ghosts if ANY block needs it
+        call s_phase_tic(PH_RBTAIL)
+        call s_phase_tic(PH_RBFLUSH); call s_amr_gather_send_flush(); call s_phase_toc(PH_RBFLUSH)
+        ! ONE allreduce for the whole loop; sets amr_xchg_coarse_ghosts if ANY block needs it
+        call s_phase_tic(PH_RBXCHG); call s_amr_reduce_xchg_flag(); call s_phase_toc(PH_RBXCHG)
         ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
         ! new-owned slots were allocated in the build loop, so this only frees - a rank keeps just its owned blocks' fine arrays
-        call s_amr_reconcile_slots()
+        call s_phase_tic(PH_RBREC); call s_amr_reconcile_slots(); call s_phase_toc(PH_RBREC)
         ! rebuild every block's fine-grid IB state for the NEW geometry (markers/ghost points/image points recomputed from the
         ! body definitions; no state carries across regrids)
         if (ib) call s_amr_setup_ib()
         call s_amr_select_slot(1)
-        call s_amr_check_seam_topology()  ! abort on seam topologies no halo reconciles (silent leak otherwise)
+        call s_phase_tic(PH_RBTOPO); call s_amr_check_seam_topology(); call s_phase_toc(PH_RBTOPO)
+        call s_phase_toc(PH_RBTAIL)  ! abort on seam topologies no halo reconciles (silent leak otherwise)
 
     end subroutine s_amr_regrid_rebuild_slots
 
