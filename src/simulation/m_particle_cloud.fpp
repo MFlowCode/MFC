@@ -23,9 +23,9 @@ module m_particle_cloud
 contains
 
     !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Each packing
-    !! method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice / s_particle_cloud_rejection_pack) and
-    !! hands back only the entries that fall within this rank's IB neighborhood. Only the first num_particle_cloud_ibs of them are
-    !! actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is left
+    !! method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice / s_particle_cloud_rejection_pack)
+    !! and hands back only the entries that fall within this rank's IB neighborhood. Only the first num_particle_cloud_ibs of them
+    !! are actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is left
     !! uninitialized.
     impure subroutine s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
 
@@ -78,13 +78,12 @@ contains
 
     end subroutine s_generate_particle_clouds
 
-    !> Rejection-samples particle centres into a box or hemisphere-shell region with a minimum centre-to-centre
-    !! spacing. Rejection sampling needs every placed particle tracked (regardless of which rank's neighborhood it
-    !! falls in) to detect overlaps deterministically, so cloud_ibs is allocated here to the cloud's full requested
-    !! particle count and only pared down to this rank's neighborhood afterwards, via s_reduce_particle_cloud_ibs.
-    !! Only the per-candidate geometry sampling differs between box and hemisphere shell; it is delegated to
-    !! s_sample_cloud_candidate, and every other step (overlap rejection via the spatial hash, acceptance,
-    !! reduction) is geometry-independent.
+    !> Rejection-samples particle centres into a box or hemisphere-shell region with a minimum centre-to-centre spacing. Rejection
+    !! sampling needs every placed particle tracked (regardless of which rank's neighborhood it falls in) to detect overlaps
+    !! deterministically, so cloud_ibs is allocated here to the cloud's full requested particle count and only pared down to this
+    !! rank's neighborhood afterwards, via s_reduce_particle_cloud_ibs. Only the per-candidate geometry sampling differs between box
+    !! and hemisphere shell; it is delegated to s_sample_cloud_candidate, and every other step (overlap rejection via the spatial
+    !! hash, acceptance, reduction) is geometry-independent.
     subroutine s_particle_cloud_rejection_pack(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
 
         integer, intent(in)                                               :: cloud_idx
@@ -167,12 +166,11 @@ contains
 
     end subroutine s_particle_cloud_rejection_pack
 
-    !> Draws one rejection-sampling candidate centre (rx, ry, rz) for cloud_idx, advancing seed in place. For box
-    !! geometry the candidate is uniform in the box and never rejected. For a hemisphere shell the candidate is
-    !! uniform in the shell volume - 2D uses theta uniform on [0, pi] with the sqrt radial CDF; 3D uses uniform
-    !! phi, uniform cos(polar) on [0, 1], and the cube-root radial CDF - and reject is set when it lands within one
-    !! particle radius of the flat face (the plane at y_centroid in 2D, z_centroid in 3D), a hard geometric cut
-    !! applied after sampling that preserves uniformity over the remaining region.
+    !> Draws one rejection-sampling candidate centre (rx, ry, rz) for cloud_idx, advancing seed in place. For box geometry the
+    !! candidate is uniform in the box and never rejected. For a hemisphere shell the candidate is uniform in the shell volume - 2D
+    !! uses theta uniform on [0, pi] with the sqrt radial CDF; 3D uses uniform phi, uniform cos(polar) on [0, 1], and the cube-root
+    !! radial CDF - and reject is set when it lands within one particle radius of the flat face (the plane at y_centroid in 2D,
+    !! z_centroid in 3D), a hard geometric cut applied after sampling that preserves uniformity over the remaining region.
     subroutine s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
 
         integer, intent(in)    :: cloud_idx
@@ -335,8 +333,8 @@ contains
 
     !> Writes a single placed particle into particle_cloud_ibs at the next free slot, advancing ib_idx. The caller decides whether
     !! this particle belongs in the array (neighborhood membership, for lattice packing, or unconditionally for rejection packing -
-    !! see s_particle_cloud_lattice / s_particle_cloud_rejection_pack) and supplies its already-assigned, absolute global patch id via
-    !! glbl_idx - s_reduce_ib_patch_array copies gbl_patch_id as-is. Shared by all packing methods so the per-particle
+    !! see s_particle_cloud_lattice / s_particle_cloud_rejection_pack) and supplies its already-assigned, absolute global patch id
+    !! via glbl_idx - s_reduce_ib_patch_array copies gbl_patch_id as-is. Shared by all packing methods so the per-particle
     !! ib_patch_parameters setup stays in one place.
     subroutine s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, px, py, pz, particle_cloud_ibs)
 

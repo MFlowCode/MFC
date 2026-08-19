@@ -738,10 +738,7 @@ class CaseValidator:
                     shell_outer_radius is None
                     or radius is None
                     or shell_inner_radius is None
-                    or (
-                        all(self._is_numeric(v) for v in [shell_outer_radius, shell_inner_radius, radius])
-                        and shell_outer_radius <= shell_inner_radius + 2 * radius
-                    )
+                    or (all(self._is_numeric(v) for v in [shell_outer_radius, shell_inner_radius, radius]) and shell_outer_radius <= shell_inner_radius + 2 * radius)
                 ),
                 f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
             )
