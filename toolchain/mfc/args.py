@@ -17,8 +17,6 @@ from .user_guide import (
     is_first_time_user,
     print_command_help,
     print_help,
-    print_help_topics,
-    print_topic_help,
     print_welcome,
 )
 
@@ -94,15 +92,6 @@ def parse(config: MFCConfig):
     # Handle --help at top level
     if args.get("help") and args["command"] is None:
         print_help()
-        sys.exit(0)
-
-    # Handle 'help' command
-    if args["command"] == "help":
-        topic = args.get("topic")
-        if topic:
-            print_topic_help(topic)
-        else:
-            print_help_topics()
         sys.exit(0)
 
     # Resolve command aliases
