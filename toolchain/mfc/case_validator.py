@@ -686,6 +686,8 @@ class CaseValidator:
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
+            n = self.get("n", 0)
+            p = self.get("p", 0)
             geometry = self.get(f"particle_cloud({i})%cloud_geometry", 1)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
             self.prohibit(
@@ -705,6 +707,36 @@ class CaseValidator:
             radius = self.get(f"particle_cloud({i})%radius", None)
             mass = self.get(f"particle_cloud({i})%mass", None)
             num_particles = self.get(f"particle_cloud({i})%num_particles", None)
+            periodic = self.get(f"particle_cloud({i})%periodic", 0)
+            length_x = self.get(f"particle_cloud({i})%length_x", None)
+            length_y = self.get(f"particle_cloud({i})%length_y", None)
+            length_z = self.get(f"particle_cloud({i})%length_z", None)
+
+            self.prohibit(
+                periodic not in [0, 1],
+                f"particle_cloud({i})%periodic must be 0 (off) or 1 (on)",
+            )
+            self.prohibit(
+                periodic == 1 and geometry != 1,
+                f"particle_cloud({i})%periodic is only supported for box particle clouds",
+            )
+            self.prohibit(
+                periodic == 1 and packing_method != 1,
+                f"particle_cloud({i})%periodic is only supported for rejection packing",
+            )
+            self.prohibit(
+                periodic == 1
+                and (
+                    length_x is None
+                    or not self._is_numeric(length_x)
+                    or length_x <= 0
+                    or length_y is None
+                    or not self._is_numeric(length_y)
+                    or length_y <= 0
+                    or (p > 0 and (length_z is None or not self._is_numeric(length_z) or length_z <= 0))
+                ),
+                f"particle_cloud({i})%periodic requires positive box lengths in each active dimension",
+            )
 
             # radius, mass, and num_particles are required and positive for every cloud, independent of
             # geometry. An unset radius reaches the sampler as dflt_real, which makes min_dist negative and
@@ -756,8 +788,6 @@ class CaseValidator:
                 y_end = self.get("y_domain%end", None)
                 z_beg = self.get("z_domain%beg", None)
                 z_end = self.get("z_domain%end", None)
-                n = self.get("n", 0)
-                p = self.get("p", 0)
 
                 if all(self._is_numeric(v) for v in [x_centroid, x_beg, x_end]):
                     self.prohibit(
