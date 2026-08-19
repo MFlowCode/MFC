@@ -26,31 +26,11 @@ contains
         integer(kind=8), intent(in) :: n_global
 
         if (check_total_cells) call s_check_total_cells(n_global)
-        call s_check_eos
         #:if USING_AMD
             call s_check_amd
         #:endif
 
     end subroutine s_check_inputs_common
-
-    !> Reject unsupported EOS selectors and intra-cell mixing; only stiffened_gas (non-chemistry) and ideal_gas_mixture (chemistry)
-    !! have a backend, and every fluid in a run must share one family.
-    impure subroutine s_check_eos
-
-        integer :: i
-
-        ! Every slot is default-assigned and broadcast up to num_fluids_max, so check all of
-        ! them: a selector left on an unused slot still reaches the solver. Input-time only.
-
-        do i = 1, num_fluids_max
-            @:PROHIBIT(chemistry .and. fluid_pp(i)%eos /= eos_ideal_gas_mixture, &
-                       & "fluid_pp(:)%eos must be 'ideal_gas_mixture' for every fluid when chemistry is enabled")
-            @:PROHIBIT(.not. chemistry .and. fluid_pp(i)%eos /= eos_stiffened_gas, &
-                       & "fluid_pp(:)%eos selector is not supported; only 'stiffened_gas' is available " &
-                       & // "(or 'ideal_gas_mixture' with a chemistry build)")
-        end do
-
-    end subroutine s_check_eos
 
     !> Verify that the total number of grid cells meets the minimum required by the number of dimensions and MPI ranks.
     impure subroutine s_check_total_cells(n_global)

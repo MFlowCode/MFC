@@ -12,7 +12,37 @@ from ..case_validator import CaseConstraintError, CaseValidator
 from ..common import MFCException
 from ..params.definitions import _EOS_NAMES
 from ..params.namelist_parser import get_fortran_constants
-from .negative_tests import BASE_CASE
+
+# A minimal known-good pre_process case. Previously imported from
+# params_tests.negative_tests, which was removed in #1717; inlined here because
+# num_fluids = 1 and the absence of any chemistry parameter are what give the
+# unused-slot and ideal_gas_mixture tests below their meaning.
+BASE_CASE = {
+    "m": 50,
+    "n": 0,
+    "p": 0,
+    "model_eqns": 2,
+    "num_fluids": 1,
+    "num_patches": 1,
+    "t_step_start": 0,
+    "t_step_stop": 100,
+    "t_step_save": 10,
+    "dt": 1e-6,
+    "weno_order": 5,
+    "bc_x%beg": -1,
+    "bc_x%end": -1,
+    "x_domain%beg": 0.0,
+    "x_domain%end": 1.0,
+    "patch_icpp(1)%geometry": 1,
+    "patch_icpp(1)%x_centroid": 0.5,
+    "patch_icpp(1)%length_x": 1.0,
+    "patch_icpp(1)%vel(1)": 0.0,
+    "patch_icpp(1)%pres": 1.0,
+    "patch_icpp(1)%alpha_rho(1)": 1.0,
+    "patch_icpp(1)%alpha(1)": 1.0,
+    "fluid_pp(1)%gamma": 0.4,
+    "fluid_pp(1)%pi_inf": 0.0,
+}
 
 
 def _eos_errors(overrides):
