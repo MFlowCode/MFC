@@ -1110,6 +1110,11 @@ default, walled off above by device OOM rather than by tuning:
 | 48 | 324 | 40 | 16.73 | 158.5 |
 | 64, 96, 128 | - | - | **OOM** | - |
 
+> **THIS ROW IS WRONG (correction 2026-08-15/18).** Cap 64 runs fine from scratch and is now the
+> recommended setting (2.24x less wall at LOWER memory); the OOMs were a checkpoint-restart confound.
+> Caps 96 and 128 were never retested from scratch, so their status is UNKNOWN, not OOM. Do not cite
+> this row for any cap. See `amr_action_plan.md` Tier 0.1.
+
 cap 32 reproduced across two independent sweeps to 2%. cap 16 is anomalous (2401 boxes, MORE than
 cap 12's 1089) - the clusterer tiles pathologically there; an oddity, not a trend.
 
