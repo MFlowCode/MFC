@@ -187,9 +187,6 @@ class CLISchema:
     # Reusable argument sets
     common_sets: List[CommonArgumentSet] = field(default_factory=list)
 
-    # Help topics (separate from commands)
-    help_topics: dict = field(default_factory=dict)
-
     def get_command(self, name: str) -> Optional[Command]:
         """Get a command by name or alias."""
         for cmd in self.commands:
