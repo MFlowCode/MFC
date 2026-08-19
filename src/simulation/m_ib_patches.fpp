@@ -481,7 +481,7 @@ contains
             ly(1) = stl_bounding_boxes(patch%model_id, 2, 1)
             ly(2) = stl_bounding_boxes(patch%model_id, 2, 3)
 
-            bound = sqrt((lx(2) - lx(1))**2 + (ly(2) - ly(1))**2)
+            bound = 0.5_wp*sqrt((lx(2) - lx(1))**2 + (ly(2) - ly(1))**2)
         else if (patch%geometry == 6) then
             ! ellipse geometry
             bound = 0.5_wp*max(patch%length_x, patch%length_y)
@@ -500,7 +500,7 @@ contains
             lz(1) = stl_bounding_boxes(patch%model_id, 3, 1) + patch%centroid_offset(3)
             lz(2) = stl_bounding_boxes(patch%model_id, 3, 3) + patch%centroid_offset(3)
 
-            bound = sqrt((lx(2) - lx(1))**2 + (ly(2) - ly(1))**2 + (lz(2) - lz(1))**2)
+            bound = 0.5_wp*sqrt((lx(2) - lx(1))**2 + (ly(2) - ly(1))**2 + (lz(2) - lz(1))**2)
         end if
 
     end subroutine s_get_ib_bound

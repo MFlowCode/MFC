@@ -898,6 +898,7 @@ contains
                 type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
                 integer                                :: num_particle_cloud_ibs
 
+                call s_instantiate_STL_models()
                 call s_get_neighbor_bounds()
 
                 if (cfl_dt .and. n_start > 0) then
@@ -911,7 +912,6 @@ contains
                 else
                     call s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
                 end if
-                call s_instantiate_STL_models()
                 call s_initialize_ib_airfoils()
                 call s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
                 deallocate (particle_cloud_ibs)
@@ -1530,6 +1530,7 @@ contains
 
             ! approximate the size of the neighborhood with a local 1.1x fudge factor for safety, lower bound of 1
             ib_neighborhood_radius = max(1, floor(1.1_wp*max_ib_bound/(0.5_wp*max_rank_width)))
+            if (proc_rank == 0) print *, "Automatic choice of ib_neighborhood_radius selected: ", ib_neighborhood_radius,
         end if
 
         ! For each direction, propagate the left/right boundary edges outward ib_neighborhood_radius hops. After k rounds: beg_val =
