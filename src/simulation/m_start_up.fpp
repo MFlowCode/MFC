@@ -621,6 +621,9 @@ contains
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_cons_ts(1)%vf(i)%sf]')
             end do
+            if (bubbles_euler) then
+                $:GPU_UPDATE(host='[ptil]')
+            end if
         end if
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
