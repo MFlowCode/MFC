@@ -17,7 +17,11 @@ concurrency:
 jobs:
   refresh:
     if: github.repository == 'MFlowCode/MFC'
-    timeout-minutes: 240
+    # Wall clock here is dominated by the SLURM queue, not by the build: observed waits on
+    # the phoenix `embers` QOS have reached 6h, and a 240-minute cap silently killed the
+    # refresh of #1717 at 4h05m. Cap generously -- a refresh that never finishes leaves the
+    # map behind, which is exactly what coverage-health.yml then reports.
+    timeout-minutes: 480
     runs-on:
       group:  phoenix
       labels: gt
@@ -71,3 +75,26 @@ jobs:
             # Discard the rebuilt file so the runner's working tree matches master.
             git checkout -- tests/coverage_map.json.gz
           fi
+          # Record that a refresh verified the map against THIS commit, in BOTH branches
+          # above. coverage-health.yml cannot use the map's _meta.git_sha for this: git_sha
+          # advances only when a commit lands, and the guard above deliberately skips the
+          # commit when the entries are unchanged, so a coverage-relevant commit whose
+          # coverage is identical left the map looking permanently stale to the health
+          # check while this workflow was working fine.
+          #
+          # refs/coverage-map/ is outside refs/heads/ and refs/tags/ on purpose: a branch or
+          # tag would fire the `push` trigger of any workflow that filters on paths alone
+          # (homebrew.yml does), starting unrelated jobs on every refresh.
+          #
+          # Non-fatal: the map itself is already committed and pushed by this point, so a
+          # failed bookkeeping push must not red a refresh that succeeded. It is not silent
+          # either -- the warning lands in the run summary, and a ref that stops advancing
+          # drops coverage-health.yml back to its wall-clock rule, which goes red within
+          # MAX_AGE_DAYS.
+          # $GITHUB_SHA, not HEAD: when the entries changed, HEAD is the bot's new map
+          # commit, one past the commit this refresh actually rebuilt from. Either answers
+          # the health check's ancestry question, but only $GITHUB_SHA names the same thing
+          # in both branches -- the source state the map was built against.
+          git push "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git" \
+            --force "$GITHUB_SHA:refs/coverage-map/verified" \
+            || echo "::warning::Could not update refs/coverage-map/verified; coverage-health.yml falls back to the age rule."
