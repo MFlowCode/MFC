@@ -1099,8 +1099,11 @@ def _load():
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
     # lag_params (Lagrangian bubbles)
-    # Members present in bubbles_lagrange_parameters. T0/Thost/c0/rho0/x0 were
-    # removed from the Fortran type by upstream #1085/#1093 — they must NOT be
+    # Members present in bubbles_lagrange_parameters: solver_approach, cluster_type,
+    # pressure_corrector, smooth_type, heatTransfer_model, massTransfer_model,
+    # write_bubbles, write_bubbles_stats, write_void_evol, pressure_force,
+    # gravity_force, nBubs_glb, epsilonb, charwidth, valmaxvoid. T0/Thost/c0/rho0/x0
+    # were removed from the Fortran type by upstream #1085/#1093 — they must NOT be
     # registered (namelist read would crash).
     for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol", "kahan_summation"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})

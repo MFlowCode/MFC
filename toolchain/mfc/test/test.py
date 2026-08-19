@@ -50,13 +50,22 @@ class TestTimeoutError(MFCException):
     pass
 
 
-def _read_ib_state_records(filepath: str, precision: int):
+# ib_state_*.dat record layout, written by s_write_serial_ib_state / s_write_parallel_ib_state in
+# src/simulation/m_data_output.fpp: NFIELDS_PER_IB reals per IB, with x/y/z_centroid at fields 17:19.
+_NFIELDS_PER_IB = 20
+_CENTROID_SLICE = slice(16, 19)
+
+
+def _read_ib_state_records(filepath: str, single: bool):
     if not os.path.isfile(filepath):
         raise MFCException(f"Expected IB state file does not exist: {filepath}")
 
-    field_size = 8 if precision == 2 else 4
-    fmt = "<" + ("d" if precision == 2 else "f") * 20
-    record_size = 20 * field_size
+    # ib_buf is real(wp) written with mpi_p, so the on-disk field width follows the build's working
+    # precision. wp is single only under --single (--mixed keeps wp double, narrowing only stp), so this
+    # keys off the build flag alone, not the case's `precision` (which selects database output format).
+    field_size = 4 if single else 8
+    fmt = "<" + ("f" if single else "d") * _NFIELDS_PER_IB
+    record_size = _NFIELDS_PER_IB * field_size
 
     with open(filepath, "rb") as state_file:
         data = state_file.read()
@@ -67,17 +76,17 @@ def _read_ib_state_records(filepath: str, precision: int):
     return [struct.unpack(fmt, data[offset : offset + record_size]) for offset in range(0, len(data), record_size)]
 
 
-def _assert_particle_cloud_non_overlap(case: TestCase, cloud_idx: int, records, start: int, count: int):
+def _assert_particle_cloud_non_overlap(case: TestCase, cloud_idx: int, records, start: int, count: int, tol: float):
     radius = case.params[f"particle_cloud({cloud_idx})%radius"]
     min_spacing = case.params.get(f"particle_cloud({cloud_idx})%min_spacing", 0.0)
     min_dist = 2.0 * radius + min_spacing
 
     for i in range(start, start + count):
-        xi, yi, zi = records[i][16:19]
+        xi, yi, zi = records[i][_CENTROID_SLICE]
         for j in range(i + 1, start + count):
-            xj, yj, zj = records[j][16:19]
+            xj, yj, zj = records[j][_CENTROID_SLICE]
             dist = math.sqrt((xi - xj) ** 2 + (yi - yj) ** 2 + (zi - zj) ** 2)
-            if dist < min_dist - 1.0e-12:
+            if dist < min_dist - tol:
                 raise MFCException(f"particle_cloud({cloud_idx}) particles overlap in ib_state_0.dat")
 
 
@@ -85,21 +94,31 @@ def _assert_particle_cloud_ib_state(case: TestCase):
     num_particle_clouds = case.params.get("num_particle_clouds", 0) or 0
     if num_particle_clouds <= 0 or case.params.get("ib_state_wrt", "F") != "T":
         return
+    # file_per_process writes a different path and record layout (per-rank files with leading
+    # num_local_ibs / gbl_patch_id integers); this reader only handles the single-file layout.
+    if case.params.get("file_per_process", "F") == "T":
+        return
 
-    ib_state_precision = 1 if ARG("single") or ARG("mixed") else case.params.get("precision", 2)
-    records = _read_ib_state_records(os.path.join(case.get_dirpath(), "restart_data", "ib_state_0.dat"), ib_state_precision)
+    single = ARG("single")
+    # Single precision carries ~1e-7 absolute error at O(1) coordinates, four orders past a 1e-12 slack, so
+    # scale the geometric tolerance with the working precision to avoid spurious single/CI failures.
+    tol = 1.0e-6 if single else 1.0e-12
+    records = _read_ib_state_records(os.path.join(case.get_dirpath(), "restart_data", "ib_state_0.dat"), single)
     start = case.params.get("num_ibs", 0) or 0
     num_dims = 3 if (case.params.get("p", 0) or 0) > 0 else 2 if (case.params.get("n", 0) or 0) > 0 else 1
 
     for cloud_idx in range(1, num_particle_clouds + 1):
         geometry = case.params.get(f"particle_cloud({cloud_idx})%cloud_geometry", 1)
+        packing_method = case.params.get(f"particle_cloud({cloud_idx})%packing_method", 1)
         count = case.params.get(f"particle_cloud({cloud_idx})%num_particles", 0) or 0
         radius = case.params[f"particle_cloud({cloud_idx})%radius"]
         records_end = start + count
         if records_end > len(records):
             raise MFCException(f"particle_cloud({cloud_idx}) expected {count} IB state records, found {len(records) - start}")
 
-        if geometry == 1:
+        # Box containment only holds for rejection sampling; lattice packing can place sites past the
+        # requested region (issue #1730), so the bounds assertion is gated on packing_method == 1.
+        if geometry == 1 and packing_method == 1:
             xc = case.params[f"particle_cloud({cloud_idx})%x_centroid"]
             yc = case.params.get(f"particle_cloud({cloud_idx})%y_centroid", 0.0)
             zc = case.params.get(f"particle_cloud({cloud_idx})%z_centroid", 0.0)
@@ -108,11 +127,11 @@ def _assert_particle_cloud_ib_state(case: TestCase):
             lz = case.params.get(f"particle_cloud({cloud_idx})%length_z", 0.0)
             bounds = [(xc - lx / 2.0, xc + lx / 2.0), (yc - ly / 2.0, yc + ly / 2.0), (zc - lz / 2.0, zc + lz / 2.0)]
             for record in records[start:records_end]:
-                for axis, coord in enumerate(record[16:19]):
+                for axis, coord in enumerate(record[_CENTROID_SLICE]):
                     if axis >= num_dims:
                         continue
                     lo, hi = bounds[axis]
-                    if coord < lo - 1.0e-12 or coord > hi + 1.0e-12:
+                    if coord < lo - tol or coord > hi + tol:
                         raise MFCException(f"particle_cloud({cloud_idx}) box particle lies outside its cloud bounds in ib_state_0.dat")
         elif geometry == 2:
             xc = case.params[f"particle_cloud({cloud_idx})%x_centroid"]
@@ -121,19 +140,19 @@ def _assert_particle_cloud_ib_state(case: TestCase):
             r_inner = case.params[f"particle_cloud({cloud_idx})%shell_inner_radius"] + radius
             r_outer = case.params[f"particle_cloud({cloud_idx})%shell_outer_radius"] - radius
             for record in records[start:records_end]:
-                x, y, z = record[16:19]
+                x, y, z = record[_CENTROID_SLICE]
                 if num_dims < 3:
                     radial_dist = math.sqrt((x - xc) ** 2 + (y - yc) ** 2)
                     plane_coord = y - yc
                 else:
                     radial_dist = math.sqrt((x - xc) ** 2 + (y - yc) ** 2 + (z - zc) ** 2)
                     plane_coord = z - zc
-                if radial_dist < r_inner - 1.0e-12 or radial_dist > r_outer + 1.0e-12:
+                if radial_dist < r_inner - tol or radial_dist > r_outer + tol:
                     raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates radial clearance in ib_state_0.dat")
-                if plane_coord < radius - 1.0e-12:
+                if plane_coord < radius - tol:
                     raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates flat-plane clearance in ib_state_0.dat")
 
-        _assert_particle_cloud_non_overlap(case, cloud_idx, records, start, count)
+        _assert_particle_cloud_non_overlap(case, cloud_idx, records, start, count, tol)
         start = records_end
 
 
