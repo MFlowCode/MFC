@@ -84,12 +84,6 @@ contains
         real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp) :: alpha_L_sum, alpha_R_sum
         real(wp) :: zcoef, pcorr  !< low Mach number correction
-        type(riemann_states) :: c_fast, pres_mag
-        type(riemann_states_vec3) :: B
-        type(riemann_states) :: Ga  !< Gamma (Lorentz factor)
-        type(riemann_states) :: vdotB, B2
-        type(riemann_states_vec3) :: b4  !< 4-magnetic field components (spatial: b4x, b4y, b4z)
-        type(riemann_states_vec3) :: cm  !< Conservative momentum variables
         integer :: i, j, k, l  !< Generic loop iterators
         integer :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
         integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
@@ -110,13 +104,12 @@ contains
             if (norm_dir == ${NORM_DIR}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
                                     & Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, &
-                                    & Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, &
-                                    & B2, b4, cm, pcorr, zcoef, vel_grad_L, vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, &
-                                    & vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, &
-                                    & c_avg, pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, &
-                                    & c_R, E_L, E_R, H_L, H_R, ptilde_L, ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, &
-                                    & eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, &
-                                    & Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, pcorr, zcoef, vel_grad_L, &
+                                    & vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, &
+                                    & Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, rho_L, rho_R, &
+                                    & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, H_L, H_R, ptilde_L, &
+                                    & ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, &
+                                    & Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -145,24 +138,6 @@ contains
                             pres_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
                             pres_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
 
-                            if (mhd) then
-                                if (n == 0) then  ! 1D: constant Bx; By, Bz as variables
-                                    B%L(1) = Bx0
-                                    B%R(1) = Bx0
-                                    B%L(2) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg)
-                                    B%R(2) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg)
-                                    B%L(3) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + 1)
-                                    B%R(3) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + 1)
-                                else  ! 2D/3D: Bx, By, Bz as variables
-                                    B%L(1) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg)
-                                    B%R(1) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg)
-                                    B%L(2) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + 1)
-                                    B%R(2) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + 1)
-                                    B%L(3) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + 2)
-                                    B%R(3) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + 2)
-                                end if
-                            end if
-
                             rho_L = 0._wp
                             gamma_L = 0._wp
                             pi_inf_L = 0._wp
@@ -175,9 +150,6 @@ contains
 
                             alpha_L_sum = 0._wp
                             alpha_R_sum = 0._wp
-
-                            pres_mag%L = 0._wp
-                            pres_mag%R = 0._wp
 
                             if (mpp_lim) then
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -250,40 +222,6 @@ contains
                                 E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
-                            else if (mhd .and. relativity) then
-                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
-                                    Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
-                                    Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
-                                    vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
-                                    vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
-
-                                    b4%L(1:3) = B%L(1:3)/Ga%L + Ga%L*vel_L(1:3)*vdotB%L
-                                    b4%R(1:3) = B%R(1:3)/Ga%R + Ga%R*vel_R(1:3)*vdotB%R
-                                    B2%L = B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp
-                                    B2%R = B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp
-
-                                    pres_mag%L = 0.5_wp*(B2%L/Ga%L**2._wp + vdotB%L**2._wp)
-                                    pres_mag%R = 0.5_wp*(B2%R/Ga%R**2._wp + vdotB%R**2._wp)
-
-                                    ! Hard-coded EOS
-                                    H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
-                                    H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
-
-                                    cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
-                                    cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
-
-                                    E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
-                                    E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
-                                #:endif
-                            else if (mhd .and. .not. relativity) then
-                                pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
-                                pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
-                                E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
-                                ! includes magnetic energy
-                                E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R
-                                H_L = (E_L + pres_L - pres_mag%L)/rho_L
-                                ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
-                                H_R = (E_R + pres_R - pres_mag%R)/rho_R
                             else
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
                                 E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
@@ -296,11 +234,6 @@ contains
 
                             call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, vel_R_rms, 0._wp, c_R, &
                                                           & qv_R)
-
-                            if (mhd) then
-                                call s_compute_fast_magnetosonic_speed(rho_L, c_L, B%L, norm_dir, c_fast%L, H_L)
-                                call s_compute_fast_magnetosonic_speed(rho_R, c_R, B%R, norm_dir, c_fast%R, H_R)
-                            end if
 
                             s_L = 0._wp; s_R = 0._wp
 
@@ -327,47 +260,15 @@ contains
                             end if
 
                             ! Mass
-                            if (.not. relativity) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, eqn_idx%cont%end
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & i) = (s_M*alpha_rho_R(i)*vel_R(norm_dir) - s_P*alpha_rho_L(i)*vel_L(norm_dir) &
-                                                & + s_M*s_P*(alpha_rho_L(i) - alpha_rho_R(i)))/(s_M - s_P)
-                                end do
-                            else if (relativity) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, eqn_idx%cont%end
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & i) = (s_M*Ga%R*alpha_rho_R(i)*vel_R(norm_dir) - s_P*Ga%L*alpha_rho_L(i) &
-                                                & *vel_L(norm_dir) + s_M*s_P*(Ga%L*alpha_rho_L(i) - Ga%R*alpha_rho_R(i)))/(s_M &
-                                                & - s_P)
-                                end do
-                            end if
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%cont%end
+                                flux_rsx_vf(${SF('')}$, &
+                                            & i) = (s_M*alpha_rho_R(i)*vel_R(norm_dir) - s_P*alpha_rho_L(i)*vel_L(norm_dir) &
+                                            & + s_M*s_P*(alpha_rho_L(i) - alpha_rho_R(i)))/(s_M - s_P)
+                            end do
 
                             ! Momentum
-                            if (mhd .and. (.not. relativity)) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 3
-                                    ! Flux of rho*v_i in the ${XYZ}$ direction = rho * v_i * v_${XYZ}$ - B_i * B_${XYZ}$ +
-                                    ! delta_(${XYZ}$,i) * p_tot
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%cont%end + i) = (s_M*(rho_R*vel_R(i)*vel_R(norm_dir) - B%R(i) &
-                                                & *B%R(norm_dir) + dir_flg(i)*(pres_R + pres_mag%R)) - s_P*(rho_L*vel_L(i) &
-                                                & *vel_L(norm_dir) - B%L(i)*B%L(norm_dir) + dir_flg(i)*(pres_L + pres_mag%L)) &
-                                                & + s_M*s_P*(rho_L*vel_L(i) - rho_R*vel_R(i)))/(s_M - s_P)
-                                end do
-                            else if (mhd .and. relativity) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 3
-                                    ! Flux of m_i in the ${XYZ}$ direction = m_i * v_${XYZ}$ - b_i/Gamma * B_${XYZ}$ +
-                                    ! delta_(${XYZ}$,i) * p_tot
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%cont%end + i) = (s_M*(cm%R(i)*vel_R(norm_dir) - b4%R(i) &
-                                                & /Ga%R*B%R(norm_dir) + dir_flg(i)*(pres_R + pres_mag%R)) - s_P*(cm%L(i) &
-                                                & *vel_L(norm_dir) - b4%L(i)/Ga%L*B%L(norm_dir) + dir_flg(i)*(pres_L + pres_mag%L) &
-                                                & ) + s_M*s_P*(cm%L(i) - cm%R(i)))/(s_M - s_P)
-                                end do
-                            else if (bubbles_euler) then
+                            if (bubbles_euler) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_vels
                                     flux_rsx_vf(${SF('')}$, &
@@ -390,22 +291,7 @@ contains
                             end if
 
                             ! Energy
-                            if (mhd .and. (.not. relativity)) then
-                                ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
-                                #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
-                                    flux_rsx_vf(${SF('')}$, &
-                                                & eqn_idx%E) = (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir) &
-                                                & *(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) - s_P*(vel_L(norm_dir) &
-                                                & *(E_L + pres_L + pres_mag%L) - B%L(norm_dir)*(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) &
-                                                & + vel_L(3)*B%L(3))) + s_M*s_P*(E_L - E_R))/(s_M - s_P)
-                                #:endif
-                            else if (mhd .and. relativity) then
-                                ! energy flux = m_${XYZ}$ - mass flux Hard-coded for single-component for now
-                                flux_rsx_vf(${SF('')}$, &
-                                            & eqn_idx%E) = (s_M*(cm%R(norm_dir) - Ga%R*alpha_rho_R(1)*vel_R(norm_dir)) &
-                                            & - s_P*(cm%L(norm_dir) - Ga%L*alpha_rho_L(1)*vel_L(norm_dir)) + s_M*s_P*(E_L - E_R)) &
-                                            & /(s_M - s_P)
-                            else if (bubbles_euler) then
+                            if (bubbles_euler) then
                                 flux_rsx_vf(${SF('')}$, &
                                             & eqn_idx%E) = (s_M*vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) - s_P*vel_L(dir_idx(1) &
                                             & )*(E_L + pres_L - ptilde_L) + s_M*s_P*(E_L - E_R))/(s_M - s_P) + (s_M/s_L)*(s_P/s_R) &
@@ -444,32 +330,6 @@ contains
                                                 & + s_M*s_P*(Y_L*rho_L - Y_R*rho_R))/(s_M - s_P)
                                     flux_src_rsx_vf(${SF('')}$, i) = 0._wp
                                 end do
-                            end if
-
-                            ! MHD: magnetic flux and Maxwell stress contributions
-                            if (mhd) then
-                                if (n == 0) then  ! 1D: d/dx flux only & Bx = Bx0 = const.
-                                    ! B_y flux = v_x * B_y - v_y * Bx0 B_z flux = v_x * B_z - v_z * Bx0
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 0, 1
-                                        flux_rsx_vf(j, k, l, &
-                                                    & eqn_idx%B%beg + i) = (s_M*(vel_R(1)*B%R(2 + i) - vel_R(2 + i)*Bx0) &
-                                                    & - s_P*(vel_L(1)*B%L(2 + i) - vel_L(2 + i)*Bx0) + s_M*s_P*(B%L(2 + i) &
-                                                    & - B%R(2 + i)))/(s_M - s_P)
-                                    end do
-                                else  ! 2D/3D: Bx, By, Bz /= const. but zero flux component in the same direction
-                                    ! B_x d/d${XYZ}$ flux = (1 - delta(x,${XYZ}$)) * (v_${XYZ}$ * B_x - v_x * B_${XYZ}$) B_y
-                                    ! d/d${XYZ}$ flux = (1 - delta(y,${XYZ}$)) * (v_${XYZ}$ * B_y - v_y * B_${XYZ}$) B_z d/d${XYZ}$
-                                    ! flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 0, 2
-                                        flux_rsx_vf(${SF('')}$, &
-                                                    & eqn_idx%B%beg + i) = (1 - dir_flg(i + 1))*(s_M*(vel_R(dir_idx(1))*B%R(i + 1) &
-                                                    & - vel_R(i + 1)*B%R(norm_dir)) - s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i &
-                                                    & + 1)*B%L(norm_dir)) + s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
-                                    end do
-                                end if
-                                flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = 0._wp
                             end if
 
                             #:if (NORM_DIR == 2)
