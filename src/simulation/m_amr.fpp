@@ -1267,12 +1267,11 @@ contains
     #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
         impure subroutine s_amr_gather_from_parent_field_${GSFX}$(pblk, qp, to_host)
 
-            integer, intent(in)   :: pblk
-            integer, intent(in)   :: qp       !< parent's flat-store slot
-            logical, intent(in)   :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
-            integer               :: w1, w2, w3, powner, cowner, boxsz, ierr
-            real(wp), allocatable :: xbuf(:)
-            integer               :: plo(3), phi(3)
+            integer, intent(in) :: pblk
+            integer, intent(in) :: qp       !< parent's flat-store slot
+            logical, intent(in) :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
+            integer             :: w1, w2, w3, powner, cowner, boxsz, ierr
+            integer             :: plo(3), phi(3)
 
             ! Patch box in the PARENT-FINE frame. Both the child owner and the parent owner must agree on it, so derive it from
             ! REPLICATED metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the empty
@@ -1299,11 +1298,18 @@ contains
             ! Split ownership, parent side: exactly one destination (the block's owner) and one box, so a blocking pair suffices -
             ! no
             ! overlap map and no collective, matching the L0<->L1 gather's "non-participants send/recv nothing" property.
+            ! NON-BLOCKING, via the same deferred pool the level-1 gather uses (see s_amr_gsnd_reserve). The old code used a
+            ! BLOCKING MPI_SEND here, so the parent's owner rendezvoused with the child's owner once per box, in lockstep - the
+            ! defect m_amr.fpp:256 records for the level-1 path and fixes there, never applied to this one. Level>=2 is the
+            ! MAJORITY of boxes (160 of 224 at cap 64), and it measured 420 ms per send / 8.6% of wall at the production point.
+            ! The pool owns the buffer because an ISEND requires it to stay live until completion; the drain is the existing
+            ! s_amr_gather_send_flush after the rebuild's box loop.
             boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
-            allocate (xbuf(boxsz))
-            call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, xbuf)
-            call MPI_SEND(xbuf, boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, ierr)
-            deallocate (xbuf)
+            call s_amr_gsnd_reserve(boxsz)
+            amr_gsnd_n = amr_gsnd_n + 1
+            call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, amr_gsnd_pool(:,amr_gsnd_n))
+            call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, amr_gsnd_req(amr_gsnd_n), &
+                           & ierr)
 #endif
 
         end subroutine s_amr_gather_from_parent_field_${GSFX}$
@@ -5132,12 +5138,14 @@ contains
             ! Both sends carry tag amr_cur; MPI non-overtaking on a fixed (source, tag, comm) keeps t_a ahead of t_b.
             if (amr_block_owner(pblk) == proc_rank) then
                 call s_amr_gather_from_parent_field_stor(pblk, amr_loc_of(pblk), .false.)  ! parent @ t_a (device C/F fill)
+                call s_amr_gather_send_flush()  ! keep this site's original blocking semantics - NO drain follows this loop
             else
                 call s_amr_recv_parent_patch(pblk, .false.)
             end if
             if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gsta(amr_cg, amr_loc_of(kc))
             if (amr_block_owner(pblk) == proc_rank) then
                 call s_amr_gather_from_parent_field_cons(pblk, amr_loc_of(pblk), .false.)  ! parent @ t_b (device C/F fill)
+                call s_amr_gather_send_flush()  ! keep this site's original blocking semantics - NO drain follows this loop
             else
                 call s_amr_recv_parent_patch(pblk, .false.)
             end if
