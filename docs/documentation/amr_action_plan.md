@@ -1,353 +1,564 @@
-# AMR performance action plan (rewritten 2026-08-18)
+# AMR performance plan (2026-08-19 — post-diagnosis execution plan)
 
-The working plan for closing MFC's AMR tax. This version supersedes the 2026-08-15 plan (in git
-history) after two rounds of external audit; it folds in the audit corrections, the 2026-08-18
-phase budgets, and the rb:mem/rb:unpk refutation. Companions: `amr_tax_review.md` (the audit and
-its reasoning), `amr_block_batching.md` (chronological research log). Every number below carries
-its operating point; a number without one is a bug in this document.
+**Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
+untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18
+rewrite (git history) now that the WHY is established — the findings live in
+`amr_slowness_analysis.md` (causal model, five-reviewer panel) and `amr_tax_review.md` (measurement
+audit); this document is only the work list, its gates, and its decision rules.
 
----
+## Where we stand
 
-## 1. Where we are
+- **Landed:** R1 (level-2 gather blocking-SEND -> ISEND pool): **-17%/-22% wall**, regrid -39%,
+  goldens 76/76. Phase instrumentation: 44 brackets, call counts, per-rank output; zero cost when
+  `rank_time_wrt` is off.
+- **Measured taxes:** matched point 6.30x -> **5.21x** post-R1. Production point: **not a number** —
+  4.02x in the 40-80 step window growing to 12.14x in 80-160 at constant mesh; the growth costs
+  ~61% of a 160-step run. Long runs at `regrid_int=2` **OOM by regrid count** (40 regrids dies).
+- **Store fix A' applied** (one line, growth policy): the OOM mechanism is diagnosed as a plateau
+  overshot by doubling, not a leak - Phase 1. Verification in flight on the case that dies today.
+- **The causal model** (`amr_slowness_analysis.md` sec. 3): regrid churn -> rank-local grow-only
+  store ratchet -> (a) OOM at the 64->128 doubling, (b) VRAM pressure -> slow per-launch alloc path
+  -> rank-local rhs divergence -> **convoy amplification** through the per-box blocking lattice.
+  Link (b) is the leading hypothesis (E-H1), under adjudication now.
+- **Two laws that gate every fix below:** (1) a per-box rendezvous is also a BARRIER — deferral
+  without a downstream sync relocates cost (measured, twice); aggregation removes it. (2) Code-read
+  attributions run ~2-for-11 here — every fix is gated on a bracket or counter, never on a reading.
 
-**The gap.** At matched block size (cap 64 both codes, 400^3, np=8, 2 levels, volumetric blob,
-weno1 + Lax-Friedrichs, regrid_int=2), MFC's AMR tax is **6.89x** vs AMReX's **3.40x** — a **2.03x
-excess**. The once-quoted 7.64x excess was an unmatched comparison (MFC cap 32 vs AMReX 64^3) and
-is retired. The tax metric structurally rewards heavier physics, so production numerics (WENO5 +
-HLLC) will report a LOWER tax with nothing changed; quote both operating points.
+## Phase 0 — finish the adjudication (hours, in flight)
 
-**What is already won** (landed, measured): cap 32 -> 64 = 2.24-2.32x wall at lower memory;
-`flux_n` deletion = -25%; hllc + weno `map(alloc:)` = -26.4% (3D AMR case, byte-identical);
-loop-invariant coarse halo; regrid stash steps A/B; the flat store. The per-cell arithmetic penalty
-of AMR is GONE at cap 64 (a = 3.50 ns/cell vs uniform 3.63) — what remains is per-box overhead and
-the regrid path.
-
-**The budget everything below allocates against** (2026-08-18, exclusive node, 400^3, np=8,
-`regrid_int=2`, weno1+LF, from-scratch, `ph_wall_total`; cap 32 wall 656.975 s / cap 64 293.730 s):
-
-| phase | cap 32 | cap 64 | inside it (cap 64) |
-|---|---|---|---|
-| **regrid** | 35.2% | **42.2%** | rg:build 26.1% of wall (rb:gath 15.8 = wait 7.4 + UNBRACKETED host ~8.4); rg:mig 9.4%; rest <4% |
-| per-box per-step MPI (gather+reflux+seam) | 29.0% | 25.1% | gather 11.7, reflux 9.8, seam 3.6 |
-| rhs (fine-block advance) | 23.1% | 18.7% | internal GPU-busy ~45-50% (ESTIMATE — see G0) |
-| coarse (monolithic L0 RHS) | 2.6% | 4.9% | ~53-65% busy |
-| halo / gfill / rk | 2.4% | 2.5% | |
-| unbracketed | 7.6% | 6.7% | contains the per-block swap — never measured |
-
-**Regrid's share RISES with the cap** (35.2 -> 42.2%): raising the cap made regrid relatively more
-dominant, not less. And the whole table is at `regrid_int=2` + the cheapest numerics: at int=20
-regrid roughly halves and rhs roughly doubles (cap-32 sweep), and production numerics push rhs
-further. **The production-point budget does not exist and the priority ordering depends on it** —
-which is why the plan starts with measurements, not code.
-
-**Settled negatively, this week:** the regrid host cost is NOT the per-box allocate (rb:mem
-0.002-0.010 s) and NOT the unpack (rb:unpk 0.026-0.104 s) — both brackets landed 2026-08-18 at both
-caps; the scratch-hoist fix is cancelled. The ~25-64 s host remainder is in the still-unbracketed
-send-side pack, per-(box,source) geometry scan, and send-pool drains. Third refuted code-read
-attribution of the campaign; only brackets decide.
-
----
-
-## 1b. GATE G0 — RESULTS (measured 2026-08-18, `amr-bench/logs/g0-0818_1056`)
-
-G0 ran and **routed the plan away from where it was pointing.** Three from-scratch runs, cap 64,
-400^3, np=8, one binary, exclusive node. A = matched point (`regrid_int=2`, WENO1+LF, wall 305.881 s);
-B = **production point** (`regrid_int=20`, WENO5+HLLC, wall 139.940 s); C = A + kernel trace.
-A and B carry **identical box counts** (64 L1 + 160 L2) and `fine_work` within 9%, so the mesh-lag
-confound that invalidated earlier interval comparisons is absent.
-
-| phase | A (int=2, WENO1+LF) | **B (PRODUCTION: int=20, WENO5+HLLC)** |
+| item | action | decides |
 |---|---|---|
-| **regrid** | **39.4%** | **37.6%** |
-| gather (per-step, per-box) | 12.7% | **16.6%** |
-| rhs | 17.9% | 15.0% |
-| coarse (monolithic L0) | 5.4% | 13.8% |
-| reflux | 10.9% | 6.8% |
-| seam | 4.0% | 2.9% |
-| **swap** | **0.8%** | **0.5%** |
-| unbracketed | 6.1% | 3.7% |
+| 0.1 | Read RK_160 per-rank data (running) against pre-registered signatures: rhs bimodal at flat fine_work + same slow ranks = E-H1; rhs tracks block/L2 count = composition; rotating slow ranks = thermal | which Phase-1 premise holds |
+| 0.2 | `map(alloc:)` revert A/B at 160 steps (2 lines, temporary) | E-H1 (VRAM-pressure alloc path) vs heap fragmentation |
+| 0.3 | Land trip-wire (stderr: `amr_loc_n`, `amr_st_cap`, live slots per rank per regrid) + `PH_RESTR` bracket on the post-stage restrict/reflux chain (~15 LOC) | makes the ratchet and the invisible 4-6% observable |
+| 0.4 | Commit the verified instrumentation (reflux + per-rank brackets, goldens green) | keeps the tree honest |
 
-**G0.1 — the per-block swap is 0.8% / 0.5% of wall.** It was never measured before and was assumed
-large. **This refutes the central premise of the batched-advance design**: per-block grid-state
-reconfiguration is not a material cost, so removing it cannot pay for the batching machinery.
+## Phase 1 — the store fix: DIAGNOSED, A' APPLIED, verification in flight
 
-**G0.2 — `PH_RHS` is 54-57%% GPU-busy**, measured on all 8 ranks with numerator and denominator from
-ONE run (rocprofv3 kernel trace; coarse and fine `s_compute_rhs` separated by the exact signature
-that the coarse call fires 3x per step at the rank's 200^3 subdomain while fine blocks spread over
-many smaller grids; `br_load`/`br_store` at ~77/step = 28 blocks x 3 stages corroborates the split).
-Tracing inflates the denominator, so this is a LOWER bound. **Batching ceiling = rhs overhead 7.8%%
-+ swap 0.8%% = ~1.09x.** The audited estimate of 44-49%% was close and slightly conservative.
+### What the counters actually showed (2026-08-19, `logs/recon-0819_1351`)
+```
+rank 5  live 29  loc_n 48  freed 19  stack_in 0  stack_out 19
+rank 5  live 32  loc_n 89  freed 57  stack_in 0  stack_out 57
+rank 5  live 29  loc_n 89  freed 60  stack_in 0  stack_out 60
+rank 0  live 26  loc_n 31  freed  4  stack_in 1  stack_out 5
+```
+**RETRACTION: it is not an index leak.** `loc_n = live + stack_out` EXACTLY on every line - nothing is
+lost. It is a **PLATEAU**: `stack_in` is 0 every time because the rebuild drains the whole recycle
+stack then needs more, since frees happen AFTER allocs. `loc_n` settles at ~3x live (29 live + 60
+parked); the floor with this ordering is ~2x, old and new being concurrently live during a rebuild.
 
-**G0.3 — the priority flip that the review predicted does NOT happen.** Regrid is ~38%% at BOTH
-operating points and, at the production point, **2.5x larger than rhs**. Production numerics raise
-`coarse` (5.4 -> 13.8%%) and `gather` (12.7 -> 16.6%%), not `rhs`.
+**The OOM comes from DOUBLING overshooting the plateau**, not the plateau itself: `loc_n` tops at 89,
+`newcap = max(2*oldcap, nloc)` jumps 64 -> **128** = 28.3 GB of store holding 6.4 GB of live data,
+total 60.4 GB of 68.7.
 
-**G0.4 — all four round-1 gather candidates measured ~ZERO** (`rb:own` 0.010, `rb:upd` 0.017,
-`rb:pack` 0.043, `rb:rsv` **0.000** s at the production point). The `s_amr_gsnd_reserve` force-drain
-hypothesis is refuted outright. **70%% of `rb:gath` and 12.5%% of wall inside `rg:build` remain
-unexplained** - round-2 brackets (`rb:seam`, `rb:post`, `rb:geo`, `rb:slot`, `rb:tail`) are in.
+**THE ASYMMETRY IS CHURN, NOT WORK:** rank 0 frees 4-5 slots/regrid, rank 5 frees **57-60** - 12x, at
+identical `fine_work`. Which subdomain the feature migrates through is a deterministic geometric fact
+and **nothing balances churn**. Rank 5 is also the 4x `rhs` straggler in both per-rank runs.
 
-**BONUS RESULT — regrid frequency is a weak lever.** Cutting frequency 10x (int 2 -> 20) cut total
-regrid cost only **2.3x** (120.6 -> 52.7 s), because per-regrid cost rose **4.4x** (6.03 -> 26.33 s)
-as the mesh drifts further between rebuilds. "Regrid less often" is not a mitigation, and the old
-"tax 27.2x -> 7.2x" framing overstates what the interval buys.
+### FIX A' — applied, one line — FAILED ALONE, still in tree (see the attribution caveat above)
+`newcap = max(oldcap + max(oldcap/4, 8), nloc)`. Trajectory 8,16,24,32,40,50,62,77,**96** (~21 GB,
+total ~53 GB) instead of 16,32,64,**128**. Growth POLICY only - slot lifetime, index assignment and
+the device-authoritative contract untouched, so it cannot produce a wrong answer, only a different
+allocation trajectory. Checked: `newcap >= nloc` always (never undersized), `newcap > oldcap` always
+(cannot stall).
 
-### ROUND 2 (same day): rg:build CLOSES; the gather's host half does not
+**A' RESULT: FAILED (2026-08-19, `logs/fixA-0819_1456`).** The case still aborts, same
+`HSA_STATUS_ERROR_OUT_OF_RESOURCES` on rank 5, never reaching the step loop. A' worked as designed -
+cap 128 -> 120, lower ranks 64 -> 50-77 - but that reclaims only 1.8 GB. TWO errors in the projection:
+(a) `loc_n` does NOT plateau at 89; that was measured over 20 regrids and over 40 it reaches **103**,
+so growth policy alone cannot bound it; (b) the non-store footprint was estimated at 32.1 GB from one
+historical figure, while the VRAM sampler measured **63.9 GB peak**, back-solving to ~35.6 GB. At cap
+120: 35.6 + 26.5 = **62.1 GB** against an effective ceiling near 64 - it dies by a nose. A' is kept
+(strictly better than doubling, safe, one line) but is NOT sufficient. **Fix B is therefore required,
+not optional**, and is under test now.
 
-Five more brackets, both arms re-run. **`rg:build` now accounts to 100.0%%** (residuals 0.003 s and
-0.001 s) - the 22.5%% that was unexplained is two regions:
+**PASS BAR:** the 80-step / 40-regrid matched case - which aborts today with
+`HSA_STATUS_ERROR_OUT_OF_RESOURCES` - must COMPLETE with zero OOM strings; then goldens 76/76.
+Live evidence mid-run: ranks at `nloc` 56-63 sit at cap 62 where doubling would have forced 128; only
+the two churniest reached 96; **no rank has requested 128**; and `nloc` 89 on rank 5 reproduces the
+plateau measured independently in the reconcile run.
 
-| bracket | matched | **production** | imbalance | what it is |
+**If it passes**, three things unlock together: long runs at realistic regrid intervals, the
+differenced matched-tax measurement that was never possible, and a genuine test of whether relieving
+capacity pressure touches the rank-5 straggler (E-H1's real prediction, still untested).
+
+### FIX B — APPLIED AND VERIFIED ON THE OOM CASE (2026-08-19)
+
+`s_amr_compact_store(nlive)`: dense renumber of `amr_loc_of` + shrink realloc of all four store
+arrays, called at the end of `s_amr_reconcile_slots`. Trigger `amr_st_cap > 3*nlive`, target
+`2*nlive`.
+
+**Result: the case that reliably OOMs today COMPLETED, rc=0, 814.570 s step-loop wall, and the
+full suite is 76/76.** Compaction fires as designed (`loc_n 96 -> 29, cap 58`).
+
+> **CORRECTION (2026-08-19): the OOM case is NOT the cap-96 case.** It is
+> `regrid_int=2` / `amr_max_grid_size=64` / `weno_order=1` / `riemann_solver=5` / 80 steps — a
+> deliberate high-CHURN stress case (40 regrids) with a cheap scheme so store churn dominates the
+> run. "cap 96 OOMs" is a **separate, independent** finding from a different experiment. An earlier
+> revision of this document conflated the two; whether Fix B unblocks cap 96 is **untested**.
+
+> **ATTRIBUTION CAVEAT — the verified configuration is A' + B TOGETHER, not B alone.** Fix A'
+> (1.25x growth, `m_amr.fpp` `s_amr_st_reserve`) was left in the tree when B was built and tested.
+> What is established: A' *alone* does not prevent the OOM; A'+B does. **B alone is untested.**
+> Do not claim "compaction fixes the OOM" without either running B-alone or keeping both. The two
+> are plausibly complementary — A' limits overshoot on the way up, B reclaims on the way down —
+> but A' also makes reallocs *more frequent*, and each one is a multi-GB host round trip, so A'
+> may be a net time cost once B exists. Resolve this by measurement, not reasoning.
+
+Peak local indices still reach `nloc 103 / cap 112` on the hot rank, so the plateau is *reduced,
+not removed* — expected, since the trigger is deliberately hysteretic (see next block for why, and
+for the fix that removes the hysteresis).
+
+### The hysteresis is an artifact of a host round trip — external review (2026-08-19)
+
+Reviewers on AMReX, Parthenon/Athena++ and Chombo/SAMRAI converge on the same two points, and both
+are actionable:
+
+1. **Our compaction and growth both stage the whole store through the host**
+   (`GPU_UPDATE(host)` -> `tmp = store` -> realloc -> `GPU_UPDATE(device)`). Multi-GB over PCIe, so
+   we cannot afford to run it often — hence the 3x trigger and the 2x target. AMReX's
+   `RemakeLevel` fills the new `MultiFab` **device-side** from the still-live old one. Making our
+   remap a device-to-device gather lets compaction run unconditionally at `newcap = nlive`, taking
+   steady state from 2-3x live to **1x**, with a transient peak of 2x *live* rather than today's
+   2x *cap* — cheaper than the current peak even before the steady-state win.
+2. **Neither AMReX nor Parthenon allocates a local index at all.** AMReX's `localindex` is a binary
+   search over the sorted owned-box list; Parthenon's `lid = n - nbs` is recomputed contiguous every
+   regrid. The index space *is* the live set by construction, so it cannot ratchet. This is Option 1
+   (stable slot identity), and it deletes `amr_loc_free`/`amr_loc_nfree`/`amr_loc_n` as concepts
+   rather than mitigating them.
+
+Do (1) then (2): (1) is the larger memory win and is local to two routines; (2) removes the bug
+class. Together they reproduce AMReX's invariant — *storage size == live working set, every regrid,
+with no memory of the past* — while keeping the one contiguous device array the offload result
+requires.
+
+Two caveats banked from the same review, against over-claiming the batching payoff:
+
+- Parthenon's headline 82x packing win is **launch-latency-bound buffer fill** (kernels copying ~8
+  numbers). MFC's blocks are ~2.3M cells; a per-block kernel runs for milliseconds and cannot be
+  launch-latency-bound. Our overhead is a *different* mechanism (offload descriptor mapping), so
+  that number does not transfer.
+- Parthenon-VIBE, on a code that already has full pack fusion, still measures **4.4% GPU-busy** on
+  a 3-level AMR case — worse than ours. Kernel fusion removes one term; it does not fix host-side
+  mesh bookkeeping.
+
+### FIX B — original deferred plan (superseded by the block above)
+Compact post-reconcile so `loc_n` returns to `live` (peak ~2x not ~3x): recovers ~15.5 GB against
+A''s ~7.3 GB. Safe in principle (post-reconcile all readers are done) but it MOVES LIVE DATA - the
+silent-corruption class. Price only after A' is measured; it may not be needed.
+
+### REFUTED — kept as a warning
+"Free stale slots BEFORE the rebuild's alloc loop" (~20 LOC) was this phase's original fix. Its
+premise - stale slots have no readers by rebuild time - is FALSE: the overlap carry-forward reads
+`amr_stor_st(..., amr_loc_of(kks))` for OLD blocks (m_amr_regrid.fpp ~1422) while the stash is
+WRITTEN at those same old local indices (~1221), and `s_amr_free_slot` zeroes `amr_loc_of` and
+recycles the index. Silent wrong answers. Patch parked at `amr-bench/phase1_patch.py` (raises on
+execution). **Caught by tracing runtime reads, not by the anchor check - the eleventh code-read
+attribution refuted, and the first caught before burning a build.**
+
+## THE RUN QUEUE (2026-08-19, one node / 8 GCDs, serial)
+
+Ordering is the scarce resource: one node means one timing arm at a time, and the overlap policy
+forbids building during a timing arm. So the queue is ordered by **how much of the remaining plan
+each run invalidates**, not by how promising each idea is.
+
+Every entry names the decision it changes. A run that cannot change a decision does not belong here.
+
+| # | run | cost | decides |
+|---|---|---|---|
+| **R1** | **A5 discriminator** (RUNNING) | build + 80 + 160 steps, ~40 min | **Whether the balancer track exists at all** |
+| **R2** | **Cap sweep 64 / 96 / 128** | 3 runs, ~45 min | Whether Fix B unlocked a faster operating point |
+| R3a | A7 SFC-cut hysteresis A/B | 40-60 LOC + build + 2 runs | *gated on R1* |
+| R3b | A1 per-block cost constant | ~10 LOC + build + 2 runs | *gated on R1* |
+| R4 | Fix B alone vs A'+B | build + 1 run, ~30 min | One line (`s_amr_st_reserve` growth factor) |
+| R5 | Device-side store remap | days | Independent; steady-state store 2-3x live -> 1x |
+
+### R1 — the gate (running)
+
+Reads per-rank `gather` against per-rank `rhs` at 80 and 160 steps, so the discriminator is read on
+the **onset difference** rather than one endpoint (at 80 steps there is no straggler at all).
+
+- `gather` skews with `rhs` -> **L0-sourcing**: the sick rank sources its coarse gathers from a
+  *static* L0 subdomain. No fine-block balancer can move that work. **A1/A7 are dead**; go to A6.
+- `gather` flat while `rhs` is 4x -> L0-sourcing is out; the churn correlation survives; A7/A1 live.
+
+The binary also prints per-rank `[amr-recon]` churn and `[amr-store]` peaks, which supply the
+reviewer's *blocks-arrived/departed* counter for free. The one thing still missing is
+*coarse-gather bytes sourced*; add it only if R1 comes back ambiguous.
+
+**Why this must be read carefully:** the apparent refutation of L0-sourcing (`rhs` 2.91 vs `gather`
+1.127) compares numbers from **two different cases** — 2.91 is cap-64 production at 160 steps, 1.127
+is the cap-32 matched case over a 10-warm-step window. R1 measures both on one case in one run,
+which is the only reason its answer is worth anything.
+
+### R1 + R1b RESULT — SETTLED: the straggler is a STORE-CAPACITY artifact
+
+Same node (k004-004), same case, **byte-identical `fine_work` sequence**, the only difference being
+Fix A' + Fix B:
+
+| | wall | ns/fine-cell-step | rhs max/mean | rank-5 rhs | max cap |
+|---|---|---|---|---|---|
+| pre-fix (reverted) | 1693.195 s | 56.80 | **2.694** | 923.6 s | **128** |
+| post-fix (A'+B) | **712.032 s** | **23.89** | **1.069** | 221.3 s | **77** |
+
+**2.378x wall at identical work.** The straggler returns when the fix is removed and vanishes when
+it is restored, on the same hardware. Mechanism: caps of 128 drove two GCDs to **63.8 / 62.5 GiB of
+64 (97-99%)**; ungoverned store growth exhausts VRAM and pushes onto a slow path. It is
+state-dependent — the first 80 steps match across nodes to 0.6%, and all divergence is in 80->160.
+
+**Consequences for this plan:**
+- **L0-sourcing REFUTED.** `gather` never skewed to rank 5 (argmax was rank 6). The gate that was
+  blocking A1/A7 is lifted — but see below, because the *reason* to do them has changed.
+- **"Cost grows with sim time" is not intrinsic**: 3.68x pre-fix, **1.17x post-fix** (linear).
+- **The balancer track is deprioritised on its merits, not by the gate.** Work was balanced to 1.4%
+  throughout and the straggler had nothing to do with partitioning. A1/A7 remain cheap and
+  defensible, but they are no longer aimed at a known 2.4x problem.
+- **The device-side remap (R5) is promoted.** If capacity is what costs 2.378x, then getting steady
+  state from 2-3x live down to 1x live is the highest-value remaining store item.
+
+**Still unexplained, do not paper over:** ranks 4 and 5 both reach cap 128 pre-fix but only rank 5
+is slow (294 s vs 924 s). Capacity is necessary, not sufficient. One run with a per-rank VRAM print
+would close it.
+
+### R1 — PRE-REGISTERED READ (written before the 160-step arm returned)
+
+Recorded in advance because the failure mode of this campaign has been fitting a story to numbers
+after seeing them. The 80-step baseline is in: `rhs` imbalance **1.089** (pathology absent), and
+per-rank `gather` **56.86 on rank 5 against a 52.14 mean** — mildly above, but the argmax is rank 6.
+
+**The direction of the gather skew is the discriminator, not its magnitude.** `gather` contains MPI,
+so a slow rank makes *other* ranks wait inside it. The two hypotheses therefore predict opposite
+signs, which is a far stronger test than "is gather skewed":
+
+| | rank 5's `gather` | other ranks' `gather` |
+|---|---|---|
+| **L0-sourcing** (rank 5 does the work) | **HIGH** | low |
+| **Consequence of `rhs` skew** (others wait on rank 5) | **LOW** | high |
+
+The `reflux` column already shows what a pure wait-sink looks like: rank 5 is the **lowest** (20.87
+vs 31.83 mean, 0.656x) precisely because it is the one computing while everyone else waits. So if
+`gather` were only absorbing rank 5's lateness, rank 5 would be *lowest* there too. **At 80 steps it
+is not — it is above the mean.** That is a genuine, if weak, point against pure wait-artifact.
+
+Decision rule, fixed now:
+
+- **L0-sourcing CONFIRMED** — at 160 steps rank 5's `gather`/mean rises materially from 1.09 *and*
+  rank 5 is the argmax. Balancer track (A1/A7) is dead; go to A6.
+- **L0-sourcing REFUTED** — `gather` imbalance stays near 1.1-1.2 or its argmax is another rank,
+  while `rhs` imbalance reaches ~2.9. Note this outcome does **not** confirm the churn hypothesis;
+  the rank-4/rank-5 control pair below already damages that independently.
+- **AMBIGUOUS** — `gather` rises to roughly 1.3-1.5, or rank 5 goes *below* mean (wait-artifact
+  contaminating the signal). Then the *coarse-gather bytes sourced* counter is required, and no
+  balancer work starts until it is run.
+
+**The control pair, which stands regardless of the above.** At 80 steps ranks 4 and 5 carry
+near-identical churn (91 vs 88) and store high-water (nloc 65 vs 64) but `rhs` of 0.998x vs 1.089x
+mean. **Churn does not determine `rhs` time.** This reproduces, within a single run, the anomaly
+previously noted across two ("rank 4 also reaches cap 128 and is NOT slow") and materially weakens
+the churn/store-plateau mechanism as a *cause* of the straggler.
+
+**Do not quote the 80-step correlations** (churn-rhs +0.54, gather-rhs +0.47, churn-gather +0.77).
+With n=8 and a 1.089x signal they are not distinguishable from noise; they are recorded only as a
+baseline for the 80 -> 160 change.
+
+### R4 RESULT — both store fixes are load-bearing; they fix TWO different costs
+
+| config | wall | ns/fine-cell-step | rhs imbalance | max cap |
 |---|---|---|---|---|
-| **`rb:tail`** | 5.1%% | **8.8%%** | **2.6-2.7** | post-loop `send_flush` (WAITALL) + `reduce_xchg_flag` (ALLREDUCE) + reconcile + topology check |
-| `rb:slot` | 1.5%% | 4.2%% | 1.21 | `s_amr_alloc_slot` |
-| `rb:seam` | 0.002 s | 0.001 s | - | **REFUTED** - the O(N^2) `s_amr_build_seam_pairs` was the top candidate |
-| `rb:post` | 0.028 s | 0.018 s | - | REFUTED |
-| `rb:geo` | 0.002 s | 0.001 s | - | REFUTED - `s_set_amr_fine_geometry` runs per box on every rank and is free |
+| neither | 1693.2 s | 56.80 | **2.694** | 128 |
+| **B alone** | 941.8 s | 31.59 | **1.106** | **128** |
+| A'+B (2 runs) | **729.7 s** | 24.5 | 1.06 | **77** |
 
-**`rb:tail`'s imbalance of 2.6-2.7 is the highest in the entire budget** (mean 11.7 s, max ~30 s at
-the production point). A WAITALL plus an ALLREDUCE with that spread is ranks ARRIVING at different
-times and blocking, not work - the per-box rendezvous skew resurfacing at the drain point.
+**B alone 1.80x | A' on top 1.29x | combined 2.32x.** All four at byte-identical `fine_work`.
+Dropping A' costs **29.1%**, far outside the 4.96% noise floor. **Commit both.**
 
-**`rb:gath`'s host half is STILL unexplained: 11.9%% of wall at the production point**, the largest
-single unknown in the budget. Only 32.1%% of `rb:gath` is accounted there. **That is SEVEN code-read
-attributions refuted by their own brackets against two real finds** - a ~22%% hit rate, which is the
-strongest argument in this document for bracketing before fixing. Round 3 brackets the only two
-things left in that routine (the non-owner `MPI_ISEND` on 1.5-3 MB rendezvous-sized messages, and two
-scalar geometry calls) and splits `rb:tail` into its four collectives.
+The mechanism was predicted before the run and confirmed: compaction fires at `cap > 3*nlive`
+(trigger ~87), and 2x growth doubles 64 -> 128 in one step straight past it — so B alone overshoots
+to cap 128/116 and cleans up afterward (5 compaction events), while A' prevents the overshoot.
 
-### ROUNDS 3-4: THE ROOT CAUSE, AND THE REGRID PATH NOW CLOSES 100%%
+**The non-obvious result: these are two separate costs.** B alone already removes the straggler
+(2.694 -> 1.106) yet remains 29% slow. So (1) the capacity *cliff* causes the straggler and
+compaction fixes it, and (2) *carrying* excess capacity costs a further 1.29x with no straggler
+involved. "Just add compaction" would have left a third of the win unclaimed.
 
-**Round 3** killed the last two candidates (`rb:send` 0.017 s; `rb:tail` is **99.98%% one
-`MPI_ALLREDUCE`**, `rb:flush` 0.000 s) and left 11.9%% of wall unexplained with no code left to blame.
+### R2 RESULT — cap 64 is an interior optimum; stop sweeping upward
 
-**Round 4 found why every candidate measured zero.** `s_amr_gather_coarse_patch` returns at its FIRST
-branch for level >= 2 blocks, into `s_amr_gather_from_parent` - so all ten rb:* brackets instrument
-only the level-1 path, **64 of 224 boxes. The other 160 (71%%) were never measured.**
+| cap | wall | ns/fine-cell-step | work imbalance | outcome |
+|---|---|---|---|---|
+| 64 | 747.333 s | **25.07** | 1.027 | **best** |
+| 96 | 888.174 s | 29.58 (+18%) | 1.140 (max 1.237) | runs |
+| 128 | - | - | - | **device OOM** |
 
-Confirmed against a PRE-REGISTERED prediction (`amr-bench/PREREGISTERED_pgather.md`): predicted
-`pg:all` = 11.9%% of wall at the production point, **measured 11.9%%** (matched point: predicted
-22.9 s, measured 26.6 s, +16%%, inside the 20%% rule). `pg:send + pg:recv = pg:all` exactly, and
-`rb:gath`, `rg:build`, `rb:tail` and `pg:all` now all account to **100.0%%**.
+Work matched to +0.7% between 64 and 96, so the 18% is overhead, not less useful work. With the
+prior cap 32 -> 64 result (2.26x), the curve is worse-below / best-at-64 / worse-above /
+infeasible-beyond.
 
-**THE DEFECT: the level-2 parent gather uses a BLOCKING `MPI_SEND`/`MPI_RECV` once per box**
-(`m_amr.fpp:1305` and `s_amr_recv_parent_patch`). The codebase documents this exact pathology at
-`m_amr.fpp:256` - *"the non-owner side used a BLOCKING MPI_SEND, so every rank had to rendezvous with
-the owner 794 times per rebuild, in lockstep ... measured at 45%% of regrid and ~25%% of total
-runtime"* - and the fix (`MPI_ISEND` + `amr_gsnd_pool` + one drain per rebuild, `m_amr.fpp:1025`)
-**was applied to the level-1 path only.** Level 2 is the majority path.
+**Three results, one of them a refutation of my own premise:**
 
-### TRACK R WORK LIST - measured, production point (int=20, WENO5+HLLC, cap 64, np=8)
+1. **Fix B generalizes.** cap 96 completes (rc=0) where it previously OOMed twice. Fix B was
+   verified on the `regrid_int=2` churn case; this is independent confirmation.
+2. **THE NOISE FLOOR IS 4.96%.** The cap-64 arm re-ran the exact configuration measured at
+   712.032 s and returned 747.333 s. This is the first run-to-run spread for this case. It licenses
+   the 2.378x store result (far outside it) and is now the yardstick: **anything under ~5% is not a
+   result.**
+3. **cap 128's OOM is a DIFFERENT failure from the pre-Fix-B ones.** `HSA_STATUS_ERROR_OUT_OF_
+   RESOURCES` at **nloc 16, cap 16** - immediately, at a tiny slot count. A cap-128 level-1 block
+   spans 256^3 fine cells, so a few slots plus the stash exhaust 64 GiB. This is the raw per-block
+   working set, **not** the capacity ratchet, and Fix B cannot help. Do not conflate the two.
 
-| target | %% wall | calls/rank | ms/call | imbal | fix |
-|---|---|---|---|---|---|
-| **`rb:xchg`** one-flag ALLREDUCE | **8.9%%** | 2 | **5857** | 2.62 | SYMPTOM - pure arrival skew; fix upstream, never the allreduce |
-| **`pg:send`** blocking MPI_SEND | **8.6%%** | 27 | **420** | 2.02 | ISEND + pool + one drain (in-tree precedent at :1025) |
-| `rg:mig` stash + migrate | 6.7%% | - | - | 1.05 | not yet decomposed |
-| `rb:wait` per-box WAITALL (L1) | 5.0%% | 15 | 441 | 1.54 | batch the recv side |
-| `rb:slot` `s_amr_alloc_slot` | 4.2%% | - | - | 1.21 | |
-| **`pg:recv`** blocking MPI_RECV | **3.3%%** | 19 | 228 | 2.95 | IRECV + drain |
+**My premise for R2 was wrong and the direction is closed.** I ranked it "most likely to produce an
+outright win" on WarpX's measured optimum of ~9 boxes/GPU. It does not transfer: at cap 96 we sit
+near their optimum and are measurably worse, because larger blocks degrade partitioning granularity
+(1.027 -> 1.140) faster than they save per-block overhead. Different code, different per-block cost
+structure.
 
-**`pg:send` + `pg:recv` + `rb:wait` = 16.9%% of wall is per-box BLOCKING point-to-point, and
-`rb:xchg`'s 8.9%% is the arrival skew that serialisation produces. Together ~26%% of wall - two thirds
-of the whole regrid phase - is one defect with one known fix.**
+**Caveat on box counts:** the parser's `est blocks = fine_work/cap^3` gives 711 at cap 64 against
+~224 recorded elsewhere. It scales correctly across arms (711 -> 212) so it is internally
+consistent, but its absolute value disagrees - `fine_work` may not be plain fine-cell count.
+Compare caps on ns/fine-cell-step, which needs no box count.
 
-Not yet priced, same family: blocking `MPI_SEND` at `m_amr.fpp:1219` (level-1 host path), `:2874`
-(reflux to parent), `:2908/2909` (flux registers to parent).
+### R2 — original premise (superseded by the result above)
 
-### What G0 decided
+**Premise, stated correctly.** `amr_max_grid_size = 96` OOMed in an earlier, separate experiment.
+Fix B was verified on a *different* case (the `regrid_int=2` churn stress case) — so **whether Fix B
+unblocks cap 96 is exactly what R2 tests**, not something it assumes. If cap 96 still OOMs, that is
+itself the result, and it says compaction's 3x/2x hysteresis is too loose for that configuration.
 
-- **Track R (regrid) is FIRST**, at both operating points, by a factor of ~2.5 over anything else.
-- **Track B (batching) is DEFERRED** by the plan's own >50%%-busy rule. The widened bridge is set
-  dormant (`amr_br_batch = 1`, restoring the one-block allocation); the full hunk is preserved in
-  `amr-bench/bridge_and_brackets.patch` if it is ever revived.
-- **Track M rises**: per-step `gather` is 16.6%% at the production point, now second-largest.
+External evidence says block count matters more than any balancer change:
 
----
+- WarpX measured 150 boxes/GPU giving *better* load-balance efficiency but *worse* walltime than 9
+  boxes/GPU (1040 s vs 896 s) — "the overhead associated with a greater number of boxes outweighs
+  the performance benefit of improved load balance efficiency". Their optimum was **9 boxes/GPU**.
+- Three independent sources converge on **boxes per rank >= 3-4** as the parameter that actually
+  governs balance quality in Chombo/BoxLib-family codes.
+- **We currently run ~224 blocks over 8 ranks = ~28 boxes/GCD** — far above WarpX's optimum and far
+  above the 3-4 floor. Every per-block overhead we have measured is multiplied by that count.
+- Our own prior A/B: cap 32 -> 64 gave 4.9x fewer boxes, lower memory, and **2.26x less wall**.
 
-## 2. Gate G0 — measurements that route the plan (hours; do before any track)
+So the direction is established and the next step up was blocked only by the OOM that Fix B just
+removed. Sweep 64 / 96 / 128 at the production point, matched on everything else, and report
+wall + per-rank phases + box count.
 
-1. **Bracket the per-block swap.** `s_amr_swap_to_fine()` sits OUTSIDE `PH_RHS` while
-   `s_amr_restore_coarse()` sits INSIDE (`m_amr.fpp`, `s_amr_fine_stage_rhs`) — the bracket is
-   charged half a swap pair, and the batched design's single largest claimed benefit has never been
-   measured. Add a symmetric `PH_SWAP` around both halves; move the restore out of `PH_RHS`.
-2. **Kernel time INSIDE `PH_RHS`, one run, one clock.** rocprofv3 kernel trace intersected with the
-   bracket on the current binary. The composed estimate (~45-50% busy) went through three audit
-   layers and shifted each time; it must be replaced, not refined. This number decides Track B's
-   ceiling: busy < 30% -> batching is first-order here; busy > 50% -> batching waits.
-3. **The production-point budget.** Same 400^3 case at `regrid_int=20`, WENO5 + HLLC, cap 64,
-   from-scratch, phase report on. One run, no comparison arm. This is the budget the paper's claims
-   will live at, and every priority below is provisional until it exists.
-4. **Bracket the gather's remaining host work**: send-side pack, geometry scan, pool drains (gate
-   with the existing `amr_rg_gather` flag). Completes the rb decomposition that E2 started.
+**Caveat to apply when reading it:** larger blocks refine more volume than the tags require, so
+arithmetic work rises even as overhead falls. Report **wall AND fine-cell count**, and compare
+ns/cell, not wall alone — otherwise a cap that wins on wall by doing less useful work will look
+like a free win. This is the same denominator error that produced the retracted 1.57x tax.
 
----
+### Gating logic, stated once
 
-## 2b. R1 LANDED AND MEASURED (2026-08-18) — one call site, -17.3%% wall
+R3a/R3b are **not** queued behind R1 as a formality — if R1 says L0-sourcing, the cost model and the
+cut hysteresis both operate on a quantity that is not the bottleneck, and running them would produce
+two clean null results that teach nothing. R4 and R5 are independent of R1 and can fill any gap.
 
-`m_amr.fpp:1305`, level-2 parent gather: blocking `MPI_SEND` -> `MPI_ISEND` into the existing
-`amr_gsnd_pool`, drained by the `s_amr_gather_send_flush` already present after the rebuild's box
-loop. The level-1 path has used exactly this since the defect note at `m_amr.fpp:256`; R1 applies it
-to the majority path.
+## Migration cost is a SECOND quantity we do not model (external review, 2026-08-19)
 
-**Matched point, before -> after** (wall **338.545 -> 280.042 s, -17.3%%**):
+Reviewers on p4est/Dendro/GAMER/Enzo-E, Zoltan/ParMETIS and Chombo/SAMRAI/Uintah converge on a
+result we have no analogue for. Three independent groups, three decades, same order of magnitude:
 
-| phase | before | after | delta | calls (both) | ms/call |
-|---|---|---|---|---|---|
-| `pg:send` (the converted site) | 18.368 | 4.663 | **-74.6%%** | 89 | 206.4 -> **52.4** |
-| `pg:recv` | 8.263 | 3.956 | -52.1%% | 63 | 131.2 -> **62.8** |
-| **`rb:xchg`** (never touched) | 17.552 | 8.020 | **-54.3%%** | 5 | 3510 -> **1604** |
-| **`rb:wait`** (level-1 path, never touched) | 23.335 | 23.052 | **-1.2%%** | - | NULL CONTROL |
-| `regrid` | 128.379 | 101.150 | -21.2%% | 20 | - |
+| study | migration reduction | cut-quality cost |
+|---|---|---|
+| Schloegel/Karypis/Kumar (JPDC 1997), multilevel diffusion vs from-scratch | >10x total, >3.3x max-rank | within 5% |
+| Walshaw (JOSTLE), 9 successive adaptive meshes | 20-100x (0.54-3.76% vs ~94% migrated) | within ~8% |
+| Zheng/Bhatele/Meneses/Kale (IJHPCA 2011), Charm++ RefineLB vs GreedyLB | 16-30x, and it GROWS with scale | - |
 
-**Why this is more than one noisy pair.** (a) **Call counts are IDENTICAL** (89/63/5) - the workload
-is unchanged in every countable respect, so only per-call cost moved. (b) **A built-in null control**:
-`rb:wait` is the sibling level-1 receive path, untouched, and it moved -1.2%% while the converted path
-moved -74.6%% - global drift cannot explain that. (c) **A pre-stated prediction held**: if the per-box
-blocking sends CREATE the arrival skew, then `rb:xchg` should shrink although never touched. It halved.
-That establishes the causal chain (serialisation upstream -> skew downstream), not just correlation.
+And the blunt one, Bak et al. CCGrid 2018: **"GreedyLB doesn't work well even compared to execution
+runs without load balancing."** Unconditional optimal remapping is a *net loss*.
 
-**Correctness.** 76/76 AMR/store goldens pass, and four of them (`multi-level static np=2` 1D and 2D,
-`multi-level dynamic regrid np=2`, `2D dynamic regrid np=2`) genuinely execute the converted line -
-at np=1 `powner == cowner` takes the local device-copy branch and the send is never reached, so
-single-rank tests would have proved nothing.
+**The concrete gap: ParMETIS carries TWO per-object arrays — `vwgt` (work, the balance constraint)
+and `vsize` (redistribution cost). `s_amr_block_cost` has only the `vwgt` analogue.** Every scheme
+in this literature needs both. For MFC the second is cheap and exact: a block's migration cost is
+`sys_size x fine cells`, known from its region and level.
 
-**A DEFECT IN R1, FOUND BY CALL-SITE AUDIT AND FIXED SEPARATELY.** `s_amr_subcycle_setup_level`
-(`m_amr.fpp:5140/5146`) calls the two Fypp-generated variants DIRECTLY, bypassing
-`s_amr_gather_from_parent`, and that loop has NO drain: sends would accumulate to the pool's 64-slot
-force-drain, whose WAITALL blocks until every matching receiver has posted - a receiver itself stuck
-behind another rank's force-drain closes a deadlock cycle. **No test covers it**: every subcycle
-golden is 1D at np=1, i.e. the co-located branch. Fixed by draining immediately at both sites (the
-same "keep this site's original blocking semantics" treatment seven other runtime sites already
-carry), so the regrid path keeps the benefit and this path keeps its original behaviour.
-**Lesson: auditing the wrapper's callers is NOT enough - Fypp-generated routines have call sites the
-wrapper does not.**
+Two structural rules we violate, both nearly free to adopt:
 
-**Caveat:** one before/after pair against a ~12%% node noise floor. The phase deltas and ms/call
-figures are the robust claims; the -17.3%% wall is suggestive and needs interleaved pairs before it is
-quoted anywhere external.
+- **t8code**: "only send a local tree to a process p if this tree is not already local on p."
+  `s_amr_regrid_stash_migrate` has no such guard.
+- **p4est/t8code, stated as a named design rule** — *Principle 2.1 (Complementarity principle)*:
+  "A collective mesh operation shall either change the local element sizes within the existing
+  partition boundary, or change the partition boundary and keep the elements the same, **but not
+  both**." Its stated payoff is exactly our problem: it "simplifies the projection and transfer of
+  simulation data" — interpolation runs processor-local because the partition has not moved yet,
+  and the subsequent partition step transfers data without further changing the refinement pattern.
+  **`s_amr_regrid_stash_migrate` does both at once**: it changes the box set, reassigns owners, and
+  moves data in a single pass.
 
----
+### Reconciling "partition is cheap" with "migration is expensive"
 
-## 3. Track R — the regrid rebuild (the largest measured item)
+The two reviews appear to contradict each other. p4est says partitioning is "usually negligible in
+terms of execution time, so we suggest to call it whenever load balance is desirable"; ParMETIS and
+Charm++ say migration must be actively penalized or it costs more than it saves.
 
-Regrid is 42.2% of wall at cap 64/int=2 and ~18% at int=20 (cap-32 measurement); MFC pays ~12 s per
-regrid where AMReX pays ~0.027 s for the same logical operation — two to three orders of headroom.
-Fixing it also removes the regrid-frequency asymmetry (tax 27.2x -> 7.2x going int 2 -> 20), which
-currently makes the reported tax hostage to a tuning knob.
+**Both are right, and the complementarity principle is why.** p4est's cheap operation is the SFC cut
+over a forest of *elements* — pure topology, no field data. The *transfer* is a separate, explicitly
+invoked step. So "the cut is cheap" and "the transfer is expensive" are statements about two
+different operations that p4est keeps apart and MFC runs together. Fusing them means we pay the
+expensive one every time we want the cheap one, and we cannot price them separately because no
+instrumentation boundary separates them. Splitting the two is therefore a prerequisite for
+*measuring* the migration cost, not merely a tidiness argument.
 
-- **R1. Aggregate the rebuild gather across boxes.** `s_amr_gather_coarse_patch` runs once per box
-  (~224-1207 per rebuild) with an owner-side IRECV + immediate WAITALL each. The deferred-SEND pool
-  with a single post-loop drain already exists and works on this path; the recv side needs the same
-  treatment: post all boxes' receives, then one wait-and-unpack pass (needs per-box `amr_cg`
-  landing buffers or direct-to-slot unpack). Targets rb:wait (7.4% of wall) plus the serialization
-  skew it creates (rb:wait imbalance 1.59).
-- **R2. Whatever G0.4 finds in the ~8.4% unbracketed host remainder.** No fix is chosen until the
-  bracket lands — the last three pre-chosen fixes on this path were all refuted by their brackets.
-- **R3. Device-resident rebuild.** The rebuild is host-based end to end: host prolong
-  (`s_prolong_one_var`), host overlap carry-forward, and the stash/migrate round trip (rg:mig,
-  9.4% of wall) that moves full slots through the host even at np=1 where migration never fires.
-  The conditional-migration design (pull to host only blocks that actually migrate) is recorded and
-  believed right but HAS NEVER EXECUTED; steps A/B de-risked the kernel-placement traps (device
-  kernels must live in small separate routines; gate on run rc, not `strings`). This is the
-  structural fix and the one that approaches AMReX's 0.027 s.
+### COMPETING HYPOTHESIS for the sick rank — and the run that settles it
 
-Verification: counts first (gather Waitalls per rebuild must drop ~boxes-fold), wall second, at
-BOTH int=2 and int=20; goldens + an np=2 run (migration paths are invisible at np=1).
+A reviewer on SAMRAI/Chombo/Uintah proposes a mechanism that would **invalidate the entire
+load-balancer track**, so it must be tested before any balancer work:
 
----
+> Cells balanced to 1.4% with one rank 4x slower is more consistent with *intrinsic* churn — the
+> feature crosses that rank's **level-0 coarse subdomain**, so it sources all the per-block coarse
+> gathers and migration packs — than with partitioner-induced ownership flipping. **The L0
+> decomposition is static, so no fine-block ownership balancer can move that work.**
 
-## 4. Track B — the batched fine-block advance
+**Status: not yet discriminated, and our existing data does not settle it.** The competing
+predictions differ in *which phase* carries the skew:
 
-The design is gated and groundwork landed (flat store, widened bridge, BC escape hatch verified,
-uniform slot shapes, Cartesian-only coordinate audit). The batched-kernel MWE returns 12.4x — but
-that is an UPPER BOUND (plain contiguous array, no bridge staging), and the in-situ ceiling at
-cap 64/int=2 is only ~1.11-1.20x if `PH_RHS` is really ~half busy. **G0.2 and G0.3 size this track;
-do not start it before they land.**
+| hypothesis | predicts skew in |
+|---|---|
+| Reviewer's L0-sourcing | `gather` (and regrid migration) |
+| Our churn/store correlation | `rhs` |
 
-If it proceeds: goldens on the widened bridge first (never run); re-measure the bridge penalty with
->= 8 interleaved pairs on an exclusive node (the +24.8% at n=3 was a converging transient); sweep
-`amr_br_batch` 2/4/8 with the batched path unused; then wire `s_amr_br_load_all` -> tall (m,n,p) ->
-one `s_compute_rhs` -> `s_amr_br_store_all`, batch 8, per-block fallback retained. **Gate on
-counts** (rhs-family launches/step must fall ~batch-fold, GPU busy must rise); wall at pilot scale
-is below the noise floor. If G0 defers this track, REVERT the widened bridge — it allocates 8x
-bridge memory (~880 MB at cap 64) that nothing uses, measured slower, goldens never run.
+The phase budget shows `rhs` imbalance **2.91** against `gather` **1.127**, which looks like a clean
+refutation of the reviewer — **but it is not**, and claiming so would repeat a mistake we have
+already made twice. The 1.127 comes from a 10-warm-step window; the rank-5 pathology **develops
+between steps 80 and 160** (at 80 steps `rhs` imbalance is 1.06 and there is no straggler). The two
+numbers describe different regimes and cannot be compared.
 
----
+**The settling run is cheap and the instrument already exists.** The per-rank gather reporting added
+this session (`PR_ID = [PH_RHS, PH_REFLUX, PH_GATHER, PH_SEAM]` in `m_phase_timing.fpp`) prints
+per-rank `gather` alongside per-rank `rhs`. A single 160-step run with the current binary answers it:
+if rank 5's `gather` is flat while its `rhs` is 4x, the L0-sourcing mechanism is out; if `gather`
+skews with it, the balancer track is dead and A6/B-class fixes are the ones that pay.
 
-## 5. Track M — per-box per-step MPI (25.1% of wall at cap 64)
+Add the two counters the reviewer suggests to make it unambiguous: per rank per regrid,
+**blocks-arrived/blocks-departed** (partitioner churn) versus **coarse-gather bytes sourced**
+(subdomain churn).
 
-The per-step fill gathers (11.7%), reflux (9.8%, ~11 Recv per box), and seam halo (3.6%, imbalance
-1.9) are per-box blocking chains — the same shape Track R1 fixes at regrid time. The level-
-aggregated exchange (post-all per level, one drain — the FillPatch pattern) is the fix. **Sequence
-it after R or B frees the host**: the Waitall-hoist experiment removed 53.8% of Waitalls for zero
-wall because the host was busy anyway; these waits become critical path only once it is not.
-Verify by counts (Waitalls/step), which reproduce to ratio 1.000 across 52%-different walls.
+### Earlier hypothesis (SUPERSEDED by the above — keep for the reasoning, not the conclusion)
 
----
+We have measured, at *identical* `fine_work`: rank 5 spends 976 s in `rhs` vs ~245 s for the other
+seven, and separately that rank 0 frees 4-5 slots/regrid while rank 5 frees 57-60 — **12x the
+churn**. Rank 5 is also the highest-`nloc` rank. The literature above says churn is a first-class
+cost, which makes "the sick rank is the high-churn rank" a candidate mechanism rather than a
+coincidence. It is currently only a correlation across two separately-measured quantities; the test
+is to plot per-rank churn against per-rank `rhs` time in a single run. See
+[[amr-one-sick-rank]] and [[amr-reflux-is-the-sink-not-the-source]].
 
-## 6. Track C — cheap configuration and comparison items (any order, fill idle node time)
+### Corrections to earlier reading
 
-- **C1. Cap 96, one from-scratch run.** "96/128 OOM" is UNVERIFIED — it descends from the sweep
-  table that also listed cap 64 as OOM (the checkpoint-restart confound). Expect marginal (~1.48x
-  memory headroom, scratch scales as cap^3, ~66 boxes over 8 ranks is poor granularity), but 32->64
-  bought 2.24x for zero code. Gate on exit 134 + `HSA_STATUS_ERROR_OUT_OF_RESOURCES`, not a hang.
-- **C2. The honest AMReX comparison at the production point.** Cap 64 both sides, same realistic
-  regrid_int both sides, landed fixes. Close the mesh-lag confound by scaling `amr_buf` with the
-  interval — and because `amr_buf` doubles as the box-MERGE threshold (`thr = buff_size +
-  2*amr_buf`), matched `fine_work` must be an iterated GATE with box count reported beside it.
-- **C3. Split-finder midpoint fallback.** Real defect: convex blobs return their bounding box
-  (~91% over-cover for a sphere) and `amr_cluster_eff` is dead code. No valid break-even model
-  exists (`b` is not a constant) — decide by direct A/B on a fixed problem.
-- **C4. np=1 of the matched case.** Splits MPI-progress idle from local launch idle at the
-  operating point that matters; sets expectations for what R/B can recover at np=8.
-- **C5. Cross-backend probe (needs an allocation).** Same case on CCE offload or an NVIDIA lane:
-  launches/step, dead time per launch, tax. Bounds the amdflang/ROCm share of the toll.
+- **Zoltan's `LB_APPROACH` applies only to `GRAPH`/`HYPERGRAPH`** — there is no migration-vs-quality
+  dial for RCB/RIB/HSFC. The geometric equivalent is `RCB_REUSE` (default 0), which has no
+  published payoff.
+- The ITR dial's real useful range is **~2x**, not orders of magnitude: sweeping it over six
+  decades buys 2.33x worse cut for 2.0x less redistribution, with the knee between 0.1 and 1.
+- **Enzo-E has no measured load-balancing result anywhere**; its "cello" balancer is three lines of
+  equal-count SFC cut. Its architectural claims should not be cited as measurements.
+- **`GreedyRefine` semantic trap**: the old `+LBPercentMoves` was a *migration* budget; the current
+  TreeLB `tolerance` is an *imbalance* budget (default 1). Cite the old parameter if citing it as
+  prior art for a migration budget.
 
----
+**Caveat to carry**: Walshaw also finds that when load changes *dramatically*, repartitioning from
+scratch can win outright. This is a regime question, and our regrids are frequent and incremental —
+which is the regime where diffusion wins — but that should be checked, not assumed.
 
-## 7. Decision rules
+What is genuinely absent from the literature is an end-to-end **wall-clock** attribution on a GPU
+AMR code. MFC would be producing that datum, not reproducing it.
 
-- ~~G0.3 reallocates everything~~ **FIRED: regrid leads at the production point (37.6% vs rhs 15.0%).
-  Track R is first.**
-- ~~G0.2: busy < 30% -> Track B first-order~~ **FIRED: 54-57% busy -> Track B waits, bridge dormant.**
-- Remaining live rule: no fix on Tracks R/M is chosen until its bracket lands. **Rounds 1-2 refuted
-  SEVEN code-read candidates and found two real ones (`rb:tail` 8.8%%, `rb:slot` 4.2%%).**
-- **Two gates `precheck` cannot provide, now run before every build** (it passed 9/9 twice on
-  non-compiling trees): assert `PH_N` equals the `PH_NAME` entry count, and assert every `PH_*` used
-  in a file is imported by that file's `use m_phase_timing, only:` list.
-- Any fix on Tracks R/M lands only with: counts moved as predicted, goldens green, an np=2 case
-  exercised, and wall measured at both int=2 and int=20 on an exclusive node.
-- A code-read attribution is a hypothesis for a BRACKET, never for a fix. Three were refuted by
-  their brackets this week alone.
+## Ranked items from the SAMRAI/Chombo/Uintah review (2026-08-19)
 
-## 8. DO NOT DO (all measured; do not re-litigate without new evidence)
+**The reframing:** none of SAMRAI, Chombo or Uintah puts migration cost in the partitioning
+objective — all three balancers are pure `(boxes, weights) -> owners` with no `previous_owner`
+input. `s_amr_sfc_cut` has the same signature shape. **MFC is not doing anything unusual; it is
+missing the compensating mechanisms**, which live elsewhere: metadata-only movement, a gain
+threshold, and anti-churn logic in the *regridder* rather than the balancer.
 
-- Load balancing (oracle ceiling 5.1% of wall; box/weight balance 1.008; skew explains 7.6% of MPI).
-- `nowait` chains and cross-chain concurrency (both disproved in dedicated MWEs).
-- Mapping-clause mechanisms (all seven fail; module-scope derived types are 3.5x WORSE), and
-  further descriptor-copy reduction beyond the landed hllc/weno clauses (convert_conservative was
-  correct, mechanism-verified, and bought +0.1% — reverted).
-- Byte-count reduction as a goal (removing 12% of bytes bought zero wall) and Waitall-count
-  reduction alone (removing 53.8% bought zero wall — hence Track M's sequencing).
-- Runtime knob tuning (12 configurations; the harmful ones registered 1.8-3.2x, the rest are null).
-- Scoping anything from cap-32 phase shares or from the retired 7.64x/23.92x/443x numbers.
+| # | item | LOC | confidence |
+|---|---|---|---|
+| A7 | **Hysteresis on the SFC cut.** Keep the previous `amr_fine_cut(:,lev)`, adopt the new one only if it improves max-rank load past a threshold. This is Uintah's `gainThreshold` (0.05) and WarpX's ratio threshold (**measured optimum 10%**; 5% churns too much, 15% too little). No correctness risk — any owner map is valid. | 30-50 | high |
+| A1 | **Per-block constant term in `s_amr_block_cost`.** Uintah ships `patchCost = 16` cells; SAMRAI added `minimum_patch_load` for exactly the regime "uniformity in patch count matters more than in cell count". Our per-block constant is almost certainly large given the measured per-region overhead. | ~10 | high |
+| A10 | **A dedicated migration phase bracket.** Uintah instruments regrid / LB / schedule / migrate separately, and that separation is what let them identify migration as the AMR-ICE scaling limiter. Makes the A5 question answerable in one run. | ~10 | high |
+| A2 | **Fit the cost coefficients to measured per-block time** (Uintah `ModelLS`: regress time on `[cells, ib_cells, pc_iters, 1]`, Cholesky on the normal equations, smooth the *coefficients* with `alpha = 2/(min(iter,T)+1)`, T~20). Yields A1's constant automatically and is far more robust than using raw per-block times as weights. | 80-120 | medium |
+| A6 | **Batch the per-block regrid data motion.** SAMRAI fills a whole new level with **one `RefineSchedule`**; Chombo with **one `copyTo` + one `Copier`**. We do one `s_amr_gather_coarse_patch` per block with its own allocs and P2P set. *"SAMRAI can afford a churn-blind partitioner precisely because moving load meant moving only metadata, not voluminous mesh data."* Converts churn from O(blocks) to O(1) plans. | weeks | high value |
+| B3 | **Free each old slot as its overlap contribution is consumed**, rather than all of them after. Drops the peak toward `max(live_old, live_new)` instead of the sum. A reordering, not a redesign — but see sec. 9.2: the stash is read at old indices throughout the rebuild, so this needs per-block liveness, not a bulk move. | ~30 | medium |
 
-## 9. Metric discipline (the canon; violations produced every retraction)
+**A4 — the negative result to heed before investing in measured cost.** Uintah's dissertation found
+the measured filters *"perform worse than the model immediately following a regrid... and load
+balancing will always occur immediately following a regrid."* WarpX's tuned optimum used the
+**heuristic**, not the measured GPU clock, and CUPTI-based measurement made their run **2x slower**.
+If we regrid every 2 steps, a fitted algorithmic model (A2) is defensible; direct per-block timing as
+the weight is the risky one.
 
-- Perturb and regress; never decompose a residual.
-- One clock per ratio, and **never compose a ratio from two runs** — this produced a 2x-wrong
-  batching ceiling during the 2026-08-18 audit, and its correction was itself off (wall used as
-  kernel) until a third pass. If numerator and denominator cannot come from one run, the honest
-  output is an experiment.
-- A tax figure carries its arithmetic intensity and its operating point (cap, regrid_int, np,
-  fixes, physics).
-- Judge cap changes by WALL on a fixed physical problem, not ns/cell.
-- Union-of-intervals for kernel busy time, never median x count.
-- Never take wall from an instrumented run (rocprofv3 inflates MFC 1.3-2.4x).
-- Counts before wall: counts reproduce to ratio 1.000 across runs whose walls differ 52%.
-- From-scratch runs for anything that redetermines the hierarchy; a restart pins the state the
-  parameter is supposed to set.
-- ~12% single-run noise floor on an exclusive node; include a known-null arm in every sweep.
-- Zero-time phases are silently dropped from the report; a missing line means a stale binary, not
-  missing code.
+**A3 — keep cost keyed to SPACE, not block identity. We already do this and should not stop.**
+Uintah deliberately profiles on a fixed lattice of regions, *"so the patch set can change without
+needing to migrate forecasting data between the changing patch sets."* Our footprint-integral
+formulation is right. Seed new blocks with the **domain-average** weight, as Uintah does.
+
+**A relevant measured counterpoint to more/smaller blocks (WarpX):** 150 boxes/GPU gave *better*
+load-balance efficiency but *worse* walltime than 9 boxes/GPU (1040 s vs 896 s), "because the
+overhead associated with a greater number of boxes outweighs the performance benefit." Three
+independent sources converge on **boxes per rank >= 3-4** as the parameter that actually governs
+balance quality.
+
+### Two source cautions
+
+- **Chombo's design document does not describe the code that ships.** It says `LoadBalance` uses
+  Kernighan-Lin knapsack; the KL knapsack has **zero callers outside a unit test**. The shipping path
+  is single-pass greedy bin-fill, and the Morton sort its comment assumes is a separate function the
+  application must call and the flagship examples do not. Do not cite Chombo as knapsack prior art.
+- **Chombo's petascale numbers are not evidence about load balancing** — the 196K-core run
+  *replaced* the balancer with lexicographic assignment. IPDPS'09 measured that load balance and
+  communication volume were *"the lowest priority"* impediments.
+
+## Phase 2 — the convoy pilot (days; ~40-60 LOC)
+
+freg pre-post: post ALL participant IRECVs at stage start with per-block tags (buffers are already
+per-block: `freg(D)%%lo(:,:,:,amr_cur)`), one WAITALL before the apply loop; owner hoists its
+per-block WAITALL identically. Keep the subcycle twin (`m_time_steppers.fpp:793`) blocking — the R1
+lesson: grep every generated/secondary call site, not the wrapper.
+
+Gate on counts + per-call time: reflux ms/call at 160 steps should collapse toward its 80-step
+value if the convoy mechanism is real. **This pilot is the go/no-go for the whole aggregation
+family (Phase 3). If it is null, STOP and re-diagnose before spending Phase 3's ~500 LOC.**
+
+## Phase 3 — per-level aggregation family (weeks; conditional on Phase 2)
+
+In value/risk order, re-priced against post-Phase-1 budgets before each:
+
+| item | today's share | LOC | risk |
+|---|---|---|---|
+| 3.1 L1 gather recv batching (`rb:wait`) | ~5% | 60-100 | medium |
+| 3.2 post-stage restrict/freg chain (bracket first via 0.3) | ~4-6% + kills the step-to-step skew feedback | 100-150 | med-high |
+| 3.3 fill-gather aggregation (per-block `amr_cg` patches, ~0.5 GB; cached overlap lists exist) | gather 13-17% | 150-300 | high |
+| 3.4 seam halo aggregation | 2.5-4% | 60-100 | medium |
+
+All four share Phase 2's pattern: post-all, per-block tags, one drain, cached lists, aggregation
+WITH a sync point (never bare deferral).
+
+## Phase 4 — regrid modernisation (weeks)
+
+4.1 Device-side rebuild (prolong + stash on device): `rg:mig` 6.7% + `rb:ovl/slot` ~6%; ~120-200
+LOC; HIGH risk — the documented history (device kernels silently not emitted in large routines,
+the 3-change NaN). Piecewise, probe-first, one change per A/B. 4.2 capture-sweep precompute (~40
+LOC, low-med) when rhs's non-busy share is re-measured post-Phase-1.
+
+## Phase 5 — endgame (after the tax is stationary)
+
+5.1 Cost-weighted balancer (AMReX `makeKnapSack` shape; infra exists in `m_load_weight`) — ONLY if
+per-rank data still shows skew after Phases 1-3; under convoys it is absorbed, and after the ratchet
+fix there may be nothing left to balance. 5.2 The honest AMReX head-to-head: matched cap 64, same
+regrid_int, DIFFERENCED protocol both sides, `amr_buf` scaled with interval and matched `fine_work`
+as an iterated gate — meaningful only once MFC's tax is a number again. 5.3 Multi-node scaling
+(the per-box lattice anti-scales; Phase 3 is what changes that slope).
+
+## Standing rules (the short list; canon in `amr_tax_review.md` sec. 8 and the memory index)
+
+- Bracket before believing; counts before wall; one clock per ratio; never compose across runs.
+- Every number carries its operating point AND its time window.
+- From-scratch runs; VRAM settle gate between GPU runs; stderr for anything that must survive an
+  abort; `gate_phases.py` before every build; grep generated twins for every touched call site.
+- np=2 dynamic-regrid is the minimum correctness bar for anything touching slots, stash, or
+  exchanges — np=1 and single-rank goldens prove nothing about this code.
+
+## Expected trajectory (estimates, not promises)
+
+Phase 1: production tax becomes a NUMBER again (~4x static at int=20) and long runs work.
+Phases 2-3: the ~27% static per-box communication share compresses -> ~2.5-3x. Phase 4: regrid's
+residual halves -> ~2-2.5x, at or below AMReX's 3.40x on its own protocol. Floor: the physics is
+already at parity (per-cell arithmetic 0.96x uniform at cap 64) — everything above 1.0x is
+infrastructure, and every line of it is now attributed.
