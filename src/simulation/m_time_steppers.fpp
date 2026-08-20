@@ -596,8 +596,10 @@ contains
                     call s_amr_select_slot(islot)
                     ! freg slices of the block faces move to the coarse-outside-owners (ALL ranks call; no-op at np=1)
                     call s_phase_tic(PH_REFLUX)
-                    call s_amr_p2p_reflux_faces()
+                    call s_phase_tic(PH_RFP2P); call s_amr_p2p_reflux_faces(); call s_phase_toc(PH_RFP2P)
+                    call s_phase_tic(PH_RFAPP)
                     call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
+                    call s_phase_toc(PH_RFAPP)
                     call s_phase_toc(PH_REFLUX)
                 end do
                 call s_amr_select_slot(1)
@@ -783,6 +785,7 @@ contains
                 if (amr_subcycle .and. amr_block_level(amr_cur) >= 2) cycle
                 ! equilibrate the fine solution (phase change) before it restricts to the coarse level
                 if (relax) call s_amr_relax_fine()
+                call s_phase_tic(PH_RESTR)
                 call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
                 ! multi-level lock-step: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the parent's
                 ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured during
@@ -792,6 +795,7 @@ contains
                 ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
                 if (amr_subcycle) call s_amr_p2p_reflux_faces()
                 if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
+                call s_phase_toc(PH_RESTR)
             end do
             call s_amr_select_slot(1)
             ! Coexist: the restrict above wrote the fine-averaged solution into the L0 covered cells; route those covered cells back
