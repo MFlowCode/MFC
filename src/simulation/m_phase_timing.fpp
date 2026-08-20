@@ -34,6 +34,8 @@ module m_phase_timing
     public :: PH_RBSEAM, PH_RBPOST, PH_RBGEO, PH_RBSLOT, PH_RBTAIL
     public :: PH_RBSEND, PH_RBFLUSH, PH_RBXCHG, PH_RBREC, PH_RBTOPO
     public :: PH_PGALL, PH_PGSEND, PH_PGRECV
+    public :: PH_RFP2P, PH_RFAPP, PH_RFRECV, PH_RFWAIT
+    public :: PH_RESTR
 
     integer, parameter :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
     integer, parameter :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
@@ -95,15 +97,28 @@ module m_phase_timing
     !> THE LEVEL>=2 PATH. `s_amr_gather_coarse_patch` returns at its FIRST branch for any block with level >= 2, into
     !! `s_amr_gather_from_parent` - so every rb:* bracket above instruments only the level-1 path, which is 64 of 224 boxes. The
     !! other 160 (71%%) were never measured. That is why EIGHT successive candidates each came back at ~0.
-    integer, parameter          :: PH_PGALL = 38   !< s_amr_gather_from_parent (the whole level>=2 path)
-    integer, parameter          :: PH_PGSEND = 39  !< parent owner: s_amr_gather_from_parent_field_cons (pack + send)
-    integer, parameter          :: PH_PGRECV = 40  !< block owner: s_amr_recv_parent_patch
-    integer, parameter          :: PH_N = 40
+    integer, parameter :: PH_PGALL = 38   !< s_amr_gather_from_parent (the whole level>=2 path)
+    integer, parameter :: PH_PGSEND = 39  !< parent owner: s_amr_gather_from_parent_field_cons (pack + send)
+    integer, parameter :: PH_PGRECV = 40  !< block owner: s_amr_recv_parent_patch
+    !> Decomposing REFLUX, whose per-call cost grows 19x between the 40-80 and 80-160 windows at a CONSTANT 64 level-1 blocks
+    !! (imbalance 1.17, so it is real work, not waiting on a straggler). The owner already posts ISENDs + one WAITALL; each
+    !! PARTICIPATING non-owner does 6 BLOCKING MPI_RECVs per block. rf:recv's CALL COUNT therefore measures how many blocks this
+    !! rank participates in - if participation grows as the refined region spreads across ranks, that is the mechanism; if it is
+    !! flat and ms/call grows instead, it is not.
+    integer, parameter :: PH_RFP2P = 41   !< s_amr_p2p_reflux_faces (the whole exchange)
+    integer, parameter :: PH_RFAPP = 42   !< s_amr_apply_reflux (local correction)
+    integer, parameter :: PH_RFRECV = 43  !< non-owner blocking-RECV branch; CALL COUNT = participation
+    integer, parameter :: PH_RFWAIT = 44  !< owner's MPI_WAITALL over its posted ISENDs
+    !> The post-stage per-block restrict/reflux-to-parent chain (m_time_steppers, the reverse islot loop). Same per-box blocking P2P
+    !! shape as PH_REFLUX, runs once per STEP over every block on every rank, and was entirely UNBRACKETED - it sits inside the
+    !! 3.7-6.3%% residual. Its exit skew becomes the next step's entry skew, so it is the candidate for super-linear growth.
+    integer, parameter          :: PH_RESTR = 45
+    integer, parameter          :: PH_N = 45
     character(len=8), parameter :: PH_NAME(PH_N) = [character(len=8)::'halo','gather', 'gfill', 'seam', 'rhs', 'rk', 'reflux', &
               & 'regrid', 'L0', 'coarse', 'rg:halo', 'rg:tag', 'rg:clus', 'rg:shape', 'rg:mig', 'rg:build', 'rb:gath', 'rb:ovl', &
               & 'rb:push', 'rb:wait', 'rb:mem', 'rb:unpk', 'swap', 'rb:own', 'rb:upd', 'rb:pack', 'rb:rsv', 'rb:seam', 'rb:post', &
               & 'rb:geo', 'rb:slot', 'rb:tail', 'rb:send', 'rb:flush', 'rb:xchg', 'rb:rec', 'rb:topo', 'pg:all', 'pg:send', &
-              & 'pg:recv']
+              & 'pg:recv', 'rf:p2p', 'rf:app', 'rf:recv', 'rf:wait', 'restr']
 
     real(wp) :: acc(PH_N) = 0._wp
     !> Entry count per phase. Time alone cannot distinguish "this region is slow" from "this region runs far more often than
@@ -154,7 +169,13 @@ contains
         real(wp), intent(in) :: wall
         real(wp)             :: tot, gmax(PH_N), gsum(PH_N)
         integer(8)           :: gcall(PH_N)
-        integer              :: i, ierr
+        integer              :: i, ierr, ip
+        !> Per-rank times for the phases whose IMBALANCE moves with simulation time. mean/max cannot say WHICH rank is slow or
+        !! whether it is the one holding more work, which is what the rhs skew (1.09 -> 2.90 between the 80- and 160-step windows)
+        !! actually needs.
+        integer, parameter    :: NPR = 4
+        integer, parameter    :: PR_ID(NPR) = [PH_RHS, PH_REFLUX, PH_GATHER, PH_SEAM]
+        real(wp), allocatable :: prank(:,:)
 
         if (.not. rank_time_wrt) return
         tot = sum(acc)
@@ -165,6 +186,24 @@ contains
 #else
         gmax = acc; gsum = acc*real(num_procs, wp); gcall = ncall*int(num_procs, 8)
 #endif
+        allocate (prank(0:num_procs - 1,NPR))
+        do i = 1, NPR
+#ifdef MFC_MPI
+            call MPI_GATHER(acc(PR_ID(i)), 1, mpi_p, prank(0, i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+#else
+            prank(0, i) = acc(PR_ID(i))
+#endif
+        end do
+        if (proc_rank == 0) then
+            do i = 1, NPR
+                write (*, '(A,A8,A)', advance='no') '[phase-rank] ', PH_NAME(PR_ID(i)), ' :'
+                do ip = 0, num_procs - 1
+                    write (*, '(F10.2)', advance='no') prank(ip, i)
+                end do
+                write (*, '(A)') ''
+            end do
+        end if
+        deallocate (prank)
         if (proc_rank /= 0) return
         print '(A)', '[phase] PHASE BUDGET'
         print '(A,F10.3,A)', '[phase] step-loop wall = ', wall, ' s'
