@@ -99,10 +99,13 @@ module m_amr
     !! be sized for the whole global pool. `amr_loc_of(g)` is the local index of global slot g (0 if not live), `amr_loc_n` is the
     !! high-water mark, and freed indices are recycled through `amr_loc_free` so the dense range stays tight under regrid churn.
     !! Pure bookkeeping: nothing reads it yet.
-    integer, allocatable :: amr_loc_of(:)      !< global slot -> dense local index, 0 if not live
-    integer, allocatable :: amr_loc_free(:)    !< stack of recycled local indices
-    integer              :: amr_loc_n = 0      !< high-water mark of local indices handed out
-    integer              :: amr_loc_nfree = 0  !< depth of the recycle stack
+    integer, allocatable :: amr_loc_of(:)    !< global slot -> dense local index, 0 if not live
+    integer, allocatable :: amr_loc_free(:)  !< stack of recycled local indices
+    integer              :: amr_loc_n = 0    !< high-water mark of local indices handed out
+    !> Last high-water REPORTED by the store trip-wire. Module scope (not `save`) so the wire prints one line per NEW high-water
+    !! instead of one per slot alloc (~224/regrid/rank would both flood stderr and perturb the run).
+    integer :: amr_st_hw = 0
+    integer :: amr_loc_nfree = 0  !< depth of the recycle stack
 
     !> FLAT PER-BLOCK FIELD STORE, indexed (x, y, z, var, LOCAL slot) by the dense index above. One contiguous module array
     !! replacing a per-slot vector of independently allocated scalar_fields: the layout AMReX's MultiFab uses, and the prerequisite
@@ -1908,10 +1911,13 @@ contains
                         end if
                     #:endfor
                 end do
+                call s_phase_tic(PH_RFWAIT)
                 call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
+                call s_phase_toc(PH_RFWAIT)
                 deallocate (reqs)
             end if
         else if (f_amr_reflux_participates(proc_rank)) then
+            call s_phase_tic(PH_RFRECV)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
@@ -1922,6 +1928,7 @@ contains
                     $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
                 end if
             #:endfor
+            call s_phase_toc(PH_RFRECV)
         end if
 #endif
 
@@ -2199,6 +2206,12 @@ contains
                 & '/ranks ', num_procs, ' max/mean ', mx/mean, ' boxes_max/mean ', cmx/cmean, ' no_blocks_ranks ', empty, ' of ', &
                 & num_procs
         end do
+        ! per-rank WEIGHT (fine cells) and BOX COUNT, so rhs time can be regressed against actual load
+        if (proc_rank == 0) then
+            write (*, '(A)', advance='no') ' [amr-balance] per-rank fine_work :'
+            do k = 0, num_procs - 1; write (*, '(I12)', advance='no') nint(tw(k), kind=8); end do
+            write (*, '(A)') ''
+        end if
         mean = sum(tw)/real(num_procs, wp)
         ! fine_work = sum of the assigned weights = the FINE CELLS advanced per step (with no cost signals wt is exactly that).
         ! Without it an AMR-vs-uniform wall-clock ratio is uninterpretable: 5x the time is the expected outcome of advancing 5x
@@ -5403,6 +5416,74 @@ contains
     !> Size the flat store for at least nloc local slots, doubling and never shrinking, so a run pays O(log) reallocations no matter
     !! how the block count churns. Growth must PRESERVE the live blocks' fields, and those live on the device, so each array makes a
     !! device -> host -> larger array -> device round trip. Growth events are rare (7 for a 128-slot rank), so the trip is free.
+    !> FIX B: compact the flat store so the local index space is DENSE again. The store is sized by `amr_loc_n`, a high-water that
+    !! never decrements, while only `nlive` slots hold data - MEASURED at 103 vs ~29 on the churniest rank, i.e. 3.5x of the store
+    !! is dead capacity, and that is what drives the 40-regrid OOM. Growth-policy tightening alone was NOT enough (fix A' reached
+    !! cap 120 and still died), because `amr_loc_n` ITSELF keeps climbing.
+    !!
+    !! Called at the END of s_amr_reconcile_slots, where every reader is finished: the rebuild's overlap carry-forward
+    !! (which reads amr_stor_st at the OLD blocks' local indices) has completed, and the next rebuild has not started.
+    !! Reuses s_amr_st_reserve's host-round-trip pattern, so the DEVICE peak stays at max(old,new) and - importantly - the host
+    !! copy makes the remap safe REGARDLESS of index ordering (an in-place forward compaction would corrupt data whenever a
+    !! recycled index is lower than its slot's position).
+    impure subroutine s_amr_compact_store(nlive)
+
+        integer, intent(in)    :: nlive
+        integer                :: k, oldloc, newloc, i, oldcap, newcap
+        integer, allocatable   :: remap(:)
+        logical                :: want(4)
+        real(stp), allocatable :: tmp(:,:,:,:,:)
+
+        if (nlive <= 0) return
+        if (amr_st_cap <= 0) return
+        ! HYSTERESIS: compact only when capacity is genuinely oversized (>3x live), then down to 2x. Without the gap the store
+        ! thrashes - at live 29 / cap 62 a 2x target reclaims 4 slots for a multi-GB host round trip. With it, cap oscillates
+        ! ~2x..3x live (58..87 here) and compaction fires only after capacity has grown by half again.
+        oldcap = amr_st_cap
+        if (oldcap <= 3*nlive) return
+        newcap = max(2*nlive, 8)
+        if (newcap >= oldcap) return  ! nothing to reclaim
+
+        ! dense renumbering: walk slots in order, hand each live one the next index
+        allocate (remap(oldcap)); remap = 0
+        newloc = 0
+        do k = 1, amr_max_blocks
+            oldloc = amr_loc_of(k)
+            if (oldloc <= 0) cycle
+            if (oldloc > oldcap) cycle
+            newloc = newloc + 1
+            remap(oldloc) = newloc
+            amr_loc_of(k) = newloc
+        end do
+
+        want = [.true., .true., amr_subcycle, amr_subcycle]
+        #:for ST, IDX in [('amr_cons_st', 1), ('amr_stor_st', 2), ('amr_gst_a', 3), ('amr_gst_b', 4)]
+            if (want(${IDX}$)) then
+                $:GPU_UPDATE(host='[' + ST + ']')
+                allocate (tmp(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi,1:sys_size,1:oldcap))
+                tmp = ${ST}$
+                @:DEALLOCATE(${ST}$)
+                @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
+                ${ST}$ = 0._stp
+                do i = 1, oldcap
+                    if (remap(i) > 0) ${ST}$(:,:,:,:,remap(i)) = tmp(:,:,:,:,i)
+                end do
+                deallocate (tmp)
+                $:GPU_UPDATE(device='[' + ST + ']')
+            end if
+        #:endfor
+
+        amr_st_cap = newcap
+        amr_loc_n = newloc
+        amr_loc_nfree = 0  ! every recycled index is invalid after renumbering
+        amr_st_hw = newloc  ! let the trip-wire report the post-compaction trajectory
+        deallocate (remap)
+#ifdef MFC_DEBUG
+        write (0, '(A,I0,A,I0,A,I0,A,I0)') '[amr-compact] rank ', proc_rank, ' loc_n ', oldcap, ' -> ', newloc, '  cap ', newcap
+#endif
+
+    end subroutine s_amr_compact_store
+
     impure subroutine s_amr_st_reserve(nloc)
 
         integer, intent(in)    :: nloc
@@ -5415,9 +5496,27 @@ contains
         ! must push its slot to the device before the next s_amr_alloc_slot, or that host data is silently overwritten. This is
         ! new with the shared store: per-slot arrays could not clobber each other.
 
+        ! TRIP-WIRE on the memory ratchet. amr_loc_n is a HIGH-WATER mark that never decrements, and capacity doubles with no
+        ! shrink path, so regrid churn ratchets both until the 64->128 doubling cannot fit. STDERR because stdout is buffered and
+        ! lost on abort - the OOM run's stdout showed nothing at all.
+
+        if (nloc > amr_st_hw) then
+            amr_st_hw = nloc
+#ifdef MFC_DEBUG
+            write (0, '(A,I0,A,I0,A,I0,A,I0)') '[amr-store] rank ', proc_rank, ' NEW high-water nloc ', nloc, ' cap ', &
+                   & amr_st_cap, ' recycle-depth ', amr_loc_nfree
+#endif
+        end if
         if (nloc <= amr_st_cap) return
         oldcap = amr_st_cap
-        newcap = max(2*oldcap, nloc)
+        ! FIX A' (2026-08-19): grow 1.25x, not 2x. MEASURED: amr_loc_n plateaus at ~89 on the churniest rank (live working set
+        ! ~29 - the gap is slots parked on the recycle stack, since frees happen AFTER the rebuild's allocs). Doubling then
+        ! overshoots to cap 128 = 28.3 GB of store to hold 6.4 GB of live data, and THAT doubling is where the 40-regrid run
+        ! OOMs (60.4 GB of 68.7). 1.25x tops out at 95 (21.0 GB, total ~53 GB) and still amortises: growth stops once loc_n
+        ! plateaus, so the extra reallocs are ~9 instead of ~4 for the whole run. The +8 floor keeps early growth cheap when
+        ! oldcap is tiny. This changes the growth POLICY only - slot lifetime, indices and the device-authoritative contract
+        ! above are untouched, so it cannot produce a wrong answer, only a different allocation trajectory.
+        newcap = max(oldcap + max(oldcap/4, 8), nloc)
         want = [.true., .true., amr_subcycle, amr_subcycle]
 
         #:for ST, IDX in [('amr_cons_st', 1), ('amr_stor_st', 2), ('amr_gst_a', 3), ('amr_gst_b', 4)]
@@ -5637,9 +5736,10 @@ contains
     !! this call, since it frees anything not currently owned.
     impure subroutine s_amr_reconcile_slots()
 
-        integer :: k
+        integer :: k, nliv, nfr, nal, nfree_in
         logical :: needed
 
+        nliv = 0; nfr = 0; nal = 0; nfree_in = amr_loc_nfree
         do k = 1, amr_max_blocks
             ! Skip the L0 tile prefix [1..l0_slot_off]: those slots are owned + sized by s_l0_tiles_init (rr=1 tile geometry), not
             ! by the AMR fine-block reconcile. Without this, at coexist init the tile-prefix owner defaults to 0, so RANK 0 would
@@ -5650,11 +5750,24 @@ contains
             needed = k <= amr_num_blocks
             if (needed) needed = amr_block_owner(k) == proc_rank
             if (needed) then
+                if (.not. amr_slot_live(k)) nal = nal + 1
                 call s_amr_alloc_slot(k)
+                nliv = nliv + 1
             else
+                if (amr_slot_live(k)) nfr = nfr + 1
                 call s_amr_free_slot(k)
             end if
         end do
+        ! stderr (survives an abort). live = what the run actually needs; loc_n = indices ever handed out;
+        ! the gap between them IS the leak. stack_in/out shows whether frees accumulate for the next
+        ! rebuild to recycle, and 'new' counts allocs that had to EXTEND rather than recycle.
+#ifdef MFC_DEBUG
+        write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-recon] rank ', proc_rank, ' live ', nliv, ' loc_n ', amr_loc_n, &
+               & ' freed ', nfr, ' newalloc ', nal, ' stack_in ', nfree_in, ' stack_out ', amr_loc_nfree
+#endif
+        ! every reader of a stale slot has finished by here (the rebuild's overlap carry-forward is done and the next rebuild
+        ! has not started), which is what makes the renumbering safe - see s_amr_compact_store.
+        call s_amr_compact_store(nliv)
 
     end subroutine s_amr_reconcile_slots
 
