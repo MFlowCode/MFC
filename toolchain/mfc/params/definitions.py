@@ -1304,6 +1304,8 @@ _nv(
     "avg_state",
     "alt_soundspeed",
     "mixture_err",
+    "num_particle_clouds",
+    "particle_cloud",
 )
 _nv(
     _PRE_SIM,
@@ -1385,10 +1387,8 @@ _nv(
     "coefficient_of_restitution",
     "collision_time",
     "ib_coefficient_of_friction",
-    "num_particle_clouds",
     "ib_neighborhood_radius",
     "many_ib_patch_parallelism",
-    "particle_cloud",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",

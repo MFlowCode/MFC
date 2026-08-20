@@ -218,6 +218,23 @@ contains
             fluid_pp(i)%mu_bulk = dflt_real
         end do
 
+        num_particle_clouds = 0
+        do i = 1, num_particle_clouds_max
+            particle_cloud(i)%x_centroid = 0._wp
+            particle_cloud(i)%y_centroid = 0._wp
+            particle_cloud(i)%z_centroid = 0._wp
+            particle_cloud(i)%length_x = dflt_real
+            particle_cloud(i)%length_y = dflt_real
+            particle_cloud(i)%length_z = dflt_real
+            particle_cloud(i)%num_particles = 0
+            particle_cloud(i)%radius = dflt_real
+            particle_cloud(i)%mass = dflt_real
+            particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%moving_ibm = 0
+            particle_cloud(i)%seed = 0
+            particle_cloud(i)%packing_method = dflt_int
+        end do
+
         ! Subgrid bubble parameters (bub_pp struct + scalar companions; bub_pp%R0ref is set in common
         ! via R0ref; the scalar companions are per-target manual declarations)
         bub_pp%R0ref = dflt_real; R0ref = dflt_real
@@ -321,6 +338,13 @@ contains
         ! Declared for the common conversion kernel but not a post_process input, so it is neither
         ! defaulted on non-root ranks nor broadcast. Post-process never carries viscous stresses.
         viscous = .false.
+
+        ! Particle clouds expand into individual IB patches at simulation startup, so num_ibs as read
+        ! from the case file counts only the namelist patches. Match the global count the simulation
+        ! arrives at (s_reduce_ib_patch_array) so the IB state records can be read back.
+        do i = 1, num_particle_clouds
+            num_ibs = num_ibs + particle_cloud(i)%num_particles
+        end do
 
         ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
