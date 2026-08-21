@@ -167,58 +167,76 @@ advance cannot simply be hoisted out of the per-block loop.
 
 ## 5. Slot lifecycle and store sizing
 
-Four routines, in `m_amr.fpp`:
+Five routines, in `m_amr.fpp` (post-W8-fix, commit 9bcc9865):
 
 | Routine | Effect |
 |---|---|
-| `s_amr_alloc_slot(islot)` | Idempotent (`if (amr_slot_live(islot)) return`). Pops `amr_loc_free` if non-empty, else `amr_loc_n = amr_loc_n + 1`. Ends with `call s_amr_st_reserve(amr_loc_n)`. |
-| `s_amr_free_slot(islot)` | Idempotent. Pushes `amr_loc_of(islot)` onto `amr_loc_free`; sets `amr_loc_of(islot) = 0`. |
-| `s_amr_st_reserve(nloc)` | Grows the store to hold `nloc` local slots. **Never shrinks.** |
-| `s_amr_compact_store(nlive)` | Renumbers `amr_loc_of` densely and reallocates the store smaller. |
+| `s_amr_alloc_slot(islot)` | Full slot: dense index + geometry + per-slot `q_prim`/`rhs` (+ QBMM side-state). Idempotent for full slots; **upgrades a live stash-only slot in place** (keeps its index and stor data, adds the arrays). |
+| `s_amr_alloc_slot_stash(islot)` | **Stash-only slot**: dense index + `amr_slot_live` only — no per-slot arrays. Used for migration replicas, which only ever touch their `amr_stor_st` half. Roughly halves a replica's device cost. |
+| `s_amr_free_slot(islot)` | Idempotent, handles both flavors (array teardown is guarded on `allocated(q_prim)`). Pushes the index onto `amr_loc_free`. |
+| `s_amr_st_reserve(nloc)` | Grows the store, increments capped at 16 slots. Never shrinks the allocation. |
+| `s_amr_compact_store()` | Re-densifies the local index space **in place on the device**, every reconcile. Does NOT realloc. |
 
-### 5.1 How the store grows
+**Per-slot device cost has two comparable terms** (at the S0 3D operating point, ~210 MiB each):
+the slot's share of the flat store (`amr_cons_st` + `amr_stor_st`), and the per-slot
+`q_prim`/`rhs` scalar-field arrays. `[amr-cap]` instrumentation showed the store is only ~16 of a
+~52 GiB per-GCD plateau — pooling `q_prim`/`rhs` (P1 proper) is the next memory lever.
 
-`s_amr_st_reserve` early-returns when `nloc <= amr_st_cap`. Otherwise it grows geometrically and
-reallocates, staging **through the host**:
+### 5.1 How the store grows — and the host-coherence contract
+
+`s_amr_st_reserve` early-returns when `nloc <= amr_st_cap`. Otherwise it grows by
+`max(min(oldcap/4, 16), 8)` slots and reallocates, staging **through the host**:
 
 ```
 GPU_UPDATE(host=...) -> tmp = store -> DEALLOCATE -> ALLOCATE(newcap) -> zero -> copy -> GPU_UPDATE(device=...)
 ```
 
-Two consequences that matter:
+The increment cap matters at scale: a proportional (+25%) increment is itself store-sized, and
+its transient is what tipped a 59.5 GiB card over the 64 GiB ceiling on the S0 np=4 arm.
 
-1. **Peak device memory during a grow is old + new**, i.e. up to `3 x oldcap` at a 2x growth
-   factor, because the old array is still mapped while the new one is allocated.
-2. The multi-GB host round trip is expensive enough that the operation cannot be done often. This
-   is the direct reason `s_amr_compact_store` carries hysteresis rather than running every regrid.
+**The host round trip is LOAD-BEARING, not incidental.** The rebuild's overlap carry-forward
+(`s_amr_regrid_rebuild_slots`) reads `amr_stor_st` on the HOST without pulling first — it relies
+on every store resize leaving host == device, so that the migration stash's host writes (pushed
+to device at write time) survive a mid-rebuild grow. A device-only resize was tried (2026-08-21)
+and NaN'd both churn goldens through exactly this path. Until the carry-forward is converted to a
+device kernel, any change to `s_amr_st_reserve` must preserve: *after a resize, the full host
+copy equals the device copy*.
 
-### 5.2 The high-water problem
+### 5.2 The high-water problem — SOLVED by re-densification (the W8 fix)
 
-`amr_loc_n` is a **high-water mark**, not a live count. The exact relation, verified by
-instrumentation, is:
+`amr_loc_n` is still `(live slots) + (recycle-stack depth)` mid-rebuild, and
+`s_amr_regrid_rebuild_slots` still allocates new blocks while old stashes are live. What changed:
 
-```
-amr_loc_n == (live slots) + (depth of the recycle stack)
-```
+1. **`s_amr_compact_store()` runs at EVERY reconcile**, renumbering `amr_loc_of` densely and
+   moving slot data **in place on the device** (`s_amr_st_move_slot`, no staging array, no
+   realloc). In-place is safe because moves are processed in ascending source order: each
+   destination (the rank of its source among live indices) is <= its source, and every pending
+   source lies above the current destination. Moved slots' host copies go stale — that is the
+   store's normal state between rebuilds; §5.1's contract applies to *resizes*, not moves.
+2. So `amr_loc_n` is pinned to the live count at every reconcile, and `amr_st_cap` plateaus at
+   the **rebuild-transient high-water** (old + new generations coexisting) instead of ratcheting
+   run-long. The ratchet's weak-scaling form — at np>=2 the owned set is a shifting SFC window
+   plus received replicas, so the union grows without bound — is dead: S0 measures flat VRAM
+   plateaus and live 72/rank at both np=2 and np=4.
+3. The rebuild loop **early-frees** old-only slots the moment their last covering new box is
+   built (`last_use` per old block, geometric region overlap as a conservative superset of every
+   stash read), so freed indices recycle into the very next allocations and the transient union
+   itself stays small.
+4. Replicas received in migration are **stash-only** slots (see table above).
 
-There is no leak — every freed index is on the stack. But because `s_amr_regrid_rebuild_slots`
-**allocates the new blocks before the old ones are freed** (`s_amr_reconcile_slots` runs at the end
-of the rebuild), the stack is empty exactly when the allocations happen. So each regrid ratchets
-`amr_loc_n` upward, and since `s_amr_st_reserve` never shrinks, `amr_st_cap` follows it.
+The old hysteresis compaction (`cap > 3*nlive` trigger, `2*nlive` target, full host-staged
+rebuild of the store) is gone with the constraint that forced it.
 
-Measured on the 400^3 two-level case: `amr_loc_n` reaches ~3x the live block count, and continues
-to drift over regrid count (89 at 20 regrids, 103 at 40) rather than plateauing. This is a memory
-multiplier on the largest array in the code, and it is what makes `amr_max_grid_size = 96` OOM.
-
-`s_amr_compact_store` addresses the symptom: when `amr_st_cap > 3 * nlive` it renumbers
-`amr_loc_of` densely, rebuilds each store array at `2 * nlive`, and resets `amr_loc_n` and the
-recycle stack. The 3x trigger and 2x target are set by the cost of the host round trip in §5.1, not
-by anything intrinsic.
+**Instrumentation:** `[amr-cap] rank r live n cap c` prints on stderr at every reconcile when
+`rank_time_wrt` is on — per-rank store capacity is the W8 invariant quantity (device memory =
+f(live local boxes)), and wall time cannot see it. `cap - live` is the transient envelope.
 
 > **Comparison.** AMReX and Parthenon have no analogous quantity, because neither *allocates* a
 > local index. AMReX's `localindex` is a binary search over the sorted owned-box list; Parthenon's
 > `lid = n - nbs` is recomputed contiguous every regrid. In both, the index space *is* the live
-> set by construction, so it cannot ratchet. See §11.3.
+> set by construction, so it cannot ratchet. Re-densification gets MFC the same invariant at
+> reconcile granularity; deleting `amr_loc_free`/`amr_loc_nfree` outright ("derive the index")
+> remains a cleanliness follow-up. See §11.3.
 
 ---
 
@@ -391,13 +409,18 @@ do k = 1, nboxes
     !                       ^^ NEW slot                                  ^^ OLD slot, kks = f_l0_slot(kk)
 ```
 
-**This line is why old slots cannot be freed before the rebuild.** The stash is read at *old* local
-indices for `kk = 1, old_np` while new slots are being allocated, so both index sets must be
-simultaneously valid. An attempted optimization to free-before-allocate was staged and then
+**This line is why old slots cannot be freed wholesale before the rebuild.** The stash is read at
+*old* local indices for `kk = 1, old_np` while new slots are being allocated, so both index sets
+must be simultaneously valid. An attempted blanket free-before-allocate was staged and then
 withdrawn on discovering this read — it would have produced silent wrong answers, not a crash.
+The correct refinement landed 2026-08-21 (9bcc9865): the rebuild loop precomputes `last_use(kk)`
+(the last new box whose region overlaps old block `kk` — a conservative geometric superset of
+every stash read) and frees each old-only slot at the top of iteration `last_use(kk) + 1`. The
+freed dense indices recycle into the very next allocations, which is what keeps the transient
+union — and with it the store's capacity plateau — small.
 
-`s_amr_reconcile_slots` runs at the end (`PH_RBREC`), frees the now-dead slots, and calls
-`s_amr_compact_store`.
+`s_amr_reconcile_slots` runs at the end (`PH_RBREC`), frees the remaining now-dead slots, and
+calls `s_amr_compact_store` (which now re-densifies the index space every time, §5.2).
 
 ---
 
@@ -460,12 +483,17 @@ Five traps, each of which has cost real time:
 ### 11.3 Known structural weaknesses
 
 1. **The local index is allocated, not derived** (§2.2, §5.2). AMReX derives it by binary search
-   over the sorted owned-box list; Parthenon recomputes `lid` contiguous every regrid. Deriving it
-   removes the ratchet as a *concept* rather than mitigating it.
-2. **Store reallocation stages through the host** (§5.1). AMReX's `RemakeLevel` fills the new
-   `MultiFab` device-side from the still-live old one. Making MFC's remap a device-to-device gather
-   would let compaction run unconditionally at `newcap = nlive`, taking the steady state from 2-3x
-   live to 1x.
+   over the sorted owned-box list; Parthenon recomputes `lid` contiguous every regrid. Since
+   2026-08-21 the index space is re-densified at every reconcile, which gets the same invariant
+   at reconcile granularity — deriving it outright (deleting `amr_loc_free`/`amr_loc_nfree`) is
+   now a cleanliness item, not a memory one.
+2. **Store GROWTH still stages through the host** (§5.1) — and this is now a documented
+   contract, not merely a weakness: the rebuild's overlap carry-forward host-reads depend on
+   resize leaving host == device. The obvious AMReX-style fix (full device-side remake into a
+   staging array) was BUILT AND REFUTED 2026-08-21: its old+staging transient device-OOMed the
+   very weak-scaling case it targeted, and dropping the host round trip NaN'd both churn goldens
+   through the carry-forward. The path that remains: convert the carry-forward to a device
+   kernel first, then growth can go device-side — as part of P1's pooling, not before.
 3. **Slots are sized for the maximum block, not their own** (§3). AMReX's single-chunk arena sums
    actual per-box bytes. This is an independent multiplier equal to the max/mean box-volume ratio;
    measure that ratio before deciding it is worth the change to non-uniform striding.
