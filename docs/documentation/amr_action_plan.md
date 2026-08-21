@@ -51,11 +51,28 @@ rebuild mid-sweep, since analytic ICs compile into the binary):
 | 8 | — | — | — | — | **device OOM** | >=58 (uneven, died mid-spike) |
 
 Per-rank fine work is np-INVARIANT (1.004), so the ~6.5 GiB per np-doubling is replicated
-per-GLOBAL-entity device memory, ~90 MB per global box per rank. Attribution OPEN: freg/creg
-flux registers are confirmed global-block-indexed on every rank (code) but are only the ~1 GiB
-class; **the remaining ~5 GiB per doubling is an unattributed replicated device allocation —
-find it by code audit before any S-track increment is priced** (it, not the wire bytes, is what
-kills weak scaling first: the ceiling arrives at np=4 on this node).
+per-GLOBAL-entity device memory. **ATTRIBUTED (code audit + VRAM-trace corroboration + exact
+arithmetic): it is the STORE-CAPACITY RATCHET in its weak-scaling form.** Slot indices are
+GLOBAL (f_l0_slot over the global box list); at np>=2 a rank's owned set is a shifting SFC
+WINDOW of that index space, and migration allocates received non-owned slots too — so
+amr_loc_n (a high-water that never decrements) grows toward the union of the windows, far
+above the live count. Each capacity step costs **210.6 MiB per slot** (amr_cons_st AND
+amr_stor_st at 132^3 x sys_size x 8 B each), and Fix B's compaction never fires here (gate
+cap > 3*nlive = 216; cap only reaches ~107). The VRAM traces are dispositive: np=1 sits FLAT
+at 49.9 GiB from startup (owned window static, ratchet inert), np=2 ratchets mid-run
+50.30 -> 55.47 -> 56.33 in steps matching the A' growth trajectory exactly. At np=1 the
+ratchet cannot engage at all — which is why a month of single-rank-window measurements never
+saw this term. CORRECTION to the previous revision: freg/creg's np-delta is only ~90 MiB
+(they were pre-over-provisioned to 128 slots by their own doubling), not "the ~1 GiB class of
+the growth". Separate real find, host-side: the migration pack buffers spack/rpack are
+allocated at (per-block bytes x GLOBAL old block count) = ~29 GB virtual at np=2 — the I4
+right-sizing item, confirmed.
+
+**Consequence — the W8 fix is ALREADY DESIGNED and is hereby PROMOTED: P1's device-side store
+remap (kills the host round trip that forces the loose 3x/2x hysteresis, letting compaction
+run at every reconcile to cap = nlive) plus local-index derivation (the index space IS the
+live set; amr_loc_n stops existing). Those two items are the np>=4 unblocker and the first
+S-track increment in practice.**
 
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18
