@@ -1,5 +1,12 @@
 # AMR performance plan (2026-08-19 — post-diagnosis execution plan)
 
+> **2026-08-20 RE-FOUNDING: read `amr_endstate.md` first.** The program is now derived from the
+> end-state architecture (four pillars, weak-scaling invariants W1-W7), not from phase shares at
+> the matched point. This document remains the evidence ledger and detailed work list; where its
+> sequencing conflicts with the endstate ladder (notably: the batched advance is REINSTATED as
+> Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
+> document wins.
+
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18
 rewrite (git history) now that the WHY is established — the findings live in
