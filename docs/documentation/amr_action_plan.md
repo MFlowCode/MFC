@@ -6,6 +6,238 @@ rewrite (git history) now that the WHY is established — the findings live in
 `amr_slowness_analysis.md` (causal model, five-reviewer panel) and `amr_tax_review.md` (measurement
 audit); this document is only the work list, its gates, and its decision rules.
 
+## 2026-08-20 EVENING — WHAT THE MEASUREMENTS DID TO THE PLAN
+
+Four items closed or downgraded in one session. **Read this before acting on the ladder below.**
+
+| item | status | evidence |
+|---|---|---|
+| T0a non-blocking reflux recv | **correct but 0% measured** | -2.0% wall, inside a 5.3% floor; a later same-config run came in HIGHER than baseline |
+| M4 t8code guard | **no-op, already exists** | `rr /= proc_rank` at the send loop already excludes the only rank holding the block |
+| T0b send aggregation | **dead** | fan-out measured **1.048** — each moved block has one destination |
+| T0b SFC hysteresis | **alive but marginal** | `rg:move` is 50% wait / 50% volume; payoff 4.7-8.4% against a 5.3% floor |
+
+**THE NOISE FLOOR IS 5.3%**, from four runs of the identical configuration (782.856 / 799.022 /
+818.498 / 825.481). Every remaining T0 item is a 4-8% candidate. **T0 will not produce a defensible
+multiplier**, and the earlier 11.03 -> 8.54x ladder projection is withdrawn.
+
+### The one good methodological find
+
+`[amr-mig] ... bytes 10748501376` was **identical to the digit** across two runs. Migration volume is
+deterministic, so a hysteresis A/B can be judged on **bytes moved** — exact, zero noise — instead of
+wall time. Confirm the volume cut first; spend a timed run only if it lands. Apply this pattern
+wherever a fix targets a deterministic quantity: it converts a 5.3%-noise experiment into an exact one.
+
+### Where the effort should go
+
+Infrastructure is 78.2% of wall against a 6.6% parity budget (11.9x reduction needed). Nibbling
+single-digit percentages cannot get there. **T1 (per-block -> per-level conversion) is the only item
+that touches the 78.2%, and it is the same refactor as S4 (distributed box metadata).** That is the
+program; T0 is not.
+
+## TWO PROGRAMS: TAX (T) and SCALING (S)
+
+Written 2026-08-20 after the full budget. These have **different success metrics and must not be
+measured against each other** — the scaling fixes score ~0 on the matched benchmark, and the tax
+fixes do nothing for O(N) growth.
+
+| | Track T — tax | Track S — scaling |
+|---|---|---|
+| goal | matched tax 11.03x -> 3.13x (AMReX) | per-rank memory and collective volume O(1) or O(log P) in box count |
+| metric | ns per cell-step, matched point | per-rank bytes + bytes-per-collective as f(problem size) |
+| harness | exists (`tax_matched.sh`) | **does not exist** - S0 below |
+| current | 11.03x, infra 78.2%% of wall | `union_gtag` is **64 GiB/rank at 4096^3** |
+
+### THE KEY STRUCTURAL POINT: the two tracks CONVERGE at the top
+
+T's big item (convert per-box operations to per-level plan-then-execute) and S's big item (stop
+replicating global box metadata) **are the same refactor**. A per-level plan only needs *this rank's
+boxes plus its neighbours*; building it is what makes the global tables unnecessary. Doing them
+separately would mean writing the same code twice and merging conflicts. **Co-design T1 and S4.**
+
+The cheap items on both tracks are genuinely independent and can proceed in any order.
+
+### Track T — tax
+
+| id | item | LOC | expected |
+|---|---|---|---|
+| T0a | non-blocking reflux receives (`rf:recv` 6.3%%) | ~30 | 11.03 -> 10.5x |
+| T0b | migration volume: t8code guard + SFC hysteresis (`rg:move` 12.4%%) | ~50 | -> 9.9x |
+| T0c | chunked gather batching (`rb:wait` 9.0%% + the skew sinks it feeds) | ~300 | -> 8.8x |
+| T0d | flatten `q_prim`/`rhs` per-slot allocs (`rb:slot` 3.4%%) | ~150 | -> 8.5x |
+| **T1** | **per-level plan-then-execute throughout** | months | **-> ~4-5x** |
+| T2 | fused advance; attacks the 2.41x per-cell inefficiency | months | -> ~3.5x |
+
+**T0 as a whole is worth ~1.3x and does NOT reach AMReX.** Infrastructure is 78.2%% of wall and the
+parity budget is 6.6%% - an 11.9x reduction. T0 delivers ~1.4x of that. Do T0 because it is cheap and
+de-risks measurement, but the parity claim rests entirely on T1.
+
+### Track S — scaling
+
+| id | item | LOC | why |
+|---|---|---|---|
+| S0 | **weak-scaling harness** | ~150 | Track S has no metric today. Report per-rank peak bytes and per-collective volume vs problem size. Without it S1-S4 are unfalsifiable. |
+| S1 | coarsen tags to a block lattice before `union_gtag` | ~60 | **512x volume cut at 8^3.** 491 MiB/rank -> 0.96 MiB now; 64 GiB -> 0.12 GiB at 4096^3. AMReX `blocking_factor`, Uintah region lattice. |
+| S2 | `MPI_SCAN` prefix weights instead of `ALLREDUCE(cost, nboxes)` | ~40 | Carries **8 B/rank regardless of box count**, O(log P). p4est's approach. |
+| S3 | local clustering + boundary reconciliation (SAMRAI) | ~400 | Removes the global tag set entirely rather than shrinking it. |
+| **S4** | **distributed box metadata** | months | `amr_block_owner`/`amr_slots`/`amr_region_*_all` are sized `1:amr_max_blocks` on EVERY rank, and the rebuild loops `do k = 1, nboxes` globally. O(N) memory and O(N) trip count per rank. **Co-design with T1.** |
+
+### The three global collectives, measured
+
+| site | carries | current | at 4096^3 |
+|---|---|---|---|
+| `s_amr_union_gtag` ALLGATHERV | tagged **cell** indices | 491 MiB/rank, 1.53 GiB/regrid | **64 GiB/rank** |
+| `s_amr_pack_gwin_pairs` 2x ALLGATHERV | window pairs | same class | same class |
+| `s_amr_block_cost` ALLREDUCE | `cost(amr_num_blocks)` | 1.8 KiB/rank | 1.8 MiB/rank |
+
+**Warning for whoever measures S1/S2:** they cost ~0 on the matched benchmark (`rg:clus` 2.2%%,
+`rg:tag` 0.5%%). Judging them by wall time at 400^3 will make them look worthless. Judge them by S0's
+metrics.
+
+## THE LEDGER — every idea, its status, and what would move it
+
+Audited 2026-08-20. This is the index; the chronological evidence is below. **Read this section
+first and do not re-open a CLOSED row without new evidence** — several have been re-proposed more
+than once.
+
+### The frame: what the tax actually decomposes into
+
+The matched head-to-head gives **23.92x = 1.60x ARITHMETIC x 14.91x IDLE**. The arithmetic factor is
+benign (MFC does real multiphysics against a linear-advection benchmark). **The excess is idle**, and
+its shape is explained by launch count: ~224 blocks x 3 RK stages x ~21 kernels ~= 14,100, against a
+measured 14,091/step versus AMReX's 81. AMReX launches once per *level* because a MultiFab kernel
+spans every box; **we launch once per block**.
+
+Every alive item below attacks one of five idle sources:
+
+| # | idle source | measured share | attacked by |
+|---|---|---|---|
+| I1 | per-block kernel launches (not fused) | 173x launch ratio | B1, B2, B4 |
+| I2 | MPI progress spinning (np=8) | ~51% of host CPU | C1, C2, C3 |
+| I3 | per-region GPU map/descriptor cost | 2.00 copies per mapped array | **IRREDUCIBLE — see closed** |
+| I4 | per-box gather in regrid | 16.9% of wall | R2, R3 |
+| I5 | regrid frequency | 37% of wall at int=2 | R1, R4, R5 |
+
+**Unresolved conflict that gates I1 vs I2**: `PH_RHS` is 54-57% GPU-busy at `int=20` but overall busy
+is 5.4% at the matched `int=2` point. Different operating points. Until reconciled, we do not know
+whether fusing the advance (I1) or cutting regrid (I5) is the larger lever. **M2 below settles it.**
+
+### CLOSED — landed
+
+| id | item | result |
+|---|---|---|
+| L1 | Level-2 parent-gather ISEND pool | -17 to -22% wall, regrid -39.3%, 76/76 |
+| L2 | Loop-invariant coarse-halo hoist | ~2.4x on its path |
+| L3 | **Store: bounded growth + compaction** | **2.32x** (1.80x compact x 1.29x growth) |
+| L4 | Flat store is authoritative for q_cons | prerequisite for all batching |
+| L5 | max_grid_size heap corruption | fixed + golden |
+| L6 | Multi-level + subcycle + np>1 PROHIBIT lift | covered by C45DBB52 |
+
+### CLOSED — refuted, with the evidence that killed each
+
+| id | item | killed by |
+|---|---|---|
+| X1 | Packed super-grid / block packing | even-split tiler leaves blocks exactly slot-sized |
+| X2 | Cost-weighted balancer | work balanced to 1.4%; imbalance 1.015-1.027 all run |
+| X3 | Straggler = gather ownership / co-location | gather barrier 29.6 s vs 0.185 s exchange (160:1) |
+| X4 | L0-sourcing of coarse patches | gather never skewed to the sick rank (argmax rank 6) |
+| X5 | Churn causes the straggler | ranks 4/5: identical churn, 0.998x vs 1.089x rhs |
+| X6 | "Cost grows with sim time" is intrinsic | 3.68x pre-fix vs **1.17x post-fix** |
+| X7 | Batch-convert remaining blocking calls | hoisting the step gather drain made wall WORSE |
+| X8 | Bigger blocks (cap > 64) | cap 96 +18%/cell; cap 128 device-OOM on per-block size |
+| X9 | Reducing per-region GPU map cost | **7 mechanisms measured, ALL fail** — treat as a floor |
+| X10 | Optimising reflux | 99.6% comms, and it is the SINK not the source |
+| X11 | rocprof-sys-causal profiling | rejects MFC's .text FUNCs as ineligible |
+
+### ALIVE — ranked by (value x confidence) / cost
+
+**Tier 1 — cheap, high confidence, do regardless of pending measurements**
+
+| id | item | LOC | why |
+|---|---|---|---|
+| S1 | **Device-side store remap** | ~80 | Removes the host round trip that forces compaction's 3x/2x hysteresis. Steady state 2-3x live -> **1x**. AMReX `RemakeLevel` does exactly this. Given L3 measured that *carrying* capacity costs 1.29x on its own, this is directly valuable. |
+| S2 | Derive the local index, delete the recycle stack | ~40 | AMReX `localindex` = binary search over the owned-box list; Parthenon `lid = n - nbs`. Index space *is* the live set, so the ratchet cannot return. Mostly redundant with S1 but deletes the bug class. |
+| A10 | Migration phase bracket | ~10 | We cannot currently price migration at all — regrid and redistribute are fused (see M3). Uintah's separate brackets are what found their scaling limiter. |
+| R5 | Grid-identity early-out | exists | Already have the `same` check; verify it covers the level set too. |
+
+**Tier 2 — the main line, gated on M2**
+
+| id | item | LOC | why |
+|---|---|---|---|
+| B1 | **Device-resident descriptor array + one fused kernel** | weeks | Parthenon's `BndInfo`/SparsePack shape. *Fully compatible with our contiguous store* — each descriptor degenerates to an integer slot index. This is the direct attack on I1. |
+| B2 | Rebuild-descriptors-only-on-invalidation | ~30 | Parthenon rebuilds packs only at remesh. Prevents the fused path re-acquiring per-step host cost. |
+| R2 | **Batch the per-block regrid data motion** | weeks | SAMRAI fills a whole level with ONE RefineSchedule; Chombo with ONE copyTo. We do one `s_amr_gather_coarse_patch` per block (16.9% of wall). Converts churn from O(blocks) to O(1) plans. |
+| R3 | Plan-then-execute for the parent gather | ~200 | Narrower version of R2 targeting the level>=2 path specifically. |
+
+**Tier 3 — load balance; cheap but no longer aimed at a known problem**
+
+| id | item | LOC | why / caveat |
+|---|---|---|---|
+| A1 | Per-block constant in `s_amr_block_cost` | ~10 | Uintah ships `patchCost = 16` cells; SAMRAI added `minimum_patch_load` for exactly our regime. **Caveat: work is already balanced to 1.4%, so this buys little today.** |
+| A7 | SFC-cut hysteresis (gain threshold) | ~40 | Uintah `gainThreshold` 0.05; WarpX measured optimum 10%. Zero correctness risk. |
+| A2 | Fit cost coefficients to measured per-block time | ~100 | Uintah `ModelLS`. **Heed A4**: Uintah's own dissertation found measured filters *worse* than the fitted model immediately after a regrid — and LB always follows a regrid. |
+| M3 | `vsize` migration-cost companion to block cost | ~30 | Every scheme in the literature needs work AND redistribution cost; we model only work. Cheap and exact for us: `sys_size x fine cells`. |
+| M4 | t8code guard: don't send a block to a rank that already has it | ~10 | `s_amr_regrid_stash_migrate` has no such guard. |
+| M5 | Decouple adapt from repartition (p4est Principle 2.1) | ~200 | We fuse them, so we pay the expensive half every time we want the cheap half — and cannot price them separately. **Prerequisite for measuring migration at all.** |
+
+**Tier 4 — worth trying, low effort, independent**
+
+| id | item | why |
+|---|---|---|
+| C1 | Ranks per GCD (MPS-analogue) | Parthenon Table 1: ~1.8-2x independently, near-zero code change |
+| C4 | Per-thread-block scratch instead of per-block | Parthenon-VIBE: 8.858 GB -> 0.138 GB (modeled, not end-to-end) |
+| T1 | `amr_tag_eps` per-level thresholds | a single threshold populates exactly ONE level on smooth features |
+| F1 | Delete the flux families | in progress; its own premise was wrong (delete, don't flatten) |
+
+### BLOCKED — needs a measurement before it can be ranked
+
+| id | question | experiment | status |
+|---|---|---|---|
+| M1 | What is the tax NOW, post-store-fix? | matched arm, differenced 40->80 | **RUNNING** |
+| M2 | Is the excess launch-bound (I1) or MPI-bound (I2)? | **np=1 run of the MATCHED case** | designed, never run — the single highest-value open experiment |
+| M6 | Why is rank 5 slow when rank 4 has the same capacity? | per-rank `hipMemGetInfo` at each regrid | ~10 LOC |
+| M7 | Does slot size vary enough to justify per-box sizing? | max/mean box-volume ratio | derivable from a log |
+
+### M2 DESIGN — separating local launch cost from MPI progress
+
+The two idle findings (85% survives at np=1 with zero MPI; host 51% busy in MPI progress at np=8)
+were measured on different cases and have never been reconciled. The obvious experiment — run the
+matched case at np=1 — **does not work, and it is worth recording why** so it is not attempted again:
+
+- The matched case is 400^3. At np=8 we measured 44-64 GiB in use *per GCD*. Halving the rank count
+  doubles per-GCD memory, so np=4 needs ~88-128 GiB against a 64 GiB device. **np<8 on this domain
+  OOMs immediately**; np=1 is off by 8x.
+
+**The design that does work: hold per-GCD work constant instead of holding the domain constant.**
+
+| arm | domain | ranks | cells/GCD | MPI |
+|---|---|---|---|---|
+| A | 200^3 | 1 | same as B | **none** |
+| B | 400^3 | 8 | same as A | yes |
+
+200^3 at np=1 puts exactly the same number of cells on one GCD as 400^3 at np=8. Compare
+**ns per fine-cell-step** between the arms:
+
+- A ~= B -> the idle is **local** (launch path / descriptor mapping). Fusing kernels (B1) is the lever.
+- A << B -> the idle is **MPI progress**. The convoy work (C-tier) is the lever, and fusing the
+  advance would be aimed at the wrong term.
+
+This needs no rocprof: ns/fine-cell-step is already the reported quantity, and the phase brackets
+carry `GPU_WAIT` on both ends so they measure completed device work.
+
+**Known imperfection, stated up front:** a 200^3 domain does not produce the same AMR block
+*structure* as 400^3 (fewer blocks, different boundary fraction), so this is a controlled comparison
+of the idle *mechanism*, not of the tax. Do not quote a tax from arm A.
+
+### THE STRATEGIC FACT nobody should lose sight of
+
+**AMR payoff is currently < 1 at single-node scale — uniform refinement beats our AMR by 4-5x.** Every
+item above is about making AMR *cost less*, not about whether it currently *pays*. The tax must fall
+by roughly an order of magnitude before AMR is the right choice on one node; the case for it is
+multi-node, where uniform refinement does not fit in memory. **Do not let a local win obscure that
+the headline payoff is still negative.**
+
+
 ## Where we stand
 
 - **Landed:** R1 (level-2 gather blocking-SEND -> ISEND pool): **-17%/-22% wall**, regrid -39%,
