@@ -37,18 +37,25 @@ construction works). Per-rank per-regrid collective volume: **ntag 0 -> 176.9 Mi
 efficiency **0.926 at np=2** at fixed per-rank work. S1/S3/S2 now have exact baselines and a pass
 bar (flat per-rank bytes). Harness: `amr-bench/s0_sweep.sh` + `s0_report.py`.
 
-**np=4 arm DIAGNOSED (2026-08-21, VRAM-sampled rerun): device OOM, and a NEW weak-scaling
-violation — per-GCD memory GROWS with np at fixed per-rank work.** The four ranks land on four
-distinct GCDs (binding is fine); card0 reaches **63.4 GiB of 64** and one task takes the HSA
-abort while the others are torn down. np=1 and np=2 fit; np=4 crosses the ceiling — so some
-per-rank device allocation scales with the GLOBAL problem. Candidates from code (do not assert
-without measurement): freg flux registers are allocated by GLOBAL block index on every rank
-(confirmed-by-code but magnitude-insufficient alone, ~1 GiB class); the per-GCD peak-VRAM
-sampler is now part of s0_sweep.sh so the growth exponent is an S0 metric. Two harness lessons
-from the same diagnosis: (1) each per-arm DISTINCT analytic-IC expression forces a full solver
-rebuild mid-sweep (analytic ICs compile into the binary) — v2 of the sweep uses ONE periodic
-expression (cos(pi*x)**2 blobs) for every domain size; (2) a device OOM here presents as
-srun task Killed/Aborted, not as an OOM message.
+**np=4 arm DIAGNOSED + the v2 sweep MEASURED IT (2026-08-21): device OOM from a NEW weak-scaling
+violation — per-GCD memory GROWS with np at fixed per-rank work.** Ranks land on distinct GCDs
+(binding fine); the OOM presents as srun task Killed/Aborted, not an OOM message. The v2 sweep
+(one periodic cos(pi*x)**2 IC — v1's per-arm distinct analytic ICs each forced a FULL solver
+rebuild mid-sweep, since analytic ICs compile into the binary):
+
+| np | boxes | boxes/rank | fine_work/rank | ntag MiB/rank/regrid | wall s | peak GiB/GCD |
+|---|---|---|---|---|---|---|
+| 1 | 72 | 72 | 76.6M | 0 | 227.8 | **49.9** |
+| 2 | 144 | 72 | 76.9M (imb 1.004) | 375.4 | 263.0 (eff 0.866) | **56.4** |
+| 4 | ~288 | 72 | — | — | **device OOM** | **>=60 (ceiling)** |
+| 8 | — | — | — | — | **device OOM** | >=58 (uneven, died mid-spike) |
+
+Per-rank fine work is np-INVARIANT (1.004), so the ~6.5 GiB per np-doubling is replicated
+per-GLOBAL-entity device memory, ~90 MB per global box per rank. Attribution OPEN: freg/creg
+flux registers are confirmed global-block-indexed on every rank (code) but are only the ~1 GiB
+class; **the remaining ~5 GiB per doubling is an unattributed replicated device allocation —
+find it by code audit before any S-track increment is priced** (it, not the wire bytes, is what
+kills weak scaling first: the ceiling arrives at np=4 on this node).
 
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18

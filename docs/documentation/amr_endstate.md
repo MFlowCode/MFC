@@ -65,6 +65,7 @@ A weak-scaling AMR arm satisfies, at fixed per-rank work as ranks and problem gr
 | W5 | tag space independent of box count | box-id tags exceed Cray MPI_TAG_UB (~2^21) at ~10^6 boxes | (family, epoch) tag bases |
 | W6 | store lifecycle device-resident | growth/compaction stage multi-GB through host | device-side remake, index derived |
 | W7 | migration priced and bounded | cost model has work term only; adapt+repartition fused | work + migration terms, decoupled, hysteresis |
+| W8 | per-rank DEVICE memory = f(local boxes), never f(global boxes) | **measured: ~90 MB per GLOBAL box per rank (S0 v2); OOM at np=4 at fixed per-rank work** | field-sized per-box device storage allocated for owned boxes only |
 
 Deliberately **kept global**: the replicated box list + owner map (~tens of bytes/box on every
 rank). That is AMReX's own design — it buys communication-free assignment and is tolerable to
@@ -173,7 +174,7 @@ times); the full matrix and the other compilers are CI's job on push.**
 | 0.1 | migration-stash fix: verify + commit | **DONE** ca360af2, subset 65/65 |
 | 0.2 | CMA-off control | **DONE** — waits +15-18% only: skew/bandwidth mechanism confirmed, sender-progress refuted |
 | 0.3 | M2 mechanism split: 200^3 np=1 arm | **DONE** — rhs per-call IDENTICAL with/without MPI (17.10 vs 17.48 ms): the idle is LOCAL; P2 confirmed as the parity lever, regrid's 5.45x np=8 per-call excess is P3's |
-| 0.4 | **S0 weak-scaling harness** (`amr-bench/s0_sweep.sh` + `s0_report.py`) | **BUILT + first data** — boxes/rank flat by construction; ntag 0 -> 176.9 MiB/rank/regrid at np=2 (W4 measured); weak efficiency 0.926 at np=2. np=4 DIAGNOSED: device OOM at 63.4 GiB — **per-GCD memory grows with np at fixed per-rank work, a new W-invariant violation (device-memory analogue of W6)**; the sweep now samples per-GCD peak VRAM so the exponent is an S0 metric |
+| 0.4 | **S0 weak-scaling harness** (`amr-bench/s0_sweep.sh` + `s0_report.py`) | **DONE, v2 sweep measured** — boxes/rank and fine_work/rank flat by construction (imb 1.004); ntag 375 MiB/rank/regrid at np=2 (W4); weak efficiency 0.866 at np=2; **per-GCD peak VRAM 49.9 -> 56.4 -> OOM at np=1/2/4: ~6.5 GiB per np-doubling of replicated per-global-entity device memory (~90 MB per global box per rank) — a new invariant, W8; attribution open (freg/creg are the ~1 GiB class; the ~5 GiB remainder needs a code audit)** |
 | 0.5 | uniform-baseline re-run (13% discrepancy) | pending |
 
 **Phase 1 — P3 exchange (in flight; contract = `amr_plan_based_exchange.md`).**
