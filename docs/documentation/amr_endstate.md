@@ -65,7 +65,7 @@ A weak-scaling AMR arm satisfies, at fixed per-rank work as ranks and problem gr
 | W5 | tag space independent of box count | box-id tags exceed Cray MPI_TAG_UB (~2^21) at ~10^6 boxes | (family, epoch) tag bases |
 | W6 | store lifecycle device-resident | growth/compaction stage multi-GB through host | device-side remake, index derived |
 | W7 | migration priced and bounded | cost model has work term only; adapt+repartition fused | work + migration terms, decoupled, hysteresis |
-| W8 | per-rank DEVICE memory = f(local boxes), never f(global boxes) | **measured: ~90 MB per GLOBAL box per rank (S0 v2); OOM at np=4 at fixed per-rank work** | field-sized per-box device storage allocated for owned boxes only |
+| W8 | per-rank DEVICE memory = f(live local boxes), never f(global index space) | **measured + ATTRIBUTED: the store-capacity ratchet over GLOBAL slot indices (210.6 MiB/slot, compaction gate never fires); OOM at np=4 at fixed per-rank work; invisible at np=1 by construction** | P1's device-side remap + index derivation: cap == live every reconcile |
 
 Deliberately **kept global**: the replicated box list + owner map (~tens of bytes/box on every
 rank). That is AMReX's own design — it buys communication-free assignment and is tolerable to
@@ -81,6 +81,11 @@ local index *derived* (search over the owned-box list), no recycle stack.
 *Status:* flat store landed and authoritative for q_cons; bounded growth + compaction landed
 (2.32x); **remaining:** device-side remap (kills the host round trip that forces the 3x/2x
 hysteresis; steady state 2-3x live -> 1x), then index derivation (deletes the ratchet bug class).
+**PROMOTED 2026-08-21: these two are the measured W8 fix** — at np>=2 the ratchet runs over
+GLOBAL slot indices (a shifting SFC window plus received migration slots) and device-OOMs the
+weak-scaling sweep at np=4; invisible at np=1 where the owned window is static. They are the
+first S-track increment in practice and slot in alongside Phase 1 (independent of the exchange
+conversion; ~120 LOC per the old R5/S2-tier estimates).
 
 **P2 — Compute: one kernel per (stage, level) over the local box set.**
 Flattened-prefix indexing with binary search over a cell-count prefix (the form already shipping
