@@ -18,8 +18,8 @@ module m_amr_restart
     use m_constants, only: amr_restart_blk_hdr_ints
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min
-    use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_cons_st, amr_loc_of, amr_seam_pairs_dirty, s_amr_alloc_slot, &
-        & s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
+    use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_cons_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, &
+        & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
         & s_set_amr_fine_geometry
     use m_amr_regrid, only: s_amr_check_seam_topology
 
@@ -448,6 +448,7 @@ contains
         end if
         call s_amr_select_slot(1)
         amr_seam_pairs_dirty = .true.  ! restored a new block set: the cached seam-pair list must be rebuilt
+        amr_mesh_epoch = amr_mesh_epoch + 1
         call s_amr_check_seam_topology()  ! abort on seam topologies no halo reconciles (e.g. restart mode-switch)
         restored = .true.
 

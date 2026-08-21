@@ -161,17 +161,20 @@ without a downstream sync; T0 micro-items as a program; L0-sourcing; "cost grows
 ## 7. The ladder, re-derived
 
 Ordering rule: correctness first; then what unblocks measurement; then the scaling walls; then
-constant factors. Every increment lands green (AMR subset per iteration, full suite at merge) and
-reports S0 metrics once S0 exists.
+constant factors. Every increment lands green and reports S0 metrics once S0 exists. **The local
+test gate is the AMR subset (--only AMR plus the four coexist UUIDs) plus a small cross-section
+when a change touches shared code — never the full 706 locally (user directive, stated three
+times); the full matrix and the other compilers are CI's job on push.**
 
-**Phase 0 — instruments and in-flight verification (days).**
-| id | item | gate |
+**Phase 0 — instruments and in-flight verification (days).** Results: `amr_action_plan.md`,
+"2026-08-21 PHASE 0 MEASUREMENTS".
+| id | item | status |
 |---|---|---|
-| 0.1 | migration-stash fix: verify + commit (running) | AMR subset green |
-| 0.2 | CMA-off control (script exists) | per-call wait deltas |
-| 0.3 | M2 mechanism split: 200^3 np=1 arm | ns/fine-cell-step vs np=8 arm |
-| 0.4 | **S0 weak-scaling harness** (~150 LOC): per-rank peak bytes, per-collective bytes, messages/step, launches/step, vs problem size | metrics reported for the matched case |
-| 0.5 | uniform-baseline re-run (13% discrepancy) | honest tax denominator |
+| 0.1 | migration-stash fix: verify + commit | **DONE** ca360af2, subset 65/65 |
+| 0.2 | CMA-off control | **DONE** — waits +15-18% only: skew/bandwidth mechanism confirmed, sender-progress refuted |
+| 0.3 | M2 mechanism split: 200^3 np=1 arm | **DONE** — rhs per-call IDENTICAL with/without MPI (17.10 vs 17.48 ms): the idle is LOCAL; P2 confirmed as the parity lever, regrid's 5.45x np=8 per-call excess is P3's |
+| 0.4 | **S0 weak-scaling harness** (`amr-bench/s0_sweep.sh` + `s0_report.py`) | **BUILT + first data** — boxes/rank flat by construction; ntag 0 -> 176.9 MiB/rank/regrid at np=2 (W4 measured); weak efficiency 0.926 at np=2. OPEN: np>=4 arms SIGKILL in sim init — rerun with per-rank VRAM print before reading it |
+| 0.5 | uniform-baseline re-run (13% discrepancy) | pending |
 
 **Phase 1 — P3 exchange (in flight; contract = `amr_plan_based_exchange.md`).**
 I0 -> I6 as staged there, plus the two independent cheap scaling items folded in early: S1

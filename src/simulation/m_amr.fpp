@@ -48,11 +48,11 @@ module m_amr
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
     public :: s_amr_br_load_all, s_amr_br_store_all, amr_br_w, amr_br_batch, amr_rg_gather
-    public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_xchg_coarse_ghosts, amr_cpat_mar, &
-        & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
-        & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
-        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
-        & f_amr_boxes_overlap, f_l0_slot
+    public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, amr_tag_base, &
+        & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_reduce_xchg_flag, &
+        & s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, &
+        & s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
+        & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, f_l0_slot
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -164,6 +164,16 @@ module m_amr
     integer, allocatable :: amr_seam_pairs(:,:)
     integer              :: amr_num_seam_pairs, amr_seam_pairs_nblk
     logical              :: amr_seam_pairs_dirty
+    !! monotone mesh epoch (plan-based exchange, amr_plan_based_exchange.md): incremented at EVERY site that sets
+    !! amr_seam_pairs_dirty and at the end of each slot reconciliation (exchange plans bake local slot indices, so a
+    !! renumbering invalidates them even when the box set is unchanged). The boolean cannot serve as plan staleness:
+    !! it is CONSUMED by whichever lazy seam-cache rebuild fires first, and ownership can change with no regrid.
+    integer(8) :: amr_mesh_epoch = 0
+    !! per-family plan message tag bases (families F1..F7, amr_plan_based_exchange.md): amr_max_blocks + 100*f keeps
+    !! the plan tag space disjoint from the legacy per-box space (tags in [1..amr_max_blocks]) while families convert;
+    !! the epoch is folded in as base + mod(amr_mesh_epoch, 100). The init MPI_TAG_UB assert is the scale tripwire;
+    !! the amr_max_blocks term disappears with the last per-box family (increment I7).
+    integer :: amr_tag_base(7) = 0
     !! cached per-block P2P overlap-rank lists (rebuilt with the seam list - same dirty flag): amr_ovl_gather(:,k) = ranks whose
     !! owned coarse range (s_amr_rank_coarse_range) intersects block k's amr_cpat_mar-padded patch box (gather contributors);
     !! amr_ovl_scatter(:,k) = ranks whose coarse interior (s_amr_rank_interior) intersects block k's region box (restrict-scatter
@@ -516,6 +526,7 @@ contains
         end if
         allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
         amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1  ! force a seam-list build on the first fine-fine halo
+        amr_mesh_epoch = amr_mesh_epoch + 1
         mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
@@ -702,6 +713,26 @@ contains
             call s_amr_select_slot(f_l0_slot(1))  ! refresh the per-block mirrors (geometry loop left them on the last tile)
             deallocate (tiled)
         end block
+
+        ! plan-based exchange (I0): per-family tag bases sit above the legacy per-box tag space so both can coexist
+        ! while families convert one increment at a time.
+        block
+            integer :: f
+            do f = 1, size(amr_tag_base)
+                amr_tag_base(f) = amr_max_blocks + 100*f
+            end do
+        end block
+#ifdef MFC_MPI
+        block
+            integer(kind=MPI_ADDRESS_KIND) :: tag_ub
+            logical                        :: tag_ub_set
+            integer                        :: ierr
+            call MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, tag_ub, tag_ub_set, ierr)
+            @:ASSERT(tag_ub_set, "MPI_TAG_UB attribute unavailable")
+            @:ASSERT(amr_tag_base(size(amr_tag_base)) + 100 <= tag_ub, &
+                     & "AMR tag space exceeds MPI_TAG_UB: amr_max_blocks is too large for this MPI's tag range")
+        end block
+#endif
 
     end subroutine s_initialize_amr_module
 
@@ -5794,6 +5825,7 @@ contains
         ! every reader of a stale slot has finished by here (the rebuild's overlap carry-forward is done and the next rebuild
         ! has not started), which is what makes the renumbering safe - see s_amr_compact_store.
         call s_amr_compact_store(nliv)
+        amr_mesh_epoch = amr_mesh_epoch + 1  ! local slot indices may have been renumbered: plans that baked them are stale
 
     end subroutine s_amr_reconcile_slots
 
@@ -5975,6 +6007,7 @@ contains
             allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
         end if
         amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1
+        amr_mesh_epoch = amr_mesh_epoch + 1
 
         ! swap bounce buffers (same bounds as the L0 global coord arrays). SHARED with s_initialize_amr_module (identical m/n/p
         ! sizing), so only allocate in l0-only mode to avoid a coexist double-allocate; under coexist the AMR init's buffers already
@@ -6485,10 +6518,13 @@ contains
             deallocate (buf)
         end if
 
-        ! replicated ownership update on EVERY rank; mark the seam topology dirty so the next halo rebuilds pair/overlap lists
+        ! replicated ownership update on EVERY rank; mark the seam topology dirty so the next halo rebuilds pair/overlap lists.
+        ! The epoch bump matters most HERE: ownership changed with NO regrid, which the consumed boolean cannot express to a
+        ! cached exchange plan.
         amr_block_owner(k) = new_owner
         amr_owns_all(k) = (new_owner == proc_rank)
         amr_seam_pairs_dirty = .true.
+        amr_mesh_epoch = amr_mesh_epoch + 1
 
     end subroutine s_l0_migrate_tile
 

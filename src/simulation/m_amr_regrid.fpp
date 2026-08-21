@@ -22,7 +22,7 @@ module m_amr_regrid
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
         & PH_RBREC, PH_RBTOPO
     use m_amr, only: amr_rg_gather, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, &
-        & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
+        & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
         & s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, &
         & s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
         & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
@@ -123,6 +123,33 @@ contains
         end do
 
     end subroutine s_amr_check_box_caps
+
+    !> Invariant check (plan-based exchange I0): same-level boxes are pairwise DISJOINT. Guaranteed today by the cluster partition +
+    !! merge threshold + IB overlap-merge; relied on by the rebuild's overlap carry-forward and by per-peer unpack reordering in the
+    !! exchange plans (amr_plan_based_exchange.md) - enforced here rather than inherited as folklore. All levels share the global
+    !! coarse index space (see the cap formula in s_amr_check_box_caps), so the interval test is valid across parents. O(nboxes^2)
+    !! host integer compares per regrid - negligible at current box counts; replace with a sorted sweep in increment I7 if box
+    !! counts grow.
+    impure subroutine s_amr_check_box_disjoint(boxes, nboxes, box_level)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: nboxes, box_level(:)
+        integer                 :: k, kk
+
+        do k = 1, nboxes
+            if (box_level(k) < 1) cycle
+            do kk = k + 1, nboxes
+                if (box_level(kk) /= box_level(k)) cycle
+                if (all(boxes(k)%lo <= boxes(kk)%hi .and. boxes(kk)%lo <= boxes(k)%hi)) then
+                    if (proc_rank == 0) print '(A,I0,A,I0,A,I0)', ' [amr] same-level box overlap: level ', box_level(k), &
+                        & ' boxes ', k, ' and ', kk
+                    call s_mpi_abort("AMR regrid: two same-level boxes overlap (indices printed above). The overlap " &
+                                     & // "carry-forward and the exchange plans both assume same-level disjointness.")
+                end if
+            end do
+        end do
+
+    end subroutine s_amr_check_box_disjoint
 
     !> Shrink box [blo:bhi] to the tight bbox of its tagged cells. ok=.false. if none tagged. Collapsed dims (lo=hi=0) survive
     !! unchanged. Deterministic (integer scan of the identical sparse tag list).
@@ -630,6 +657,7 @@ contains
         if (nboxes == 0) return  ! every box was confined to the domain margin
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
         call s_amr_check_box_caps(boxes, nboxes, box_level)  ! invariant: no box may exceed its level's slot cap
+        call s_amr_check_box_disjoint(boxes, nboxes, box_level)  ! invariant: same-level boxes are pairwise disjoint
         call s_amr_regrid_boxes_unchanged(boxes, nboxes, box_level, same)
         if (same) return  ! identical box set and levels: keep the live slots
         call s_phase_tic(PH_RGMIG); call s_amr_regrid_stash_migrate(boxes, nboxes, box_level, old_np, old_ilo, old_ext, &
@@ -1269,6 +1297,7 @@ contains
         ! block set changed: dirty the cached seam-pair AND overlap-rank lists NOW - the rebuild's per-block P2P gathers
         ! (s_amr_regrid_rebuild_slots) consume the overlap lists with the NEW boxes, so flagging after them would be too late
         amr_seam_pairs_dirty = .true.
+        amr_mesh_epoch = amr_mesh_epoch + 1
         ! Proper-nesting guard: each level>=2 block must be covered by EXACTLY ONE parent-level block. f_amr_parent_block (and
         ! the gather/reflux that key off it) take the FIRST overlap, so a fine tile straddling two parent tiles - an internal
         ! parent-level tile seam crossed by a nested feature - would silently couple to only one parent (wrong coarse BC + a
