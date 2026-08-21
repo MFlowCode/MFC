@@ -158,6 +158,72 @@ short-lived rather than gone; it remains a cleanliness increment, no longer a me
   paid off one day after landing. Every future slot/stash/exchange change runs them FIRST
   (they are ~2 min each), before any gate sweep.
 
+## PHASE 1 ATTACK PLAN (2026-08-21) — the operational sequence, pre-registered
+
+Written the day the W8 gate passed, per the constitution's just-in-time rule (one phase ahead,
+decision rules pre-registered BEFORE the measurements that trigger them). The architecture is
+`amr_endstate.md`; this section is only the order of operations and its gates.
+
+### M3 — attribution of the 2.59x: ALREADY DONE (the gate logs carried full phase budgets)
+
+np=2 -> np=4 step-loop delta = +413.3 s (387.1 accounted; both arms same build 9bcc9865,
+identical per-rank work, 40 steps, 20 regrids):
+
+| family | phases | delta | share | reading |
+|---|---|---|---|---|
+| **wait/skew** | reflux +104.8 (imb 1.81, 0.18 -> 28.8 ms/call = pure wait), coarse +44.4 (imb 2.85), seam +8.2 | **+157** | **38%** | the "reflux is the sink" pattern is BACK at np=4 — skew originates elsewhere and drains here. Do NOT optimize reflux. |
+| **rhs per-call** | rhs +110.5 — ms/call 17.29 -> 31.34 (x1.81 in the MEAN, not a straggler), imb 1.009 -> 1.465 | **+110** | **27%** | mechanism OPEN — see M4a. M2 said rhs per-call is np-invariant at the matched 400^3 point, so this is either topology or case-specific. |
+| **regrid scaling** | regrid +91.8 (mig +42.7, build +37.8 incl. rb:gath +17.2, clus +5.1), gather +18.9 | **+111** | **27%** | the P3/P4 targets, now with exact per-sub-phase numbers. |
+
+### M4 — three cheap discriminators BEFORE any building (one allocation session)
+
+- **M4a (rhs doubling — hardware or code?):** np=2 pinned to the two GCDs of ONE physical
+  MI250X vs two GCDs on DIFFERENT cards (HIP_VISIBLE_DEVICES pinning, same case). If the
+  same-card pair reproduces ~31 ms/call -> the growth is HBM/Infinity-Fabric contention, i.e.
+  a hardware property of dense occupancy: the weak-scaling BASELINE must be defined at full-node
+  occupancy and the 2.59x shrinks accordingly. If not -> code-side; profile one np=4 rank's rhs
+  before touching anything. **Rule: no rhs-side work is scheduled until M4a lands.**
+- **M4b (whose skew?):** per-rank fine_work + per-level block counts at np=4 (load_weight_wrt
+  already on). If L2 ownership is imbalanced -> the cost-model/balancer item (S2, migration-aware
+  LB) moves up. If work is flat but waits are big -> arrival skew, T1's calibrated territory
+  (floor 8-12%). **Rule: balancer work is gated on M4b showing work imbalance > 1.15.**
+- **M4c (table completion):** np=8 arm post-fix + np=1 on the current build. **Rule: np=8
+  device-OOM promotes P1 pooling from "next memory lever" to "immediately before anything
+  else"; np=8 completing parks pooling after I1.**
+
+### The increment sequence (each = one landed permanent piece, one commit, goldens-first)
+
+1. **I1 exchange validator** (P3, ~500 LOC) — starts now, gated on nothing: it is pure code,
+   prerequisite to every exchange conversion, and M4 cannot change its scope. v2 contract + the
+   inventory corrections (F1/F2 shared pool). New asserts earned this week: replicas are
+   stash-only slots; `[amr-cap]` flatness (promote into `s0_report.py`). Verification includes
+   the I0 lesson: seed a deliberate staleness bug and confirm the validator TRIPS.
+2. **P1 q_prim/rhs pooling** — position set by M4c (see rule above). Scope: pool the two
+   block-sized per-slot families into level-major store arrays; convert the rebuild overlap
+   carry-forward to a device kernel IN THE SAME increment (that deletes the host-coherence
+   contract, which then legalizes device-side growth). Pre-registered gate: churn goldens +
+   subset 67/67 + S0 np=4 hot-card peak drops >= 10 GiB (expected ~48 GiB); np=8 attempted
+   after. QBMM side-state stays per-slot (out of scope).
+3. **M4-directed third increment:** S1 block-lattice tags (if regrid/collective scaling is the
+   chosen front — kills the measured ntag doubling; judged on ntag bytes/rank going flat), OR
+   I2-I3 exchange waves (if wait/skew traces to per-box exchange arrival), OR the S2/T1
+   balancer path (only if M4b's rule fires). One front at a time; the other rules stay written
+   so the choice is a lookup, not a debate.
+4. **Phase-2 (P2 batched advance) contract is WRITTEN during increment 2-3** per the
+   constitution — seeded by the 2a prototype (batch convert_conservative_to_primitive) and
+   M2's verdict; it does not start until its contract passes the audit ritual.
+
+### Standing constraints for this phase (the do-not list)
+
+- Do not optimize reflux (it is the sink, not the source — twice-confirmed).
+- Do not grow the operating point (np=8, deeper levels, bigger blocks) before P1 pooling.
+- Do not re-litigate P2's position (constitution D-phase2: full commitment, after Phase 1).
+- No multi-node work until single-node np=8 weak scaling is clean (D-node).
+- Every slot/stash/exchange change: churn goldens FIRST, then subset, then gates; wall claims
+  only from from-scratch same-build pairs; counters over wall wherever a counter exists.
+- Watch CI on 9bcc9865/7ca673a0: `s_amr_st_move_slot` + stash-only slots are new device code
+  paths for the other three compilers (local gate is amdflang-only by standing rule).
+
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18
 rewrite (git history) now that the WHY is established — the findings live in
