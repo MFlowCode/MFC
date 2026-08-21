@@ -50,6 +50,28 @@ rebuild mid-sweep, since analytic ICs compile into the binary):
 | 4 | ~288 | 72 | — | — | **device OOM** | **>=60 (ceiling)** |
 | 8 | — | — | — | — | **device OOM** | >=58 (uneven, died mid-spike) |
 
+**POST-W8-FIX (2026-08-21, commit 9bcc9865, node k004-008 — the first complete weak-scaling
+pair in the project's history):**
+
+| np | boxes (last regrid) | ntag MiB/rank/regrid | gwin MiB | cost B | wall s (step loop) | peak GiB/GCD |
+|---|---|---|---|---|---|---|
+| 2 | 144 | 393.6 | 160.7 | 3720 | 255.6 | 55.3 flat |
+| 4 | 288 | 787.3 | 320.0 | 7432 | **662.3** | 63.6 flat (hot card) |
+
+Same build, same case family, same 40 steps at fixed 200^3 cells/rank. np=1 was not re-run on
+this build; the np=8 arm has NEVER run post-fix and is the next S0 gate. Three readings:
+1. **MEMORY weak scaling now holds.** Per-rank live boxes 72 at BOTH np (nboxes doubles exactly
+   with np), VRAM plateaus dead flat mid-run at both, and the fix is wall-neutral at np=2
+   (255.6 vs the 249-263 s band across all variants). W8: from violated to holding.
+2. **TIME weak scaling is now the measured blocker: wall 2.59x per np-doubling at fixed
+   per-rank work.** This was invisible before today — the np=4 arm always died. The doubling
+   global entity counts are the prime suspects (regrid's O(global boxes) loops, the replicated
+   collectives below, the migration storm) but the split is UNMEASURED — the phase brackets
+   exist; running the np=2/np=4 pair with a phase-budget diff is the first S0 follow-up.
+3. **W4/S2 baselines at np=4 are exact:** ntag and gwin and cost all double per np-doubling
+   (787.3 MiB/rank/regrid of replicated tag volume at np=4 — S1's lattice tags target), final
+   regrid migration 938.7 MB. Every S-track item now has a two-point scaling curve to beat.
+
 Per-rank fine work is np-INVARIANT (1.004), so the ~6.5 GiB per np-doubling is replicated
 per-GLOBAL-entity device memory. **ATTRIBUTED (code audit + VRAM-trace corroboration + exact
 arithmetic): it is the STORE-CAPACITY RATCHET in its weak-scaling form.** Slot indices are
@@ -110,6 +132,31 @@ q_prim/rhs pooling (P1 proper) and stor-only stashes; do not grow this operating
 them.** Still OPEN from the promoted design: local-index DERIVATION (deleting
 amr_loc_free/amr_loc_nfree as concepts) — the re-densification makes the recycle stack
 short-lived rather than gone; it remains a cleanliness increment, no longer a memory one.
+
+**What the W8 arc changes about the ladder (2026-08-21):**
+- **The weak-scaling blocker moves from MEMORY to TIME.** With np=4 completing, wall 2.59x per
+  np-doubling at fixed per-rank work is now the measured gap (table above). That is the
+  constitution's predicted per-global-entity anti-scaling, finally on a curve. First follow-up
+  is cheap: re-run the np=2/np=4 pair with the phase-budget diff to split the 2.59x among
+  regrid's O(global) loops, the replicated collectives, and migration — BEFORE building
+  anything. Do not repeat the phase-share mistake of optimizing the unmeasured.
+- **P1's q_prim/rhs pooling is promoted to the next MEMORY lever.** The [amr-cap] instrument
+  showed the flat store is only ~16 of the ~52 GiB plateau; per-slot q_prim/rhs is a second
+  store-sized term, and the np=4 hot card sits 0.4 GiB from the ceiling. Any operating-point
+  growth (np=8, deeper levels, bigger blocks) needs it first. It is the same code motion P2's
+  batched advance needs anyway — the two pillars now share their first concrete increment.
+- **I1 (exchange validator) remains next in P3** — unchanged by today; the inventory
+  corrections stand. The migration path gained two facts I1 should encode: replicas are
+  stash-only slots now (an invariant the validator can assert), and the first dynamic regrid
+  is a migration STORM (init ownership vs first SFC balance) — any plan-based migration wave
+  design must budget for it, not for the steady-state trickle.
+- **S0 harness upgrades owed:** np=8 arm post-fix (the next W8-class gate), np=1 re-run on the
+  current build (table hygiene), and promote `[amr-cap]` reading into `s0_report.py` so cap
+  flatness is asserted by the harness, not eyeballed from VRAM CSVs.
+- **Test-capital lesson, now policy:** the churn goldens (27DEC5B6/D127EC91) caught BOTH wrong
+  designs same-day — a store-transient OOM and a host-coherence NaN — and the np>2 mandate
+  paid off one day after landing. Every future slot/stash/exchange change runs them FIRST
+  (they are ~2 min each), before any gate sweep.
 
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18

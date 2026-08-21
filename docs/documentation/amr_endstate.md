@@ -61,11 +61,11 @@ A weak-scaling AMR arm satisfies, at fixed per-rank work as ranks and problem gr
 | W1 | per-rank step cost = f(local cells, peers) | O(global boxes) loops in regrid/exchange | f(local, peers) |
 | W2 | kernel launches/step = O(levels x stages) | 14,091/step (O(boxes x stages x kernels)) | ~10^2 |
 | W3 | MPI messages/step = O(peers x families x levels) | O(boxes) sends, per-box WAITALLs | O(peers) |
-| W4 | no per-CELL global collectives | union_gtag ALLGATHERV: 491 MiB/rank at 400^3, **64 GiB/rank at 4096^3** | tag exchange O(local + peers) |
+| W4 | no per-CELL global collectives | union_gtag ALLGATHERV: 491 MiB/rank at 400^3, **64 GiB/rank at 4096^3**; S0 scaling curve measured 2026-08-21: ntag 393.6 -> 787.3 MiB/rank/regrid going np=2 -> np=4 (doubles per np-doubling) | tag exchange O(local + peers) |
 | W5 | tag space independent of box count | box-id tags exceed Cray MPI_TAG_UB (~2^21) at ~10^6 boxes | (family, epoch) tag bases |
 | W6 | store lifecycle device-resident | growth/compaction stage multi-GB through host | device-side remake, index derived |
 | W7 | migration priced and bounded | cost model has work term only; adapt+repartition fused | work + migration terms, decoupled, hysteresis |
-| W8 | per-rank DEVICE memory = f(live local boxes), never f(global index space) | **measured + ATTRIBUTED: the store-capacity ratchet over GLOBAL slot indices (210.6 MiB/slot, compaction gate never fires); OOM at np=4 at fixed per-rank work; invisible at np=1 by construction** | P1's device-side remap + index derivation: cap == live every reconcile |
+| W8 | per-rank DEVICE memory = f(live local boxes), never f(global index space) | **HOLDING as of 9bcc9865 (2026-08-21): live 72/rank and VRAM plateaus flat at np=2 AND np=4; S0 np=4 completes. Margin-thin: hot card 63.6/64 GiB — per-slot q_prim/rhs (not the store) is the next term** | landed: in-place re-densify + capped growth + early-free + stash-only replicas; next: pool q_prim/rhs (P1 proper) |
 
 Deliberately **kept global**: the replicated box list + owner map (~tens of bytes/box on every
 rank). That is AMReX's own design — it buys communication-free assignment and is tolerable to
@@ -188,7 +188,7 @@ times); the full matrix and the other compilers are CI's job on push.**
 | 0.1 | migration-stash fix: verify + commit | **DONE** ca360af2, subset 65/65 |
 | 0.2 | CMA-off control | **DONE** — waits +15-18% only: skew/bandwidth mechanism confirmed, sender-progress refuted |
 | 0.3 | M2 mechanism split: 200^3 np=1 arm | **DONE** — rhs per-call IDENTICAL with/without MPI (17.10 vs 17.48 ms): the idle is LOCAL; P2 confirmed as the parity lever, regrid's 5.45x np=8 per-call excess is P3's |
-| 0.4 | **S0 weak-scaling harness** (`amr-bench/s0_sweep.sh` + `s0_report.py`) | **DONE, v2 sweep measured** — boxes/rank and fine_work/rank flat by construction (imb 1.004); ntag 375 MiB/rank/regrid at np=2 (W4); weak efficiency 0.866 at np=2; **per-GCD peak VRAM 49.9 -> 56.4 -> OOM at np=1/2/4: ~6.5 GiB per np-doubling of replicated per-global-entity device memory (~90 MB per global box per rank) — a new invariant, W8; attribution open (freg/creg are the ~1 GiB class; the ~5 GiB remainder needs a code audit)** |
+| 0.4 | **S0 weak-scaling harness** (`amr-bench/s0_sweep.sh` + `s0_report.py`, gate arms `s0_w8gate.sh`) | **DONE, and the W8 blocker it found is FIXED (9bcc9865)** — boxes/rank and fine_work/rank flat by construction (imb 1.004); post-fix np=2/np=4 both complete with flat VRAM plateaus (55.3 / 63.6 GiB) and live 72/rank at both. **The measured gap is now TIME: wall 2.59x per np-doubling at fixed per-rank work (255.6 -> 662.3 s), with ntag/gwin/cost all doubling per np-doubling (W4). Next S0 runs: phase-budget diff of the np=2/np=4 pair (split the 2.59x BEFORE building anything), np=8 arm, np=1 on the current build.** (The earlier freg/creg ~1 GiB attribution guess was WRONG — their np-delta is ~90 MiB; the ratchet + per-slot q_prim/rhs were the real terms.) |
 | 0.5 | uniform-baseline re-run (13% discrepancy) | pending |
 
 **Phase 1 — P3 exchange (in flight; contract = `amr_plan_based_exchange.md`).**
