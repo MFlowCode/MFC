@@ -173,7 +173,7 @@ times); the full matrix and the other compilers are CI's job on push.**
 | 0.1 | migration-stash fix: verify + commit | **DONE** ca360af2, subset 65/65 |
 | 0.2 | CMA-off control | **DONE** — waits +15-18% only: skew/bandwidth mechanism confirmed, sender-progress refuted |
 | 0.3 | M2 mechanism split: 200^3 np=1 arm | **DONE** — rhs per-call IDENTICAL with/without MPI (17.10 vs 17.48 ms): the idle is LOCAL; P2 confirmed as the parity lever, regrid's 5.45x np=8 per-call excess is P3's |
-| 0.4 | **S0 weak-scaling harness** (`amr-bench/s0_sweep.sh` + `s0_report.py`) | **BUILT + first data** — boxes/rank flat by construction; ntag 0 -> 176.9 MiB/rank/regrid at np=2 (W4 measured); weak efficiency 0.926 at np=2. OPEN: np>=4 arms SIGKILL in sim init — rerun with per-rank VRAM print before reading it |
+| 0.4 | **S0 weak-scaling harness** (`amr-bench/s0_sweep.sh` + `s0_report.py`) | **BUILT + first data** — boxes/rank flat by construction; ntag 0 -> 176.9 MiB/rank/regrid at np=2 (W4 measured); weak efficiency 0.926 at np=2. np=4 DIAGNOSED: device OOM at 63.4 GiB — **per-GCD memory grows with np at fixed per-rank work, a new W-invariant violation (device-memory analogue of W6)**; the sweep now samples per-GCD peak VRAM so the exponent is an S0 metric |
 | 0.5 | uniform-baseline re-run (13% discrepancy) | pending |
 
 **Phase 1 — P3 exchange (in flight; contract = `amr_plan_based_exchange.md`).**

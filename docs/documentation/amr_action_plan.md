@@ -35,10 +35,20 @@ construction works). Per-rank per-regrid collective volume: **ntag 0 -> 176.9 Mi
 0 -> 72.4 MiB going just np=1 -> np=2** (the global tag set is replicated to every rank; grows
 ~np). cost bytes 1288 -> 2568 (tracks global boxes — S2's target). Wall 215.1 -> 232.2 s = weak
 efficiency **0.926 at np=2** at fixed per-rank work. S1/S3/S2 now have exact baselines and a pass
-bar (flat per-rank bytes). **Open: the np=4 and np=8 arms die by SIGKILL in simulation init**
-(no step reached; host RAM fine at 1.5 TB) — suspected device-side, the "device OOM presents as
-task kill" class; rerun with a per-rank hipMemGetInfo print (the M6 instrument) before reading
-anything into it. Harness: `amr-bench/s0_sweep.sh` + `s0_report.py`.
+bar (flat per-rank bytes). Harness: `amr-bench/s0_sweep.sh` + `s0_report.py`.
+
+**np=4 arm DIAGNOSED (2026-08-21, VRAM-sampled rerun): device OOM, and a NEW weak-scaling
+violation — per-GCD memory GROWS with np at fixed per-rank work.** The four ranks land on four
+distinct GCDs (binding is fine); card0 reaches **63.4 GiB of 64** and one task takes the HSA
+abort while the others are torn down. np=1 and np=2 fit; np=4 crosses the ceiling — so some
+per-rank device allocation scales with the GLOBAL problem. Candidates from code (do not assert
+without measurement): freg flux registers are allocated by GLOBAL block index on every rank
+(confirmed-by-code but magnitude-insufficient alone, ~1 GiB class); the per-GCD peak-VRAM
+sampler is now part of s0_sweep.sh so the growth exponent is an S0 metric. Two harness lessons
+from the same diagnosis: (1) each per-arm DISTINCT analytic-IC expression forces a full solver
+rebuild mid-sweep (analytic ICs compile into the binary) — v2 of the sweep uses ONE periodic
+expression (cos(pi*x)**2 blobs) for every domain size; (2) a device OOM here presents as
+srun task Killed/Aborted, not as an OOM message.
 
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18
