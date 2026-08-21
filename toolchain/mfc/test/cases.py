@@ -4476,6 +4476,69 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # 2D CHURN + GROWTH at np=2 (plan-based exchange I0): an off-center cylindrical blast at cap 8. The expanding
+        # annulus grows the box count monotonically (probed: nboxes 36 -> 49 -> 64 -> 81 -> 100 over 24 rebuilds, so
+        # s_amr_st_reserve growth keeps firing) while sweeping across the SFC cut (probed: up to 12 blocks migrate in a
+        # single rebuild). The planar-Sod variants CANNOT do this: their box set freezes after the first rebuild (the
+        # `same` early-out) and nothing migrates. This is the only golden exercising migration receive-unpack
+        # interleaved with store growth: the receive path host-writes the stash, and a later growth in the same rebuild
+        # pulls device->host, so a missing post-unpack device push silently discards the migrated fine detail (the I0
+        # bug fix). VERIFIED to fail without the fix (execution failure, not a tolerance diff); the planar-Sod variants
+        # tried first passed with the fix reverted and protected nothing.
+        stack.push(
+            "AMR -> 2D -> churn growth np=2",
+            {
+                "m": 127,
+                "n": 127,
+                "p": 0,
+                "dt": 4.0e-4,
+                "t_step_stop": 100,
+                "t_step_save": 100,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "num_patches": 2,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 0.1,
+                "patch_icpp(1)%alpha_rho(1)": 0.125,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%geometry": 2,
+                "patch_icpp(2)%x_centroid": 0.3,
+                "patch_icpp(2)%y_centroid": 0.3,
+                "patch_icpp(2)%radius": 0.15,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%pres": 5.0,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "amr": "T",
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.05,
+                "amr_buf": 2,
+                "amr_max_level": 1,
+                "amr_max_grid_size": 8,
+                "amr_max_blocks": 128,
+                "amr_block_beg(1)": 20,
+                "amr_block_end(1)": 56,
+                "amr_block_beg(2)": 20,
+                "amr_block_end(2)": 56,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
         # L0-as-blocks dynamic load balancer: the base grid is tiled into migratable blocks (l0_ntile), and a FORCED
         # cross-rank tile migration (l0_migrate_step) at np=2 exercises the device pack/unpack P2P path - the per-block
         # device (de)allocation / present-table churn that historically breaks across CCE and AMD flang (the ab_int /

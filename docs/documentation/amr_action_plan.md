@@ -7,6 +7,39 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-21 — PHASE 0 MEASUREMENTS (endstate ladder): three verdicts in one night
+
+**M2 mechanism split — THE IDLE IS LOCAL; P2 (batched advance) confirmed as the parity lever.**
+Arm A = 200^3 at np=1 (zero MPI, same coarse cells/GCD as the matched 400^3 np=8 arm B).
+The discriminator could not be cleaner: **rhs per-call is IDENTICAL with and without MPI —
+17.10 ms (np=1) vs 17.48 ms (np=8)**. The advance's cost does not contain MPI; it is the local
+launch path, exactly as the swap-overhead and mapped-entity measurements said. Arm A still spends
+68.1% of wall in rhs and 16.7% in regrid with no MPI at all. Meanwhile regrid per-call is 5.45x
+more expensive at np=8 (1737.6 -> 9472.8 ms) — that excess is the MPI/aggregation share, P3's
+target. Each pillar's lever confirmed by the arm that isolates it. (Per the design: no tax is
+quoted from arm A — its block structure differs.)
+
+**CMA-off transport control — waits did NOT balloon; the skew/bandwidth mechanism is confirmed.**
+Two-copy vader (sender-progress-gated) raises per-call waits only ~15-18% (gather 1.53 -> 1.77 ms,
+rb:wait 583.5 -> 670.6 ms, mg:wait 3227 -> 3822 ms) and wall to 877.2 s vs the 782.9-825.5 band.
+A sender-progress-dominated wait would have multiplied, not added 15%. The reflux waits moved
+NOT AT ALL (rf:recv 12.56 -> 11.71 ms, rf:wait 14.72 -> 13.43 — slightly lower, i.e. noise), so
+the transport term lives only in the large-payload gather/migration families and even there is
+small. Production (CMA-on) waits are NOT sender-progress: mechanism (a) posting-order skew is
+minor, (b) pack/arrival skew + (c) node-bandwidth dominate — the v2 design's corrected mechanism
+section stands, and its payoff floor framing (8-12% for T1) is calibrated, not pessimistic.
+
+**S0 weak-scaling harness — first data ever; the W4 violation is now a measured number.**
+Fixed 200^3 cells/rank, one blob per unit cell, periodic. boxes/rank exactly flat at 72 (the
+construction works). Per-rank per-regrid collective volume: **ntag 0 -> 176.9 MiB and gwin
+0 -> 72.4 MiB going just np=1 -> np=2** (the global tag set is replicated to every rank; grows
+~np). cost bytes 1288 -> 2568 (tracks global boxes — S2's target). Wall 215.1 -> 232.2 s = weak
+efficiency **0.926 at np=2** at fixed per-rank work. S1/S3/S2 now have exact baselines and a pass
+bar (flat per-rank bytes). **Open: the np=4 and np=8 arms die by SIGKILL in simulation init**
+(no step reached; host RAM fine at 1.5 TB) — suspected device-side, the "device OOM presents as
+task kill" class; rerun with a per-rank hipMemGetInfo print (the M6 instrument) before reading
+anything into it. Harness: `amr-bench/s0_sweep.sh` + `s0_report.py`.
+
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18
 rewrite (git history) now that the WHY is established — the findings live in
