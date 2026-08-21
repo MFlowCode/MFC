@@ -204,14 +204,28 @@ strategy for #1628.
 
 ## 8. Decision points (user)
 
-- **D-node:** true weak-scaling validation needs >=2 nodes at some point (mi2104x scheduled
-  instantly in July; MI210 timings are not comparable to MI250X, so it validates *scaling metrics*,
-  never the tax). Until approved, S0 runs single-node size/rank sweeps, which already expose every
-  O(boxes) term. The standing single-node rule holds until this is explicitly revisited.
-- **D-l0:** delete or keep the L0 tiling machinery (section 6).
-- **D-phase2:** commit to the full rhs-tree conversion only after 2a's measured price.
+- **D-phase2: DECIDED 2026-08-20 — full commitment.** The user approved the whole ladder through
+  the rhs-tree conversion ("yes full commitment we need to get this done"). 2a still runs first,
+  but as de-risking and pricing, not as a go/no-go gate.
+- **D-node: CONSTRAINED 2026-08-20 — nodes are scarce here.** Weak-scaling validation is designed
+  single-node-first: S0 sweeps problem size and rank count (1..8 GCDs) at fixed per-rank work,
+  which exposes every O(boxes) and O(P) term without a second node. Multi-node becomes a final
+  spot-check if and when an allocation window exists; nothing in the ladder blocks on it.
+- **D-l0:** delete or keep the L0 tiling machinery (section 6) — still open.
 
-## 9. Standing rules (unchanged, restated)
+## 9. Planning discipline: just-in-time contracts, one phase ahead
+
+Only one phase carries a detailed implementation contract at a time (today: Phase 1 =
+`amr_plan_based_exchange.md`). When phase N is roughly 70% landed, phase N+1 gets its own
+contract at the same resolution — family/kernel inventory, data-layout contract, portability
+constraints, increments with gates — written against the code as it exists *then*, and put
+through the independent multi-reviewer audit ritual before its first increment (v1 of the
+exchange design was wrong seven ways when audited; the ritual also found a live corruption bug).
+Planning further ahead than one phase is recorded here only at the pillar/invariant level.
+Concretely: the Phase 2 contract is written during Phase 1's I4-I6 stretch, seeded by the landed
+pack-kernel form, the 2a prototype's measured price, and the M2 discriminator's verdict.
+
+## 10. Standing rules (unchanged, restated)
 
 Noise floor ~5%: single-run wall deltas below it are not results; judge deterministic bytes/counts
 where possible. Pre-register decision rules before data lands. Mechanize error-prone readings.
