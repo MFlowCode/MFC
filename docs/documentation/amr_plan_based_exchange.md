@@ -42,6 +42,39 @@ sites). **Scope decision, now explicit: the subcycle call sites are NOT converte
 the per-box path behind their existing gates; each converted site asserts its `amr_subcycle`
 handling. Conversion is a follow-on increment (I8) after the lockstep path is proven.
 
+### Call-site inventory, verified against source 2026-08-21 (pre-I1 sweep)
+
+A full sweep of every AMR p2p MPI call found **42 sites** and nine facts the family table above
+misses. The ones that change I1/I2:
+
+1. **Ten call sites in five `s_l0_*` tile-routing routines sit outside the seven families**
+   (`s_l0_fill_tiles_from_coarse`, `s_l0_scatter_tiles_to_coarse`, `s_l0_add_reflux_to_tiles`,
+   `s_l0_restrict_to_tiles`, `s_l0_migrate_tile` — all blocking pairs, tags `k`/`4300`/`4400+k`).
+   **Out of scope for conversion pending the D-l0 deletion decision** (`amr_endstate.md` sec. 8):
+   the machinery measures 28-35% cost for 0.4% recovery, so converting it first would be waste.
+   The I1 validator instruments them read-only (they are inert at the `l0_ntile=0` default).
+2. **F1 and F2 share ONE request pool and ONE drain** (`amr_gsnd_req`/`amr_gsnd_pool`, cap 64,
+   `s_amr_gather_send_flush`); a reserve for either family can force-drain the other's sends.
+   The two families must be converted or fenced TOGETHER at each wave boundary — a per-family
+   `amr_gsnd_n == 0` assert is meaningless while the pool is shared.
+3. **F2's receive is a blocking `MPI_RECV`** (m_amr.fpp:1388) against pooled nonblocking sends,
+   and its send site is fypp-instantiated twice (`_cons`/`_stor` — the subcycle calls both per
+   child). The doc's per-box count undercounts, and F3's blocking-send defect has a twin on F2's
+   recv side.
+4. **F5 uses literal tags 2-7 (reflux faces) and 42-47 (freg), which numerically collide with the
+   `amr_cur` tag space used by F1/F2/F3/F7** at small block counts. Phase separation is the only
+   thing preventing mispairing today — one more reason the runtime tag bases (above) must land
+   before any family is converted.
+5. **F7 is three routines with three different blocking disciplines** (ISEND+WAITALL/blocking-RECV;
+   fully blocking pair; ISEND+WAITALL/blocking-RECV): the "restrict" row is not one shape.
+6. **F6 is blocking `MPI_SENDRECV` only** (tags 4200/4201): the validator cannot count
+   posts-vs-drains there and must instrument the SENDRECV calls directly.
+7. F5's send-side `reqs` allocation reuses `nreq` with two meanings (rank count at allocation,
+   request count at the drain) — correct today, but a naive posts-vs-drains check will trip on it.
+8. Non-AMR p2p the validator's instrumentation must NOT capture: `m_ibm.fpp` force halo
+   (MPI_PACKED), `m_mpi_proxy.fpp` Lagrangian particle exchange, `m_start_up.fpp` IB
+   neighbor-table build.
+
 ## The mechanism, corrected (MPI review B1/B2; code-truth M2; convergent)
 
 v1 claimed the waits were late-sender under rendezvous with no async progress. **Wrong for this
