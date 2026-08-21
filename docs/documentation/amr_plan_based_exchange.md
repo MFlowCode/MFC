@@ -1,292 +1,236 @@
-# T1/S4: plan-based exchange and distributed block metadata
+# T1/S4: plan-based exchange and distributed block metadata — v2, post-review
 
-This is the design for the only change that can move MFC's AMR tax materially. The incremental
-items (T0) were measured and closed: each is a 4-8%% candidate against a **5.3%% run-to-run noise
-floor**, so none is defensible. See `amr_action_plan.md` for that evidence.
+v1 of this design was independently audited by four reviewers (code-truth vs source, MPI transport,
+GPU/compiler portability, adversarial correctness). Every blocker they found is folded in below,
+with the finding named where it changed the design. **v1's payoff mechanism was partly wrong and its
+increment scoping was wrong; the architecture survived.** This version is the implementation
+contract.
 
 ## What is wrong today, stated structurally
 
-Every AMR data exchange is driven **per box**, inside a loop that every rank walks over **all global
-boxes**:
+Every AMR data exchange is driven **per box**, inside loops every rank walks over **all global
+boxes**. Two consequences:
 
-```
-do k = 1, nboxes                       ! on EVERY rank, for EVERY box
-    amr_cur = f_l0_slot(k)
-    ... one collective rendezvous for box k ...
-    if (.not. amr_rank_owns_block) cycle
-end do
-```
+1. **O(boxes) rendezvous and posting skew.** Measured: `rb:wait` 583 ms x 123, `mg:wait` 3227 ms x
+   16, plus two barriers (`rb:xchg`, `rb:flush`) absorbing the skew.
+2. **O(boxes) metadata per rank.** 21+ arrays at `amr_max_blocks` extent on every rank, plus
+   O(boxes) stack automatics in the regrid path (`old_ilo`/`old_ext`/..., `t_box` lists) and
+   O(boxes x ranks) request arrays (`rq(old_np*num_procs)`). At 10^6 boxes the tags alone break:
+   box-id tags exceed Cray MPICH's `MPI_TAG_UB` (~2^21). Fatal at scale independent of the tax.
 
-Two consequences, and they are the whole problem:
+AMReX fills a level with one `FillPatch`; Chombo with one `copyTo`; SAMRAI with one
+`RefineSchedule`. The gap is granularity. The same refactor removes both consequences.
 
-1. **Rendezvous count is O(boxes).** Rank A cannot pass box *i* even when box *i+1*'s partner is
-   ready. Measured: `rb:wait` 583 ms x 123 calls, `mg:wait` 3227 ms x 16, and two downstream
-   barriers (`rb:xchg`, `rb:flush`) that exist only to absorb the skew this creates.
-2. **Metadata is O(boxes) per rank.** **21 distinct arrays** are allocated at `amr_max_blocks`
-   extent on every rank (`amr_block_owner`, `amr_block_level`, the region/isect tables,
-   `amr_owns_all`, `amr_slot_live`, `amr_slots`, `amr_loc_of`, the cached peer lists
-   `amr_ovl_gather`/`amr_ovl_scatter`, `amr_seam_pairs`, ...), and **21 driver loops** walk the
-   global box list. At 10^6 boxes this is fatal independently of the tax. (An earlier revision said
-   "eight arrays"; the grep missed the peer caches and second allocation sites.)
+## The exchange-family inventory — complete this time
 
-AMReX fills an entire level with one `FillPatch`; Chombo with one `copyTo` + `Copier`; SAMRAI with
-one `RefineSchedule`. **The gap is granularity, not algorithm** — and the same refactor fixes both
-consequences, which is why T1 and S4 are one program rather than two.
+v1 claimed six families / 26 call sites; the audit counted 17 call sites in the named families and
+found the rest in families v1 never named. The full inventory:
 
-## The abstraction
+| # | family | per | notes |
+|---|---|---|---|
+| F1 | level-1 coarse gather (`s_amr_gather_coarse_patch`) | box | regrid AND per-stage fill |
+| F2 | level>=2 parent gather (`s_amr_gather_from_parent`) | box | source is the freshly built parent |
+| F3 | **qbmm pb/mv twin** (`s_amr_gather_coarse_patch_pbmv`) | box | LIVE at np>1 (single-level qbmm passes the checker); blocking `MPI_SEND` (never got the R1 fix); shares tag `amr_cur` with F1 under a non-overtaking lockstep contract |
+| F4 | migration (`s_amr_regrid_stash_migrate`) | old block | already posts-then-waits (see mechanism) |
+| F5 | reflux faces (`s_amr_p2p_reflux_faces`) + `s_amr_p2p_freg_to_parent` | block | pure `wp`, no precision crossing |
+| F6 | seam halo (`s_amr_fine_fine_halo`) | pair | **also called from the L0 tile advance** — v1's "does not touch L0" was false |
+| F7 | **restrict** (`s_restrict_fine_to_coarse`, `s_amr_restrict_to_parent`, `s_amr_scatter_pbmv`) | box, per STEP | reverse slot order: finest level first; v1 named it and then implemented it in no increment |
 
-One plan type serves all six exchange families (`s_amr_gather_coarse_patch`,
-`s_amr_gather_from_parent`, `s_amr_regrid_stash_migrate`, `s_amr_p2p_reflux_faces`,
-`s_amr_fine_fine_halo`, `s_amr_restrict_to_parent` — 26 call sites in total):
+The subcycle path (`amr_subcycle`) reaches F1/F2/F3/F5/F7 through its own call shapes (two parent
+snapshots per child on the same tag, ordered by non-overtaking; forced `s_amr_gather_send_flush`
+sites). **Scope decision, now explicit: the subcycle call sites are NOT converted in v2.** They keep
+the per-box path behind their existing gates; each converted site asserts its `amr_subcycle`
+handling. Conversion is a follow-on increment (I8) after the lockstep path is proven.
+
+## The mechanism, corrected (MPI review B1/B2; code-truth M2; convergent)
+
+v1 claimed the waits were late-sender under rendezvous with no async progress. **Wrong for this
+transport, and refuted by our own code:**
+
+- Open MPI 4.1.8 vader uses **CMA single-copy** (confirmed on the production node:
+  `single_copy_mechanism=cma`, `ptrace_scope=0`). The RGET rendezvous is **receiver-driven**: once
+  an ISEND is posted, the owner in `WAITALL` pulls the payload itself via `process_vm_readv`. A
+  sender computing elsewhere stalls nothing that is already posted.
+- **The in-tree control:** migration already posts all IRECVs, packs, posts all ISENDs, then one
+  `WAITALL` — the exact v1-proposed structure — and still measures `mg:wait` = 3.2 s/rebuild.
+
+The recoverable cost decomposes as: (a) **posting-order / head-of-line skew** — a send not yet
+POSTED because its rank is still walking earlier boxes (batching removes this); (b) **pack/arrival
+skew** — serial host packs, per-slot `GPU_UPDATE` staging, uneven ownership work (batching does NOT
+remove this; pack parallelisation and staging restructure do); (c) **node-aggregate bandwidth** —
+each byte crosses host DRAM ~5x (D2H stage, wp pack, CMA copy, stp unpack, H2D): 8 ranks x ~1.1 GiB
+x 5 against ~100-200 GB/s shared is a floor of **0.3-0.6 s per rebuild per node**, not v1's 130 ms.
+
+Pending measurement: a CMA-off control run (two-copy vader, where sender progress genuinely gates)
+is in flight; its result calibrates the split between (a) and (b).
+
+**Payoff, re-derived with a floor:** ceiling ~20% of wall (regrid pool with `mg:wait` mostly
+excluded, plus the per-step F1/F6 families at 13.7%, at partial recovery); **floor 8-12%** if
+pack/arrival skew dominates everywhere as it provably does in migration. Tax 11.03x -> **9.0-9.9x
+floor, ~8x ceiling** for T1 alone. The program's case does not rest on the tax number: the scale
+argument (tags, O(boxes) metadata, O(boxes x ranks) requests) is unconditional.
+
+## The abstraction (revised per GPU review B1/B2/M3)
+
+**No derived types.** The host plan is SoA flat arrays of intrinsics (avoids the CCE module-scope
+derived-type descriptor bug class already worked around at `m_amr.fpp:641`); the device form is the
+same arrays:
 
 ```fortran
-type :: t_amr_xfer                 !< one rectangular-subarray transfer (strided in memory, not contiguous)
-    integer :: blk                 !< block this transfer belongs to
-    integer :: lo(3), hi(3)        !< region in the SOURCE frame
-    integer :: off(3)              !< offset into the DESTINATION frame
-end type
-
-type :: t_amr_plan
-    integer                       :: npeer
-    integer,          allocatable :: peer(:)              !< rank ids, ascending
-    integer,          allocatable :: soff(:), scnt(:)     !< per-peer slice into xs
-    type(t_amr_xfer), allocatable :: xs(:)                !< sends,   grouped by peer
-    integer,          allocatable :: roff(:), rcnt(:)     !< per-peer slice into xr
-    type(t_amr_xfer), allocatable :: xr(:)                !< receives, grouped by peer
-    integer(8)                    :: stamp = -1           !< mesh generation this was built for
-end type
+! per (family, level): module-scope, GPU_DECLARE(create=...), allocate-max-once, 1.25x growth,
+! refilled at plan build via contiguous-prefix GPU_UPDATE(device='[pl_lo(:,1:n)]') updates.
+integer              :: pl_npeer, pl_nxs, pl_nxr
+integer, allocatable :: pl_peer(:), pl_soff(:), pl_scnt(:), pl_roff(:), pl_rcnt(:)
+integer, allocatable :: pl_loc(:)          ! LOCAL dense slot, resolved at build (amr_loc_of is
+                                           ! host-only; kernel-side blk->loc translation is
+                                           ! impossible). Couples plan validity to slot
+                                           ! reconciliation - see the epoch rule.
+integer, allocatable :: pl_lo(:,:), pl_hi(:,:), pl_off(:,:)   ! (3, nx)
+integer, allocatable :: pl_coff(:)         ! exclusive prefix of CELL counts per transfer,
+                                           ! per-peer-sliced: the unit the pack kernel's flat
+                                           ! index runs over (sys_size factor NOT included)
+integer(8)           :: pl_epoch = -1
 ```
 
-Execution is generic; **receives are posted before anything else** (large messages use the
-rendezvous protocol, and an unposted receive stalls the matching send):
+**The pack/unpack kernel form is mandated, not suggested** (GPU review B1): a gang loop over
+transfers with an inner vector loop is **silently serial on CCE and AMD flang** (`OMP_LOOP` expands
+empty there). The portable form — already shipping in this codebase at `m_amr.fpp:3403` and `4167`
+— is one flattened index over the peer's concatenated cells, decoded by **binary search over
+`pl_coff`**, `collapse=2` with the `sys_size` loop. Per-family Fypp instantiation (the `GSFX`
+idiom) supplies the array and the precision conversion. All of it lives in a new `m_amr_plan.fpp`
+(compile-time isolation from the 7k-line `m_amr.fpp`).
 
-```
-s_amr_plan_exchange(plan, src, dst)
-  1. size one buffer per peer from scnt/rcnt
-  2. post ONE MPI_IRECV per peer                      <- FIRST, before pack
-  3. ONE pack kernel/loop per peer over its xs slice
-  4. post ONE MPI_ISEND per peer
-  5. ONE MPI_WAITALL for the whole level
-  6. ONE unpack kernel/loop per peer over its xr slice
-```
+**Wire buffers are persistent module arrays** (GPU review M1): `GPU_DECLARE`d, allocated once at
+high-water, drained by contiguous-prefix `GPU_UPDATE` per peer. Never per-launch `copyout` of pool
+slices (re-imports the 2.00-copies-per-entity map tax), never strided-section updates (AMD flang
+corrupts non-contiguous `target update` — documented three times in `m_amr.fpp`). Unpack is a
+device kernel wherever the destination is device-resident; per-family residency:
 
-**Pack location follows data residency, and residency differs per family** (`m_amr.fpp:830` states
-this explicitly for the gather alone). The design's earlier "one device pack kernel" was wrong as a
-universal statement:
-
-| family | source residency | today's pack |
+| family | source | destination |
 |---|---|---|
-| per-step stage fill | device-current | device kernel |
-| regrid coarse gather | **host-current** ("valid ghosts from the exchange at the top of s_amr_regrid") | host |
-| migration (`rg:move`) | stash, host path | **serial host loop** — parallelising it is a free extra win |
+| per-step fill (F1/F2/F3) | device | device |
+| regrid gather (F1/F2/F3) | **host** (`q_cons_base` host-current) | patch storage |
+| migration (F4) | host stash | host stash, then device push (see the fixed bug) |
+| reflux/freg (F5) | device registers (`wp`) | device registers |
+| restrict (F7) | device | device |
 
-MPI buffers are host memory throughout (`amr_gsnd_pool` is a plain host allocatable), i.e. the
-transport is host-staged, not GPU-aware — so per-family the "bytes" cost includes the PCIe crossing,
-and that stays true under the plan.
+Precision: the wire is always `real(wp)`/`mpi_p`; stp<->wp conversion is a per-family template
+parameter. **F5 is `wp` end-to-end with no conversion — the one family a shared hard-wired
+conversion would corrupt under `--mixed`, invisibly to default-precision goldens.**
 
-Message count per level falls from `sum over boxes of (peers per box)` to `<= num_procs`. On the
-matched case that is **~450-900 messages per regrid -> <= 7**.
+## Execution: per-(family, level) waves — the central correctness rule
 
-## Why this is also S4
+Three reviewers independently converged on v1's worst flaw: "exchange everything, then prolong
+everything" is **impossible**, because a level-l block's exchange source is *produced* by the
+level-(l-1) prolong in the same rebuild ("re-prolongs from its (freshly-built, parents-first)
+parent", `m_amr_regrid.fpp:1428`). The rule:
 
-A plan references only the blocks this rank actually sends or receives. Once every consumer reads
-its plan instead of the global tables, the global arrays are needed **only by the plan builder** —
-and the builder is then the single place to make distributed. That ordering matters: distributing
-the metadata first would break 21 loops with nothing to replace them.
+> A level-l exchange wave may start only after the level-(l-1) prolong + overlap-copy **and its
+> device push** have completed. (The F2 pack is a device kernel; prolong writes the parent on the
+> host; batching the `PH_RBPUSH` pushes to the end would feed the pack stale device data even with
+> correct level staging.)
 
-**The boundary, stated honestly:** I7 removes the global-table *consumers*. The tag union and
-clustering (`s_amr_union_gtag`, `s_amr_cluster`) remain global — every rank still builds the whole
-box list — and making *those* local is S3 (SAMRAI-style local clustering + boundary
-reconciliation), a separate program. I7 makes S3 possible; it does not include it. One more piece of
-S-track evidence found in this review: migration staging is allocated `spack(maxcnt, old_np)` —
-**~11 GiB virtual per rank at the matched point, O(global box count) by construction**. Untouched
-pages keep it harmless today, but at 10^6 boxes the allocate itself fails. Plan buffers are sized by
-actual transfers and fix this for free.
+So: `for lev = 1 .. num_levels: build/execute plan(family, lev); prolong(lev); push(lev)`. Restrict
+(F7) is the mirror image: **finest level first**, reverse waves. The per-step stage *fill* is the
+one place cross-level batching IS legal (children are inset by `amr_cpat_mar`, so fill gathers read
+only parent interior stage-entry cells) — that asymmetry is deliberate and must not be "unified".
 
-## Correctness strategy — the part that makes this landable
+Two-pass state rule (adversarial M6): `amr_cpat_off` and the working mirrors are written by the
+gather and consumed by prolong. Pass 2 **recomputes both per box** — never inherits pass 1's frame.
+Invisible on single-block cases, where the frames coincide.
 
-**Increment 1 builds the plan and validates it against today's behaviour without using it.** The
-validator asserts that the plan's derived `(peer, blk, lo, hi)` set is exactly the message set the
-current per-box path produces. A mismatch is a silent wrong answer, not a crash, so this net comes
-before any data moves through the new path.
+Order of operations within a wave: post all IRECVs FIRST, then pack, then ISENDs, then one WAITALL
+(with real statuses + `MPI_Get_count` under `MFC_DEBUG`, not `MPI_STATUSES_IGNORE`), then unpack.
+Self-transfers (`peer == proc_rank`) are device copy kernels, present in the no-MPI build.
 
-Two invariants to assert, never assume:
+## Staleness: the epoch, not the dirty flag (adversarial B2; GPU B2)
 
-- **Layout agreement.** Sender and receiver must derive identical per-peer sequences. Deterministic
-  iteration over the same cached lists gives this; assert matching byte counts per peer before
-  unpacking.
-- **`amr_cur` is implicit.** Per-block routines read module state, not arguments. Plan execution
-  must not leave `amr_cur` pointing at the wrong block for a later consumer.
-- **Frames differ per family** (`amr_implementation.md` sec. 2): level-1 gathers are in L0 cell
-  indices, level>=2 in the PARENT-fine frame, migration in old-block-local indices. `t_amr_xfer`
-  carries lo/hi/off as bare integers with nothing marking the frame — each builder must document
-  and assert its frame, or a cross-family copy-paste becomes a silent wrong index.
+v1 folded `amr_seam_pairs_dirty` into the stamp. **That flag is consumed** — cleared by whichever of
+five lazy cache-rebuild triggers fires first — and ownership changes with NO regrid exist
+(`s_l0_rebalance` migrates tile ownership mid-run; restart reassigns owners). A cached plan can see
+"clean" and execute with the old owner map: a hang under clean tags, silent corruption under
+colliding ones.
 
-**Every increment is judged on bytes first, wall second.** Migration bytes were measured identical
-to the digit across runs (`10748501376`), so aggregation can be proven exactly — message counts and
-byte totals from the `[amr-scale]`/`[amr-mig]` counters — against a 5.3%% wall-noise floor that would
-otherwise swamp the result.
+Rule: a monotone `amr_mesh_epoch` (integer(8), module scope), incremented at every site that sets
+the dirty flag (`m_amr_regrid.fpp:1271`, `m_amr_restart.fpp:450`, `m_amr.fpp:6478`), at every real
+regrid (after the `same` early-out), and at every slot reconciliation (plans bake `pl_loc`, so
+recycled local indices invalidate them). Plans compare epochs; the boolean remains for the seam
+caches only.
 
-## Increments
+## Tags (MPI M1/M5; adversarial M5)
 
-| # | content | LOC | verified by |
+Live tag spaces today: `amr_cur` in [1..amr_max_blocks] for SIX logical transfers, migration
+[1..old_np], reflux 2-7, freg 42-47, seam 4200/4201, L0 move 4300 — already numerically colliding,
+safe only via phase separation and non-overtaking. Rules:
+
+- Family tag bases derived at runtime: `base_f = amr_max_blocks + 100*f` (never literals; asserted
+  below `MPI_TAG_UB` at init — Cray MPICH's is ~2^21, not INT_MAX).
+- The epoch folded into the tag: `tag = base_f + mod(pl_epoch, K)` — a skipped epoch then mismatches
+  loudly instead of pairing silently.
+- `@:ASSERT(amr_gsnd_n == 0)` at every plan-exchange entry (the deferred pool legitimately holds
+  level>=2 sends tagged `amr_cur` until the rebuild flush).
+- Chunk any per-peer message above ~256 MB (buffer footprint + completion granularity; the int32
+  count limit is 16 GiB and is not the reason).
+
+## The validator (I1) — hardened (MPI M3; adversarial M4)
+
+The v1 validator (set comparison + per-peer byte counts) cannot see: same-size transposition (most
+blocks are exactly slot-sized, so swapped xfers have equal bytes), cross-rank builder asymmetry,
+order/multiplicity semantics, dropped self-transfers, or which family a message belongs to (three
+families share tag `amr_cur`, disambiguated only by call-site order). Requirements:
+
+1. **Instrument the real MPI call sites** — log what is actually sent, partitioned by call site,
+   never re-derived from the same metadata the builder reads (that validates the builder against
+   itself).
+2. Compare **ordered multisets per (peer, family)**, not sets.
+3. `MFC_DEBUG` per-xfer identity: header words `(blk, lo, hi, family)` prepended to each transfer,
+   verified at unpack.
+4. **Destination-coverage tiling assert**: local copies plus received transfers exactly tile each
+   destination patch, no gaps, no overlaps — the only check that sees self-transfer bugs, and it
+   runs at np=1 for serial CI.
+5. Cross-rank plan-hash `MPI_Allreduce` (debug builds): sender-side and receiver-side plans agree.
+6. Builders read ONLY the replicated `*_all` arrays — never `amr_isect_lo/hi` or `amr_cpat_off`
+   (empty on non-owners; the exact trap the parent-gather comments warn about). Assert it.
+7. Explicit per-increment family scope, so the F3 twin cannot silently keep running per-box inside
+   a converted loop.
+
+Verified property worth one assert: old blocks ARE pairwise disjoint (cluster partition + merge
+threshold + IB overlap-merge), so per-peer unpack reordering is safe for migration/overlap
+destinations. Enforce with `@:ASSERT` after `shape_boxes`, don't inherit it as folklore.
+
+## Increments, re-staged and re-priced
+
+| # | content | LOC | gate |
 |---|---|---|---|
-| I1 | plan type, builder for the level-1 coarse gather, **validator only** | ~400 | validator + AMR goldens; no behaviour change |
-| I2 | route the level-1 gather through plan execution | ~200 | PRIMARY: message count and bytes (exact); wall only via >=3 repeats against the 5.3%% floor |
-|    | *memory note: "one WAITALL per level" needs per-owned-box destination patches alive at once: ~28 owned x ~15 MiB = ~420 MiB/rank at the matched point. Acceptable there, but I2 must carry the chunk fallback from `amr_regrid_gather_batching.md` for cases where it is not.* | | |
-| I3 | level >= 2 parent gather (`pg:all`) | ~150 | goldens; `pg:all` delta |
-| I4 | migration (`rg:move`) | ~200 | **bytes exact**; `mg:wait` delta |
-| I5 | reflux + seam | ~250 | goldens; `rf:wait`, `seam` deltas |
-| I6 | cache plans across steps, invalidate at regrid | ~100 | plan-build count == regrid count |
-| I7 | **S4**: distributed builder; shrink the global arrays | ~600 | `[amr-scale]` per-rank bytes vs problem size |
+| **I0** | prep, no plan code: `amr_mesh_epoch`; tag-base constants + init assert; `amr_gsnd_n==0` asserts; **the migration-stash device-push fix** (found live by this review: the receive-unpack path lacked the push its sibling has, so a mid-rebuild store grow clobbered migrated data) + a ppn=2 churn+growth regression case; box-disjointness assert | ~120 | AMR subset + the new case |
+| I1 | validator: call-site instrumentation across ALL families incl. F3, F5-freg, F7, plus the six checks above | ~500 | validator green over >=3 regrids at ppn=2 AND ppn=4; no behaviour change |
+| I2 | F1+F3 level-1 gathers via plans (both twins together — converting one breaks their tag-order contract), per-owned-box patch storage + `amr_cpat_off` threading through the prolong/fill chain | ~600 | message count; per-xfer identity; bitwise goldens |
+| I3 | F2 as per-level waves with the device-push rule | ~250 | dynamic-multilevel ppn=2 golden, bitwise |
+| I4 | migration: parallelise the serial host pack; per-peer aggregation; right-size `spack`/`rq` (kills two O(boxes) allocations). **Decision made now, not during: whole-block sends preserved in I4 so the bytes gate stays exact; overlap clipping is I4b with a recomputed expected-bytes gate** | ~300 | bytes exact vs expectation; pack time |
+| I5 | F5 reflux+freg (wp, no conversion) + F6 seam including the L0-advance call site | ~300 | bitwise; seam validated under L0 coexist |
+| I5b | F7 restrict as finest-first waves | ~250 | bitwise; reverse-order assert |
+| I6 | plan caching on `amr_mesh_epoch`; per-step F1/F2/F3 fills through cached plans | ~200 | plan-build count == epoch increments |
+| I7 | S4: distributed builder; shrink global arrays **whose consumers are all converted**; convert the O(boxes) stack automatics. Boundary stated: tag-union/clustering stay global (that is S3); any family left per-box (subcycle) keeps its tables | ~600 | `[amr-scale]` per-rank bytes vs size |
+| I8 | subcycle call-site conversion (two-snapshot ordering via distinct tag bases) | later | subcycle goldens |
 
-~1900 LOC total. I1-I2 alone are a complete, landable, independently valuable change.
+~3100 LOC total (v1 said 1900 — the delta is the pbmv twin, restrict, the patch-storage
+restructure, and the validator hardening; better to know now).
 
-## The MPI mechanism — why the waits are as large as they are, and what that predicts
+## Test coverage this program must ADD (adversarial M9)
 
-`rb:wait` is 583 ms per call for a ~5-15 MB-per-contributor exchange. That is not bandwidth and not
-queue depth; it is **late-sender under the rendezvous protocol with no asynchronous progress**:
+- **No existing test runs np>2.** Every plan degenerates to <=1 remote peer: multi-peer slicing,
+  peer ordering, and multi-contributor assembly are structurally unexercised. One ppn=4 dynamic
+  regrid case is mandatory before I2 lands.
+- A dynamic-regrid pbmv (qbmm non-polytropic) case at np=2 (the rebuild-path twin is uncovered).
+- Bitwise golden diff mode: several AMR goldens carry `override_tol` up to 1e-5, so "tolerance
+  zero" must be an explicit bitwise comparison, or drift hides inside existing tolerances.
+- An `MFC_DEBUG` artificially-low chunk-threshold test (the >256 MB path never triggers at golden
+  sizes).
+- A periodic-seam np>1 case (a builder that forgets wrap pairs deadlocks only there).
 
-- Slices this size use rendezvous, so the transfer starts only when the *sender* re-enters MPI.
-- Since fix R1, contributors post `ISEND` into the pool and return to compute — and we measured the
-  host spending ~40% of its CPU in Open MPI's progress engine (`amr-idle-is-mpi-progress`). The
-  owner's per-box `WAITALL` therefore stalls until each contributor happens to make an MPI call.
-- Plan exchange fixes this **because every rank posts everything and then sits in one `WAITALL`**,
-  which is itself the progress engine. Nobody is late because nobody is elsewhere. The benefit is
-  the post-then-wait-together structure, not the message count per se.
+## Merge gates
 
-Sanity bound, not a promise: ~1.1 GiB moved per rank per rebuild (migration + gather) at a
-host-staged ~8 GiB/s is **~130 ms**, against measured waits of ~4.5 s + 3.2 s per rebuild. An order
-of magnitude of headroom exists **if** late-sender is the mechanism; if it is not, the floor is the
-bytes and the win is small. I2's gate must distinguish these outcomes, which is why wall time alone
-is not the gate.
-
-Implementation guards from this analysis: per-peer messages can reach hundreds of MB — chunk any
-message above ~256 MB (also guards the 2^31 element count); fan-out 1.048 means per-peer buffers
-duplicate ~5% of bytes vs today's shared-buffer sends — negligible, accepted; MPI's per-(peer, tag,
-comm) ordering makes the one-message-per-peer scheme robust; the plan `stamp` must fold in
-`amr_seam_pairs_dirty`, not just the regrid generation, because the peer caches it consumes are
-invalidated on that flag.
-
-**Residual after batching, so the payoff is not oversold:** the skew that `rb:xchg`/`rb:flush`
-absorb comes partly from uneven *ownership work* (prolong `rb:ovl` 22 s, `rb:slot` 27 s per-rank
-spread), which batching does not touch. The sinks will shrink, not vanish.
-
-## Expected payoff — and the honest limit
-
-Plan execution removes the per-box **rendezvous**, not the **bytes**. Two pools, from the measured
-budget (caveat: `mg:wait` is from a different run than the others — the percentages mix two
-denominators 3.2%% apart, so the sums are indicative, not a single-run measurement):
-
-**Regrid-path waits and their skew sinks** (increments I1-I4):
-
-| term | %% wall |
-|---|---|
-| `rb:wait` | 9.0 |
-| `mg:wait` | 6.3 |
-| `rf:wait` | 3.3 |
-| `rb:xchg` (skew sink) | 5.8 |
-| `rb:flush` (skew sink) | 1.2 |
-| subtotal | **25.6** |
-
-**Per-STEP per-box families** (I5-I6 — these are in the six-family scope and an earlier revision of
-this table omitted them):
-
-| term | %% wall | evidence it is per-box |
-|---|---|---|
-| `gather` (stage fill) | 10.1 | 52614 calls/rank = 219 boxes x 240 stage-calls |
-| `seam` | 3.6 | serial cross-rank `MPI_SENDRECV` loop |
-| subtotal | **13.7** |
-
-At an honest 80%% recovery of both pools, wall x ~0.69: tax **11.03x -> ~7.6x**. Counting only the
-regrid pool (if I5-I6 disappoint): **-> ~8.8x**.
-
-**That is not AMReX parity, and this design should not be sold as reaching it.** Parity at 3.13x
-needs infrastructure at 6.6%% of wall against today's 78.2%% — an 11.9x reduction — and it additionally
-requires the physics term: our fine advance is **2.41x less efficient per cell** than our own uniform
-arm (ghost recompute, small-block GPU utilisation, the `scalar_field` copy bridge). T1 does not touch
-that; T2 (fused advance) does, and T1's descriptor arrays are the prerequisite for it.
-
-On T2's pool, a correction to the 2.41x figure: **34%% of the physics term is the coarse advance
-(59.9 s), which re-advances the whole domain including under the 70%%-refined region.** That
-redundancy is algorithmic in non-subcycled AMR — a fused fine advance does not touch it. T2's
-reachable pool is the fine-advance inefficiency only (~115 s against ~60 ideal).
-
-Realistic staging, arithmetic shown rather than asserted: **T1 full scope -> ~7.6x; T1+T2 ->
-~6.9x** (T2 closing half its reachable pool). An earlier revision said "T1+T2 -> ~5-6x"; that
-number is not supported unless T2 recovers nearly all of its pool AND the residual regrid work
-(`rb:slot`, `rb:ovl`, `rg:clus`, pack/unpack volume) also shrinks. The honest claim for this
-program is "closes most of the gap"; parity additionally needs the migration-volume and
-residual-infrastructure work.
-
-## Every corner — the implementation constraints that decide success
-
-These are the traps that survive a correct-looking design review. Each is grounded in something
-already measured or already worked around in this codebase; none is hypothetical.
-
-### C1 — the plan must be POD-flat on the device (the trap we measured ourselves)
-
-The `t_amr_plan` sketch above has allocatable components. **Handing that to a device pack kernel is
-the exact descriptor trap this campaign measured**: every mapped array entity costs exactly 2.00
-copy operations on the OMP backend (`amr-mapped-entity-law`), pointer views into the store are not
-attachable (measured, `m_amr.fpp` copy-bridge comment), and CCE leaves module-scope derived-type
-allocatable descriptors uninitialized (already worked around once at `m_amr.fpp` block-allocate).
-
-**Therefore: `t_amr_plan` is HOST-side bookkeeping only.** The device-facing form is flat integer
-arrays — `plan_blk(:)`, `plan_lo(3,:)`, `plan_hi(3,:)`, `plan_off(3,:)`, `plan_buf_off(:)` — mapped
-once at plan build. The pack kernel takes bare arrays and scalars, nothing derived-typed. Parthenon
-reaches the same conclusion from the other direction (POD `BndInfo` descriptors).
-
-### C2 — precision crossings are per-family, not generic
-
-The store is `stp`; every existing MPI buffer is `wp` (`spack`, `amr_gsnd_pool`), with the
-conversion done inside the pack loop (`real(amr_stor_st(...), wp)`). Under `--mixed` (`wp` double,
-`stp` half) this conversion is load-bearing, not cosmetic. The generic `s_amr_plan_exchange` must
-let each family supply its pack/unpack element conversion; a shared kernel that assumes one
-precision is a silent `--mixed` corruption that CI's default-precision goldens cannot see.
-
-### C3 — the mesh-generation stamp does not exist yet
-
-Nothing in the code counts regrids. I6's cache-invalidation needs `amr_mesh_gen`, incremented
-exactly where the box set actually changes (after the `same` early-out, not per `s_amr_regrid`
-call — 24 of 40 regrids change nothing). Getting this wrong silently reuses a stale plan: wrong
-answers, no crash.
-
-### C4 — tags currently carry meaning; per-peer messages need a tag discipline
-
-Today's tags encode identity (box id `amr_cur`, old-block id `kk`) and that is what keeps concurrent
-per-box messages from cross-matching. Plan exchange sends ONE message per (peer, family), so each
-family needs a reserved tag base, and two families' exchanges must never be in flight concurrently
-with the same (peer, tag) — the deferred-send pool (`amr_gsnd_*`) can still have level-2 sends
-pending when a plan exchange starts. Either drain it first (the existing flush rule) or separate the
-tag spaces; assert, don't assume.
-
-### C5 — np=1, no-MPI, and self-transfers
-
-The current per-box code has explicit `num_procs == 1` shortcuts and local-copy paths. In a plan,
-self-transfers (`peer == proc_rank`) must bypass MPI as direct device copies, and the whole exchange
-must compile and run in the no-MPI build (`#ifdef MFC_MPI` discipline: the plan builder and local
-copies exist everywhere; only the ISEND/IRECV/WAITALL core is gated).
-
-### C6 — the rebuild loop becomes two passes, and the stash constraint still binds
-
-Whole-level exchange means restructuring `s_amr_regrid_rebuild_slots` from
-"per box: gather -> prolong -> overlap-copy" into "exchange all patches, THEN per box: prolong ->
-overlap-copy". The stash-read constraint (`amr_implementation.md` sec. 9.2: old local indices are
-read throughout the rebuild) is unchanged — old slots still cannot be freed until the loop ends.
-The per-box `s_set_amr_fine_geometry`/`amr_cur` sequencing survives in pass 2 unchanged.
-
-### C7 — merge requirements, per this repo's contract
-
-Four CI compilers + AMD flang; GPU code via `GPU_*` macros only; every `@:ALLOCATE` paired;
-`wp`/`stp` discipline; format -> precheck -> build -> FULL test suite (not the AMR subset - that is
-the iteration gate, not the merge gate); one logical change per commit, each increment
-independently green. The bitwise expectation per increment: I1 changes no behaviour at all; I2-I6
-deliver identical data in identical order, so goldens must pass at TOLERANCE ZERO drift - any diff
-is a bug, never a regeneration.
-
-## What this explicitly does not do
-
-- It does not change numerics. Every increment is golden-verified.
-- It does not touch the L0 tile path or the non-AMR solver.
-- It does not require a new case parameter.
+Four CI compilers + AMD flang; `GPU_*` macros only; `@:ALLOCATE` pairing; full 706-test suite at
+merge (AMR subset per iteration); one increment = one commit, each independently green; bitwise
+comparison per increment as above. Every wall-time claim measured against the 5.3% run-to-run floor
+with >=3 repeats, or judged on exact byte/count gates instead.
