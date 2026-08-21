@@ -1377,6 +1377,12 @@ contains
                             end do
                         end do
                     end do
+                    ! Push the received stash before any later s_amr_alloc_slot, for the same reason as the
+                    ! owner-stash push above: the store is DEVICE-authoritative (see s_amr_st_reserve's
+                    ! contract), and a mid-rebuild grow pulls device->host, which would overwrite this
+                    ! host-written slot with an unwritten device copy - silently discarding the migrated
+                    ! fine detail on the receiving rank.
+                    $:GPU_UPDATE(device='[amr_stor_st(:, :, :, :, amr_loc_of(f_l0_slot(kk)))]')
                 end do
                 deallocate (rq, spack, rpack)
             end block
