@@ -35,7 +35,7 @@ module m_phase_timing
     public :: PH_RBSEND, PH_RBFLUSH, PH_RBXCHG, PH_RBREC, PH_RBTOPO
     public :: PH_PGALL, PH_PGSEND, PH_PGRECV
     public :: PH_RFP2P, PH_RFAPP, PH_RFRECV, PH_RFWAIT
-    public :: PH_RESTR
+    public :: PH_RESTR, PH_RGPART, PH_RGMOVE, PH_MGWAIT
 
     integer, parameter :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
     integer, parameter :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
@@ -112,13 +112,22 @@ module m_phase_timing
     !> The post-stage per-block restrict/reflux-to-parent chain (m_time_steppers, the reverse islot loop). Same per-box blocking P2P
     !! shape as PH_REFLUX, runs once per STEP over every block on every rank, and was entirely UNBRACKETED - it sits inside the
     !! 3.7-6.3%% residual. Its exit skew becomes the next step's entry skew, so it is the candidate for super-linear growth.
-    integer, parameter          :: PH_RESTR = 45
-    integer, parameter          :: PH_N = 45
+    integer, parameter :: PH_RESTR = 45
+    !> The p4est 'complementarity' split of the regrid: PART decides the new partition (cluster, nest, assign owners) and moves
+    !! NOTHING; MOVE is the data redistribution that follows. They are fused in s_amr_regrid_stash_migrate, so migration cost cannot
+    !! be priced without this boundary - and every load-balance scheme in the literature needs it.
+    integer, parameter :: PH_RGPART = 46
+    integer, parameter :: PH_RGMOVE = 47
+    !> The WAITALL inside the migration exchange. rg:move measures 103 MiB/s effective, far below intra-node bandwidth, so it is
+    !! suspected wait-bound rather than volume-bound. If mg:wait is most of rg:move, cutting migration VOLUME (SFC hysteresis) will
+    !! not convert to time.
+    integer, parameter          :: PH_MGWAIT = 48
+    integer, parameter          :: PH_N = 48
     character(len=8), parameter :: PH_NAME(PH_N) = [character(len=8)::'halo','gather', 'gfill', 'seam', 'rhs', 'rk', 'reflux', &
               & 'regrid', 'L0', 'coarse', 'rg:halo', 'rg:tag', 'rg:clus', 'rg:shape', 'rg:mig', 'rg:build', 'rb:gath', 'rb:ovl', &
               & 'rb:push', 'rb:wait', 'rb:mem', 'rb:unpk', 'swap', 'rb:own', 'rb:upd', 'rb:pack', 'rb:rsv', 'rb:seam', 'rb:post', &
               & 'rb:geo', 'rb:slot', 'rb:tail', 'rb:send', 'rb:flush', 'rb:xchg', 'rb:rec', 'rb:topo', 'pg:all', 'pg:send', &
-              & 'pg:recv', 'rf:p2p', 'rf:app', 'rf:recv', 'rf:wait', 'restr']
+              & 'pg:recv', 'rf:p2p', 'rf:app', 'rf:recv', 'rf:wait', 'restr', 'rg:part', 'rg:move', 'mg:wait']
 
     real(wp) :: acc(PH_N) = 0._wp
     !> Entry count per phase. Time alone cannot distinguish "this region is slow" from "this region runs far more often than

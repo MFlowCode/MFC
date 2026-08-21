@@ -105,6 +105,18 @@ module m_amr
     !> Last high-water REPORTED by the store trip-wire. Module scope (not `save`) so the wire prints one line per NEW high-water
     !! instead of one per slot alloc (~224/regrid/rank would both flood stderr and perturb the run).
     integer :: amr_st_hw = 0
+    !> TRACK S instrumentation: bytes each rank ALLOCATES for, and RECEIVES from, global collectives during one regrid. These are
+    !! the quantities that must stay O(1) in problem size; wall time at a single problem size cannot see them (rg:clus is 2.2%% of
+    !! wall), so they are counted explicitly. amr_gb_tag = the union_gtag ALLGATHERV, amr_gb_win = the gwin-pair ALLGATHERVs,
+    !! amr_gb_cost = the per-box cost ALLREDUCE.
+    integer(8) :: amr_gb_tag = 0, amr_gb_win = 0, amr_gb_cost = 0
+    !> TRACK T (T0b gate): regrid migration volume. An old block is ISENT to EVERY new-owner rank whose box overlaps it, so the cost
+    !! is fan-out x block bytes, not one send per block. amr_mig_blk counts blocks that had to move at all, amr_mig_snd counts the
+    !! sends, amr_gb_mig the bytes. fan-out = snd/blk is the reducible quantity: if it is ~1 the volume is inherent and hysteresis
+    !! buys nothing.
+    integer(8) :: amr_gb_mig = 0, amr_mig_snd = 0, amr_mig_blk = 0
+    public :: amr_gb_tag, amr_gb_win, amr_gb_cost
+    public :: amr_gb_mig, amr_mig_snd, amr_mig_blk
     integer :: amr_loc_nfree = 0  !< depth of the recycle stack
 
     !> FLAT PER-BLOCK FIELD STORE, indexed (x, y, z, var, LOCAL slot) by the dense index above. One contiguous module array
@@ -2010,6 +2022,7 @@ contains
             cost(k) = c
         end do
 #ifdef MFC_MPI
+        amr_gb_cost = amr_gb_cost + int(amr_num_blocks, 8)*8_8
         call MPI_ALLREDUCE(MPI_IN_PLACE, cost, amr_num_blocks, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 #endif
 

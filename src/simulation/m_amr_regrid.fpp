@@ -19,13 +19,15 @@ module m_amr_regrid
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
-        & PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, PH_RBREC, PH_RBTOPO
+        & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
+        & PH_RBREC, PH_RBTOPO
     use m_amr, only: amr_rg_gather, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, &
         & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
         & s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, &
         & s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
         & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
-        & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot
+        & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, &
+        & amr_mig_blk
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -407,6 +409,7 @@ contains
             rdsp(1) = 0
             do i = 2, num_procs; rdsp(i) = rdsp(i - 1) + rcnt(i - 1); end do
             ntag = rdsp(num_procs) + rcnt(num_procs)
+            amr_gb_tag = amr_gb_tag + int(ntag, 8)*(8_8 + 3_8*4_8)  ! allidx int8 + tags 3x int4
             allocate (allidx(max(ntag, 1)), tags(3, max(ntag, 1)))
             call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER8, allidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
             do i = 1, ntag
@@ -633,6 +636,14 @@ contains
                          & old_level, old_owns); call s_phase_toc(PH_RGMIG)
         call s_phase_tic(PH_RGBUILD); call s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, &
                          & old_level, old_owns); call s_phase_toc(PH_RGBUILD)
+
+        ! TRACK S: the quantities that must stay O(1) in problem size. Reported per regrid on rank 0
+        ! because wall time at one problem size cannot see them.
+        if (rank_time_wrt .and. proc_rank == 0) then
+            print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
+                & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
+            print '(A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', amr_mig_blk, ' sends ', amr_mig_snd, ' bytes ', amr_gb_mig
+        end if
 
     end subroutine s_amr_regrid
 
@@ -996,6 +1007,7 @@ contains
                             rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
                         end do
                         ntot_g = rdsp(num_procs) + rcnt(num_procs)
+                        amr_gb_win = amr_gb_win + int(ntot_g, 8)*(8_8 + 8_8)  ! gidx + gkb, both int8
                         allocate (gidx(max(ntot_g, 1)), gkb(max(ntot_g, 1)))
                         call MPI_ALLGATHERV(sidx, nloc_send, MPI_INTEGER8, gidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
                         call MPI_ALLGATHERV(skb, nloc_send, MPI_INTEGER, gkb, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -1197,6 +1209,7 @@ contains
         ! old_* are indexed in the regrid's own dense FINE-block space [1..old_np], which maps to shared-pool slot f_l0_slot(k);
         ! under coexist the level-0 L0-tile prefix [1..l0_slot_off] is not regrid-managed and must not be stashed or migrated.
 
+        call s_phase_tic(PH_RGPART)
         old_np = amr_num_blocks - l0_slot_off
         np_l = old_np
         do k = 1, old_np
@@ -1276,6 +1289,9 @@ contains
         end block
         amr_num_levels = maxval(box_level(1:nboxes))
         call s_amr_assign_block_owners()
+        ! The partition is decided here and NOTHING has moved yet; everything below redistributes data.
+        call s_phase_toc(PH_RGPART)
+        call s_phase_tic(PH_RGMOVE)
 
 #ifdef MFC_MPI
         ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by reading
@@ -1325,6 +1341,7 @@ contains
                             & kk))) isdest(rr) = .true.
                     end do
                     if (.not. any(isdest)) cycle
+                    amr_mig_blk = amr_mig_blk + 1_8
                     idx2 = 0
                     do ii = 1, sys_size
                         do gk = 0, old_ext(3, kk)
@@ -1339,10 +1356,14 @@ contains
                     do rr = 0, num_procs - 1
                         if (.not. isdest(rr)) cycle
                         nrq = nrq + 1
+                        amr_mig_snd = amr_mig_snd + 1_8
+                        amr_gb_mig = amr_gb_mig + int(cnt(kk), 8)*8_8
                         call MPI_ISEND(spack(1, kk), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
                     end do
                 end do
+                call s_phase_tic(PH_MGWAIT)
                 if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
+                call s_phase_toc(PH_MGWAIT)
                 do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots
                     if (.not. getk(kk)) cycle
                     idx2 = 0
@@ -1361,6 +1382,7 @@ contains
             end block
         end if
 #endif
+        call s_phase_toc(PH_RGMOVE)  ! outside MFC_MPI so the bracket is balanced in serial builds
 
     end subroutine s_amr_regrid_stash_migrate
 
