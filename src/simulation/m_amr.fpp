@@ -1917,14 +1917,27 @@ contains
                 deallocate (reqs)
             end if
         else if (f_amr_reflux_participates(proc_rank)) then
+            ! Post all 2*num_dims receives, then ONE wait. The blocking form serialised the six faces
+            ! against the owner's send order and cost 6.3%% of wall (rf:recv, 4010 calls). The slice
+            ! (:,:,:,amr_cur) is contiguous - amr_cur is the last dimension - and the owner side
+            ! already ISENDs the identical shape, so no temporary-buffer hazard is introduced.
             call s_phase_tic(PH_RFRECV)
+            allocate (reqs(2*num_dims))
+            nreq = 0
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
-                    call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D}$, MPI_COMM_WORLD, MPI_STATUS_IGNORE, &
-                                  & ierr)
-                    call MPI_RECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D + 1}$, MPI_COMM_WORLD, &
-                                  & MPI_STATUS_IGNORE, ierr)
+                    nreq = nreq + 1
+                    call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
+                    nreq = nreq + 1
+                    call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D + 1}$, MPI_COMM_WORLD, reqs(nreq), ierr)
+                end if
+            #:endfor
+            call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
+            deallocate (reqs)
+            ! Device update only AFTER the wait: the buffers hold nothing valid until then.
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
                     $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
                 end if
             #:endfor
