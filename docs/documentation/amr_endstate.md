@@ -86,6 +86,15 @@ GLOBAL slot indices (a shifting SFC window plus received migration slots) and de
 weak-scaling sweep at np=4; invisible at np=1 where the owned window is static. They are the
 first S-track increment in practice and slot in alongside Phase 1 (independent of the exchange
 conversion; ~120 LOC per the old R5/S2-tier estimates).
+**LANDED same day — S0 np=4 completes; per-rank live boxes AND store capacity measured flat
+across np (the W8 invariant holds).** What survived contact differs from the design: the full
+device-side remake OOMed on its own staging transient and broke a host-coherence contract the
+rebuild's carry-forward depends on (both churn goldens caught it). The landed form is in-place
+index re-densification every reconcile + capped growth increments + early-free of consumed old
+slots + stash-only replica slots, plus the `[amr-cap]` invariant instrument — full narrative in
+`amr_action_plan.md` "W8 FIX LANDED". np=4's hot card peaks 63.6/64 GiB: the next memory term
+is pooling per-slot q_prim/rhs (this pillar, proper) before growing the operating point.
+Local-index derivation stays open as a cleanliness increment (no longer a memory one).
 
 **P2 — Compute: one kernel per (stage, level) over the local box set.**
 Flattened-prefix indexing with binary search over a cell-count prefix (the form already shipping

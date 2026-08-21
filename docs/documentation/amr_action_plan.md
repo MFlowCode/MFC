@@ -74,6 +74,43 @@ run at every reconcile to cap = nlive) plus local-index derivation (the index sp
 live set; amr_loc_n stops existing). Those two items are the np>=4 unblocker and the first
 S-track increment in practice.**
 
+**W8 FIX LANDED (2026-08-21, same day): the S0 np=4 arm COMPLETES (rc=0, step loop 662.3 s,
+nboxes 288 = exactly 2x np=2's 144 — per-rank boxes flat, the weak-scaling construction holds).**
+What landed differs instructively from the promoted design. The full device-side remake
+(gather to a staging array + realloc) was built first and REFUTED by its own gate: holding
+old + staging on device is a store-sized transient, and the np=4 arm OOMed in init on exactly
+that; worse, the rebuild's overlap carry-forward host-reads `amr_stor_st` WITHOUT pulling,
+relying on the old growth's device->host round trip for coherence — reverting that contract
+NaN'd BOTH churn goldens (27DEC5B6/D127EC91 caught it; the np>2 golden mandate paid off the
+day after it landed). The fix that survived is four smaller mechanisms, each forced by a
+measurement:
+1. **In-place index re-densification every reconcile** (`s_amr_st_move_slot` + rewritten
+   `s_amr_compact_store`): ascending-source-order device moves, no realloc, no staging. Kills
+   the ratchet — np=2 AND np=4 VRAM plateau dead flat, per-rank live 72 at both (the W8
+   invariant measured true for the first time). The allocation plateaus at the rebuild-transient
+   high-water instead of growing run-long.
+2. **Capped growth increment** (`min(oldcap/4, 16)` slots): the proportional +25% growth was
+   itself store-scaled — one late-run growth event's +67-slot transient is what tipped a
+   59.5 GiB card over 64.
+3. **Early-free of consumed old slots** in the rebuild loop (`last_use` per old block, freed
+   once the last covering new box is built): replicas held until reconcile peaked the transient
+   union; this cut the np=4 plateau 57.3 -> 51.9 GiB. Freed dense indices recycle into the very
+   next allocs.
+4. **Stash-only replica slots** (`s_amr_alloc_slot_stash` + in-place upgrade in
+   `s_amr_alloc_slot`): a received replica only ever touches its `amr_stor_st` half, but the
+   full alloc gave it device-resident q_prim/rhs too (~doubling per-slot cost) across the
+   np-scaled migration storm of the first dynamic regrid. This was found by the new
+   `[amr-cap]` instrument (rank_time_wrt-gated live/cap line at every reconcile), which
+   REFUTED the "store is the hog" theory: the store was already flat at 77 slots ~ 16 GiB;
+   the other ~35 GiB was solver base + per-slot q_prim/rhs.
+Validation: churn goldens 27DEC5B6 (np=2) + D127EC91 (np=4) pass, AMR subset 67/67, S0 gate
+np=2 rc=0 (peak 55.3) and np=4 rc=0 (peak 63.6). **Margin note: np=4's hot card peaks at
+63.6 of 64 GiB — the gate passes but with ~0.4 GiB headroom. The next memory term is per-slot
+q_prim/rhs pooling (P1 proper) and stor-only stashes; do not grow this operating point without
+them.** Still OPEN from the promoted design: local-index DERIVATION (deleting
+amr_loc_free/amr_loc_nfree as concepts) — the re-densification makes the recycle stack
+short-lived rather than gone; it remains a cleanliness increment, no longer a memory one.
+
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18
 rewrite (git history) now that the WHY is established — the findings live in
