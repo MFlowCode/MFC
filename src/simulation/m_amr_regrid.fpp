@@ -22,12 +22,12 @@ module m_amr_regrid
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
         & PH_RBREC, PH_RBTOPO
     use m_amr, only: amr_rg_gather, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, &
-        & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
-        & s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, &
-        & s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
-        & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
-        & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, &
-        & amr_mig_blk
+        & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_free_slot, &
+        & s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
+        & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
+        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
+        & f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, &
+        & amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -1350,9 +1350,11 @@ contains
                         end do
                     end if
                 end do
-                ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the reconcile below)
+                ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the rebuild's early-free or
+                ! the reconcile below) - STASH-ONLY: a replica never touches q_prim/rhs, and full slots across the np-scaled
+                ! replica set of a migration-heavy regrid are what OOMed the W8 gate's np=4 arm
                 do kk = 1, old_np
-                    if (getk(kk)) call s_amr_alloc_slot(f_l0_slot(kk))
+                    if (getk(kk)) call s_amr_alloc_slot_stash(f_l0_slot(kk))
                 end do
                 allocate (rq(old_np*num_procs), spack(max(maxcnt, 1), old_np), rpack(max(maxcnt, 1), old_np))
                 nrq = 0
@@ -1429,12 +1431,40 @@ contains
         type(t_box), intent(in)                                :: boxes(:)
         integer, intent(in)                                    :: nboxes, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(in)                                    :: old_owns(:)
-        integer                                                :: sh(3), k, kk, i, fi, fj, fk, ofi, ofj, ofk, ks, kks
+        integer                                                :: sh(3), k, kk, i, fi, fj, fk, ofi, ofj, ofk, ks, kks, ohi(3)
+        integer, allocatable                                   :: last_use(:)
 
         ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
         ! box k lives in shared-pool slot ks = f_l0_slot(k) (identity without L0 tiles); old block kk in slot kks
 
+        ! W8 transient: last_use(kk) = the last new box whose region overlaps old block kk, i.e. the last iteration whose
+        ! overlap-copy (or pbmv copy) can read kk's stash. Holding EVERY stashed/received old block until the reconcile is
+        ! what peaks device memory at np >= 2 - the replica count grows with np - so old-only slots are freed as soon as
+        ! their last covering box is built (the loop below), and the freed dense indices recycle into the very next allocs.
+        ! Region overlap (all regions are L0-cell coords at every level) is a superset of every per-cell stash read.
+
+        allocate (last_use(old_np)); last_use = 0
+        do kk = 1, old_np
+            ohi = old_ilo(:,kk)
+            ohi(1) = ohi(1) + (old_ext(1, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
+            if (n_glb > 0) ohi(2) = ohi(2) + (old_ext(2, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
+            if (p_glb > 0) ohi(3) = ohi(3) + (old_ext(3, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
+            do k = 1, nboxes
+                if (f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), ohi)) last_use(kk) = k
+            end do
+        end do
+
         do k = 1, nboxes
+            ! free the old-only slots consumed by iterations before this one (last_use = k - 1 fires exactly once; a slot
+            ! serving as a NEW owned box keeps living - the reconcile decides it)
+            do kk = 1, old_np
+                if (last_use(kk) /= k - 1) cycle
+                kks = f_l0_slot(kk)
+                if (kks <= amr_num_blocks) then
+                    if (amr_block_owner(kks) == proc_rank) cycle
+                end if
+                call s_amr_free_slot(kks)
+            end do
             ks = f_l0_slot(k)
             amr_cur = ks
             ! owned slot needs its arrays before geometry/prolong
@@ -1518,6 +1548,7 @@ contains
             end if
             ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
         end do
+        deallocate (last_use)
 
         ! Drain the deferred gather sends now that every box has been posted: one WAITALL per rebuild instead of
         ! a per-box rendezvous. MUST happen before the send buffers are reused or freed.
