@@ -65,7 +65,7 @@ A weak-scaling AMR arm satisfies, at fixed per-rank work as ranks and problem gr
 | W5 | tag space independent of box count | box-id tags exceed Cray MPI_TAG_UB (~2^21) at ~10^6 boxes | (family, epoch) tag bases |
 | W6 | store lifecycle device-resident | growth/compaction stage multi-GB through host | device-side remake, index derived |
 | W7 | migration priced and bounded | cost model has work term only; adapt+repartition fused | work + migration terms, decoupled, hysteresis |
-| W8 | per-rank DEVICE memory = f(live local boxes), never f(global index space) | **HOLDING as of 9bcc9865 (2026-08-21): live 72/rank and VRAM plateaus flat at np=2 AND np=4; S0 np=4 completes. Margin-thin: hot card 63.6/64 GiB — per-slot q_prim/rhs (not the store) is the next term** | landed: in-place re-densify + capped growth + early-free + stash-only replicas; next: pool q_prim/rhs (P1 proper) |
+| W8 | per-rank DEVICE memory = f(live local boxes), never f(global index space) | **HOLDS THROUGH np=8 as of f5f99337 (2026-08-21 night, P1 pooling): np=4 peaks 30.2-39.5 GiB (was 63.6), np=8 COMPLETES for the first time at 39.0-51.3 GiB with live 72-75/rank — >12 GiB headroom on every card** | landed: in-place re-densify + capped growth + early-free + stash-only replicas (9bcc9865) + pooled q_prim/rhs advance scratch (f5f99337) |
 
 Deliberately **kept global**: the replicated box list + owner map (~tens of bytes/box on every
 rank). That is AMReX's own design — it buys communication-free assignment and is tolerable to
