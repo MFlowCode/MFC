@@ -175,6 +175,47 @@ identical per-rank work, 40 steps, 20 regrids):
 | **rhs per-call** | rhs +110.5 — ms/call 17.29 -> 31.34 (x1.81 in the MEAN, not a straggler), imb 1.009 -> 1.465 | **+110** | **27%** | mechanism OPEN — see M4a. M2 said rhs per-call is np-invariant at the matched 400^3 point, so this is either topology or case-specific. |
 | **regrid scaling** | regrid +91.8 (mig +42.7, build +37.8 incl. rb:gath +17.2, clus +5.1), gather +18.9 | **+111** | **27%** | the P3/P4 targets, now with exact per-sub-phase numbers. |
 
+### AUDIT of the attribution (2026-08-21 evening, mid-M4) — what the existing instruments settle
+
+Re-derived with the same-build pair (both arms of gate 1156): rhs 17.87 -> 31.34 ms/call, x1.75 —
+the families stand. Deeper reads that CHANGE the interpretation:
+
+1. **The rhs bracket is pure local advance** (`br_load + s_compute_rhs + br_store`, no MPI), and
+   the phase brackets are disjoint (per-arm phase sums = 95-97% of wall), so the rhs growth is
+   neither nested-wait contamination nor exchange time.
+2. **The `[phase-rank]` instrument (it existed all along) decomposes the family: a FIXED straggler
+   plus a uniform floor.** np=4 per-rank rhs = [212, 206, **362**, 207] (gate) and
+   [188, 196, **353**, 192] (M4 armA) — rank 2 both times. Reflux waiters are exactly ranks 1
+   and 3 (~170-190 s each; rank 0 ~0.4 s — no cross-rank reflux pairs by topology): the
+   wait/skew family is the straggler's SHADOW plus the np-scaled cross-rank pair count (reflux
+   calls/rank double at 2x2). Non-straggler ranks still run ~24.4 ms/call vs np=2's 17.9 — a
+   uniform +36% floor remains after the straggler.
+3. **Refuted by existing data** (each by a measurement, not an argument): GCD-occupancy contention
+   (M2's matched np=8 ran ALL EIGHT GCDs at 17.48 ms/call — verified from budget_full.txt);
+   VRAM fullness as a monotone cause (np=2 plateaus HIGHER than np=4, 56.5 vs 51.9 GiB, and is
+   fast); host-thread oversubscription (1 host thread/rank, unbound over 128 idle cores,
+   observed live); work imbalance (fine_work imb 1.004, [amr-balance]); store capacity
+   ([amr-cap] equal, 77 slots every rank).
+4. **The rank->GCD map is NOT identity and is load-bearing:** np=2's ranks light rocm-smi cards
+   2,3 — a HIP-vs-rocm-smi renumbering. Under the natural PCI/HSA permutation (0->2, 1->3,
+   2->0, 3->1), straggler rank 2 sits on card0 — the GCD pinned at 63.3-63.6 GiB (98-99% full)
+   for the WHOLE run in both runs — and np=2 is fast because it happens to sit on the two
+   comfortable GCDs. Leading hypotheses, discriminated inside M4: (a) a near-ceiling ROCm
+   allocator cliff on that one GCD (rank-asymmetric replicas/transients put it there);
+   (b) a degraded physical GCD on this node (the node-identity confound). Arm B's vram.csv
+   reveals the permutation directly (RVD={0,1,4,5}: whichever cards light up define the map);
+   arm D relocates ranks across GCDs (straggler follows the GCD => hardware; follows the rank
+   or vanishes with headroom => memory cliff).
+5. **Consequence if either holds: the "rhs np-scaling family" is NOT an intrinsic scaling law**
+   — it is a per-GCD asymmetry that np=4 exposes — and the honest time-weak-scaling gap
+   shrinks toward the wait/skew shadow + the regrid family. P1 pooling gains a third
+   justification: headroom removes near-ceiling operation entirely.
+6. **Protocol lessons, standing:** benchmark harnesses must run a PINNED binary — `mfc.sh run`
+   auto-rebuilds from the live tree, so code edits during a sweep leak into later arms (armA ran
+   pre-I1a code, arms B onward compile the I1a counters; negligible here — integer adds — but
+   the class is dangerous). And: read the instruments you already have before designing new
+   runs — [phase-rank] and [amr-balance] answered M4b for free, and M3 itself cost zero runs.
+
 ### M4 — three cheap discriminators BEFORE any building (one allocation session)
 
 - **M4a (rhs doubling — hardware or code?):** np=2 pinned to the two GCDs of ONE physical
@@ -190,6 +231,34 @@ identical per-rank work, 40 steps, 20 regrids):
 - **M4c (table completion):** np=8 arm post-fix + np=1 on the current build. **Rule: np=8
   device-OOM promotes P1 pooling from "next memory lever" to "immediately before anything
   else"; np=8 completing parks pooling after I1.**
+
+### M4 VERDICTS (2026-08-21 night, sweep m4-0821_1839; armA ran the committed W8 binary,
+### arms B/D/np1/np8 the same + uncommitted I1a counters — physics-neutral, marked in PIN)
+
+- **M4a: hardware is INERT.** Three GCD arrangements (0,1,2,3 / 0,1,4,5 spread-NUMA / 0,2,4,6
+  one-per-MCM): walls 593/605/581 s, rhs 29.5/30.0/29.1 ms/call, the SAME rank-2 straggler
+  (353/357/358 s) every time, and each rank's VRAM fingerprint (56.1 / 62.5 / 63.3-63.6 /
+  58.3 GiB) reproduced on whatever GCD it landed on. No sick silicon, no NUMA effect, no MCM
+  pairing. The straggler is rank-attached software state.
+- **The cliff is sharp and now bounded:** rank 1 at 62.5 GiB is FAST, rank 2 at 63.0-63.6 is
+  1.84x slow — the slow path engages between 97.7% and 98.4% device-full. Standing hypothesis
+  (probe `m4mem.sh`, pre-registered): cumulative per-slot q_prim/rhs alloc/free churn (rank 2 =
+  SFC-middle churns most) ratchets the OpenMP runtime's RETAINED device pool to the ceiling;
+  under ~1 GiB free, every target region's transient allocation hits the allocator slow path.
+  Zero-code knobs found IN OUR RUNTIME BINARY: LIBOMPTARGET_MEMORY_MANAGER_THRESHOLD=0 and
+  OMPX_AMD_MEMORY_MANAGER_THRESHOLD_EXP_2.
+- **M4c: np=1 re-run matches history exactly** (228.5 s, rhs 18.46 ms/call, 49.9 GiB): the
+  same-code curve is 18.5 -> 17.9 -> 29-31 ms/call at np=1/2/4. **np=8 FAILS (rc=143) with ALL
+  EIGHT cards pinned at 62.3-63.7 GiB** — at 2x2x2 every rank is churn-heavy, so the ratchet
+  that singles out rank 2 at np=4 hits everyone, exactly as churn-retention predicts. **The
+  pre-registered rule fires: P1 q_prim/rhs pooling is promoted to IMMEDIATE** (it removes the
+  per-slot alloc/free churn categorically, not just the footprint).
+- Sequencing consequence: I1a lands first (in flight), then `m4mem.sh` (5-min mechanism proof
+  from a clean tree), then P1 pooling as the next code increment. S-track/exchange fronts wait
+  for the post-P1 re-baseline: if the straggler+shadow (~half the 2.59x) falls with P1, the
+  remaining honest gap is the regrid family + the unexplained uniform +36% rhs floor
+  (np-attached, all np=4 arms, unexplained by every hypothesis tested today — named open
+  question, do not hand-wave it).
 
 ### The increment sequence (each = one landed permanent piece, one commit, goldens-first)
 
