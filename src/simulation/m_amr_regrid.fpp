@@ -21,13 +21,14 @@ module m_amr_regrid
     use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
         & PH_RBREC, PH_RBTOPO
-    use m_amr, only: amr_rg_gather, s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
-        & amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
-        & s_amr_alloc_slot_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
-        & s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
-        & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
-        & amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk
+    use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
+        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, amr_maxc_fit, &
+        & amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, &
+        & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
+        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
+        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
+        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, amr_gb_win, amr_gb_cost, &
+        & amr_gb_mig, amr_mig_snd, amr_mig_blk
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -1435,6 +1436,7 @@ contains
         integer, intent(in)                                    :: nboxes, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(in)                                    :: old_owns(:)
         integer                                                :: sh(3), k, kk, i, fi, fj, fk, ofi, ofj, ofk, ks, kks, ohi(3)
+        integer                                                :: c_lo, c_hi
         integer, allocatable                                   :: last_use(:)
 
         ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
@@ -1457,10 +1459,21 @@ contains
             end do
         end do
 
-        ! gather-batching step 1: derive the whole loop's gather message set up front; the per-box gathers assert against it
+        ! gather-batching step 1: derive the whole loop's gather message set up front; step 2 executes the exchange from it
         call s_amr_build_gather_plan(nboxes)
 
+        c_lo = 1
         do k = 1, nboxes
+            ! gather-batching step 2 (amr_regrid_gather_batching.md): at each chunk boundary, pre-post the chunk's recvs and
+            ! issue its sends (level>=2 sends whose parent shares the chunk are deferred to the child's consume below), so the
+            ! per-box rendezvous becomes one wait per owned box against an exchange already in flight
+            if (mod(k - 1, amr_gath_chunk) == 0) then
+                c_lo = k; c_hi = min(k + amr_gath_chunk - 1, nboxes)
+                call s_phase_tic(PH_RBGATH)
+                call s_amr_gather_chunk_post(c_lo, c_hi)
+                call s_amr_gather_chunk_send(q_cons_base, c_lo, c_hi)
+                call s_phase_toc(PH_RBGATH)
+            end if
             ! free the old-only slots consumed by iterations before this one (last_use = k - 1 fires exactly once; a slot
             ! serving as a NEW owned box keeps living - the reconcile decides it)
             do kk = 1, old_np
@@ -1480,11 +1493,10 @@ contains
             call s_phase_tic(PH_RBGEO)
             call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
             call s_phase_toc(PH_RBGEO)
-            ! fine-level distribution: gather this new block's coarse patch (collective - before the owner-only cycle;
-            ! q_cons_base is host-current with valid ghosts from the exchange at the top of s_amr_regrid)
-            amr_rg_gather = .true.
-            call s_phase_tic(PH_RBGATH); call s_amr_gather_coarse_patch(q_cons_base, .false.); call s_phase_toc(PH_RBGATH)
-            amr_rg_gather = .false.
+            ! fine-level distribution: consume this new block's coarse patch out of the chunk exchange (all ranks - before the
+            ! owner-only cycle, which is what lets the chunk request arrays be reused; q_cons_base is host-current with valid
+            ! ghosts from the exchange at the top of s_amr_regrid)
+            call s_phase_tic(PH_RBGATH); call s_amr_gather_consume_box(q_cons_base, k, c_lo); call s_phase_toc(PH_RBGATH)
             ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners re-prolong from it below)
             if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (.not. amr_rank_owns_block) cycle
