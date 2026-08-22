@@ -300,7 +300,8 @@ contains
 
                 ! allocation bounds, not runtime bounds: q_T_sf is the one array here that crosses into the AMR fine advance (it is
                 ! passed through s_amr_fine_stage_advance to s_compute_rhs), so it must hold a refined block as well as the coarse
-                ! subdomain. Every other array in this module is coarse-only - the fine advance uses amr_slots(k)%q_cons/q_prim/rhs.
+                ! subdomain. Every other array in this module is coarse-only - the fine advance works through the flat store and
+                ! the pooled q_prim/rhs scratch (m_amr).
                 @:ALLOCATE(q_T_sf%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
                            & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 @:ACC_SETUP_SFs(q_T_sf)
