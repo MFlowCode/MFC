@@ -1752,11 +1752,13 @@ contains
                 if (amr_rg_gather) call s_phase_toc(PH_RBRSV)
                 amr_gsnd_n = amr_gsnd_n + 1
                 if (pull_host) then
-                    ! runtime: pack my shell slice on the device straight into the pool slot - the EXACT-width slice, so only
-                    ! the shell words cross PCIe (the full-width slice would copy the whole maxsz slot back)
+                    ! runtime: pack my shell slice on the device straight into the pool slot. FULL-column slice on purpose:
+                    ! exact-width slices map the same column base with a different extent every call, and that aliased
+                    ! variable-extent mapping pattern globally degraded every later kernel launch (rcab-0822 A/B) - keep the
+                    ! map shape identical to the pre-clip pack.
                     if (boxsz > 0) then
                         call s_amr_shl_stage(msh, tb1, te1, tb2, te2, tb3, te3, stot)
-                        call s_amr_pack_shell_device(q_coarse, msh, stot, o1, o2, o3, amr_gsnd_pool(1:boxsz,amr_gsnd_n))
+                        call s_amr_pack_shell_device(q_coarse, msh, stot, o1, o2, o3, amr_gsnd_pool(:,amr_gsnd_n))
                     end if
                 else
                     if (amr_rg_gather) call s_phase_tic(PH_RBPACK)
@@ -2100,8 +2102,9 @@ contains
                 boxsz = sys_size*cells
                 call s_amr_gsnd_reserve(boxsz)
                 amr_gsnd_n = amr_gsnd_n + 1
-                ! EXACT-width pool slice: only the shell words cross PCIe in the pack's copyout
-                call s_amr_pack_parent_shell_device_${GSFX}$(qp, ns, stot, amr_gsnd_pool(1:boxsz,amr_gsnd_n))
+                ! FULL-column pool slice on purpose - see the level-1 pack site: aliased variable-extent maps of the same
+                ! column globally degraded later kernel launches
+                call s_amr_pack_parent_shell_device_${GSFX}$(qp, ns, stot, amr_gsnd_pool(:,amr_gsnd_n))
             end if
             call s_xa_rec(XA_F2_SND, 1, boxsz, cblk)
             call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, cowner, cblk, MPI_COMM_WORLD, amr_gsnd_req(amr_gsnd_n), ierr)
