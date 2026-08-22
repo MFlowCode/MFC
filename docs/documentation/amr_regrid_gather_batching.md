@@ -106,7 +106,44 @@ is the single knob trading memory against message count.
    stay pooled, consume in box order). **Full design below — review before implementing.**
 3. Extend to the pb/mv gather (`s_amr_gather_coarse_patch_pbmv`) if step 2 pays.
 
-## Step-2 design (written 2026-08-22 00:15, from the step-1 audit; review-then-implement)
+## Step-2 design — REVIEWED 2026-08-22: two independent adversarial reviewers (MPI/deadlock
+## lens + state/lifetime lens) CONVERGED on one fatal defect and four bindings. The design
+## below is AMENDED accordingly; implement only the amended form.
+
+**FATAL (found by BOTH reviewers, D1): the phase-B level>=2 pack reads an UNBUILT parent.**
+The parent's new-generation store content is produced only in the parent's own phase-C
+iteration (alloc m_amr_regrid.fpp:1478, fill 1491-1521, device push 1524); the box list is
+parents-first but not chunk-aligned, so a same-chunk parent/child pair makes phase B pack
+stale or unallocated store memory (amr_loc_of = 0 -> out-of-bounds device read). The XA
+identity invariant is PROVABLY BLIND to it (same counts/sizes, wrong payload).
+**AMENDMENT: level>=2 sends split by parent position — phase B ONLY when parent index <
+c_lo (parent consumed in an earlier chunk = the early-send win); otherwise the pack+ISEND
+stays at the child's box position in phase C (parents-first guarantees the parent's consume,
+index < k, has completed). Both reviewers confirm the deadlock induction survives this.**
+
+Further bindings from the review (all mandatory):
+- **Ownership predicate = `amr_block_owner(ks)` everywhere in phases A/B.** The mirrors
+  (`amr_owns_all`, `amr_rank_owns_block`) hold the PREVIOUS generation until phase C's
+  geometry call (writers: m_amr.fpp:2496/2519 only).
+- **`amr_cpat_off` is per-level and per-phase**: level-1 = region - margin; level>=2 =
+  parent-foot - margin (parent-fine frame). Recompute in every phase that calls a kernel or
+  host loop reading it; NEVER inherit it across phases (phase B's last write is arbitrary).
+- **Tag collision with QBMM pbmv (F3) is real**: pbmv reuses (src, tag=k) against F1/F2.
+  Correctness rests on MPI NON-OVERTAKING plus fixed posting order (F1 recv in A before
+  pbmv recv in C; F1 send in B before pbmv send in C) — now a STATED invariant. The pbmv
+  per-box call stays in phase C, all ranks, box order. Step 3 MUST disambiguate the tag
+  space (k + amr_max_blocks) before chunking pbmv.
+- **Keep the per-box ``GPU_UPDATE(device='[amr_cg]')``** (m_amr.fpp:1125-1131) in phase C —
+  device coherence of amr_cg is not proven dead; dropping coherence updates on a hunch is
+  the restart-NaN bug class.
+- **Recorded progress assumption**: any blocking MPI call progresses ALL traffic (true for
+  Open MPI 4.1 ob1/vader; the induction survives even per-request progress). No collective
+  may enter the chunk loop (the only rebuild collective is s_amr_reduce_xchg_flag at
+  rb:tail — keep it there).
+- Request-array reuse across chunks is safe ONLY because phase C consumes every box
+  unconditionally (the owner-cycle comes after the WAITALL position) — preserve that.
+
+## Step-2 design (original text; read with the amendments above)
 
 Restructure `s_amr_regrid_rebuild_slots`'s box loop into chunks of `CHUNK` boxes (start 32):
 
