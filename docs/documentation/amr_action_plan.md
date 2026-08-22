@@ -40,9 +40,17 @@ against source) re-aims the increment ladder:**
    L2 carry-forward exists. PRE-REGISTERED RULE: dead fraction > 50% on either family
    promotes ring/coverage clipping AHEAD of T1 (clipping est. 8-15% of wall for ~300-500
    LOC and it COMPOUNDS with T1; T1's floor is 8-12% for ~3100 LOC).
-2. **G-B (the AMReX S0 np=2/4/8 bar) runs NOW, not last** — this ledger's own words below:
-   axis-2 "done" is undefined without it. Harness-only work (`amrex_tax.sh` is most of it),
-   and its result sizes how much of the v2 contract is load-bearing.
+2. **G-B CLOSED same day (logs/amrexs0-0822_1330, amrex_s0.sh; Advection_AmrCore's IC
+   replaced with the SAME periodic-blob field as S0): THE BAR IS 1.20x (np2->4) / 1.15x
+   (np4->8) per doubling** at fixed per-rank work — and the comparison is unusually clean:
+   AMReX's per-rank advance is EXACTLY flat (76.8M cells/rank/step at every np) and nearly
+   equals MFC's S0 per-rank fine work (77.1M/rank). MFC's ratios: 1.598x (np2->4) and
+   2.63x (np4->8) -> excess 1.33x and ~2.3x. AMReX does this carrying 27.6k boxes at np=8
+   (46x MFC's block count) with regrid_int=2, no subcycle, reflux on, max_grid_size 32
+   (its own practice). Caveats: one linear scalar vs 6-var multiphase (ratio is internal,
+   physics mostly cancels — and heavier compute HIDES comm, so MFC's worse ratio is more
+   damning, not less); single runs (ratios sit far outside the 4% node variance). Axis-2
+   "done" is now defined: MFC's np-doubling must fall from 2.63x toward ~1.15-1.2x.
 3. **Regrid cadence is a benchmark-definition question.** Production AMR regrids every
    ~8-16 finest steps; our int=2 operating point inflates the exact phase being optimized
    (tax 27.2x at int=2 vs 7.2x at int=20 while AMReX barely moves). Before moving the
