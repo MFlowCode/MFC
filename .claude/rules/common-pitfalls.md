@@ -48,7 +48,12 @@ covered in `docs/documentation/contributing.md`.
   `CASE_OPT_EXTRA_LINES` literal in `toolchain/mfc/params/generators/fortran_gen.py` (covers `num_dims`,
   `num_vels`, `weno_polyn`, `muscl_polyn`, `weno_num_stencils`, `wenojs`);
   multi-variable declaration lines (`bc_x/y/z`, `x/y/z_domain`, `x/y/z_output`, post's
-  `G`); and the MPI broadcast residue in `m_mpi_proxy` (computed variables that are not
+  `G`); enum constants for compound registry keys (a `CONSTRAINTS` key with a `names` dict whose
+  key contains `%` or `(`, e.g. `fluid_pp(:)%eos`): `generate_constants_fpp` **silently** skips
+  these (the `{param}_{name}` form, `fluid_pp(1)%eos_stiffened_gas`, is not a valid Fortran
+  identifier), so their constants must be hand-written in `m_constants.fpp` (as `eos_*` is) or
+  they simply never exist; and the
+  MPI broadcast residue in `m_mpi_proxy` (computed variables that are not
   namelist-bound: `m_glb`/`n_glb`/`p_glb`, `cfl_dt`, `bc_io`, and complex struct-member
   array loops — these cannot be auto-generated and stay hand-listed). Everything else — scalar declarations, plain arrays (`FORTRAN_ARRAY_DIMS`
   table in `definitions.py`), derived-type namelist declarations including `GPU_DECLARE`
