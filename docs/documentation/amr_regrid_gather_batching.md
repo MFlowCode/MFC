@@ -101,7 +101,44 @@ is the single knob trading memory against message count.
 Step 1 is the safety net: if the plan does not reproduce the current message set box for box, the
 batching is wrong and it is visible before any data moves.
 
-## The level-1 / level-2 split — RESOLVED without a run
+## S0 np=8 REVERSES the level-1/level-2 priority (2026-08-21, post-P1 gate, logs/p1gate-0821_2144)
+
+> **The section below this one concluded — correctly, for the MATCHED point — that the level-1
+> WAITALL dominates and `pg:all` "cannot dominate." At the WEAK-SCALING point (S0, fixed
+> 200^3/rank, amr_max_level=2) the ordering flips: the split is operating-point-dependent, and
+> the increment must cover BOTH families.**
+
+Measured sub-brackets of `rb:gath` (mean s):
+
+| | np=4 | np=8 | mechanism |
+|---|---|---|---|
+| `pg:all` (level>=2 parent gather) | 15.6 | **108.0** | of which `pg:recv` 15.3 / **99.2** — the **blocking per-box `MPI_RECV`** (m_amr.fpp:1405), 252 / 208 ms/call, imb ~1.3-2.0 |
+| `rb:wait` (level-1 WAITALL) | 1.2 | **58.9** | 85 calls x 693 ms at np=8 |
+| everything else (pack/unpack/alloc/post/send) | ~0.15 | ~1.6 | dead — fixes aimed there stay dead |
+
+At S0 the refined region is a deep blob: most boxes are level 2, and each one costs a pairwise
+rendezvous — both ranks walk the same global box list, so the owner's blocking RECV for box k
+absorbs whatever skew the parent rank accumulated (rb:slot/rb:ovl/rb:push differ by ownership).
+R1 converted this site's SEND to the ISEND pool; **the RECV side is the unconverted half, and at
+np=8 it is the single largest item inside `rg:build`.**
+
+**Scope change:** the chunked plan-then-execute below covers BOTH families in one framework:
+- level-1: peer send/recv lists exactly as designed below;
+- level>=2: trivial plan (one known parent rank per box, sizes computable on both sides with no
+  handshake) — pre-post one `MPI_IRECV` per owned level>=2 box in the chunk into a per-box
+  buffer, keep the parent's pooled device-pack ISEND as-is, keep the device unpack;
+- consume in box order as today; a box is exactly one level, so tag = box index stays unambiguous
+  across the two families for pre-posted receives.
+Chunk memory bound now covers both: level-1 staging (~480 MB at chunk 32) + per-box level-2
+buffers (~15 MB each) — ~1 GB/rank at chunk 32, affordable post-P1 (>=12 GiB headroom).
+**Validation tripwire:** increment 1's plan must reproduce today's message set exactly — the I1a
+`XA_F1_*`/`XA_F2_*` conservation counters (m_amr_xchg_audit.fpp) must be IDENTICAL before/after.
+
+Expected payoff at S0 np=8, stated as a bound: rb:wait + pg:recv = 158 s = 14.3% of wall; the
+realistic target is the rendezvous share of it (not the bytes) — differenced runs required, and
+the downstream wait shadows (reflux/gather/seam, which absorb regrid-side skew) may move too.
+
+## The level-1 / level-2 split — RESOLVED without a run (MATCHED point; superseded for S0 above)
 
 `PH_PGALL` (the level >= 2 parent-gather path) is nested inside `rb:gath`, so `rb:gath` covers both
 the level-1 body this design batches and the level >= 2 path it does not. An earlier revision called
