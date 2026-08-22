@@ -81,6 +81,14 @@ PHYSICS_DOCS = {
         "math": r"m > 0, \quad n \geq 0, \quad p \geq 0",
         "explanation": ("The x-direction must have cells. Cannot have z without y. Cylindrical coordinates require odd p."),
     },
+    "check_domain_extents": {
+        "title": "Domain Extents Specified",
+        "category": "Domain and Geometry",
+        "math": r"m > 0 \Rightarrow x_{\mathrm{beg}}, x_{\mathrm{end}} \ \mathrm{set}",
+        "explanation": (
+            "Every dimension that has cells needs its physical extents so that the grid can be generated. Skipped on restarts (old_grid = T), where the mesh is read from the existing grid files."
+        ),
+    },
     "check_patch_within_domain": {
         "title": "Patch Within Domain",
         "category": "Domain and Geometry",
@@ -329,12 +337,6 @@ class CaseValidator:
             self.get("recon_type", 1) not in _recon_choices,
             f"recon_type must be one of {_recon_shown}",
         )
-
-        # Required domain parameters when m > 0
-        m = self.get("m")
-        if m is not None and m > 0:
-            self.prohibit(not self.is_set("x_domain%beg"), "x_domain%beg must be set when m > 0")
-            self.prohibit(not self.is_set("x_domain%end"), "x_domain%end must be set when m > 0")
 
     # Common Checks (All Stages)
 
@@ -643,12 +645,17 @@ class CaseValidator:
         relax = self.get("relax", "F") == "T"
         relax_model = self.get("relax_model")
         model_eqns = self.get("model_eqns")
+        num_fluids = self.get("num_fluids")
         palpha_eps = self.get("palpha_eps")
         ptgalpha_eps = self.get("ptgalpha_eps")
 
         if not relax:
             return
 
+        self.prohibit(
+            num_fluids is None or num_fluids < 2,
+            "phase change requires num_fluids >= 2 (liquid = 1, vapor = 2)",
+        )
         self.prohibit(
             (model_eqns not in (2, 3) or (model_eqns == 2 and relax_model not in (5, 6)) or (model_eqns == 3 and relax_model not in (1, 4, 5, 6))),
             "phase change requires model_eqns==2 with relax_model in [5,6] or model_eqns==3 with relax_model in [1,4,5,6]",
@@ -1507,6 +1514,31 @@ class CaseValidator:
             num_patches > num_patches_max,
             f"num_patches must be <= {num_patches_max} (num_patches_max in m_constants.fpp)",
         )
+
+    def check_domain_extents(self):
+        """Checks that the physical extents of every active dimension are set (pre-process)
+
+        The grid generator needs (xyz)_domain%beg and (xyz)_domain%end for each
+        dimension that has cells. On a restart (old_grid = T) the mesh is read
+        from the existing grid files, so the extents are neither needed nor read.
+        """
+        if self.get("old_grid", "F") == "T":
+            return
+
+        m = self.get("m", 0)
+        if self._is_numeric(m) and m > 0:
+            self.prohibit(not self.is_set("x_domain%beg"), "x_domain%beg must be set when m > 0")
+            self.prohibit(not self.is_set("x_domain%end"), "x_domain%end must be set when m > 0")
+
+        n = self.get("n", 0)
+        if self._is_numeric(n) and n > 0:
+            self.prohibit(not self.is_set("y_domain%beg"), "y_domain%beg must be set when n > 0")
+            self.prohibit(not self.is_set("y_domain%end"), "y_domain%end must be set when n > 0")
+
+        p = self.get("p", 0)
+        if self._is_numeric(p) and p > 0:
+            self.prohibit(not self.is_set("z_domain%beg"), "z_domain%beg must be set when p > 0")
+            self.prohibit(not self.is_set("z_domain%end"), "z_domain%end must be set when p > 0")
 
     def check_qbmm_pre_process(self):
         """Checks QBMM constraints for pre-process"""
@@ -2499,6 +2531,7 @@ class CaseValidator:
         """Validate pre-process-specific parameters"""
         self.validate_common()
         self.check_restart()
+        self.check_domain_extents()
         self.check_qbmm_pre_process()
         self.check_parallel_io_pre_process()
         self.check_grid_stretching()

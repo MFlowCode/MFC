@@ -54,7 +54,12 @@ case "$cluster" in
         compiler_flag="f"
         account="CFD154"
         job_prefix="MFC"
-        qos="hackathon"
+        # The hackathon QOS was a temporary grant and is no longer held by
+        # CFD154; submitting under it now fails outright with "Invalid qos
+        # specification". "normal" is the only QOS on this allocation without a
+        # one-job-at-a-time cap, so it is the only one that can run the CI
+        # matrix concurrently.
+        qos="normal"
         # Let each job's slurmstepd broker its own steps instead of routing
         # every srun through slurmctld. The in-job test suite launches ~1700+
         # srun steps per allocation, which congests the Frontier controller.
@@ -67,7 +72,7 @@ case "$cluster" in
         compiler_flag="famd"
         account="CFD154"
         job_prefix="MFC"
-        qos="hackathon"
+        qos="normal"
         extra_sbatch="#SBATCH --stepmgr"
         test_time="01:59:00"
         bench_time="01:59:00"
