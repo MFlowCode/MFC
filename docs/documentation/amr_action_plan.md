@@ -267,12 +267,26 @@ the families stand. Deeper reads that CHANGE the interpretation:
    inventory corrections (F1/F2 shared pool). New asserts earned this week: replicas are
    stash-only slots; `[amr-cap]` flatness (promote into `s0_report.py`). Verification includes
    the I0 lesson: seed a deliberate staleness bug and confirm the validator TRIPS.
-2. **P1 q_prim/rhs pooling** — position set by M4c (see rule above). Scope: pool the two
-   block-sized per-slot families into level-major store arrays; convert the rebuild overlap
-   carry-forward to a device kernel IN THE SAME increment (that deletes the host-coherence
-   contract, which then legalizes device-side growth). Pre-registered gate: churn goldens +
-   subset 67/67 + S0 np=4 hot-card peak drops >= 10 GiB (expected ~48 GiB); np=8 attempted
-   after. QBMM side-state stays per-slot (out of scope).
+2. **P1 q_prim/rhs pooling — REDESIGNED by the pre-increment audit (consumer-lifetime sweep,
+   2026-08-21 night; full report in the session record).** The sweep established: fine-block
+   `rhs` is single-block scratch (fused per-block compute+update, `m_amr.fpp:4910`; reflux
+   never reads slot rhs on that path) but **L0 tiles need per-slot rhs** across the
+   MPI-synchronized reflux point (`m_time_steppers.fpp:635-637`); `q_prim` is written only
+   under `run_time_info|probe_wrt|ib|bubbles_lagrange` (`m_rhs.fpp:849`) and read only by IB
+   correction + the hyper_cleaning term. So the increment becomes: (a) a BATCH-SHAPED shared
+   rhs/q_prim scratch for fine slots — batch-shaped (amr_br_batch blocks), NOT single-block,
+   so it IS the storage P2's batched advance needs rather than a conflict with it; (b) per-slot
+   rhs kept for L0 tile slots only; (c) per-slot q_prim allocated only when a reader exists
+   (ib/bubbles_lagrange/run_time_info/probe_wrt), shared scratch otherwise — and the
+   reconcile-time `allocated(q_prim)` assert reworked to the new discriminator. Expected
+   ~15 GiB/rank at the S0 point. Same gate as before (goldens + subset + S0 np=4 peak
+   >= 10 GiB lower; np=8 after). The carry-forward device conversion + device-side growth
+   remain bundled. **Bug candidate RESOLVED for our path: `m_rhs.fpp:772` reads q_prim(psi)
+   before the gated copy-out, but amr+hyper_cleaning is transitively unreachable (amr+mhd is
+   1D-only per m_checker.fpp:136; hyper_cleaning forbids 1D per case_validator.py:1158). On
+   the MONOLITHIC path the read may see stage-stale psi when none of the gate flags is set —
+   an upstream accuracy question, filed as a candidate for an upstream issue, not on our
+   critical path.**
 3. **M4-directed third increment:** S1 block-lattice tags (if regrid/collective scaling is the
    chosen front — kills the measured ntag doubling; judged on ntag bytes/rank going flat), OR
    I2-I3 exchange waves (if wait/skew traces to per-box exchange arrival), OR the S2/T1
@@ -281,6 +295,24 @@ the families stand. Deeper reads that CHANGE the interpretation:
 4. **Phase-2 (P2 batched advance) contract is WRITTEN during increment 2-3** per the
    constitution — seeded by the 2a prototype (batch convert_conservative_to_primitive) and
    M2's verdict; it does not start until its contract passes the audit ritual.
+
+### Re-audit cadence (user directive 2026-08-21: "reaudit things as needed regularly")
+
+An evidence audit is a ZERO-RUN activity — re-read the instruments, re-check same-build/
+same-node provenance (the PIN files), re-derive the headline ratios from the raw tables — and
+the 2026-08-21 audit overturned two working theories and found the straggler without a single
+new run. It is now scheduled, not occasional:
+
+- **Before starting any increment:** does the evidence still support its premise? (The device-
+  remake increment failed exactly this check in hindsight — its premise ignored a measured
+  transient.)
+- **After every sweep:** do the new data change any pre-registered rule's input? Read
+  [phase-rank]/[amr-balance]/[amr-cap]/[amr-xa] per rank, not just the means.
+- **At phase boundaries:** a full re-derivation of the operating picture against the
+  constitution's invariants, with anything refuted banner-marked in the docs AND memory.
+- **Confound checklist at each audit:** build identity (PIN), node identity (PIN), bracket
+  nesting (phase-sum vs wall), cumulative-vs-stationary phenomena (rule 16), rank->device
+  permutation (rule 6).
 
 ### Standing constraints for this phase (the do-not list)
 
