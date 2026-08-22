@@ -101,10 +101,52 @@ is the single knob trading memory against message count.
    tripwires that each ABORTED as required (level-1 size +1 -> "send entry mismatch" on a
    contributor rank; parent size +1 -> parent send-size assert on the parent owner; S0-style
    np=4, first rebuild). The plan may now be trusted by step 2.
-2. Chunked exchange for BOTH families, `pull_host = .false.` only (see the S0 np=8 scope
-   section above: pre-post the chunk's level-1 IRECVs and the level>=2 per-box IRECVs, sends
-   stay pooled, consume in box order). **Full design below — review before implementing.**
-3. Extend to the pb/mv gather (`s_amr_gather_coarse_patch_pbmv`) if step 2 pays.
+2. **LANDED 01cc4318 + assert re-guard 3de4724e (2026-08-22). Verdict below.** Chunked
+   exchange for BOTH families, `pull_host = .false.` only (pre-post the chunk's level-1
+   IRECVs and the level>=2 per-box IRECVs, sends stay pooled, consume in box order).
+3. Extend to the pb/mv gather (`s_amr_coarse_patch_pbmv`) — **DEPRIORITIZED** after the
+   step-2 verdict: F3 is absent from the S0 operating point (QBMM gated), and the tag
+   split (`k + amr_max_blocks`) it requires buys nothing until an F3-heavy case matters.
+
+## STEP-2 VERDICT (2026-08-22, node k004-001, on-node differenced arms)
+
+**Correctness: proven at every np.** AMR subset 67/67 goldens; XA exchange report
+line-for-line identical in FOUR comparisons (np=4 tripwire, np=4 arm, np=8 both arms);
+output BIT-IDENTICAL across binaries at np=4 (1.5 GB state + 14.8 GB hierarchy file) and
+np=8 (3.1 + 31.3 GB) — which also demonstrates the pipeline is bitwise deterministic
+cross-node, legitimizing bit-diff as the np>2 verification method. VRAM peaks identical
+card-for-card (the chunk pool is host-side).
+
+**Wall (same node, differenced): np=4 421.1 -> 413.0 s (-1.9%); np=8 1246.0 -> 1235.6 s
+(-0.8%).** Both inside the 4.96% noise floor, both the right sign. Mechanism brackets at
+np=8: `rb:wait` 63.9 -> 45.2 (-29%), `rb:gath` 180.1 -> 159.6, `rg:build` -13.4 s; ~11 s
+reabsorbed at `rb:tail`/`rb:xchg` (skew moved one fence later, as the design's own caveat
+predicted).
+
+**THE ATTRIBUTION CORRECTION — read before proposing more exchange work.** `pg:recv` did
+NOT move (np=4: 15.3 -> 16.2 s; np=8: 106.2 -> 101.7 s) even though most level-2 parents
+sit in earlier chunks and DID get the early phase-B send. The banked "158 s rendezvous
+bound" was wrong: the F2 payload is CREATED BY THE REBUILD ITSELF — the parent's store
+exists only after the parent owner's own consume + prolong + device push — so the child's
+wait measures the build-backlog difference between the two owners plus pack/D2H/copy.
+Pre-posting removes none of that. `rb:wait` was the true rendezvous share (~20 s at np=8);
+level-1 sends have no data dependency (`q_cons_base` is host-current before the loop), so
+they overlap fully once posted early. **Further MPI batching of the parent-gather family is
+a dead end; the residual ~100 s yields only to owner-local rebuild (removing the lockstep
+all-ranks box walk) or rebuild-work rebalancing.**
+
+**Node confound recorded:** k004-001's GCD 6 runs hot/slow (rank-6 rhs 237/216 s vs ~175
+mean on BOTH binaries; +8% total GPU compute vs k004-004 on byte-identical work; the seven
+healthy ranks absorb it as 90-129 s of reflux wait). Never compare walls across
+k004-001/k004-004 — the +11.7% cross-node scare that triggered the same-node control was
+entirely this.
+
+**Follow-ups from the expert review round (MPI + AMR auditors, 2026-08-22):** the
+`amr_gcr_*` chunk machinery is scaffolding — absorb and delete it when the v2 plan-based
+exchange (cached per-peer schedules) lands; add a forced-drain counter to
+`s_amr_gsnd_reserve` (cap-64 + width-regrowth triggers) when next instrumenting; the
+program's next constraint is DEAD BYTES (the per-step fill family ships full patches whose
+interior is never read — see the action plan's re-aimed increment list).
 
 ## Step-2 design — REVIEWED 2026-08-22: two independent adversarial reviewers (MPI/deadlock
 ## lens + state/lifetime lens) CONVERGED on one fatal defect and four bindings. The design
