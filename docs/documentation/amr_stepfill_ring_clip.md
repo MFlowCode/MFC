@@ -91,12 +91,14 @@ this work.
   words (own-box, np=1) that XA never sees, and XA ids blend runtime/rebuild/subcycle.
   The word prediction therefore asserts TRANSPORT only; shell correctness rests on
   bit-identity + the poison arm.
-- **Boundary-block coverage** (F5): dynamic regrid clamps boxes off domain boundaries
-  and every existing static golden insets its block, so the shell arithmetic at
-  boundary-extended contributor ranges ships with zero coverage. Close with ONE new
-  static-block golden at `amr_block_beg(1)=0` (np=1 + ppn=2) — or a checker PROHIBIT
-  aligning static blocks with the dynamic clamp (user-visible; maintainer's call —
-  default to the golden).
+- **Boundary-block coverage (F5): CLOSED BY EVIDENCE, no new test.** The attempted
+  boundary golden (static block at 0, ppn=2) aborts in the RUNTIME checker: "amr block
+  must lie at least buff_size cells inside the domain boundaries" — the reviewer's
+  premise (only `>= 0` enforced) missed this simulation-side @:PROHIBIT. Since
+  `amr_cpat_mar = ceil(buff_size/rr) + 1 <= buff_size` for buff_size >= 2, no VALID
+  configuration produces a patch crossing the domain boundary. The implementation
+  asserts the premise instead of handling the case: `@:ASSERT(amr_cpat_mar <=
+  buff_size)` at shell-helper init.
 
 ## Expected payoff, stated as a bound
 
