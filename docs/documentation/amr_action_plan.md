@@ -335,11 +335,14 @@ story). rb:slot and rb:ovl FLAT (-1.7/+0.2). **Post-P1 front CONFIRMED: the per-
 (rb:gath + its rb:tail shadow) and migration (rg:mig, T1 waves) own the remaining scaling
 excess; every S-track share quoted from here on uses THIS pair, not the 2.59x table.**
 3. **Third increment — SELECTED by the post-knob re-baseline (2026-08-21, supersedes the
-   M4-directed menu below): rb:gath + rb:tail (per-box gather batching).** The re-baseline
-   split is decisive (regrid = 57%% of the doubling gap) and the gather's mechanism is
-   already root-caused (s_amr_gather_coarse_patch once per box with a WAITALL + heap allocs
-   each). Judged on rb:gath ms/call flattening across np (5.5x/call growth np=2->np=4 is the
-   baseline) and its rb:tail wait shadow shrinking with it. **Fourth: T1 migration waves**
+   M4-directed menu below): rb:gath + rb:tail (per-box gather batching), scope SHARPENED by
+   the np=8 sub-brackets: rb:gath = pg:recv 99.2 s (level>=2 parent gather's BLOCKING per-box
+   MPI_RECV — the unconverted half of R1) + rb:wait 58.9 s (level-1 WAITALL); pack/unpack/
+   alloc all ~0. BOTH families go through one chunked plan-then-execute (design:
+   amr_regrid_gather_batching.md, updated with the S0 evidence — its old level-1-only scope
+   was matched-point-specific).** Judged on rb:gath ms/call flattening across np and the
+   rb:tail/reflux/seam wait shadows shrinking with it; increment 1 (plan reproduces today's
+   message set, asserted via the I1a XA counters) is the safety net before any batching. **Fourth: T1 migration waves**
    (rg:mig +41.7 s, the largest single item; design v2 reviewed, floor 8-12%%). The old menu
    (S1 lattice tags / I2-I3 waves / S2 balancer) stays written below as the fallback rules if
    either increment's gate fails.
