@@ -367,11 +367,16 @@ np=4 wall came out 421.2 s vs 405.4 pre-P1 (+3.9%%) — **ADJUDICATED AS VARIANC
 arm (410.7 s, rhs 18.88 ms/call vs 18.63 pre-P1 / 19.65 first run; VRAM peaks byte-identical
 across both post-P1 runs). P1 is wall-neutral at np=4, as the mapped-entity law predicts
 (same dummy count per region, different backing). Post-P1 np=4 wall band: 410.7-421.2 s.**
-- **G-A: every absolute-tax number predates the knob AND P1.** The 11.03x matched tax /
-  1.38x payoff / 14.91x idle decomposition were measured pre-allocator-fix; the knob
-  plausibly helps the matched case too. Re-run the matched head-to-head on the post-P1
-  binary WITH the knob before quoting any tax number or ranking P2 — the 14.91x idle factor
-  is P2's justification and may have shrunk.
+- **G-A: CLOSED same night (logs/tax-0821_2241, tax_matched_p1.out; the analyzer reproduces
+  the historical 11.03x on the old file — protocol-exact, stationarity verified at 229.6
+  blocks/step in BOTH windows). MATCHED TAX 11.03x -> 7.06x; PAYOFF vs uniform-at-finest
+  1.38x -> 2.15x; excess over AMReX's 3.13x: 3.52x -> 2.26x.** Delta between the pairs =
+  knob + P1 only (zero solver-algorithm change): the differenced L2 window fell 489.0 ->
+  332.0 s (-32.1%%) at identical fine_work; the uniform window is stable (10.51 -> 11.16 s).
+  Carry-forward caveat: the uniform denominator is still the one flagged 13%% high (open
+  row: uniform re-run at cc59ad38) — honest tax range ~7.0-8.0x. P2's old 14.91x idle
+  factor is now UNMEASURED at the matched point (that decomposition predates both fixes) —
+  re-decompose before ranking P2 against increments 3/4.
 - **G-B: "no performance tax over SOTA" has NO weak-scaling bar.** We compare AMReX at one
   operating point but judge scaling only against ourselves (1.598x/doubling). Run the
   AMReX S0-equivalent at np=2/4/8 on this node (amrex_tax.sh is most of the harness) to

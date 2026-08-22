@@ -21,13 +21,13 @@ module m_amr_regrid
     use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
         & PH_RBREC, PH_RBTOPO
-    use m_amr, only: amr_rg_gather, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_maxc_fit, amr_seam_pairs_dirty, &
-        & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_free_slot, &
-        & s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
-        & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
-        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
-        & f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, &
-        & amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk
+    use m_amr, only: amr_rg_gather, s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
+        & amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
+        & s_amr_alloc_slot_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
+        & s_amr_gather_coarse_patch, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
+        & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
+        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
+        & amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -1457,6 +1457,9 @@ contains
             end do
         end do
 
+        ! gather-batching step 1: derive the whole loop's gather message set up front; the per-box gathers assert against it
+        call s_amr_build_gather_plan(nboxes)
+
         do k = 1, nboxes
             ! free the old-only slots consumed by iterations before this one (last_use = k - 1 fires exactly once; a slot
             ! serving as a NEW owned box keeps living - the reconcile decides it)
@@ -1552,6 +1555,7 @@ contains
             ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
         end do
         deallocate (last_use)
+        amr_gpl_valid = .false.  ! the plan describes THIS rebuild's box loop only; per-step gathers never consult it
 
         ! Drain the deferred gather sends now that every box has been posted: one WAITALL per rebuild instead of
         ! a per-box rendezvous. MUST happen before the send buffers are reused or freed.

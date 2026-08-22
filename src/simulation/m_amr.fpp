@@ -49,6 +49,7 @@ module m_amr
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
     public :: s_amr_br_load_all, s_amr_br_store_all, amr_br_w, amr_br_batch, amr_rg_gather
+    public :: s_amr_build_gather_plan, amr_gpl_valid
     public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, amr_tag_base, &
         & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_free_slot, s_amr_reconcile_slots, &
         & s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, &
@@ -191,6 +192,14 @@ module m_amr
     !> (max-overlap, amr_max_blocks); sized in s_amr_build_seam_pairs
     integer, allocatable :: amr_ovl_gather(:,:), amr_ovl_scatter(:,:)
     integer, allocatable :: amr_ovl_gather_n(:), amr_ovl_scatter_n(:)  !< per-block list lengths
+    !> Rebuild gather PLAN (gather-batching step 1): the whole rebuild's gather message set, derived up front by
+    !! s_amr_build_gather_plan from the replicated caches. Per level-1 slot: contributor count/ranks/message sizes (owner excluded,
+    !! list order = amr_ovl_gather order). Per level>=2 slot: the parent-owner source rank (-1 when co-located, no message) and its
+    !! message size. The per-box gather ASSERTS its inline derivation against this plan (guarded on amr_rg_gather + amr_gpl_valid,
+    !! so per-step gathers never consult it); the chunked exchange of step 2 may trust the plan only because those asserts prove it
+    !! reproduces today's message set exactly.
+    integer, allocatable :: amr_gpl_nsrc(:), amr_gpl_src(:,:), amr_gpl_sz(:,:), amr_gpl_psrc(:), amr_gpl_psz(:)
+    logical              :: amr_gpl_valid = .false.  !< true only between plan build and the end of the rebuild box loop
     !> (0:num_procs-1) SFC Morton-key upper bound per rank from the cost-weighted split; owner = cut-search (f_amr_owner). The O(P)
     !! computed replacement for the O(global_blocks) amr_block_owner table (validated against it during bring-up).
     integer(kind=8), allocatable :: amr_owner_cut(:)
@@ -908,6 +917,70 @@ contains
 
     end subroutine s_amr_gather_send_flush
 
+    !> Gather-batching step 1: derive the ENTIRE rebuild gather message set up front - per level-1 box its contributor ranks and
+    !! message sizes, per level>=2 box its parent source and size - from the same replicated caches the per-box path reads
+    !! (amr_region_*_all, amr_ovl_gather, amr_block_owner, rank coarse ranges, s_amr_parent_foot). Exchange behavior is UNCHANGED by
+    !! this step: the per-box gather asserts against the plan, box by box (see amr_gpl_* declarations). Caller
+    !! (s_amr_regrid_rebuild_slots) clears amr_gpl_valid when its box loop ends.
+    impure subroutine s_amr_build_gather_plan(nboxes)
+
+        integer, intent(in) :: nboxes
+        integer             :: k, ks, idx, r, nsrc, mo, pblk
+        integer             :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), w(3)
+
+        ! the per-box path lazily rebuilds the overlap lists inside the first gather; force the SAME rebuild here so the plan
+        ! and the boxes read identical lists
+
+        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
+        mo = size(amr_ovl_gather, 1)
+        if (allocated(amr_gpl_src)) then
+            if (size(amr_gpl_src, 1) < mo) deallocate (amr_gpl_src, amr_gpl_sz)
+        end if
+        if (.not. allocated(amr_gpl_nsrc)) allocate (amr_gpl_nsrc(amr_max_blocks), amr_gpl_psrc(amr_max_blocks), &
+            & amr_gpl_psz(amr_max_blocks))
+        if (.not. allocated(amr_gpl_src)) allocate (amr_gpl_src(mo, amr_max_blocks), amr_gpl_sz(mo, amr_max_blocks))
+        do k = 1, nboxes
+            ks = f_l0_slot(k)
+            amr_gpl_nsrc(ks) = 0; amr_gpl_psrc(ks) = -1; amr_gpl_psz(ks) = 0
+            if (amr_block_level(ks) >= 2) then
+                pblk = f_amr_parent_block(ks)
+                if (amr_block_owner(pblk) /= amr_block_owner(ks)) then
+                    call s_amr_parent_foot(ks, pblk, plo, phi)
+                    w = 0
+                    w(1) = (phi(1) - plo(1)) + 2*amr_cpat_mar
+                    if (n_glb > 0) w(2) = (phi(2) - plo(2)) + 2*amr_cpat_mar
+                    if (p_glb > 0) w(3) = (phi(3) - plo(3)) + 2*amr_cpat_mar
+                    amr_gpl_psrc(ks) = amr_block_owner(pblk)
+                    amr_gpl_psz(ks) = sys_size*(w(1) + 1)*(w(2) + 1)*(w(3) + 1)
+                end if
+            else
+                ! level-1 patch box: same arithmetic as the gather's patch-frame block (collapsed dims stay 0)
+                plo = 0
+                plo(1) = amr_region_lo_all(1, ks) - amr_cpat_mar
+                if (n_glb > 0) plo(2) = amr_region_lo_all(2, ks) - amr_cpat_mar
+                if (p_glb > 0) plo(3) = amr_region_lo_all(3, ks) - amr_cpat_mar
+                v1hi = (amr_region_hi_all(1, ks) - amr_region_lo_all(1, ks)) + 2*amr_cpat_mar
+                v2hi = 0; v3hi = 0
+                if (n_glb > 0) v2hi = (amr_region_hi_all(2, ks) - amr_region_lo_all(2, ks)) + 2*amr_cpat_mar
+                if (p_glb > 0) v3hi = (amr_region_hi_all(3, ks) - amr_region_lo_all(3, ks)) + 2*amr_cpat_mar
+                phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
+                nsrc = 0
+                do idx = 1, amr_ovl_gather_n(ks)
+                    r = amr_ovl_gather(idx, ks)
+                    if (r == amr_block_owner(ks)) cycle
+                    call s_amr_rank_coarse_range(r, crlo, crhi)
+                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                    nsrc = nsrc + 1
+                    amr_gpl_src(nsrc, ks) = r
+                    amr_gpl_sz(nsrc, ks) = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                end do
+                amr_gpl_nsrc(ks) = nsrc
+            end if
+        end do
+        amr_gpl_valid = .true.
+
+    end subroutine s_amr_build_gather_plan
+
     impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -986,6 +1059,9 @@ contains
             do idx = 1, amr_ovl_gather_n(amr_cur)
                 if (amr_ovl_gather(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
+            if (amr_rg_gather .and. amr_gpl_valid) then
+                @:ASSERT(nsrc == amr_gpl_nsrc(amr_cur), "gather plan: contributor count mismatch")
+            end if
             if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
             if (nsrc > 0) then
                 if (amr_rg_gather) call s_phase_tic(PH_RBALLOC)
@@ -1000,6 +1076,10 @@ contains
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     nsrc = nsrc + 1; srank(nsrc) = r
+                    if (amr_rg_gather .and. amr_gpl_valid) then
+                        @:ASSERT(amr_gpl_src(nsrc, amr_cur) == r .and. amr_gpl_sz(nsrc, amr_cur) == boxsz, &
+                                 & "gather plan: recv entry mismatch")
+                    end if
 #ifdef MFC_MPI
                     call s_xa_rec(XA_F1_RCV, 2, boxsz, amr_cur)
                     call MPI_IRECV(rbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
@@ -1055,6 +1135,14 @@ contains
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                if (amr_rg_gather .and. amr_gpl_valid) then
+                    ! this rank must appear in the plan's contributor list for this box, with this exact size
+                    nsrc = 0
+                    do idx = 1, amr_gpl_nsrc(amr_cur)
+                        if (amr_gpl_src(idx, amr_cur) == proc_rank .and. amr_gpl_sz(idx, amr_cur) == boxsz) nsrc = 1
+                    end do
+                    @:ASSERT(nsrc == 1, "gather plan: send entry mismatch")
+                end if
                 if (amr_rg_gather) call s_phase_tic(PH_RBRSV)
                 call s_amr_gsnd_reserve(maxsz)
                 if (amr_rg_gather) call s_phase_toc(PH_RBRSV)
@@ -1300,6 +1388,13 @@ contains
         integer             :: pblk
 
         pblk = f_amr_parent_block(amr_cur)
+        if (amr_rg_gather .and. amr_gpl_valid) then
+            if (amr_block_owner(pblk) == amr_block_owner(amr_cur)) then
+                @:ASSERT(amr_gpl_psrc(amr_cur) == -1, "gather plan: expected co-located parent")
+            else
+                @:ASSERT(amr_gpl_psrc(amr_cur) == amr_block_owner(pblk), "gather plan: parent source mismatch")
+            end if
+        end if
         ! lock-step fill: gather from the parent's CURRENT fine state. pull_host stays in the signature for the level-1 path.
         ! Owner-guard at the CALL SITE: the parent slot is allocated only on ITS owner, and passing its store slot on any
         ! other rank would dereference an unallocated slot. So both participants enter - the parent's owner to pack and send, the
@@ -1367,6 +1462,9 @@ contains
             ! The pool owns the buffer because an ISEND requires it to stay live until completion; the drain is the existing
             ! s_amr_gather_send_flush after the rebuild's box loop.
             boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
+            if (amr_rg_gather .and. amr_gpl_valid) then
+                @:ASSERT(amr_gpl_psz(amr_cur) == boxsz, "gather plan: parent send size mismatch")
+            end if
             call s_amr_gsnd_reserve(boxsz)
             amr_gsnd_n = amr_gsnd_n + 1
             call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, amr_gsnd_pool(:,amr_gsnd_n))
@@ -1401,6 +1499,9 @@ contains
 #ifdef MFC_MPI
         powner = amr_block_owner(pblk)
         boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
+        if (amr_rg_gather .and. amr_gpl_valid) then
+            @:ASSERT(amr_gpl_psrc(amr_cur) == powner .and. amr_gpl_psz(amr_cur) == boxsz, "gather plan: parent recv mismatch")
+        end if
         allocate (xbuf(boxsz))
         call s_xa_rec(XA_F2_RCV, 2, boxsz, amr_cur)
         call MPI_RECV(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
@@ -7184,6 +7285,7 @@ contains
             if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
             if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
             deallocate (amr_ovl_gather_n, amr_ovl_scatter_n)
+            if (allocated(amr_gpl_nsrc)) deallocate (amr_gpl_nsrc, amr_gpl_src, amr_gpl_sz, amr_gpl_psrc, amr_gpl_psz)
             deallocate (amr_slots)
             deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
             deallocate (amr_block_owner, amr_block_level)
@@ -7225,6 +7327,7 @@ contains
         if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
         if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
         deallocate (amr_ovl_gather_n, amr_ovl_scatter_n)
+        if (allocated(amr_gpl_nsrc)) deallocate (amr_gpl_nsrc, amr_gpl_src, amr_gpl_sz, amr_gpl_psrc, amr_gpl_psz)
         do i = 1, sys_size
             @:DEALLOCATE(amr_cg(i)%sf)
         end do
