@@ -26,6 +26,7 @@ module m_amr
     use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_phase_timing
+    use m_amr_xchg_audit  ! I1a: per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps, ib_markers
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
@@ -991,6 +992,7 @@ contains
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     nsrc = nsrc + 1; srank(nsrc) = r
 #ifdef MFC_MPI
+                    call s_xa_rec(XA_F1_RCV, 2, boxsz, amr_cur)
                     call MPI_IRECV(rbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
                 end do
@@ -1070,6 +1072,7 @@ contains
                 ! NON-BLOCKING: the owner's per-box IRECV/WAITALL still orders the data correctly, but this rank no longer
                 ! rendezvouses on every box. Completed by s_amr_gather_send_flush (caller) or the drain in s_amr_gsnd_reserve.
                 if (amr_rg_gather) call s_phase_tic(PH_RBSEND)
+                call s_xa_rec(XA_F1_SND, 1, boxsz, amr_cur)
                 call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, &
                                & amr_gsnd_req(amr_gsnd_n), ierr)
                 if (amr_rg_gather) call s_phase_toc(PH_RBSEND)
@@ -1176,6 +1179,7 @@ contains
                     boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     nsrc = nsrc + 1; srank(nsrc) = r
 #ifdef MFC_MPI
+                    call s_xa_rec(XA_F3_RCV, 2, boxsz, amr_cur)
                     call MPI_IRECV(rbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
                 end do
@@ -1264,6 +1268,7 @@ contains
                     end do
                 end if
 #ifdef MFC_MPI
+                call s_xa_rec(XA_F3_SND, 1, boxsz, amr_cur)
                 call MPI_SEND(sbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
 #endif
                 deallocate (sbuf)
@@ -1356,6 +1361,7 @@ contains
             call s_amr_gsnd_reserve(boxsz)
             amr_gsnd_n = amr_gsnd_n + 1
             call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, amr_gsnd_pool(:,amr_gsnd_n))
+            call s_xa_rec(XA_F2_SND, 1, boxsz, amr_cur)
             call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, amr_gsnd_req(amr_gsnd_n), &
                            & ierr)
 #endif
@@ -1387,6 +1393,7 @@ contains
         powner = amr_block_owner(pblk)
         boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
         allocate (xbuf(boxsz))
+        call s_xa_rec(XA_F2_RCV, 2, boxsz, amr_cur)
         call MPI_RECV(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
         call s_amr_unpack_parent_patch_device(w1, w2, w3, xbuf, to_host)
         deallocate (xbuf)
@@ -1949,8 +1956,10 @@ contains
                         if (${D}$ <= num_dims) then
                             cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
                             nreq = nreq + 1
+                            call s_xa_rec(XA_F5_FACE_SND, 1, cnt, ${2*D}$)
                             call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, r, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
                             nreq = nreq + 1
+                            call s_xa_rec(XA_F5_FACE_SND, 1, cnt, ${2*D + 1}$)
                             call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, r, ${2*D + 1}$, MPI_COMM_WORLD, reqs(nreq), &
                                            & ierr)
                         end if
@@ -1973,8 +1982,10 @@ contains
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
                     nreq = nreq + 1
+                    call s_xa_rec(XA_F5_FACE_RCV, 2, cnt, ${2*D}$)
                     call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
                     nreq = nreq + 1
+                    call s_xa_rec(XA_F5_FACE_RCV, 2, cnt, ${2*D + 1}$)
                     call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D + 1}$, MPI_COMM_WORLD, reqs(nreq), ierr)
                 end if
             #:endfor
@@ -2870,6 +2881,7 @@ contains
                     ! child-sum order and wp values as the device overwrite above) - no full-field host pull
                     call s_amr_restrict_pack_device(amr_loc_of(amr_cur), bl, bh, rlo, rr, dj_hi, dk_hi, nchild, sbuf(1:boxsz,nsrc))
 #ifdef MFC_MPI
+                    call s_xa_rec(XA_F7A_SND, 1, boxsz, amr_cur)
                     call MPI_ISEND(sbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
                 end do
@@ -2886,6 +2898,7 @@ contains
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                 allocate (rbuf(boxsz))
 #ifdef MFC_MPI
+                call s_xa_rec(XA_F7A_RCV, 2, boxsz, amr_cur)
                 call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
                 ! DEVICE unpack of the covered box, writing only those cells (a whole-array push would clobber the device-advanced
@@ -2949,8 +2962,10 @@ contains
         allocate (xbuf(boxsz))
         if (proc_rank == cowner) then
             call s_amr_restrict_pack_device(amr_loc_of(amr_cur), plo, phi, plo, rr, dj_hi, dk_hi, nchild, xbuf)
+            call s_xa_rec(XA_F7B_SND, 1, boxsz, amr_cur)
             call MPI_SEND(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, ierr)
         else
+            call s_xa_rec(XA_F7B_RCV, 2, boxsz, amr_cur)
             call MPI_RECV(xbuf, boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
             ! DEVICE unpack of just the covered box - never a host unpack plus a strided GPU_UPDATE (see the L0 scatter's note: AMD
             ! flang copies a non-contiguous 3-D section as contiguous elements and silently corrupts neighbouring cells).
@@ -2983,7 +2998,9 @@ contains
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
                     $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    call s_xa_rec(XA_F5_FREG_SND, 1, cnt, ${40 + 2*D}$)
                     call MPI_SEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, powner, ${40 + 2*D}$, MPI_COMM_WORLD, ierr)
+                    call s_xa_rec(XA_F5_FREG_SND, 1, cnt, ${41 + 2*D}$)
                     call MPI_SEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, powner, ${41 + 2*D}$, MPI_COMM_WORLD, ierr)
                 end if
             #:endfor
@@ -2991,8 +3008,10 @@ contains
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${40 + 2*D}$)
                     call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, cowner, ${40 + 2*D}$, MPI_COMM_WORLD, &
                                   & MPI_STATUS_IGNORE, ierr)
+                    call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${41 + 2*D}$)
                     call MPI_RECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, cowner, ${41 + 2*D}$, MPI_COMM_WORLD, &
                                   & MPI_STATUS_IGNORE, ierr)
                     $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
@@ -3762,6 +3781,7 @@ contains
                     ! buffer, same child-sum as the device overwrite above) - no full-field fine host pull
                     call s_amr_restrict_pbmv_pack_device(pb_fin, mv_fin, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, sbuf(1:boxsz,nsrc))
 #ifdef MFC_MPI
+                    call s_xa_rec(XA_F7C_SND, 1, boxsz, amr_cur)
                     call MPI_ISEND(sbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
                 end do
@@ -3778,6 +3798,7 @@ contains
                 boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                 allocate (rbuf(boxsz))
 #ifdef MFC_MPI
+                call s_xa_rec(XA_F7C_RCV, 2, boxsz, amr_cur)
                 call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
                 ! DEVICE unpack, writing only the covered cells (a whole-array push would clobber device-advanced non-covered
@@ -4794,6 +4815,7 @@ contains
                 ! send xb high interior
                 call s_amr_fine_slice(xb, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
 #ifdef MFC_MPI
+                call s_xa_rec(XA_F6_XY, 1, cnt, 4200); call s_xa_rec(XA_F6_XY, 2, cnt, 4201)
                 call MPI_SENDRECV(amr_seambuf_x(1:cnt), cnt, mpi_p, rY, 4200, amr_seambuf_y(1:cnt), cnt, mpi_p, rY, 4201, &
                                   & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
@@ -4803,6 +4825,7 @@ contains
                 ! send yb low interior
                 call s_amr_fine_slice(yb, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)
 #ifdef MFC_MPI
+                call s_xa_rec(XA_F6_YX, 1, cnt, 4201); call s_xa_rec(XA_F6_YX, 2, cnt, 4200)
                 call MPI_SENDRECV(amr_seambuf_y(1:cnt), cnt, mpi_p, rX, 4201, amr_seambuf_x(1:cnt), cnt, mpi_p, rX, 4200, &
                                   & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
@@ -5849,6 +5872,13 @@ contains
         write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-recon] rank ', proc_rank, ' live ', nliv, ' loc_n ', amr_loc_n, &
                & ' freed ', nfr, ' newalloc ', nal, ' stack_in ', nfree_in, ' stack_out ', amr_loc_nfree
 #endif
+        ! I1a invariant: no stash-only slot survives a reconcile - every migration replica was freed (early-free or the walk
+        ! above) or upgraded to a full slot by the owned-path alloc. A survivor would reach the solver with no q_prim/rhs.
+        do k = 1, amr_max_blocks
+            if (amr_slot_live(k)) then
+                @:ASSERT(allocated(amr_slots(k)%q_prim), "a stash-only replica slot survived reconcile")
+            end if
+        end do
         ! every reader of a stale slot has finished by here (the rebuild's overlap carry-forward is done and the next rebuild
         ! has not started), which is what makes the renumbering safe - see s_amr_compact_store.
         call s_amr_compact_store()
@@ -6278,12 +6308,14 @@ contains
                 allocate (buf(cnt))
                 call s_l0_pack_unpack_block_sf(q_cons_vf, o1, o2, o3, fm1, fm2, fm3, buf, .true.)
 #ifdef MFC_MPI
+                call s_xa_rec(XA_L0_FILL_SND, 1, cnt, k)
                 call MPI_SEND(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, ierr)
 #endif
                 deallocate (buf)
             else if (proc_rank == bown) then  ! compute owner: recv, device-unpack into the tile interior
                 allocate (buf(cnt))
 #ifdef MFC_MPI
+                call s_xa_rec(XA_L0_FILL_RCV, 2, cnt, k)
                 call MPI_RECV(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
                 call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, fm1, fm2, fm3, buf, .false.)
@@ -6341,6 +6373,7 @@ contains
                 allocate (buf(cnt))
                 call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, fm1, fm2, fm3, buf, .true.)
 #ifdef MFC_MPI
+                call s_xa_rec(XA_L0_SCAT_SND, 1, cnt, k)
                 call MPI_SEND(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, ierr)
 #endif
                 deallocate (buf)
@@ -6348,6 +6381,7 @@ contains
                 call s_l0_tile_l0_offsets(k, o1, o2, o3)  ! GPU_UPDATE(host) s_save_data does before writing)
                 allocate (buf(cnt))
 #ifdef MFC_MPI
+                call s_xa_rec(XA_L0_SCAT_RCV, 2, cnt, k)
                 call MPI_RECV(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
                 call s_l0_pack_unpack_block_sf(q_cons_vf, o1, o2, o3, fm1, fm2, fm3, buf, .false.)
@@ -6435,12 +6469,14 @@ contains
                 allocate (buf(cnt))
                 call s_l0_pack_unpack_block_sf(rhs_delta, o1, o2, o3, fm1, fm2, fm3, buf, .true.)
 #ifdef MFC_MPI
+                call s_xa_rec(XA_L0_RFLX_SND, 1, cnt, k)
                 call MPI_SEND(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, ierr)
 #endif
                 deallocate (buf)
             else if (proc_rank == bown) then  ! compute owner: recv, device-ADD the delta into the tile rhs
                 allocate (buf(cnt))
 #ifdef MFC_MPI
+                call s_xa_rec(XA_L0_RFLX_RCV, 2, cnt, k)
                 call MPI_RECV(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
                 call s_l0_unpack_add_block(amr_slots(k)%rhs, fm1, fm2, fm3, buf)
@@ -6495,12 +6531,14 @@ contains
                     allocate (buf(cnt))
                     call s_l0_pack_unpack_block_sf(q_cons_vf, lo1, lo2, lo3, e1, e2, e3, buf, .true.)
 #ifdef MFC_MPI
+                    call s_xa_rec(XA_L0_REST_SND, 1, cnt, 4400 + k)
                     call MPI_SEND(buf, cnt, mpi_p, bown, 4400 + k, MPI_COMM_WORLD, ierr)
 #endif
                     deallocate (buf)
                 else if (proc_rank == bown) then  ! compute owner: recv, device-unpack (overwrite) into the tile covered cells
                     allocate (buf(cnt))
 #ifdef MFC_MPI
+                    call s_xa_rec(XA_L0_REST_RCV, 2, cnt, 4400 + k)
                     call MPI_RECV(buf, cnt, mpi_p, lown, 4400 + k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
                     call s_l0_pack_unpack_block_st(amr_loc_of(k), to1, to2, to3, e1, e2, e3, buf, .false.)
@@ -6534,6 +6572,7 @@ contains
             allocate (buf(cnt))
             call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, ni, nj, nl, buf, .true.)
 #ifdef MFC_MPI
+            call s_xa_rec(XA_L0_MIGR_SND, 1, cnt, 4300)
             call MPI_SEND(buf, cnt, mpi_p, new_owner, 4300, MPI_COMM_WORLD, ierr)
 #endif
             deallocate (buf)
@@ -6542,6 +6581,7 @@ contains
             call s_l0_build_tile_slot(k)
             allocate (buf(cnt))
 #ifdef MFC_MPI
+            call s_xa_rec(XA_L0_MIGR_RCV, 2, cnt, 4300)
             call MPI_RECV(buf, cnt, mpi_p, old_owner, 4300, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
             call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, ni, nj, nl, buf, .false.)
@@ -7082,6 +7122,10 @@ contains
 
         integer :: i, islot
 
+        ! BEFORE the amr early-return: the report's conservation allreduce is collective, and the L0 tile
+        ! families can fire with amr = F. All ranks take the same path either way.
+
+        call s_xa_report()
         if (.not. amr) return
         do islot = 1, amr_max_blocks
             call s_amr_free_slot(islot)

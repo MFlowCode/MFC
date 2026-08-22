@@ -79,6 +79,7 @@
       "m_amr_regrid",
       "m_amr_restart",
       "m_amr_registers",
+      "m_amr_xchg_audit",
       "m_constants",
       "m_precision_select",
       "m_helper",
