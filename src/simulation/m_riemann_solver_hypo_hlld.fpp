@@ -103,14 +103,15 @@ contains
 
         ! HLLD Hypo variables
 
-        real(wp) :: G_eff, G_eff_tol, C_NC, sqrtC_NC
-        real(wp) :: A_L, A_R, denomA, fac_L, fac_R
-        real(wp) :: u_n_L, u_t_L, u_n_R, u_t_R
-        real(wp) :: u_t2_L, u_t2_R
-        real(wp) :: tau_nn_L, tau_nt_L, tau_tt_L, tau_nn_R, tau_nt_R, tau_tt_R
-        real(wp) :: tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R
-        real(wp) :: tau_qq_L, tau_qq_R
-        real(wp) :: G_L, G_R
+        real(wp)        :: G_eff, G_eff_tol, C_NC, sqrtC_NC
+        real(wp)        :: A_L, A_R, denomA, fac_L, fac_R
+        real(wp)        :: u_n_L, u_t_L, u_n_R, u_t_R
+        real(wp)        :: u_t2_L, u_t2_R
+        real(wp)        :: tau_nn_L, tau_nt_L, tau_tt_L, tau_nn_R, tau_nt_R, tau_tt_R
+        real(wp)        :: tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R
+        real(wp)        :: tau_qq_L, tau_qq_R
+        real(wp)        :: G_L, G_R
+        type(eos_state) :: eos_s_L, eos_s_R
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(6) :: tau_e_L, tau_e_R
         #:else
@@ -183,7 +184,7 @@ contains
                 #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,shear_degenerate,fan_fallback,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,G_eff,G_eff_tol,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
-                #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
+                #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum,eos_s_L,eos_s_R]'
                 ! Wave-fan side table for the per-component F_hlld fold below: side name, the side's two zones,
                 ! its starstar zone, and the outer/inner wave speeds. The L and R sides are mirror images.
                 #:set HLLD_FAN_SIDES = [('L', 1, 2, 2, 'S_L', 'S_Lstar'), ('R', 3, 4, 3, 'S_R', 'S_Rstar')]
@@ -357,10 +358,11 @@ contains
 
                             ! Compute Riemann states
 
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H%L, alpha_L, vel_rms%L, 0._wp, c%L, &
-                                                          & qv%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H%R, alpha_R, vel_rms%R, 0._wp, c%R, &
-                                                          & qv%R)
+                            eos_s_L = eos_state(rho%L, pres%L, gamma%L, pi_inf%L, qv%L, vel_rms%L, H%L, 0._wp)
+                            call s_compute_speed_of_sound(eos_s_L, alpha_L, c%L)
+
+                            eos_s_R = eos_state(rho%R, pres%R, gamma%R, pi_inf%R, qv%R, vel_rms%R, H%R, 0._wp)
+                            call s_compute_speed_of_sound(eos_s_R, alpha_R, c%R)
 
                             S_L = min(u_n_L - sqrt(max(verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L)), &
                                       & u_n_R - sqrt(max(verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R)))

@@ -511,6 +511,7 @@ contains
         real(wp)               :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)               :: vel_K_sum, vel_dv_dt_sum
         integer                :: i, j, k, r  !< Generic loop iterators
+        type(eos_state)        :: eos_s
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
 
@@ -597,7 +598,7 @@ contains
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, H, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j]', copyin='[dir_idx]')
+                                    & vel_dv_dt_sum, i, j, eos_s]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         ! Transferring the Primitive Variables
@@ -661,7 +662,8 @@ contains
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv_local, vel_K_sum, 0._wp, c, qv)
+                        call s_eos_state_roe(eos_s, pres, rho, gamma, pi_inf, qv, vel_K_sum, H)
+                        call s_compute_speed_of_sound(eos_s, adv_local, c)
 
                         ! First-Order Spatial Derivatives of Primitive Variables
 

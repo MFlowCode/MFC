@@ -659,14 +659,15 @@ contains
         real(wp)               :: dt_local
         integer                :: j, k, l  !< Generic loop iterators
         integer                :: fl       !< Fluid loop iterator
+        type(eos_state)        :: eos_s
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
         dt_local = huge(1.0_wp)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt]', &
-                            & reduction='[[dt_local]]', reductionOp='[min]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt, &
+                            & eos_s]', reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -677,7 +678,8 @@ contains
                     end if
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+                    call s_eos_state_roe(eos_s, pres, rho, gamma, pi_inf, qv, vel_sum, H)
+                    call s_compute_speed_of_sound(eos_s, alpha, c)
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp

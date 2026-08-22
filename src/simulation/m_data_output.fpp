@@ -184,6 +184,7 @@ contains
         real(wp)               :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
         real(wp)               :: icfl, vcfl, ccfl, Rc
         integer                :: fl                          !< Fluid loop iterator
+        type(eos_state)        :: eos_s
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
@@ -191,14 +192,15 @@ contains
         Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
-                            & vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
-                            & reductionOp='[max, min]')
+                            & vcfl, Rc, ccfl, fl, eos_s]', reduction='[[icfl_max_loc, vcfl_max_loc, &
+                            & ccfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+                    call s_eos_state_roe(eos_s, pres, rho, gamma, pi_inf, qv, vel_sum, H)
+                    call s_compute_speed_of_sound(eos_s, alpha, c)
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp
@@ -1154,6 +1156,7 @@ contains
         real(wp)                        :: nondim_time       !< Non-dimensional time
         real(wp)                        :: tmp               !< Temporary variable to store quantity for mpi_allreduce
         real(wp)                        :: rhoYks(1:num_species)
+        type(eos_state)                 :: eos_s
 
         T = dflt_T_guess
 
@@ -1291,8 +1294,8 @@ contains
                     end if
 
                     ! Compute mixture sound Speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, &
-                                                  & 0._wp, c, qv)
+                    call s_eos_state(eos_s, pres, rho, gamma, pi_inf, qv, 0._wp)
+                    call s_compute_speed_of_sound(eos_s, alpha, c)
                     if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                     accel = accel_mag(j - 2, k, l)
@@ -1375,8 +1378,8 @@ contains
                             Rdot(:) = nRdot(:)/nbub
                         end if
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
-                                                      & 0._wp, 0._wp, c, qv)
+                        call s_eos_state(eos_s, pres, rho, gamma, pi_inf, qv, 0._wp)
+                        call s_compute_speed_of_sound(eos_s, alpha, c)
                         if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
                     end if
                 end if
@@ -1445,8 +1448,8 @@ contains
                             end if
 
                             ! Compute mixture sound speed
-                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
-                                                          & 0._wp, 0._wp, c, qv)
+                            call s_eos_state(eos_s, pres, rho, gamma, pi_inf, qv, 0._wp)
+                            call s_compute_speed_of_sound(eos_s, alpha, c)
                             if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)

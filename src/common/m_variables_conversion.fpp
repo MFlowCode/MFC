@@ -25,7 +25,7 @@ module m_variables_conversion
         & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
-        & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_fast_magnetosonic_speed, &
+        & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_fast_magnetosonic_speed, s_eos_state, s_eos_state_roe, &
         & s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
@@ -1202,55 +1202,92 @@ contains
 
     end subroutine s_finalize_variables_conversion_module
 
+    !> Build an exact thermodynamic state. The specific total enthalpy is derived here rather than supplied, so it cannot disagree
+    !! with qv: H = (E + p)/rho with E = gamma*p + pi_inf + qv + rho*|u|^2/2. Every caller that previously open-coded the closed
+    !! form should use this, which makes the defect in #1707 unrepresentable.
+    subroutine s_eos_state(s, pres, rho, gamma, pi_inf, qv, vel_sum)
+
+        $:GPU_ROUTINE(function_name='s_eos_state', parallelism='[seq]', cray_inline=True)
+
+        type(eos_state), intent(out) :: s
+        real(wp), intent(in)         :: pres, rho, gamma, pi_inf, qv, vel_sum
+
+        s%pres = pres
+        s%rho = rho
+        s%gamma = gamma
+        s%pi_inf = pi_inf
+        s%qv = qv
+        s%vel_sum = vel_sum
+        s%c_c = 0._wp
+        s%H = ((gamma + 1._wp)*pres + pi_inf + qv)/rho + 5.e-1_wp*vel_sum
+
+    end subroutine s_eos_state
+
+    !> Build a state whose enthalpy is supplied by the caller. The Roe-averaged Riemann paths, the chemistry Roe branch and the
+    !! relativistic branch all pass an H that is deliberately not the exact enthalpy of the state, so they cannot use s_eos_state.
+    subroutine s_eos_state_roe(s, pres, rho, gamma, pi_inf, qv, vel_sum, H)
+
+        $:GPU_ROUTINE(function_name='s_eos_state_roe', parallelism='[seq]', cray_inline=True)
+
+        type(eos_state), intent(out) :: s
+        real(wp), intent(in)         :: pres, rho, gamma, pi_inf, qv, vel_sum, H
+
+        s%pres = pres
+        s%rho = rho
+        s%gamma = gamma
+        s%pi_inf = pi_inf
+        s%qv = qv
+        s%vel_sum = vel_sum
+        s%H = H
+        s%c_c = 0._wp
+
+    end subroutine s_eos_state_roe
+
     !> Compute the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
+    subroutine s_compute_speed_of_sound(s, adv, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in) :: pres
-        real(wp), intent(in) :: rho, gamma, pi_inf, qv
-        real(wp), intent(in) :: H
+        type(eos_state), intent(in) :: s
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3), intent(in) :: adv
         #:else
             real(wp), dimension(num_fluids), intent(in) :: adv
         #:endif
-        real(wp), intent(in)  :: vel_sum
-        real(wp), intent(in)  :: c_c
         real(wp), intent(out) :: c
         real(wp)              :: blkmod1, blkmod2
         integer               :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
-            if (avg_state == avg_state_roe .and. abs(c_c) > verysmall) then
-                c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
+            if (avg_state == avg_state_roe .and. abs(s%c_c) > verysmall) then
+                c = sqrt(s%c_c - (s%gamma - 1.0_wp)*(s%vel_sum - s%H))
             else
-                c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
+                c = sqrt((1.0_wp + 1.0_wp/s%gamma)*s%pres/s%rho)
             end if
         else if (relativity) then  ! Relativistic sound speed
-            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
+            c = sqrt((1._wp + 1._wp/s%gamma)*s%pres/s%rho/s%H)
         else
             if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
-                blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
-                blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
-                c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
+                blkmod1 = ((gammas(1) + 1._wp)*s%pres + pi_infs(1))/gammas(1)
+                blkmod2 = ((gammas(2) + 1._wp)*s%pres + pi_infs(2))/gammas(2)
+                c = (1._wp/(s%rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
             else if (model_eqns == model_eqns_6eq) then  ! Six-equation model sound speed
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
-                    c = c + adv(q)*gs_min(q)*(pres + pi_infs(q)/(gammas(q) + 1._wp))
+                    c = c + adv(q)*gs_min(q)*(s%pres + pi_infs(q)/(gammas(q) + 1._wp))
                 end do
-                c = c/rho
+                c = c/s%rho
             else if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
                 ! Sound speed for bubble mixture to order O(\alpha)
 
                 if (mpp_lim .and. (num_fluids > 1)) then
-                    c = (1._wp/gamma + 1._wp)*(pres + pi_inf/(gamma + 1._wp))/rho
+                    c = (1._wp/s%gamma + 1._wp)*(s%pres + s%pi_inf/(s%gamma + 1._wp))/s%rho
                 else
-                    c = (1._wp/gamma + 1._wp)*(pres + pi_inf/(gamma + 1._wp))/(rho*(1._wp - adv(num_fluids)))
+                    c = (1._wp/s%gamma + 1._wp)*(s%pres + s%pi_inf/(s%gamma + 1._wp))/(s%rho*(1._wp - adv(num_fluids)))
                 end if
             else
-                c = (H - 5.e-1*vel_sum - qv/rho)/gamma
+                c = (s%H - 5.e-1*s%vel_sum - s%qv/s%rho)/s%gamma
             end if
 
             if (mixture_err .and. c < 0._wp) then
