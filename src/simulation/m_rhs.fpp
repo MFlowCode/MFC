@@ -842,6 +842,13 @@ contains
             call nvtxEndRange
         end if
 
+        ! ptil is a probe-output diagnostic only, so evaluate it only when probes are on.
+        ! This sits outside the source-term branch above so that the qbmm and adap_dt
+        ! paths, which skip that branch, still get a filled ptil.
+        if (bubbles_euler .and. probe_wrt) then
+            call s_compute_ptilde(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size))
+        end if
+
         if (bubbles_lagrange) then
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
