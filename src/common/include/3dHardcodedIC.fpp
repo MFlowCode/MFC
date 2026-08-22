@@ -258,6 +258,12 @@
                   & j, k))*g0_ic*(ih(start_idx(1) + i, start_idx(3) + k) - y_cc(j))
 
         if (surface_tension) q_prim_vf(eqn_idx%c)%sf(i, j, k) = alph
+    case (306)  ! Smooth density blob on a uniform background (the AMR S0/matched benchmark IC)
+        ! VERBATIM the codegen output for the analytic form "1 + 4*exp(-(cos(pi*x)**2 + cos(pi*y)**2 + cos(pi*z)**2)/0.15)"
+        ! (same literals, same parenthesization) so the field is bit-identical to the analytic-IC path while the case dict
+        ! stays codegen-free - benchmark cases stop rewriting case.fpp and forcing a rebuild on every case switch
+        q_prim_vf(eqn_idx%cont%beg + 0)%sf(i, j, &
+                  & k) = 1 + 4*exp((-(cos(pi*x_cc(i))**2 + cos(pi*y_cc(j))**2 + cos(pi*z_cc(k))**2))/0.15)
     case (370)  ! 3D extrusion of 2D profile from external data
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()

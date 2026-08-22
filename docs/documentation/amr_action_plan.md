@@ -46,8 +46,15 @@ against source) re-aims the increment ladder:**
    cached per-peer schedules): absorb and delete it when I2 lands — two parallel exchange
    frameworks is the D2 failure mode as code.
 
+**Matched-tax rung at HEAD (logs/tax-0822_1154, tax_analyze.py protocol-exact,
+stationarity 229.6 blocks/step in window): TAX 7.06x -> 6.81x, payoff 2.15x -> 2.23x,
+excess over AMReX's 3.13x now 2.18x.** Ladder: 23.92 -> 11.03 -> 7.06 -> 6.81x. The new
+rung was measured on k004-001 (the slow-GCD6 node) so it is conservative; the differenced
+L2 window fell 332.0 -> 302.8 s (-8.8%) despite the node. Uniform-denominator caveat
+carries: honest range ~6.8-7.8x.
+
 Still open and unchanged: the uniform-denominator re-run (13% tax error bar), the P2 idle
-re-decomposition (gates the Phase-2 contract), I1b, and the matched-tax rung at HEAD.
+re-decomposition (gates the Phase-2 contract), and I1b.
 
 ## 2026-08-21 — PHASE 0 MEASUREMENTS (endstate ladder): three verdicts in one night
 
