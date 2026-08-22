@@ -877,7 +877,7 @@ contains
             call nvtxEndRange
         end if
 
-        if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
+        if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, q_prim_qp%vf, rhs_vf)
 
         ! END: Additional physics and source terms
 

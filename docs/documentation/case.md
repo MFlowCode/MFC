@@ -1142,7 +1142,7 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | `rburn%%n`         | Real    | Reactive-burn pressure-drive exponent               |
 | `rburn%%ta`        | Real    | Reactive-burn activation temperature [K] (0 = off)  |
 
-- `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) (\cite Cao19).
+- `cont_damage` activates the continuum damage model for hypoelastic solid materials (requires `hypoelasticity = T`; HLL/HLLC only). Damage is produced by tensile maximum principal Cauchy stress beyond `tau_star` (\f$\geq 0\f$) at rate `(alpha_bar*(sigma_1 - tau_star))**cont_damage_s` and is transported with the damageable-solid partial mass; see @ref equations for the model statement (\cite Cao19; \cite Spratt24). `tau_star`, `cont_damage_s` (\f$> 0\f$), and `alpha_bar` (\f$\geq 0\f$) are empirically determined.
 
 - `reactive_burn` converts a "reactant" fluid into a "product" fluid (`num_fluids = 2`, ``chemistry = 'F'``) via a programmed pressure burn `dlambda/dt = rburn%%k (1 - lambda) ((p - rburn%%pign)/rburn%%pref)^rburn%%n`. The two fluids share the same `gamma`/`pi_inf` and differ only in `qv`, so the conversion releases `qv` through the mixture EOS — a reactive-Euler/ZND detonation model on the diffuse-interface framework. It runs on the 5-equation (`model_eqns = 2`) and 6-equation (`model_eqns = 3`) multi-fluid models. Setting `rburn%%ta > 0` multiplies the rate by an Arrhenius factor `exp(-rburn%%ta/T)`, where `T` is the reactant phasic temperature, giving temperature-driven ignition instead of a pure pressure switch.
 
