@@ -349,7 +349,21 @@ excess; every S-track share quoted from here on uses THIS pair, not the 2.59x ta
    balancer path (only if M4b's rule fires). One front at a time; the other rules stay written
    so the choice is a lookup, not a debate.
 
-**AUDIT GAPS (2026-08-21 planning audit — both are cheap, parallel, zero-code):**
+**P1 LANDED (f5f99337) AND GATED (2026-08-21 night, logs/p1gate-0821_2144, pin e964b45f):**
+subset 67/67 incl. both churn goldens. **np=4 peaks 30.2-39.5 GiB vs 63.6 pre-P1 (~27 GiB
+drop; gate was >=10). np=8 COMPLETED FOR THE FIRST TIME EVER: rc=0, peaks 39.0-51.3 GiB
+(predicted ~48), live 72-75 boxes/rank — the MEMORY axis (W8) now holds through np=8 at
+fixed 200^3/rank.** First np=8 phase budget (wall 1106.0 s = 2.63x over np=4): regrid 48.1%%
+(rg:mig 204.8 s over 11 migration events vs 4 at np=4; rg:build 287.9 with rb:gath 168.5 s =
+15.2%% of wall at 6104 calls, 27.6 ms/call) + gather 14.3%% (2.42 ms/call, 3.2x np=4) +
+reflux 5.3%% + seam 4.5%%; rhs healthy at 15.7%% (21.3 ms/call). **The np=8 wall IS the
+per-box gather + migration — increments 3 (rb:gath) and 4 (T1) confirmed with force.**
+Two predictions corrected, honestly: rb:slot did NOT collapse (21.1 s at np=4, unchanged —
+that bracket is dominated by host-staged store growth, not the removed per-slot allocs), and
+np=4 wall came out 421.2 s vs 405.4 pre-P1 (+3.9%%) — **ADJUDICATED AS VARIANCE by a repeat
+arm (410.7 s, rhs 18.88 ms/call vs 18.63 pre-P1 / 19.65 first run; VRAM peaks byte-identical
+across both post-P1 runs). P1 is wall-neutral at np=4, as the mapped-entity law predicts
+(same dummy count per region, different backing). Post-P1 np=4 wall band: 410.7-421.2 s.**
 - **G-A: every absolute-tax number predates the knob AND P1.** The 11.03x matched tax /
   1.38x payoff / 14.91x idle decomposition were measured pre-allocator-fix; the knob
   plausibly helps the matched case too. Re-run the matched head-to-head on the post-P1
