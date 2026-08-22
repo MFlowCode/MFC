@@ -103,8 +103,64 @@ is the single knob trading memory against message count.
    np=4, first rebuild). The plan may now be trusted by step 2.
 2. Chunked exchange for BOTH families, `pull_host = .false.` only (see the S0 np=8 scope
    section above: pre-post the chunk's level-1 IRECVs and the level>=2 per-box IRECVs, sends
-   stay pooled, consume in box order).
+   stay pooled, consume in box order). **Full design below — review before implementing.**
 3. Extend to the pb/mv gather (`s_amr_gather_coarse_patch_pbmv`) if step 2 pays.
+
+## Step-2 design (written 2026-08-22 00:15, from the step-1 audit; review-then-implement)
+
+Restructure `s_amr_regrid_rebuild_slots`'s box loop into chunks of `CHUNK` boxes (start 32):
+
+```
+call s_amr_build_gather_plan(nboxes)
+do c_lo = 1, nboxes, CHUNK
+    c_hi = min(c_lo + CHUNK - 1, nboxes)
+    A: post   - for each box k in chunk I OWN: IRECVs per plan entry (level-1: one per
+                contributor; level>=2 split: one from the parent owner), tag k, into the
+                chunk recv pool; requests appended IN BOX ORDER so each box's requests are
+                a contiguous run.
+    B: send   - for each box k in chunk where I contribute (level-1: plan lists me;
+                level>=2: I own the parent, split): pack + pooled ISEND exactly as today
+                (s_amr_gsnd_reserve/amr_gsnd_pool unchanged, forced drains included).
+    C: consume - per box k in chunk, IN ORDER: the existing per-box body (early-free,
+                alloc, geometry) but the gather call replaced by: set amr_cpat_off for k;
+                own-slice host copy; MPI_WAITALL on k's contiguous request run; unpack
+                (host for level-1 slices, device for the level-2 buffer); co-located
+                level>=2 parent copy happens HERE (device copy, as today); then
+                interpolate/carry-forward/push unchanged.
+end do
+flush (existing rb:tail)  ! sends may still be in flight across chunks - unchanged
+```
+
+Load-bearing details, each verified against source during the step-1 audit:
+- **Geometry without the swap.** The post/send phases need only plan data + `bl/bh`
+  (recomputable from replicated caches, as the builder does) + `start_idx` (rank-constant).
+  `amr_cpat_off` is consumed host-side by the pack/unpack kernels (captured into locals
+  before the kernel), so setting it per box in the phase that calls the kernel suffices;
+  the full `s_set_amr_fine_geometry` swap stays in phase C where it is today.
+- **Buffers.** One flat `real(wp)` chunk recv pool + an offset table, sized from the plan
+  (sum of the chunk's owned-box message sizes; bound ~CHUNK x patch ~ 0.5-1 GB at 32);
+  one request array; a per-box (first-request, count) index. Reused across chunks, grown
+  monotonically, freed at module finalize.
+- **No (src, tag) ambiguity.** Tag = box index; a box is exactly one level; level-1 sources
+  are distinct ranks; the level>=2 rebuild path sends only the `_cons` message. So every
+  (source, tag) pair in a chunk is unique - pre-posting cannot mismatch.
+- **Deadlock-freedom argument.** Recv-posting (A) contains no MPI waits. The only blocking
+  points are per-box WAITALLs (C) and the send pool's forced drain (B, cap 64). Consider
+  the rank at the globally minimal (chunk, phase) position: its phase A completes
+  unconditionally; its drains wait on sends whose receivers are at-or-ahead and whose
+  matching recvs are posted in THEIR phase A, which they reach without waiting on anything
+  from the minimal rank's current chunk. So the minimum always advances - no cycle. (The
+  refuted per-STEP drain hoist does not apply: that experiment deferred sends past a sync
+  that could not absorb the drift; here recvs are pre-posted and the WAITALL that pays the
+  skew is per-box but no longer serializes the WHOLE exchange behind it.)
+- **`num_procs = 1` and co-located parents** degenerate naturally: empty plan entries, no
+  posts/sends; phase C's own-copy and co-located device copy reproduce today's path.
+- **Validation:** goldens + subset must stay green; XA_F1/F2 message and word totals must be
+  IDENTICAL to the per-box path (same plan, same messages, different timing); S0 np=4/np=8
+  differenced arms judge the win (target: pg:recv 99 s + rb:wait 59 s at np=8 collapse
+  toward one skew absorption); watch the reflux/gather/seam shadows for the downstream
+  effect. Step-1's per-box asserts are bypassed on the chunked path by construction - the
+  XA identity is the replacement invariant.
 
 Step 1 is the safety net: if the plan does not reproduce the current message set box for box, the
 batching is wrong and it is visible before any data moves.
