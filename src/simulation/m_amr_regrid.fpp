@@ -22,13 +22,13 @@ module m_amr_regrid
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
         & PH_RBREC, PH_RBTOPO
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
-        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, amr_maxc_fit, &
-        & amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, &
-        & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
-        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
-        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
-        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, amr_gb_win, amr_gb_cost, &
-        & amr_gb_mig, amr_mig_snd, amr_mig_blk
+        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
+        & amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
+        & s_amr_alloc_slot_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
+        & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
+        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
+        & f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, &
+        & amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -1500,6 +1500,7 @@ contains
             ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners re-prolong from it below)
             if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (.not. amr_rank_owns_block) cycle
+            call s_amr_cov_note(old_np, old_ilo, old_ext, old_level)  ! [amr-cov] rebuild-gather coverage split
             call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()
             ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy the
             ! overlap from EVERY covering old block regardless of owner - sh is the old->new LOCAL fine index shift. A level>=2
