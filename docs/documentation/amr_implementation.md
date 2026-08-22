@@ -171,16 +171,23 @@ Five routines, in `m_amr.fpp` (post-W8-fix, commit 9bcc9865):
 
 | Routine | Effect |
 |---|---|
-| `s_amr_alloc_slot(islot)` | Full slot: dense index + geometry + per-slot `q_prim`/`rhs` (+ QBMM side-state). Idempotent for full slots; **upgrades a live stash-only slot in place** (keeps its index and stor data, adds the arrays). |
-| `s_amr_alloc_slot_stash(islot)` | **Stash-only slot**: dense index + `amr_slot_live` only — no per-slot arrays. Used for migration replicas, which only ever touch their `amr_stor_st` half. Roughly halves a replica's device cost. |
-| `s_amr_free_slot(islot)` | Idempotent, handles both flavors (array teardown is guarded on `allocated(q_prim)`). Pushes the index onto `amr_loc_free`. |
+| `s_amr_alloc_slot(islot)` | Full slot: dense index + geometry (+ QBMM side-state; + per-slot `rhs`/gated `q_prim` for L0 **tile** slots only). Idempotent for full slots; **upgrades a live stash-only slot in place** (keeps its index and stor data, adds the arrays). |
+| `s_amr_alloc_slot_stash(islot)` | **Stash-only slot**: dense index + `amr_slot_live` only — no geometry or field arrays. Used for migration replicas, which only ever touch their `amr_stor_st` half. |
+| `s_amr_free_slot(islot)` | Idempotent, handles both flavors (each array family's teardown guarded on its own `allocated`; the full-vs-stash discriminator is `allocated(x_cb)`). Pushes the index onto `amr_loc_free`. |
 | `s_amr_st_reserve(nloc)` | Grows the store, increments capped at 16 slots. Never shrinks the allocation. |
+| `s_amr_scr_init()` | Allocates the **pooled `q_prim`/`rhs` advance scratch** (`amr_scr_prim`/`amr_scr_rhs`), once, on every rank. Called where `mbuf*` are final per mode: module init (pure AMR) or after `s_l0_tiles_init`'s mbuf union (any tiles). |
 | `s_amr_compact_store()` | Re-densifies the local index space **in place on the device**, every reconcile. Does NOT realloc. |
 
-**Per-slot device cost has two comparable terms** (at the S0 3D operating point, ~210 MiB each):
-the slot's share of the flat store (`amr_cons_st` + `amr_stor_st`), and the per-slot
-`q_prim`/`rhs` scalar-field arrays. `[amr-cap]` instrumentation showed the store is only ~16 of a
-~52 GiB per-GCD plateau — pooling `q_prim`/`rhs` (P1 proper) is the next memory lever.
+**P1 pooling (this section's state after it): fine blocks carry NO per-slot `q_prim`/`rhs`.**
+The fused per-block advance (`s_amr_fine_stage_advance`: rhs then rk on one block) leaves no
+cross-block lifetime, so all fine blocks share one slot-shaped scratch pair; the stage routines
+take the target arrays as dummies and the caller chooses (fine → scratch; L0 tiles → per-slot,
+because all owned tiles' rhs coexist across the MPI reflux point, and a tile's `q_prim` is read
+in the RK pass after other tiles' RHS work — allocated per-slot exactly when the `m_rhs`
+copy-out gate writes it: `run_time_info|probe_wrt|ib|bubbles_lagrange`). This removes ~2×105 MiB
+per live fine slot (~15 GiB/rank at the S0 point) AND the per-slot alloc/free churn that fed
+the libomptarget retention plateau. Per-slot device cost is now the slot's share of the flat
+store (`amr_cons_st` + `amr_stor_st`) plus, under QBMM only, the per-slot side-state.
 
 ### 5.1 How the store grows — and the host-coherence contract
 

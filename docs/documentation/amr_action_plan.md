@@ -273,15 +273,39 @@ the families stand. Deeper reads that CHANGE the interpretation:
    never reads slot rhs on that path) but **L0 tiles need per-slot rhs** across the
    MPI-synchronized reflux point (`m_time_steppers.fpp:635-637`); `q_prim` is written only
    under `run_time_info|probe_wrt|ib|bubbles_lagrange` (`m_rhs.fpp:849`) and read only by IB
-   correction + the hyper_cleaning term. So the increment becomes: (a) a BATCH-SHAPED shared
-   rhs/q_prim scratch for fine slots — batch-shaped (amr_br_batch blocks), NOT single-block,
-   so it IS the storage P2's batched advance needs rather than a conflict with it; (b) per-slot
-   rhs kept for L0 tile slots only; (c) per-slot q_prim allocated only when a reader exists
-   (ib/bubbles_lagrange/run_time_info/probe_wrt), shared scratch otherwise — and the
-   reconcile-time `allocated(q_prim)` assert reworked to the new discriminator. Expected
-   ~15 GiB/rank at the S0 point. Same gate as before (goldens + subset + S0 np=4 peak
-   >= 10 GiB lower; np=8 after). The carry-forward device conversion + device-side growth
-   remain bundled. **Bug candidate RESOLVED for our path: `m_rhs.fpp:772` reads q_prim(psi)
+   correction + the hyper_cleaning term.
+   **Before-increment re-audit (2026-08-21, this session) verified the shape in source and
+   sharpened it:**
+   - Every fine slot's q_prim/rhs is allocated at the SAME uniform `mbuf*` extents
+     (`s_amr_alloc_slot`) — a shared scratch is a drop-in, no per-block reshaping. The module
+     already carries this exact pattern: `amr_rhs_pb_f`/`amr_rhs_mv_f` and `amr_cg` are shared
+     scratch by design (docstring at m_amr.fpp:5484), and `amr_cons_br` (5625) is the
+     batch-folded precedent; `amr_br_batch = 1` today, so slot-shaped scratch IS batch-shaped
+     until P2 widens it.
+   - The tile path calls the SAME stage routines (`s_amr_select_slot` + `s_amr_fine_stage_rhs/rk`
+     at 7052/7073). Caller list is COMPLETE and verified: fused fine advance 4910-4911,
+     subtree advance 5165/5168/5176, tile loops 7052/7073, m_time_steppers:581. So the
+     increment's shape is a thin dispatcher: stage bodies take q_prim/rhs as dummies; tile
+     callers pass `amr_slots(k)%...`, fine callers pass the scratch. `s_amr_ib_correct_fine`
+     (3325/3327) gets the arrays the same way.
+   - Tile slots allocate through the SAME `s_amr_alloc_slot` (tile-geometry mbuf at call time,
+     per the reconcile skip-comment at 5851) — the alloc site needs the tile discriminator
+     (`islot <= l0_slot_off .or. .not. amr`): tiles keep per-slot rhs; fine slots allocate
+     neither.
+   - q_prim gate SHARPENED: the only reader of a SLOT q_prim is `s_ibm_correct_state` — so
+     per-slot q_prim exists only for TILE slots under `ib` (the RK-pass read spans other
+     tiles' RHS work); every other configuration shares the scratch (a gated copy-out into
+     scratch nobody reads is harmless). QBMM `pb_f/mv_f/pb_stor/mv_stor` are persistent
+     per-block side-state and stay per-slot.
+   - The three `allocated(q_prim)` discriminators (alloc-entry upgrade check 5746, free-path
+     teardown guard, reconcile stash assert 5879) move to `allocated(x_cb)` — grid arrays are
+     allocated for every full slot (tile or fine) and absent on stash-only slots; the free
+     path's teardown guards become per-array (q_prim/rhs/QBMM independently).
+   - Verify during implementation: `s_amr_copy_fine_fields` (s==1 backup) touches only the
+     store, not q_prim/rhs.
+   Expected ~15 GiB/rank saved at the S0 point (72 slots x ~2x105 MiB). Same gate as before
+   (goldens + subset + S0 np=4 peak >= 10 GiB lower; np=8 after). The carry-forward device
+   conversion + device-side growth remain bundled. **Bug candidate RESOLVED for our path: `m_rhs.fpp:772` reads q_prim(psi)
    before the gated copy-out, but amr+hyper_cleaning is transitively unreachable (amr+mhd is
    1D-only per m_checker.fpp:136; hyper_cleaning forbids 1D per case_validator.py:1158). On
    the MONOLITHIC path the read may see stage-stale psi when none of the gate flags is set —
@@ -298,11 +322,44 @@ knob-independent — while performance tracks the retention plateau) is the shap
 is judged on from now on. **Before quoting any S-track/regrid share: re-baseline the S0
 np=2/np=4 pair WITH the knob** — the 2.59x table above is the pre-knob world; the post-knob
 gap (~1.59x per doubling) is the one the remaining fronts compete over.
-3. **M4-directed third increment:** S1 block-lattice tags (if regrid/collective scaling is the
+
+**S0 POST-KNOB RE-BASELINE — DONE (2026-08-21, logs/s0knob-0821_2057 np=2 + m4mem-0821_1959/P1
+np=4; same build 9751e479, knob on both, k004-004).** np=2 wall 253.7 s (knob inert below the
+cliff: peaks 43.3/43.7 GiB; pre-knob np=2 was 255.6 on the pre-I1a binary). np=4 wall 405.4 s
+= **1.598x per doubling, gap +151.7 s**, and the split is decisive:
+regrid +86.6 s (57%% of the gap: rg:mig 12.4->54.1 = +41.7; rb:gath 1.7->18.1 = +16.4 at
+5.5x/call; rb:tail 1.9->23.6 = +21.7 with imb 2.44; rg:clus +4.5) + exchange-wait families
++42.7 (gather +17.5 at 3.7x/call, reflux +11.0 pure wait, coarse +8.2 imb 2.17, seam +6.0)
++ rhs only +7.8 (per-call 17.64->18.63 ms = +5.6%%: the allocator fix fully retired the rhs
+story). rb:slot and rb:ovl FLAT (-1.7/+0.2). **Post-P1 front CONFIRMED: the per-box gather
+(rb:gath + its rb:tail shadow) and migration (rg:mig, T1 waves) own the remaining scaling
+excess; every S-track share quoted from here on uses THIS pair, not the 2.59x table.**
+3. **Third increment — SELECTED by the post-knob re-baseline (2026-08-21, supersedes the
+   M4-directed menu below): rb:gath + rb:tail (per-box gather batching).** The re-baseline
+   split is decisive (regrid = 57%% of the doubling gap) and the gather's mechanism is
+   already root-caused (s_amr_gather_coarse_patch once per box with a WAITALL + heap allocs
+   each). Judged on rb:gath ms/call flattening across np (5.5x/call growth np=2->np=4 is the
+   baseline) and its rb:tail wait shadow shrinking with it. **Fourth: T1 migration waves**
+   (rg:mig +41.7 s, the largest single item; design v2 reviewed, floor 8-12%%). The old menu
+   (S1 lattice tags / I2-I3 waves / S2 balancer) stays written below as the fallback rules if
+   either increment's gate fails.
+   Original menu: S1 block-lattice tags (if regrid/collective scaling is the
    chosen front — kills the measured ntag doubling; judged on ntag bytes/rank going flat), OR
    I2-I3 exchange waves (if wait/skew traces to per-box exchange arrival), OR the S2/T1
    balancer path (only if M4b's rule fires). One front at a time; the other rules stay written
    so the choice is a lookup, not a debate.
+
+**AUDIT GAPS (2026-08-21 planning audit — both are cheap, parallel, zero-code):**
+- **G-A: every absolute-tax number predates the knob AND P1.** The 11.03x matched tax /
+  1.38x payoff / 14.91x idle decomposition were measured pre-allocator-fix; the knob
+  plausibly helps the matched case too. Re-run the matched head-to-head on the post-P1
+  binary WITH the knob before quoting any tax number or ranking P2 — the 14.91x idle factor
+  is P2's justification and may have shrunk.
+- **G-B: "no performance tax over SOTA" has NO weak-scaling bar.** We compare AMReX at one
+  operating point but judge scaling only against ourselves (1.598x/doubling). Run the
+  AMReX S0-equivalent at np=2/4/8 on this node (amrex_tax.sh is most of the harness) to
+  define the target our np-doubling ratio must meet. Until it exists, axis-2 "done" is
+  undefined.
 4. **Phase-2 (P2 batched advance) contract is WRITTEN during increment 2-3** per the
    constitution — seeded by the 2a prototype (batch convert_conservative_to_primitive) and
    M2's verdict; it does not start until its contract passes the audit ritual.

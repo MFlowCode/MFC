@@ -141,6 +141,12 @@ module m_amr
     !! carrying its own ghost shell, so consecutive blocks are separated by TWO ghost shells and no block's stencil can reach
     !! another's interior - the property the batched advance's correctness rests on.
     integer :: amr_br_w = 0, amr_br_nblk = 0
+    !> P1 pooled advance scratch: the fused per-block fine advance (rhs then rk on ONE block, s_amr_fine_stage_advance) leaves no
+    !! cross-block q_prim/rhs lifetime, so every fine block shares this one slot-shaped pair instead of carrying per-slot arrays
+    !! (~2x105 MiB per live slot at the S0 point - the np>=8 live-footprint blocker AND the alloc/free churn that fed the
+    !! libomptarget retention plateau). Same shared-scratch pattern as amr_rhs_pb_f/amr_cg. L0 tile slots are the exception and keep
+    !! per-slot arrays (see s_amr_alloc_slot).
+    type(scalar_field), allocatable :: amr_scr_prim(:), amr_scr_rhs(:)
     !> True only while the REGRID path is inside s_amr_gather_coarse_patch, so the WAITALL bracket attributes to rb:wait rather than
     !! mixing in the per-step gather that shares this routine.
     logical :: amr_rg_gather = .false.
@@ -534,13 +540,16 @@ contains
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
+        ! with tiles, s_l0_tiles_init's mbuf UNION below may still enlarge these - the scratch waits for it (see s_amr_scr_init)
+        if (l0_ntile == 0) call s_amr_scr_init()
 
         ! MEMORY DEMAND, reported not guessed. There is no portable way to ask how much device (or
         ! host) memory is available - hipMemGetInfo / cudaMemGetInfo / nothing-on-CPU across four
         ! compilers and three offload backends - so do NOT try to pick a cap from a memory budget.
-        ! What IS exactly known here is the DEMAND: a block costs 4 per-slot field families (q_cons,
-        ! q_cons_stor, q_prim, rhs) plus, under amr_subcycle only, 2 more in the flat store
-        ! (amr_gst_a/amr_gst_b, sized per LOCAL slot) x sys_size arrays on the mbuf extents. Print it
+        ! What IS exactly known here is the DEMAND: a block costs 2 per-slot field families (q_cons,
+        ! q_cons_stor; q_prim/rhs are POOLED - one shared scratch pair, not per block) plus, under
+        ! amr_subcycle only, 2 more in the flat store (amr_gst_a/amr_gst_b, sized per LOCAL slot)
+        ! x sys_size arrays on the mbuf extents. Print it
         ! and let the reader compare against hardware they know.
         !
         ! Why this matters more than a default: the OPTIMAL cap is set by the largest slot that
@@ -555,7 +564,7 @@ contains
                 cells = real(mbuf1_hi - mbuf1_lo + 1, wp)
                 if (n_glb > 0) cells = cells*real(mbuf2_hi - mbuf2_lo + 1, wp)
                 if (p_glb > 0) cells = cells*real(mbuf3_hi - mbuf3_lo + 1, wp)
-                nfam = 4._wp; if (amr_subcycle) nfam = 6._wp
+                nfam = 2._wp; if (amr_subcycle) nfam = 4._wp
                 slot_gib = cells*real(sys_size, wp)*nfam*real(storage_size(1._wp)/8, wp)/1024._wp**3
                 print '(A,I0,A,I0,A,ES10.3,A,F8.3,A)', ' [amr] per-block slot: ', nint(cells), ' cells x sys_size x ', &
                     & nint(nfam), ' fields = ', cells*real(sys_size, wp)*nfam, ' words (', slot_gib, ' GiB per owned block)'
@@ -3312,7 +3321,11 @@ contains
     !> Apply the IB state correction on the current fine block after its RK update (static-body AMR). Mirrors the coarse per-stage
     !! s_ibm_correct_state: swap the grid + IB globals to the fine block, correct q_cons/q_prim at the fine body/ghost cells,
     !! restore. amr_cur / amr_rank_owns_block are set by the caller (the per-block advance loop). No-op unless ib.
-    impure subroutine s_amr_ib_correct_fine()
+    impure subroutine s_amr_ib_correct_fine(q_prim_b)
+
+        !> the q_prim the block's RHS pass filled (pooled scratch for fine blocks; per-slot for L0 tiles, where other tiles' RHS
+        !! work ran in between - ib is in the copy-out gate, so a tile slot always has its own q_prim when this reads it)
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_b
 
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return
@@ -3322,9 +3335,9 @@ contains
         if (qbmm .and. .not. polytropic) then
             ! mirror the coarse correct-state: non-polytropic QBMM also corrects the block's own pb/mv side-state at the body ghost
             ! points (bounds match the swapped fine idwbuff)
-            call s_ibm_correct_state(amr_cons_br, amr_slots(amr_cur)%q_prim, amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
+            call s_ibm_correct_state(amr_cons_br, q_prim_b, amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
         else
-            call s_ibm_correct_state(amr_cons_br, amr_slots(amr_cur)%q_prim)
+            call s_ibm_correct_state(amr_cons_br, q_prim_b)
         end if
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_ibm_restore_from_fine(amr_cur)
@@ -4907,21 +4920,24 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
 
-        call s_amr_fine_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
-        call s_amr_fine_stage_rk(s, coefs)
+        call s_amr_fine_stage_rhs(s, bc_type, q_T_sf, amr_scr_prim, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        call s_amr_fine_stage_rk(s, coefs, amr_scr_prim, amr_scr_rhs)
 
     end subroutine s_amr_fine_stage_advance
 
     !> RHS pass of a fine-block RK stage: step-entry backup, swap grid globals to the block, s_compute_rhs (fills amr_slots%rhs +
     !! captures the block's freg / its children's creg), restore coarse globals. Leaves the per-slot rhs ready for the RK pass (or,
     !! under coexist, for the reflux-delta copy-back before the RK pass).
-    impure subroutine s_amr_fine_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+    impure subroutine s_amr_fine_stage_rhs(s, bc_type, q_T_sf, q_prim_b, rhs_b, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
         integer, intent(in)                                        :: s, t_step
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         type(scalar_field), intent(inout)                          :: q_T_sf
-        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
-        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+        !> the block's q_prim/rhs target: the pooled scratch for fine blocks, the slot's own arrays for L0 tiles (whose rhs must
+        !! survive the whole-set RHS pass; the caller chooses - see s_l0_advance_stage_rhs)
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_b, rhs_b
+        real(stp), dimension(:,:,:,:,:), intent(inout)           :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)            :: rhs_pb, rhs_mv
 
         if (.not. amr .and. l0_ntile == 0) return
         if (.not. amr_rank_owns_block) return
@@ -4948,11 +4964,10 @@ contains
         if (qbmm .and. .not. polytropic) then
             ! the block's OWN side-state and rhs scratch: the coarse pb_in/rhs_pb must not be touched at fine indices (the coarse
             ! stage consumes them after this fine stage)
-            call s_compute_rhs(amr_cons_br, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
-                               & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, s)
+            call s_compute_rhs(amr_cons_br, q_T_sf, q_prim_b, bc_type, rhs_b, amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, &
+                               & amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, s)
         else
-            call s_compute_rhs(amr_cons_br, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, pb_in, rhs_pb, &
-                               & mv_in, rhs_mv, t_step, s)
+            call s_compute_rhs(amr_cons_br, q_T_sf, q_prim_b, bc_type, rhs_b, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
         end if
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_phase_toc(PH_RHS)
@@ -4965,10 +4980,12 @@ contains
 
     !> RK pass of a fine-block RK stage: SSP-RK combination consuming the per-slot rhs (already reflux-corrected under coexist),
     !! then per-stage pressure relaxation / moving-IB / IB-state correction. Uses slot bounds (no grid swap needed).
-    impure subroutine s_amr_fine_stage_rk(s, coefs)
+    impure subroutine s_amr_fine_stage_rk(s, coefs, q_prim_b, rhs_b)
 
         integer, intent(in)  :: s
         real(wp), intent(in) :: coefs(4)
+        !> the same q_prim/rhs pair the RHS pass of this stage filled (pooled scratch for fine blocks, per-slot for L0 tiles)
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_b, rhs_b
 
         if (.not. amr .and. l0_ntile == 0) return
         if (.not. amr_rank_owns_block) return
@@ -4976,8 +4993,7 @@ contains
         call s_phase_tic(PH_RK)
         ! RK stage update (device kernel; mirror of the coarse form - under IGR the rhs already embeds dt, matching the coarse igr
         ! update, so the dt factor is 1)
-        call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_slots(amr_cur)%rhs, coefs(1), coefs(2), coefs(3), coefs(4), &
-                                  & merge(1._wp, dt, igr))
+        call s_amr_fine_rk_update(amr_loc_of(amr_cur), rhs_b, coefs(1), coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
         if (qbmm .and. .not. polytropic) call s_amr_fine_rk_update_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
             & amr_slots(amr_cur)%pb_stor%sf, amr_slots(amr_cur)%mv_stor%sf, amr_rhs_pb_f, amr_rhs_mv_f, coefs(1), coefs(2), &
             & coefs(3), coefs(4), dt)
@@ -4986,7 +5002,7 @@ contains
         ! moving body: rebuild the fine-block IB state at the current (lockstep-stage) body position before the correct-state
         if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(-1._wp)
         ! IB state correction on the fine block (mirrors the coarse per-stage correct-state; no-op unless ib)
-        call s_amr_ib_correct_fine()
+        call s_amr_ib_correct_fine(q_prim_b)
         call s_phase_toc(PH_RK)
         if (rank_time_wrt) call s_rank_time_toc()
 
@@ -5162,19 +5178,17 @@ contains
         call s_amr_br_load(amr_loc_of(amr_cur))
         if (qbmm .and. .not. polytropic) then
             ! the block's OWN side-state and rhs scratch (the coarse arrays stay untouched)
-            call s_compute_rhs(amr_cons_br, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, &
-                               & amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, s)
+            call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, &
+                               & amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, s)
         else
-            call s_compute_rhs(amr_cons_br, q_T_sf, amr_slots(amr_cur)%q_prim, bc_type, amr_slots(amr_cur)%rhs, pb_in, rhs_pb, &
-                               & mv_in, rhs_mv, t_step, s)
+            call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
         end if
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
 
         ! RK stage update at the FINE time step (device kernel)
-        call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_slots(amr_cur)%rhs, coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, &
-                                  & 4), dt_sub)
+        call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_scr_rhs, coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, 4), dt_sub)
         if (qbmm .and. .not. polytropic) then
             call s_amr_fine_rk_update_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, amr_slots(amr_cur)%pb_stor%sf, &
                                            & amr_slots(amr_cur)%mv_stor%sf, amr_rhs_pb_f, amr_rhs_mv_f, coefs(s, 1), coefs(s, 2), &
@@ -5186,7 +5200,7 @@ contains
         ! moving body: rebuild the fine-block IB state at the body's fine sub-time position (th matches the fluid-ghost lerp)
         if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(th)
         ! IB state correction on the fine block after each substep RK update (no-op unless ib)
-        call s_amr_ib_correct_fine()
+        call s_amr_ib_correct_fine(amr_scr_prim)
         if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_amr_subtree_stage_advance
@@ -5633,6 +5647,32 @@ contains
 
     end subroutine s_amr_st_reserve
 
+    !> Allocate the pooled q_prim/rhs advance scratch (idempotent). The lockstep driver argument-associates the scratch for every
+    !! block, owned or not, so it must exist on EVERY rank - including one that never allocates a slot. Called from the ONE point
+    !! per mode where mbuf* are final: end of s_initialize_amr_module when l0_ntile == 0 (pure AMR), and after s_l0_tiles_init's
+    !! mbuf UNION when tiles exist (pure-L0 AND coexist - the union can enlarge mbuf* past the fine-only values, so an earlier
+    !! allocation would undersize the scratch). rhs mirrors the per-slot igr widening.
+    impure subroutine s_amr_scr_init()
+
+        integer :: i
+
+        if (allocated(amr_scr_prim)) return
+        @:ALLOCATE(amr_scr_prim(1:sys_size))
+        @:ALLOCATE(amr_scr_rhs(1:sys_size))
+        do i = 1, sys_size
+            @:ALLOCATE(amr_scr_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+            if (igr) then
+                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
+                           & -1):max(mbuf3_hi, 1)))
+            else
+                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+            end if
+            @:ACC_SETUP_SFs(amr_scr_prim(i))
+            @:ACC_SETUP_SFs(amr_scr_rhs(i))
+        end do
+
+    end subroutine s_amr_scr_init
+
     !> Move block loc's conserved state between the flat store and the bridge. One kernel each way over the whole buffered box:
     !! every slot's arrays carry the same mbuf extents, so this is exactly the box the per-slot q_cons used to own.
     #:set BR = 'amr_cons_br(i)%sf(j, k, l)'
@@ -5712,6 +5752,16 @@ contains
             end do
             @:DEALLOCATE(amr_cons_br)
         end if
+        if (allocated(amr_scr_prim)) then
+            do i = 1, sys_size
+                @:ACC_TEARDOWN_SFs(amr_scr_prim(i))
+                @:DEALLOCATE(amr_scr_prim(i)%sf)
+                @:ACC_TEARDOWN_SFs(amr_scr_rhs(i))
+                @:DEALLOCATE(amr_scr_rhs(i)%sf)
+            end do
+            @:DEALLOCATE(amr_scr_prim)
+            @:DEALLOCATE(amr_scr_rhs)
+        end if
         amr_st_cap = 0
 
     end subroutine s_amr_st_finalize
@@ -5743,7 +5793,10 @@ contains
         integer, intent(in) :: islot
         integer             :: i
 
-        if (amr_slot_live(islot) .and. allocated(amr_slots(islot)%q_prim)) return
+        ! full-vs-stash discriminator is the grid arrays: every full slot (tile or fine) has x_cb; a stash-only slot has none
+        ! (fine slots no longer carry q_prim - see the pooled scratch amr_scr_prim/amr_scr_rhs)
+
+        if (amr_slot_live(islot) .and. allocated(amr_slots(islot)%x_cb)) return
         ! recycle a freed local index if one is available, else extend the dense range; a live STASH-ONLY slot upgrading to a
         ! full one keeps the index (and so the stor data) it already holds
         if (.not. amr_slot_live(islot)) then
@@ -5760,20 +5813,31 @@ contains
         allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
         if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), amr_slots(islot)%dy(0:max_f2))
         if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), amr_slots(islot)%dz(0:max_f3))
-        @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
-        @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
-        do i = 1, sys_size
-            @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
-            ! rhs is ghost-inclusive (mbuf); igr widens to -1:+1 per dim including collapsed ones (coarse rhs_vf is -1:m+1 etc.)
-            if (igr) then
-                @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
-                           & -1):max(mbuf3_hi, 1)))
-            else
-                @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+        ! P1 pooling: fine blocks advance through the shared scratch (amr_scr_prim/amr_scr_rhs) - the fused per-block advance
+        ! leaves no cross-block q_prim/rhs lifetime. L0 tile slots are the exception: all owned tiles' rhs coexist across the
+        ! MPI-synchronized reflux point (s_l0_add_reflux_to_tiles between the whole-set RHS and RK passes), and a tile's q_prim
+        ! written by the RHS pass is read in the later RK pass (IB correction), so tiles keep per-slot rhs always and per-slot
+        ! q_prim exactly when s_compute_rhs's copy-out gate writes it (m_rhs.fpp end-of-rhs gate).
+        if (islot <= l0_slot_off) then
+            @:ALLOCATE(amr_slots(islot)%rhs(1:sys_size))
+            if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+                @:ALLOCATE(amr_slots(islot)%q_prim(1:sys_size))
             end if
-            @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
-            @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
-        end do
+            do i = 1, sys_size
+                ! rhs is ghost-inclusive (mbuf); igr widens to -1:+1 per dim including collapsed ones (coarse rhs_vf is -1:m+1 etc.)
+                if (igr) then
+                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
+                               & -1):max(mbuf3_hi, 1)))
+                else
+                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                end if
+                @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
+                if (allocated(amr_slots(islot)%q_prim)) then
+                    @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                    @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
+                end if
+            end do
+        end if
         if (qbmm .and. .not. polytropic) then
             #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
                 @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
@@ -5812,22 +5876,26 @@ contains
             do i = 1, sys_size
                 @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_prim(i))
                 @:DEALLOCATE(amr_slots(islot)%q_prim(i)%sf)
+            end do
+            @:DEALLOCATE(amr_slots(islot)%q_prim)
+        end if
+        if (allocated(amr_slots(islot)%rhs)) then
+            do i = 1, sys_size
                 @:ACC_TEARDOWN_SFs(amr_slots(islot)%rhs(i))
                 @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
             end do
-            @:DEALLOCATE(amr_slots(islot)%q_prim)
             @:DEALLOCATE(amr_slots(islot)%rhs)
-            if (qbmm .and. .not. polytropic) then
-                #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
+        end if
+        if (qbmm .and. .not. polytropic .and. allocated(amr_slots(islot)%pb_f%sf)) then
+            #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
+                @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
+                @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
+            #:endfor
+            if (amr_subcycle) then
+                #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
                     @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
                     @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
                 #:endfor
-                if (amr_subcycle) then
-                    #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
-                        @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
-                        @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
-                    #:endfor
-                end if
             end if
         end if
         if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
@@ -5873,10 +5941,10 @@ contains
                & ' freed ', nfr, ' newalloc ', nal, ' stack_in ', nfree_in, ' stack_out ', amr_loc_nfree
 #endif
         ! I1a invariant: no stash-only slot survives a reconcile - every migration replica was freed (early-free or the walk
-        ! above) or upgraded to a full slot by the owned-path alloc. A survivor would reach the solver with no q_prim/rhs.
+        ! above) or upgraded to a full slot by the owned-path alloc. A survivor would reach the solver with no geometry arrays.
         do k = 1, amr_max_blocks
             if (amr_slot_live(k)) then
-                @:ASSERT(allocated(amr_slots(k)%q_prim), "a stash-only replica slot survived reconcile")
+                @:ASSERT(allocated(amr_slots(k)%x_cb), "a stash-only replica slot survived reconcile")
             end if
         end do
         ! every reader of a stale slot has finished by here (the rebuild's overlap carry-forward is done and the next rebuild
@@ -6047,6 +6115,7 @@ contains
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
+        call s_amr_scr_init()  ! mbuf* now FINAL (fine/tile union under coexist); scratch must exist on every rank
 
         ! fine-fine seam pack buffers (sys_size*buff_size * largest transverse fine face), reused per seam per stage.
         tcap = 1
@@ -7049,7 +7118,16 @@ contains
                 $:GPU_WAIT()
                 call system_clock(tc0)
             end if
-            call s_amr_fine_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+            ! tiles fill their OWN rhs (it must survive the whole-set RHS pass through the reflux point to the RK pass); the
+            ! per-slot q_prim exists exactly when the copy-out gate writes it - otherwise the pooled scratch takes the (unread,
+            ! unwritten) dummy
+            if (allocated(amr_slots(islot)%q_prim)) then
+                call s_amr_fine_stage_rhs(s, bc_type, q_T_sf, amr_slots(islot)%q_prim, amr_slots(islot)%rhs, pb_in, rhs_pb, &
+                                          & mv_in, rhs_mv, t_step)
+            else
+                call s_amr_fine_stage_rhs(s, bc_type, q_T_sf, amr_scr_prim, amr_slots(islot)%rhs, pb_in, rhs_pb, mv_in, rhs_mv, &
+                                          & t_step)
+            end if
             if (measure) then
                 $:GPU_WAIT()
                 call system_clock(tc1, crate)
@@ -7070,7 +7148,11 @@ contains
         do islot = 1, l0_ntiles_tot
             if (amr_block_owner(islot) /= proc_rank) cycle
             call s_amr_select_slot(islot)
-            call s_amr_fine_stage_rk(s, coefs)
+            if (allocated(amr_slots(islot)%q_prim)) then
+                call s_amr_fine_stage_rk(s, coefs, amr_slots(islot)%q_prim, amr_slots(islot)%rhs)
+            else
+                call s_amr_fine_stage_rk(s, coefs, amr_scr_prim, amr_slots(islot)%rhs)
+            end if
         end do
         call s_amr_select_slot(1)
 
