@@ -93,9 +93,17 @@ is the single knob trading memory against message count.
 
 ## Increments
 
-1. Plan builder + assertions, with the exchange still per-box (no behaviour change; validates that
-   the derived plan reproduces today's message set exactly).
-2. Chunked exchange for the level-1 gather, `pull_host = .false.` only.
+1. **LANDED (2026-08-21 night).** Plan builder (`s_amr_build_gather_plan`, both families:
+   level-1 contributor lists + sizes AND the level>=2 parent source/size) + always-on
+   `@:ASSERT`s at all five derivation points in the per-box gathers, exchange still per-box
+   (no behaviour change). Validated three ways: AMR subset 67/67 with asserts armed (zero
+   trips = plan reproduces the live message set across the suite), and TWO seeded-bug
+   tripwires that each ABORTED as required (level-1 size +1 -> "send entry mismatch" on a
+   contributor rank; parent size +1 -> parent send-size assert on the parent owner; S0-style
+   np=4, first rebuild). The plan may now be trusted by step 2.
+2. Chunked exchange for BOTH families, `pull_host = .false.` only (see the S0 np=8 scope
+   section above: pre-post the chunk's level-1 IRECVs and the level>=2 per-box IRECVs, sends
+   stay pooled, consume in box order).
 3. Extend to the pb/mv gather (`s_amr_gather_coarse_patch_pbmv`) if step 2 pays.
 
 Step 1 is the safety net: if the plan does not reproduce the current message set box for box, the
