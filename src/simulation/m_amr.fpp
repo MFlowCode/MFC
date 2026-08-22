@@ -324,11 +324,18 @@ module m_amr
     !!
     !! The pool owns the buffers because MPI_ISEND requires them to stay live until completion - the old code deallocated sbuf
     !! immediately after the blocking send, which is exactly what must NOT happen here.
-    integer, parameter    :: amr_gsnd_max = 64    !< pending sends before a forced drain (bounds pool memory)
+    integer, parameter    :: amr_gsnd_max = 64  !< pending sends before a forced drain (bounds pool memory)
     real(wp), allocatable :: amr_gsnd_pool(:,:)
     integer, allocatable  :: amr_gsnd_req(:)
     integer               :: amr_gsnd_n = 0
-    integer               :: amr_cpat_off(3) = 0  !< GLOBAL coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar)
+    !> GLOBAL coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar) Ring clip: device-resident slab metadata, staged by
+    !! s_amr_shl_stage with ONE small GPU_UPDATE before each clipped kernel (cols 1-6 = lb1,le1,lb2,le2,lb3,le3; col 7 = soff cell
+    !! prefix; col 8 = scnt cells). Passing these as per-launch mapped array dummies instead cost a hipMalloc/hipFree pair PER MAP
+    !! at the standing threshold=0 default, and the churn measurably slowed EVERY subsequent kernel launch (rhs +68%/call, rk 3x -
+    !! rcab-0822 A/B), not just the clipped ones.
+    integer :: amr_cpat_off(3) = 0
+    integer :: amr_shl(6, 8) = 0
+    $:GPU_DECLARE(create='[amr_shl]')
     !> Gathered coarse pb/mv patch for non-polytropic QBMM (analogue of amr_cg): the block's coarse-side pb/mv side-state,
     !! P2P-gathered from the coarse-cell owners into the block owner in the amr_cg patch-local frame (cell 0 == amr_cpat_off). Read
     !! by the pb/mv prolong + ghost-fill so np>=2 couples to the correct coarse rank. Allocated only for non-polytropic QBMM.
@@ -1455,6 +1462,29 @@ contains
 
     end subroutine s_amr_parent_shell_slabs
 
+    !> Stage a clipped slab list into the device-resident metadata buffer amr_shl (one 48-int H2D update - NEVER a per-launch array
+    !! map, see the amr_shl declaration) and return the concatenated cell total for the kernel's flat loop.
+    impure subroutine s_amr_shl_stage(ms, tb1, te1, tb2, te2, tb3, te3, stot)
+
+        integer, intent(in)  :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+        integer, intent(out) :: stot
+        integer              :: s
+
+        do s = 1, ms
+            amr_shl(s, 1) = tb1(s); amr_shl(s, 2) = te1(s)
+            amr_shl(s, 3) = tb2(s); amr_shl(s, 4) = te2(s)
+            amr_shl(s, 5) = tb3(s); amr_shl(s, 6) = te3(s)
+            amr_shl(s, 8) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
+        end do
+        amr_shl(1, 7) = 0
+        do s = 2, ms
+            amr_shl(s, 7) = amr_shl(s - 1, 7) + amr_shl(s - 1, 8)
+        end do
+        stot = amr_shl(ms, 7) + amr_shl(ms, 8)
+        $:GPU_UPDATE(device='[amr_shl]')
+
+    end subroutine s_amr_shl_stage
+
 #ifdef MFC_DEBUG
     !> Validation arm (debug builds only): flood the current patch extent of amr_cg with quiet NaN BEFORE a clipped gather writes
     !! its shell, so a consumer read of any unshipped cell - core OR a missed shell slab - NaNs the ghost fill within a step
@@ -1489,7 +1519,7 @@ contains
         logical, intent(in)   :: pull_host
         integer               :: i, g1, g2, g3, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
         integer               :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
-        integer               :: nsh, msh, cells, got, clo(3), chi(3)
+        integer               :: nsh, msh, cells, stot, got, clo(3), chi(3)
         integer               :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6)
         integer               :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
         real(wp), allocatable :: rbuf(:,:), sbuf(:)
@@ -1560,7 +1590,10 @@ contains
             call s_amr_rank_coarse_range(owner, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msh, tb1, te1, tb2, te2, tb3, te3, cells)
-            if (cells > 0) call s_amr_gather_own_shell_device(q_coarse, msh, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
+            if (cells > 0) then
+                call s_amr_shl_stage(msh, tb1, te1, tb2, te2, tb3, te3, stot)
+                call s_amr_gather_own_shell_device(q_coarse, msh, stot, o1, o2, o3)
+            end if
             return
         end if
 
@@ -1580,7 +1613,10 @@ contains
             if (pull_host) then
                 ! runtime: q_coarse is device-current - shell-only own-box copy on the device (clipped analogue of the host path)
                 call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msh, tb1, te1, tb2, te2, tb3, te3, cells)
-                if (cells > 0) call s_amr_gather_own_shell_device(q_coarse, msh, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
+                if (cells > 0) then
+                    call s_amr_shl_stage(msh, tb1, te1, tb2, te2, tb3, te3, stot)
+                    call s_amr_gather_own_shell_device(q_coarse, msh, stot, o1, o2, o3)
+                end if
             else
                 if (amr_rg_gather) call s_phase_tic(PH_RBOWN)
                 call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
@@ -1657,7 +1693,10 @@ contains
                             tb2(r) = tb2(r) - amr_cpat_off(2); te2(r) = te2(r) - amr_cpat_off(2)
                             tb3(r) = tb3(r) - amr_cpat_off(3); te3(r) = te3(r) - amr_cpat_off(3)
                         end do
-                        if (cells > 0) call s_amr_unpack_shell_device(msh, tb1, te1, tb2, te2, tb3, te3, rbuf(1:sys_size*cells,idx))
+                        if (cells > 0) then
+                            call s_amr_shl_stage(msh, tb1, te1, tb2, te2, tb3, te3, stot)
+                            call s_amr_unpack_shell_device(msh, stot, rbuf(1:sys_size*cells,idx))
+                        end if
                         cycle
                     end if
                     ! unpack in the SAME (i, g3, g2, g1) order the sender packed; place at amr_cg patch-local index
@@ -1715,8 +1754,10 @@ contains
                 if (pull_host) then
                     ! runtime: pack my shell slice on the device straight into the pool slot - the EXACT-width slice, so only
                     ! the shell words cross PCIe (the full-width slice would copy the whole maxsz slot back)
-                    if (boxsz > 0) call s_amr_pack_shell_device(q_coarse, msh, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3, &
-                        & amr_gsnd_pool(1:boxsz,amr_gsnd_n))
+                    if (boxsz > 0) then
+                        call s_amr_shl_stage(msh, tb1, te1, tb2, te2, tb3, te3, stot)
+                        call s_amr_pack_shell_device(q_coarse, msh, stot, o1, o2, o3, amr_gsnd_pool(1:boxsz,amr_gsnd_n))
+                    end if
                 else
                     if (amr_rg_gather) call s_phase_tic(PH_RBPACK)
                     idx = 0
@@ -1999,7 +2040,7 @@ contains
             logical, intent(in) :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
             integer             :: w1, w2, w3, powner, cowner, boxsz, ierr
             integer             :: plo(3), phi(3)
-            integer             :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
+            integer             :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells, stot
 
             ! Patch box in the PARENT-FINE frame. Both the child owner and the parent owner must agree on it, so derive it from
             ! REPLICATED metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the empty
@@ -2055,12 +2096,12 @@ contains
                 ! (patch-local frame; the receiver's clipped unpack decodes the same slab-major layout from the same
                 ! replicated (w, amr_cpat_mar) inputs, so the two sides cannot drift apart)
                 call s_amr_parent_shell_slabs(w1, w2, w3, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+                call s_amr_shl_stage(ns, sb1, se1, sb2, se2, sb3, se3, stot)
                 boxsz = sys_size*cells
                 call s_amr_gsnd_reserve(boxsz)
                 amr_gsnd_n = amr_gsnd_n + 1
                 ! EXACT-width pool slice: only the shell words cross PCIe in the pack's copyout
-                call s_amr_pack_parent_shell_device_${GSFX}$(qp, ns, sb1, se1, sb2, se2, sb3, se3, amr_gsnd_pool(1:boxsz, &
-                    & amr_gsnd_n))
+                call s_amr_pack_parent_shell_device_${GSFX}$(qp, ns, stot, amr_gsnd_pool(1:boxsz,amr_gsnd_n))
             end if
             call s_xa_rec(XA_F2_SND, 1, boxsz, cblk)
             call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, cowner, cblk, MPI_COMM_WORLD, amr_gsnd_req(amr_gsnd_n), ierr)
@@ -2159,7 +2200,7 @@ contains
         real(wp), intent(in), contiguous :: buf(:)
         logical, intent(in)              :: to_host
         integer                          :: i, g1, g2, g3, n1, n2, n3
-        integer                          :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
+        integer                          :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells, stot
 
         if (.not. to_host) then
             ! runtime ring clip: buf carries only the shell slabs (the sender's clipped pack); decode with the same
@@ -2168,7 +2209,8 @@ contains
             call s_amr_poison_patch_device(w1, w2, w3)
 #endif
             call s_amr_parent_shell_slabs(w1, w2, w3, ns, sb1, se1, sb2, se2, sb3, se3, cells)
-            call s_amr_unpack_shell_device(ns, sb1, se1, sb2, se2, sb3, se3, buf)
+            call s_amr_shl_stage(ns, sb1, se1, sb2, se2, sb3, se3, stot)
+            call s_amr_unpack_shell_device(ns, stot, buf)
             return
         end if
 
@@ -2203,7 +2245,7 @@ contains
             !! C/F ghost-fill reads amr_cg on the DEVICE (filled by the kernel below), so no device->host copy is needed.
             logical, intent(in) :: to_host
             integer             :: i, g1, g2, g3, o1, o2, o3
-            integer             :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
+            integer             :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells, stot
 
             if (.not. to_host) then
                 ! runtime ring clip: the C/F ghost fill reads only the shell - copy just the <= 6 slabs. Poison first
@@ -2212,7 +2254,8 @@ contains
                 call s_amr_poison_patch_device(w1, w2, w3)
 #endif
                 call s_amr_parent_shell_slabs(w1, w2, w3, ns, sb1, se1, sb2, se2, sb3, se3, cells)
-                call s_amr_copy_parent_shell_device_${GSFX}$(qp, ns, sb1, se1, sb2, se2, sb3, se3)
+                call s_amr_shl_stage(ns, sb1, se1, sb2, se2, sb3, se3, stot)
+                call s_amr_copy_parent_shell_device_${GSFX}$(qp, ns, stot)
                 return
             end if
 
@@ -2243,34 +2286,25 @@ contains
     !! (w, amr_cpat_mar) inputs, so they cannot drift apart.
     #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
         #:set QP = lambda ix: GARR + '(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)'
-        impure subroutine s_amr_copy_parent_shell_device_${GSFX}$(qp, ms, tb1, te1, tb2, te2, tb3, te3)
+        impure subroutine s_amr_copy_parent_shell_device_${GSFX}$(qp, ms, stot)
 
-            integer, intent(in) :: qp  !< parent's flat-store slot
-            integer, intent(in) :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
-            integer             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
-            integer             :: i, s, ss, g, r, n1, n2, g1, g2, g3, o1, o2, o3, stot
+            integer, intent(in) :: qp        !< parent's flat-store slot
+            integer, intent(in) :: ms, stot  !< slab count + cell total of the STAGED amr_shl metadata (s_amr_shl_stage)
+            integer             :: i, s, ss, g, r, n1, n2, g1, g2, g3, o1, o2, o3
 
             o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
-            soff(1) = 0
-            do s = 1, ms
-                lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
-                scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
-                if (s < ms) soff(s + 1) = soff(s) + scnt(s)
-            end do
-            stot = soff(ms) + scnt(ms)
-            $:GPU_PARALLEL_LOOP(collapse=2, copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', private='[s, ss, r, n1, n2, g1, &
-                                & g2, g3]')
+            $:GPU_PARALLEL_LOOP(collapse=2, private='[s, ss, r, n1, n2, g1, g2, g3]')
             do i = 1, sys_size
                 do g = 0, stot - 1
                     s = 1  ! decode the flat index: ms <= 6, so a scan beats storing a per-cell slab map
                     do ss = 2, ms
-                        if (g >= soff(ss)) s = ss
+                        if (g >= amr_shl(ss, 7)) s = ss
                     end do
-                    r = g - soff(s)
-                    n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
-                    g1 = lb1(s) + mod(r, n1)
-                    g2 = lb2(s) + mod(r/n1, n2)
-                    g3 = lb3(s) + r/(n1*n2)
+                    r = g - amr_shl(s, 7)
+                    n1 = amr_shl(s, 2) - amr_shl(s, 1) + 1; n2 = amr_shl(s, 4) - amr_shl(s, 3) + 1
+                    g1 = amr_shl(s, 1) + mod(r, n1)
+                    g2 = amr_shl(s, 3) + mod(r/n1, n2)
+                    g3 = amr_shl(s, 5) + r/(n1*n2)
                     amr_cg(i)%sf(g1, g2, g3) = ${QP('i')}$
                 end do
             end do
@@ -2278,37 +2312,28 @@ contains
 
         end subroutine s_amr_copy_parent_shell_device_${GSFX}$
 
-        impure subroutine s_amr_pack_parent_shell_device_${GSFX}$(qp, ms, tb1, te1, tb2, te2, tb3, te3, buf)
+        impure subroutine s_amr_pack_parent_shell_device_${GSFX}$(qp, ms, stot, buf)
 
-            integer, intent(in)                 :: qp  !< parent's flat-store slot
-            integer, intent(in)                 :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+            integer, intent(in)                 :: qp        !< parent's flat-store slot
+            integer, intent(in)                 :: ms, stot  !< slab count + cell total of the STAGED amr_shl metadata
             real(wp), intent(inout), contiguous :: buf(:)
-            integer                             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
-            integer                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, o1, o2, o3, stot, nv
+            integer                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, o1, o2, o3, nv
 
             o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
             nv = sys_size
-            soff(1) = 0
-            do s = 1, ms
-                lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
-                scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
-                if (s < ms) soff(s + 1) = soff(s) + scnt(s)
-            end do
-            stot = soff(ms) + scnt(ms)
-            $:GPU_PARALLEL_LOOP(collapse=2, copyout='[buf]', copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', private='[s, &
-                                & ss, r, n1, n2, g1, g2, g3]')
+            $:GPU_PARALLEL_LOOP(collapse=2, copyout='[buf]', private='[s, ss, r, n1, n2, g1, g2, g3]')
             do i = 1, nv
                 do g = 0, stot - 1
                     s = 1
                     do ss = 2, ms
-                        if (g >= soff(ss)) s = ss
+                        if (g >= amr_shl(ss, 7)) s = ss
                     end do
-                    r = g - soff(s)
-                    n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
-                    g1 = lb1(s) + mod(r, n1)
-                    g2 = lb2(s) + mod(r/n1, n2)
-                    g3 = lb3(s) + r/(n1*n2)
-                    buf(1 + nv*soff(s) + (i - 1)*scnt(s) + r) = real(${QP('i')}$, wp)
+                    r = g - amr_shl(s, 7)
+                    n1 = amr_shl(s, 2) - amr_shl(s, 1) + 1; n2 = amr_shl(s, 4) - amr_shl(s, 3) + 1
+                    g1 = amr_shl(s, 1) + mod(r, n1)
+                    g2 = amr_shl(s, 3) + mod(r/n1, n2)
+                    g3 = amr_shl(s, 5) + r/(n1*n2)
+                    buf(1 + nv*amr_shl(s, 7) + (i - 1)*amr_shl(s, 8) + r) = real(${QP('i')}$, wp)
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -2535,36 +2560,28 @@ contains
     !> Ring-clipped runtime own-box copy (device): the owner's shell-slab / own-box intersections [tb:te] GLOBAL from q_coarse into
     !! amr_cg in the patch-local frame - no host round-trip, ONE fused kernel over the slab concatenation (the ghost-fill kernel's
     !! flat-index idiom). Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch.
-    impure subroutine s_amr_gather_own_shell_device(q_coarse, ms, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
+    impure subroutine s_amr_gather_own_shell_device(q_coarse, ms, stot, o1, o2, o3)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6), o1, o2, o3
-        integer                                             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
-        integer                                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, stot, coff1, coff2, coff3
+        integer, intent(in)                                 :: ms, stot, o1, o2, o3
+        integer                                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, coff1, coff2, coff3
 
-        ! scalar/local copies: no host array may be referenced inside the device region (nvfortran/Cray demand it PRESENT)
+        ! slab metadata comes from the STAGED device-resident amr_shl (s_amr_shl_stage) - never a per-launch array map;
+        ! scalar copies: no host array may be referenced inside the device region (nvfortran/Cray demand it PRESENT)
 
         coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        soff(1) = 0
-        do s = 1, ms
-            lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
-            scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
-            if (s < ms) soff(s + 1) = soff(s) + scnt(s)
-        end do
-        stot = soff(ms) + scnt(ms)
-        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', &
-                            & private='[s, ss, r, n1, n2, g1, g2, g3]')
+        $:GPU_PARALLEL_LOOP(collapse=2, private='[s, ss, r, n1, n2, g1, g2, g3]')
         do i = 1, sys_size
             do g = 0, stot - 1
                 s = 1  ! decode the flat index: ms <= 6, so a scan beats storing a per-cell slab map
                 do ss = 2, ms
-                    if (g >= soff(ss)) s = ss
+                    if (g >= amr_shl(ss, 7)) s = ss
                 end do
-                r = g - soff(s)
-                n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
-                g1 = lb1(s) + mod(r, n1)
-                g2 = lb2(s) + mod(r/n1, n2)
-                g3 = lb3(s) + r/(n1*n2)
+                r = g - amr_shl(s, 7)
+                n1 = amr_shl(s, 2) - amr_shl(s, 1) + 1; n2 = amr_shl(s, 4) - amr_shl(s, 3) + 1
+                g1 = amr_shl(s, 1) + mod(r, n1)
+                g2 = amr_shl(s, 3) + mod(r/n1, n2)
+                g3 = amr_shl(s, 5) + r/(n1*n2)
                 amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
             end do
         end do
@@ -2576,36 +2593,27 @@ contains
     !! into the contiguous wire buffer buf (host, via copyout) - only the shell slices cross PCIe. Slab-major (i, g3, g2, g1) wire
     !! layout with the wp cast; decoded element-for-element by s_amr_unpack_shell_device on the owner (both sides derive the same
     !! slab list from replicated data). The pbmv gather is NOT clipped - it keeps its full-box wire contract.
-    impure subroutine s_amr_pack_shell_device(q_coarse, ms, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3, buf)
+    impure subroutine s_amr_pack_shell_device(q_coarse, ms, stot, o1, o2, o3, buf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6), o1, o2, o3
+        integer, intent(in)                                 :: ms, stot, o1, o2, o3
         real(wp), intent(inout), contiguous                 :: buf(:)
-        integer                                             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
-        integer                                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, stot, nv
+        integer                                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, nv
 
         nv = sys_size
-        soff(1) = 0
-        do s = 1, ms
-            lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
-            scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
-            if (s < ms) soff(s + 1) = soff(s) + scnt(s)
-        end do
-        stot = soff(ms) + scnt(ms)
-        $:GPU_PARALLEL_LOOP(collapse=2, copyout='[buf]', copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', private='[s, ss, r, &
-                            & n1, n2, g1, g2, g3]')
+        $:GPU_PARALLEL_LOOP(collapse=2, copyout='[buf]', private='[s, ss, r, n1, n2, g1, g2, g3]')
         do i = 1, nv
             do g = 0, stot - 1
                 s = 1
                 do ss = 2, ms
-                    if (g >= soff(ss)) s = ss
+                    if (g >= amr_shl(ss, 7)) s = ss
                 end do
-                r = g - soff(s)
-                n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
-                g1 = lb1(s) + mod(r, n1)
-                g2 = lb2(s) + mod(r/n1, n2)
-                g3 = lb3(s) + r/(n1*n2)
-                buf(1 + nv*soff(s) + (i - 1)*scnt(s) + r) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
+                r = g - amr_shl(s, 7)
+                n1 = amr_shl(s, 2) - amr_shl(s, 1) + 1; n2 = amr_shl(s, 4) - amr_shl(s, 3) + 1
+                g1 = amr_shl(s, 1) + mod(r, n1)
+                g2 = amr_shl(s, 3) + mod(r/n1, n2)
+                g3 = amr_shl(s, 5) + r/(n1*n2)
+                buf(1 + nv*amr_shl(s, 7) + (i - 1)*amr_shl(s, 8) + r) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -2615,35 +2623,26 @@ contains
     !> Ring-clipped runtime device unpack: a received shell wire buffer into amr_cg over the clipped slabs [tb:te], given
     !! PATCH-LOCAL (level-1 callers shift their global slabs by amr_cpat_off; the level>=2 slabs are patch-local natively, so ONE
     !! kernel serves both). Inverse layout and stp cast of s_amr_pack_shell_device / s_amr_pack_parent_shell_device.
-    impure subroutine s_amr_unpack_shell_device(ms, tb1, te1, tb2, te2, tb3, te3, buf)
+    impure subroutine s_amr_unpack_shell_device(ms, stot, buf)
 
-        integer, intent(in)              :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+        integer, intent(in)              :: ms, stot
         real(wp), intent(in), contiguous :: buf(:)
-        integer                          :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
-        integer                          :: i, s, ss, g, r, n1, n2, g1, g2, g3, stot, nv
+        integer                          :: i, s, ss, g, r, n1, n2, g1, g2, g3, nv
 
         nv = sys_size
-        soff(1) = 0
-        do s = 1, ms
-            lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
-            scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
-            if (s < ms) soff(s + 1) = soff(s) + scnt(s)
-        end do
-        stot = soff(ms) + scnt(ms)
-        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[buf, lb1, le1, lb2, le2, lb3, le3, soff, scnt]', private='[s, ss, r, n1, n2, g1, &
-                            & g2, g3]')
+        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[buf]', private='[s, ss, r, n1, n2, g1, g2, g3]')
         do i = 1, nv
             do g = 0, stot - 1
                 s = 1
                 do ss = 2, ms
-                    if (g >= soff(ss)) s = ss
+                    if (g >= amr_shl(ss, 7)) s = ss
                 end do
-                r = g - soff(s)
-                n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
-                g1 = lb1(s) + mod(r, n1)
-                g2 = lb2(s) + mod(r/n1, n2)
-                g3 = lb3(s) + r/(n1*n2)
-                amr_cg(i)%sf(g1, g2, g3) = real(buf(1 + nv*soff(s) + (i - 1)*scnt(s) + r), stp)
+                r = g - amr_shl(s, 7)
+                n1 = amr_shl(s, 2) - amr_shl(s, 1) + 1; n2 = amr_shl(s, 4) - amr_shl(s, 3) + 1
+                g1 = amr_shl(s, 1) + mod(r, n1)
+                g2 = amr_shl(s, 3) + mod(r/n1, n2)
+                g3 = amr_shl(s, 5) + r/(n1*n2)
+                amr_cg(i)%sf(g1, g2, g3) = real(buf(1 + nv*amr_shl(s, 7) + (i - 1)*amr_shl(s, 8) + r), stp)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
