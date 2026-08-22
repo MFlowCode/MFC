@@ -73,7 +73,7 @@ This wraps the lines in `code` with parallelization calls to openACC or openMP, 
 | `copyinReadOnly` | string list         | None              | Allocates and copies readonly data to GPU and then deallocated on exit                    |
 | `copyout`        | string list         | None              | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit          |
 | `create`         | string list         | None              | Allocates data on GPU on entrance and then deallocates on exit                            |
-| `no_create`      | string list         | None              | Use data in CPU memory unless data is already in GPU memory                               |
+| `no_create`      | string list         | None              | Use data in CPU memory unless data is already in GPU memory (OpenACC only)                |
 | `present`        | string list         | None              | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit |
 | `deviceptr`      | string list         | None              | Pointer variables that are already allocated on GPU memory                                |
 | `attach`         | string list         | None              | Attaches device pointer to device targets on entrance, then detach on exit                |
@@ -184,7 +184,7 @@ Uses FYPP call directive using `#:call`
 | `copyinReadOnly` | string list         | None          | Allocates and copies readonly data to GPU and then deallocated on exit                    |
 | `copyout`        | string list         | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit          |
 | `create`         | string list         | None          | Allocates data on GPU on entrance and then deallocates on exit                            |
-| `no_create`      | string list         | None          | Use data in CPU memory unless data is already in GPU memory                               |
+| `no_create`      | string list         | None          | Use data in CPU memory unless data is already in GPU memory (OpenACC only)                |
 | `present`        | string list         | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit |
 | `deviceptr`      | string list         | None          | Pointer variables that are already allocated on GPU memory                                |
 | `attach`         | string list         | None          | Attaches device pointer to device targets on entrance, then detach on exit                |
@@ -247,7 +247,7 @@ Uses FYPP call directive using `#:call`
 | `copyinReadOnly` | string list | None          | Allocates and copies a readonly variable to GPU and then deallocated on exit                 |
 | `copyout`        | string list | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit             |
 | `create`         | string list | None          | Allocates data on GPU on entrance and then deallocates on exit                               |
-| `no_create`      | string list | None          | Use data in CPU memory unless data is already in GPU memory                                  |
+| `no_create`      | string list | None          | Use data in CPU memory unless data is already in GPU memory (OpenACC only)                   |
 | `present`        | string list | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit    |
 | `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                   |
 | `attach`         | string list | None          | Attaches device pointer to device targets on entrance, then detach on exit                   |

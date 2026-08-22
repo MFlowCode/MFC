@@ -67,9 +67,13 @@
 #:enddef
 
 #:def OMP_NOCREATE_STR(no_create)
-    #:if no_create is not None
-        #:stop 'no_create is not supported yet'
-    #:endif
+    #! OpenMP has no no_create equivalent, so this is a documented no-op: the variable is
+    #! left to whatever mapping the enclosing region already applies to it. Note that is
+    #! NOT equivalent to no_create on most targets -- OMP_DEFAULT_STR emits nothing unless
+    #! the caller passes default='present', and even then only CCE maps present; NVHPC/PGI
+    #! and the fallback emit a defaultmap(tofrom:scalar) clause, which copies rather than reuses.
+    #! Do NOT #:stop here: GPU_DATA expands both backends before #if selects one, so
+    #! aborting would break OpenACC builds, where no_create is supported natively.
     #:set no_create_val = ''
     $:no_create_val
 #:enddef
@@ -275,11 +279,23 @@
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n') + &
         & default_val.strip('\n')
+    #! An OpenMP `target data` region must carry at least one map, use_device_ptr or
+    #! use_device_addr clause. no_create contributes none (it is a no-op here), and
+    #! `default` is None by default, so GPU_DATA(no_create=x) with no other clause left
+    #! clause_val empty and emitted a bare `!$omp target data` that no compiler accepts.
+    #! Emit the body alone in that case -- a data region with nothing to map has nothing
+    #! to do, which is what GPU_DATA's own #else branch already does when neither backend
+    #! is enabled. A #:stop is not an option here, for the reason in OMP_NOCREATE_STR.
+    #:set has_clauses = clause_val.strip() != '' or extraOmpArgs_val.strip() != ''
     #:set omp_directive = '!$omp target data ' + clause_val + extraOmpArgs_val.strip('\n')
     #:set end_omp_directive = '!$omp end target data'
-    $:omp_directive
+    #:if has_clauses
+        $:omp_directive
+    #:endif
     $:code
-    $:end_omp_directive
+    #:if has_clauses
+        $:end_omp_directive
+    #:endif
 #:enddef
 
 #:def OMP_ENTER_DATA(copyin=None, copyinReadOnly=None, create=None, attach=None, extraOmpArgs=None)
