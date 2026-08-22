@@ -1748,7 +1748,11 @@ contains
             ! The pool owns the buffer because an ISEND requires it to stay live until completion; the drain is the existing
             ! s_amr_gather_send_flush after the rebuild's box loop.
             boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
-            if (amr_rg_gather .and. amr_gpl_valid) then
+            ! guard on the plan alone, NOT amr_rg_gather (nothing sets it since the chunked rebuild landed): this is the ONE
+            ! step-1 assert on the chunked path's live route - a send packed short of the plan-sized recv completes short and
+            ! the consume unpacks stale pool bytes, the silent-wrong-answer class. amr_gpl_valid is false outside the rebuild
+            ! box loop, so subcycle/per-step calls never consult the plan.
+            if (amr_gpl_valid) then
                 @:ASSERT(amr_gpl_psz(cblk) == boxsz, "gather plan: parent send size mismatch")
             end if
             call s_amr_gsnd_reserve(boxsz)
