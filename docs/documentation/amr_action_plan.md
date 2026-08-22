@@ -268,7 +268,7 @@ the families stand. Deeper reads that CHANGE the interpretation:
    stash-only slots; `[amr-cap]` flatness (promote into `s0_report.py`). Verification includes
    the I0 lesson: seed a deliberate staleness bug and confirm the validator TRIPS.
 2. **P1 q_prim/rhs pooling — REDESIGNED by the pre-increment audit (consumer-lifetime sweep,
-   2026-08-21 night; full report in the session record).** The sweep established: fine-block
+   2026-08-21 night; full report: amr-bench/qprim_rhs_lifetime_audit.md).** The sweep established: fine-block
    `rhs` is single-block scratch (fused per-block compute+update, `m_amr.fpp:4910`; reflux
    never reads slot rhs on that path) but **L0 tiles need per-slot rhs** across the
    MPI-synchronized reflux point (`m_time_steppers.fpp:635-637`); `q_prim` is written only
