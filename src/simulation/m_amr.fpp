@@ -50,7 +50,7 @@ module m_amr
     !! module). State stays HERE - only the drivers moved.
     public :: s_amr_br_load_all, s_amr_br_store_all, amr_br_w, amr_br_batch, amr_rg_gather
     public :: s_amr_build_gather_plan, amr_gpl_valid
-    public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk
+    public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note
     public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, amr_tag_base, &
         & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_free_slot, s_amr_reconcile_slots, &
         & s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, &
@@ -214,6 +214,13 @@ module m_amr
     integer               :: amr_gcr_r0(amr_gath_chunk), amr_gcr_nr(amr_gath_chunk)  !< per chunk-local box: first recv, count
     logical               :: amr_gcr_sent(amr_gath_chunk)  !< chunk-local: level>=2 send already issued in the send phase
     integer               :: amr_gcr_n = 0  !< posted recvs in the current chunk
+    !> [amr-cov] dead-byte accounting (expert-audit increment, amr_action_plan.md 2026-08-22): partition each gather family's patch
+    !! words into live vs provably-dead. (1) step-fill: the ghost-fill kernel reads only floor(f/rr) +- 1, so the patch's interior
+    !! core (region shrunk by 1 per face) is never read. (2) rebuild level-1: the same-level carry-forward overwrites prolonged
+    !! cells covered by old blocks (shrunk by 1 for the minmod stencil - a conservative under-count). (3) rebuild level>=2: no
+    !! carry-forward exists, so the patch is live by construction. Deterministic - identical across reruns; decides ring/coverage
+    !! clipping vs T1 (pre-registered: dead > 50% on either family promotes clipping).
+    integer(8) :: amr_cov_tot(3) = 0, amr_cov_dead(3) = 0  !< 1=step-fill, 2=rebuild L1, 3=rebuild L>=2
     !> (0:num_procs-1) SFC Morton-key upper bound per rank from the cost-weighted split; owner = cut-search (f_amr_owner). The O(P)
     !! computed replacement for the O(global_blocks) amr_block_owner table (validated against it during bring-up).
     integer(kind=8), allocatable :: amr_owner_cut(:)
@@ -1263,6 +1270,100 @@ contains
         call s_phase_toc(PH_RBUPD)
 
     end subroutine s_amr_gather_consume_box
+
+    !> [amr-cov]: accumulate the step-fill coverage split for the current block (owner calls, once per fill). The whole patch is
+    !! shipped/copied; the ghost-fill kernel reads only the margin plus ONE interior cell per face (floor(f/rr) +- 1), so the
+    !! interior core - the patch frame's region shrunk by 1 per face - is provably dead. Level>=2 blocks fill from the parent-fine
+    !! foot patch; same split in that frame.
+    impure subroutine s_amr_cov_note_fill()
+
+        integer :: r1, r2, r3, pblk, plo(3), phi(3)
+
+        if (amr_block_level(amr_cur) >= 2) then
+            pblk = f_amr_parent_block(amr_cur)
+            call s_amr_parent_foot(amr_cur, pblk, plo, phi)
+            r1 = phi(1) - plo(1) + 1
+            r2 = 1; r3 = 1
+            if (n_glb > 0) r2 = phi(2) - plo(2) + 1
+            if (p_glb > 0) r3 = phi(3) - plo(3) + 1
+        else
+            r1 = amr_region_hi_all(1, amr_cur) - amr_region_lo_all(1, amr_cur) + 1
+            r2 = 1; r3 = 1
+            if (n_glb > 0) r2 = amr_region_hi_all(2, amr_cur) - amr_region_lo_all(2, amr_cur) + 1
+            if (p_glb > 0) r3 = amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur) + 1
+        end if
+        amr_cov_tot(1) = amr_cov_tot(1) + int(sys_size, 8)*int(r1 + 2*amr_cpat_mar, 8)*int(merge(r2 + 2*amr_cpat_mar, 1, &
+                    & n_glb > 0), 8)*int(merge(r3 + 2*amr_cpat_mar, 1, p_glb > 0), 8)
+        amr_cov_dead(1) = amr_cov_dead(1) + int(sys_size, 8)*int(max(r1 - 2, 0), 8)*int(merge(max(r2 - 2, 0), 1, n_glb > 0), &
+                     & 8)*int(merge(max(r3 - 2, 0), 1, p_glb > 0), 8)
+
+    end subroutine s_amr_cov_note_fill
+
+    !> [amr-cov]: accumulate the rebuild-gather coverage split for the current box (owner calls, once per owned box). Level-1: patch
+    !! words vs words prolonged into cells the same-level carry-forward overwrites (old same-level regions are disjoint, so the
+    !! intersections sum exactly; each shrunk by 1 per face for the minmod stencil - conservative). Level>=2: patch words only - no
+    !! carry-forward exists, the patch is live by construction.
+    impure subroutine s_amr_cov_note(old_np, old_ilo, old_ext, old_level)
+
+        integer, intent(in) :: old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
+        integer             :: kk, pblk, plo(3), phi(3), olo(3), ohi(3), bl(3), bh(3), r1, r2, r3
+        integer(8)          :: words
+
+        if (amr_block_level(amr_cur) >= 2) then
+            pblk = f_amr_parent_block(amr_cur)
+            call s_amr_parent_foot(amr_cur, pblk, plo, phi)
+            r1 = phi(1) - plo(1) + 1
+            r2 = 1; r3 = 1
+            if (n_glb > 0) r2 = phi(2) - plo(2) + 1
+            if (p_glb > 0) r3 = phi(3) - plo(3) + 1
+            amr_cov_tot(3) = amr_cov_tot(3) + int(sys_size, 8)*int(r1 + 2*amr_cpat_mar, 8)*int(merge(r2 + 2*amr_cpat_mar, 1, &
+                        & n_glb > 0), 8)*int(merge(r3 + 2*amr_cpat_mar, 1, p_glb > 0), 8)
+            return
+        end if
+        r1 = amr_region_hi_all(1, amr_cur) - amr_region_lo_all(1, amr_cur) + 1
+        r2 = 1; r3 = 1
+        if (n_glb > 0) r2 = amr_region_hi_all(2, amr_cur) - amr_region_lo_all(2, amr_cur) + 1
+        if (p_glb > 0) r3 = amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur) + 1
+        amr_cov_tot(2) = amr_cov_tot(2) + int(sys_size, 8)*int(r1 + 2*amr_cpat_mar, 8)*int(merge(r2 + 2*amr_cpat_mar, 1, &
+                    & n_glb > 0), 8)*int(merge(r3 + 2*amr_cpat_mar, 1, p_glb > 0), 8)
+        do kk = 1, old_np
+            if (old_level(kk) /= amr_block_level(amr_cur)) cycle
+            olo = old_ilo(:,kk)
+            ohi = olo
+            ohi(1) = olo(1) + (old_ext(1, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
+            if (n_glb > 0) ohi(2) = olo(2) + (old_ext(2, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
+            if (p_glb > 0) ohi(3) = olo(3) + (old_ext(3, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
+            call s_amr_box_isect(amr_region_lo_all(:,amr_cur), amr_region_hi_all(:,amr_cur), olo, ohi, bl, bh)
+            if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
+            words = int(max(bh(1) - bl(1) + 1 - 2, 0), 8)
+            if (n_glb > 0) words = words*int(max(bh(2) - bl(2) + 1 - 2, 0), 8)
+            if (p_glb > 0) words = words*int(max(bh(3) - bl(3) + 1 - 2, 0), 8)
+            amr_cov_dead(2) = amr_cov_dead(2) + int(sys_size, 8)*words
+        end do
+
+    end subroutine s_amr_cov_note
+
+    !> [amr-cov] report: SUM-allreduce the counters and print once on rank 0. Collective - the caller (s_finalize_amr_module) runs
+    !! it before the amr early-return so every rank participates (all-zero when amr is off).
+    impure subroutine s_amr_cov_report()
+
+        integer(8)                  :: tot(3), dead(3)
+        integer                     :: ierr, f
+        character(len=8), parameter :: nm(3) = ["stepfill", "rb-L1   ", "rb-L2   "]
+
+        tot = amr_cov_tot; dead = amr_cov_dead
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(amr_cov_tot, tot, 3, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(amr_cov_dead, dead, 3, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+#endif
+        if (proc_rank == 0) then
+            do f = 1, 3
+                if (tot(f) > 0) write (0, '(A,A,A,I0,A,I0,A,F6.3)') ' [amr-cov] ', nm(f), ' words ', tot(f), ' dead ', dead(f), &
+                    & ' frac ', real(dead(f))/real(tot(f))
+            end do
+        end if
+
+    end subroutine s_amr_cov_report
 
     impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
 
@@ -5281,6 +5382,7 @@ contains
         ! pair
         ! nests to a no-op)
         if (rank_time_wrt) call s_rank_time_tic()
+        call s_amr_cov_note_fill()
         call s_phase_tic(PH_GFILL)
         call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
         call s_phase_toc(PH_GFILL)
@@ -7601,6 +7703,7 @@ contains
         ! families can fire with amr = F. All ranks take the same path either way.
 
         call s_xa_report()
+        call s_amr_cov_report()
         if (.not. amr) return
         do islot = 1, amr_max_blocks
             call s_amr_free_slot(islot)
