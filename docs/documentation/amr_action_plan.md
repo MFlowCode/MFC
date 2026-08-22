@@ -287,6 +287,17 @@ the families stand. Deeper reads that CHANGE the interpretation:
    the MONOLITHIC path the read may see stage-stale psi when none of the gate flags is set —
    an upstream accuracy question, filed as a candidate for an upstream issue, not on our
    critical path.**
+
+**Config decision closed (P4 arm): threshold=2^20 measured IDENTICAL to =0** (rhs
+[145.0, 140.0, 147.4, 149.7] vs [145.4, 146.5, 152.3, 142.8]) — hoarding of the big freed
+blocks was the entire story; descriptor caching adds nothing. **=0 is the STANDING DEFAULT,
+exported in amr-bench/env.sh (dated note there); every benchmark from 2026-08-21 on runs with
+it, and any runtime upgrade must re-verify it.** The peak-vs-plateau distinction from the P4
+VRAM trace (rank 2 still spikes to 62.4 at the migration storm — LIVE transient,
+knob-independent — while performance tracks the retention plateau) is the shape memory work
+is judged on from now on. **Before quoting any S-track/regrid share: re-baseline the S0
+np=2/np=4 pair WITH the knob** — the 2.59x table above is the pre-knob world; the post-knob
+gap (~1.59x per doubling) is the one the remaining fronts compete over.
 3. **M4-directed third increment:** S1 block-lattice tags (if regrid/collective scaling is the
    chosen front — kills the measured ntag doubling; judged on ntag bytes/rank going flat), OR
    I2-I3 exchange waves (if wait/skew traces to per-box exchange arrival), OR the S2/T1
