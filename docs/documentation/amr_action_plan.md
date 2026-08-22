@@ -21,7 +21,17 @@ of `rb:gath` was ~20 s at np=8, and step 2 already collected it.
 **Expert audit (2 independent reviewers: MPI internals + AMR architecture, both verified
 against source) re-aims the increment ladder:**
 
-1. **`[amr-cov]` dead-byte counter FIRST (~40 LOC, deterministic, piggybacks any S0 run).**
+1. **DONE same day (7b7ae5c9, logs/p1gate-0822_1259) — THE RULE FIRED: promote clipping
+   ahead of T1.** Measured at np=8: stepfill 67.65e9 words/run **71.2% dead**, rb-L1
+   1.48e9 words **67.9% dead**, rb-L2 4.90e9 words live-by-construction; np=4 agrees
+   (70.9%/55.6%). stepfill is 91% of all gather-family words (~590 GB of host-DRAM traffic
+   per 40-step np=8 run, 71% dead). Both families clear the pre-registered 50% bar ->
+   **next code increment = ring-clip the step fill** (gather only the margin + one interior
+   cell per face), then coverage-clip rb-L1; T1 re-ranks after. Same sweep: first
+   production run of the hcid dicts (clean), and np=8 wall 1186.4 vs 1235.6 s across
+   back-to-back identical runs = 4% run-to-run variance on k004-001 - never quote
+   single-run walls here. Original design note follows.
+   **`[amr-cov]` dead-byte counter FIRST (~40 LOC, deterministic, piggybacks any S0 run).**
    VERIFIED in code: `s_amr_fine_stage_fill` (m_amr.fpp:4982) gathers the FULL coarse patch
    every RK stage while the consumer prolongs only the ghost shell — the interior of every
    message in the 14.3%-of-np=8-wall gather family is never read. Rebuild side: the
