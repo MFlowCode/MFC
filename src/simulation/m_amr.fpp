@@ -687,6 +687,10 @@ contains
         ! coarse
         ! cells + 2*nmar halo, block-local frame). Device-mapped so the runtime ghost-fill reads it on the owner.
         amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
+        ! ring-clip premise (docs/documentation/amr_stepfill_ring_clip.md, F5): the runtime checker forbids blocks closer than
+        ! buff_size to the domain boundary, and mar <= buff_size keeps every patch inside it - so the clipped shell always exists
+        ! without boundary special-casing. Assert the premise instead of handling the case.
+        @:ASSERT(amr_cpat_mar <= buff_size, "ring clip: amr_cpat_mar exceeds buff_size")
         amr_cpat_hi = 0
         amr_cpat_hi(1) = maxc_loc(1) - 1 + 2*amr_cpat_mar
         if (n_glb > 0) amr_cpat_hi(2) = maxc_loc(2) - 1 + 2*amr_cpat_mar
@@ -899,8 +903,9 @@ contains
     !! patch cells it does not hold from exactly the (SFC-local) coarse-owners that hold them - each rank's contribution is the
     !! patch intersected with its contiguous owned coarse range (s_amr_rank_coarse_range, = the f_amr_own_coarse set, computed from
     !! the cartesian decomposition). Non-participants send/recv nothing (no global collective). At np=1 the owner just copies its
-    !! own coarse over the patch, bit-for-bit. Runtime (pull_host) packs/unpacks the overlap boxes on the DEVICE (q_coarse
-    !! device-current with valid ghosts); init/regrid fills from the host (host-current with valid ghosts). Packed data is wp, cast
+    !! own coarse over the patch, bit-for-bit. Runtime (pull_host) is RING-CLIPPED - only each overlap box's shell slabs move, on
+    !! the DEVICE (q_coarse device-current with valid ghosts; see docs/documentation/amr_stepfill_ring_clip.md); init/regrid fills
+    !! the FULL patch from the host (host-current with valid ghosts - its consumers prolong the whole box). Packed data is wp, cast
     !! to stp into amr_cg (identity for stp coarse), device-current on exit. INVARIANT: "coarse" here means the block's PARENT level
     !! (level l-1), NOT the base grid (level 0). For a level-1 block the parent IS L0, but a level>=2 block folds to/from its parent
     !! block's fine array; the C<->F prolong/restrict/gather routines all operate in the parent-fine frame, not the L0 frame. TWIN
@@ -1365,6 +1370,118 @@ contains
 
     end subroutine s_amr_cov_report
 
+    !> Ring clip: decompose the hollow shell of patch [plo:phi] minus its OPEN core [clo:chi] (same integer frame; collapsed dims
+    !! pass plo=phi=clo=chi=0 so they never cut the core) into at most 6 DISJOINT slabs in a FIXED order: x-low/x-high spanning the
+    !! full transverse extent, then y-low/high restricted to the core's x-interval, then z-low/high restricted in x and y. Width<=2
+    !! cores are empty (shell = whole patch, legal); the width-1 double-cover is resolved by clamping the high slab past the low
+    !! one. Both sides of every clipped exchange derive the same list from replicated metadata, so the wire layout needs no
+    !! handshake (docs/documentation/amr_stepfill_ring_clip.md).
+    impure subroutine s_amr_shell_slabs(plo, phi, clo, chi, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+
+        integer, intent(in)  :: plo(3), phi(3), clo(3), chi(3)
+        integer, intent(out) :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
+        integer              :: cb(3, 6), ce(3, 6), s, ss
+        integer(8)           :: words, patchw, corew
+
+        cb(:,1) = plo; ce(:,1) = [clo(1) - 1, phi(2), phi(3)]
+        cb(:,2) = [max(chi(1) + 1, clo(1)), plo(2), plo(3)]; ce(:,2) = phi
+        cb(:,3) = [clo(1), plo(2), plo(3)]; ce(:,3) = [chi(1), clo(2) - 1, phi(3)]
+        cb(:,4) = [clo(1), max(chi(2) + 1, clo(2)), plo(3)]; ce(:,4) = [chi(1), phi(2), phi(3)]
+        cb(:,5) = [clo(1), clo(2), plo(3)]; ce(:,5) = [chi(1), chi(2), clo(3) - 1]
+        cb(:,6) = [clo(1), clo(2), max(chi(3) + 1, clo(3))]; ce(:,6) = [chi(1), chi(2), phi(3)]
+        ns = 0; words = 0
+        do s = 1, 6
+            if (cb(1, s) > ce(1, s) .or. cb(2, s) > ce(2, s) .or. cb(3, s) > ce(3, s)) cycle
+            ns = ns + 1
+            sb1(ns) = cb(1, s); se1(ns) = ce(1, s)
+            sb2(ns) = cb(2, s); se2(ns) = ce(2, s)
+            sb3(ns) = cb(3, s); se3(ns) = ce(3, s)
+            words = words + int(se1(ns) - sb1(ns) + 1, 8)*int(se2(ns) - sb2(ns) + 1, 8)*int(se3(ns) - sb3(ns) + 1, 8)
+        end do
+        ! the slabs must tile the shell EXACTLY: pairwise disjoint, cells summing to patch - core
+        do s = 1, ns - 1
+            do ss = s + 1, ns
+                @:ASSERT(max(sb1(s), sb1(ss)) > min(se1(s), se1(ss)) .or. max(sb2(s), sb2(ss)) > min(se2(s), &
+                         & se2(ss)) .or. max(sb3(s), sb3(ss)) > min(se3(s), se3(ss)), "shell slabs: overlap")
+            end do
+        end do
+        patchw = int(phi(1) - plo(1) + 1, 8)*int(phi(2) - plo(2) + 1, 8)*int(phi(3) - plo(3) + 1, 8)
+        corew = int(max(chi(1) - clo(1) + 1, 0), 8)*int(max(chi(2) - clo(2) + 1, 0), 8)*int(max(chi(3) - clo(3) + 1, 0), 8)
+        @:ASSERT(words == patchw - corew, "shell slabs: coverage mismatch")
+        cells = int(words)
+
+    end subroutine s_amr_shell_slabs
+
+    !> Intersect the shell-slab list with box [bl:bh]: the surviving clipped slabs in the SAME fixed order (each exchange side
+    !! derives an identical list from replicated data, so empties drop symmetrically) plus their total cell count.
+    impure subroutine s_amr_shell_clip(ns, sb1, se1, sb2, se2, sb3, se3, bl, bh, ms, tb1, te1, tb2, te2, tb3, te3, cells)
+
+        integer, intent(in)  :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), bl(3), bh(3)
+        integer, intent(out) :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6), cells
+        integer              :: s, l1, u1, l2, u2, l3, u3
+
+        ms = 0; cells = 0
+        do s = 1, ns
+            l1 = max(sb1(s), bl(1)); u1 = min(se1(s), bh(1))
+            l2 = max(sb2(s), bl(2)); u2 = min(se2(s), bh(2))
+            l3 = max(sb3(s), bl(3)); u3 = min(se3(s), bh(3))
+            if (l1 > u1 .or. l2 > u2 .or. l3 > u3) cycle
+            ms = ms + 1
+            tb1(ms) = l1; te1(ms) = u1; tb2(ms) = l2; te2(ms) = u2; tb3(ms) = l3; te3(ms) = u3
+            cells = cells + (u1 - l1 + 1)*(u2 - l2 + 1)*(u3 - l3 + 1)
+        end do
+
+    end subroutine s_amr_shell_clip
+
+    !> Level>=2 shell in the PATCH-LOCAL frame [0:w]: the parent foot maps to [mar, w-mar], so the open core is [mar+1, w-mar-1] per
+    !! active dim (collapsed dims pass [0,0] and never cut). Sender pack, receiver size, and unpack all derive the same list from
+    !! the same replicated (w, amr_cpat_mar) inputs.
+    impure subroutine s_amr_parent_shell_slabs(w1, w2, w3, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+
+        integer, intent(in)  :: w1, w2, w3
+        integer, intent(out) :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
+        integer              :: pl(3), ph(3), cl(3), ch(3)
+
+        pl = 0; ph = [w1, w2, w3]
+        cl = 0; ch = 0
+        cl(1) = amr_cpat_mar + 1; ch(1) = w1 - amr_cpat_mar - 1
+        if (n_glb > 0) then
+            cl(2) = amr_cpat_mar + 1; ch(2) = w2 - amr_cpat_mar - 1
+        end if
+        if (p_glb > 0) then
+            cl(3) = amr_cpat_mar + 1; ch(3) = w3 - amr_cpat_mar - 1
+        end if
+        call s_amr_shell_slabs(pl, ph, cl, ch, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+
+    end subroutine s_amr_parent_shell_slabs
+
+#ifdef MFC_DEBUG
+    !> Validation arm (debug builds only): flood the current patch extent of amr_cg with quiet NaN BEFORE a clipped gather writes
+    !! its shell, so a consumer read of any unshipped cell - core OR a missed shell slab - NaNs the ghost fill within a step
+    !! (mandated by docs/documentation/amr_stepfill_ring_clip.md).
+    impure subroutine s_amr_poison_patch_device(w1, w2, w3)
+
+        use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+        integer, intent(in) :: w1, w2, w3
+        integer             :: i, g1, g2, g3
+        real(stp)           :: nanv
+
+        nanv = real(ieee_value(0._wp, ieee_quiet_nan), stp)
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do g3 = 0, w3
+                do g2 = 0, w2
+                    do g1 = 0, w1
+                        amr_cg(i)%sf(g1, g2, g3) = nanv
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_poison_patch_device
+#endif
+
     impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -1372,8 +1489,11 @@ contains
         logical, intent(in)   :: pull_host
         integer               :: i, g1, g2, g3, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
         integer               :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
+        integer               :: nsh, msh, cells, got, clo(3), chi(3)
+        integer               :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6)
+        integer               :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
         real(wp), allocatable :: rbuf(:,:), sbuf(:)
-        integer, allocatable  :: reqs(:), srank(:)
+        integer, allocatable  :: reqs(:), srank(:), wsz(:), stats(:,:)
 
         ! multi-level: a level>=2 block's coarse side is its PARENT block's fine cells, not the L0 base grid q_coarse - gather
         ! amr_cg
@@ -1405,13 +1525,42 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = sys_size*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
 
+        ! Ring clip (runtime only): every runtime consumer of amr_cg reads only the patch's hollow shell - the open core
+        ! [region_lo+1, region_hi-1] is provably dead (docs/documentation/amr_stepfill_ring_clip.md) - so the runtime path
+        ! copies/ships the <= 6 shell slabs instead of the full patch. Same contributor set and tags; a core-only contributor
+        ! sends a ZERO-word message (a one-sided skip would hang the owner's WAITALL). Init/regrid (.not. pull_host) still
+        ! moves the full patch: the rebuild's consumers prolong the whole box.
+        nsh = 0
+        if (pull_host) then
+            clo = 0; chi = 0
+            clo(1) = amr_region_lo_all(1, amr_cur) + 1; chi(1) = amr_region_hi_all(1, amr_cur) - 1
+            if (n_glb > 0) then
+                clo(2) = amr_region_lo_all(2, amr_cur) + 1; chi(2) = amr_region_hi_all(2, amr_cur) - 1
+            end if
+            if (p_glb > 0) then
+                clo(3) = amr_region_lo_all(3, amr_cur) + 1; chi(3) = amr_region_hi_all(3, amr_cur) - 1
+            end if
+            call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, cells)
+            if (proc_rank == owner) then
+                ! the clip makes sender-frame (replicated region) vs consumer-frame (amr_isect_lo) agreement load-bearing
+                @:ASSERT(amr_isect_lo(1) == amr_region_lo_all(1, &
+                         & amr_cur) .and. (n_glb == 0 .or. amr_isect_lo(2) == amr_region_lo_all(2, &
+                         & amr_cur)) .and. (p_glb == 0 .or. amr_isect_lo(3) == amr_region_lo_all(3, amr_cur)), &
+                         & "ring clip: consumer frame mismatch")
+#ifdef MFC_DEBUG
+                call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
+#endif
+            end if
+        end if
+
         ! np=1: the sole owner holds every covered coarse cell, so copy q_coarse->amr_cg on-device (same index map as
         ! s_amr_unpack_patch), skipping the device->host->device round-trip. Only for pull_host; init/regrid (.not. pull_host) falls
         ! through to the host path (device copy may be stale).
         if (num_procs == 1 .and. pull_host) then
             call s_amr_rank_coarse_range(owner, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            call s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)  ! same kernel the np>1 owner path uses
+            call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msh, tb1, te1, tb2, te2, tb3, te3, cells)
+            if (cells > 0) call s_amr_gather_own_shell_device(q_coarse, msh, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
             return
         end if
 
@@ -1429,8 +1578,9 @@ contains
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (pull_host) then
-                ! runtime: q_coarse is device-current - copy the own box on the device (same index map/assignment as the host path)
-                call s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
+                ! runtime: q_coarse is device-current - shell-only own-box copy on the device (clipped analogue of the host path)
+                call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msh, tb1, te1, tb2, te2, tb3, te3, cells)
+                if (cells > 0) call s_amr_gather_own_shell_device(q_coarse, msh, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
             else
                 if (amr_rg_gather) call s_phase_tic(PH_RBOWN)
                 call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
@@ -1449,7 +1599,7 @@ contains
             if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
             if (nsrc > 0) then
                 if (amr_rg_gather) call s_phase_tic(PH_RBALLOC)
-                allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc))
+                allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc), wsz(nsrc))
                 if (amr_rg_gather) call s_phase_toc(PH_RBALLOC)
                 if (amr_rg_gather) call s_phase_tic(PH_RBPOST)
                 nsrc = 0
@@ -1459,7 +1609,13 @@ contains
                     call s_amr_rank_coarse_range(r, crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    nsrc = nsrc + 1; srank(nsrc) = r
+                    if (pull_host) then
+                        ! runtime: the contributor ships only its slice of the shell (possibly zero words)
+                        call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msh, tb1, te1, tb2, te2, tb3, te3, &
+                                              & cells)
+                        boxsz = sys_size*cells
+                    end if
+                    nsrc = nsrc + 1; srank(nsrc) = r; wsz(nsrc) = boxsz
                     if (amr_rg_gather .and. amr_gpl_valid) then
                         @:ASSERT(amr_gpl_src(nsrc, amr_cur) == r .and. amr_gpl_sz(nsrc, amr_cur) == boxsz, &
                                  & "gather plan: recv entry mismatch")
@@ -1472,7 +1628,19 @@ contains
                 if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
 #ifdef MFC_MPI
                 if (amr_rg_gather) call s_phase_tic(PH_RBWAIT)
-                call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+                if (pull_host) then
+                    ! transport assert (ring clip): each clipped send must complete at exactly the predicted live-word count -
+                    ! sender-vs-receiver recomputation of the same replicated function cannot see a short send, MPI_GET_COUNT can
+                    allocate (stats(MPI_STATUS_SIZE, nsrc))
+                    call MPI_WAITALL(nsrc, reqs, stats, ierr)
+                    do idx = 1, nsrc
+                        call MPI_GET_COUNT(stats(:,idx), mpi_p, got, ierr)
+                        @:ASSERT(got == wsz(idx), "ring clip: transport word-count mismatch")
+                    end do
+                    deallocate (stats)
+                else
+                    call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+                end if
                 if (amr_rg_gather) call s_phase_toc(PH_RBWAIT)
 #endif
                 if (amr_rg_gather) call s_phase_tic(PH_RBUNPK)
@@ -1480,9 +1648,16 @@ contains
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                     if (pull_host) then
-                        ! runtime: unpack ONLY this box's wire buffer on the device (same order/cast as the host unpack below)
-                        boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                        call s_amr_unpack_box_device(bl, bh, rbuf(1:boxsz,idx))
+                        ! runtime: clipped device unpack of this contributor's shell slice (slabs shifted to the patch-local
+                        ! frame for the shared shell unpack kernel; same wire order/cast as the sender's clipped pack)
+                        call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msh, tb1, te1, tb2, te2, tb3, te3, &
+                                              & cells)
+                        do r = 1, msh
+                            tb1(r) = tb1(r) - amr_cpat_off(1); te1(r) = te1(r) - amr_cpat_off(1)
+                            tb2(r) = tb2(r) - amr_cpat_off(2); te2(r) = te2(r) - amr_cpat_off(2)
+                            tb3(r) = tb3(r) - amr_cpat_off(3); te3(r) = te3(r) - amr_cpat_off(3)
+                        end do
+                        if (cells > 0) call s_amr_unpack_shell_device(msh, tb1, te1, tb2, te2, tb3, te3, rbuf(1:sys_size*cells,idx))
                         cycle
                     end if
                     ! unpack in the SAME (i, g3, g2, g1) order the sender packed; place at amr_cg patch-local index
@@ -1501,7 +1676,7 @@ contains
                 end do
                 if (amr_rg_gather) call s_phase_toc(PH_RBUNPK)
                 if (amr_rg_gather) call s_phase_tic(PH_RBALLOC)
-                deallocate (rbuf, reqs, srank)
+                deallocate (rbuf, reqs, srank, wsz)
                 if (amr_rg_gather) call s_phase_toc(PH_RBALLOC)
             end if
             ! host path only: the runtime device path wrote amr_cg on the device directly (host amr_cg stays stale, as at np=1 -
@@ -1519,6 +1694,12 @@ contains
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                if (pull_host) then
+                    ! runtime ring clip: ship only my slice of the shell. cells may be ZERO (my box lies in the core) - the
+                    ! owner posted a matching zero-word recv, so send anyway; skipping one-sidedly would hang its WAITALL
+                    call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msh, tb1, te1, tb2, te2, tb3, te3, cells)
+                    boxsz = sys_size*cells
+                end if
                 if (amr_rg_gather .and. amr_gpl_valid) then
                     ! this rank must appear in the plan's contributor list for this box, with this exact size
                     nsrc = 0
@@ -1532,8 +1713,10 @@ contains
                 if (amr_rg_gather) call s_phase_toc(PH_RBRSV)
                 amr_gsnd_n = amr_gsnd_n + 1
                 if (pull_host) then
-                    ! runtime: pack the overlap box on the device straight into the pool slot (only the box crosses PCIe)
-                    call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, amr_gsnd_pool(:,amr_gsnd_n))
+                    ! runtime: pack my shell slice on the device straight into the pool slot - the EXACT-width slice, so only
+                    ! the shell words cross PCIe (the full-width slice would copy the whole maxsz slot back)
+                    if (boxsz > 0) call s_amr_pack_shell_device(q_coarse, msh, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3, &
+                        & amr_gsnd_pool(1:boxsz,amr_gsnd_n))
                 else
                     if (amr_rg_gather) call s_phase_tic(PH_RBPACK)
                     idx = 0
@@ -1816,6 +1999,7 @@ contains
             logical, intent(in) :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
             integer             :: w1, w2, w3, powner, cowner, boxsz, ierr
             integer             :: plo(3), phi(3)
+            integer             :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
 
             ! Patch box in the PARENT-FINE frame. Both the child owner and the parent owner must agree on it, so derive it from
             ! REPLICATED metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the empty
@@ -1833,7 +2017,13 @@ contains
 
             cowner = amr_block_owner(cblk); powner = amr_block_owner(pblk)
             if (powner == cowner) then
-                ! co-located (always true at np=1, and under tower co-location): straight device copy, bit-for-bit as before.
+                ! co-located (always true at np=1, and under tower co-location): straight device copy - ring-clipped to the
+                ! shell at runtime (inside the copy), full-patch when a host consumer follows (to_host).
+                if (.not. to_host) then
+                    ! runtime only (cblk == amr_cur there): consumer-frame agreement is load-bearing under the clip
+                    @:ASSERT(amr_isect_lo(1) == plo(1) .and. (n_glb == 0 .or. amr_isect_lo(2) == plo(2)) .and. (p_glb == 0 &
+                             & .or. amr_isect_lo(3) == plo(3)), "ring clip: parent frame mismatch (co-located)")
+                end if
                 call s_amr_copy_parent_patch_${GSFX}$(qp, w1, w2, w3, to_host)
                 return
             end if
@@ -1848,17 +2038,30 @@ contains
             ! MAJORITY of boxes (160 of 224 at cap 64), and it measured 420 ms per send / 8.6% of wall at the production point.
             ! The pool owns the buffer because an ISEND requires it to stay live until completion; the drain is the existing
             ! s_amr_gather_send_flush after the rebuild's box loop.
-            boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
-            ! guard on the plan alone, NOT amr_rg_gather (nothing sets it since the chunked rebuild landed): this is the ONE
-            ! step-1 assert on the chunked path's live route - a send packed short of the plan-sized recv completes short and
-            ! the consume unpacks stale pool bytes, the silent-wrong-answer class. amr_gpl_valid is false outside the rebuild
-            ! box loop, so subcycle/per-step calls never consult the plan.
-            if (amr_gpl_valid) then
-                @:ASSERT(amr_gpl_psz(cblk) == boxsz, "gather plan: parent send size mismatch")
+            if (to_host) then
+                boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
+                ! guard on the plan alone, NOT amr_rg_gather (nothing sets it since the chunked rebuild landed): this is the ONE
+                ! step-1 assert on the chunked path's live route - a send packed short of the plan-sized recv completes short and
+                ! the consume unpacks stale pool bytes, the silent-wrong-answer class. amr_gpl_valid is false outside the rebuild
+                ! box loop, so subcycle/per-step calls never consult the plan.
+                if (amr_gpl_valid) then
+                    @:ASSERT(amr_gpl_psz(cblk) == boxsz, "gather plan: parent send size mismatch")
+                end if
+                call s_amr_gsnd_reserve(boxsz)
+                amr_gsnd_n = amr_gsnd_n + 1
+                call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, amr_gsnd_pool(:,amr_gsnd_n))
+            else
+                ! runtime ring clip: the child's C/F ghost fill reads only the patch shell - pack/ship the <= 6 slabs
+                ! (patch-local frame; the receiver's clipped unpack decodes the same slab-major layout from the same
+                ! replicated (w, amr_cpat_mar) inputs, so the two sides cannot drift apart)
+                call s_amr_parent_shell_slabs(w1, w2, w3, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+                boxsz = sys_size*cells
+                call s_amr_gsnd_reserve(boxsz)
+                amr_gsnd_n = amr_gsnd_n + 1
+                ! EXACT-width pool slice: only the shell words cross PCIe in the pack's copyout
+                call s_amr_pack_parent_shell_device_${GSFX}$(qp, ns, sb1, se1, sb2, se2, sb3, se3, amr_gsnd_pool(1:boxsz, &
+                    & amr_gsnd_n))
             end if
-            call s_amr_gsnd_reserve(boxsz)
-            amr_gsnd_n = amr_gsnd_n + 1
-            call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, amr_gsnd_pool(:,amr_gsnd_n))
             call s_xa_rec(XA_F2_SND, 1, boxsz, cblk)
             call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, cowner, cblk, MPI_COMM_WORLD, amr_gsnd_req(amr_gsnd_n), ierr)
 #endif
@@ -1874,7 +2077,12 @@ contains
         integer, intent(in)   :: pblk
         logical, intent(in)   :: to_host
         integer               :: w1, w2, w3, powner, boxsz, ierr, plo(3), phi(3)
+        integer               :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells, got
         real(wp), allocatable :: xbuf(:)
+
+#ifdef MFC_MPI
+        integer :: stat(MPI_STATUS_SIZE)
+#endif
 
         call s_amr_parent_foot(amr_cur, pblk, plo, phi)
         amr_cpat_off = 0
@@ -1889,12 +2097,26 @@ contains
 #ifdef MFC_MPI
         powner = amr_block_owner(pblk)
         boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
+        if (.not. to_host) then
+            ! runtime ring clip: the sender packed only the shell; size the recv from the same replicated slab derivation
+            call s_amr_parent_shell_slabs(w1, w2, w3, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+            boxsz = sys_size*cells
+            @:ASSERT(amr_isect_lo(1) == plo(1) .and. (n_glb == 0 .or. amr_isect_lo(2) == plo(2)) .and. (p_glb == 0 &
+                     & .or. amr_isect_lo(3) == plo(3)), "ring clip: parent frame mismatch (recv)")
+        end if
         if (amr_rg_gather .and. amr_gpl_valid) then
             @:ASSERT(amr_gpl_psrc(amr_cur) == powner .and. amr_gpl_psz(amr_cur) == boxsz, "gather plan: parent recv mismatch")
         end if
         allocate (xbuf(boxsz))
         call s_xa_rec(XA_F2_RCV, 2, boxsz, amr_cur)
-        call MPI_RECV(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        if (to_host) then
+            call MPI_RECV(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        else
+            ! transport assert (ring clip): the clipped send must complete at exactly the predicted live-word count
+            call MPI_RECV(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, stat, ierr)
+            call MPI_GET_COUNT(stat, mpi_p, got, ierr)
+            @:ASSERT(got == boxsz, "ring clip: parent transport word-count mismatch")
+        end if
         call s_amr_unpack_parent_patch_device(w1, w2, w3, xbuf, to_host)
         deallocate (xbuf)
 #endif
@@ -1937,6 +2159,18 @@ contains
         real(wp), intent(in), contiguous :: buf(:)
         logical, intent(in)              :: to_host
         integer                          :: i, g1, g2, g3, n1, n2, n3
+        integer                          :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
+
+        if (.not. to_host) then
+            ! runtime ring clip: buf carries only the shell slabs (the sender's clipped pack); decode with the same
+            ! replicated slab derivation. Poison first (debug): a consumer read of any unshipped cell trips as NaN.
+#ifdef MFC_DEBUG
+            call s_amr_poison_patch_device(w1, w2, w3)
+#endif
+            call s_amr_parent_shell_slabs(w1, w2, w3, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+            call s_amr_unpack_shell_device(ns, sb1, se1, sb2, se2, sb3, se3, buf)
+            return
+        end if
 
         n1 = w1 + 1; n2 = w2 + 1; n3 = w3 + 1
         $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
@@ -1950,11 +2184,9 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-        if (to_host) then
-            do i = 1, sys_size
-                $:GPU_UPDATE(host='[amr_cg(i)%sf]')
-            end do
-        end if
+        do i = 1, sys_size
+            $:GPU_UPDATE(host='[amr_cg(i)%sf]')
+        end do
 
     end subroutine s_amr_unpack_parent_patch_device
 
@@ -1971,6 +2203,18 @@ contains
             !! C/F ghost-fill reads amr_cg on the DEVICE (filled by the kernel below), so no device->host copy is needed.
             logical, intent(in) :: to_host
             integer             :: i, g1, g2, g3, o1, o2, o3
+            integer             :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
+
+            if (.not. to_host) then
+                ! runtime ring clip: the C/F ghost fill reads only the shell - copy just the <= 6 slabs. Poison first
+                ! (debug): a consumer read of any uncopied cell trips as NaN.
+#ifdef MFC_DEBUG
+                call s_amr_poison_patch_device(w1, w2, w3)
+#endif
+                call s_amr_parent_shell_slabs(w1, w2, w3, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+                call s_amr_copy_parent_shell_device_${GSFX}$(qp, ns, sb1, se1, sb2, se2, sb3, se3)
+                return
+            end if
 
             o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
             $:GPU_PARALLEL_LOOP(collapse=4)
@@ -1984,14 +2228,92 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            ! amr_cg is now device-current for the runtime C/F ghost-fill. Sync to host only when a host consumer follows.
-            if (to_host) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_cg(i)%sf]')
-                end do
-            end if
+            ! amr_cg is now device-current with a host consumer following (init/regrid): sync to host.
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_cg(i)%sf]')
+            end do
 
         end subroutine s_amr_copy_parent_patch_${GSFX}$
+    #:endfor
+
+    !> Ring-clipped device analogues of s_amr_copy_parent_patch / s_amr_pack_parent_patch_device: iterate the <= 6 shell slabs
+    !! (patch-local frame) through ONE fused kernel - the ghost-fill kernel's concatenated-flat-index idiom - so a clipped gather
+    !! still costs one launch (the family's measured tax is launch-path serialization). The pack's slab-major (i, g3, g2, g1) wire
+    !! layout is decoded by s_amr_unpack_shell_device on the receiver; both sides derive the same slab list from the same replicated
+    !! (w, amr_cpat_mar) inputs, so they cannot drift apart.
+    #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
+        #:set QP = lambda ix: GARR + '(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)'
+        impure subroutine s_amr_copy_parent_shell_device_${GSFX}$(qp, ms, tb1, te1, tb2, te2, tb3, te3)
+
+            integer, intent(in) :: qp  !< parent's flat-store slot
+            integer, intent(in) :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+            integer             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
+            integer             :: i, s, ss, g, r, n1, n2, g1, g2, g3, o1, o2, o3, stot
+
+            o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
+            soff(1) = 0
+            do s = 1, ms
+                lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
+                scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
+                if (s < ms) soff(s + 1) = soff(s) + scnt(s)
+            end do
+            stot = soff(ms) + scnt(ms)
+            $:GPU_PARALLEL_LOOP(collapse=2, copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', private='[s, ss, r, n1, n2, g1, &
+                                & g2, g3]')
+            do i = 1, sys_size
+                do g = 0, stot - 1
+                    s = 1  ! decode the flat index: ms <= 6, so a scan beats storing a per-cell slab map
+                    do ss = 2, ms
+                        if (g >= soff(ss)) s = ss
+                    end do
+                    r = g - soff(s)
+                    n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
+                    g1 = lb1(s) + mod(r, n1)
+                    g2 = lb2(s) + mod(r/n1, n2)
+                    g3 = lb3(s) + r/(n1*n2)
+                    amr_cg(i)%sf(g1, g2, g3) = ${QP('i')}$
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+        end subroutine s_amr_copy_parent_shell_device_${GSFX}$
+
+        impure subroutine s_amr_pack_parent_shell_device_${GSFX}$(qp, ms, tb1, te1, tb2, te2, tb3, te3, buf)
+
+            integer, intent(in)                 :: qp  !< parent's flat-store slot
+            integer, intent(in)                 :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+            real(wp), intent(inout), contiguous :: buf(:)
+            integer                             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
+            integer                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, o1, o2, o3, stot, nv
+
+            o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
+            nv = sys_size
+            soff(1) = 0
+            do s = 1, ms
+                lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
+                scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
+                if (s < ms) soff(s + 1) = soff(s) + scnt(s)
+            end do
+            stot = soff(ms) + scnt(ms)
+            $:GPU_PARALLEL_LOOP(collapse=2, copyout='[buf]', copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', private='[s, &
+                                & ss, r, n1, n2, g1, g2, g3]')
+            do i = 1, nv
+                do g = 0, stot - 1
+                    s = 1
+                    do ss = 2, ms
+                        if (g >= soff(ss)) s = ss
+                    end do
+                    r = g - soff(s)
+                    n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
+                    g1 = lb1(s) + mod(r, n1)
+                    g2 = lb2(s) + mod(r/n1, n2)
+                    g3 = lb3(s) + r/(n1*n2)
+                    buf(1 + nv*soff(s) + (i - 1)*scnt(s) + r) = real(${QP('i')}$, wp)
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+        end subroutine s_amr_pack_parent_shell_device_${GSFX}$
     #:endfor
 
     !> Rank r's coarse-grid decomposition (start_idx + local extent m/n/p), computed O(1) from its cartesian coords instead of the
@@ -2210,92 +2532,127 @@ contains
 
     end subroutine s_amr_unpack_patch
 
-    !> Runtime device analogue of s_amr_unpack_patch: copy the owner's own coarse box [bl:bh] GLOBAL from q_coarse (device) into
-    !! amr_cg (device) in the patch-local frame - no host round-trip. Same index map and direct stp assignment as the host path.
-    !! TWIN s_amr_gather_own_box_pbmv_device (q<->pb/mv): same own-box index map; keep lockstep.
-    impure subroutine s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
+    !> Ring-clipped runtime own-box copy (device): the owner's shell-slab / own-box intersections [tb:te] GLOBAL from q_coarse into
+    !! amr_cg in the patch-local frame - no host round-trip, ONE fused kernel over the slab concatenation (the ghost-fill kernel's
+    !! flat-index idiom). Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch.
+    impure subroutine s_amr_gather_own_shell_device(q_coarse, ms, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: bl(3), bh(3), o1, o2, o3
-        integer                                             :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, coff1, coff2, coff3
+        integer, intent(in)                                 :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6), o1, o2, o3
+        integer                                             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
+        integer                                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, stot, coff1, coff2, coff3
 
-        ! scalar copies: no host array may be referenced inside the device region (nvfortran/Cray demand it PRESENT)
+        ! scalar/local copies: no host array may be referenced inside the device region (nvfortran/Cray demand it PRESENT)
 
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
         coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        soff(1) = 0
+        do s = 1, ms
+            lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
+            scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
+            if (s < ms) soff(s + 1) = soff(s) + scnt(s)
+        end do
+        stot = soff(ms) + scnt(ms)
+        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', &
+                            & private='[s, ss, r, n1, n2, g1, g2, g3]')
         do i = 1, sys_size
-            do g3 = bl3, bh3
-                do g2 = bl2, bh2
-                    do g1 = bl1, bh1
-                        amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
-                    end do
+            do g = 0, stot - 1
+                s = 1  ! decode the flat index: ms <= 6, so a scan beats storing a per-cell slab map
+                do ss = 2, ms
+                    if (g >= soff(ss)) s = ss
                 end do
+                r = g - soff(s)
+                n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
+                g1 = lb1(s) + mod(r, n1)
+                g2 = lb2(s) + mod(r/n1, n2)
+                g3 = lb3(s) + r/(n1*n2)
+                amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_gather_own_box_device
+    end subroutine s_amr_gather_own_shell_device
 
-    !> Runtime device pack of the overlap box [bl:bh] GLOBAL from q_coarse (device) into the contiguous wire buffer buf (host, via
-    !! copyout) - only the box crosses PCIe, not the full field. Explicit-loop linear buf indexing (g1 fastest, then g2, g3, i) and
-    !! the wp cast match the host pack in s_amr_gather_coarse_patch element-for-element, so the receiver's unpack is layout- and
-    !! byte-identical (same discipline as s_amr_fine_slice: no array-section syntax near the device map). TWIN
-    !! s_amr_pack_box_pbmv_device (q<->pb/mv): same wire linear order + wp cast; keep lockstep.
-    impure subroutine s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, buf)
+    !> Ring-clipped runtime device pack: a contributor's shell-slab / own-box intersections [tb:te] GLOBAL from q_coarse (device)
+    !! into the contiguous wire buffer buf (host, via copyout) - only the shell slices cross PCIe. Slab-major (i, g3, g2, g1) wire
+    !! layout with the wp cast; decoded element-for-element by s_amr_unpack_shell_device on the owner (both sides derive the same
+    !! slab list from replicated data). The pbmv gather is NOT clipped - it keeps its full-box wire contract.
+    impure subroutine s_amr_pack_shell_device(q_coarse, ms, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3, buf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: bl(3), bh(3), o1, o2, o3
+        integer, intent(in)                                 :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6), o1, o2, o3
         real(wp), intent(inout), contiguous                 :: buf(:)
-        integer                                             :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3
+        integer                                             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
+        integer                                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, stot, nv
 
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
-        do i = 1, sys_size
-            do g3 = bl3, bh3
-                do g2 = bl2, bh2
-                    do g1 = bl1, bh1
-                        buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*(i - 1)))) = real(q_coarse(i)%sf(g1 - o1, &
-                            & g2 - o2, g3 - o3), wp)
-                    end do
+        nv = sys_size
+        soff(1) = 0
+        do s = 1, ms
+            lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
+            scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
+            if (s < ms) soff(s + 1) = soff(s) + scnt(s)
+        end do
+        stot = soff(ms) + scnt(ms)
+        $:GPU_PARALLEL_LOOP(collapse=2, copyout='[buf]', copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', private='[s, ss, r, &
+                            & n1, n2, g1, g2, g3]')
+        do i = 1, nv
+            do g = 0, stot - 1
+                s = 1
+                do ss = 2, ms
+                    if (g >= soff(ss)) s = ss
                 end do
+                r = g - soff(s)
+                n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
+                g1 = lb1(s) + mod(r, n1)
+                g2 = lb2(s) + mod(r/n1, n2)
+                g3 = lb3(s) + r/(n1*n2)
+                buf(1 + nv*soff(s) + (i - 1)*scnt(s) + r) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_pack_box_device
+    end subroutine s_amr_pack_shell_device
 
-    !> Runtime device unpack of a received overlap box [bl:bh] GLOBAL from the contiguous wire buffer buf (host, via copyin) into
-    !! amr_cg (device) in the patch-local frame - only the box crosses PCIe. Same linear order and stp cast as the host unpack in
-    !! s_amr_gather_coarse_patch. TWIN s_amr_unpack_box_pbmv_device (q<->pb/mv): same wire linear order + stp cast; keep lockstep.
-    impure subroutine s_amr_unpack_box_device(bl, bh, buf)
+    !> Ring-clipped runtime device unpack: a received shell wire buffer into amr_cg over the clipped slabs [tb:te], given
+    !! PATCH-LOCAL (level-1 callers shift their global slabs by amr_cpat_off; the level>=2 slabs are patch-local natively, so ONE
+    !! kernel serves both). Inverse layout and stp cast of s_amr_pack_shell_device / s_amr_pack_parent_shell_device.
+    impure subroutine s_amr_unpack_shell_device(ms, tb1, te1, tb2, te2, tb3, te3, buf)
 
-        integer, intent(in)              :: bl(3), bh(3)
+        integer, intent(in)              :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
         real(wp), intent(in), contiguous :: buf(:)
-        integer                          :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, coff1, coff2, coff3
+        integer                          :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
+        integer                          :: i, s, ss, g, r, n1, n2, g1, g2, g3, stot, nv
 
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
-        do i = 1, sys_size
-            do g3 = bl3, bh3
-                do g2 = bl2, bh2
-                    do g1 = bl1, bh1
-                        amr_cg(i)%sf(g1 - coff1, g2 - coff2, &
-                               & g3 - coff3) = real(buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*(i - 1)))), stp)
-                    end do
+        nv = sys_size
+        soff(1) = 0
+        do s = 1, ms
+            lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
+            scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
+            if (s < ms) soff(s + 1) = soff(s) + scnt(s)
+        end do
+        stot = soff(ms) + scnt(ms)
+        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[buf, lb1, le1, lb2, le2, lb3, le3, soff, scnt]', private='[s, ss, r, n1, n2, g1, &
+                            & g2, g3]')
+        do i = 1, nv
+            do g = 0, stot - 1
+                s = 1
+                do ss = 2, ms
+                    if (g >= soff(ss)) s = ss
                 end do
+                r = g - soff(s)
+                n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
+                g1 = lb1(s) + mod(r, n1)
+                g2 = lb2(s) + mod(r/n1, n2)
+                g3 = lb3(s) + r/(n1*n2)
+                amr_cg(i)%sf(g1, g2, g3) = real(buf(1 + nv*soff(s) + (i - 1)*scnt(s) + r), stp)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_unpack_box_device
+    end subroutine s_amr_unpack_shell_device
 
     !> Runtime device own-box copy for the pbmv gather: pb/mv (device) -> amr_cg_pb/mv (device) over [bl:bh] GLOBAL in the
-    !! patch-local frame. Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch_pbmv. TWIN
-    !! s_amr_gather_own_box_device (pb/mv<->q): q_cons sibling of this own-box copy; keep the index map lockstep.
+    !! patch-local frame. Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch_pbmv. The q_cons
+    !! runtime path is ring-clipped (s_amr_gather_own_shell_device); the pbmv gather deliberately is NOT - full box here.
     impure subroutine s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
@@ -2323,8 +2680,8 @@ contains
 
     !> Runtime device pack for the pbmv gather: pb block then mv block of the overlap box [bl:bh] GLOBAL into the contiguous wire
     !! buffer buf (host, via copyout). Linear order (g1 fastest, then g2, g3, q, ib_; mv offset by half the message) and wp cast
-    !! match the host pack in s_amr_gather_coarse_patch_pbmv element-for-element. TWIN s_amr_pack_box_device (pb/mv<->q): q_cons
-    !! sibling; keep the wire linear order + wp cast lockstep.
+    !! match the host pack in s_amr_gather_coarse_patch_pbmv element-for-element. The q_cons runtime wire is ring-clipped
+    !! (s_amr_pack_shell_device); the pbmv gather deliberately is NOT - full box, own wire contract.
     impure subroutine s_amr_pack_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3, buf)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
@@ -2355,8 +2712,8 @@ contains
     end subroutine s_amr_pack_box_pbmv_device
 
     !> Runtime device unpack for the pbmv gather: received wire buffer buf (host, via copyin) -> amr_cg_pb/mv (device) over [bl:bh]
-    !! GLOBAL in the patch-local frame. Same linear order and stp cast as the host unpack in s_amr_gather_coarse_patch_pbmv. TWIN
-    !! s_amr_unpack_box_device (pb/mv<->q): q_cons sibling; keep the wire linear order + stp cast lockstep.
+    !! GLOBAL in the patch-local frame. Same linear order and stp cast as the host unpack in s_amr_gather_coarse_patch_pbmv. The
+    !! q_cons runtime wire is ring-clipped (s_amr_unpack_shell_device); the pbmv gather deliberately is NOT - full box.
     impure subroutine s_amr_unpack_box_pbmv_device(bl, bh, buf)
 
         integer, intent(in)              :: bl(3), bh(3)
@@ -5527,12 +5884,14 @@ contains
         call s_amr_gather_coarse_patch(q_old, .true.)
         call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
         if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_old, mv_old, .true.)
+        if (amr_rank_owns_block) call s_amr_cov_note_fill()  ! [amr-cov] counts EVERY runtime fill gather, subcycle included
         if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gsta(amr_cg, amr_loc_of(amr_cur))
         if (amr_rank_owns_block .and. qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &
             & amr_slots(amr_cur)%pb_ghost_a%sf, amr_slots(amr_cur)%mv_ghost_a%sf)
         call s_amr_gather_coarse_patch(q_new, .true.)
         call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
         if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_in, mv_in, .true.)
+        if (amr_rank_owns_block) call s_amr_cov_note_fill()
         if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gstb(amr_cg, amr_loc_of(amr_cur))
         if (amr_rank_owns_block .and. qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &
             & amr_slots(amr_cur)%pb_ghost_b%sf, amr_slots(amr_cur)%mv_ghost_b%sf)
@@ -5743,6 +6102,7 @@ contains
             else
                 call s_amr_recv_parent_patch(pblk, .false.)
             end if
+            if (amr_rank_owns_block) call s_amr_cov_note_fill()  ! [amr-cov]: every runtime fill gather, level>=2 included
             if (amr_rank_owns_block) call s_amr_fill_fine_ghosts_gsta(amr_cg, amr_loc_of(kc))
             if (amr_block_owner(pblk) == proc_rank) then
                 call s_amr_gather_from_parent_field_cons(amr_cur, pblk, amr_loc_of(pblk), .false.)  ! parent @ t_b (device C/F fill)
@@ -5751,6 +6111,7 @@ contains
                 call s_amr_recv_parent_patch(pblk, .false.)
             end if
             if (.not. amr_rank_owns_block) cycle
+            call s_amr_cov_note_fill()
             call s_amr_fill_fine_ghosts_gstb(amr_cg, amr_loc_of(kc))
             call s_amr_zero_fine_registers()
         end do
