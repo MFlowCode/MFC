@@ -28,6 +28,7 @@ module m_amr_regrid
         & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
         & f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, &
         & amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk
+    use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -1361,6 +1362,7 @@ contains
                 do kk = 1, old_np  ! post receives for the old blocks I need
                     if (.not. getk(kk)) cycle
                     nrq = nrq + 1
+                    call s_xa_rec(XA_F4_RCV, 2, cnt(kk), kk)
                     call MPI_IRECV(rpack(1, kk), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
                 end do
                 do kk = 1, old_np  ! pack + send each old block I own to every distinct new-owner (/= me) overlapping it
@@ -1389,6 +1391,7 @@ contains
                         nrq = nrq + 1
                         amr_mig_snd = amr_mig_snd + 1_8
                         amr_gb_mig = amr_gb_mig + int(cnt(kk), 8)*8_8
+                        call s_xa_rec(XA_F4_SND, 1, cnt(kk), kk)
                         call MPI_ISEND(spack(1, kk), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
                     end do
                 end do
