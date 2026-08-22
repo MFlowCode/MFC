@@ -7,6 +7,48 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-22 — STEP 2 LANDED + THE EXPERT-AUDIT RE-AIM (read this before picking new work)
+
+**Gather-batching step 2 (chunked plan-then-execute, both families) LANDED 01cc4318 + 3de4724e
+and is FULLY VALIDATED** — the complete verdict, including the correctness evidence (output
+bit-identity at np=4 AND np=8 across binaries), the on-node differenced walls (np=4 -1.9%,
+np=8 -0.8%), the `pg:recv`-is-dataflow attribution correction, and the k004-001-GCD6 node
+confound, lives in `amr_regrid_gather_batching.md` "STEP-2 VERDICT". The load-bearing
+conclusion for THIS ledger: **the parent-gather wait is a dataflow dependency created by the
+rebuild itself — no further MPI protocol work on that family can pay.** The rendezvous share
+of `rb:gath` was ~20 s at np=8, and step 2 already collected it.
+
+**Expert audit (2 independent reviewers: MPI internals + AMR architecture, both verified
+against source) re-aims the increment ladder:**
+
+1. **`[amr-cov]` dead-byte counter FIRST (~40 LOC, deterministic, piggybacks any S0 run).**
+   VERIFIED in code: `s_amr_fine_stage_fill` (m_amr.fpp:4982) gathers the FULL coarse patch
+   every RK stage while the consumer prolongs only the ghost shell — the interior of every
+   message in the 14.3%-of-np=8-wall gather family is never read. Rebuild side: the
+   carry-forward overwrite is level-1-only (m_amr_regrid.fpp:1498), so the rebuild-clip
+   claim covers F1 (~5% of wall) — level-2 parent bytes stay live until detail-preserving
+   L2 carry-forward exists. PRE-REGISTERED RULE: dead fraction > 50% on either family
+   promotes ring/coverage clipping AHEAD of T1 (clipping est. 8-15% of wall for ~300-500
+   LOC and it COMPOUNDS with T1; T1's floor is 8-12% for ~3100 LOC).
+2. **G-B (the AMReX S0 np=2/4/8 bar) runs NOW, not last** — this ledger's own words below:
+   axis-2 "done" is undefined without it. Harness-only work (`amrex_tax.sh` is most of it),
+   and its result sizes how much of the v2 contract is load-bearing.
+3. **Regrid cadence is a benchmark-definition question.** Production AMR regrids every
+   ~8-16 finest steps; our int=2 operating point inflates the exact phase being optimized
+   (tax 27.2x at int=2 vs 7.2x at int=20 while AMReX barely moves). Before moving the
+   operating point: land the validity coupling (validator rule `amr_buf >= CFL x interval`
+   per level + a regrid-time containment assert, ~30 LOC) and re-baseline box counts (TRAP:
+   `amr_buf` also feeds merge topology via `thr = buff_size + 2*amr_buf`,
+   m_amr_regrid.fpp:596).
+4. **T1 migration waves re-ranked after (1) prices clipping.** rg:mig is 213-218 s at np=8
+   — still the largest single family — but clipping may be cheaper per saved second.
+5. The `amr_gcr_*` chunk machinery is scaffolding for the v2 plan-based exchange (I2/I6
+   cached per-peer schedules): absorb and delete it when I2 lands — two parallel exchange
+   frameworks is the D2 failure mode as code.
+
+Still open and unchanged: the uniform-denominator re-run (13% tax error bar), the P2 idle
+re-decomposition (gates the Phase-2 contract), I1b, and the matched-tax rung at HEAD.
+
 ## 2026-08-21 — PHASE 0 MEASUREMENTS (endstate ladder): three verdicts in one night
 
 **M2 mechanism split — THE IDLE IS LOCAL; P2 (batched advance) confirmed as the parity lever.**
