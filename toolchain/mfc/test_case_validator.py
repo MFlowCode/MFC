@@ -242,6 +242,36 @@ class TestReactiveBurnFluidPairing(ConstraintTestCase):
         self.assertAccepts(REACTIVE_BURN)
 
 
+class TestPhaseChangeFluidPairing(ConstraintTestCase):
+    MSG = "phase change requires num_fluids >= 2 (liquid = 1, vapor = 2)"
+
+    def test_rejects_single_fluid(self):
+        self.assertRejects({**BASE, "relax": "T", "relax_model": 5}, self.MSG)
+
+    def test_rejects_unset_num_fluids(self):
+        params = {k: v for k, v in TWO_FLUID.items() if k != "num_fluids"}
+        self.assertRejects({**params, "relax": "T", "relax_model": 5}, self.MSG)
+
+    def test_accepts_two_fluids(self):
+        self.assertAccepts({**TWO_FLUID, "relax": "T", "relax_model": 5})
+
+    def test_accepts_three_fluids(self):
+        params = {
+            **TWO_FLUID,
+            "num_fluids": 3,
+            "fluid_pp(3)%gamma": 0.4,
+            "fluid_pp(3)%pi_inf": 0.0,
+            "patch_icpp(1)%alpha_rho(3)": 0.0,
+            "patch_icpp(1)%alpha(3)": 0.0,
+            "relax": "T",
+            "relax_model": 5,
+        }
+        self.assertAccepts(params)
+
+    def test_not_checked_when_disabled(self):
+        self.assertAccepts({**BASE, "relax": "F"})
+
+
 class TestSyntheticTurbulence(ConstraintTestCase):
     """A 2D case with one fully specified forcing zone."""
 
