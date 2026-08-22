@@ -82,11 +82,16 @@ contains
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
-        real(wp), dimension(1:num_species)             :: Y_rs
-        real(wp)                                       :: E_e
-        real(wp)                                       :: e_Per_Kg, Pdyn_Per_Kg
-        real(wp)                                       :: T_guess
-        integer                                        :: s  !< Generic loop iterator
+        !> Lower bound 0 is a deliberate, unused pad element: it keeps Y_rs(1) off private frame offset 0. Cray ftn builds a flat
+        !! pointer to a private object as zext(offset) with no aperture, so the flat->private cast back (select(p == null, ~0, trunc
+        !! p)) turns offset 0 into 0xFFFFFFFF and the scratch store lands 4 GiB out of bounds. Faults every chemistry case on CCE
+        !! 21/gfx90a. Do not tighten to 1:num_species without re-checking that the device image is free of `s_cselect_b32 sN, 0,
+        !! -1`.
+        real(wp), dimension(0:num_species) :: Y_rs
+        real(wp)                           :: E_e
+        real(wp)                           :: e_Per_Kg, Pdyn_Per_Kg
+        real(wp)                           :: T_guess
+        integer                            :: s  !< Generic loop iterator
         #:if not chemistry
             ! Depending on model_eqns and bubbles_euler, the appropriate procedure for computing pressure is targeted by the
             ! procedure pointer
@@ -119,14 +124,14 @@ contains
             end if
         #:else
             ! Reacting mixture pressure from temperature and species
-            Y_rs(:) = rhoYks(:)/rho
+            Y_rs(1:num_species) = rhoYks(:)/rho
             e_Per_Kg = energy/rho
             Pdyn_Per_Kg = dyn_p/rho
 
             T_guess = T
 
-            call get_temperature(e_Per_Kg - Pdyn_Per_Kg, T_guess, Y_rs, .true., T)
-            call get_pressure(rho, T, Y_rs, pres)
+            call get_temperature(e_Per_Kg - Pdyn_Per_Kg, T_guess, Y_rs(1:num_species), .true., T)
+            call get_pressure(rho, T, Y_rs(1:num_species), pres)
         #:endif
 
     end subroutine s_compute_pressure

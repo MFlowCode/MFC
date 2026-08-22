@@ -632,7 +632,8 @@ contains
         $:GPU_PARALLEL_LOOP(private='[k, myalpha_rho, myalpha, Re, cell, myVapFlux, preterm1, term2, paux, pint, Romega, &
                             & term1_fac, myR_m, mygamma_m, myPb, myMass_n, myMass_v, myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, &
                             & myMvdot, myPinf, aux1, aux2, myCson, myRho, gamma, pi_inf, qv, dmalf, dmntait, dmBtait, &
-                            & dm_bub_adv_src, dm_divu, adap_dt_stop, myPos, myVel]', copy='[adap_dt_stop_sum]',copyin='[stage]')
+                            & dm_bub_adv_src, dm_divu, adap_dt_stop, myPos, myVel]', copy='[adap_dt_stop_sum]',copyin='[stage]', &
+                            & extraAccArgs=CCE_AGPR_WG_ACC, extraOmpArgs=CCE_AGPR_WG_OMP)
         do k = 1, n_el_bubs_loc
             ! Keller-Miksis model
 

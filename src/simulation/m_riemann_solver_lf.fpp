@@ -365,7 +365,13 @@ contains
                         idx_right_phys(1) = j
                         idx_right_phys(2) = k
                         idx_right_phys(3) = l
-                        idx_right_phys(norm_dir) = idx_right_phys(norm_dir) + 1
+                        if (norm_dir == 1) then
+                            idx_right_phys(1) = j + 1
+                        else if (norm_dir == 2) then
+                            idx_right_phys(2) = k + 1
+                        else
+                            idx_right_phys(3) = l + 1
+                        end if
 
                         if (norm_dir == 1) then
                             $:GPU_LOOP(parallelism='[seq]')

@@ -634,7 +634,13 @@ contains
                 do j = ix%beg, ix%end
                     ! Determine indices for the 'right' state for averaging across the interface
                     idx_rp = [j, k, l]
-                    idx_rp(norm_dir) = idx_rp(norm_dir) + 1
+                    if (norm_dir == 1) then
+                        idx_rp(1) = j + 1
+                    else if (norm_dir == 2) then
+                        idx_rp(2) = k + 1
+                    else
+                        idx_rp(3) = l + 1
+                    end if
 
                     ! Average velocities and their derivatives at the interface For cylindrical: x-dir ~ axial (z_cyl), y-dir ~
                     ! radial (r_cyl), z-dir ~ azimuthal (theta_cyl)
@@ -849,7 +855,13 @@ contains
                     idx_right_phys(1) = j_loop
                     idx_right_phys(2) = k_loop
                     idx_right_phys(3) = l_loop
-                    idx_right_phys(norm_dir) = idx_right_phys(norm_dir) + 1
+                    if (norm_dir == 1) then
+                        idx_right_phys(1) = j_loop + 1
+                    else if (norm_dir == 2) then
+                        idx_right_phys(2) = k_loop + 1
+                    else
+                        idx_right_phys(3) = l_loop + 1
+                    end if
 
                     vel_grad_avg = 0.0_wp
                     do vel_comp_idx = 1, num_dims

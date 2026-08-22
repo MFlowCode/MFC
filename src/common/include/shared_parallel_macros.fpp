@@ -8,6 +8,15 @@
 #:set USING_CCE = (MFC_COMPILER == CCE_COMPILER_ID)
 #:set USING_AMD = (MFC_COMPILER == AMD_COMPILER_ID)
 
+#! Larger work-group for the handful of kernels that trip CCE 21's
+#! "AMDGPU Rewrite AGPR-Copy-MFMA" assert during the device link. A bigger group means
+#! fewer registers per thread, so the live-range split that produces the dead value
+#! number never happens -- which lets -mattr=-mai-insts be dropped program-wide.
+#! CCE ONLY: other compilers have no such assert and must not inherit a work-group
+#! size tuned for gfx90a.
+#:set CCE_AGPR_WG_ACC = 'vector_length(512)' if USING_CCE else None
+#:set CCE_AGPR_WG_OMP = 'thread_limit(512)' if USING_CCE else None
+
 #:def ASSERT_LIST(data, datatype)
     #:assert data is not None
     #:assert isinstance(data, list)
