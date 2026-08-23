@@ -7,6 +7,30 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-22 (late) — RING CLIP LANDED, CORRECT, AND WALL-REGRESSED (open hunt)
+
+**The ring clip (dc6d4129 + bd85c792 + a7970743) implements `amr_stepfill_ring_clip.md` in
+full and is CORRECT**: output bit-identity at np=4 AND np=8 vs the pre-clip binary
+(logs/rcgate-0822_1516, including the 14/31 GB hierarchy files), zero trips of the always-on
+transport/coverage/frame asserts, message set unchanged, wire words F1 −72/−68% and
+F2 −68/−64% (np4/np8), gather family −33% at np=8 (185.8→124.9 s).
+
+**BUT the clip binary carries a constant ~1.7–1.9x per-launch tax on EVERY compute kernel**
+(rhs 22.1→37–42 ms/call, rk ~3x, restrict ~1.8x — same call counts, bit-identical data,
+phases the clip never touches), making np=4 wall 553 s vs HEAD-same-day 407 s. Refuted by
+same-day A/B (all in logs/rcab*-*): node drift (HEAD reruns at 407/22.1 on BOTH k004-001 and
+k004-009), per-launch metadata-map churn (bd85c792 removed all such maps — no change),
+exact-width slice aliasing (a7970743 + the tax is constant from step one), the MFC_DEBUG
+poison (verified off in flags), amr_shl itself (predated by the 556 s measurement). The DPM
+clock theory is REOPENED (the 2-s SCLK sampling that "refuted" it cannot see ms-scale ramp).
+**A 3-minute discriminator exists**: the 5-step np=4 probe (HEAD rhs 22.1 ms/call, clip
+37–42; dirs under logs/rcab2-0822 and rcab3-k009). Current step: rocprofv3 kernel-trace on
+both arms to split the tax into in-kernel device time vs launch-gap time, then a targeted
+fix — or, if irreducible on this stack, REVERT the clip (delivered wall is the metric; the
+design, proof, and gate evidence stay banked for after the launch-path tax is fixed).
+Still queued behind the verdict: goldens, np=1 bit-identity (HEAD binary prebuilt in
+mfc-amr-baseline), the MFC_DEBUG poison sweep, np=8 same-day A/B.
+
 ## 2026-08-22 — STEP 2 LANDED + THE EXPERT-AUDIT RE-AIM (read this before picking new work)
 
 **Gather-batching step 2 (chunked plan-then-execute, both families) LANDED 01cc4318 + 3de4724e
