@@ -7,6 +7,32 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 (2) — I4b PRICED AND HALF-RETIRED: store growth was the cost, not the pack
+
+The I4a note below left I4b as "pack parallelization, blocked on the host-macro question."
+The pricing measurement (new `mg:slot/pack/unpk/push` brackets splitting `rg:move`; np=8 S0
+on k004-009, budgets in amr-bench/logs/i4b-price-0823_{1011,1106}) REFUTED that framing:
+the pack (27.2 s) and unpack (44.3 s) are secondary — the dominant term was **mg:slot =
+57.9 s mean / 90.2 s max (imbalance 1.56)**: each migration wave's replica-slot allocs grew
+the shared store in 8–16-slot increments, and every growth event restages the WHOLE store
+(both arrays, ~30 GiB at end-of-run caps) through the host in `s_amr_st_reserve`
+(D2H + three host passes + H2D), ~12 events on the worst rank.
+
+**I4b-a LANDED (`180cdf17`, +26 LOC, zero new device code):** `s_amr_prereserve_stash`
+does one exact-target reserve per wave (at most ONE restage), and `s_amr_st_reserve` zeroes
+only the NEW columns. Same-day A/B: mg:slot 57.9→14.2 s (−75%), **mg:wait 53.8→15.6 s
+(−71%: the growth events were desynchronizing ranks and charging the delay to MPI waits)**,
+rg:mig 206.2→126.0 s (−39%), wall 1048.9→1006.0 s (−4.1%, phase deltas far outside the 4%
+noise floor). Gate: step-40 outputs BIT-IDENTICAL (coarse + 30 GB AMR hierarchy),
+`[amr-scale]` trajectory identical, `[amr-cad]` tag-for-tag identical (87,993,659 /
+escaped 0), 75/75 AMR goldens. Caps drop slightly (122–182 vs 125–189), live identical.
+
+**I4b-b (pack/unpack, 71.5 s combined) is DEFERRED behind the cadence move**: those shares
+are int=2 shares, and at int≈20 the whole migration family amortizes ~10x — decide at the
+new operating point before building host-threading machinery. The rebuild's `rb:slot`
+(25.5 s, same growth mechanism, interleaved frees make the pre-count harder) is likewise
+deferred to the post-cadence budget.
+
 ## 2026-08-23 — T1/I4a LANDED: migration pools right-sized
 
 `s_amr_regrid_stash_migrate`'s pools were sized for the worst case times every old block:
