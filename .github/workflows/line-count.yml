@@ -1,58 +1,55 @@
 name: Lines of Code
 
+# pull_request_target so that the comment can be posted on pull requests from
+# forks, whose GITHUB_TOKEN is read-only under the pull_request event. The PR's
+# code is checked out as data and read by the base branch's counter; it is never
+# executed, and no credentials are persisted alongside it.
 on:
-  push:
-    branches: [master]
-  pull_request:
-  workflow_dispatch:
+  pull_request_target:
+    paths:
+      - 'src/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
-  file-changes:
-    name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
-    steps:
-      - name: Clone
-        uses: actions/checkout@v5
-
-      - name: Detect Changes
-        uses: dorny/paths-filter@v4
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-
   sz:
     name: Core MFC Line Difference
-    if: needs.file-changes.outputs.checkall == 'true'
-    needs: file-changes
     permissions:
       contents: read
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code from PR branch
+      - name: Checkout the base branch
         uses: actions/checkout@v5
         with:
+          path: base
+          fetch-depth: 0
+
+      - name: Checkout the PR branch
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
           path: pr
+          persist-credentials: false
 
-      - name: Checkout code from MFC master
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ github.event.pull_request.repository }}
-          ref:        ${{ github.event.pull_request.base.ref }}
-          path:       base
-          # repository: MFlowCode/MFC
-          # ref:        master
-          # path:       base
-
+      # Counting against the merge base rather than the tip of the base branch
+      # means a PR is only ever charged for the lines it actually adds, however
+      # far behind the branch has fallen.
       - name: Get Line Diff
+        working-directory: base
         run: |
-          BASE="$GITHUB_WORKSPACE/base"
-          PR="$GITHUB_WORKSPACE/pr"
-          cd $BASE
-          export MFC_PR=$PR
-          pwd
-          ./mfc.sh init &> tmp.txt
-          ./mfc.sh count_diff
+          git fetch --no-tags origin "+refs/pull/${{ github.event.number }}/head:refs/mfc/pr"
+          git worktree add ../mb "$(git merge-base HEAD refs/mfc/pr)"
+          ./mfc.sh count_diff ../mb ../pr --markdown "$GITHUB_WORKSPACE/loc.md"
 
+      - name: Comment Line Diff
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ignore_empty: true
+          skip_unchanged: true
+          recreate: true
+          path: loc.md
