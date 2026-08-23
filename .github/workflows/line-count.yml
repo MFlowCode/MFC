@@ -2,8 +2,9 @@ name: Lines of Code
 
 # pull_request_target so that the comment can be posted on pull requests from
 # forks, whose GITHUB_TOKEN is read-only under the pull_request event. The PR's
-# code is checked out as data and read by the base branch's counter; it is never
-# executed, and no credentials are persisted alongside it.
+# code is only ever opened and line-counted by the base branch's counter, which
+# runs from base/. Nothing in pr/ is executed, and no step may be added that
+# does so.
 #
 # Deliberately unfiltered by path: a pull request that stops touching src/ must
 # still run, so that a comment left by an earlier push can be taken back down.
@@ -28,22 +29,17 @@ jobs:
           path: base
           fetch-depth: 0
 
-      - name: Checkout the PR branch
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: pr
-          persist-credentials: false
-
-      # Counting against the merge base rather than the tip of the base branch
-      # means a PR is only ever charged for the lines it actually adds, however
-      # far behind the branch has fallen.
+      # The PR's tree is materialized with git from the base clone rather than
+      # with actions/checkout, so this privileged workflow never runs a checkout
+      # of untrusted code. Counting against the merge base rather than the tip
+      # of the base branch means a PR is only ever charged for the lines it
+      # actually adds, however far behind the branch has fallen.
       - name: Get Line Diff
         id: diff
         working-directory: base
         run: |
           git fetch --no-tags origin "+refs/pull/${{ github.event.number }}/head:refs/mfc/pr"
+          git worktree add ../pr refs/mfc/pr
           git worktree add ../mb "$(git merge-base HEAD refs/mfc/pr)"
           ./mfc.sh count_diff ../mb ../pr --markdown "$GITHUB_WORKSPACE/loc.md"
           test -s "$GITHUB_WORKSPACE/loc.md" && echo "changed=true" >> "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"

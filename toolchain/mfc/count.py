@@ -13,22 +13,22 @@ def handle_dir(mfc_dir: str, srcdirname: str) -> typing.Tuple[typing.Dict[str, i
     files = {}
     total = 0
 
+    # These trees are untrusted in CI, so count only regular files that really
+    # live inside them: a symlink, or a path reached through a symlinked
+    # directory, otherwise names a file anywhere on the runner. Read lazily and
+    # tolerate stray bytes so that neither a huge file nor a non-UTF-8 one can
+    # take the job down.
+    root = os.path.realpath(os.path.join(mfc_dir, "src")) + os.sep
+
     for filepath in glob.glob(os.path.join(mfc_dir, "src", srcdirname, "**", "*.*f*"), recursive=True):
-        # These trees are untrusted in CI: skip anything that is not a regular
-        # file, and never let one stray byte fail the run.
-        if not os.path.isfile(filepath):
+        if not os.path.isfile(filepath) or not os.path.realpath(filepath).startswith(root):
             continue
 
         with open(filepath, errors="replace") as f:
-            counter = 0
-            for line in f.read().split("\n"):
-                # Skip whitespace and comments
-                if line.isspace() or len(line) == 0 or line.lstrip().startswith("!"):
-                    continue
-                counter += 1
+            counter = sum(1 for line in f if line.strip() and not line.lstrip().startswith("!"))
 
-            files[os.path.relpath(filepath, mfc_dir)] = counter
-            total += counter
+        files[os.path.relpath(filepath, mfc_dir)] = counter
+        total += counter
 
     return (files, total)
 
@@ -36,7 +36,7 @@ def handle_dir(mfc_dir: str, srcdirname: str) -> typing.Tuple[typing.Dict[str, i
 def count():
     target_str_list = format_list_to_string(ARG("targets"), "magenta")
 
-    cons.print(f"[bold]Counting lines of code in {target_str_list}[/bold] (excluding whitespace lines)")
+    cons.print(f"[bold]Counting lines of code in {target_str_list}[/bold] (excluding whitespace and comment lines)")
     cons.indent()
 
     total = 0
@@ -77,7 +77,7 @@ def count_diff():
     base_dir, pr_dir = ARG("base"), ARG("pr")
     target_str_list = format_list_to_string(ARG("targets"), "magenta")
 
-    cons.print(f"[bold]Counting lines of code in {target_str_list}[/bold] (excluding whitespace lines)")
+    cons.print(f"[bold]Counting lines of code in {target_str_list}[/bold] (excluding whitespace and comment lines)")
     cons.indent()
 
     files, dirs, total, total_diff = [], [], 0, 0
