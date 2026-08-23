@@ -7,6 +7,58 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 (3) — CADENCE MOVE VALIDATED: int=20 cuts 41% of wall; gather is the new front
+
+**The operating point moves: amr_regrid_int 2 → 20 (amr_buf stays 4), certified and adopted**
+(user approval on record). S0's feature speed ~1 at fine-CFL ~0.05 means <1 fine cell of
+travel per 20-step interval, and `[amr-cad]` certifies containment at BOTH the transient
+(40-step arm: 4.6M tags escaped 0) and steady state (240-step arm: 51.0M tags over 12
+regrids, escaped 0). Steady box count identical to int=2 (594).
+
+**Measurement protocol note (the transient trap):** a 40-step arm at int=20 regrids only at
+steps 20/40, so the mesh is coarse for half the run — its 156.8 s wall is the
+hierarchy-population transient, NOT a budget. The honest number is DIFFERENCED from-scratch
+arms (240-step minus 40-step = 200 steady steps), the measure-the-step-loop instrument.
+Checkpoint-restart is not used (it froze the hierarchy historically).
+
+**np=8 steady result (k004-009, post-I4b-a binary, logs/cad20{,b}-0823_*):
+14.86 s/step at int=20 vs 25.2 s/step at int=2 = −41% wall.** Cross-check: the regrid
+family was ~44% of int=2 wall; amortizing ~90% of it predicts 15.2 s/step — matches.
+Steady top-level budget at int=20: rhs 29.3%, gather 20.2%, reflux 14.2% (rf:p2p ≈ all of
+it, rf:wait 8.5%), regrid 12.0%, restr 10.8%, seam 5.7%, coarse 3.0% (sums ~99.5%).
+
+Consequences:
+- **I4b-b and rb:slot are DEAD at the operating point** (mg:unpk 1.6%, mg:slot 0.8% of
+  steady wall) — the deferral rule fired exactly as designed.
+- **The ring clip's value ~doubles**: gather is now the #1 overhead and the parked clip
+  removes 64–72% of gather wire words. The AMD compiler-bug report is the gate.
+- **restr (10.8%) enters the target list** — the per-step restrict-to-parent chain,
+  never optimized, same per-box blocking P2P shape as reflux.
+- **AMReX bar protocol**: AMReX stays at ITS operating point (int=2, n_error_buf=1 at
+  CFL 0.7 — an int=20 AMReX arm would need ~14-cell buffers, a different code); the
+  1.20x/1.15x doubling bar is internal to each code, so it stands unchanged. MFC's
+  np=2/np=4 int=20 differenced ladder gives our side (s0cad sweep).
+
+**THE LADDER AT int=20 (s0cad-0823_1225 + cad20{,b}, all differenced 240−40, all
+escaped=0, 72 boxes/rank at every np): steady s/step 5.36 (np2) / 7.46 (np4) / 14.86
+(np8) → doubling ratios 1.392x (np2→4) and 1.993x (np4→8), vs 1.598x/2.63x at int=2 and
+the AMReX 1.20x/1.15x bar.** Per-phase rungs (np4→np8): rhs 1.11x (AT the bar; physics
+5.3 s/step and near-flat), gather 3.84x (3.01 s/step at np8 — the largest overhead),
+reflux 6.84x, regrid 3.17x, seam 3.12x, restr 2.39x. Attribution complete (phase sums
+match walls to 0.3%). **If the five comm families scaled at 1.2x the np4→8 rung would be
+1.15x — the remaining program IS the exchange scaling: T1 waves + plan-based exchange +
+the parked ring clip.** The cadence win grows with np (−15%/−26%/−41% at np2/4/8),
+confirming regrid was the worst-scaling family.
+
+Audit notes on the numbers: (a) per-step cross-check passes for gather (3.49 int=2 vs
+3.01 int=20 s/step) but **reflux RISES 1.34 → 2.10 s/step (+57%, rf:wait 1.26 of it) —
+frequent regrids were acting as skew synchronizers; at int=20 the skew accumulates across
+20 steps and the per-step P2P families absorb it.** Already included in the −41%; it is
+T1's mechanism, now visible per-step. (b) The int=2 comparator (25.2 s/step) includes its
+cheap early transient, so steady int=2 is slightly higher and −41% is conservative.
+(c) Cadence also relieves memory: store caps 77 at int=20 vs 125–189 at int=2 (fewer
+migration waves → the replica ratchet barely engages).
+
 ## 2026-08-23 (2) — I4b PRICED AND HALF-RETIRED: store growth was the cost, not the pack
 
 The I4a note below left I4b as "pack parallelization, blocked on the host-macro question."
