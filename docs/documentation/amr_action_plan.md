@@ -7,6 +7,52 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 (6) — I2a LANDED: the level-1 stage-fill WAVE (plan-based exchange, first payoff increment)
+
+`s_amr_stage_fill_wave` (m_amr.fpp) replaces the per-box rendezvous chain of the
+non-subcycle level-1 per-stage fill — owner IRECV+WAITALL per box, contributor
+pack+ISEND+flush per box, F3 blocking MPI_SEND per box — with ONE wave per RK stage:
+transfer plans derived on every rank from the replicated caches (identical enumeration
+order on both sides, so offsets agree with no metadata exchange), one aggregated message
+per (peer, family) on the runtime tag bases (`amr_tag_base` + epoch fold), all IRECVs
+posted first, device packs into contiguous host pool slices via the EXISTING per-box
+kernels, all ISENDs, one WAITALL, then box-major consume through the single `amr_cg`.
+Level>=2 keeps the per-box F2 path (I3); subcycle keeps its sites (I8). The driver's
+parent-before-child order is strictly refined (all level-1 fills before any level>=2
+gather — legal per the design doc's inset-children argument).
+
+SCOPE DEVIATION from the I2 row, recorded: per-owned-box patch storage + `amr_cpat_off`
+threading is NOT needed for the wave itself — box-major consume after the WAITALL reuses
+the single patch buffer. The storage restructure only buys cross-box batched unpack
+kernels (launch-count reduction) and is deferred to **I2b, contingent** on the post-I2a
+phase budget showing launch/map overhead (not wait) left in the gather share. Zero new
+device kernels — the amdflang codegen-lottery rule is not triggered.
+
+GATES: (1) `[amr-xa]` exactness — F1 payload words EXACT vs baseline (1,071,084,168),
+msgs 858 -> 381 (the per-step per-box messages collapsed to peer aggregates; the
+remainder is the untouched regrid-chunked + init path), F2/F4/F5/F6/F7 byte-identical
+in msgs AND words; (2) debug live headers on every wave transfer + per-message
+MPI_Get_count length asserts, clean probe rc=0, family totals identical to production;
+(3) seeded-bug arm — one-word shift of a consume offset aborted with "header mismatch:
+expected site 31" (XA_F1W_SND), seed reverted; (3b) the F3 twin's wave path — never
+exercised by the S0 probes (no QBMM) and goldens compile headers out — ran the np=2
+QBMM-nonpolytropic case (test DDD79C8B's case) on the DEBUG binary with the [amr-xa]
+report enabled: F3 38 msgs / 2,736 words send==recv exact, live headers on every
+transfer, rc=0; (4) adversarial review — ONE critical
+finding (the high-water grow helpers discarded already-appended transfers on growth;
+invisible at S0 scale, corrupting beyond 64 transfers/rank) — fixed with copy-preserving
+move_alloc BEFORE any gate ran; every other checked invariant clean; (5) goldens: full
+local suite at e531d354+diff in the baseline worktree (job 383666, mi2101x); (6) wall:
+2x differenced np=8 int=20 pairs with the PINNED COPY binary on k004-008 (job 383667),
+priced against the SAME-NODE 3-repeat floor from job 383518: steady s/step
+14.817 / 13.730 / 13.892 (mean 14.15, spread 7.7% — WIDER than the historic 5.3%; wall
+claims on this case must clear it).
+
+Ops lessons banked to memory: install-dir mtime is NOT binary freshness (a stale Aug-21
+binary got probed first — pick by file mtime or explicit path); batch jobs must pin a
+COPY of the binary, never a build-tree path (383518 pinned the path I overwrote mid-job;
+all reps exec'd before the overwrite, so the floor is clean, but only by minutes).
+
 ## 2026-08-23 (5) — I1b-gather LANDED: identity headers live on F1/F2/F3, tripwire proven
 
 Per the binding in amr_plan_based_exchange.md: `XA_NH` (8 under MFC_DEBUG, else 0) +
