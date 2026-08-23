@@ -12,6 +12,7 @@
 !! I1b and layer on this registry.
 module m_amr_xchg_audit
 
+    use m_precision_select
     use m_global_parameters, only: rank_time_wrt, proc_rank
     use m_mpi_proxy, only: s_mpi_abort
 
@@ -71,10 +72,23 @@ module m_amr_xchg_audit
     integer    :: xa_tag_min(XA_NSITE) = huge(0)
     integer    :: xa_tag_max(XA_NSITE) = -huge(0)
 
-    private; public :: s_xa_rec, s_xa_report, s_xa_reset, XA_F1_SND, XA_F1_RCV, XA_F3_SND, XA_F3_RCV, XA_F2_SND, XA_F2_RCV, &
-        & XA_F4_SND, XA_F4_RCV, XA_F5_FACE_SND, XA_F5_FACE_RCV, XA_F5_FREG_SND, XA_F5_FREG_RCV, XA_F6_XY, XA_F6_YX, XA_F7A_SND, &
-        & XA_F7A_RCV, XA_F7B_SND, XA_F7B_RCV, XA_F7C_SND, XA_F7C_RCV, XA_L0_FILL_SND, XA_L0_FILL_RCV, XA_L0_SCAT_SND, &
-        & XA_L0_SCAT_RCV, XA_L0_RFLX_SND, XA_L0_RFLX_RCV, XA_L0_REST_SND, XA_L0_REST_RCV, XA_L0_MIGR_SND, XA_L0_MIGR_RCV
+    ! I1b: per-xfer identity header (amr_plan_based_exchange.md "I1b implementation binding").
+    ! XA_NH real(wp) words - [site, blk, bl(3), bh(3)] as exact integer-valued reals - are
+    ! PREPENDED to each converted family's wire payload under MFC_DEBUG and verified at unpack,
+    ! so a plan/pack disagreement (wrong slab, wrong block, crossed families) aborts at the
+    ! receiver instead of silently corrupting the patch. Zero in production, so every wire
+    ! count/offset adds XA_NH unconditionally and the release arithmetic is untouched.
+#ifdef MFC_DEBUG
+    integer, parameter :: XA_NH = 8
+#else
+    integer, parameter :: XA_NH = 0
+#endif
+
+    private; public :: s_xa_rec, s_xa_report, s_xa_reset, XA_NH, s_xa_hdr_pack, s_xa_hdr_check, XA_F1_SND, XA_F1_RCV, XA_F3_SND, &
+        & XA_F3_RCV, XA_F2_SND, XA_F2_RCV, XA_F4_SND, XA_F4_RCV, XA_F5_FACE_SND, XA_F5_FACE_RCV, XA_F5_FREG_SND, XA_F5_FREG_RCV, &
+        & XA_F6_XY, XA_F6_YX, XA_F7A_SND, XA_F7A_RCV, XA_F7B_SND, XA_F7B_RCV, XA_F7C_SND, XA_F7C_RCV, XA_L0_FILL_SND, &
+        & XA_L0_FILL_RCV, XA_L0_SCAT_SND, XA_L0_SCAT_RCV, XA_L0_RFLX_SND, XA_L0_RFLX_RCV, XA_L0_REST_SND, XA_L0_REST_RCV, &
+        & XA_L0_MIGR_SND, XA_L0_MIGR_RCV
 
 contains
 
@@ -90,6 +104,39 @@ contains
         xa_tag_max(isite) = max(xa_tag_max(isite), tag)
 
     end subroutine s_xa_rec
+
+    !> Write the XA_NH-word identity header into buf(1:XA_NH): the sending site id, the block the payload is for, and the slab [bl,
+    !! bh] the sender packed. Call only under `if (XA_NH > 0)`.
+    impure subroutine s_xa_hdr_pack(buf, isite, blk, bl, bh)
+
+        real(wp), intent(inout) :: buf(:)
+        integer, intent(in)     :: isite, blk, bl(3), bh(3)
+
+        buf(1) = real(isite, wp); buf(2) = real(blk, wp)
+        buf(3:5) = real(bl, wp); buf(6:8) = real(bh, wp)
+
+    end subroutine s_xa_hdr_pack
+
+    !> Verify a received header against what THIS unpack believes it is consuming. isite is the expected SENDING site id (the
+    !! matched _SND constant). Aborts with both sides on mismatch - a plan/pack disagreement caught at the wire, before it corrupts
+    !! the patch.
+    impure subroutine s_xa_hdr_check(buf, isite, blk, bl, bh)
+
+        real(wp), intent(in) :: buf(:)
+        integer, intent(in)  :: isite, blk, bl(3), bh(3)
+        integer              :: got(8), i
+        character(len=256)   :: msg
+
+        got = nint(buf(1:8))
+        if (got(1) /= isite .or. got(2) /= blk .or. any(got(3:5) /= bl) .or. any(got(6:8) /= bh)) then
+            write (msg, &
+                   & '(A,I0,A,I0,A,3(I0,1x),A,3(I0,1x),A,I0,A,I0,A,3(I0,1x),A,3(I0,1x))') &
+                   & 'amr xchg header mismatch: expected site ', isite, ' blk ', blk, ' lo ', (bl(i), i=1, 3), 'hi ', (bh(i), &
+                   & i=1, 3), '| got site ', got(1), ' blk ', got(2), ' lo ', (got(i), i=3, 5), 'hi ', (got(i), i=6, 8)
+            call s_mpi_abort(trim(msg))
+        end if
+
+    end subroutine s_xa_hdr_check
 
     !> Zero the accumulators (a future per-window use; finalize-report runs cumulative).
     impure subroutine s_xa_reset()

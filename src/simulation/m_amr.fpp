@@ -1027,13 +1027,14 @@ contains
         do k = c_lo, c_hi
             ks = f_l0_slot(k)
             if (amr_block_owner(ks) /= proc_rank) cycle
+            ! + XA_NH per message: the I1b identity header rides ahead of each payload (zero in production)
             if (amr_block_level(ks) >= 2) then
                 if (amr_gpl_psrc(ks) >= 0) then
-                    need = need + amr_gpl_psz(ks); nreq = nreq + 1
+                    need = need + amr_gpl_psz(ks) + XA_NH; nreq = nreq + 1
                 end if
             else
                 do idx = 1, amr_gpl_nsrc(ks)
-                    need = need + amr_gpl_sz(idx, ks)
+                    need = need + amr_gpl_sz(idx, ks) + XA_NH
                 end do
                 nreq = nreq + amr_gpl_nsrc(ks)
             end if
@@ -1060,9 +1061,9 @@ contains
                     amr_gcr_n = amr_gcr_n + 1
                     amr_gcr_off(amr_gcr_n) = off
                     call s_xa_rec(XA_F2_RCV, 2, amr_gpl_psz(ks), ks)
-                    call MPI_IRECV(amr_gcr_pool(off + 1), amr_gpl_psz(ks), mpi_p, amr_gpl_psrc(ks), ks, MPI_COMM_WORLD, &
+                    call MPI_IRECV(amr_gcr_pool(off + 1), amr_gpl_psz(ks) + XA_NH, mpi_p, amr_gpl_psrc(ks), ks, MPI_COMM_WORLD, &
                                    & amr_gcr_req(amr_gcr_n), ierr)
-                    off = off + amr_gpl_psz(ks)
+                    off = off + amr_gpl_psz(ks) + XA_NH
                     amr_gcr_nr(cb) = 1
                 end if
             else
@@ -1070,9 +1071,9 @@ contains
                     amr_gcr_n = amr_gcr_n + 1
                     amr_gcr_off(amr_gcr_n) = off
                     call s_xa_rec(XA_F1_RCV, 2, amr_gpl_sz(idx, ks), ks)
-                    call MPI_IRECV(amr_gcr_pool(off + 1), amr_gpl_sz(idx, ks), mpi_p, amr_gpl_src(idx, ks), ks, MPI_COMM_WORLD, &
-                                   & amr_gcr_req(amr_gcr_n), ierr)
-                    off = off + amr_gpl_sz(idx, ks)
+                    call MPI_IRECV(amr_gcr_pool(off + 1), amr_gpl_sz(idx, ks) + XA_NH, mpi_p, amr_gpl_src(idx, ks), ks, &
+                                   & MPI_COMM_WORLD, amr_gcr_req(amr_gcr_n), ierr)
+                    off = off + amr_gpl_sz(idx, ks) + XA_NH
                 end do
                 amr_gcr_nr(cb) = amr_gpl_nsrc(ks)
             end if
@@ -1133,11 +1134,12 @@ contains
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                 maxsz = sys_size*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
                 call s_phase_tic(PH_RBRSV)
-                call s_amr_gsnd_reserve(maxsz)
+                call s_amr_gsnd_reserve(maxsz + XA_NH)
                 call s_phase_toc(PH_RBRSV)
                 amr_gsnd_n = amr_gsnd_n + 1
                 call s_phase_tic(PH_RBPACK)
-                idx = 0
+                if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F1_SND, ks, bl, bh)
+                idx = XA_NH
                 do i = 1, sys_size
                     do g3 = bl(3), bh(3)
                         do g2 = bl(2), bh(2)
@@ -1152,7 +1154,7 @@ contains
 #ifdef MFC_MPI
                 call s_phase_tic(PH_RBSEND)
                 call s_xa_rec(XA_F1_SND, 1, boxsz, ks)
-                call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, amr_block_owner(ks), ks, MPI_COMM_WORLD, &
+                call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, amr_block_owner(ks), ks, MPI_COMM_WORLD, &
                                & amr_gsnd_req(amr_gsnd_n), ierr)
                 call s_phase_toc(PH_RBSEND)
 #endif
@@ -1216,7 +1218,8 @@ contains
                 call s_phase_toc(PH_PGRECV)
                 off = amr_gcr_off(r0)
                 boxsz = amr_gpl_psz(amr_cur)
-                call s_amr_unpack_parent_patch_device(w1, w2, w3, amr_gcr_pool(off + 1:off + boxsz), .true.)
+                if (XA_NH > 0) call s_xa_hdr_check(amr_gcr_pool(off + 1:off + XA_NH), XA_F2_SND, amr_cur, plo, phi)
+                call s_amr_unpack_parent_patch_device(w1, w2, w3, amr_gcr_pool(off + XA_NH + 1:off + XA_NH + boxsz), .true.)
 #endif
             end if
             call s_phase_toc(PH_PGALL)
@@ -1256,7 +1259,8 @@ contains
                 call s_amr_rank_coarse_range(amr_gpl_src(idx, amr_cur), crlo, crhi)
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                 off = amr_gcr_off(r0 + idx - 1)
-                r = 0
+                if (XA_NH > 0) call s_xa_hdr_check(amr_gcr_pool(off + 1:off + XA_NH), XA_F1_SND, amr_cur, bl, bh)
+                r = XA_NH
                 do i = 1, sys_size
                     do g3 = bl(3), bh(3)
                         do g2 = bl(2), bh(2)
@@ -1463,7 +1467,7 @@ contains
             if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
             if (nsrc > 0) then
                 if (amr_rg_gather) call s_phase_tic(PH_RBALLOC)
-                allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc))
+                allocate (rbuf(maxsz + XA_NH, nsrc), reqs(nsrc), srank(nsrc))
                 if (amr_rg_gather) call s_phase_toc(PH_RBALLOC)
                 if (amr_rg_gather) call s_phase_tic(PH_RBPOST)
                 nsrc = 0
@@ -1480,7 +1484,7 @@ contains
                     end if
 #ifdef MFC_MPI
                     call s_xa_rec(XA_F1_RCV, 2, boxsz, amr_cur)
-                    call MPI_IRECV(rbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
+                    call MPI_IRECV(rbuf(1, nsrc), boxsz + XA_NH, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
                 end do
                 if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
@@ -1493,14 +1497,15 @@ contains
                 do idx = 1, nsrc
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                    if (XA_NH > 0) call s_xa_hdr_check(rbuf(:,idx), XA_F1_SND, amr_cur, bl, bh)
                     if (pull_host) then
                         ! runtime: unpack ONLY this box's wire buffer on the device (same order/cast as the host unpack below)
                         boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                        call s_amr_unpack_box_device(bl, bh, rbuf(1:boxsz,idx))
+                        call s_amr_unpack_box_device(bl, bh, rbuf(XA_NH + 1:XA_NH + boxsz,idx))
                         cycle
                     end if
                     ! unpack in the SAME (i, g3, g2, g1) order the sender packed; place at amr_cg patch-local index
-                    r = 0
+                    r = XA_NH
                     do i = 1, sys_size
                         do g3 = bl(3), bh(3)
                             do g2 = bl(2), bh(2)
@@ -1542,15 +1547,16 @@ contains
                     @:ASSERT(nsrc == 1, "gather plan: send entry mismatch")
                 end if
                 if (amr_rg_gather) call s_phase_tic(PH_RBRSV)
-                call s_amr_gsnd_reserve(maxsz)
+                call s_amr_gsnd_reserve(maxsz + XA_NH)
                 if (amr_rg_gather) call s_phase_toc(PH_RBRSV)
                 amr_gsnd_n = amr_gsnd_n + 1
                 if (pull_host) then
-                    ! runtime: pack the overlap box on the device straight into the pool slot (only the box crosses PCIe)
-                    call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, amr_gsnd_pool(:,amr_gsnd_n))
+                    ! runtime: pack the overlap box on the device straight into the pool slot (only the box crosses PCIe);
+                    ! the slice leaves the I1b header words ahead of the data (kernel untouched)
+                    call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, amr_gsnd_pool(XA_NH + 1:,amr_gsnd_n))
                 else
                     if (amr_rg_gather) call s_phase_tic(PH_RBPACK)
-                    idx = 0
+                    idx = XA_NH
                     do i = 1, sys_size
                         do g3 = bl(3), bh(3)
                             do g2 = bl(2), bh(2)
@@ -1567,8 +1573,9 @@ contains
                 ! NON-BLOCKING: the owner's per-box IRECV/WAITALL still orders the data correctly, but this rank no longer
                 ! rendezvouses on every box. Completed by s_amr_gather_send_flush (caller) or the drain in s_amr_gsnd_reserve.
                 if (amr_rg_gather) call s_phase_tic(PH_RBSEND)
+                if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F1_SND, amr_cur, bl, bh)
                 call s_xa_rec(XA_F1_SND, 1, boxsz, amr_cur)
-                call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, &
+                call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, owner, amr_cur, MPI_COMM_WORLD, &
                                & amr_gsnd_req(amr_gsnd_n), ierr)
                 if (amr_rg_gather) call s_phase_toc(PH_RBSEND)
 #endif
@@ -1664,7 +1671,7 @@ contains
                 if (amr_ovl_gather(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
             if (nsrc > 0) then
-                allocate (rbuf(maxsz, nsrc), reqs(nsrc), srank(nsrc))
+                allocate (rbuf(maxsz + XA_NH, nsrc), reqs(nsrc), srank(nsrc))
                 nsrc = 0
                 do idx = 1, amr_ovl_gather_n(amr_cur)
                     r = amr_ovl_gather(idx, amr_cur)
@@ -1675,7 +1682,7 @@ contains
                     nsrc = nsrc + 1; srank(nsrc) = r
 #ifdef MFC_MPI
                     call s_xa_rec(XA_F3_RCV, 2, boxsz, amr_cur)
-                    call MPI_IRECV(rbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
+                    call MPI_IRECV(rbuf(1, nsrc), boxsz + XA_NH, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
                 end do
 #ifdef MFC_MPI
@@ -1684,14 +1691,15 @@ contains
                 do idx = 1, nsrc
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                    if (XA_NH > 0) call s_xa_hdr_check(rbuf(:,idx), XA_F3_SND, amr_cur, bl, bh)
                     if (pull_host) then
                         ! runtime: unpack ONLY this box's wire buffer on the device (same order/cast as the host unpack below)
                         boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                        call s_amr_unpack_box_pbmv_device(bl, bh, rbuf(1:boxsz,idx))
+                        call s_amr_unpack_box_pbmv_device(bl, bh, rbuf(XA_NH + 1:XA_NH + boxsz,idx))
                         cycle
                     end if
                     ! unpack in the SAME (ib_, q, g3, g2, g1) order the sender packed - pb block then mv block
-                    r = 0
+                    r = XA_NH
                     do ib_ = 1, nb
                         do q = 1, nnode
                             do g3 = bl(3), bh(3)
@@ -1733,12 +1741,13 @@ contains
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                allocate (sbuf(boxsz))
+                allocate (sbuf(boxsz + XA_NH))
                 if (pull_host) then
-                    ! runtime: pack the overlap box on the device straight into sbuf (only the box crosses PCIe)
-                    call s_amr_pack_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3, sbuf)
+                    ! runtime: pack the overlap box on the device straight into sbuf (only the box crosses PCIe);
+                    ! the slice leaves the I1b header words ahead of the data (kernel untouched)
+                    call s_amr_pack_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3, sbuf(XA_NH + 1:))
                 else
-                    idx = 0
+                    idx = XA_NH
                     do ib_ = 1, nb
                         do q = 1, nnode
                             do g3 = bl(3), bh(3)
@@ -1763,8 +1772,9 @@ contains
                     end do
                 end if
 #ifdef MFC_MPI
+                if (XA_NH > 0) call s_xa_hdr_pack(sbuf, XA_F3_SND, amr_cur, bl, bh)
                 call s_xa_rec(XA_F3_SND, 1, boxsz, amr_cur)
-                call MPI_SEND(sbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
+                call MPI_SEND(sbuf, boxsz + XA_NH, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
 #endif
                 deallocate (sbuf)
             end if
@@ -1870,11 +1880,14 @@ contains
             if (amr_gpl_valid) then
                 @:ASSERT(amr_gpl_psz(cblk) == boxsz, "gather plan: parent send size mismatch")
             end if
-            call s_amr_gsnd_reserve(boxsz)
+            call s_amr_gsnd_reserve(boxsz + XA_NH)
             amr_gsnd_n = amr_gsnd_n + 1
-            call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, amr_gsnd_pool(:,amr_gsnd_n))
+            ! header written on the host AFTER the device pack lands (copyout) - data at XA_NH+1 via the slice
+            call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, amr_gsnd_pool(XA_NH + 1:,amr_gsnd_n))
+            if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F2_SND, cblk, plo, phi)
             call s_xa_rec(XA_F2_SND, 1, boxsz, cblk)
-            call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz, mpi_p, cowner, cblk, MPI_COMM_WORLD, amr_gsnd_req(amr_gsnd_n), ierr)
+            call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, cowner, cblk, MPI_COMM_WORLD, &
+                           & amr_gsnd_req(amr_gsnd_n), ierr)
 #endif
 
         end subroutine s_amr_gather_from_parent_field_${GSFX}$
@@ -1906,10 +1919,11 @@ contains
         if (amr_rg_gather .and. amr_gpl_valid) then
             @:ASSERT(amr_gpl_psrc(amr_cur) == powner .and. amr_gpl_psz(amr_cur) == boxsz, "gather plan: parent recv mismatch")
         end if
-        allocate (xbuf(boxsz))
+        allocate (xbuf(boxsz + XA_NH))
         call s_xa_rec(XA_F2_RCV, 2, boxsz, amr_cur)
-        call MPI_RECV(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-        call s_amr_unpack_parent_patch_device(w1, w2, w3, xbuf, to_host)
+        call MPI_RECV(xbuf, boxsz + XA_NH, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        if (XA_NH > 0) call s_xa_hdr_check(xbuf, XA_F2_SND, amr_cur, plo, phi)
+        call s_amr_unpack_parent_patch_device(w1, w2, w3, xbuf(XA_NH + 1:XA_NH + boxsz), to_host)
         deallocate (xbuf)
 #endif
 
