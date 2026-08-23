@@ -7,6 +7,20 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 — T1/I4a LANDED: migration pools right-sized
+
+`s_amr_regrid_stash_migrate`'s pools were sized for the worst case times every old block:
+`spack/rpack(maxcnt, old_np)` (GBs per regrid at production counts, nearly all columns
+unused) and `rq(old_np*num_procs)` — the O(boxes x ranks) array the endstate's W-invariants
+forbid. Now sized to the blocks actually sent/received (dense column maps from a pre-pass
+that reuses the send loop's own destination criterion) and the exact request count.
+Message set/sizes/tags/order UNCHANGED — gated on exact `[amr-xa]` F4 equality
+(39 msgs / 417,682,080 words both directions on the S0 5-step probe), identical
+`[amr-cad]` counts, fast-class rhs (22.1 ms/call), and the 75-case AMR golden subset.
+Remaining I4: pack parallelization (I4b) — blocked on the host-threading-macro question
+(raw `!$omp` is lint-forbidden; a device pack would need the ISA-stat probe per the
+codegen-instability rule) and priced by a pack-time baseline still to be measured.
+
 ## 2026-08-22 (final) — RING CLIP PARKED: an amdflang whole-image codegen regression
 
 **VERDICT: the clip is REVERTED (this commit) and PARKED pending a toolchain fix — the
