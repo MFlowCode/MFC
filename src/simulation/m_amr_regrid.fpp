@@ -28,7 +28,7 @@ module m_amr_regrid
         & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
         & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
         & f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, &
-        & amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk
+        & amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -653,6 +653,7 @@ contains
         if (bubbles_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
 
         call s_phase_tic(PH_RGTAG); call s_amr_regrid_tag_cells(q_cons_base, tag_grid, sidx); call s_phase_toc(PH_RGTAG)
+        call s_amr_cad_count(tag_grid, sidx)  ! [amr-cad] cadence containment audit (counts only; report at finalize)
         call s_phase_tic(PH_RGCLUS); call s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes); call s_phase_toc(PH_RGCLUS)
         if (nboxes == 0) return  ! nothing tagged on any rank; keep the current blocks
         call s_phase_tic(PH_RGSHAPE); call s_amr_regrid_shape_boxes(boxes, nboxes); call s_phase_toc(PH_RGSHAPE)
@@ -727,6 +728,60 @@ contains
         end do
 
     end subroutine s_amr_regrid_tag_cells
+
+    !> [amr-cad] cadence containment audit: count this rank's level-1 tags, and how many fall OUTSIDE the pre-regrid level-1
+    !! coverage - a feature that evolved unrefined since the last regrid because amr_buf did not cover its drift over amr_regrid_int
+    !! steps. Counts only (reported once by s_amr_cov_report); the first refinement from scratch is skipped (every tag is new by
+    !! construction). Region bounds are GLOBAL coarse cells; tag_grid is rank-local, so paint each region's clip with this subdomain
+    !! into a local mask first.
+    impure subroutine s_amr_cad_count(tag_grid, sidx)
+
+        logical, intent(in)  :: tag_grid(0:,0:,0:)
+        integer, intent(in)  :: sidx(3)
+        logical, allocatable :: cov(:,:,:)
+        integer              :: k, ci, cj, ck, bl(3), bh(3)
+        logical              :: any_l1
+
+        ! skip the FIRST regrid: it populates the hierarchy from the seed block, so nearly every tag is
+        ! legitimately outside the old coverage (measured 47% escaped on S0 from the t=0 transient alone).
+        ! The instrument measures STEADY-STATE containment - regrid 2 onward.
+
+        if (.not. amr_cad_armed) then
+            amr_cad_armed = .true.
+            return
+        end if
+        any_l1 = .false.
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) == 1) any_l1 = .true.
+        end do
+        if (.not. any_l1) return
+        allocate (cov(0:m,0:n,0:p)); cov = .false.
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
+            bl = 0; bh = 0
+            bl(1) = max(amr_region_lo_all(1, k) - sidx(1), 0); bh(1) = min(amr_region_hi_all(1, k) - sidx(1), m)
+            if (n_glb > 0) then
+                bl(2) = max(amr_region_lo_all(2, k) - sidx(2), 0); bh(2) = min(amr_region_hi_all(2, k) - sidx(2), n)
+            end if
+            if (p_glb > 0) then
+                bl(3) = max(amr_region_lo_all(3, k) - sidx(3), 0); bh(3) = min(amr_region_hi_all(3, k) - sidx(3), p)
+            end if
+            if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
+            cov(bl(1):bh(1),bl(2):bh(2),bl(3):bh(3)) = .true.
+        end do
+        do ck = 0, p
+            do cj = 0, n
+                do ci = 0, m
+                    if (tag_grid(ci, cj, ck)) then
+                        amr_cad_tot = amr_cad_tot + 1
+                        if (.not. cov(ci, cj, ck)) amr_cad_esc = amr_cad_esc + 1
+                    end if
+                end do
+            end do
+        end do
+        deallocate (cov)
+
+    end subroutine s_amr_cad_count
 
     !> Regrid phase 2: union the per-rank tag fields into the rank-invariant sparse global tag list, then cluster it into a list of
     !! separated candidate boxes (nboxes = 0 if nothing is tagged on any rank).

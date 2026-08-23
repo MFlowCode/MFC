@@ -50,7 +50,8 @@ module m_amr
     !! module). State stays HERE - only the drivers moved.
     public :: s_amr_br_load_all, s_amr_br_store_all, amr_br_w, amr_br_batch, amr_rg_gather
     public :: s_amr_build_gather_plan, amr_gpl_valid
-    public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note
+    public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
+        & amr_cad_tot, amr_cad_esc, amr_cad_armed
     public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, amr_tag_base, &
         & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_free_slot, s_amr_reconcile_slots, &
         & s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, &
@@ -220,7 +221,14 @@ module m_amr
     !! cells covered by old blocks (shrunk by 1 for the minmod stencil - a conservative under-count). (3) rebuild level>=2: no
     !! carry-forward exists, so the patch is live by construction. Deterministic - identical across reruns; decides ring/coverage
     !! clipping vs T1 (pre-registered: dead > 50% on either family promotes clipping).
-    integer(8) :: amr_cov_tot(3) = 0, amr_cov_dead(3) = 0  !< 1=step-fill, 2=rebuild L1, 3=rebuild L>=2
+    !> 1=step-fill, 2=rebuild L1, 3=rebuild L>=2 [amr-cad] regrid-cadence containment audit: level-1 tags counted at each regrid,
+    !! and how many fell OUTSIDE the pre-regrid level-1 coverage (a feature that evolved unrefined since the last regrid - the tag
+    !! buffer amr_buf did not cover its drift). Zero escaped validates the (amr_regrid_int, amr_buf) pair for that run; the case
+    !! validator only warns (the CFL <= 1 worst case is too strict for low-CFL cases). Incremented by m_amr_regrid, reported by
+    !! s_amr_cov_report.
+    integer(8) :: amr_cov_tot(3) = 0, amr_cov_dead(3) = 0
+    integer(8) :: amr_cad_tot = 0, amr_cad_esc = 0
+    logical    :: amr_cad_armed = .false.  !< first regrid (hierarchy population) is skipped - see s_amr_cad_count
     !> (0:num_procs-1) SFC Morton-key upper bound per rank from the cost-weighted split; owner = cut-search (f_amr_owner). The O(P)
     !! computed replacement for the O(global_blocks) amr_block_owner table (validated against it during bring-up).
     integer(kind=8), allocatable :: amr_owner_cut(:)
@@ -1347,20 +1355,25 @@ contains
     !! it before the amr early-return so every rank participates (all-zero when amr is off).
     impure subroutine s_amr_cov_report()
 
-        integer(8)                  :: tot(3), dead(3)
+        integer(8)                  :: tot(3), dead(3), cad(2), cadr(2)
         integer                     :: ierr, f
         character(len=8), parameter :: nm(3) = ["stepfill", "rb-L1   ", "rb-L2   "]
 
         tot = amr_cov_tot; dead = amr_cov_dead
+        cad(1) = amr_cad_tot; cad(2) = amr_cad_esc; cadr = cad
 #ifdef MFC_MPI
         call MPI_ALLREDUCE(amr_cov_tot, tot, 3, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
         call MPI_ALLREDUCE(amr_cov_dead, dead, 3, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(cad, cadr, 2, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
 #endif
         if (proc_rank == 0) then
             do f = 1, 3
                 if (tot(f) > 0) write (0, '(A,A,A,I0,A,I0,A,F6.3)') ' [amr-cov] ', nm(f), ' words ', tot(f), ' dead ', dead(f), &
                     & ' frac ', real(dead(f))/real(tot(f))
             end do
+            ! cadence containment: escaped > 0 means a feature outran amr_buf between regrids (see the decl)
+            if (cadr(1) > 0) write (0, '(A,I0,A,I0,A,F6.3)') ' [amr-cad] L1 tags ', cadr(1), ' escaped ', cadr(2), ' frac ', &
+                & real(cadr(2))/real(cadr(1))
         end if
 
     end subroutine s_amr_cov_report
