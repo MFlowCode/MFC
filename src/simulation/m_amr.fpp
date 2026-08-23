@@ -53,10 +53,11 @@ module m_amr
     public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
         & amr_cad_tot, amr_cad_esc, amr_cad_armed
     public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, amr_tag_base, &
-        & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_free_slot, s_amr_reconcile_slots, &
-        & s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, s_amr_gather_send_flush, &
-        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
-        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, f_l0_slot
+        & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
+        & s_amr_free_slot, s_amr_reconcile_slots, s_amr_reduce_xchg_flag, s_amr_assign_block_owners, s_amr_gather_coarse_patch, &
+        & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
+        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
+        & f_amr_boxes_overlap, f_l0_slot
 
     !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
     real(wp) :: amr_dt_fine = 0._wp
@@ -6127,10 +6128,14 @@ contains
                     @:DEALLOCATE(${ST}$)
                 end if
                 @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
-                ${ST}$ = 0._stp
                 if (oldcap > 0) then
+                    ! preserved columns are fully overwritten from tmp - zero only the NEW columns
+                    ! (one full-store host pass saved per growth event; mg:slot measured 57.9 s at np=8)
                     ${ST}$(:,:,:,:,1:oldcap) = tmp
+                    ${ST}$(:,:,:,:,oldcap + 1:newcap) = 0._stp
                     deallocate (tmp)
+                else
+                    ${ST}$ = 0._stp
                 end if
                 $:GPU_UPDATE(device='[' + ST + ']')
             end if
@@ -6276,6 +6281,26 @@ contains
     !! cost across the np-scaled replica set of a migration-heavy regrid (the W8 gate's np=4 arm OOMed on exactly that storm).
     !! s_amr_alloc_slot upgrades a stash-only slot in place when the same global slot becomes an owned block; s_amr_free_slot
     !! handles both flavors.
+    !> One-shot pre-reserve before a batch of s_amr_alloc_slot_stash calls: grows the store AT MOST ONCE, to the batch's exact final
+    !! size, instead of once per 8-16 incrementally allocated slots. Every growth restages the WHOLE store (both arrays) through the
+    !! host (s_amr_st_reserve), so a migration wave allocating tens of replica slots pays that restage repeatedly without this.
+    !! getk(k) marks dense fine-block index k (slot f_l0_slot(k)) for a coming stash alloc.
+    impure subroutine s_amr_prereserve_stash(getk, nblk)
+
+        integer, intent(in) :: nblk
+        logical, intent(in) :: getk(nblk)
+        integer             :: i, nneed
+
+        nneed = 0
+        do i = 1, nblk
+            if (getk(i) .and. .not. amr_slot_live(f_l0_slot(i))) nneed = nneed + 1
+        end do
+        ! mirrors the alloc loop exactly: the first amr_loc_nfree allocs pop the recycle stack and do
+        ! not raise amr_loc_n; only the remainder grow
+        call s_amr_st_reserve(amr_loc_n + max(nneed - amr_loc_nfree, 0))
+
+    end subroutine s_amr_prereserve_stash
+
     impure subroutine s_amr_alloc_slot_stash(islot)
 
         integer, intent(in) :: islot
