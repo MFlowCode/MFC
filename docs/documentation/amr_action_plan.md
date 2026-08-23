@@ -7,7 +7,35 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
-## 2026-08-22 (late) — RING CLIP LANDED, CORRECT, AND WALL-REGRESSED (open hunt)
+## 2026-08-22 (final) — RING CLIP PARKED: an amdflang whole-image codegen regression
+
+**VERDICT: the clip is REVERTED (this commit) and PARKED pending a toolchain fix — the
+wall regression is NOT the clip's algorithm, it is the compiler.** Root cause, proven via
+rocprofv3 per-dispatch ISA records (logs/rcab3-k009): amdflang (AFAR 23.2.1) generates all
+device ISA in a whole-image link (`-flto-partitions`, cmake/MFCTargets.cmake), and adding
+the clip's 7 target regions deterministically degraded UNTOUCHED kernels' code — weno
+scratch 28→140 B (5x spill), the riemann solver's register file flipped into accumulation
+AGPRs (VGPR 128→40, AccVGPR 8→136), LDS 2048→2560 image-wide — making every compute
+kernel 2.4–4.5x slower (rhs 22.1→41 ms/call; np=4 wall 407→553 s). Reproduced
+deterministically in a second tree; partition-count-independent (`-flto-partitions=1`
+identical); constant from step one; both nodes. This is the same AGPR-blowup family as
+`~/work/software/weno-agpr-repro` (which fixed the SLICE variant in 23.2.1) — a NEW
+trigger in the same pipeline. Same-day diagnostics eliminated: node drift, map churn,
+mapping aliasing, DPM clocks, GPU sharing, MFC_DEBUG poison, amr_shl.
+
+**What survives the revert:** the clip's correctness is fully proven (output bit-identity
+at np=4 AND np=8 incl. hierarchy files, zero transport-assert trips, wire words −64 to
+−72%, gather family −33% at np=8) and the two-reviewer design (`amr_stepfill_ring_clip.md`)
+is implementation-complete at commits dc6d4129+bd85c792+a7970743 (this revert's parents).
+**Return trigger:** a toolchain drop whose 3-minute 5-step probe (dirs in
+logs/rcab2-0822 + rcab3-k009; HEAD rhs ≈ 22 ms/call bar) plus per-dispatch ISA stats
+(scratch/VGPR/LDS unchanged for untouched kernels) come back clean — then re-land the
+three commits and rerun the validation ladder (bit-identity, goldens, np=1 arm, MFC_DEBUG
+poison sweep, same-day A/B vs the 1.2x AMReX bar). Measurement rule from this episode,
+standing: any increment that adds/removes GPU kernels must include the ISA-stat probe —
+a wall A/B alone cannot distinguish algorithm cost from codegen lottery.
+
+## 2026-08-22 (late, superseded by the verdict above) — RING CLIP LANDED, CORRECT, AND WALL-REGRESSED (open hunt)
 
 **The ring clip (dc6d4129 + bd85c792 + a7970743) implements `amr_stepfill_ring_clip.md` in
 full and is CORRECT**: output bit-identity at np=4 AND np=8 vs the pre-clip binary

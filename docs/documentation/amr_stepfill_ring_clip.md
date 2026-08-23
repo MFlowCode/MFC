@@ -1,5 +1,15 @@
 # Ring-clipping the runtime fill gathers
 
+> **STATUS 2026-08-22: IMPLEMENTED, PROVEN CORRECT, and PARKED (reverted) on an amdflang
+> whole-image codegen regression — NOT on any defect of this design.** The implementation
+> (commits dc6d4129 + bd85c792 + a7970743, reverted immediately after) passed the full
+> correctness bar: output bit-identity at np=4 and np=8, zero transport-assert trips,
+> wire words −64 to −72%, gather family −33% at np=8. But adding its 7 target regions
+> made amdflang's whole-image device link deterministically regenerate UNTOUCHED kernels
+> with 2.4–4.5x worse ISA (weno 5x scratch, riemann VGPR→AGPR flip, LDS 2048→2560
+> image-wide). Verdict, evidence, and the re-landing trigger: `amr_action_plan.md`
+> "2026-08-22 (final)".
+
 **Target:** the step-fill gather family = 14.3% of np=8 wall (185.8 s post-step-2 on
 k004-001), whose words are **71.2% provably dead** (`[amr-cov]`, logs/p1gate-0822_1259:
 48.2e9 of 67.7e9 words at np=8). The ghost-fill kernel reads only `floor(f/rr) +- 1`
