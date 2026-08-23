@@ -681,7 +681,8 @@ contains
     !> Initialize the global parameters module
     impure subroutine s_initialize_global_parameters_module
 
-        integer :: i, j, k
+        integer :: i, j
+        integer :: k
         integer :: fac
 
         #:if not MFC_CASE_OPTIMIZATION
