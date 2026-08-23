@@ -7,6 +7,27 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 (5) — I1b-gather LANDED: identity headers live on F1/F2/F3, tripwire proven
+
+Per the binding in amr_plan_based_exchange.md: `XA_NH` (8 under MFC_DEBUG, else 0) +
+`s_xa_hdr_pack`/`s_xa_hdr_check` in m_amr_xchg_audit; every gather-trio wire site
+prepends [site, blk, bl, bh] to its payload and the receiver verifies before unpacking.
+Device pack/unpack kernels are UNTOUCHED (offset via argument slices) — no codegen-lottery
+exposure; production arithmetic adds +0 everywhere. `[amr-xa]` records payload words only,
+so its baselines stay comparable across debug/production.
+
+GATES, all passed: (1) production build 75/75 AMR goldens; (2) debug live-header probe —
+5-step np=8 S0, headers verified on all 858 F1 + 1646 F2 messages, zero mismatches,
+[amr-xa] send==recv exact in every family; (3) SEEDED-BUG counterfactual — consume order
+reversed locally, headers aborted with the full diagnostic (expected-vs-got slab), seed
+reverted. The tiling assert (I1b's other half) needs the plan builder's periodic-wrap
+analysis first and rides with I2 prep. Remaining families get headers with their
+conversion increments (F5/F6 with I5, F7 with I5b). Ops note: a fresh build VARIANT
+configured without FC bakes gfortran into its CMakeCache and every retry reuses it
+(rc=143, looks like a SIGTERM race) — purge build/staging/<variant> and verify FC inline.
+
+**I2 (F1+F3 plans, ~600 LOC) is now unblocked and next.**
+
 ## 2026-08-23 (4) — T1 RE-PRICED AT int=20: I2 is the program's highest-value increment
 
 Against the int=20 np=8 steady budget, the plan-based-exchange ladder re-prices as:
