@@ -1387,17 +1387,22 @@ contains
         ! overlap-copy's per-(k,kk) index guard skips every cell of a non-overlapping pair. No-op at np=1 (single owner, local).
         if (num_procs > 1) then
             block
-                integer               :: kk, k2, ii, gi, gj, gk, idx2, ierr2, rr, maxcnt, nrq
-                integer               :: cnt(np_l)
+                integer               :: kk, k2, ii, gi, gj, gk, idx2, ierr2, rr, nrq
+                integer               :: cnt(np_l), scol(np_l), rcol(np_l)
+                integer               :: nsnd, nrcv, nsreq, maxsnd, maxrcv
                 logical               :: getk(np_l), isdest(0:num_procs - 1)
                 real(wp), allocatable :: spack(:,:), rpack(:,:)
                 integer, allocatable  :: rq(:)
-                maxcnt = 0
+                ! I4a right-sizing: pack/request pools sized to the blocks ACTUALLY sent/received, not old_np columns of the
+                ! largest block each plus an O(old_np x ranks) request array - at production counts those allocated GBs per
+                ! regrid for a handful of live columns. Message set, sizes, tags, and order are UNCHANGED (byte-exact gate:
+                ! identical [amr-xa] F4 totals).
+                nrcv = 0; maxrcv = 0
                 do kk = 1, old_np
                     cnt(kk) = sys_size*(old_ext(1, kk) + 1)*(old_ext(2, kk) + 1)*(old_ext(3, kk) + 1)
-                    maxcnt = max(maxcnt, cnt(kk))
                     ! I need old block kk iff I own a NEW block overlapping it (and do not already hold kk locally)
                     getk(kk) = .false.
+                    rcol(kk) = 0
                     if (.not. old_owns(kk)) then
                         do k2 = 1, nboxes
                             if (amr_block_owner(f_l0_slot(k2)) == proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, &
@@ -1406,22 +1411,14 @@ contains
                             end if
                         end do
                     end if
+                    if (getk(kk)) then
+                        nrcv = nrcv + 1; rcol(kk) = nrcv; maxrcv = max(maxrcv, cnt(kk))
+                    end if
                 end do
-                ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the rebuild's early-free or
-                ! the reconcile below) - STASH-ONLY: a replica never touches q_prim/rhs, and full slots across the np-scaled
-                ! replica set of a migration-heavy regrid are what OOMed the W8 gate's np=4 arm
+                ! pre-pass over my owned blocks: which are sent anywhere, and how many sends in total (sizes rq exactly)
+                nsnd = 0; nsreq = 0; maxsnd = 0
                 do kk = 1, old_np
-                    if (getk(kk)) call s_amr_alloc_slot_stash(f_l0_slot(kk))
-                end do
-                allocate (rq(old_np*num_procs), spack(max(maxcnt, 1), old_np), rpack(max(maxcnt, 1), old_np))
-                nrq = 0
-                do kk = 1, old_np  ! post receives for the old blocks I need
-                    if (.not. getk(kk)) cycle
-                    nrq = nrq + 1
-                    call s_xa_rec(XA_F4_RCV, 2, cnt(kk), kk)
-                    call MPI_IRECV(rpack(1, kk), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
-                end do
-                do kk = 1, old_np  ! pack + send each old block I own to every distinct new-owner (/= me) overlapping it
+                    scol(kk) = 0
                     if (.not. old_owns(kk)) cycle
                     isdest = .false.
                     do k2 = 1, nboxes
@@ -1430,6 +1427,31 @@ contains
                             & kk))) isdest(rr) = .true.
                     end do
                     if (.not. any(isdest)) cycle
+                    nsnd = nsnd + 1; scol(kk) = nsnd; maxsnd = max(maxsnd, cnt(kk))
+                    nsreq = nsreq + count(isdest)
+                end do
+                ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the rebuild's early-free or
+                ! the reconcile below) - STASH-ONLY: a replica never touches q_prim/rhs, and full slots across the np-scaled
+                ! replica set of a migration-heavy regrid are what OOMed the W8 gate's np=4 arm
+                do kk = 1, old_np
+                    if (getk(kk)) call s_amr_alloc_slot_stash(f_l0_slot(kk))
+                end do
+                allocate (rq(max(nsreq + nrcv, 1)), spack(max(maxsnd, 1), max(nsnd, 1)), rpack(max(maxrcv, 1), max(nrcv, 1)))
+                nrq = 0
+                do kk = 1, old_np  ! post receives for the old blocks I need
+                    if (.not. getk(kk)) cycle
+                    nrq = nrq + 1
+                    call s_xa_rec(XA_F4_RCV, 2, cnt(kk), kk)
+                    call MPI_IRECV(rpack(1, rcol(kk)), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
+                end do
+                do kk = 1, old_np  ! pack + send each old block I own to every distinct new-owner (/= me) overlapping it
+                    if (scol(kk) == 0) cycle  ! not mine, or no remote destination (pre-pass above)
+                    isdest = .false.
+                    do k2 = 1, nboxes
+                        rr = amr_block_owner(f_l0_slot(k2))
+                        if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:, &
+                            & kk))) isdest(rr) = .true.
+                    end do
                     amr_mig_blk = amr_mig_blk + 1_8
                     idx2 = 0
                     do ii = 1, sys_size
@@ -1437,7 +1459,7 @@ contains
                             do gj = 0, old_ext(2, kk)
                                 do gi = 0, old_ext(1, kk)
                                     idx2 = idx2 + 1
-                                    spack(idx2, kk) = real(amr_stor_st(gi, gj, gk, ii, amr_loc_of(f_l0_slot(kk))), wp)
+                                    spack(idx2, scol(kk)) = real(amr_stor_st(gi, gj, gk, ii, amr_loc_of(f_l0_slot(kk))), wp)
                                 end do
                             end do
                         end do
@@ -1448,7 +1470,7 @@ contains
                         amr_mig_snd = amr_mig_snd + 1_8
                         amr_gb_mig = amr_gb_mig + int(cnt(kk), 8)*8_8
                         call s_xa_rec(XA_F4_SND, 1, cnt(kk), kk)
-                        call MPI_ISEND(spack(1, kk), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
+                        call MPI_ISEND(spack(1, scol(kk)), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
                     end do
                 end do
                 call s_phase_tic(PH_MGWAIT)
@@ -1462,7 +1484,7 @@ contains
                             do gj = 0, old_ext(2, kk)
                                 do gi = 0, old_ext(1, kk)
                                     idx2 = idx2 + 1
-                                    amr_stor_st(gi, gj, gk, ii, amr_loc_of(f_l0_slot(kk))) = real(rpack(idx2, kk), stp)
+                                    amr_stor_st(gi, gj, gk, ii, amr_loc_of(f_l0_slot(kk))) = real(rpack(idx2, rcol(kk)), stp)
                                 end do
                             end do
                         end do
