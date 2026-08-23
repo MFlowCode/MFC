@@ -6276,11 +6276,6 @@ contains
 
     end subroutine s_amr_st_finalize
 
-    !> Assign slot islot a dense store index WITHOUT the per-block field arrays: a migration REPLICA only ever has its amr_stor_st
-    !! slot written (receive-unpack) and read (the rebuild's overlap carry-forward), so q_prim/rhs would roughly double its device
-    !! cost across the np-scaled replica set of a migration-heavy regrid (the W8 gate's np=4 arm OOMed on exactly that storm).
-    !! s_amr_alloc_slot upgrades a stash-only slot in place when the same global slot becomes an owned block; s_amr_free_slot
-    !! handles both flavors.
     !> One-shot pre-reserve before a batch of s_amr_alloc_slot_stash calls: grows the store AT MOST ONCE, to the batch's exact final
     !! size, instead of once per 8-16 incrementally allocated slots. Every growth restages the WHOLE store (both arrays) through the
     !! host (s_amr_st_reserve), so a migration wave allocating tens of replica slots pays that restage repeatedly without this.
@@ -6301,6 +6296,11 @@ contains
 
     end subroutine s_amr_prereserve_stash
 
+    !> Assign slot islot a dense store index WITHOUT the per-block field arrays: a migration REPLICA only ever has its amr_stor_st
+    !! slot written (receive-unpack) and read (the rebuild's overlap carry-forward), so q_prim/rhs would roughly double its device
+    !! cost across the np-scaled replica set of a migration-heavy regrid (the W8 gate's np=4 arm OOMed on exactly that storm).
+    !! s_amr_alloc_slot upgrades a stash-only slot in place when the same global slot becomes an owned block; s_amr_free_slot
+    !! handles both flavors.
     impure subroutine s_amr_alloc_slot_stash(islot)
 
         integer, intent(in) :: islot
