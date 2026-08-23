@@ -109,7 +109,6 @@ And a high-amplitude acoustic wave reflecting and emerging through a circular or
 | `./mfc.sh validate case.py` | Check a case file for errors before running |
 | `./mfc.sh new my_case` | Create a new case from a template |
 | `./mfc.sh clean` | Remove build artifacts |
-| `./mfc.sh interactive` | Launch interactive menu-driven interface |
 
 Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`new` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/examples.html)).
 
@@ -280,11 +279,11 @@ MFC computations have been run on many supercomputing systems. A partial list is
 ---
 
 <p align="center">
-  <a href="https://star-history.com/#MFlowCode/MFC&Date">
+  <a href="https://star-history.dera.page/#MFlowCode/MFC&Date">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" />
-      <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+      <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date" />
+      <img src="https://star-history.dera.page/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
     </picture>
   </a>
 </p>

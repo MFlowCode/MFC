@@ -12,6 +12,7 @@ Based on the constraints enforced in:
 - src/post_process/m_checker.fpp
 """
 
+import math
 import re
 from functools import lru_cache
 from typing import Any, Dict, List, Set
@@ -79,6 +80,14 @@ PHYSICS_DOCS = {
         "category": "Domain and Geometry",
         "math": r"m > 0, \quad n \geq 0, \quad p \geq 0",
         "explanation": ("The x-direction must have cells. Cannot have z without y. Cylindrical coordinates require odd p."),
+    },
+    "check_domain_extents": {
+        "title": "Domain Extents Specified",
+        "category": "Domain and Geometry",
+        "math": r"m > 0 \Rightarrow x_{\mathrm{beg}}, x_{\mathrm{end}} \ \mathrm{set}",
+        "explanation": (
+            "Every dimension that has cells needs its physical extents so that the grid can be generated. Skipped on restarts (old_grid = T), where the mesh is read from the existing grid files."
+        ),
     },
     "check_patch_within_domain": {
         "title": "Patch Within Domain",
@@ -170,7 +179,7 @@ PHYSICS_DOCS = {
     "check_hypoelasticity": {
         "title": "Hypoelasticity",
         "category": "Feature Compatibility",
-        "explanation": "Requires model_eqns = 2, HLL Riemann solver.",
+        "explanation": "Requires model_eqns = 2, HLL/HLLC/HLLD Riemann solver.",
     },
     "check_phase_change": {
         "title": "Phase Change",
@@ -180,7 +189,7 @@ PHYSICS_DOCS = {
     "check_alt_soundspeed": {
         "title": "Alternative Sound Speed",
         "category": "Feature Compatibility",
-        "explanation": "Requires model_eqns = 2, num_fluids 2 or 3, HLLC solver. Incompatible with bubbles.",
+        "explanation": "Requires model_eqns = 2, exactly two fluid components, HLL/HLLC/HLLD solver. Incompatible with bubbles.",
     },
     "check_igr": {
         "title": "Iterative Generalized Riemann (IGR)",
@@ -203,6 +212,16 @@ PHYSICS_DOCS = {
         ),
         "references": ["Papanastasiou87"],
         "docs_section": "sec-non-newtonian",
+    },
+    # Forcing
+    "check_synthetic_turbulence": {
+        "title": "Synthetic Turbulence Forcing",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "num_turbulent_sources must be > 0 and <= num_turb_sources_max. Each active forcing zone i needs "
+            "turb_pos(i,d) set and synth_L(i,d) > 0 for every active dimension d (d = 1..num_dims); components "
+            "beyond num_dims are unused and not required."
+        ),
     },
     # Acoustic Sources
     "check_acoustic_source": {
@@ -318,12 +337,6 @@ class CaseValidator:
             self.get("recon_type", 1) not in _recon_choices,
             f"recon_type must be one of {_recon_shown}",
         )
-
-        # Required domain parameters when m > 0
-        m = self.get("m")
-        if m is not None and m > 0:
-            self.prohibit(not self.is_set("x_domain%beg"), "x_domain%beg must be set when m > 0")
-            self.prohibit(not self.is_set("x_domain%end"), "x_domain%end must be set when m > 0")
 
     # Common Checks (All Stages)
 
@@ -576,24 +589,73 @@ class CaseValidator:
         hypoelasticity = self.get("hypoelasticity", "F") == "T"
         model_eqns = self.get("model_eqns")
         riemann_solver = self.get("riemann_solver")
+        riemann_hypo_ADC = self.get("riemann_hypo_ADC", "F") == "T"
+        hypo_hll_interface_rhs = self.get("hypo_hll_interface_rhs", "F") == "T"
+        self.prohibit(riemann_hypo_ADC and not hypoelasticity, "riemann_hypo_ADC requires hypoelasticity to be enabled")
+        self.prohibit(hypo_hll_interface_rhs and not hypoelasticity, "hypo_hll_interface_rhs requires hypoelasticity to be enabled")
 
         if not hypoelasticity:
             return
 
         self.prohibit(model_eqns is not None and model_eqns != 2, "hypoelasticity requires model_eqns = 2")
-        self.prohibit(riemann_solver is not None and riemann_solver != 1, "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
+        self.prohibit(riemann_solver is not None and riemann_solver not in [1, 2, 4], "hypoelasticity requires HLL (1), HLLC (2), or HLLD (4) Riemann solver")
+        self.prohibit(riemann_hypo_ADC and riemann_solver is not None and riemann_solver not in [2, 4], "riemann_hypo_ADC only applies to HLLC (2) or HLLD (4)")
+        self.prohibit(hypo_hll_interface_rhs and riemann_solver is not None and riemann_solver != 1, "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
+        viscous = self.get("viscous", "F") == "T"
+        surface_tension = self.get("surface_tension", "F") == "T"
+        self.prohibit(riemann_solver == 4 and viscous, "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
+        self.prohibit(riemann_solver == 4 and surface_tension, "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
+        cont_damage = self.get("cont_damage", "F") == "T"
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
+        mhd = self.get("mhd", "F") == "T"
+        n = self.get("n", 0)
+        p = self.get("p", 0)
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+        num_fluids = self.get("num_fluids")
+        alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
+        self.prohibit(cyl_coord and p > 0, "3D cylindrical hypoelasticity is not supported")
+        self.prohibit(riemann_solver == 4 and n == 0, "HLLD hypoelasticity requires at least 2D (n > 0)")
+        self.prohibit(riemann_solver == 4 and num_fluids is not None and num_fluids != 2, "HLLD hypoelasticity requires exactly 2 fluid components")
+        self.prohibit(alt_soundspeed and num_fluids is not None and num_fluids != 2, "hypoelastic alt_soundspeed requires exactly 2 fluid components")
+        self.prohibit(mhd, "MHD and hypoelasticity cannot be enabled together")
+        self.prohibit(bubbles_euler, "Hypoelasticity does not support Euler-Euler bubbles")
+        self.prohibit(riemann_solver == 4 and cont_damage, "HLLD hypoelasticity does not support continuum damage (the dual-pass does not damage-scale the shear modulus)")
+        self.prohibit(riemann_solver == 4 and chemistry, "HLLD hypoelasticity does not support chemistry")
+        self.prohibit(
+            riemann_hypo_ADC and (bubbles_euler or surface_tension or chemistry or cont_damage),
+            "riemann_hypo_ADC does not support bubbles, surface tension, chemistry, or continuum damage (the ADC HLL blend omits their flux components)",
+        )
+        fd_order = self.get("fd_order")
+        wave_speeds = self.get("wave_speeds")
+        low_Mach = self.get("low_Mach", 0)
+        ADC_kappa = self.get("ADC_kappa")
+        cfl_const_dt = self.get("cfl_const_dt", "F") == "T"
+        cfl_adap_dt = self.get("cfl_adap_dt", "F") == "T"
+        self.prohibit(fd_order is None, "hypoelasticity requires fd_order to be set (1, 2, or 4); the finite-difference coefficients are initialized unconditionally")
+        self.prohibit(wave_speeds == 2, "Pressure-based wave speeds (wave_speeds = 2) omit the elastic longitudinal speed and are not supported with hypoelasticity")
+        self.prohibit(riemann_hypo_ADC and low_Mach > 0, "riemann_hypo_ADC does not support low_Mach (the ADC HLL reference flux uses pre-correction velocities)")
+        self.prohibit(riemann_hypo_ADC and ADC_kappa is not None and ADC_kappa <= 0, "ADC_kappa must be positive")
+        self.prohibit(
+            cfl_const_dt or cfl_adap_dt, "Automatic CFL time stepping uses the acoustic sound speed only and does not bound the elastic characteristic speed; set dt explicitly for hypoelastic runs"
+        )
 
     def check_phase_change(self):
         """Checks constraints on phase change parameters"""
         relax = self.get("relax", "F") == "T"
         relax_model = self.get("relax_model")
         model_eqns = self.get("model_eqns")
+        num_fluids = self.get("num_fluids")
         palpha_eps = self.get("palpha_eps")
         ptgalpha_eps = self.get("ptgalpha_eps")
 
         if not relax:
             return
 
+        self.prohibit(
+            num_fluids is None or num_fluids < 2,
+            "phase change requires num_fluids >= 2 (liquid = 1, vapor = 2)",
+        )
         self.prohibit(
             (model_eqns not in (2, 3) or (model_eqns == 2 and relax_model not in (5, 6)) or (model_eqns == 3 and relax_model not in (1, 4, 5, 6))),
             "phase change requires model_eqns==2 with relax_model in [5,6] or model_eqns==3 with relax_model in [1,4,5,6]",
@@ -611,6 +673,7 @@ class CaseValidator:
         num_particle_clouds = self.get("num_particle_clouds", 0) or 0
 
         ib_state_wrt = self.get("ib_state_wrt", "F") == "T"
+        many_ib_patch_parallelism = self.get("many_ib_patch_parallelism", "F") == "T"
 
         fd_order = self.get("fd_order")
         self.prohibit(ib and fd_order is None, "fd_order must be specified for ib")
@@ -627,6 +690,7 @@ class CaseValidator:
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
+        self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
@@ -781,12 +845,20 @@ class CaseValidator:
         low_Mach = self.get("low_Mach", 0)
         cyl_coord = self.get("cyl_coord", "F") == "T"
         viscous = self.get("viscous", "F") == "T"
+        hll_u_interface = self.get("hll_u_interface", "F") == "T"
 
         self.prohibit(riemann_solver is None, "riemann_solver must be specified (1=HLL, 2=HLLC, 4=HLLD, 5=Lax-Friedrichs)")
         if riemann_solver is None:
             return
 
         self.prohibit(riemann_solver not in [1, 2, 4, 5], "riemann_solver must be 1 (HLL), 2 (HLLC), 4 (HLLD), or 5 (Lax-Friedrichs)")
+        self.prohibit(hll_u_interface and riemann_solver != 1, "hll_u_interface requires HLL Riemann solver (riemann_solver = 1)")
+        mhd = self.get("mhd", "F") == "T"
+        surface_tension = self.get("surface_tension", "F") == "T"
+        self.prohibit(hll_u_interface and mhd, "HLL Method 2 does not support MHD (the MHD path zeroes the shared interface-velocity trace)")
+        self.prohibit(riemann_solver == 1 and hll_u_interface and cyl_coord and self.get("p", 0) > 0, "HLL Method 2 is not supported for 3D cylindrical geometry")
+        self.prohibit(surface_tension and riemann_solver == 1 and not hll_u_interface, "surface_tension requires a shared interface-velocity representation (HLL Method 2 or HLLC)")
+        self.prohibit(surface_tension and riemann_solver == 5, "surface_tension requires a shared interface-velocity representation (HLL Method 2 or HLLC)")
         self.prohibit(riemann_solver != 2 and model_eqns == 3, "6-equation model (model_eqns = 3) requires riemann_solver = 2 (HLLC)")
         self.prohibit(wave_speeds is not None and wave_speeds not in [1, 2], "wave_speeds must be 1 or 2")
         self.prohibit(avg_state is not None and avg_state not in [1, 2], "avg_state must be 1 or 2")
@@ -795,13 +867,14 @@ class CaseValidator:
         self.prohibit(low_Mach not in [0, 1, 2], "low_Mach must be 0, 1, or 2")
         self.prohibit(riemann_solver != 2 and low_Mach == 2, "low_Mach = 2 requires riemann_solver = 2")
         self.prohibit(low_Mach != 0 and model_eqns not in [2, 3], "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
+        self.prohibit(riemann_solver == 4 and wave_speeds == 2, "HLLD uses its own direct wave-speed estimates; wave_speeds = 2 is not supported")
+        self.prohibit(riemann_solver == 4 and low_Mach > 0, "low_Mach corrections are not implemented for HLLD")
         self.prohibit(riemann_solver == 5 and cyl_coord and viscous, "Lax Friedrichs with cylindrical viscous flux not supported")
 
     def check_time_stepping(self):
         """Checks time stepping parameters (simulation/post-process)"""
         cfl_dt = self.get("cfl_dt", "F") == "T"
         cfl_adap_dt = self.get("cfl_adap_dt", "F") == "T"
-        adap_dt = self.get("adap_dt", "F") == "T"
         time_stepper = self.get("time_stepper")
 
         # Check time_stepper bounds
@@ -840,10 +913,13 @@ class CaseValidator:
         )
 
         if not variable_dt:
-            # dt is required in pure fixed dt mode (not cfl_dt, not cfl_adap_dt)
-            # adap_dt mode uses dt as initial value, so it's optional
+            # dt is required whenever stepping is not CFL-driven. adap_dt is not an
+            # exemption: it uses dt as its initial value, and the Fortran checked
+            # `if (.not. cfl_dt) dt <= 0`, which fired on the dflt_real sentinel when
+            # dt was left unset. Cases that genuinely need no dt set cfl_adap_dt
+            # instead, which lands in the variable_dt branch above.
             uses_fixed_stepping = self.is_set("t_step_start") or self.is_set("t_step_stop")
-            self.prohibit(uses_fixed_stepping and not adap_dt and not self.is_set("dt"), "dt must be set when using fixed time stepping (t_step_start/t_step_stop)")
+            self.prohibit(uses_fixed_stepping and not self.is_set("dt"), "dt must be set when using fixed time stepping (t_step_start/t_step_stop)")
 
     def check_finite_difference(self):
         """Checks constraints on finite difference parameters"""
@@ -938,8 +1014,45 @@ class CaseValidator:
         self.prohibit(avg_state is not None and avg_state != 2, "Bubble modeling requires arithmetic average (avg_state = 2)")
         self.prohibit(model_eqns == 2 and bubble_model == 1, "The 5-equation bubbly flow model does not support bubble_model = 1 (Gilmore)")
 
+    def check_synthetic_turbulence(self):
+        """Checks constraints on synthetic-turbulence forcing zones (simulation)"""
+        if self.get("synthetic_turbulence", "F") != "T":
+            return
+
+        num_turbulent_sources = self.get("num_turbulent_sources", 0) or 0
+        self.prohibit(num_turbulent_sources <= 0, "num_turbulent_sources must be > 0 when synthetic_turbulence is enabled")
+
+        num_turb_sources_max = get_fortran_constants().get("num_turb_sources_max", 10)
+        self.prohibit(
+            num_turbulent_sources > num_turb_sources_max,
+            f"num_turbulent_sources must be <= {num_turb_sources_max} (num_turb_sources_max in m_constants.fpp)",
+        )
+
+        # Each active zone needs a position and a positive extent in every active
+        # dimension; the Fortran loops d = 1, num_dims, so trailing components of a
+        # lower-dimensional case are not required.
+        num_dims = 3 if (self.get("p", 0) or 0) > 0 else (2 if (self.get("n", 0) or 0) > 0 else 1)
+        for i in range(1, min(num_turbulent_sources, num_turb_sources_max) + 1):
+            for d in range(1, num_dims + 1):
+                self.prohibit(
+                    not self.is_set(f"turb_pos({i},{d})"),
+                    f"turb_pos({i},{d}) must be specified for all num_dims when synthetic_turbulence is enabled",
+                )
+                synth_l = self.get(f"synth_L({i},{d})")
+                self.prohibit(
+                    synth_l is None or (self._is_numeric(synth_l) and synth_l <= 0),
+                    f"synth_L({i},{d}) must be positive for all num_dims when synthetic_turbulence is enabled",
+                )
+
     def check_body_forces(self):
         """Checks constraints on body forces parameters"""
+        # Spatially supported forcing writes mom%beg and mom%beg+1 directly, so it is
+        # only defined for a 2D domain (n > 0 with p == 0).
+        bf_spatial_support = self.get("bf_spatial_support", "F") == "T"
+        n = self.get("n", 0) or 0
+        p = self.get("p", 0) or 0
+        self.prohibit(bf_spatial_support and (n == 0 or p != 0), "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
+
         for dir in ["x", "y", "z"]:
             bf = self.get(f"bf_{dir}", "F") == "T"
 
@@ -1055,7 +1168,8 @@ class CaseValidator:
 
         self.prohibit(mhd and riemann_solver is not None and riemann_solver not in [1, 4], "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
         self.prohibit(mhd and wave_speeds is not None and wave_speeds == 2, "MHD requires wave_speeds = 1")
-        self.prohibit(riemann_solver == 4 and not mhd, "HLLD (riemann_solver = 4) is only available for MHD simulations")
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
+        self.prohibit(riemann_solver == 4 and not mhd and not hypoelasticity, "HLLD (riemann_solver = 4) requires MHD or hypoelasticity")
         self.prohibit(riemann_solver == 4 and relativity, "HLLD is not available for RMHD (relativity)")
         self.prohibit(hyper_cleaning and not mhd, "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0, "Hyperbolic cleaning is not supported for 1D simulations")
@@ -1289,12 +1403,19 @@ class CaseValidator:
         avg_state = self.get("avg_state")
         riemann_solver = self.get("riemann_solver")
         num_fluids = self.get("num_fluids")
+        hll_u_interface = self.get("hll_u_interface", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+        p = self.get("p", 0)
 
         self.prohibit(model_eqns is not None and model_eqns != 2, "5-equation model (model_eqns = 2) is required for alt_soundspeed")
         self.prohibit(bubbles_euler, "alt_soundspeed is not compatible with bubbles_euler")
         self.prohibit(avg_state is not None and avg_state != 2, "alt_soundspeed requires avg_state = 2")
-        self.prohibit(riemann_solver is not None and riemann_solver != 2, "alt_soundspeed requires HLLC Riemann solver (riemann_solver = 2)")
-        self.prohibit(num_fluids is not None and num_fluids not in [2, 3], "alt_soundspeed requires num_fluids = 2 or 3")
+        self.prohibit(riemann_solver is not None and riemann_solver not in [1, 2, 4], "alt_soundspeed requires HLL (1), HLLC (2), or HLLD (4) Riemann solver")
+        self.prohibit(num_fluids is not None and num_fluids != 2, "alt_soundspeed requires exactly 2 fluid components (the Kapila K coefficient is a two-fluid closure)")
+        self.prohibit(riemann_solver == 1 and not hll_u_interface and cyl_coord and p == 0, "alt_soundspeed with HLL Method 1 is not supported for 2D axisymmetric geometry")
+        self.prohibit(riemann_solver == 1 and cyl_coord and p > 0, "alt_soundspeed with HLL is not currently supported for 3D cylindrical geometry")
+        self.prohibit(riemann_solver == 4 and not hypoelasticity, "alt_soundspeed with HLLD requires hypoelasticity = T")
 
     def check_bubbles_lagrange(self):
         """Checks Lagrangian bubble parameters (simulation)"""
@@ -1342,11 +1463,13 @@ class CaseValidator:
         cont_damage_s = self.get("cont_damage_s")
         alpha_bar = self.get("alpha_bar")
         model_eqns = self.get("model_eqns")
+        alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
 
         self.prohibit(tau_star is None, "tau_star must be specified for cont_damage")
         self.prohibit(cont_damage_s is None, "cont_damage_s must be specified for cont_damage")
         self.prohibit(alpha_bar is None, "alpha_bar must be specified for cont_damage")
         self.prohibit(model_eqns is not None and model_eqns != 2, "cont_damage requires model_eqns = 2")
+        self.prohibit(alt_soundspeed, "Continuum damage does not support alt_soundspeed")
 
     def check_grcbc(self):
         """Checks Generalized Relaxation Characteristics BC (simulation)"""
@@ -1366,16 +1489,12 @@ class CaseValidator:
             if grcbc_vel_out:
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow Velocity (grcbc_vel_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
 
-    def check_probe_integral_output(self):
-        """Checks probe and integral output requirements (simulation)"""
+    def check_probe_output(self):
+        """Checks probe output requirements (simulation)"""
         probe_wrt = self.get("probe_wrt", "F") == "T"
-        integral_wrt = self.get("integral_wrt", "F") == "T"
         fd_order = self.get("fd_order")
-        bubbles_euler = self.get("bubbles_euler", "F") == "T"
 
         self.prohibit(probe_wrt and fd_order is None, "fd_order must be specified for probe_wrt")
-        self.prohibit(integral_wrt and fd_order is None, "fd_order must be specified for integral_wrt")
-        self.prohibit(integral_wrt and not bubbles_euler, "integral_wrt requires bubbles_euler to be enabled")
 
     # Pre-Process Specific Checks
 
@@ -1395,6 +1514,31 @@ class CaseValidator:
             num_patches > num_patches_max,
             f"num_patches must be <= {num_patches_max} (num_patches_max in m_constants.fpp)",
         )
+
+    def check_domain_extents(self):
+        """Checks that the physical extents of every active dimension are set (pre-process)
+
+        The grid generator needs (xyz)_domain%beg and (xyz)_domain%end for each
+        dimension that has cells. On a restart (old_grid = T) the mesh is read
+        from the existing grid files, so the extents are neither needed nor read.
+        """
+        if self.get("old_grid", "F") == "T":
+            return
+
+        m = self.get("m", 0)
+        if self._is_numeric(m) and m > 0:
+            self.prohibit(not self.is_set("x_domain%beg"), "x_domain%beg must be set when m > 0")
+            self.prohibit(not self.is_set("x_domain%end"), "x_domain%end must be set when m > 0")
+
+        n = self.get("n", 0)
+        if self._is_numeric(n) and n > 0:
+            self.prohibit(not self.is_set("y_domain%beg"), "y_domain%beg must be set when n > 0")
+            self.prohibit(not self.is_set("y_domain%end"), "y_domain%end must be set when n > 0")
+
+        p = self.get("p", 0)
+        if self._is_numeric(p) and p > 0:
+            self.prohibit(not self.is_set("z_domain%beg"), "z_domain%beg must be set when p > 0")
+            self.prohibit(not self.is_set("z_domain%end"), "z_domain%end must be set when p > 0")
 
     def check_qbmm_pre_process(self):
         """Checks QBMM constraints for pre-process"""
@@ -1516,6 +1660,31 @@ class CaseValidator:
         qbmm = self.get("qbmm", "F") == "T"
         self.prohibit(chemistry and (bubbles_euler or qbmm), "chemistry is not currently supported with Euler bubbles (bubbles_euler / qbmm)")
 
+        # Operator-split reaction sub-stepping. The Fortran defaults are
+        # reaction_substeps = reaction_substeps_max = 0 and adap_substeps = F, so an
+        # unset value is treated as 0 here to match.
+        igr = self.get("igr", "F") == "T"
+        adap_substeps = self.get("chem_params%adap_substeps", "F") == "T"
+        reaction_substeps = self.get("chem_params%reaction_substeps", 0) or 0
+        reaction_substeps_max = self.get("chem_params%reaction_substeps_max", 0) or 0
+
+        self.prohibit(
+            chemistry and reaction_substeps < 0,
+            "chem_params%reaction_substeps must be >= 0 (0 = reaction source in the flow RHS; > 0 = operator-split sub-stepping)",
+        )
+        self.prohibit(
+            chemistry and igr and reaction_substeps > 0,
+            "operator-split reaction sub-stepping (reaction_substeps > 0) is not supported with igr: the reactor reads the post-flow (rho, e, T) state, which the IGR update path does not guarantee",
+        )
+        self.prohibit(
+            chemistry and adap_substeps and reaction_substeps < 1,
+            "chem_params%adap_substeps requires reaction_substeps >= 1 (the operator-split floor)",
+        )
+        self.prohibit(
+            chemistry and adap_substeps and reaction_substeps_max < reaction_substeps,
+            "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
+        )
+
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
@@ -1556,9 +1725,35 @@ class CaseValidator:
         reactive_burn = self.get("reactive_burn", "F") == "T"
         if not reactive_burn:
             return
+        # These mirror Fortran checks that compared against the dflt_real / dflt_int
+        # sentinels, so an unset parameter was a violation there. A bare
+        # "is not None" guard would silently pass the unset case instead.
         model_eqns = self.get("model_eqns")
         # Supported on the 5-equation (pressure-equilibrium) and 6-equation multi-fluid models.
-        self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "reactive_burn requires model_eqns = 2 or 3 (5- or 6-equation multi-fluid model)")
+        self.prohibit(model_eqns not in (2, 3), "reactive_burn requires model_eqns = 2 or 3 (5- or 6-equation multi-fluid model) to be set")
+
+        # Exactly two fluids (reactant = 1, product = 2) sharing the stiffened-gas EOS and
+        # differing only in qv; violating these silently corrupts the mass/energy balance.
+        self.prohibit(self.get("num_fluids") != 2, "reactive_burn requires num_fluids = 2 (reactant then product) to be set")
+        for prop in ("gamma", "pi_inf"):
+            v1 = self.get(f"fluid_pp(1)%{prop}")
+            v2 = self.get(f"fluid_pp(2)%{prop}")
+            if not self._is_numeric(v1) or not self._is_numeric(v2):
+                # Unset defaults to dflt_real in the solver, so a missing value is
+                # either a negative EOS or a mismatch against the fluid that is set.
+                self.prohibit(True, f"reactive_burn requires both fluid_pp(1)%{prop} and fluid_pp(2)%{prop} to be set (reactant and product share the EOS)")
+                continue
+            self.prohibit(
+                not math.isclose(v1, v2, rel_tol=1e-10),
+                f"reactive_burn requires fluid_pp(1)%{prop} == fluid_pp(2)%{prop} (reactant and product share the EOS)",
+            )
+        # qv defaults to 0 in the Fortran, so an unset value is treated as 0 here to match.
+        qv1 = self.get("fluid_pp(1)%qv", 0.0)
+        qv2 = self.get("fluid_pp(2)%qv", 0.0)
+        self.prohibit(
+            self._is_numeric(qv1) and self._is_numeric(qv2) and qv1 <= qv2,
+            "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)",
+        )
         # The rate uses rburn%k, %pign, %pref, %n directly; an unset value defaults to a negative
         # sentinel in the solver and silently corrupts the burn, so require each to be set.
         rk = self.get("rburn%k")
@@ -2319,6 +2514,7 @@ class CaseValidator:
         self.check_model_eqns_simulation()
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
+        self.check_synthetic_turbulence()
         self.check_viscosity()
         self.check_non_newtonian()
         self.check_mhd_simulation()
@@ -2329,12 +2525,13 @@ class CaseValidator:
         self.check_bubbles_lagrange()
         self.check_continuum_damage()
         self.check_grcbc()
-        self.check_probe_integral_output()
+        self.check_probe_output()
 
     def validate_pre_process(self):
         """Validate pre-process-specific parameters"""
         self.validate_common()
         self.check_restart()
+        self.check_domain_extents()
         self.check_qbmm_pre_process()
         self.check_parallel_io_pre_process()
         self.check_grid_stretching()

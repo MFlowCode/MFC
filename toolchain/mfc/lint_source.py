@@ -33,6 +33,36 @@ PRECISION_EXCLUDE_PATTERNS = {"nvtx", "precision_select"}
 # MPI proxy source directory -> params-registry target key
 MPI_PROXY_TARGETS = {"pre_process": "pre", "simulation": "sim", "post_process": "post"}
 
+# Checker subroutines whose every @:PROHIBIT depends on state the Python
+# validator cannot see: the active compiler, the MPI decomposition, or a value
+# Cantera fills in at runtime. Constraints between input parameters belong in
+# toolchain/mfc/case_validator.py instead -- see check_checker_input_constraints.
+#
+# Subroutines that mix runtime and input-only checks are deliberately NOT listed.
+# s_check_inputs_weno and s_check_inputs_muscl are the case in point: their
+# grid-extent checks need per-rank m/n/p, but the muscl_order/int_comp check that
+# used to sit alongside them was pure input, and allowlisting the subroutine would
+# have let its replacement back in unnoticed. Those lines carry an explicit
+# RUNTIME_CHECK_MARKER instead, so anything new added there is still flagged.
+RUNTIME_CHECKER_SUBROUTINES = {
+    # Compiler conditionals (#ifdef / #if guarded).
+    "s_check_amd",
+    "s_check_inputs_compilers",
+    "s_check_inputs_nvidia_uvm",
+    # MPI decomposition: n_global, num_procs_y/z.
+    "s_check_total_cells",
+    "s_check_inputs_fft",
+    # num_species is populated by Cantera at runtime.
+    "s_check_inputs_ib_injection",
+}
+
+# Opt out of check_checker_input_constraints for a single @:PROHIBIT.
+RUNTIME_CHECK_MARKER = "lint: runtime-check"
+
+# Fortran subroutine declaration, allowing any order of the prefixes MFC uses
+# (impure/pure/elemental/recursive/module) before the `subroutine` keyword.
+_SUBROUTINE_DECL = re.compile(r"(?:(?:impure|pure|elemental|recursive|module|non_recursive)\s+)*subroutine\s+(\w+)")
+
 
 def _is_comment_or_blank(stripped: str) -> bool:
     """True if stripped line is blank, a Fortran comment, or a Fypp directive."""
@@ -187,8 +217,15 @@ def check_double_precision(repo_root: Path) -> list[str]:
     """
     errors: list[str] = []
     src_dir = repo_root / SRC_DIR
+    # The d-literal alternative catches double-precision literals with a full
+    # mantissa and a signed or multi-digit exponent (5.0d-11, 101325.d0, .5d0,
+    # 1013.25d3), not just '[0-9]d0'. The boundaries keep it out of identifiers
+    # like cart2d12_coords and out of 'D' edit descriptors like (1D12.4).
     precision_re = re.compile(
-        r"\b(?:double_precision|double\s+precision|dsqrt|dexp|dlog|dble|dabs|" r"dprod|dmin|dmax|dfloat|dreal|dcos|dsin|dtan|dsign|dtanh|dsinh|dcosh)\b|" r"\breal\s*\(\s*[48]\s*\)|" r"[0-9]d0",
+        r"\b(?:double_precision|double\s+precision|dsqrt|dexp|dlog|dble|dabs|"
+        r"dprod|dmin|dmax|dfloat|dreal|dcos|dsin|dtan|dsign|dtanh|dsinh|dcosh)\b|"
+        r"\breal\s*\(\s*[48]\s*\)|"
+        r"(?<![A-Za-z0-9_.])(?:[0-9]+\.?[0-9]*|\.[0-9]+)[dD][-+]?[0-9]+(?![A-Za-z0-9_.])",
         re.IGNORECASE,
     )
 
@@ -260,6 +297,31 @@ def check_false_integers(repo_root: Path) -> list[str]:
             match = false_int_re.search(code)
             if match:
                 errors.append(f"  {rel}:{i + 1} bare integer with _wp kind '{match.group()}'. Fix: use a real literal (e.g. {match.group().replace('_wp', '.0_wp')})")
+
+    return errors
+
+
+def check_integer_wp(repo_root: Path) -> list[str]:
+    """Flag ``integer(wp)`` and ``integer(kind=wp)`` declarations.
+
+    ``wp`` is a floating-point kind parameter; using it as an integer kind is a
+    copy-paste error. Integers take the default kind: plain ``integer``.
+    """
+    errors: list[str] = []
+    src_dir = repo_root / SRC_DIR
+    integer_wp_re = re.compile(r"\binteger\s*\(\s*(?:kind\s*=\s*)?wp\s*\)", re.IGNORECASE)
+
+    for src in _fortran_fpp_files(src_dir):
+        lines = src.read_text(encoding="utf-8").splitlines()
+        rel = src.relative_to(repo_root)
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if _is_comment_or_blank(stripped):
+                continue
+            match = integer_wp_re.search(stripped.split("!")[0])
+            if match:
+                errors.append(f"  {rel}:{i + 1} '{match.group()}' uses a floating-point kind. Fix: use plain 'integer'")
 
     return errors
 
@@ -437,6 +499,105 @@ def check_manual_registry_bcasts(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_checker_input_constraints(repo_root: Path) -> list[str]:
+    """Keep input-only constraints out of the Fortran m_checker files.
+
+    Constraints between case-file parameters are enforced in
+    toolchain/mfc/case_validator.py, which runs before any binary is invoked.
+    Adding them to Fortran as well means the same rule is written twice, in two
+    languages, and the copies drift.
+
+    A @:PROHIBIT is allowed only inside a subroutine in
+    RUNTIME_CHECKER_SUBROUTINES, or under a "! lint: runtime-check <reason>"
+    comment. The marker applies to the next @:PROHIBIT, so blank lines, Fypp
+    directives, and further comments may sit between the two.
+    """
+    errors = []
+
+    for path in sorted((repo_root / SRC_DIR).rglob("m_checker*.fpp")):
+        rel = path.relative_to(repo_root)
+        subroutine = None
+        exempt = False
+
+        for lineno, line in enumerate(path.read_text().splitlines(), 1):
+            stripped = line.strip()
+
+            match = _SUBROUTINE_DECL.match(stripped)
+            if match:
+                subroutine = match.group(1)
+            elif stripped.startswith("end subroutine"):
+                subroutine = None
+
+            if stripped.startswith("!"):
+                exempt = exempt or RUNTIME_CHECK_MARKER in stripped
+                continue
+            if not stripped or stripped.startswith("#"):
+                # Blank lines and Fypp/preprocessor directives do not consume the marker.
+                continue
+
+            if "@:PROHIBIT" in stripped:
+                if not exempt and subroutine not in RUNTIME_CHECKER_SUBROUTINES:
+                    if subroutine:
+                        where = f"in {subroutine}"
+                        allowlist_hint = f"add '{subroutine}' to RUNTIME_CHECKER_SUBROUTINES in {Path(__file__).name}"
+                    else:
+                        where = "at module scope"
+                        allowlist_hint = f"put it in a subroutine listed in RUNTIME_CHECKER_SUBROUTINES in {Path(__file__).name}"
+                    errors.append(
+                        f"{rel}:{lineno}: @:PROHIBIT {where} looks like an input-only constraint. "
+                        f"Add it to a check_* method in toolchain/mfc/case_validator.py instead. "
+                        f"If it genuinely needs runtime or compiler state, {allowlist_hint}, "
+                        f"or mark it with '! {RUNTIME_CHECK_MARKER} <reason>'."
+                    )
+                exempt = False
+
+    return errors
+
+
+def check_cluster_menu_slugs(repo_root: Path) -> list[str]:
+    """Keep the ``./mfc.sh load`` cluster menu in sync with toolchain/modules.
+
+    The menu in toolchain/bootstrap/modules.sh is hand-written so it can be
+    grouped and coloured by organisation. That is fine, but it drifts: it used
+    to offer Summit, which has no module set, and omitted Phoenix IFX and
+    Santis, which do. Compare the advertised slugs against the data file.
+    """
+    modules = repo_root / "toolchain" / "modules"
+    script = repo_root / "toolchain" / "bootstrap" / "modules.sh"
+    if not modules.exists() or not script.exists():
+        return []
+
+    # Cluster definitions in toolchain/modules are "<slug> <System Name>". The
+    # "<slug>-{all,cpu,gpu}[-unload] <modules...>" lines carry the module lists.
+    module_list_line = re.compile(r"-(all|cpu|gpu)(-unload)?$")
+    defined = set()
+    for raw_line in modules.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        slug = line.split()[0]
+        if not module_list_line.search(slug):
+            defined.add(slug)
+
+    # The menu is delimited by explicit markers rather than by prose, so rewording
+    # the prompt or the read cannot silently disable this check.
+    text = script.read_text()
+    block = re.search(r"# lint: cluster-menu-begin\n(.*?)# lint: cluster-menu-end", text, re.S)
+    if block is None:
+        return [f"{script.relative_to(repo_root)}: cluster-menu-begin/end markers are missing; check_cluster_menu_slugs cannot verify the menu against toolchain/modules"]
+    # Slugs are advertised as "Name (slug)"; require the closing paren to be
+    # followed by a separator so shell fragments like ${G} are not picked up.
+    advertised = set(re.findall(r"\((\w[\w-]*)\)(?=[\s|\"']|$)", block.group(1), re.M))
+
+    errors = []
+    rel = script.relative_to(repo_root)
+    for slug in sorted(advertised - defined):
+        errors.append(f"{rel}: cluster menu offers '{slug}', which has no entry in toolchain/modules (selecting it loads nothing)")
+    for slug in sorted(defined - advertised):
+        errors.append(f"{rel}: toolchain/modules defines '{slug}', but the cluster menu does not offer it (users cannot discover it)")
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -445,11 +606,14 @@ def main():
     all_errors.extend(check_double_precision(repo_root))
     all_errors.extend(check_junk_code(repo_root))
     all_errors.extend(check_false_integers(repo_root))
+    all_errors.extend(check_integer_wp(repo_root))
     all_errors.extend(check_junk_comments(repo_root))
     all_errors.extend(check_fypp_list_duplicates(repo_root))
     all_errors.extend(check_duplicate_lines(repo_root))
     all_errors.extend(check_hardcoded_byte_size(repo_root))
     all_errors.extend(check_manual_registry_bcasts(repo_root))
+    all_errors.extend(check_checker_input_constraints(repo_root))
+    all_errors.extend(check_cluster_menu_slugs(repo_root))
 
     if all_errors:
         print("Source lint failed:")
