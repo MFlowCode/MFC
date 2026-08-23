@@ -20,7 +20,7 @@ module m_amr_regrid
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
-        & PH_RBREC, PH_RBTOPO
+        & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
         & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
         & amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
@@ -1433,9 +1433,11 @@ contains
                 ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the rebuild's early-free or
                 ! the reconcile below) - STASH-ONLY: a replica never touches q_prim/rhs, and full slots across the np-scaled
                 ! replica set of a migration-heavy regrid are what OOMed the W8 gate's np=4 arm
+                call s_phase_tic(PH_MGSLOT)
                 do kk = 1, old_np
                     if (getk(kk)) call s_amr_alloc_slot_stash(f_l0_slot(kk))
                 end do
+                call s_phase_toc(PH_MGSLOT)
                 allocate (rq(max(nsreq + nrcv, 1)), spack(max(maxsnd, 1), max(nsnd, 1)), rpack(max(maxrcv, 1), max(nrcv, 1)))
                 nrq = 0
                 do kk = 1, old_np  ! post receives for the old blocks I need
@@ -1444,6 +1446,7 @@ contains
                     call s_xa_rec(XA_F4_RCV, 2, cnt(kk), kk)
                     call MPI_IRECV(rpack(1, rcol(kk)), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
                 end do
+                call s_phase_tic(PH_MGPACK)
                 do kk = 1, old_np  ! pack + send each old block I own to every distinct new-owner (/= me) overlapping it
                     if (scol(kk) == 0) cycle  ! not mine, or no remote destination (pre-pass above)
                     isdest = .false.
@@ -1473,11 +1476,13 @@ contains
                         call MPI_ISEND(spack(1, scol(kk)), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
                     end do
                 end do
+                call s_phase_toc(PH_MGPACK)
                 call s_phase_tic(PH_MGWAIT)
                 if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
                 call s_phase_toc(PH_MGWAIT)
                 do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots
                     if (.not. getk(kk)) cycle
+                    call s_phase_tic(PH_MGUNPK)
                     idx2 = 0
                     do ii = 1, sys_size
                         do gk = 0, old_ext(3, kk)
@@ -1489,12 +1494,15 @@ contains
                             end do
                         end do
                     end do
+                    call s_phase_toc(PH_MGUNPK)
                     ! Push the received stash before any later s_amr_alloc_slot, for the same reason as the
                     ! owner-stash push above: the store is DEVICE-authoritative (see s_amr_st_reserve's
                     ! contract), and a mid-rebuild grow pulls device->host, which would overwrite this
                     ! host-written slot with an unwritten device copy - silently discarding the migrated
                     ! fine detail on the receiving rank.
+                    call s_phase_tic(PH_MGPUSH)
                     $:GPU_UPDATE(device='[amr_stor_st(:, :, :, :, amr_loc_of(f_l0_slot(kk)))]')
+                    call s_phase_toc(PH_MGPUSH)
                 end do
                 deallocate (rq, spack, rpack)
             end block
