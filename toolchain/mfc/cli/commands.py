@@ -876,8 +876,24 @@ COUNT_COMMAND = Command(
 
 COUNT_DIFF_COMMAND = Command(
     name="count_diff",
-    help="Compare LOC between branches.",
+    help="Compare LOC between two MFC source trees.",
     include_common=["targets", "mfc_config", "jobs", "verbose", "debug_log"],
+    positionals=[
+        Positional(name="base", help="Path to the baseline MFC source tree.", completion=Completion(type=CompletionType.DIRECTORIES)),
+        Positional(name="pr", help="Path to the MFC source tree to compare against the baseline.", completion=Completion(type=CompletionType.DIRECTORIES)),
+    ],
+    arguments=[
+        Argument(
+            name="markdown",
+            help="Also write the diff as GitHub-flavored Markdown to PATH (empty if nothing changed).",
+            type=str,
+            metavar="PATH",
+            completion=Completion(type=CompletionType.FILES),
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh count_diff ../master .", "Compare this tree's LOC against another checkout"),
+    ],
 )
 
 FP_STABILITY_COMMAND = Command(
