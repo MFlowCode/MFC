@@ -278,7 +278,9 @@ PHYSICS_DOCS = {
             "active_box is supported (single-rank, per active_box's own MPI gate): blocks must "
             "sit strictly inside the growing active window (init abort + regrid clamp), and the "
             "fine advance treats its whole block as active. "
-            "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1. "
+            "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1; amr_buf < amr_regrid_int "
+            "is allowed but advisory-warned (at CFL near 1 a feature can outrun the tag buffer between regrids - the "
+            "runtime [amr-cad] report counts tags that escaped the previous coverage; keep it at 0). "
             "amr_ref_ratio must be 2 or 4 (amr_ref_ratio = 4 is single-level without subcycling); amr_max_level >= 1, "
             "and multi-level (amr_max_level > 1) needs amr_max_blocks >= 2. "
             "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
@@ -1558,6 +1560,14 @@ class CaseValidator:
         self.prohibit(
             amr_regrid_int is not None and amr_regrid_int > 0 and (amr_buf is None or amr_buf < 1),
             "amr_buf must be >= 1 when amr_regrid_int > 0",
+        )
+        # advisory, not a prohibit: at CFL <= 1 a feature front can cross up to one cell per step, so
+        # amr_buf < amr_regrid_int risks features outrunning the tag buffer between regrids; low-CFL
+        # cases are legitimately below this worst-case bound (several suite goldens run int=5, buf=2-3).
+        # The runtime [amr-cad] counter reports the per-run truth (tags escaping the previous coverage).
+        self.warn(
+            amr_regrid_int is not None and amr_regrid_int > 0 and amr_buf is not None and amr_buf < amr_regrid_int,
+            "amr_buf < amr_regrid_int: at CFL near 1 a feature can outrun the tag buffer between regrids; " "check the [amr-cad] escaped-tag report stays 0 for this case",
         )
 
     def check_sfc_partition(self):
