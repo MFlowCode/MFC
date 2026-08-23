@@ -1,13 +1,8 @@
 name: Lines of Code
 
-# pull_request_target so that the comment can be posted on pull requests from
-# forks, whose GITHUB_TOKEN is read-only under the pull_request event. The PR's
-# code is only ever opened and line-counted by the base branch's counter, which
-# runs from base/. Nothing in pr/ is executed, and no step may be added that
-# does so.
-#
-# Deliberately unfiltered by path: a pull request that stops touching src/ must
-# still run, so that a comment left by an earlier push can be taken back down.
+# pull_request_target: fork PRs are read-only under pull_request and cannot be
+# commented on. Nothing in pr/ may ever be executed.
+# Unfiltered by path: a PR that stops touching src/ must still run to clean up.
 on:
   pull_request_target:
 
@@ -29,11 +24,9 @@ jobs:
           path: base
           fetch-depth: 0
 
-      # The PR's tree is materialized with git from the base clone rather than
-      # with actions/checkout, so this privileged workflow never runs a checkout
-      # of untrusted code. Counting against the merge base rather than the tip
-      # of the base branch means a PR is only ever charged for the lines it
-      # actually adds, however far behind the branch has fallen.
+      # git worktree, not actions/checkout: no untrusted checkout in a
+      # privileged workflow. Merge base, not branch tip: a stale branch is not
+      # charged for other people's lines.
       - name: Get Line Diff
         id: diff
         working-directory: base
@@ -53,8 +46,7 @@ jobs:
           recreate: true
           path: loc.md
 
-      # No line difference: take down the comment an earlier push may have left,
-      # rather than leaving a number that is no longer true.
+      # No diff: take down any comment an earlier push left.
       - name: Remove Line Diff Comment
         if: steps.diff.outputs.changed == 'false'
         uses: marocchino/sticky-pull-request-comment@v3

@@ -13,11 +13,7 @@ def handle_dir(mfc_dir: str, srcdirname: str) -> typing.Tuple[typing.Dict[str, i
     files = {}
     total = 0
 
-    # These trees are untrusted in CI, so count only regular files that really
-    # live inside them: a symlink, or a path reached through a symlinked
-    # directory, otherwise names a file anywhere on the runner. Read lazily and
-    # tolerate stray bytes so that neither a huge file nor a non-UTF-8 one can
-    # take the job down.
+    # Untrusted tree in CI: a symlink must not reach off it.
     root = os.path.realpath(os.path.join(mfc_dir, "src")) + os.sep
 
     for filepath in glob.glob(os.path.join(mfc_dir, "src", srcdirname, "**", "*.*f*"), recursive=True):
@@ -59,7 +55,7 @@ def count():
 
 
 def _write_markdown(filepath: str, files: list, dirs: list, total: int, total_diff: int):
-    # An empty file tells the CI commenter there is nothing worth saying.
+    # Empty file: the CI commenter posts nothing.
     if not files:
         file_write(filepath, "")
         return
