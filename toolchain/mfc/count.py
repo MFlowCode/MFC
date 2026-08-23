@@ -14,7 +14,12 @@ def handle_dir(mfc_dir: str, srcdirname: str) -> typing.Tuple[typing.Dict[str, i
     total = 0
 
     for filepath in glob.glob(os.path.join(mfc_dir, "src", srcdirname, "**", "*.*f*"), recursive=True):
-        with open(filepath) as f:
+        # These trees are untrusted in CI: skip anything that is not a regular
+        # file, and never let one stray byte fail the run.
+        if not os.path.isfile(filepath):
+            continue
+
+        with open(filepath, errors="replace") as f:
             counter = 0
             for line in f.read().split("\n"):
                 # Skip whitespace and comments

@@ -4,13 +4,14 @@ name: Lines of Code
 # forks, whose GITHUB_TOKEN is read-only under the pull_request event. The PR's
 # code is checked out as data and read by the base branch's counter; it is never
 # executed, and no credentials are persisted alongside it.
+#
+# Deliberately unfiltered by path: a pull request that stops touching src/ must
+# still run, so that a comment left by an earlier push can be taken back down.
 on:
   pull_request_target:
-    paths:
-      - 'src/**'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:
@@ -39,17 +40,28 @@ jobs:
       # means a PR is only ever charged for the lines it actually adds, however
       # far behind the branch has fallen.
       - name: Get Line Diff
+        id: diff
         working-directory: base
         run: |
           git fetch --no-tags origin "+refs/pull/${{ github.event.number }}/head:refs/mfc/pr"
           git worktree add ../mb "$(git merge-base HEAD refs/mfc/pr)"
           ./mfc.sh count_diff ../mb ../pr --markdown "$GITHUB_WORKSPACE/loc.md"
+          test -s "$GITHUB_WORKSPACE/loc.md" && echo "changed=true" >> "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
 
       - name: Comment Line Diff
+        if: steps.diff.outputs.changed == 'true'
         uses: marocchino/sticky-pull-request-comment@v3
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ignore_empty: true
           skip_unchanged: true
           recreate: true
           path: loc.md
+
+      # No line difference: take down the comment an earlier push may have left,
+      # rather than leaving a number that is no longer true.
+      - name: Remove Line Diff Comment
+        if: steps.diff.outputs.changed == 'false'
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          delete: true
