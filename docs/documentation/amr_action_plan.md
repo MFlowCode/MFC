@@ -7,6 +7,19 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 (4) — T1 RE-PRICED AT int=20: I2 is the program's highest-value increment
+
+Against the int=20 np=8 steady budget, the plan-based-exchange ladder re-prices as:
+**I2 (F1+F3 gather plans) targets 23% of wall scaling 3.84x/doubling — first**; I5
+(reflux+seam, 20%, worst rung 6.84x) and I5b (restr, 10.8%) behind it; I3 small; I4's
+"parallelise the pack" item is REFUTED (see (2) below) and its right-sizing half already
+landed as I4a. Already complete from the ladder's prerequisites: I0, I1a, the mandatory
+ppn=4 dynamic-regrid case, I4a, I4b-a. **NEXT SESSION: I1b-gather (headers on F1/F2/F3 +
+tiling assert + seeded-bug counterfactual — the gate I2's validation requires), then I2.**
+Implementation binding with line numbers: amr_plan_based_exchange.md "I1b implementation
+binding". Overnight: 3-repeat np=8 int=20 pairs queued (job 383518) for the variance floor
+at the new operating point.
+
 ## 2026-08-23 (3) — CADENCE MOVE VALIDATED: int=20 cuts 41% of wall; gather is the new front
 
 **The operating point moves: amr_regrid_int 2 → 20 (amr_buf stays 4), certified and adopted**

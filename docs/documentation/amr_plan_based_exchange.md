@@ -249,6 +249,40 @@ destinations. Enforce with `@:ASSERT` after `shape_boxes`, don't inherit it as f
 ~3100 LOC total (v1 said 1900 — the delta is the pbmv twin, restrict, the patch-storage
 restructure, and the validator hardening; better to know now).
 
+### I1b implementation binding (2026-08-23, line numbers at commit 0b36c148)
+
+Scope: **I1b-gather** — headers on the trio I2 converts (F1/F2/F3), per the validator's
+own explicit-family-scope principle; remaining families get headers with their conversion
+increments (F5/F6 with I5, F7 with I5b). Priced against the int=20 ladder: the gather
+family is 23% of np=8 steady wall scaling 3.84x/doubling — I2 is the program's
+highest-value increment and this is its gate.
+
+Mechanics (the trick that keeps it ~100 LOC): `m_amr_xchg_audit` exports
+`XA_NH` (= 8 under `MFC_DEBUG`, else 0) plus `s_xa_hdr_pack(buf, fam, blk, bl, bh)` /
+`s_xa_hdr_check(buf, fam, blk, bl, bh)` (integers encoded as `real(wp)`, exact ≤ 2^53).
+Every wire count/offset gains `+ XA_NH` UNCONDITIONALLY (zero when the header is off, so
+production arithmetic is untouched and no call site needs an `#ifdef`); pack/verify calls
+are `if (XA_NH > 0)` — dead-code-eliminated. Anchors are the existing `s_xa_rec` calls
+(1:1 with wire ops by I1a's construction):
+- plan sizes: `amr_gpl_sz`/`amr_gpl_psz` in `s_amr_build_gather_plan` gain +XA_NH per
+  message (recv posts at m_amr.fpp:1063/1073 then need no size edits);
+- chunked F1: pack/send 1140-1156 (header before the pack loop, `boxsz + XA_NH` on the
+  wire), pool unpack 1266 (verify then offset); chunked F2: send via
+  `s_amr_gather_from_parent_field_cons` (1876), device-unpack 1219 (host-verify the first
+  XA_NH words before `s_amr_unpack_parent_patch_device`, then pass the offset slice);
+- per-step F1: 1482 (recv)/1570 (send) + twins at 3403/3416 and 4307/4320 (fypp
+  instantiations share XA ids — enumerate by grepping `XA_F1_`); F3: 1677/1766;
+  per-step F2 blocking recv: 1911 (xbuf);
+- pool reserves: `s_amr_gsnd_reserve(maxsz + XA_NH)` at 1136 and the `need` sum in
+  `s_amr_gather_chunk_post` (~1040).
+Header check failure → `call s_mpi_abort` with family/blk/expected-vs-got. Tiling assert
+(the other I1b half): at each owner's unpack completion, assert the union of contributor
+slabs plus the own-slice tiles the patch exactly (count cells, compare to patch volume) —
+lives beside the existing gather asserts. Gate: the seeded-bug counterfactual (swap two
+plan source entries locally → headers must abort; revert seed) + 75-golden subset +
+`[amr-xa]` totals unchanged (headers are size-invisible to the F-family word counters:
+count payload words only, i.e. record `cnt` not `cnt + XA_NH`).
+
 ## Test coverage this program must ADD (adversarial M9)
 
 - **No existing test runs np>2.** Every plan degenerates to <=1 remote peer: multi-peer slicing,
