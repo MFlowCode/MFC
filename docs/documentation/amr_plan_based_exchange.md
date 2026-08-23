@@ -283,7 +283,24 @@ plan source entries locally → headers must abort; revert seed) + 75-golden sub
 `[amr-xa]` totals unchanged (headers are size-invisible to the F-family word counters:
 count payload words only, i.e. record `cnt` not `cnt + XA_NH`).
 
-## Test coverage this program must ADD (adversarial M9)
+### I2a implementation binding (2026-08-23)
+
+I2 is staged. **I2a (landed)**: `s_amr_stage_fill_wave` (m_amr.fpp) converts the
+non-subcycle per-stage LEVEL-1 fill (F1 + the F3 twin together) to one wave per RK stage —
+SoA transfer lists built per wave from the replicated caches (both sides enumerate boxes
+ascending with per-rank running offsets, so the per-(peer, family) wire layout — the
+ascending-box concatenation of [XA_NH header | slab] — agrees with no metadata exchange),
+recvs-then-packs-then-sends-then-one-WAITALL per the order-of-operations rule, tags
+`amr_tag_base(1|3) + mod(amr_mesh_epoch, 100)`, wave audit sites XA_F1W_*/XA_F3W_* folding
+into families F1/F3 (payload-words-only, so `[amr-xa]` family words stay exactly comparable
+to the per-box baseline — the landed gate). Consume is box-major through the single
+`amr_cg`/`amr_cpat_off`, reusing the per-box device kernels on contiguous pool slices:
+**per-owned-box patch storage turned out unnecessary for the wave** — it only buys
+cross-box batched unpack kernels, deferred to **I2b (contingent)** on the post-I2a budget
+showing launch/map overhead rather than wait left in the gather share. The mandated
+binary-search pack/unpack kernel form applies to I2b's kernels when/if they exist; I2a
+adds zero device kernels. Plan caching on the epoch remains I6; the regrid-path F1
+(chunked) and init/static/restart/subcycle sites keep the per-box path unchanged.
 
 - **No existing test runs np>2.** Every plan degenerates to <=1 remote peer: multi-peer slicing,
   peer ordering, and multi-contributor assembly are structurally unexercised. One ppn=4 dynamic

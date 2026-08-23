@@ -61,10 +61,14 @@ module m_amr_xchg_audit
     integer, parameter :: XA_L0_REST_RCV = 28  !< s_l0_restrict_to_tiles RECV
     integer, parameter :: XA_L0_MIGR_SND = 29  !< s_l0_migrate_tile SEND (tag 4300)
     integer, parameter :: XA_L0_MIGR_RCV = 30  !< s_l0_migrate_tile RECV
-    integer, parameter :: XA_NSITE = 30
+    integer, parameter :: XA_F1W_SND = 31      !< s_amr_stage_fill_wave per-peer aggregated q ISEND (I2a)
+    integer, parameter :: XA_F1W_RCV = 32      !< s_amr_stage_fill_wave per-peer aggregated q IRECV
+    integer, parameter :: XA_F3W_SND = 33      !< s_amr_stage_fill_wave per-peer aggregated pb/mv ISEND
+    integer, parameter :: XA_F3W_RCV = 34      !< s_amr_stage_fill_wave per-peer aggregated pb/mv IRECV
+    integer, parameter :: XA_NSITE = 34
     integer, parameter :: xa_fam(XA_NSITE) = [XA_F1, XA_F1, XA_F3, XA_F3, XA_F2, XA_F2, XA_F4, XA_F4, XA_F5, XA_F5, XA_F5, XA_F5, &
                                  & XA_F6, XA_F6, XA_F7, XA_F7, XA_F7, XA_F7, XA_F7, XA_F7, XA_FL0, XA_FL0, XA_FL0, XA_FL0, &
-                                 & XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0]
+                                 & XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_F1, XA_F1, XA_F3, XA_F3]
 
     ! dir 1 = send, 2 = recv; a SENDRECV site records both.
     integer(8) :: xa_msgs(XA_NSITE, 2) = 0_8
@@ -88,7 +92,7 @@ module m_amr_xchg_audit
         & XA_F3_RCV, XA_F2_SND, XA_F2_RCV, XA_F4_SND, XA_F4_RCV, XA_F5_FACE_SND, XA_F5_FACE_RCV, XA_F5_FREG_SND, XA_F5_FREG_RCV, &
         & XA_F6_XY, XA_F6_YX, XA_F7A_SND, XA_F7A_RCV, XA_F7B_SND, XA_F7B_RCV, XA_F7C_SND, XA_F7C_RCV, XA_L0_FILL_SND, &
         & XA_L0_FILL_RCV, XA_L0_SCAT_SND, XA_L0_SCAT_RCV, XA_L0_RFLX_SND, XA_L0_RFLX_RCV, XA_L0_REST_SND, XA_L0_REST_RCV, &
-        & XA_L0_MIGR_SND, XA_L0_MIGR_RCV
+        & XA_L0_MIGR_SND, XA_L0_MIGR_RCV, XA_F1W_SND, XA_F1W_RCV, XA_F3W_SND, XA_F3W_RCV
 
 contains
 
