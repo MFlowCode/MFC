@@ -414,7 +414,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
-- `ib_neighborhood_radius` controls the size of the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IBs up to 1 ranks away. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
+- `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 
 #### Particle Clouds
 
