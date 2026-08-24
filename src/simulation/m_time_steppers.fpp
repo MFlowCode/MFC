@@ -29,7 +29,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
-    use m_amr, only: amr_xchg_coarse_ghosts, s_amr_exchange_coarse_cons_halo, s_amr_fine_stage_fill, s_amr_stage_fill_wave, &
+    use m_amr, only: amr_xchg_coarse_ghosts, s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, &
         & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, &
         & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, &
         & s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, &
@@ -458,7 +458,7 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         !> block-slot loop variable (s_amr_select_slot sets global amr_cur, so amr_cur must not be the active DO variable)
-        integer            :: islot
+        integer            :: islot, ilev
         integer            :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
         real(wp)           :: start, finish
         integer(kind=8)    :: stage_t0, stage_t1, clock_rate, clock_max
@@ -556,24 +556,19 @@ contains
             ! next stage's coarse RHS captures creg into slot 1.
             if (amr .and. .not. amr_subcycle) then
                 ! max_grid_size tiling: three phases so a sub-block's seam ghosts read its neighbours' STAGE-ENTRY interior.
-                ! Phase 1 - FILL every block's ghost shell top-down. s_amr_fine_stage_fill is level-aware: a level>=2 block gathers
-                ! ghosts from its PARENT (s_amr_gather_coarse_patch's level branch), a level-1 block from L0. Blocks are stored
-                ! parent-before-child (L2 at higher slot), so slot order fills the parent's stage-entry state before the child reads
-                ! it.
-                ! valid coarse CONS ghosts for every block's ghost prolongation, ONCE for the whole loop (ALL ranks call: pairwise
-                ! halo). q_cons_ts(1)%vf is read by the fills below and never written by them, so one exchange serves every block;
-                ! doing it inside s_amr_fine_stage_fill repeated it amr_num_blocks times per stage.
+                ! Phase 1 - FILL every block's ghost shell top-down, as per-(family, level) exchange WAVES (plan-based
+                ! exchange): the level-1 wave (F1+F3, I2a), then one F2 parent-gather wave per level ascending (I3) - each
+                ! level's sources (the parents' stage-entry interiors, plus their freshly filled ghost shells) are complete
+                ! before its wave runs, the same parent-before-child guarantee slot order gave the old per-box loop.
+                ! valid coarse CONS ghosts for every block's ghost prolongation, ONCE for the whole loop (ALL ranks call:
+                ! pairwise halo). q_cons_ts(1)%vf is read by the level-1 fills and never written by them, so one exchange
+                ! serves every block.
                 call s_phase_tic(PH_HALO)
                 if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
                 call s_phase_toc(PH_HALO)
-                ! level-1 fills as ONE exchange wave (I2a plan-based exchange); level>=2 keeps the per-box parent-gather path
-                ! (increment I3). All level-1 fills complete before any level>=2 gather, a strict refinement of the
-                ! parent-before-child slot order this loop relied on.
                 call s_amr_stage_fill_wave(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
-                do islot = 1, amr_num_blocks
-                    if (amr_block_level(islot) < 2) cycle  ! L0 tile slots + level-1 (served by the wave above)
-                    call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
-                    call s_amr_fine_stage_fill(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                do ilev = 2, amr_num_levels
+                    call s_amr_parent_fill_wave(ilev)
                 end do
                 ! Phase 2 - block-to-block fine-fine halo: overwrite adjacent-sub-block seam ghosts with neighbour fine interior.
                 call s_phase_tic(PH_SEAM)

@@ -447,6 +447,9 @@ contains
             end do
         end if
         call s_amr_select_slot(1)
+        ! restored levels without a regrid: the per-level fill waves iterate 2..amr_num_levels, so leaving it at the
+        ! default 1 would silently skip every level>=2 fill until the first regrid recomputes it
+        amr_num_levels = max(1, maxval(amr_block_level(1:amr_num_blocks)))
         amr_seam_pairs_dirty = .true.  ! restored a new block set: the cached seam-pair list must be rebuilt
         amr_mesh_epoch = amr_mesh_epoch + 1
         call s_amr_check_seam_topology()  ! abort on seam topologies no halo reconciles (e.g. restart mode-switch)
