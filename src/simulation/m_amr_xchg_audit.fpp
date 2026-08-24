@@ -31,49 +31,53 @@ module m_amr_xchg_audit
     ! Call-site registry. One id per PHYSICAL MPI call site (fypp twins get their own ids where
     ! they carry different payloads). Names are assigned in init; the id constants are the
     ! documentation at the call sites.
-    integer, parameter :: XA_F1_SND = 1        !< s_amr_gather_coarse_patch pooled ISEND
-    integer, parameter :: XA_F1_RCV = 2        !< s_amr_gather_coarse_patch IRECV
-    integer, parameter :: XA_F3_SND = 3        !< s_amr_gather_coarse_patch_pbmv blocking SEND
-    integer, parameter :: XA_F3_RCV = 4        !< s_amr_gather_coarse_patch_pbmv IRECV
-    integer, parameter :: XA_F2_SND = 5        !< s_amr_gather_from_parent pooled ISEND (cons+stor instantiations)
-    integer, parameter :: XA_F2_RCV = 6        !< s_amr_gather_from_parent blocking RECV
-    integer, parameter :: XA_F4_SND = 7        !< s_amr_regrid_stash_migrate ISEND
-    integer, parameter :: XA_F4_RCV = 8        !< s_amr_regrid_stash_migrate IRECV
-    integer, parameter :: XA_F5_FACE_SND = 9   !< reflux face ISEND (freg lo/hi, tags 2*D/2*D+1)
-    integer, parameter :: XA_F5_FACE_RCV = 10  !< reflux face IRECV
-    integer, parameter :: XA_F5_FREG_SND = 11  !< freg-to-parent SEND (tags 40+)
-    integer, parameter :: XA_F5_FREG_RCV = 12  !< freg-to-parent RECV
-    integer, parameter :: XA_F6_XY = 13        !< seam halo SENDRECV, x-side of the pair (tag 4200 out)
-    integer, parameter :: XA_F6_YX = 14        !< seam halo SENDRECV, y-side of the pair (tag 4201 out)
-    integer, parameter :: XA_F7A_SND = 15      !< s_restrict_fine_to_coarse ISEND
-    integer, parameter :: XA_F7A_RCV = 16      !< s_restrict_fine_to_coarse RECV
-    integer, parameter :: XA_F7B_SND = 17      !< s_amr_restrict_to_parent SEND
-    integer, parameter :: XA_F7B_RCV = 18      !< s_amr_restrict_to_parent RECV
-    integer, parameter :: XA_F7C_SND = 19      !< s_amr_scatter_pbmv ISEND
-    integer, parameter :: XA_F7C_RCV = 20      !< s_amr_scatter_pbmv RECV
-    integer, parameter :: XA_L0_FILL_SND = 21  !< s_l0_fill_tiles_from_coarse SEND
-    integer, parameter :: XA_L0_FILL_RCV = 22  !< s_l0_fill_tiles_from_coarse RECV
-    integer, parameter :: XA_L0_SCAT_SND = 23  !< s_l0_scatter_tiles_to_coarse SEND
-    integer, parameter :: XA_L0_SCAT_RCV = 24  !< s_l0_scatter_tiles_to_coarse RECV
-    integer, parameter :: XA_L0_RFLX_SND = 25  !< s_l0_add_reflux_to_tiles SEND
-    integer, parameter :: XA_L0_RFLX_RCV = 26  !< s_l0_add_reflux_to_tiles RECV
-    integer, parameter :: XA_L0_REST_SND = 27  !< s_l0_restrict_to_tiles SEND (tag 4400+k)
-    integer, parameter :: XA_L0_REST_RCV = 28  !< s_l0_restrict_to_tiles RECV
-    integer, parameter :: XA_L0_MIGR_SND = 29  !< s_l0_migrate_tile SEND (tag 4300)
-    integer, parameter :: XA_L0_MIGR_RCV = 30  !< s_l0_migrate_tile RECV
-    integer, parameter :: XA_F1W_SND = 31      !< s_amr_stage_fill_wave per-peer aggregated q ISEND (I2a)
-    integer, parameter :: XA_F1W_RCV = 32      !< s_amr_stage_fill_wave per-peer aggregated q IRECV
-    integer, parameter :: XA_F3W_SND = 33      !< s_amr_stage_fill_wave per-peer aggregated pb/mv ISEND
-    integer, parameter :: XA_F3W_RCV = 34      !< s_amr_stage_fill_wave per-peer aggregated pb/mv IRECV
-    integer, parameter :: XA_F2W_SND = 35      !< s_amr_parent_fill_wave per-peer aggregated ISEND (I3)
-    integer, parameter :: XA_F2W_RCV = 36      !< s_amr_parent_fill_wave per-peer aggregated IRECV
-    integer, parameter :: XA_F6W_SND = 37      !< s_amr_fine_fine_halo per-peer aggregated ISEND (I5-F6)
-    integer, parameter :: XA_F6W_RCV = 38      !< s_amr_fine_fine_halo per-peer aggregated IRECV
-    integer, parameter :: XA_NSITE = 38
+    integer, parameter :: XA_F1_SND = 1         !< s_amr_gather_coarse_patch pooled ISEND
+    integer, parameter :: XA_F1_RCV = 2         !< s_amr_gather_coarse_patch IRECV
+    integer, parameter :: XA_F3_SND = 3         !< s_amr_gather_coarse_patch_pbmv blocking SEND
+    integer, parameter :: XA_F3_RCV = 4         !< s_amr_gather_coarse_patch_pbmv IRECV
+    integer, parameter :: XA_F2_SND = 5         !< s_amr_gather_from_parent pooled ISEND (cons+stor instantiations)
+    integer, parameter :: XA_F2_RCV = 6         !< s_amr_gather_from_parent blocking RECV
+    integer, parameter :: XA_F4_SND = 7         !< s_amr_regrid_stash_migrate ISEND
+    integer, parameter :: XA_F4_RCV = 8         !< s_amr_regrid_stash_migrate IRECV
+    integer, parameter :: XA_F5_FACE_SND = 9    !< reflux face ISEND (freg lo/hi, tags 2*D/2*D+1)
+    integer, parameter :: XA_F5_FACE_RCV = 10   !< reflux face IRECV
+    integer, parameter :: XA_F5_FREG_SND = 11   !< freg-to-parent SEND (tags 40+)
+    integer, parameter :: XA_F5_FREG_RCV = 12   !< freg-to-parent RECV
+    integer, parameter :: XA_F6_XY = 13         !< seam halo SENDRECV, x-side of the pair (tag 4200 out)
+    integer, parameter :: XA_F6_YX = 14         !< seam halo SENDRECV, y-side of the pair (tag 4201 out)
+    integer, parameter :: XA_F7A_SND = 15       !< s_restrict_fine_to_coarse ISEND
+    integer, parameter :: XA_F7A_RCV = 16       !< s_restrict_fine_to_coarse RECV
+    integer, parameter :: XA_F7B_SND = 17       !< s_amr_restrict_to_parent SEND
+    integer, parameter :: XA_F7B_RCV = 18       !< s_amr_restrict_to_parent RECV
+    integer, parameter :: XA_F7C_SND = 19       !< s_amr_scatter_pbmv ISEND
+    integer, parameter :: XA_F7C_RCV = 20       !< s_amr_scatter_pbmv RECV
+    integer, parameter :: XA_L0_FILL_SND = 21   !< s_l0_fill_tiles_from_coarse SEND
+    integer, parameter :: XA_L0_FILL_RCV = 22   !< s_l0_fill_tiles_from_coarse RECV
+    integer, parameter :: XA_L0_SCAT_SND = 23   !< s_l0_scatter_tiles_to_coarse SEND
+    integer, parameter :: XA_L0_SCAT_RCV = 24   !< s_l0_scatter_tiles_to_coarse RECV
+    integer, parameter :: XA_L0_RFLX_SND = 25   !< s_l0_add_reflux_to_tiles SEND
+    integer, parameter :: XA_L0_RFLX_RCV = 26   !< s_l0_add_reflux_to_tiles RECV
+    integer, parameter :: XA_L0_REST_SND = 27   !< s_l0_restrict_to_tiles SEND (tag 4400+k)
+    integer, parameter :: XA_L0_REST_RCV = 28   !< s_l0_restrict_to_tiles RECV
+    integer, parameter :: XA_L0_MIGR_SND = 29   !< s_l0_migrate_tile SEND (tag 4300)
+    integer, parameter :: XA_L0_MIGR_RCV = 30   !< s_l0_migrate_tile RECV
+    integer, parameter :: XA_F1W_SND = 31       !< s_amr_stage_fill_wave per-peer aggregated q ISEND (I2a)
+    integer, parameter :: XA_F1W_RCV = 32       !< s_amr_stage_fill_wave per-peer aggregated q IRECV
+    integer, parameter :: XA_F3W_SND = 33       !< s_amr_stage_fill_wave per-peer aggregated pb/mv ISEND
+    integer, parameter :: XA_F3W_RCV = 34       !< s_amr_stage_fill_wave per-peer aggregated pb/mv IRECV
+    integer, parameter :: XA_F2W_SND = 35       !< s_amr_parent_fill_wave per-peer aggregated ISEND (I3)
+    integer, parameter :: XA_F2W_RCV = 36       !< s_amr_parent_fill_wave per-peer aggregated IRECV
+    integer, parameter :: XA_F6W_SND = 37       !< s_amr_fine_fine_halo per-peer aggregated ISEND (I5-F6)
+    integer, parameter :: XA_F6W_RCV = 38       !< s_amr_fine_fine_halo per-peer aggregated IRECV
+    integer, parameter :: XA_F5W_FACE_SND = 39  !< s_amr_reflux_faces_wave ISEND (I5-F5a, zero-copy)
+    integer, parameter :: XA_F5W_FACE_RCV = 40  !< s_amr_reflux_faces_wave IRECV
+    integer, parameter :: XA_F5W_FREG_SND = 41  !< s_amr_freg_wave ISEND (I5-F5b)
+    integer, parameter :: XA_F5W_FREG_RCV = 42  !< s_amr_freg_wave IRECV
+    integer, parameter :: XA_NSITE = 42
     integer, parameter :: xa_fam(XA_NSITE) = [XA_F1, XA_F1, XA_F3, XA_F3, XA_F2, XA_F2, XA_F4, XA_F4, XA_F5, XA_F5, XA_F5, XA_F5, &
                                  & XA_F6, XA_F6, XA_F7, XA_F7, XA_F7, XA_F7, XA_F7, XA_F7, XA_FL0, XA_FL0, XA_FL0, XA_FL0, &
                                  & XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_F1, XA_F1, XA_F3, XA_F3, XA_F2, XA_F2, &
-                                 & XA_F6, XA_F6]
+                                 & XA_F6, XA_F6, XA_F5, XA_F5, XA_F5, XA_F5]
 
     ! dir 1 = send, 2 = recv; a SENDRECV site records both.
     integer(8) :: xa_msgs(XA_NSITE, 2) = 0_8
@@ -98,7 +102,7 @@ module m_amr_xchg_audit
         & XA_F6_XY, XA_F6_YX, XA_F7A_SND, XA_F7A_RCV, XA_F7B_SND, XA_F7B_RCV, XA_F7C_SND, XA_F7C_RCV, XA_L0_FILL_SND, &
         & XA_L0_FILL_RCV, XA_L0_SCAT_SND, XA_L0_SCAT_RCV, XA_L0_RFLX_SND, XA_L0_RFLX_RCV, XA_L0_REST_SND, XA_L0_REST_RCV, &
         & XA_L0_MIGR_SND, XA_L0_MIGR_RCV, XA_F1W_SND, XA_F1W_RCV, XA_F3W_SND, XA_F3W_RCV, XA_F2W_SND, XA_F2W_RCV, XA_F6W_SND, &
-        & XA_F6W_RCV
+        & XA_F6W_RCV, XA_F5W_FACE_SND, XA_F5W_FACE_RCV, XA_F5W_FREG_SND, XA_F5W_FREG_RCV
 
 contains
 

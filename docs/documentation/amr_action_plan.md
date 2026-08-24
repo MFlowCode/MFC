@@ -7,6 +7,31 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 (9) — I5-F5 LANDED: reflux faces + split-ownership freg as waves; message count unchanged BY DESIGN
+
+F5 was the last per-box rendezvous chain: the level-1 face exchange posted and WAITALLed
+once PER BOX on both sides (`s_amr_p2p_reflux_faces`), and the level>=2 split-ownership
+freg handoff did the same inside `s_amr_reflux_to_parent`. Both are now single waves:
+`s_amr_reflux_faces_wave` (F5a, per stage-final step) posts every receive ZERO-COPY into
+the freg register host mirrors — each box owns a register slot, so no pool or unpack
+exists to aggregate into — then the owner D2H + multicast ISENDs, ONE WAITALL, receivers
+push H2D. `s_amr_freg_wave` (F5b) does the cowner->powner freg pairs the same way before
+the reverse apply fold. `s_amr_reflux_to_parent` takes `do_xchg` (subcycle keeps its
+per-box exchange, `.true.` at the dt_sub site; the lock-step driver passes `.false.`
+because the wave already ran). The MESSAGE COUNT IS UNCHANGED (6708) by design — what the
+wave removes is the O(boxes) chain of separate rendezvous, the same structure I2a/I3
+removed for the fills. `s_amr_reg_reserve` hoists ahead of both waves (the apply can
+REALLOCATE the registers under it — the map finding).
+
+GATES: [amr-xa] F5 payload words EXACT vs baseline (659,423,232), msgs 6708 unchanged BY
+DESIGN; F1/F2/F4/F6/F7 byte-identical (F6 at its landed 378); zero-copy means headers
+cannot prefix the payload, so under MFC_DEBUG each transfer gets a COMPANION 8-word
+message ([site, blk, ...]; never s_xa_rec'd, keeping family words comparable) plus
+per-message MPI_Get_count length asserts, clean rc=0; seeded blk-shift arm aborts at the
+companion check (site 39); adversarial review of the F5+F6 pair; local AMR-75 goldens
+75/75. The owner-side multicast membership is the conjunction cand(region+-1 overlap)
+AND f_amr_reflux_participates — reproduced exactly, header-verified.
+
 ## 2026-08-23 (8) — I5-F6 LANDED: the seam halo's cross-rank pairs as one wave; shared seam buffers DELETED
 
 The cross-rank branch of `s_amr_fine_fine_halo` — one blocking MPI_SENDRECV per pair in

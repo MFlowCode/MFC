@@ -23,7 +23,7 @@ module m_amr
         & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
-    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg
+    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg, s_amr_reg_reserve
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_phase_timing
     use m_amr_xchg_audit  ! I1a: per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
@@ -41,10 +41,10 @@ module m_amr
     public :: t_level, amr_maxc, amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_interpolate_coarse_to_fine, &
         & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_stage_fill_wave, s_amr_parent_fill_wave, &
         & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, &
-        & s_amr_relax_fine, s_amr_setup_ib, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, &
-        & s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, &
-        & s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance, &
-        & s_l0_fill_tiles_from_coarse
+        & s_amr_relax_fine, s_amr_setup_ib, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, &
+        & s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
+        & s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
+        & s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance, s_l0_fill_tiles_from_coarse
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -2535,6 +2535,262 @@ contains
 
     end subroutine s_amr_p2p_reflux_faces
 
+    !> I5-F5a: the per-stage level-1 reflux-face exchange as ONE wave (amr_plan_based_exchange.md). The per-box form posted and
+    !! WAITALLed per box on both sides - an O(boxes) rendezvous chain. Here every rank walks the level-1 slots ascending: all
+    !! receives post first (ZERO-COPY, directly into the freg host mirrors - each box owns a register slot, so no pool is needed and
+    !! the message count is unchanged BY DESIGN), then the owners stage + multicast, then ONE waitall, then the receivers push to
+    !! device. All messages between a fixed (owner, participant) pair share tag amr_tag_base(5)+epoch and match by non-overtaking in
+    !! the (ascending box, ascending dim, lo-then-hi) order both sides derive from the same predicates the per-box form used
+    !! (amr_block_owner + the replicated region mirrors + the pure participation test). Under MFC_DEBUG the identity headers travel
+    !! as separate 8-word COMPANION messages, one per (box, peer) group ahead of its payloads (a prefix cannot ride a zero-copy
+    !! payload); they are never recorded in [amr-xa], so the family words stay exactly comparable. The register arrays are sized UP
+    !! FRONT: the apply can REALLOCATE them, so nothing may post into freg before s_amr_reg_reserve.
+    impure subroutine s_amr_reflux_faces_wave()
+
+#ifdef MFC_MPI
+        integer :: k, r, ierr, nreq, cnt, idx, ncand, tq, nhr, nhs, j
+        integer :: cand(num_procs), glo(3), ghi(3)
+
+        if (num_procs == 1) return
+        call s_amr_reg_reserve(amr_num_blocks)
+        tq = amr_tag_base(5) + int(mod(amr_mesh_epoch, 50_8))
+        nreq = 0; nhr = 0; nhs = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
+            call s_amr_select_slot(k)
+            if (amr_block_owner(k) == proc_rank) cycle
+            if (.not. f_amr_reflux_participates(proc_rank)) cycle
+            if (XA_NH > 0) then
+                nhr = nhr + 1
+                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr); call s_amr_fw_szi(amr_fw_rblk, nhr)
+                amr_fw_rblk(nhr) = k
+                nreq = nreq + 1
+                call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                amr_fw_reqw(nreq) = XA_NH
+                call MPI_IRECV(amr_fw_rq(XA_NH*(nhr - 1) + 1), XA_NH, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    nreq = nreq + 1
+                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                    amr_fw_reqw(nreq) = cnt
+                    call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
+                    call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
+                                   & amr_fw_req(nreq), ierr)
+                    nreq = nreq + 1
+                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                    amr_fw_reqw(nreq) = cnt
+                    call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
+                    call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
+                                   & amr_fw_req(nreq), ierr)
+                end if
+            #:endfor
+        end do
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
+            call s_amr_select_slot(k)
+            if (amr_block_owner(k) /= proc_rank) cycle
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                end if
+            #:endfor
+            glo = 0; ghi = 0
+            glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
+            if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
+            if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
+            call s_amr_ranks_overlapping(glo, ghi, cand, ncand)
+            do idx = 1, ncand
+                r = cand(idx)
+                if (r == proc_rank .or. .not. f_amr_reflux_participates(r)) cycle
+                if (XA_NH > 0) then
+                    nhs = nhs + 1
+                    call s_amr_fw_szr(amr_fw_sq, XA_NH*nhs)
+                    call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
+                    nreq = nreq + 1
+                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                    amr_fw_reqw(nreq) = -1
+                    call MPI_ISEND(amr_fw_sq(XA_NH*(nhs - 1) + 1), XA_NH, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                end if
+                #:for D in [1, 2, 3]
+                    if (${D}$ <= num_dims) then
+                        cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                        nreq = nreq + 1
+                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                        amr_fw_reqw(nreq) = -1
+                        call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
+                        call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                        nreq = nreq + 1
+                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                        amr_fw_reqw(nreq) = -1
+                        call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
+                        call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                    end if
+                #:endfor
+            end do
+        end do
+        if (nreq > 0) then
+#ifdef MFC_DEBUG
+            block
+                integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call s_phase_tic(PH_RFWAIT)
+                call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                call s_phase_toc(PH_RFWAIT)
+                do q = 1, nreq
+                    if (amr_fw_reqw(q) < 0) cycle
+                    call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
+                    @:ASSERT(gotw == amr_fw_reqw(q), "reflux-faces wave: received message length differs from the plan")
+                end do
+            end block
+#else
+            call s_phase_tic(PH_RFWAIT)
+            call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+            call s_phase_toc(PH_RFWAIT)
+#endif
+        end if
+        call s_phase_tic(PH_RFRECV)
+        j = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
+            call s_amr_select_slot(k)
+            if (amr_block_owner(k) == proc_rank) cycle
+            if (.not. f_amr_reflux_participates(proc_rank)) cycle
+            if (XA_NH > 0) then
+                j = j + 1
+                @:ASSERT(amr_fw_rblk(j) == k, "reflux-faces wave: header slot order broke")
+                call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
+            end if
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                end if
+            #:endfor
+        end do
+        call s_phase_toc(PH_RFRECV)
+#endif
+
+    end subroutine s_amr_reflux_faces_wave
+
+    !> I5-F5b: the split-ownership level>=2 freg exchange as ONE wave, run once before the reflux fold (the registers are final
+    !! after the advance, and the applies keep their per-box reverse-order position). Replaces one fully BLOCKING SEND/RECV pair per
+    !! dim per split child. Same zero-copy, companion-header, single-tag-by-order design as the faces wave; tag block
+    !! amr_tag_base(5)+50 keeps it disjoint from the faces wave's within the family. The subcycle path keeps its per-box exchange
+    !! inside s_amr_reflux_to_parent (do_xchg).
+    impure subroutine s_amr_freg_wave()
+
+#ifdef MFC_MPI
+        integer :: k, ierr, nreq, cnt, pblk, cowner, powner, tq, nhr, nhs, j
+
+        if (num_procs == 1) return
+        call s_amr_reg_reserve(amr_num_blocks)
+        tq = amr_tag_base(5) + 50 + int(mod(amr_mesh_epoch, 50_8))
+        nreq = 0; nhr = 0; nhs = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) < 2) cycle
+            call s_amr_select_slot(k)
+            pblk = f_amr_parent_block(k)
+            cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
+            if (cowner == powner .or. powner /= proc_rank) cycle
+            if (XA_NH > 0) then
+                nhr = nhr + 1
+                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr); call s_amr_fw_szi(amr_fw_rblk, nhr)
+                amr_fw_rblk(nhr) = k
+                nreq = nreq + 1
+                call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                amr_fw_reqw(nreq) = XA_NH
+                call MPI_IRECV(amr_fw_rq(XA_NH*(nhr - 1) + 1), XA_NH, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+            end if
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    nreq = nreq + 1
+                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                    amr_fw_reqw(nreq) = cnt
+                    call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
+                    call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                    nreq = nreq + 1
+                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                    amr_fw_reqw(nreq) = cnt
+                    call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
+                    call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                end if
+            #:endfor
+        end do
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) < 2) cycle
+            call s_amr_select_slot(k)
+            pblk = f_amr_parent_block(k)
+            cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
+            if (cowner == powner .or. cowner /= proc_rank) cycle
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                end if
+            #:endfor
+            if (XA_NH > 0) then
+                nhs = nhs + 1
+                call s_amr_fw_szr(amr_fw_sq, XA_NH*nhs)
+                call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
+                nreq = nreq + 1
+                call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                amr_fw_reqw(nreq) = -1
+                call MPI_ISEND(amr_fw_sq(XA_NH*(nhs - 1) + 1), XA_NH, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+            end if
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    nreq = nreq + 1
+                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                    amr_fw_reqw(nreq) = -1
+                    call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
+                    call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                    nreq = nreq + 1
+                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                    amr_fw_reqw(nreq) = -1
+                    call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
+                    call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                end if
+            #:endfor
+        end do
+        if (nreq > 0) then
+#ifdef MFC_DEBUG
+            block
+                integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                do q = 1, nreq
+                    if (amr_fw_reqw(q) < 0) cycle
+                    call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
+                    @:ASSERT(gotw == amr_fw_reqw(q), "freg wave: received message length differs from the plan")
+                end do
+            end block
+#else
+            call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+#endif
+        end if
+        j = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) < 2) cycle
+            call s_amr_select_slot(k)
+            pblk = f_amr_parent_block(k)
+            cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
+            if (cowner == powner .or. powner /= proc_rank) cycle
+            if (XA_NH > 0) then
+                j = j + 1
+                @:ASSERT(amr_fw_rblk(j) == k, "freg wave: header slot order broke")
+                call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
+            end if
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                end if
+            #:endfor
+        end do
+#endif
+
+    end subroutine s_amr_freg_wave
+
     !> True iff this rank is the AUTHORITATIVE holder of global coarse cell g in one dimension (o = interior origin start_idx, ext =
     !! interior extent m/n/p, glb = global last index). A cell is owned by exactly one rank: its interior owner, or - for a
     !! physical-exterior ghost (g < 0 or g > glb) - the boundary-adjacent rank that holds it as a ghost. Inter-rank ghosts are
@@ -3563,18 +3819,20 @@ contains
     !! The PARENT's owner applies: it holds the parent field and the parent-side creg (captured over its own advance). Only freg
     !! crosses the wire, and only when the two owners differ - under tower co-location they never do, so this is byte-identical to
     !! the previous owner-local form. BOTH participants must reach this routine or the P2P pair deadlocks (cf. the restrict).
-    impure subroutine s_amr_reflux_to_parent(dt_reflux)
+    impure subroutine s_amr_reflux_to_parent(dt_reflux, do_xchg)
 
         real(wp), intent(in) :: dt_reflux
-        integer              :: pblk, d, y, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
-        real(wp)             :: w_lo(3), w_hi(3), mlo(3), mhi(3)
-        logical              :: own_child, own_parent
+        !> exchange the split-ownership freg here (the subcycle per-box path); the lock-step driver runs s_amr_freg_wave first
+        logical, intent(in) :: do_xchg
+        integer             :: pblk, d, y, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
+        real(wp)            :: w_lo(3), w_hi(3), mlo(3), mhi(3)
+        logical             :: own_child, own_parent
 
         pblk = f_amr_parent_block(amr_cur)
         own_child = amr_rank_owns_block
         own_parent = (amr_block_owner(pblk) == proc_rank)
         if (.not. (own_child .or. own_parent)) return
-        if (own_child .neqv. own_parent) call s_amr_p2p_freg_to_parent(pblk)
+        if (do_xchg .and. (own_child .neqv. own_parent)) call s_amr_p2p_freg_to_parent(pblk)
         if (.not. own_parent) return
         ! max_grid_size tiling of a level>=2 feature: a face shared with an ADJACENT sibling tile (same parent) is fine-fine, not a
         ! c/f boundary - its "outside" parent cell is covered by the sibling's restrict, so refluxing there double-writes and leaks.
@@ -6022,17 +6280,21 @@ contains
 
     end subroutine s_amr_fw_szi3
 
-    !> Wire pools are sized ONCE per wave before any write, so no grow ever needs to preserve contents.
+    !> Wire pools: preserving on grow (the F5 waves append debug header slots incrementally; the other waves size once).
     impure subroutine s_amr_fw_szr(a, n)
 
         real(wp), allocatable, intent(inout) :: a(:)
         integer, intent(in)                  :: n
+        real(wp), allocatable                :: tmp(:)
 
-        if (allocated(a)) then
-            if (size(a) >= n) return
-            deallocate (a)
+        if (.not. allocated(a)) then
+            allocate (a(max(n, 64)))
+            return
         end if
-        allocate (a(max(n, 64)))
+        if (size(a) >= n) return
+        call move_alloc(a, tmp)
+        allocate (a(max(n, 2*size(tmp))))
+        a(1:size(tmp)) = tmp
 
     end subroutine s_amr_fw_szr
 
@@ -6430,7 +6692,7 @@ contains
             end if
             if (amr_rank_owns_block .or. amr_block_owner(f_amr_parent_block(kc)) == proc_rank) then
                 call s_amr_restrict_to_parent()
-                call s_amr_reflux_to_parent(dt_sub)
+                call s_amr_reflux_to_parent(dt_sub, .true.)
             end if
         end do
 
