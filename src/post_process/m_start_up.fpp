@@ -456,7 +456,7 @@ contains
 
         if (cont_damage) then
             write (varname, '(A)') 'damage_state'
-            call s_write_field(varname, t_step, q_cons_vf(eqn_idx%damage), x_beg, x_end, y_beg, y_end, z_beg, z_end)
+            call s_write_field(varname, t_step, q_prim_vf(eqn_idx%damage), x_beg, x_end, y_beg, y_end, z_beg, z_end)
         end if
 
         if (hyper_cleaning) then
