@@ -76,6 +76,16 @@ module m_amr_registers
     logical, allocatable :: bclo(:), bchi(:), bactive(:)
     $:GPU_DECLARE(create='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
 
+    !> Per-slot geometry scratch for the batched reflux APPLY kernels (mirror of the capture batching above): a_act gates the slot,
+    !! a_lo/a_hi the per-face applies, a_ol/a_oh the outside coarse cell's local index in the face dim, a_t1/t2/t3 the local
+    !! transverse origins, a_b1l..a_b2h the transverse windows (block-relative, freg/creg-aligned), a_mlo/a_mhi the outside-cell
+    !! widths with the cyl area factors folded in. Filled per direction on the host, GPU_UPDATE'd, consumed by ONE kernel per face
+    !! direction instead of O(blocks) tiny launches.
+    integer, allocatable  :: a_ol(:), a_oh(:), a_t1(:), a_t2(:), a_t3(:), a_b1l(:), a_b1h(:), a_b2l(:), a_b2h(:)
+    logical, allocatable  :: a_lo(:), a_hi(:), a_act(:)
+    real(wp), allocatable :: a_mlo(:), a_mhi(:)
+    $:GPU_DECLARE(create='[a_ol, a_oh, a_t1, a_t2, a_t3, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
+
 contains
 
     #:def REG_GROW(A, L2, U2, L3, U3)
@@ -243,6 +253,10 @@ contains
         @:ALLOCATE(bjlo(1:amr_max_blocks), bjhi(1:amr_max_blocks), bo1(1:amr_max_blocks), bo2(1:amr_max_blocks))
         @:ALLOCATE(bt1lo(1:amr_max_blocks), bt1hi(1:amr_max_blocks), bt2lo(1:amr_max_blocks), bt2hi(1:amr_max_blocks))
         @:ALLOCATE(bclo(1:amr_max_blocks), bchi(1:amr_max_blocks), bactive(1:amr_max_blocks))
+        @:ALLOCATE(a_ol(1:amr_max_blocks), a_oh(1:amr_max_blocks), a_t1(1:amr_max_blocks), a_t2(1:amr_max_blocks))
+        @:ALLOCATE(a_t3(1:amr_max_blocks), a_b1l(1:amr_max_blocks), a_b1h(1:amr_max_blocks), a_b2l(1:amr_max_blocks))
+        @:ALLOCATE(a_b2h(1:amr_max_blocks), a_lo(1:amr_max_blocks), a_hi(1:amr_max_blocks), a_act(1:amr_max_blocks))
+        @:ALLOCATE(a_mlo(1:amr_max_blocks), a_mhi(1:amr_max_blocks))
 
     end subroutine s_initialize_amr_registers
 
@@ -679,166 +693,241 @@ contains
     impure subroutine s_amr_apply_reflux(rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: eq, c1, c2, f10, f20, dd1, dd2, nch, islot, rr
-        integer                                                :: bl1, bh1, bl2, bh2, bl3, bh3, ol1, ol2, ol3, oh1, oh2, oh3
-        integer                                                :: tl1, tl2, tl3, dd1_hi, dd2_hi, sidx(3), ext(3), tlo(3), thi(3)
-        logical                                                :: d2, d3, own_lo(3), own_hi(3), has_lo, has_hi
-        real(wp)                                               :: fblo, fbhi, mlo, mhi, wsum, rf
+        integer                                                :: eq, c1, c2, c1w, c2w, k, save_cur, nact, gmax1, gmax2
+        integer                                                :: f10, f20, dd1, dd2, nch, rr, dd1_hi, dd2_hi
+        integer                                                :: bl1, bh1, bl2, bh2, bl3, bh3
+        integer                                                :: i2, i3, sidx(3), ext(3), tlo(3), thi(3)
+        logical                                                :: d2, d3, own_lo(3), own_hi(3)
+        real(wp)                                               :: fblo, fbhi, wsum, rf
 
         if (.not. amr) return
         ! Registers are indexed to amr_num_blocks on every rank, so make sure they reach that far before any slot index
         ! is used. No-op (one integer compare) once the capacity is sufficient.
         call s_amr_reg_reserve(amr_num_blocks)
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
-        islot = amr_cur  ! working block slot (local => captured by value in the device kernels below)
         rr = amr_ref_ratio
-        ! per-face participation: each face's correction runs on the rank owning its OUTSIDE cell layer (all faces at np=1).
-        ! Under whole-block ownership the block's freg is already resident on its owner, so no broadcast here.
-        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
-        if (.not. (any(own_lo) .or. any(own_hi))) return
-        ! device kernels: the coarse rhs stays device-resident for the coarse RK update kernel
         d2 = n_glb > 0; d3 = p_glb > 0
-        ! block-relative transverse frame (aligned with the owner's freg): loop c over each dim's owned overlap [bl:bh] =
-        ! [tlo-region_lo : thi-region_lo]; creg/freg use c directly, LOCAL cell = tl + c, tl = region_lo - sidx.
-        bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
-        bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
-        bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
-        ol1 = amr_region_lo(1) - 1 - sidx(1); oh1 = amr_region_hi(1) + 1 - sidx(1)
-        ol2 = amr_region_lo(2) - 1 - sidx(2); oh2 = amr_region_hi(2) + 1 - sidx(2)
-        ol3 = amr_region_lo(3) - 1 - sidx(3); oh3 = amr_region_hi(3) + 1 - sidx(3)
-        tl1 = amr_region_lo(1) - sidx(1); tl2 = amr_region_lo(2) - sidx(2); tl3 = amr_region_lo(3) - sidx(3)
+        save_cur = amr_cur
+
+        ! BATCHED over the level-1 blocks, one kernel per face direction (mirror of the capture-side batching,
+        ! s_amr_capture_creg_dense_batch): the per-box form launched up to 3 tiny face kernels per block per step, and the
+        ! per-launch overhead - not the arithmetic - dominated the reflux-apply phase. The per-(face, eq, cell) arithmetic
+        ! and child-sum order below are IDENTICAL to the per-box form, and block corrections are disjoint (the merge
+        ! invariant keeps blocks >= buff_size apart), so the outputs are bit-identical. Host precompute walks the slots
+        ! with the SAME select_slot + s_amr_reflux_face_flags the per-box form used; the a_* descriptors are pushed once
+        ! per direction.
+
         ! x-faces: transverse dims (y, z); children in each active transverse dim
-        has_lo = own_lo(1); has_hi = own_hi(1)
-        if (has_lo .or. has_hi) then
-            nch = 1
-            if (n_glb > 0) nch = nch*rr
-            if (p_glb > 0) nch = nch*rr
-            dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
-            mlo = 1._wp; mhi = 1._wp
-            if (has_lo) mlo = dx(ol1)
-            if (has_hi) mhi = dx(oh1)
+        nch = 1
+        if (n_glb > 0) nch = nch*rr
+        if (p_glb > 0) nch = nch*rr
+        dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
+        nact = 0; gmax1 = 0; gmax2 = 0
+        a_act(1:amr_num_blocks) = .false.
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
+            call s_amr_select_slot(k)
+            call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
+            if (.not. (own_lo(1) .or. own_hi(1))) cycle
+            bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
+            bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
+            a_act(k) = .true.; a_lo(k) = own_lo(1); a_hi(k) = own_hi(1)
+            a_ol(k) = amr_region_lo(1) - 1 - sidx(1); a_oh(k) = amr_region_hi(1) + 1 - sidx(1)
+            a_t2(k) = amr_region_lo(2) - sidx(2); a_t3(k) = amr_region_lo(3) - sidx(3)
+            a_b1l(k) = bl2; a_b1h(k) = bh2; a_b2l(k) = bl3; a_b2h(k) = bh3
+            a_mlo(k) = 1._wp; a_mhi(k) = 1._wp
+            if (own_lo(1)) a_mlo(k) = dx(a_ol(k))
+            if (own_hi(1)) a_mhi(k) = dx(a_oh(k))
+            nact = nact + 1
+            gmax1 = max(gmax1, bh2 - bl2); gmax2 = max(gmax2, bh3 - bl3)
+        end do
+        call s_amr_select_slot(save_cur)
+        if (nact > 0) then
+            $:GPU_UPDATE(device='[a_ol, a_oh, a_t2, a_t3, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
             if (cyl_coord) then
-                ! axisymmetric x-face (axial): the rr covering fine faces stack in the RADIAL (transverse) direction at DIFFERENT
-                ! radii, so Fbar_fine must be area-weighted by fine-face radius (fine y_cc rebuilt from the coarse y_cb of
-                ! transverse
-                ! cell tl2+c1). Outside-cell axial divergence has no radial factor (axial face area ~ cell volume ~ y_cc, cancels),
-                ! so the width stays dx.
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi, wsum, rf]')
-                do eq = 1, sys_size
-                    do c2 = bl3, bh3
-                        do c1 = bl2, bh2
-                            f20 = 0
-                            f10 = rr*c1
-                            fblo = 0._wp; fbhi = 0._wp; wsum = 0._wp
-                            do dd1 = 0, dd1_hi
-                                rf = y_cb(tl2 + c1 - 1) + (real(dd1, wp) + 0.5_wp)*(y_cb(tl2 + c1) - y_cb(tl2 + c1 - 1))/real(rr, &
-                                          & wp)
-                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20, islot)*rf
-                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20, islot)*rf
-                                wsum = wsum + rf
+                ! axisymmetric x-face (axial): the rr covering fine faces stack in the RADIAL (transverse) direction at
+                ! DIFFERENT radii, so Fbar_fine must be area-weighted by fine-face radius (fine y_cc rebuilt from the coarse
+                ! y_cb of transverse cell tl2+c1). Outside-cell axial divergence has no radial factor (axial face area ~
+                ! cell volume ~ y_cc, cancels), so the width stays dx.
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, fblo, fbhi, wsum, rf, i2, i3]')
+                do k = 1, amr_num_blocks
+                    do c2w = 0, gmax2
+                        do c1w = 0, gmax1
+                            do eq = 1, sys_size
+                                if (.not. a_act(k)) cycle
+                                c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
+                                if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
+                                f20 = 0
+                                f10 = rr*c1
+                                fblo = 0._wp; fbhi = 0._wp; wsum = 0._wp
+                                do dd1 = 0, dd1_hi
+                                    rf = y_cb(a_t2(k) + c1 - 1) + (real(dd1, &
+                                              & wp) + 0.5_wp)*(y_cb(a_t2(k) + c1) - y_cb(a_t2(k) + c1 - 1))/real(rr, wp)
+                                    fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20, k)*rf
+                                    fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20, k)*rf
+                                    wsum = wsum + rf
+                                end do
+                                fblo = fblo/wsum; fbhi = fbhi/wsum
+                                i2 = a_t2(k) + c1; i3 = a_t3(k) + c2
+                                if (a_lo(k)) rhs_vf(eq)%sf(a_ol(k), i2, i3) = rhs_vf(eq)%sf(a_ol(k), i2, i3) + (creg(1)%lo(eq, &
+                                    & c1, c2, k) - fblo)/a_mlo(k)
+                                if (a_hi(k)) rhs_vf(eq)%sf(a_oh(k), i2, i3) = rhs_vf(eq)%sf(a_oh(k), i2, &
+                                    & i3) + (fbhi - creg(1)%hi(eq, c1, c2, k))/a_mhi(k)
                             end do
-                            fblo = fblo/wsum; fbhi = fbhi/wsum
-                            if (has_lo) rhs_vf(eq)%sf(ol1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(ol1, tl2 + c1, &
-                                & tl3 + c2) + (creg(1)%lo(eq, c1, c2, islot) - fblo)/mlo
-                            if (has_hi) rhs_vf(eq)%sf(oh1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(oh1, tl2 + c1, &
-                                & tl3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2, islot))/mhi
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             else
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-                do eq = 1, sys_size
-                    do c2 = bl3, bh3
-                        do c1 = bl2, bh2
-                            f20 = 0; if (d3) f20 = rr*c2
-                            f10 = 0; if (d2) f10 = rr*c1
-                            fblo = 0._wp; fbhi = 0._wp
-                            do dd2 = 0, dd2_hi
-                                do dd1 = 0, dd1_hi
-                                    fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                    fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
+                do k = 1, amr_num_blocks
+                    do c2w = 0, gmax2
+                        do c1w = 0, gmax1
+                            do eq = 1, sys_size
+                                if (.not. a_act(k)) cycle
+                                c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
+                                if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
+                                f20 = 0; if (d3) f20 = rr*c2
+                                f10 = 0; if (d2) f10 = rr*c1
+                                fblo = 0._wp; fbhi = 0._wp
+                                do dd2 = 0, dd2_hi
+                                    do dd1 = 0, dd1_hi
+                                        fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, k)
+                                        fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, k)
+                                    end do
                                 end do
+                                fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                                i2 = a_t2(k) + c1; i3 = a_t3(k) + c2
+                                if (a_lo(k)) rhs_vf(eq)%sf(a_ol(k), i2, i3) = rhs_vf(eq)%sf(a_ol(k), i2, i3) + (creg(1)%lo(eq, &
+                                    & c1, c2, k) - fblo)/a_mlo(k)
+                                if (a_hi(k)) rhs_vf(eq)%sf(a_oh(k), i2, i3) = rhs_vf(eq)%sf(a_oh(k), i2, &
+                                    & i3) + (fbhi - creg(1)%hi(eq, c1, c2, k))/a_mhi(k)
                             end do
-                            fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                            if (has_lo) rhs_vf(eq)%sf(ol1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(ol1, tl2 + c1, &
-                                & tl3 + c2) + (creg(1)%lo(eq, c1, c2, islot) - fblo)/mlo
-                            if (has_hi) rhs_vf(eq)%sf(oh1, tl2 + c1, tl3 + c2) = rhs_vf(eq)%sf(oh1, tl2 + c1, &
-                                & tl3 + c2) + (fbhi - creg(1)%hi(eq, c1, c2, islot))/mhi
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
         end if
+
         ! y-faces (n_glb > 0): transverse dims (x, z); x is always active (2 children)
-        has_lo = own_lo(2); has_hi = own_hi(2)
-        if (n_glb > 0 .and. (has_lo .or. has_hi)) then
+        if (n_glb > 0) then
             nch = rr
             if (p_glb > 0) nch = nch*rr
             dd2_hi = merge(rr - 1, 0, p_glb > 0)
-            mlo = 1._wp; mhi = 1._wp
-            if (has_lo) mlo = dy(ol2)
-            if (has_hi) mhi = dy(oh2)
-            ! cyl_coord (axisymmetric): the radial c/f flux correction is area-weighted - low/high face carries radius y_cb, outside
-            ! cell volume carries y_cc, so fold r_face/r_cell into the width (kernel divides by it). r_+ = y_cb(ol2) at the block's
-            ! low face; r_- = y_cb(oh2-1) at the high face. Byte-identical to the previous form on Cartesian grids.
-            if (cyl_coord) then
-                if (has_lo) mlo = mlo*y_cc(ol2)/y_cb(ol2)
-                if (has_hi) mhi = mhi*y_cc(oh2)/y_cb(oh2 - 1)
+            nact = 0; gmax1 = 0; gmax2 = 0
+            a_act(1:amr_num_blocks) = .false.
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) /= 1) cycle
+                call s_amr_select_slot(k)
+                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
+                if (.not. (own_lo(2) .or. own_hi(2))) cycle
+                bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
+                bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
+                a_act(k) = .true.; a_lo(k) = own_lo(2); a_hi(k) = own_hi(2)
+                a_ol(k) = amr_region_lo(2) - 1 - sidx(2); a_oh(k) = amr_region_hi(2) + 1 - sidx(2)
+                a_t1(k) = amr_region_lo(1) - sidx(1); a_t3(k) = amr_region_lo(3) - sidx(3)
+                a_b1l(k) = bl1; a_b1h(k) = bh1; a_b2l(k) = bl3; a_b2h(k) = bh3
+                a_mlo(k) = 1._wp; a_mhi(k) = 1._wp
+                if (own_lo(2)) a_mlo(k) = dy(a_ol(k))
+                if (own_hi(2)) a_mhi(k) = dy(a_oh(k))
+                ! cyl_coord (axisymmetric): the radial c/f flux correction is area-weighted - low/high face carries radius
+                ! y_cb, outside cell volume carries y_cc, so fold r_face/r_cell into the width (kernel divides by it).
+                if (cyl_coord) then
+                    if (own_lo(2)) a_mlo(k) = a_mlo(k)*y_cc(a_ol(k))/y_cb(a_ol(k))
+                    if (own_hi(2)) a_mhi(k) = a_mhi(k)*y_cc(a_oh(k))/y_cb(a_oh(k) - 1)
+                end if
+                nact = nact + 1
+                gmax1 = max(gmax1, bh1 - bl1); gmax2 = max(gmax2, bh3 - bl3)
+            end do
+            call s_amr_select_slot(save_cur)
+            if (nact > 0) then
+                $:GPU_UPDATE(device='[a_ol, a_oh, a_t1, a_t3, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
+                do k = 1, amr_num_blocks
+                    do c2w = 0, gmax2
+                        do c1w = 0, gmax1
+                            do eq = 1, sys_size
+                                if (.not. a_act(k)) cycle
+                                c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
+                                if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
+                                f20 = 0; if (d3) f20 = rr*c2
+                                f10 = rr*c1
+                                fblo = 0._wp; fbhi = 0._wp
+                                do dd2 = 0, dd2_hi
+                                    do dd1 = 0, rr - 1
+                                        fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, k)
+                                        fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, k)
+                                    end do
+                                end do
+                                fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                                i2 = a_t1(k) + c1; i3 = a_t3(k) + c2
+                                if (a_lo(k)) rhs_vf(eq)%sf(i2, a_ol(k), i3) = rhs_vf(eq)%sf(i2, a_ol(k), i3) + (creg(2)%lo(eq, &
+                                    & c1, c2, k) - fblo)/a_mlo(k)
+                                if (a_hi(k)) rhs_vf(eq)%sf(i2, a_oh(k), i3) = rhs_vf(eq)%sf(i2, a_oh(k), &
+                                    & i3) + (fbhi - creg(2)%hi(eq, c1, c2, k))/a_mhi(k)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do c2 = bl3, bh3
-                    do c1 = bl1, bh1
-                        f20 = 0; if (d3) f20 = rr*c2
-                        f10 = rr*c1
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, dd2_hi
-                            do dd1 = 0, rr - 1
-                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, islot)
-                            end do
-                        end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (has_lo) rhs_vf(eq)%sf(tl1 + c1, ol2, tl3 + c2) = rhs_vf(eq)%sf(tl1 + c1, ol2, &
-                            & tl3 + c2) + (creg(2)%lo(eq, c1, c2, islot) - fblo)/mlo
-                        if (has_hi) rhs_vf(eq)%sf(tl1 + c1, oh2, tl3 + c2) = rhs_vf(eq)%sf(tl1 + c1, oh2, &
-                            & tl3 + c2) + (fbhi - creg(2)%hi(eq, c1, c2, islot))/mhi
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
         end if
+
         ! z-faces (p_glb > 0): transverse dims (x, y); both always active in 3D (4 children)
-        has_lo = own_lo(3); has_hi = own_hi(3)
-        if (p_glb > 0 .and. (has_lo .or. has_hi)) then
+        if (p_glb > 0) then
             nch = rr*rr
-            mlo = 1._wp; mhi = 1._wp
-            if (has_lo) mlo = dz(ol3)
-            if (has_hi) mhi = dz(oh3)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do c2 = bl2, bh2
-                    do c1 = bl1, bh1
-                        f20 = rr*c2
-                        f10 = rr*c1
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, rr - 1
-                            do dd1 = 0, rr - 1
-                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, islot)
+            nact = 0; gmax1 = 0; gmax2 = 0
+            a_act(1:amr_num_blocks) = .false.
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) /= 1) cycle
+                call s_amr_select_slot(k)
+                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
+                if (.not. (own_lo(3) .or. own_hi(3))) cycle
+                bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
+                bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
+                a_act(k) = .true.; a_lo(k) = own_lo(3); a_hi(k) = own_hi(3)
+                a_ol(k) = amr_region_lo(3) - 1 - sidx(3); a_oh(k) = amr_region_hi(3) + 1 - sidx(3)
+                a_t1(k) = amr_region_lo(1) - sidx(1); a_t2(k) = amr_region_lo(2) - sidx(2)
+                a_b1l(k) = bl1; a_b1h(k) = bh1; a_b2l(k) = bl2; a_b2h(k) = bh2
+                a_mlo(k) = 1._wp; a_mhi(k) = 1._wp
+                if (own_lo(3)) a_mlo(k) = dz(a_ol(k))
+                if (own_hi(3)) a_mhi(k) = dz(a_oh(k))
+                nact = nact + 1
+                gmax1 = max(gmax1, bh1 - bl1); gmax2 = max(gmax2, bh2 - bl2)
+            end do
+            call s_amr_select_slot(save_cur)
+            if (nact > 0) then
+                $:GPU_UPDATE(device='[a_ol, a_oh, a_t1, a_t2, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
+                do k = 1, amr_num_blocks
+                    do c2w = 0, gmax2
+                        do c1w = 0, gmax1
+                            do eq = 1, sys_size
+                                if (.not. a_act(k)) cycle
+                                c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
+                                if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
+                                f20 = rr*c2
+                                f10 = rr*c1
+                                fblo = 0._wp; fbhi = 0._wp
+                                do dd2 = 0, rr - 1
+                                    do dd1 = 0, rr - 1
+                                        fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, k)
+                                        fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, k)
+                                    end do
+                                end do
+                                fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                                i2 = a_t1(k) + c1; i3 = a_t2(k) + c2
+                                if (a_lo(k)) rhs_vf(eq)%sf(i2, i3, a_ol(k)) = rhs_vf(eq)%sf(i2, i3, a_ol(k)) + (creg(3)%lo(eq, &
+                                    & c1, c2, k) - fblo)/a_mlo(k)
+                                if (a_hi(k)) rhs_vf(eq)%sf(i2, i3, a_oh(k)) = rhs_vf(eq)%sf(i2, i3, &
+                                    & a_oh(k)) + (fbhi - creg(3)%hi(eq, c1, c2, k))/a_mhi(k)
                             end do
                         end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (has_lo) rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, ol3) = rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, &
-                            & ol3) + (creg(3)%lo(eq, c1, c2, islot) - fblo)/mlo
-                        if (has_hi) rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, oh3) = rhs_vf(eq)%sf(tl1 + c1, tl2 + c2, &
-                            & oh3) + (fbhi - creg(3)%hi(eq, c1, c2, islot))/mhi
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
 
     end subroutine s_amr_apply_reflux
@@ -1072,6 +1161,7 @@ contains
             end if
         end do
         @:DEALLOCATE(bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive)
+        @:DEALLOCATE(a_ol, a_oh, a_t1, a_t2, a_t3, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi)
 
     end subroutine s_finalize_amr_registers
 
