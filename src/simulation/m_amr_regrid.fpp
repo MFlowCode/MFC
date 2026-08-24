@@ -1659,14 +1659,10 @@ contains
             if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (.not. amr_rank_owns_block) cycle
             call s_amr_cov_note(old_np, old_ilo, old_ext, old_level)  ! [amr-cov] rebuild-gather coverage split
+            ! prolong and overlap carry-forward are both DEVICE kernels now: the slot is built entirely in place where the
+            ! store is authoritative, and the per-box full-slot push (PH_RBPUSH) is gone.
             call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()
             call s_phase_toc(PH_RBOVL)
-            ! prolonged interior -> device BEFORE the overlap carry-forward: the carry-forward is a DEVICE kernel now (the
-            ! stash never visits the host since the device-side migration), so this push must precede it or the host
-            ! prolong copy would clobber the overlap writes. Same final device state as the old overlap-then-push order.
-            call s_phase_tic(PH_RBPUSH)
-            $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(ks))]')
-            call s_phase_toc(PH_RBPUSH)
             ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy the
             ! overlap from EVERY covering old block regardless of owner - sh is the old->new LOCAL fine index shift. A level>=2
             ! block
