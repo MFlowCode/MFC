@@ -16,7 +16,8 @@ module m_hypoelastic
 
     private; public :: s_initialize_hypoelastic_module, s_finalize_hypoelastic_module, &
         & s_compute_hypoelastic_rhs_finite_diff_per_sweep, s_compute_hypoelastic_rhs_iface, &
-        & s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_hypoelastic_rhs_axisym_geom_dual_pass, s_compute_damage_state
+        & s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_hypoelastic_rhs_axisym_geom_dual_pass, s_compute_damage_state, &
+        & s_enforce_cont_damage_bounds
 
     real(wp), allocatable, dimension(:) :: Gs_hypo
     $:GPU_DECLARE(create='[Gs_hypo]')
@@ -770,5 +771,33 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_damage_state
+
+    !> Project the conservative continuum-damage carrier onto 0 <= U_D <= m_s.
+    subroutine s_enforce_cont_damage_bounds(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(stp)                                              :: ms_K
+        integer                                                :: q, l, k, i
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ms_K]')
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    ! Damageable-solid partial mass
+                    ms_K = 0._stp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        if (Gs_hypo(i) > verysmall) then
+                            ms_K = ms_K + q_cons_vf(eqn_idx%cont%beg + i - 1)%sf(k, l, q)
+                        end if
+                    end do
+                    ms_K = max(ms_K, 0._stp)
+                    q_cons_vf(eqn_idx%damage)%sf(k, l, q) = min(max(q_cons_vf(eqn_idx%damage)%sf(k, l, q), 0._stp), ms_K)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_enforce_cont_damage_bounds
 
 end module m_hypoelastic
