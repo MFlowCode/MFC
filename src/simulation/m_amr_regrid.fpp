@@ -1275,6 +1275,102 @@ contains
 
     end subroutine s_amr_regrid_boxes_unchanged
 
+    !> DEVICE pack of an owned old block's stash into the migration wire buffer (wp wire, stp store): the store is
+    !! device-authoritative during the rebuild, so pack where the data lives; the copyout hands the host MPI buffer back as one
+    !! contiguous transfer of exactly the interior. Wire layout (gi fastest, then gj, gk, ii) matches the old host pack
+    !! byte-for-byte, so the message set and [amr-xa] F4 totals are unchanged.
+    impure subroutine s_amr_mig_pack_device(loc, e1, e2, e3, buf)
+
+        integer, intent(in)                 :: loc, e1, e2, e3
+        real(wp), intent(inout), contiguous :: buf(:)
+        integer                             :: ii, gk, gj, gi, n1, n2, n3
+
+        n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
+        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
+        do ii = 1, sys_size
+            do gk = 0, e3
+                do gj = 0, e2
+                    do gi = 0, e1
+                        buf(1 + gi + n1*(gj + n2*(gk + n3*(ii - 1)))) = real(amr_stor_st(gi, gj, gk, ii, loc), wp)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_mig_pack_device
+
+    !> DEVICE unpack of a received old block into its stash replica (mirror of the pack; the copyin stages the wire buffer).
+    !! Replaces the host cast loop AND the full-slot device push it required.
+    impure subroutine s_amr_mig_unpack_device(loc, e1, e2, e3, buf)
+
+        integer, intent(in)              :: loc, e1, e2, e3
+        real(wp), intent(in), contiguous :: buf(:)
+        integer                          :: ii, gk, gj, gi, n1, n2, n3
+
+        n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
+        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
+        do ii = 1, sys_size
+            do gk = 0, e3
+                do gj = 0, e2
+                    do gi = 0, e1
+                        amr_stor_st(gi, gj, gk, ii, loc) = real(buf(1 + gi + n1*(gj + n2*(gk + n3*(ii - 1)))), stp)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_mig_unpack_device
+
+    !> DEVICE cons->stor stash copy of one owned old block's fine interior (the store is device-authoritative; no host staging).
+    impure subroutine s_amr_stash_copy_device(loc, e1, e2, e3)
+
+        integer, intent(in) :: loc, e1, e2, e3
+        integer             :: ii, gk, gj, gi
+
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do ii = 1, sys_size
+            do gk = 0, e3
+                do gj = 0, e2
+                    do gi = 0, e1
+                        amr_stor_st(gi, gj, gk, ii, loc) = amr_cons_st(gi, gj, gk, ii, loc)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_stash_copy_device
+
+    !> DEVICE overlap carry-forward: overwrite the new block's prolonged cons (slot column vloc, extents vm/vn/vp) with the covering
+    !! old block's stashed fine detail (column vold, extents ve*), shifted by sh. Guards mirror the old host loop.
+    impure subroutine s_amr_overlap_copy_device(vloc, vold, vm, vn, vp, sh, ve1, ve2, ve3)
+
+        integer, intent(in) :: vloc, vold, vm, vn, vp, sh(3), ve1, ve2, ve3
+        integer             :: i, fi, fj, fk, ofi, ofj, ofk, sh1, sh2, sh3
+        logical             :: vd2, vd3
+
+        sh1 = sh(1); sh2 = sh(2); sh3 = sh(3)
+        vd2 = n_glb > 0; vd3 = p_glb > 0
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[ofi, ofj, ofk]')
+        do i = 1, sys_size
+            do fk = 0, vp
+                do fj = 0, vn
+                    do fi = 0, vm
+                        ofk = fk + sh3; ofj = fj + sh2; ofi = fi + sh1
+                        if (vd3 .and. (ofk < 0 .or. ofk > ve3)) cycle
+                        if (vd2 .and. (ofj < 0 .or. ofj > ve2)) cycle
+                        if (ofi < 0 .or. ofi > ve1) cycle
+                        amr_cons_st(fi, fj, fk, i, vloc) = amr_stor_st(ofi, ofj, ofk, i, vold)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_overlap_copy_device
+
     !> Regrid phase 5: stash every live slot's fine interior (dead-between-steps q_cons_stor bounce), record the old block set
     !! (old_*), commit the new regions/levels/owners, and migrate each stashed old block point-to-point to the ranks that now own an
     !! overlapping new block.
@@ -1315,14 +1411,14 @@ contains
             old_level(k) = amr_block_level(ks)
             old_owns(k) = amr_owns_all(ks)
             if (old_owns(k)) then
-                $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(ks))]')
-                amr_stor_st(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,amr_loc_of(ks)) = amr_cons_st(0:old_ext(1, k), &
-                            & 0:old_ext(2, k),0:old_ext(3, k),:,amr_loc_of(ks))
-                ! Push the stash before any later s_amr_alloc_slot: allocating a slot can grow the shared
-                ! store, and s_amr_st_reserve preserves growth by pulling device->host, which would
-                ! overwrite this host-written stash with an unwritten device copy. Same hazard that made
-                ! restart return NaN; see the contract on s_amr_st_reserve.
-                $:GPU_UPDATE(device='[amr_stor_st(:, :, :, :, amr_loc_of(ks))]')
+                ! DEVICE-side stash: the store is device-authoritative, so copy cons->stor where the data lives instead of
+                ! staging two full-slot transfers through the host (the old pull/host-copy/push). A mid-rebuild grow's
+                ! device->host round trip preserves this stash by construction (s_amr_st_reserve's contract); the host
+                ! mirror of amr_stor_st stays stale, which is fine - the migration pack and the overlap carry-forward
+                ! below are device kernels now and no host reader of the stash remains. (The kernel lives in its own
+                ! subroutine: amdflang drops target regions nested in BLOCK constructs from the device image - the host
+                ! registers them and the first launch dies on HSA_STATUS_ERROR_INVALID_SYMBOL_NAME.)
+                call s_amr_stash_copy_device(amr_loc_of(ks), old_ext(1, k), old_ext(2, k), old_ext(3, k))
                 ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like q_cons (both stors are dead between
                 ! steps)
                 if (qbmm .and. .not. polytropic) then
@@ -1387,7 +1483,7 @@ contains
         ! overlap-copy's per-(k,kk) index guard skips every cell of a non-overlapping pair. No-op at np=1 (single owner, local).
         if (num_procs > 1) then
             block
-                integer               :: kk, k2, ii, gi, gj, gk, idx2, ierr2, rr, nrq
+                integer               :: kk, k2, ierr2, rr, nrq
                 integer               :: cnt(np_l), scol(np_l), rcol(np_l)
                 integer               :: nsnd, nrcv, nsreq, maxsnd, maxrcv
                 logical               :: getk(np_l), isdest(0:num_procs - 1)
@@ -1457,17 +1553,8 @@ contains
                             & kk))) isdest(rr) = .true.
                     end do
                     amr_mig_blk = amr_mig_blk + 1_8
-                    idx2 = 0
-                    do ii = 1, sys_size
-                        do gk = 0, old_ext(3, kk)
-                            do gj = 0, old_ext(2, kk)
-                                do gi = 0, old_ext(1, kk)
-                                    idx2 = idx2 + 1
-                                    spack(idx2, scol(kk)) = real(amr_stor_st(gi, gj, gk, ii, amr_loc_of(f_l0_slot(kk))), wp)
-                                end do
-                            end do
-                        end do
-                    end do
+                    call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
+                                               & spack(1:cnt(kk),scol(kk)))
                     do rr = 0, num_procs - 1
                         if (.not. isdest(rr)) cycle
                         nrq = nrq + 1
@@ -1481,29 +1568,14 @@ contains
                 call s_phase_tic(PH_MGWAIT)
                 if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
                 call s_phase_toc(PH_MGWAIT)
-                do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots
+                do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots (DEVICE-direct:
+                    ! the copyin stages exactly the packed interior, and the replica lands device-side where the store is
+                    ! authoritative - no host cast loop and no full-slot push, and a mid-rebuild grow preserves it)
                     if (.not. getk(kk)) cycle
                     call s_phase_tic(PH_MGUNPK)
-                    idx2 = 0
-                    do ii = 1, sys_size
-                        do gk = 0, old_ext(3, kk)
-                            do gj = 0, old_ext(2, kk)
-                                do gi = 0, old_ext(1, kk)
-                                    idx2 = idx2 + 1
-                                    amr_stor_st(gi, gj, gk, ii, amr_loc_of(f_l0_slot(kk))) = real(rpack(idx2, rcol(kk)), stp)
-                                end do
-                            end do
-                        end do
-                    end do
+                    call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
+                                                 & rpack(1:cnt(kk),rcol(kk)))
                     call s_phase_toc(PH_MGUNPK)
-                    ! Push the received stash before any later s_amr_alloc_slot, for the same reason as the
-                    ! owner-stash push above: the store is DEVICE-authoritative (see s_amr_st_reserve's
-                    ! contract), and a mid-rebuild grow pulls device->host, which would overwrite this
-                    ! host-written slot with an unwritten device copy - silently discarding the migrated
-                    ! fine detail on the receiving rank.
-                    call s_phase_tic(PH_MGPUSH)
-                    $:GPU_UPDATE(device='[amr_stor_st(:, :, :, :, amr_loc_of(f_l0_slot(kk)))]')
-                    call s_phase_toc(PH_MGPUSH)
                 end do
                 deallocate (rq, spack, rpack)
             end block
@@ -1588,12 +1660,20 @@ contains
             if (.not. amr_rank_owns_block) cycle
             call s_amr_cov_note(old_np, old_ilo, old_ext, old_level)  ! [amr-cov] rebuild-gather coverage split
             call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()
+            call s_phase_toc(PH_RBOVL)
+            ! prolonged interior -> device BEFORE the overlap carry-forward: the carry-forward is a DEVICE kernel now (the
+            ! stash never visits the host since the device-side migration), so this push must precede it or the host
+            ! prolong copy would clobber the overlap writes. Same final device state as the old overlap-then-push order.
+            call s_phase_tic(PH_RBPUSH)
+            $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(ks))]')
+            call s_phase_toc(PH_RBPUSH)
             ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy the
             ! overlap from EVERY covering old block regardless of owner - sh is the old->new LOCAL fine index shift. A level>=2
             ! block
             ! SKIPS this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its PARENT-fine frame, so the shift is
             ! wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid instead; the coupling keeps
             ! conservation. Detail-preserving same-level L2 migration (parent-fine overlap) is a later increment.
+            call s_phase_tic(PH_RBOVL)
             if (amr_block_level(amr_cur) < 2) then
                 do kk = 1, old_np
                     ! same-level overlap only (a child's stash is 4x-framed)
@@ -1601,27 +1681,11 @@ contains
                     kks = f_l0_slot(kk)
                     ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
                     sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
-                    do i = 1, sys_size
-                        do fk = 0, amr_slots(ks)%p
-                            ofk = fk + sh(3)
-                            if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
-                            do fj = 0, amr_slots(ks)%n
-                                ofj = fj + sh(2)
-                                if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
-                                do fi = 0, amr_slots(ks)%m
-                                    ofi = fi + sh(1)
-                                    if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                    amr_cons_st(fi, fj, fk, i, amr_loc_of(ks)) = amr_stor_st(ofi, ofj, ofk, i, amr_loc_of(kks))
-                                end do
-                            end do
-                        end do
-                    end do
+                    call s_amr_overlap_copy_device(amr_loc_of(ks), amr_loc_of(kks), amr_slots(ks)%m, amr_slots(ks)%n, &
+                                                   & amr_slots(ks)%p, sh, old_ext(1, kk), old_ext(2, kk), old_ext(3, kk))
                 end do
             end if
             call s_phase_toc(PH_RBOVL)
-            call s_phase_tic(PH_RBPUSH)
-            $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(ks))]')
-            call s_phase_toc(PH_RBPUSH)
             ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant), then overwrite the overlap with the
             ! old blocks' fine data (same index shift)
             if (qbmm .and. .not. polytropic) then

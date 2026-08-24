@@ -46,6 +46,10 @@ covered in `docs/documentation/contributing.md`.
 
 ## GPU
 
+- NEVER put a `GPU_PARALLEL_LOOP` inside a Fortran `block` construct: amdflang compiles
+  it clean but silently DROPS the region from the device image — the first launch dies
+  with `HSA_STATUS_ERROR_INVALID_SYMBOL_NAME` naming an `__omp_offloading_*` symbol.
+  Hoist the kernel into its own module subroutine.
 - WARNING: do NOT wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops — `GPU_LOOP` emits
   empty directives on Cray and AMD, causing silent serial execution. Spatial loops always
   use `GPU_PARALLEL_LOOP`/`END_GPU_PARALLEL_LOOP`. Macro API:
