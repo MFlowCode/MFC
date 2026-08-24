@@ -487,7 +487,7 @@ contains
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
         ! Immersed Boundaries (sim-specific extras)
-        ib_neighborhood_radius = 1
+        ib_neighborhood_radius = 0
         collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
@@ -640,9 +640,13 @@ contains
             particle_cloud(i)%radius = dflt_real
             particle_cloud(i)%mass = dflt_real
             particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%shell_inner_radius = dflt_real
+            particle_cloud(i)%shell_outer_radius = dflt_real
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
+            particle_cloud(i)%cloud_geometry = 1
             particle_cloud(i)%packing_method = dflt_int
+            particle_cloud(i)%periodic = 0
         end do
 
         do i = 1, num_ib_patches_max_namelist
