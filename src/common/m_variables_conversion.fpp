@@ -424,6 +424,8 @@ contains
     !! each model has different variable sets and EOS.
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, q_T_sf, qK_prim_vf, ibounds)
 
+        use m_global_parameters_common, only: shear_indices  ! Performance fix with AMDFlang
+
         type(scalar_field), dimension(sys_size), intent(in)    :: qK_cons_vf
         type(scalar_field), intent(inout)                      :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
