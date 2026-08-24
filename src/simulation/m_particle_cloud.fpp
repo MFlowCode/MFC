@@ -23,9 +23,9 @@ module m_particle_cloud
 contains
 
     !> Generate all particle beds and fill particle_cloud_ibs. Called on all ranks before s_reduce_ib_patch_array. Each packing
-    !! method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice / s_particle_cloud_random_box) and
-    !! hands back only the entries that fall within this rank's IB neighborhood. Only the first num_particle_cloud_ibs of them are
-    !! actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is left
+    !! method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice / s_particle_cloud_rejection_pack)
+    !! and hands back only the entries that fall within this rank's IB neighborhood. Only the first num_particle_cloud_ibs of them
+    !! are actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is left
     !! uninitialized.
     impure subroutine s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
 
@@ -53,9 +53,12 @@ contains
         glbl_idx = num_ibs
 
         do cloud_idx = 1, num_particle_clouds
+            ! Dispatch on packing method only: rejection sampling handles both box and hemisphere-shell
+            ! geometries (the per-candidate geometry sampling lives in s_sample_cloud_candidate), while lattice
+            ! packing is box-only - the hemisphere-shell + lattice combination is rejected in case_validator.py.
             select case (particle_cloud(cloud_idx)%packing_method)
-            case (1)  ! random box packing method
-                call s_particle_cloud_random_box(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
+            case (1)  ! rejection (random) packing method
+                call s_particle_cloud_rejection_pack(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
             case (2)  ! lattice packing method
                 call s_particle_cloud_lattice(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
             case default
@@ -75,11 +78,13 @@ contains
 
     end subroutine s_generate_particle_clouds
 
-    !> Generates a random distributions of particles in a box with a minimum spacing. Rejection sampling needs every placed particle
-    !! tracked (regardless of which rank's neighborhood it falls in) to detect overlaps deterministically, so cloud_ibs is allocated
-    !! here to the cloud's full requested particle count and only pared down to this rank's neighborhood afterwards, via
-    !! s_reduce_particle_cloud_ibs.
-    subroutine s_particle_cloud_random_box(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
+    !> Rejection-samples particle centres into a box or hemisphere-shell region with a minimum centre-to-centre spacing. Rejection
+    !! sampling needs every placed particle tracked (regardless of which rank's neighborhood it falls in) to detect overlaps
+    !! deterministically, so cloud_ibs is allocated here to the cloud's full requested particle count and only pared down to this
+    !! rank's neighborhood afterwards, via s_reduce_particle_cloud_ibs. Only the per-candidate geometry sampling differs between box
+    !! and hemisphere shell; it is delegated to s_sample_cloud_candidate, and every other step (overlap rejection via the spatial
+    !! hash, acceptance, reduction) is geometry-independent.
+    subroutine s_particle_cloud_rejection_pack(cloud_idx, glbl_idx, cloud_ibs, num_cloud_ibs)
 
         integer, intent(in)                                               :: cloud_idx
         integer, intent(inout)                                            :: glbl_idx
@@ -87,14 +92,13 @@ contains
         integer, intent(out)                                              :: num_cloud_ibs
         integer                                                           :: ib_idx, n_placed, geom, seed, alloc_stat
         integer(8)                                                        :: n_attempts, max_attempts
-        real(wp)                                                          :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp)                                                          :: rx, ry, rz, dist
-        logical                                                           :: overlaps
+        real(wp)                                                          :: min_dist, rx, ry, rz
+        logical                                                           :: overlaps, reject, periodic_pack
         real(wp), allocatable                                             :: placed(:,:)
         integer                                                           :: hash_size, slot
-        integer                                                           :: bx, by, bz, nbx, nby, nbz
-        integer                                                           :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        integer                                                           :: bx, by, bz, nx_bins, ny_bins, nz_bins
         integer, allocatable                                              :: hash_head(:), chain_next(:)
+        real(wp)                                                          :: xmin, ymin, zmin, length_x, length_y, length_z
 
         allocate (cloud_ibs(particle_cloud(cloud_idx)%num_particles), stat=alloc_stat)
         if (alloc_stat /= 0) then
@@ -103,23 +107,23 @@ contains
         end if
         ib_idx = 0
 
-        xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
-        xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
-        ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_y
-        ymax = particle_cloud(cloud_idx)%y_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_y
-        zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_z
-        zmax = particle_cloud(cloud_idx)%z_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_z
-
         min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
+        periodic_pack = particle_cloud(cloud_idx)%cloud_geometry == 1 .and. particle_cloud(cloud_idx)%periodic == 1
+        length_x = particle_cloud(cloud_idx)%length_x
+        length_y = particle_cloud(cloud_idx)%length_y
+        length_z = particle_cloud(cloud_idx)%length_z
+        xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*length_x
+        ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*length_y
+        zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*length_z
+        nx_bins = max(1, ceiling(length_x/min_dist))
+        ny_bins = max(1, ceiling(length_y/min_dist))
+        nz_bins = max(1, ceiling(length_z/min_dist))
+        if (num_dims < 3) nz_bins = 1
 
         if (num_dims < 3) then
             geom = 2  ! circle for 2D
-            dz_lo = 0
-            dz_hi = 0
         else
             geom = 8  ! sphere for 3D
-            dz_lo = -1
-            dz_hi = 1
         end if
 
         max_attempts = int(particle_cloud(cloud_idx)%num_particles, 8)*1000_8
@@ -141,44 +145,12 @@ contains
         do while (n_placed < particle_cloud(cloud_idx)%num_particles .and. n_attempts < max_attempts)
             n_attempts = n_attempts + 1
 
-            rx = xmin + f_xorshift(seed)*(xmax - xmin)
-            ry = ymin + f_xorshift(seed)*(ymax - ymin)
-            if (num_dims < 3) then
-                rz = particle_cloud(cloud_idx)%z_centroid
-            else
-                rz = zmin + f_xorshift(seed)*(zmax - zmin)
-            end if
+            call s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
+            if (reject) cycle
 
-            bx = int(floor(rx/min_dist))
-            by = int(floor(ry/min_dist))
-            bz = 0
-            if (p /= 0) bz = int(floor(rz/min_dist))
-
-            ! Check 3x3(x3) neighboring bins - O(1) average via hash lookup
-            overlaps = .false.
-            outer: do dx_b = -1, 1
-                do dy_b = -1, 1
-                    do dz_b = dz_lo, dz_hi
-                        nbx = bx + dx_b
-                        nby = by + dy_b
-                        nbz = bz + dz_b
-                        slot = f_bin_hash(nbx, nby, nbz, hash_size)
-                        j = hash_head(slot)
-                        do while (j > 0)
-                            if (num_dims < 3) then
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2)
-                            else
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2 + (rz - placed(3, j))**2)
-                            end if
-                            if (dist < min_dist) then
-                                overlaps = .true.
-                                exit outer
-                            end if
-                            j = chain_next(j)
-                        end do
-                    end do
-                end do
-            end do outer
+            call s_check_cloud_particle_overlap(rx, ry, rz, placed, hash_head, chain_next, hash_size, min_dist, periodic_pack, &
+                                                & xmin, ymin, zmin, length_x, length_y, length_z, nx_bins, ny_bins, nz_bins, &
+                                                & overlaps, bx, by, bz)
 
             if (.not. overlaps) then
                 n_placed = n_placed + 1
@@ -205,7 +177,68 @@ contains
         call s_reduce_particle_cloud_ibs(cloud_ibs, ib_idx)
         num_cloud_ibs = ib_idx
 
-    end subroutine s_particle_cloud_random_box
+    end subroutine s_particle_cloud_rejection_pack
+
+    !> Draws one rejection-sampling candidate centre (rx, ry, rz) for cloud_idx, advancing seed in place. For box geometry the
+    !! candidate is uniform in the box and never rejected. For a hemisphere shell the candidate is uniform in the shell volume - 2D
+    !! uses theta uniform on [0, pi] with the sqrt radial CDF; 3D uses uniform phi, uniform cos(polar) on [0, 1], and the cube-root
+    !! radial CDF - and reject is set when it lands within one particle radius of the flat face (the plane at y_centroid in 2D,
+    !! z_centroid in 3D), a hard geometric cut applied after sampling that preserves uniformity over the remaining region.
+    subroutine s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
+
+        integer, intent(in)    :: cloud_idx
+        integer, intent(inout) :: seed
+        real(wp), intent(out)  :: rx, ry, rz
+        logical, intent(out)   :: reject
+        real(wp)               :: xmin, xmax, ymin, ymax, zmin, zmax
+        real(wp)               :: theta, phi, r_shell, rho, u, zdir, r_inner, r_outer
+
+        reject = .false.
+
+        select case (particle_cloud(cloud_idx)%cloud_geometry)
+        case (1)  ! box
+            xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
+            xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
+            ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_y
+            ymax = particle_cloud(cloud_idx)%y_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_y
+            zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_z
+            zmax = particle_cloud(cloud_idx)%z_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_z
+
+            rx = xmin + f_xorshift(seed)*(xmax - xmin)
+            ry = ymin + f_xorshift(seed)*(ymax - ymin)
+            if (num_dims < 3) then
+                rz = particle_cloud(cloud_idx)%z_centroid
+            else
+                rz = zmin + f_xorshift(seed)*(zmax - zmin)
+            end if
+        case (2)  ! hemisphere shell
+            r_inner = particle_cloud(cloud_idx)%shell_inner_radius + particle_cloud(cloud_idx)%radius
+            r_outer = particle_cloud(cloud_idx)%shell_outer_radius - particle_cloud(cloud_idx)%radius
+
+            if (num_dims < 3) then
+                theta = pi*f_xorshift(seed)
+                u = f_xorshift(seed)
+                r_shell = sqrt((r_outer**2 - r_inner**2)*u + r_inner**2)
+                rx = particle_cloud(cloud_idx)%x_centroid + r_shell*cos(theta)
+                ry = particle_cloud(cloud_idx)%y_centroid + r_shell*sin(theta)
+                rz = particle_cloud(cloud_idx)%z_centroid
+                if (ry < particle_cloud(cloud_idx)%y_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+            else
+                phi = 2._wp*pi*f_xorshift(seed)
+                zdir = f_xorshift(seed)
+                rho = sqrt(max(0._wp, 1._wp - zdir**2))
+                u = f_xorshift(seed)
+                r_shell = ((r_outer**3 - r_inner**3)*u + r_inner**3)**(1._wp/3._wp)
+                rx = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
+                ry = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*sin(phi)
+                rz = particle_cloud(cloud_idx)%z_centroid + r_shell*zdir
+                if (rz < particle_cloud(cloud_idx)%z_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+            end if
+        case default
+            call s_mpi_abort("Particle cloud geometry is not a known cloud geometry of MFC. Exiting.")
+        end select
+
+    end subroutine s_sample_cloud_candidate
 
     !> Places particles on the optimally dense lattice for the cloud region: a triangular lattice in 2D, a face-centered cubic
     !! lattice in 3D. The lattice spacing is set by the particle density (num_particles over the region area/volume); if that
@@ -313,8 +346,8 @@ contains
 
     !> Writes a single placed particle into particle_cloud_ibs at the next free slot, advancing ib_idx. The caller decides whether
     !! this particle belongs in the array (neighborhood membership, for lattice packing, or unconditionally for rejection packing -
-    !! see s_particle_cloud_lattice / s_particle_cloud_random_box) and supplies its already-assigned, absolute global patch id via
-    !! glbl_idx - s_reduce_ib_patch_array copies gbl_patch_id as-is. Shared by all packing methods so the per-particle
+    !! see s_particle_cloud_lattice / s_particle_cloud_rejection_pack) and supplies its already-assigned, absolute global patch id
+    !! via glbl_idx - s_reduce_ib_patch_array copies gbl_patch_id as-is. Shared by all packing methods so the per-particle
     !! ib_patch_parameters setup stays in one place.
     subroutine s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, px, py, pz, particle_cloud_ibs)
 
@@ -368,9 +401,108 @@ contains
 
     end subroutine s_add_cloud_particle
 
+    !> Convert a candidate particle centre to spatial-hash bin coordinates.
+    subroutine s_get_cloud_bin(px, py, pz, min_dist, periodic_pack, xmin, ymin, zmin, nx_bins, ny_bins, nz_bins, bx, by, bz)
+
+        real(wp), intent(in) :: px, py, pz, min_dist
+        logical, intent(in)  :: periodic_pack
+        real(wp), intent(in) :: xmin, ymin, zmin
+        integer, intent(in)  :: nx_bins, ny_bins, nz_bins
+        integer, intent(out) :: bx, by, bz
+
+        if (periodic_pack) then
+            bx = modulo(int(floor((px - xmin)/min_dist)), nx_bins)
+            by = modulo(int(floor((py - ymin)/min_dist)), ny_bins)
+            if (num_dims < 3) then
+                bz = 0
+            else
+                bz = modulo(int(floor((pz - zmin)/min_dist)), nz_bins)
+            end if
+        else
+            bx = int(floor(px/min_dist))
+            by = int(floor(py/min_dist))
+            if (num_dims < 3) then
+                bz = 0
+            else
+                bz = int(floor(pz/min_dist))
+            end if
+        end if
+
+    end subroutine s_get_cloud_bin
+
+    !> Check whether a candidate particle centre overlaps any already-placed particle in neighbouring spatial-hash bins. Scans the
+    !! 3x3(x3) bin neighborhood - O(1) average via hash lookup - and also hands back the candidate's own bin so the caller can
+    !! insert it without recomputing.
+    subroutine s_check_cloud_particle_overlap(px, py, pz, placed, hash_head, chain_next, hash_size, min_dist, periodic_pack, &
+        & xmin, ymin, zmin, length_x, length_y, length_z, nx_bins, ny_bins, nz_bins, overlaps, bx, by, bz)
+
+        real(wp), intent(in)                 :: px, py, pz, min_dist
+        real(wp), intent(in), dimension(:,:) :: placed
+        integer, intent(in), dimension(:)    :: hash_head, chain_next
+        integer, intent(in)                  :: hash_size
+        logical, intent(in)                  :: periodic_pack
+        real(wp), intent(in)                 :: xmin, ymin, zmin, length_x, length_y, length_z
+        integer, intent(in)                  :: nx_bins, ny_bins, nz_bins
+        logical, intent(out)                 :: overlaps
+        integer, intent(out)                 :: bx, by, bz
+        integer                              :: nbx, nby, nbz, slot
+        integer                              :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
+        real(wp)                             :: dist_sq, min_dist_sq, dx, dy, dz
+
+        call s_get_cloud_bin(px, py, pz, min_dist, periodic_pack, xmin, ymin, zmin, nx_bins, ny_bins, nz_bins, bx, by, bz)
+
+        dz_lo = -1
+        dz_hi = 1
+        if (num_dims < 3) then
+            dz_lo = 0
+            dz_hi = 0
+        end if
+
+        min_dist_sq = min_dist**2
+        overlaps = .false.
+
+        do dx_b = -1, 1
+            do dy_b = -1, 1
+                do dz_b = dz_lo, dz_hi
+                    nbx = bx + dx_b
+                    nby = by + dy_b
+                    nbz = bz + dz_b
+                    if (periodic_pack) then
+                        nbx = modulo(nbx, nx_bins)
+                        nby = modulo(nby, ny_bins)
+                        if (num_dims == 3) nbz = modulo(nbz, nz_bins)
+                    end if
+                    slot = f_bin_hash(nbx, nby, nbz, hash_size)
+                    j = hash_head(slot)
+                    do while (j > 0)
+                        dx = abs(px - placed(1, j))
+                        dy = abs(py - placed(2, j))
+                        if (periodic_pack) then
+                            dx = min(dx, length_x - dx)
+                            dy = min(dy, length_y - dy)
+                        end if
+                        if (num_dims < 3) then
+                            dist_sq = dx**2 + dy**2
+                        else
+                            dz = abs(pz - placed(3, j))
+                            if (periodic_pack) dz = min(dz, length_z - dz)
+                            dist_sq = dx**2 + dy**2 + dz**2
+                        end if
+                        if (dist_sq < min_dist_sq) then
+                            overlaps = .true.
+                            return
+                        end if
+                        j = chain_next(j)
+                    end do
+                end do
+            end do
+        end do
+
+    end subroutine s_check_cloud_particle_overlap
+
     !> Compacts cloud_ibs(1:num_ibs) in place, discarding entries outside this rank's IB neighborhood (get_neighbor_bounds() must
     !! already have run) and updating num_ibs to the retained count. Used by rejection packing, which cannot filter as it places
-    !! particles (see s_particle_cloud_random_box), to pare its full, unfiltered placement down to this rank's neighborhood.
+    !! particles (see s_particle_cloud_rejection_pack), to pare its full, unfiltered placement down to this rank's neighborhood.
     subroutine s_reduce_particle_cloud_ibs(cloud_ibs, num_cloud_ibs)
 
         type(ib_patch_parameters), intent(inout), dimension(:) :: cloud_ibs
@@ -401,7 +533,10 @@ contains
         seed = ieor(seed, ishft(seed, -17))
         seed = ieor(seed, ishft(seed, 5))
 
-        rval = abs(real(seed, wp))/real(huge(seed), wp)
+        ! Mask off the sign bit rather than abs(): at seed = -huge-1, abs() overflows and returns the value
+        ! unchanged, yielding rval = -1 and, in the shell sampler, a NaN centre that then passes every overlap
+        ! comparison (all comparisons against NaN are false) and gets placed.
+        rval = real(iand(seed, huge(seed)), wp)/real(huge(seed), wp)
 
     end function f_xorshift
 
