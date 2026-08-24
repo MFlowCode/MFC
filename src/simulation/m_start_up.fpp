@@ -905,7 +905,9 @@ contains
                 type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
                 integer                                :: num_particle_cloud_ibs
 
-                call get_neighbor_bounds()
+                call s_instantiate_STL_models()
+                call s_initialize_ib_airfoils()
+                call s_get_neighbor_bounds()
 
                 if (cfl_dt .and. n_start > 0) then
                     call s_read_ib_restart_data(n_start)
@@ -918,8 +920,6 @@ contains
                 else
                     call s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
                 end if
-                call s_instantiate_STL_models()
-                call s_initialize_ib_airfoils()
                 call s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
                 deallocate (particle_cloud_ibs)
             end block
@@ -1499,10 +1499,10 @@ contains
 
     end subroutine s_compute_ib_neighbor_ranks
 
-    subroutine get_neighbor_bounds()
+    subroutine s_get_neighbor_bounds()
 
-        real(wp) :: beg_val, end_val, recv_val
-        integer  :: k, send_neighbor, recv_neighbor, ierr
+        real(wp) :: beg_val, end_val, recv_val, bound, max_ib_bound, local_rank_width, min_rank_width
+        integer  :: k, send_neighbor, recv_neighbor, ierr, temporary_radius
 
         ! Default: unbounded in all directions (covers single-rank and no-MPI cases)
 
@@ -1514,6 +1514,32 @@ contains
         neighbor_domain_z%end = huge(0._wp)
 
 #ifdef MFC_MPI
+        ! perform setup if we are doing automatic radius checking
+        if (ib_neighborhood_radius < 1) then
+            ib_neighborhood_radius = 0  ! ensure we are starting with 0 neighborhood radius
+
+            ! determine the maximum length of space that needs to be contained by the neighborhood
+            max_ib_bound = -1._wp
+            do k = 1, num_ibs
+                call s_get_ib_bound(patch_ib(k), bound)
+                max_ib_bound = max(max_ib_bound, bound)
+            end do
+            do k = 1, num_particle_clouds
+                max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
+            end do
+
+            ! determine the upper bound on the size
+            local_rank_width = -1._wp
+            #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
+                if (num_dims >= ${ID}$) local_rank_width = max(local_rank_width, abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)))
+            #:endfor
+            call s_mpi_allreduce_min(local_rank_width, min_rank_width)
+
+            ! approximate the size of the neighborhood with a local 1.1x fudge factor for safety, lower bound of 1
+            ib_neighborhood_radius = max(1, ceiling(1.1_wp*max_ib_bound/(min_rank_width)))
+            if (proc_rank == 0) print *, "Automatic choice of ib_neighborhood_radius selected: ", ib_neighborhood_radius
+        end if
+
         ! For each direction, propagate the left/right boundary edges outward ib_neighborhood_radius hops. After k rounds: beg_val =
         ! left edge of the rank k hops to the left; end_val = right edge of the rank k hops to the right.
         #:for X, ID, TAG, DIM in [('x', 1, 100, 'm'), ('y', 2, 102, 'n'), ('z', 3, 104, 'p')]
@@ -1548,6 +1574,6 @@ contains
         #:endfor
 #endif
 
-    end subroutine get_neighbor_bounds
+    end subroutine s_get_neighbor_bounds
 
 end module m_start_up
