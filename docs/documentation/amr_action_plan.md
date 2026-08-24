@@ -7,6 +7,32 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-24 (12) — MIGRATION GOES DEVICE-SIDE: the stash chain stops staging through the host
+
+The regrid budget's migration half (rg:mig, 0.80 s/step at np8) was host-staged end to
+end: full-slot D2H + host copy + full-slot H2D per owned old block (stash creation),
+serial host cast loops for the MPI pack/unpack (74 ms/block unpack), a full-slot H2D
+push per received replica, and a host overlap carry-forward. All four now run where the
+store is authoritative: a device cons->stor stash kernel (both full-slot transfers
+deleted), device pack/unpack kernels whose copyin/copyout stage EXACTLY the packed
+interior (wire layout byte-identical, so the message set and [amr-xa] F4 totals are
+unchanged), and a device overlap kernel — with the per-box prolong push HOISTED ahead
+of it (the prolong is still a host loop; same final device state). The stash never
+touches the host mirror any more, which also retires the two grow-hazard push sites and
+their footguns (s_amr_st_reserve's device->host round trip now preserves the stash by
+construction).
+
+GATES: step-5 full-state output BYTE-IDENTICAL to the batched-apply binary (np8 S0
+probe); [amr-xa] byte-identical; probe rg:mig 9.66 -> 5.65 s (-41%), mg:unpk 74 -> 11
+ms/call; local AMR-75 goldens 75/75 (CPU) + the GPU dynamic-regrid case direct. The
+differenced wall pair is queued behind the batched-apply pair on the floor node.
+
+FOUND EN ROUTE (new compiler trap, banked in .claude/rules/common-pitfalls.md):
+amdflang SILENTLY DROPS target regions nested inside Fortran BLOCK constructs from the
+device image — the host registers them and the first launch dies with
+HSA_STATUS_ERROR_INVALID_SYMBOL_NAME naming the missing __omp_offloading_* symbol.
+Kernels must live in ordinary (module) subroutines.
+
 ## 2026-08-24 (11) — REFLUX APPLY BATCHED: one kernel per face direction, 759 -> 15 calls/rank on the probe
 
 The verdict below ranked the reflux APPLY loop (10.4% of the np8 step — the exchange is
