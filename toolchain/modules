@@ -93,6 +93,7 @@ dai     NCSA DeltaAI
 dai-all python cmake nvidia/25.5
 dai-all CC=nvc CXX=nvc++ FC=nvfortran
 dai-gpu MFC_CUDA_CC=89,90
+dai-gpu LD_LIBRARY_PATH=/opt/nvidia/hpc_sdk/Linux_aarch64/25.5/cuda/11.8/targets/sbsa-linux/lib:$LD_LIBRARY_PATH
 
 c     DoD Carpenter (GNU)
 c-all python/3.12.1
