@@ -31,9 +31,9 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: amr_xchg_coarse_ghosts, s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, &
         & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, &
-        & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, &
-        & s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, &
-        & s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse
+        & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_reflux_to_parent, &
+        & s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
+        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -590,13 +590,17 @@ contains
                 ! keeps blocks >= buff_size apart so their c/f corrections are disjoint; every rank still visits the same slots
                 ! in the same order, preserving the collective ordering of s_amr_p2p_reflux_faces). Interleaving the two forces
                 ! a swap/restore round trip per block, which is what blocks batching the advances - see @ref amr_block_batching.
+                ! I5-F5a: ALL level-1 face exchanges as one wave (zero-copy into the freg register mirrors), then the
+                ! applies per box - the exchange set and apply set are both order-free (disjoint register slots; disjoint
+                ! rhs corrections by the merge invariant), so the split is legal.
+                call s_phase_tic(PH_REFLUX)
+                call s_phase_tic(PH_RFP2P); call s_amr_reflux_faces_wave(); call s_phase_toc(PH_RFP2P)
+                call s_phase_toc(PH_REFLUX)
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) == 0) cycle
                     if (amr_block_level(islot) >= 2) cycle
                     call s_amr_select_slot(islot)
-                    ! freg slices of the block faces move to the coarse-outside-owners (ALL ranks call; no-op at np=1)
                     call s_phase_tic(PH_REFLUX)
-                    call s_phase_tic(PH_RFP2P); call s_amr_p2p_reflux_faces(); call s_phase_toc(PH_RFP2P)
                     call s_phase_tic(PH_RFAPP)
                     call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
                     call s_phase_toc(PH_RFAPP)
@@ -777,6 +781,11 @@ contains
                                                      & pb_ts(stor)%sf, mv_ts(stor)%sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                      & t_step)
             end if
+            ! I5-F5b: the split-ownership level>=2 freg exchange as ONE wave (the registers are final after the advance);
+            ! the applies keep their per-box reverse-order position in the fold below. Subcycle keeps its per-box exchange.
+            if (.not. amr_subcycle) then
+                call s_phase_tic(PH_RESTR); call s_amr_freg_wave(); call s_phase_toc(PH_RESTR)
+            end if
             do islot = amr_num_blocks, 1, -1
                 if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                 call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
@@ -791,7 +800,7 @@ contains
                 ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured during
                 ! the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle
                 ! multi-level reflux is future work; dt is the shared lock-step step.
-                if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) call s_amr_reflux_to_parent(dt)
+                if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) call s_amr_reflux_to_parent(dt, .false.)
                 ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
                 if (amr_subcycle) call s_amr_p2p_reflux_faces()
                 if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)

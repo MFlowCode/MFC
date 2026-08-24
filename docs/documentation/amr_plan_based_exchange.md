@@ -352,3 +352,21 @@ Four CI compilers + AMD flang; `GPU_*` macros only; `@:ALLOCATE` pairing; full 7
 merge (AMR subset per iteration); one increment = one commit, each independently green; bitwise
 comparison per increment as above. Every wall-time claim measured against the 5.3% run-to-run floor
 with >=3 repeats, or judged on exact byte/count gates instead.
+
+### I5-F5 implementation binding (2026-08-23)
+
+`s_amr_reflux_faces_wave` (level-1 walk, ascending slots) and `s_amr_freg_wave`
+(level>=2 cowner->powner pairs) replace the per-box F5 exchanges in the lock-step
+driver; the subcycle path keeps its per-box form (`do_xchg` on
+`s_amr_reflux_to_parent`). Plan = the replicated owner/region tables: face-wave
+participants are cand from `s_amr_ranks_overlapping` on region+-1 INTERSECTED with
+`f_amr_reflux_participates(r)` (the conjunction the per-box form applied — a wave must
+reproduce it exactly or a rank posts a recv no one sends). Receives are ZERO-COPY into
+the `freg(d)%%lo/hi(:,:,:,slot)` host mirrors (each box owns a register slot — there is
+no pool and MUST be none, or the zero-copy design is lost); owner D2H before the ISENDs,
+receivers H2D after the WAITALL. Tags: `amr_tag_base(5) + mod(epoch, 50)`, freg wave at
+`+50`. Identity headers are DEBUG-ONLY COMPANION 8-word messages carried in
+`amr_fw_sq/rq` (never `s_xa_rec`'d, so [amr-xa] family words stay comparable to the
+per-box baseline); `amr_fw_rblk` tracks the expected box order at consume.
+`s_amr_reg_reserve(amr_num_blocks)` runs FIRST in both waves — the apply can reallocate
+`freg`, and a recv posted into a stale mirror is a silent wrong-memory write.
