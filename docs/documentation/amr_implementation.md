@@ -257,8 +257,9 @@ PH_COARSE   s_compute_rhs on the coarse (level-0) grid                          
 if (amr .and. .not. amr_subcycle):
   PH_HALO   s_amr_exchange_coarse_cons_halo                                     [1 per stage]
 
-            do islot = 1, amr_num_blocks           ! skip level 0
-  PH_GATHER   s_amr_fine_stage_fill                                             [1 per BLOCK]
+  PH_GATHER s_amr_stage_fill_wave     ! ALL level-1 fills as ONE F1+F3 wave     [1 per stage]
+            do ilev = 2, amr_num_levels
+  PH_GATHER   s_amr_parent_fill_wave(ilev)  ! level-lev fills as one F2 wave    [1 per LEVEL]
 
   PH_SEAM   s_amr_fine_fine_halo(0)   ! all levels together                     [1 per stage]
 

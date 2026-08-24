@@ -7,6 +7,34 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 (7) — I3 LANDED: level>=2 parent gathers as per-level F2 waves; per-box stage fill DELETED
+
+`s_amr_parent_fill_wave(lev)` (m_amr.fpp) converts the per-step level>=2 F2 parent
+gather — previously one pooled ISEND + one BLOCKING MPI_RECV per box, per stage, on the
+majority of boxes — to one aggregated message per (parent-owner -> child-owner) pair per
+level per RK stage, levels ascending (preserving the parent-before-child guarantee).
+Each split child is exactly one transfer, so the plan is a pair list derived on all
+ranks from replicated metadata only (f_amr_parent_block + s_amr_parent_foot +
+amr_block_owner — never the lagging per-owner mirrors). Reuses the I2a wave's scratch
+arrays and helpers (the two waves never overlap in time); zero new device kernels.
+`s_amr_fine_stage_fill` lost its last caller and is DELETED (net +155 LOC for the
+increment). Regrid keeps the chunked F2 path; subcycle keeps its per-box sites (I8);
+init/static keep per-box. Two defects found and fixed before any gate ran: (1) restart
+left `amr_num_levels` at its default 1 until the first regrid — the old per-box loop
+keyed on per-slot levels and was immune, the new per-level driver would have silently
+skipped every level>=2 fill; fixed in s_read_amr_restart (and exercised by the
+multi-level-restart np=2 golden). (2) The architecture doc's timestep diagram cited the
+deleted routine (review finding); updated to the wave structure.
+
+GATES: [amr-xa] F2 payload words EXACT vs baseline (1,628,915,568), msgs 1646 -> 524
+(the per-step per-box portion collapsed; remainder = regrid chunked + init), F1
+unchanged from I2a (381 msgs, words exact), F4-F7 byte-identical; debug live headers on
+every F2W transfer + per-message length asserts, clean rc=0; seeded one-word offset
+shift aborts at the header check; adversarial review: all ten checked invariants clean,
+no correctness findings; local AMR-75 goldens. Directional: the 5-step np=8 probe wall
+dropped 130.6 -> 100.9 s vs the I2a-only binary (transient-dominated, n=1 — the honest
+number is the differenced steady pair at the operating point).
+
 ## 2026-08-23 (6) — I2a LANDED: the level-1 stage-fill WAVE (plan-based exchange, first payoff increment)
 
 `s_amr_stage_fill_wave` (m_amr.fpp) replaces the per-box rendezvous chain of the
@@ -41,8 +69,9 @@ report enabled: F3 38 msgs / 2,736 words send==recv exact, live headers on every
 transfer, rc=0; (4) adversarial review — ONE critical
 finding (the high-water grow helpers discarded already-appended transfers on growth;
 invisible at S0 scale, corrupting beyond 64 transfers/rank) — fixed with copy-preserving
-move_alloc BEFORE any gate ran; every other checked invariant clean; (5) goldens: full
-local suite at e531d354+diff in the baseline worktree (job 383666, mi2101x); (6) wall:
+move_alloc BEFORE any gate ran; every other checked invariant clean; (5) goldens: the local AMR-75 subset 75/75 on k004-004 AND the FULL 708-test suite
+708/708, zero failures (job 383666, mi2101x, baseline worktree at e531d354+diff) —
+committed as bdb00d5d with 383666 recorded outstanding, now CLOSED; (6) wall:
 2x differenced np=8 int=20 pairs with the PINNED COPY binary on k004-008 (job 383667),
 priced against the SAME-NODE 3-repeat floor from job 383518: steady s/step
 14.817 / 13.730 / 13.892 (mean 14.15, spread 7.7% — WIDER than the historic 5.3%; wall

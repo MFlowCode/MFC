@@ -302,6 +302,22 @@ binary-search pack/unpack kernel form applies to I2b's kernels when/if they exis
 adds zero device kernels. Plan caching on the epoch remains I6; the regrid-path F1
 (chunked) and init/static/restart/subcycle sites keep the per-box path unchanged.
 
+### I3 implementation binding (2026-08-23)
+
+`s_amr_parent_fill_wave(lev)`: the per-step F2 gather as one wave per level per stage,
+levels ascending from the driver (`do ilev = 2, amr_num_levels`). Each split child is
+exactly one (parent-owner -> child-owner) transfer; both sides derive the pair list from
+`f_amr_parent_block` + `s_amr_parent_foot` + `amr_block_owner` ONLY (the per-owner
+mirrors lag a generation — the map's asymmetry finding). Tags `amr_tag_base(2)` + epoch
+fold; audit sites XA_F2W_* (family F2, payload-words-only). Reuses the I2a wave's
+scratch (q-side arrays only; the waves never overlap in time). The pack kernel reads
+module `amr_cpat_off`, so the pack loop sets the CHILD's frame per transfer; consume
+recomputes per box. `s_amr_fine_stage_fill` deleted with the conversion (no caller
+remained). Restart gotcha fixed with it: `amr_num_levels` was regrid-only; the per-level
+driver needs it truthful after restart too (set in `s_read_amr_restart`). Remaining
+per-box F2: regrid chunked (converts with I6/I7 work if ever), subcycle (I8),
+init/static.
+
 - **No existing test runs np>2.** Every plan degenerates to <=1 remote peer: multi-peer slicing,
   peer ordering, and multi-contributor assembly are structurally unexercised. One ppn=4 dynamic
   regrid case is mandatory before I2 lands.
