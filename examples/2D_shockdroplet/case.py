@@ -1,30 +1,69 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import math
 
-Ma = 1.4
-ps = 238558
-rho_post_a = 2.18
+parser = argparse.ArgumentParser(prog="2D_shockdroplet", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument(
+    "--mfc",
+    type=json.loads,
+    default="{}",
+    metavar="DICT",
+    help="MFC's toolchain's internal state.",
+)
+parser.add_argument("--mach", type=float, default=1.4, help="Shock Mach number.")
+parser.add_argument("--adap-dt", action="store_true", help="Use CFL-based adaptive time-stepping.")
+parser.add_argument("--cfl", type=float, default=0.2, help="CFL number.")
+parser.add_argument("--tend", type=float, default=1.0, help="Dimensionless end time.")
+parser.add_argument("--res", type=float, default=1.0, help="Resolution scaling factor.")
+args = parser.parse_args()
+
+Ma = args.mach
+p_a = 101325.0
 rho_a = 1.204
 rho_w = 1000
 gam_a = 1.4
 gam_w = 6.12
 pi_w = 3.43e8
-vel = 226
-rho = 1
-c_l = math.sqrt(1.4 * ps / rho)
-eps = 1e-9
+
+# Post-shock state from the Rankine-Hugoniot conditions (shock moving into still air)
+ps = p_a * (1 + 2 * gam_a / (gam_a + 1) * (Ma**2 - 1))
+rho_post_a = rho_a * (gam_a + 1) * Ma**2 / ((gam_a - 1) * Ma**2 + 2)
+c_a = math.sqrt(gam_a * p_a / rho_a)
+vel = 2 * c_a / (gam_a + 1) * (Ma**2 - 1) / Ma
+
+c_l = math.sqrt(gam_a * ps / rho_a)
+eps = 1e-6
 
 D = 0.048
-Ny = 299.0
-Nx = 1199.0
-dx = 0.25 / Nx  # 8.3e-6
+Ny = (300 * args.res) - 1
+Nx = (1200 * args.res) - 1
+dx = 24 * D / Nx
 
-time_end = 0.005  # 50us
-cfl = 0.25
+# End time in units of the Ranger & Nicholls (1969) breakup time scale
+# t_breakup = D sqrt(rho_l/rho_g) / u_g, with post-shock gas conditions
+tau_end = args.tend
+time_end = tau_end * D * math.sqrt(rho_w / rho_post_a) / vel
+cfl = args.cfl
 
-dt = cfl * dx / c_l  # 5.3E-9
-Nt = int(time_end / dt)  # 10000
+dt = cfl * dx / c_l
+Nt = int(time_end / dt)
+
+if args.adap_dt:
+    time_stepping = {
+        "cfl_adap_dt": "T",
+        "cfl_target": cfl,
+        "n_start": 0,
+        "t_stop": time_end,
+        "t_save": time_end / 100,
+    }
+else:
+    time_stepping = {
+        "dt": dt,
+        "t_step_start": 0,
+        "t_step_stop": Nt,
+        "t_step_save": math.ceil(Nt / 100),
+    }
 
 print(
     json.dumps(
@@ -44,19 +83,18 @@ print(
             "m": int(Nx),
             "n": int(Ny),
             "p": 0,
-            "dt": dt,
-            "t_step_start": 0,
-            "t_step_stop": Nt,
-            "t_step_save": Nt,  # math.ceil(Nt/100),
+            **time_stepping,
+            "elliptic_smoothing": "T",
+            "elliptic_smoothing_iters": 20,
             # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": "5eq",
             "alt_soundspeed": "F",
             "num_fluids": 2,
-            "mpp_lim": "T",
-            "mixture_err": "T",
+            "mpp_lim": "F",
+            "mixture_err": "F",
             "time_stepper": "rk3",
-            "weno_order": 5,
+            "weno_order": 3,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
             "weno_avg": "F",
@@ -83,9 +121,9 @@ print(
             "patch_icpp(1)%length_y": 14 * D,
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0e00,
-            "patch_icpp(1)%pres": 101325.0,
-            "patch_icpp(1)%alpha_rho(1)": eps * 1000,
-            "patch_icpp(1)%alpha_rho(2)": (1 - eps) * 1.17,
+            "patch_icpp(1)%pres": p_a,
+            "patch_icpp(1)%alpha_rho(1)": eps * rho_w,
+            "patch_icpp(1)%alpha_rho(2)": (1 - eps) * rho_a,
             "patch_icpp(1)%alpha(1)": eps,
             "patch_icpp(1)%alpha(2)": 1 - eps,
             # Patch 2: Shocked state
@@ -98,7 +136,7 @@ print(
             "patch_icpp(2)%vel(1)": vel,
             "patch_icpp(2)%vel(2)": 0.0e00,
             "patch_icpp(2)%pres": ps,
-            "patch_icpp(2)%alpha_rho(1)": eps * 1000,
+            "patch_icpp(2)%alpha_rho(1)": eps * rho_w,
             "patch_icpp(2)%alpha_rho(2)": (1 - eps) * rho_post_a,
             "patch_icpp(2)%alpha(1)": eps,
             "patch_icpp(2)%alpha(2)": 1 - eps,
@@ -110,7 +148,7 @@ print(
             "patch_icpp(3)%alter_patch(1)": "T",
             "patch_icpp(3)%vel(1)": 0.0,
             "patch_icpp(3)%vel(2)": 0.0e00,
-            "patch_icpp(3)%pres": 101325.0,
+            "patch_icpp(3)%pres": p_a,
             "patch_icpp(3)%alpha_rho(1)": (1 - eps) * rho_w,
             "patch_icpp(3)%alpha_rho(2)": eps * 1.17,
             "patch_icpp(3)%alpha(1)": 1 - eps,  # 0.95

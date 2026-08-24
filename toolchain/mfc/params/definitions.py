@@ -376,7 +376,7 @@ CONSTRAINTS = {
     "num_fluids": {"min": 1, "max": NF},
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
-    "ib_neighborhood_radius": {"min": 1},
+    "ib_neighborhood_radius": {"min": 0},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "nb": {"min": 1},
@@ -1006,9 +1006,13 @@ def _load():
     _pb_attrs["radius"] = (REAL, _pb_tags)
     _pb_attrs["mass"] = (REAL, _pb_tags)
     _pb_attrs["min_spacing"] = (REAL, _pb_tags)
+    _pb_attrs["shell_inner_radius"] = (REAL, _pb_tags)
+    _pb_attrs["shell_outer_radius"] = (REAL, _pb_tags)
     _pb_attrs["moving_ibm"] = (INT, _pb_tags)
     _pb_attrs["seed"] = (INT, _pb_tags)
+    _pb_attrs["cloud_geometry"] = (INT, _pb_tags)
     _pb_attrs["packing_method"] = (INT, _pb_tags)
+    _pb_attrs["periodic"] = (INT, _pb_tags)
     REGISTRY.register_family(
         IndexedFamily(
             base_name="particle_cloud",
