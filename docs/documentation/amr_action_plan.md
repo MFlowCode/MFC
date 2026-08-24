@@ -7,6 +7,31 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-23 (8) — I5-F6 LANDED: the seam halo's cross-rank pairs as one wave; shared seam buffers DELETED
+
+The cross-rank branch of `s_amr_fine_fine_halo` — one blocking MPI_SENDRECV per pair in
+pair-list order through two shared buffers, the chain that ABSORBED the skew the fill
+waves freed (I2a probe: seam 2.34 -> 3.47 s while gather fell) — is now one aggregated
+message per (peer, direction) per call: every pair contributes one send and one recv
+transfer on each owner, both ranks walk the SAME replicated pair list ascending, and the
+per-peer offsets agree with no metadata exchange (the property the paired SENDRECVs
+relied on positionally, made explicit and header-verified). Same-rank pairs keep the
+batched device kernel. Converting INSIDE the routine covers all four call sites — the
+per-stage driver, both subcycle sites (shape-preserving, so the I8 scope stands), and
+the L0-advance coexist site the I5 row required. The two shared seam buffers and their
+tile-grow reconciliation block became dead and are DELETED (net +110 LOC). Wire stays
+wp with the stp cast on unpack (F6 converts; F5 must NOT — kept separate).
+
+GATES: [amr-xa] F6 payload words EXACT vs baseline (380,849,184), msgs 2646 -> 378
+(-86%, the largest collapse of the program); F1/F2/F4/F5/F7 byte-identical; debug live
+headers ([site, sending slot, (d, dlo, dhi), (cnt,0,0)]) + per-message length asserts,
+clean rc=0; seeded offset-shift arm aborts at the header check (site 37); adversarial
+review: all ten invariants clean, three cleanliness fixes applied (orphaned comment,
+stale sizing note, the pre-existing dead ym compute); local AMR-75 goldens. F5 (faces +
+freg) remains per-box - next: faces need debug-only companion header messages to keep
+the zero-copy recv-into-register design, and s_amr_reg_reserve must hoist ahead of any
+wave that posts into freg (the apply can REALLOCATE the registers - map finding).
+
 ## 2026-08-23 (7) — I3 LANDED: level>=2 parent gathers as per-level F2 waves; per-box stage fill DELETED
 
 `s_amr_parent_fill_wave(lev)` (m_amr.fpp) converts the per-step level>=2 F2 parent

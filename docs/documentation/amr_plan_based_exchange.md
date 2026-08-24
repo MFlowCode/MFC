@@ -318,6 +318,24 @@ driver needs it truthful after restart too (set in `s_read_amr_restart`). Remain
 per-box F2: regrid chunked (converts with I6/I7 work if ever), subcycle (I8),
 init/static.
 
+### I5-F6 implementation binding (2026-08-23)
+
+The seam wave lives INSIDE `s_amr_fine_fine_halo` (all four call sites covered,
+subcycle shape-preserved). Plan = the replicated `amr_seam_pairs` list itself, walked
+twice (sends, then recvs); each cross-rank pair is one transfer each way per owner;
+per-peer aggregation on tag `amr_tag_base(6)` + epoch fold; audit sites XA_F6W_*
+(payload-words-only keeps family F6 words exact vs the SENDRECV baseline — the landed
+gate). Reuses the fill waves' fw scratch, with `amr_fw_spo/rpo` repurposed to carry
+per-transfer `cnt` (the F6 payload is not derivable from bl/bh alone at consume). The
+shared `amr_seambuf_x/y` and their tile-grow reconciliation are deleted. Header
+convention: [site, sending slot, (d, pack dlo, pack dhi), (cnt, 0, 0)] — the receiver
+derives the peer's pack bounds from the same replicated metadata. F5 remains per-box;
+its conversion notes: faces recv directly into the mapped `freg` host mirror (zero-copy)
+so headers must be DEBUG-ONLY COMPANION MESSAGES, not prefixes; `s_amr_reg_reserve`
+must hoist ahead of any wave posting into `freg` (the apply can reallocate the
+registers); the owner-side multicast membership is `cand ∩ f_amr_reflux_participates`
+vs the receiver's bare predicate — a wave must reproduce the conjunction exactly.
+
 - **No existing test runs np>2.** Every plan degenerates to <=1 remote peer: multi-peer slicing,
   peer ordering, and multi-contributor assembly are structurally unexercised. One ppn=4 dynamic
   regrid case is mandatory before I2 lands.

@@ -170,8 +170,6 @@ module m_amr
     integer              :: max_f1, max_f2, max_f3
     integer              :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
     logical, allocatable :: amr_slot_live(:)
-    !! fine-fine seam pack buffers, hoisted out of the per-seam s_amr_fine_fine_halo loop (allocated once at max seam extent)
-    real(wp), allocatable :: amr_seambuf_x(:), amr_seambuf_y(:)
     !! cached same-level adjacent-seam list (3, npairs) = (xb, yb, seam-dim), so s_amr_fine_fine_halo iterates O(#seams) instead of
     !! rescanning all O(nblocks^2) pairs every RK stage. Block topology changes only at regrid/restart, so the list is rebuilt only
     !! when amr_seam_pairs_dirty is set (or the block count changes - a tripwire).
@@ -391,7 +389,7 @@ contains
     !! (sys_size/buff_size set). Per-slot fine arrays allocated lazily (s_amr_reconcile_slots) - only the blocks a rank owns.
     impure subroutine s_initialize_amr_module()
 
-        integer                         :: i, d, islot, tcap
+        integer                         :: i, d, islot
         integer                         :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
         integer                         :: blk_lo(3), blk_hi(3)
         type(scalar_field), allocatable :: tmp_cg(:)
@@ -579,16 +577,6 @@ contains
         if (n_glb > 0) max_f2 = amr_ref_ratio*maxc_loc(2) - 1
         if (p_glb > 0) max_f3 = amr_ref_ratio*maxc_loc(3) - 1
 
-        ! fine-fine seam pack buffers: sized ONCE to the largest possible seam (sys_size*buff_size * max transverse fine face), so
-        ! s_amr_fine_fine_halo reuses them instead of allocating per seam per stage. Transverse cap = the largest fine face over the
-        ! choice of seam dimension: 3D -> max pairwise product, 2D -> the larger single dim, 1D -> 1.
-        tcap = 1
-        if (n_glb > 0 .and. p_glb > 0) then
-            tcap = max((max_f1 + 1)*(max_f2 + 1), (max_f2 + 1)*(max_f3 + 1), (max_f1 + 1)*(max_f3 + 1))
-        else if (n_glb > 0) then
-            tcap = max(max_f1, max_f2) + 1
-        end if
-        allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
         amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1  ! force a seam-list build on the first fine-fine halo
         amr_mesh_epoch = amr_mesh_epoch + 1
         mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
@@ -5134,13 +5122,13 @@ contains
 
     !> Same-rank seam exchange for ONE pair, both directions in ONE device kernel: xb's high near-seam interior -> yb's low seam
     !! ghost, and yb's low interior -> xb's high ghost. Replaces the four s_amr_fine_slice calls the local branch used to make -
-    !! that path routed a purely LOCAL copy through amr_seambuf_*, a buffer that exists only to cross MPI, costing four kernels and
-    !! four blocking device<->host round trips per pair per stage. Byte-identical to it: the same cells in the same order, and its
-    !! wp buffer only widened and re-narrowed the stp values. Fusing the two directions is safe because all four slabs are disjoint
-    !! - a block's seam GHOST lies outside its own interior, and the two reads are from different slots than the two writes - so
-    !! neither direction can observe the other's store. Both blocks are now addressed by their flat-store slot, so batching across
-    !! PAIRS is no longer structurally blocked (a runtime slot index into the module store is a plain subscript, not the null deref
-    !! the per-slot scalar_field layout forced). Index order matches s_amr_fine_slice. BATCHED over pairs: one kernel for every
+    !! that path routed a purely LOCAL copy through the (since-removed) shared seam buffers, costing four kernels and four blocking
+    !! device<->host round trips per pair per stage. Byte-identical to it: the same cells in the same order, and its wp buffer only
+    !! widened and re-narrowed the stp values. Fusing the two directions is safe because all four slabs are disjoint - a block's
+    !! seam GHOST lies outside its own interior, and the two reads are from different slots than the two writes - so neither
+    !! direction can observe the other's store. Both blocks are now addressed by their flat-store slot, so batching across PAIRS is
+    !! no longer structurally blocked (a runtime slot index into the module store is a plain subscript, not the null deref the
+    !! per-slot scalar_field layout forced). Index order matches s_amr_fine_slice. BATCHED over pairs: one kernel for every
     !! same-rank seam pair on this rank, instead of one per pair (measured 546 of the 7134 AMR-local launches per run). Both blocks
     !! of a pair are addressed by their flat-store slot, so a runtime pair index is now a plain subscript - the per-slot
     !! scalar_field layout is what used to make this a null deref. The per-pair seam dim varies, so the index decode is a runtime
@@ -5314,7 +5302,8 @@ contains
         !> level to exchange, or 0 for ALL levels. The subcycled level-2 child advance needs to reconcile ONLY its own level's
         !! seams: it runs inside one of the parent's substeps, when the level-1 blocks are mid-substep and must not be touched.
         integer, intent(in) :: lev_only
-        integer             :: xb, yb, d, rX, rY, cnt, xm(3), ym(3), tsz, ierr, fmul, idx
+        integer             :: xb, yb, d, rX, rY, cnt, xm(3), tsz, ierr, fmul, idx
+        integer             :: ip, boff, tq, nreq, qbase, r, sblk, sdlo, sdhi, ublk, udlo, udhi, eblk, edlo, edhi
         !> same-rank pairs are collected here and exchanged in ONE kernel; cross-rank pairs stay serial (each is an MPI_SENDRECV)
         integer              :: nsame
         integer, allocatable :: plx(:), ply(:), pd(:), pxhi(:), pfm(:,:)
@@ -5331,7 +5320,22 @@ contains
         ! pack/unpack touches (not the whole block) - a large PCIe saving since this runs per stage (6x per fine step)
         allocate (plx(amr_num_seam_pairs), ply(amr_num_seam_pairs), pd(amr_num_seam_pairs), pxhi(amr_num_seam_pairs), pfm(3, &
                   & amr_num_seam_pairs))
+        ! I5-F6 WAVE (plan-based exchange, amr_plan_based_exchange.md): the cross-rank pairs - previously one blocking
+        ! MPI_SENDRECV each, in pair-list order, through the two shared seam buffers - become ONE aggregated message per
+        ! (peer, direction): all recvs posted, all packs into per-transfer pool slices, all sends, one WAITALL, then all
+        ! unpacks. Every pair contributes one send and one recv transfer on each of its two owners; both ranks walk the
+        ! SAME replicated pair list ascending with per-peer running offsets, so the wire layout agrees with no metadata
+        ! exchange (the property the paired SENDRECVs relied on, made explicit). Wire is wp with the same stp cast on
+        ! unpack; under MFC_DEBUG each slab carries the identity header [site, sending slot, (d, dlo, dhi), (cnt, 0, 0)].
+        ! Reuses the fill waves' scratch/pools (the waves never overlap in time). Same-rank pairs keep the batched kernel.
+        if (.not. allocated(amr_fw_map)) then
+            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
+                      & amr_fw_pp(0:num_procs - 1))
+            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
+        end if
+        tq = amr_tag_base(6) + int(mod(amr_mesh_epoch, 100_8))
         nsame = 0
+        amr_fw_snx = 0; amr_fw_snp = 0
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
             if (lev_only > 0 .and. amr_block_level(xb) /= lev_only) cycle  ! pairs are same-level, so xb's level is the pair's
@@ -5346,9 +5350,6 @@ contains
             xm(1) = fmul*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
             xm(2) = merge(fmul*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
             xm(3) = merge(fmul*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
-            ym(1) = fmul*(amr_region_hi_all(1, yb) - amr_region_lo_all(1, yb) + 1) - 1
-            ym(2) = merge(fmul*(amr_region_hi_all(2, yb) - amr_region_lo_all(2, yb) + 1) - 1, 0, n_glb > 0)
-            ym(3) = merge(fmul*(amr_region_hi_all(3, yb) - amr_region_lo_all(3, yb) + 1) - 1, 0, p_glb > 0)
             ! transverse fine size (dims /= d); xb and yb share it (exact-match seam)
             tsz = 1
             if (d /= 1) tsz = tsz*(xm(1) + 1)
@@ -5359,27 +5360,148 @@ contains
                 nsame = nsame + 1
                 plx(nsame) = amr_loc_of(xb); ply(nsame) = amr_loc_of(yb)
                 pd(nsame) = d; pxhi(nsame) = xm(d); pfm(:,nsame) = xm
-            else if (proc_rank == rX) then
-                ! send xb high interior
-                call s_amr_fine_slice(xb, d, xm(d) - buff_size + 1, xm(d), amr_seambuf_x(1:cnt), 1)
-#ifdef MFC_MPI
-                call s_xa_rec(XA_F6_XY, 1, cnt, 4200); call s_xa_rec(XA_F6_XY, 2, cnt, 4201)
-                call MPI_SENDRECV(amr_seambuf_x(1:cnt), cnt, mpi_p, rY, 4200, amr_seambuf_y(1:cnt), cnt, mpi_p, rY, 4201, &
-                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
-                ! recv yb low interior -> xb high ghost
-                call s_amr_fine_slice(xb, d, xm(d) + 1, xm(d) + buff_size, amr_seambuf_y(1:cnt), -1)
-            else  ! proc_rank == rY
-                ! send yb low interior
-                call s_amr_fine_slice(yb, d, 0, buff_size - 1, amr_seambuf_y(1:cnt), 1)
-#ifdef MFC_MPI
-                call s_xa_rec(XA_F6_YX, 1, cnt, 4201); call s_xa_rec(XA_F6_YX, 2, cnt, 4200)
-                call MPI_SENDRECV(amr_seambuf_y(1:cnt), cnt, mpi_p, rX, 4201, amr_seambuf_x(1:cnt), cnt, mpi_p, rX, 4200, &
-                                  & MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
-                ! recv xb high interior -> yb low ghost
-                call s_amr_fine_slice(yb, d, -buff_size, -1, amr_seambuf_x(1:cnt), -1)
+                cycle
             end if
+            ! cross-rank: append this side's SEND transfer (the matching recv is appended in the second pair walk below)
+            if (proc_rank == rX) then
+                r = rY; sblk = xb; sdlo = xm(d) - buff_size + 1; sdhi = xm(d)
+            else
+                r = rX; sblk = yb; sdlo = 0; sdhi = buff_size - 1
+            end if
+            if (amr_fw_map(r) == 0) then
+                amr_fw_snp = amr_fw_snp + 1
+                call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
+                call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp)
+                amr_fw_map(r) = amr_fw_snp
+                amr_fw_sprank(amr_fw_snp) = r
+            end if
+            amr_fw_snx = amr_fw_snx + 1
+            call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
+            call s_amr_fw_szi(amr_fw_spi, amr_fw_snx); call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx)
+            call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
+            amr_fw_sblk(amr_fw_snx) = sblk
+            amr_fw_sbl(1, amr_fw_snx) = d; amr_fw_sbl(2, amr_fw_snx) = sdlo; amr_fw_sbl(3, amr_fw_snx) = sdhi
+            amr_fw_spo(amr_fw_snx) = cnt
+            amr_fw_spi(amr_fw_snx) = amr_fw_map(r)
+            amr_fw_sqo(amr_fw_snx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_fw_pq(r) = amr_fw_pq(r) + cnt
+            amr_fw_nx(r) = amr_fw_nx(r) + 1
+        end do
+        qbase = 0
+        do ip = 1, amr_fw_snp
+            r = amr_fw_sprank(ip)
+            amr_fw_snxp(ip) = amr_fw_nx(r)
+            amr_fw_sqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
+            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
+        end do
+        call s_amr_fw_szr(amr_fw_sq, qbase)
+        ! RECV transfers, second walk over the same pairs: unpack destination is MY block's ghost slab; the expected header
+        ! is the PEER's pack (its block + its interior slab bounds), derived from the same replicated metadata
+        amr_fw_rnx = 0; amr_fw_rnp = 0
+        do idx = 1, amr_num_seam_pairs
+            xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
+            if (lev_only > 0 .and. amr_block_level(xb) /= lev_only) cycle
+            rX = amr_block_owner(xb); rY = amr_block_owner(yb)
+            if (rX == rY) cycle
+            if (proc_rank /= rX .and. proc_rank /= rY) cycle
+            fmul = amr_ref_ratio**amr_block_level(xb)
+            xm(1) = fmul*(amr_region_hi_all(1, xb) - amr_region_lo_all(1, xb) + 1) - 1
+            xm(2) = merge(fmul*(amr_region_hi_all(2, xb) - amr_region_lo_all(2, xb) + 1) - 1, 0, n_glb > 0)
+            xm(3) = merge(fmul*(amr_region_hi_all(3, xb) - amr_region_lo_all(3, xb) + 1) - 1, 0, p_glb > 0)
+            tsz = 1
+            if (d /= 1) tsz = tsz*(xm(1) + 1)
+            if (d /= 2 .and. n_glb > 0) tsz = tsz*(xm(2) + 1)
+            if (d /= 3 .and. p_glb > 0) tsz = tsz*(xm(3) + 1)
+            cnt = sys_size*buff_size*tsz
+            if (proc_rank == rX) then
+                ! yb's low interior arrives -> xb's high ghost
+                r = rY; ublk = xb; udlo = xm(d) + 1; udhi = xm(d) + buff_size
+                eblk = yb; edlo = 0; edhi = buff_size - 1
+            else
+                ! xb's high interior arrives -> yb's low ghost
+                r = rX; ublk = yb; udlo = -buff_size; udhi = -1
+                eblk = xb; edlo = xm(d) - buff_size + 1; edhi = xm(d)
+            end if
+            if (amr_fw_map(r) == 0) then
+                amr_fw_rnp = amr_fw_rnp + 1
+                call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
+                call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp)
+                amr_fw_map(r) = amr_fw_rnp
+                amr_fw_rprank(amr_fw_rnp) = r
+            end if
+            amr_fw_rnx = amr_fw_rnx + 1
+            call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
+            call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
+            call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
+            amr_fw_rblk(amr_fw_rnx) = ublk
+            amr_fw_rbl(1, amr_fw_rnx) = d; amr_fw_rbl(2, amr_fw_rnx) = udlo; amr_fw_rbl(3, amr_fw_rnx) = udhi
+            amr_fw_rbh(1, amr_fw_rnx) = eblk; amr_fw_rbh(2, amr_fw_rnx) = edlo; amr_fw_rbh(3, amr_fw_rnx) = edhi
+            amr_fw_rpo(amr_fw_rnx) = cnt
+            amr_fw_rpi(amr_fw_rnx) = amr_fw_map(r)
+            amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_fw_pq(r) = amr_fw_pq(r) + cnt
+            amr_fw_nx(r) = amr_fw_nx(r) + 1
+        end do
+        qbase = 0
+        do ip = 1, amr_fw_rnp
+            r = amr_fw_rprank(ip)
+            amr_fw_rnxp(ip) = amr_fw_nx(r)
+            amr_fw_rqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
+            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
+        end do
+        call s_amr_fw_szr(amr_fw_rq, qbase)
+        nreq = amr_fw_snp + amr_fw_rnp
+        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+
+        nreq = 0
+#ifdef MFC_MPI
+        do ip = 1, amr_fw_rnp
+            call s_xa_rec(XA_F6W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq)
+            nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
+            call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
+                           & amr_fw_req(nreq), ierr)
+        end do
+#endif
+        do idx = 1, amr_fw_snx
+            cnt = amr_fw_spo(idx)
+            boff = amr_fw_sqbase(amr_fw_spi(idx)) + amr_fw_sqo(idx)
+            call s_amr_fine_slice(amr_fw_sblk(idx), amr_fw_sbl(1, idx), amr_fw_sbl(2, idx), amr_fw_sbl(3, idx), &
+                                  & amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + cnt), 1)
+            if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F6W_SND, amr_fw_sblk(idx), amr_fw_sbl(:,idx), &
+                & [cnt, 0, 0])
+        end do
+#ifdef MFC_MPI
+        do ip = 1, amr_fw_snp
+            call s_xa_rec(XA_F6W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq)
+            nreq = nreq + 1; amr_fw_reqw(nreq) = -1
+            call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
+                           & amr_fw_req(nreq), ierr)
+        end do
+        if (nreq > 0) then
+#ifdef MFC_DEBUG
+            block
+                integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                do q = 1, nreq
+                    if (amr_fw_reqw(q) < 0) cycle
+                    call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
+                    @:ASSERT(gotw == amr_fw_reqw(q), "seam wave: received message length differs from the plan")
+                end do
+            end block
+#else
+            call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+#endif
+        end if
+#endif
+        do idx = 1, amr_fw_rnx
+            cnt = amr_fw_rpo(idx)
+            boff = amr_fw_rqbase(amr_fw_rpi(idx)) + amr_fw_rqo(idx)
+            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F6W_SND, amr_fw_rbh(1, idx), [amr_fw_rbl(1, &
+                & idx), amr_fw_rbh(2, idx), amr_fw_rbh(3, idx)], [cnt, 0, 0])
+            call s_amr_fine_slice(amr_fw_rblk(idx), amr_fw_rbl(1, idx), amr_fw_rbl(2, idx), amr_fw_rbl(3, idx), &
+                                  & amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + cnt), -1)
         end do
         ! Every same-rank pair in ONE launch. Two things make this safe. Fusing ACROSS pairs: the four slabs of a pair are disjoint
         ! and no pair writes another's source. DEFERRING past the MPI pairs above (a reordering the per-pair loop did not do):
@@ -7031,7 +7153,7 @@ contains
     !! s_initialize_amr_module) so the spike lifts out cleanly. np=1 spike: rank 0 owns every tile.
     impure subroutine s_l0_tiles_init()
 
-        integer :: nt(3), ix, iy, iz, k, j, r, e, tcap
+        integer :: nt(3), ix, iy, iz, k, j, r, e
         integer :: tlo(3), thi(3)
         integer :: rsidx(3), rext(3)
         integer :: ierr
@@ -7149,24 +7271,6 @@ contains
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
         call s_amr_scr_init()  ! mbuf* now FINAL (fine/tile union under coexist); scratch must exist on every rank
 
-        ! fine-fine seam pack buffers (sys_size*buff_size * largest transverse fine face), reused per seam per stage.
-        tcap = 1
-        if (n_glb > 0 .and. p_glb > 0) then
-            tcap = max((max_f1 + 1)*(max_f2 + 1), (max_f2 + 1)*(max_f3 + 1), (max_f1 + 1)*(max_f3 + 1))
-        else if (n_glb > 0) then
-            tcap = max(max_f1, max_f2) + 1
-        end if
-        ! amr_seambuf is SHARED with s_initialize_amr_module (fine-block seams). Under coexist that routine already allocated it
-        ! sized for the FINE blocks; the fine-fine halo processes tile AND fine pairs from the same buffer, so it must fit the
-        ! LARGER of the two. Grow only if this tile sizing exceeds the existing buffer. A blind re-allocate is a fatal runtime
-        ! error on gfortran and, on flang (no alloc check), a SILENT re-allocate to the tile size that undersizes the fine seams
-        ! -> a heap overflow in the fine-fine halo that corrupts the c/f reflux at np>1 (the exact coexist-np>1 NaN this fixes).
-        if (.not. allocated(amr_seambuf_x)) then
-            allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
-        else if (size(amr_seambuf_x) < sys_size*buff_size*tcap) then
-            deallocate (amr_seambuf_x, amr_seambuf_y)
-            allocate (amr_seambuf_x(sys_size*buff_size*tcap), amr_seambuf_y(sys_size*buff_size*tcap))
-        end if
         amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1
         amr_mesh_epoch = amr_mesh_epoch + 1
 
@@ -8204,7 +8308,6 @@ contains
                 call s_amr_free_slot(islot)
             end do
         end if
-        if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         ! amr_slots, amr_region_*, amr_isect_*, amr_owns_all, amr_block_owner, amr_block_level, amr_ovl_*, and
         ! amr_slot_live are SHARED with s_initialize_amr_module/s_finalize_amr_module: when amr, that pair owns them, so only
@@ -8256,7 +8359,6 @@ contains
         end if
         deallocate (amr_slot_live)
         call s_amr_st_finalize()
-        if (allocated(amr_seambuf_x)) deallocate (amr_seambuf_x, amr_seambuf_y)
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
         if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
         if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
