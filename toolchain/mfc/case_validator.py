@@ -214,7 +214,7 @@ PHYSICS_DOCS = {
     "check_ic_extrusion": {
         "title": "IC Extrusion File Parameters",
         "category": "IC Extrusion",
-        "explanation": "Extrusion hcids (170, 270, 271, 272, 370) read initial condition data from files. Both files_dir and file_extension must be set.",
+        "explanation": "Extrusion hcids (170, 270, 271, 272, 370, 371) read initial condition data from files. Both files_dir and file_extension must be set.",
     },
     # Post-Processing
     "check_vorticity": {
@@ -2320,7 +2320,7 @@ class CaseValidator:
 
     def check_ic_extrusion(self):
         """Checks that files_dir and file_extension are set for extrusion hcids."""
-        extrusion_hcids = {170, 270, 271, 272, 370}
+        extrusion_hcids = {170, 270, 271, 272, 370, 371}
         num_patches = self.get("num_patches", 0)
         if not self._is_numeric(num_patches) or num_patches <= 0:
             return
