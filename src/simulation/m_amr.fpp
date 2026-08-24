@@ -3266,45 +3266,50 @@ contains
         integer, intent(in)            :: loc, ivar  !< flat-store slot and variable of the fine target
         logical, optional, intent(in)  :: pos        !< floor the child at bub_pos_frac*u0 (bubble radius-moment realizability)
         logical, optional, intent(in)  :: inject     !< piecewise-constant (child = u0): QBMM moment realizability preservation
-        integer                        :: fi, fj, fk, ci, cj, ck, ox, oy, oz
-        real(wp)                       :: u0, sx, sy, sz, xix, xiy, xiz, child
-        logical                        :: floor_pos, pw_const
+        integer                        :: fi, fj, fk, ci, cj, ck, ox, oy, oz, rrat, mm, nn, pp, il1, il2, il3
+        real(wp)                       :: u0, sx, sy, sz, xix, xiy, xiz, child, bpf
+        logical                        :: floor_pos, pw_const, d2, d3
 
         floor_pos = .false.; if (present(pos)) floor_pos = pos
         pw_const = .false.; if (present(inject)) pw_const = inject
 
         ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): amr_isect_lo is GLOBAL and equals
-        ! region_lo on the owner, so amr_isect_lo + f/rr - amr_cpat_off = nmar + f/rr is the patch-local coarse index
+        ! region_lo on the owner, so amr_isect_lo + f/rr - amr_cpat_off = nmar + f/rr is the patch-local coarse index.
+        ! DEVICE kernel (device-side rebuild): reads the patch's device mirror (pushed once per prolong dispatch by
+        ! s_interpolate_coarse_to_fine), writes the fine slot in place - the per-slot full push at every caller is deleted.
+        ! CPU builds compile this to the identical plain loop, so CPU results are unchanged.
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-        do fk = 0, amr_slots(amr_cur)%p
-            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%amr_ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%amr_ref_ratio), &
-                             & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                             & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
-            do fj = 0, amr_slots(amr_cur)%n
-                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%amr_ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%amr_ref_ratio), &
-                                 & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                                 & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
-                do fi = 0, amr_slots(amr_cur)%m
-                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%amr_ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%amr_ref_ratio), wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
+        rrat = amr_slots(amr_cur)%amr_ref_ratio
+        mm = amr_slots(amr_cur)%m; nn = amr_slots(amr_cur)%n; pp = amr_slots(amr_cur)%p
+        il1 = amr_isect_lo(1); il2 = amr_isect_lo(2); il3 = amr_isect_lo(3)
+        d2 = n_glb > 0; d3 = p_glb > 0
+        bpf = bub_pos_frac
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, child]')
+        do fk = 0, pp
+            do fj = 0, nn
+                do fi = 0, mm
+                    ck = il3 + fk/rrat - oz; if (.not. d3) ck = 0
+                    xiz = 0._wp; if (d3) xiz = (real(mod(fk, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
+                    cj = il2 + fj/rrat - oy; if (.not. d2) cj = 0
+                    xiy = 0._wp; if (d2) xiy = (real(mod(fj, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
+                    ci = il1 + fi/rrat - ox
+                    xix = (real(mod(fi, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
                     u0 = real(qc%sf(ci, cj, ck), wp)
                     sx = minmod(real(qc%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc%sf(ci - 1, cj, ck), wp))
                     sy = 0._wp
-                    if (n_glb > 0) sy = minmod(real(qc%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc%sf(ci, cj - 1, ck), wp))
+                    if (d2) sy = minmod(real(qc%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc%sf(ci, cj - 1, ck), wp))
                     sz = 0._wp
-                    if (p_glb > 0) sz = minmod(real(qc%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc%sf(ci, cj, ck - 1), wp))
+                    if (d3) sz = minmod(real(qc%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc%sf(ci, cj, ck - 1), wp))
                     if (pw_const) then
                         sx = 0._wp; sy = 0._wp; sz = 0._wp
                     end if
                     child = u0 + sx*xix + sy*xiy + sz*xiz
-                    if (floor_pos) child = max(child, bub_pos_frac*u0)
+                    if (floor_pos) child = max(child, bpf*u0)
                     amr_cons_st(fi, fj, fk, ivar, loc) = child
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_prolong_one_var
 
@@ -3317,6 +3322,13 @@ contains
 
         integer :: i, bstride
 
+        ! the prolong kernels read the gathered patch's DEVICE mirror; the level-1 patch is host-filled by the gather
+        ! unpack, so push it once per dispatch (patch-sized - 8x smaller than the full-slot pushes this replaces; for a
+        ! level>=2 block the patch was device-produced and this re-push of the pulled bytes is redundant but harmless)
+
+        do i = 1, sys_size
+            $:GPU_UPDATE(device='[amr_cg(i)%sf]')
+        end do
         bstride = 1
         if (bubbles_euler) bstride = (eqn_idx%bub%end - eqn_idx%bub%beg + 1)/nb
         do i = 1, sys_size
@@ -3350,46 +3362,65 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: qc
         integer, intent(in)                                 :: loc
         integer                                             :: fi, fj, fk, ci, cj, ck, ox, oy, oz, i
+        integer                                             :: rrat, mm, nn, pp, il1, il2, il3, advb, adve
         real(wp)                                            :: xix, xiy, xiz, u0, sx, sy, sz, av, asum
-        logical                                             :: shx, shy, shz
+        logical                                             :: shx, shy, shz, d2, d3
 
-        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): patch-frame offset
+        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): patch-frame offset.
+        ! DEVICE kernel (device-side rebuild); the shared limiter switch (s_alpha_shared_switch) is inlined verbatim.
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-        do fk = 0, amr_slots(amr_cur)%p
-            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%amr_ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%amr_ref_ratio), &
-                             & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                             & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
-            do fj = 0, amr_slots(amr_cur)%n
-                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%amr_ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%amr_ref_ratio), &
-                                 & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                                 & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
-                do fi = 0, amr_slots(amr_cur)%m
-                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%amr_ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%amr_ref_ratio), wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
-                    call s_alpha_shared_switch(qc, ci, cj, ck, shx, shy, shz)
+        rrat = amr_slots(amr_cur)%amr_ref_ratio
+        mm = amr_slots(amr_cur)%m; nn = amr_slots(amr_cur)%n; pp = amr_slots(amr_cur)%p
+        il1 = amr_isect_lo(1); il2 = amr_isect_lo(2); il3 = amr_isect_lo(3)
+        d2 = n_glb > 0; d3 = p_glb > 0
+        advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz, i]')
+        do fk = 0, pp
+            do fj = 0, nn
+                do fi = 0, mm
+                    ck = il3 + fk/rrat - oz; if (.not. d3) ck = 0
+                    xiz = 0._wp; if (d3) xiz = (real(mod(fk, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
+                    cj = il2 + fj/rrat - oy; if (.not. d2) cj = 0
+                    xiy = 0._wp; if (d2) xiy = (real(mod(fj, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
+                    ci = il1 + fi/rrat - ox
+                    xix = (real(mod(fi, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
+                    ! shared per-cell limiter switch (inlined s_alpha_shared_switch): per dim, slopes stay on only if NO
+                    ! fluid's centered differences change sign there (symmetric in the fluids, incl. the closure fluid)
+                    shx = .true.; shy = d2; shz = d3
+                    do i = advb, adve
+                        u0 = real(qc(i)%sf(ci, cj, ck), wp)
+                        if ((real(qc(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(qc(i)%sf(ci - 1, cj, ck), &
+                            & wp)) <= 0._wp) shx = .false.
+                        if (d2) then
+                            if ((real(qc(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(qc(i)%sf(ci, cj - 1, ck), &
+                                & wp)) <= 0._wp) shy = .false.
+                        end if
+                        if (d3) then
+                            if ((real(qc(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(qc(i)%sf(ci, cj, ck - 1), &
+                                & wp)) <= 0._wp) shz = .false.
+                        end if
+                    end do
                     asum = 0._wp
-                    do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
+                    do i = advb, adve - 1
                         u0 = real(qc(i)%sf(ci, cj, ck), wp)
                         sx = 0._wp
                         if (shx) sx = minmod(real(qc(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc(i)%sf(ci - 1, cj, ck), wp))
                         sy = 0._wp
-                        if (n_glb > 0 .and. shy) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, &
-                            & cj - 1, ck), wp))
+                        if (d2 .and. shy) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, cj - 1, &
+                            & ck), wp))
                         sz = 0._wp
-                        if (p_glb > 0 .and. shz) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, &
+                        if (d3 .and. shz) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, &
                             & ck - 1), wp))
                         av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
                         amr_cons_st(fi, fj, fk, i, loc) = av
                         asum = asum + av
                     end do
-                    amr_cons_st(fi, fj, fk, eqn_idx%adv%end, loc) = 1._wp - asum
+                    amr_cons_st(fi, fj, fk, adve, loc) = 1._wp - asum
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_prolong_alphas_closure
 
@@ -3403,70 +3434,51 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: qc
         integer, intent(in)                                 :: loc
         integer                                             :: fi, fj, fk, ci, cj, ck, ox, oy, oz, i
+        integer                                             :: rrat, mm, nn, pp, il1, il2, il3, spb, spe, cte
         real(wp)                                            :: xix, xiy, xiz, u0, sx, sy, sz, av, rsum, rscale
+        logical                                             :: d2, d3
 
-        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): patch-frame offset
+        ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): patch-frame offset.
+        ! DEVICE kernel (device-side rebuild); the rescale re-reads only this thread's own cell, so the loop nest is safe.
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-        do fk = 0, amr_slots(amr_cur)%p
-            ck = amr_isect_lo(3) + fk/amr_slots(amr_cur)%amr_ref_ratio - oz; if (p_glb == 0) ck = 0
-            xiz = 0._wp; if (p_glb > 0) xiz = (real(mod(fk, amr_slots(amr_cur)%amr_ref_ratio), &
-                             & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                             & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
-            do fj = 0, amr_slots(amr_cur)%n
-                cj = amr_isect_lo(2) + fj/amr_slots(amr_cur)%amr_ref_ratio - oy; if (n_glb == 0) cj = 0
-                xiy = 0._wp; if (n_glb > 0) xiy = (real(mod(fj, amr_slots(amr_cur)%amr_ref_ratio), &
-                                 & wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                                 & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
-                do fi = 0, amr_slots(amr_cur)%m
-                    ci = amr_isect_lo(1) + fi/amr_slots(amr_cur)%amr_ref_ratio - ox
-                    xix = (real(mod(fi, amr_slots(amr_cur)%amr_ref_ratio), wp) - real(amr_slots(amr_cur)%amr_ref_ratio - 1, &
-                           & wp)*0.5_wp)/real(amr_slots(amr_cur)%amr_ref_ratio, wp)
+        rrat = amr_slots(amr_cur)%amr_ref_ratio
+        mm = amr_slots(amr_cur)%m; nn = amr_slots(amr_cur)%n; pp = amr_slots(amr_cur)%p
+        il1 = amr_isect_lo(1); il2 = amr_isect_lo(2); il3 = amr_isect_lo(3)
+        d2 = n_glb > 0; d3 = p_glb > 0
+        spb = eqn_idx%species%beg; spe = eqn_idx%species%end; cte = eqn_idx%cont%end
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, rsum, rscale, i]')
+        do fk = 0, pp
+            do fj = 0, nn
+                do fi = 0, mm
+                    ck = il3 + fk/rrat - oz; if (.not. d3) ck = 0
+                    xiz = 0._wp; if (d3) xiz = (real(mod(fk, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
+                    cj = il2 + fj/rrat - oy; if (.not. d2) cj = 0
+                    xiy = 0._wp; if (d2) xiy = (real(mod(fj, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
+                    ci = il1 + fi/rrat - ox
+                    xix = (real(mod(fi, rrat), wp) - real(rrat - 1, wp)*0.5_wp)/real(rrat, wp)
                     rsum = 0._wp
-                    do i = eqn_idx%species%beg, eqn_idx%species%end
+                    do i = spb, spe
                         u0 = real(qc(i)%sf(ci, cj, ck), wp)
                         sx = minmod(real(qc(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc(i)%sf(ci - 1, cj, ck), wp))
                         sy = 0._wp
-                        if (n_glb > 0) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, cj - 1, ck), wp))
+                        if (d2) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, cj - 1, ck), wp))
                         sz = 0._wp
-                        if (p_glb > 0) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, ck - 1), wp))
+                        if (d3) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, ck - 1), wp))
                         av = max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp)
                         amr_cons_st(fi, fj, fk, i, loc) = av
                         rsum = rsum + av
                     end do
-                    rscale = real(amr_cons_st(fi, fj, fk, eqn_idx%cont%end, loc), wp)/max(rsum, 1.e-30_wp)
-                    do i = eqn_idx%species%beg, eqn_idx%species%end
+                    rscale = real(amr_cons_st(fi, fj, fk, cte, loc), wp)/max(rsum, 1.e-30_wp)
+                    do i = spb, spe
                         amr_cons_st(fi, fj, fk, i, loc) = real(amr_cons_st(fi, fj, fk, i, loc), wp)*rscale
                     end do
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_prolong_species_closure
-
-    !> Shared per-cell limiter switch for the volume-fraction closure prolongation: per dim, slopes stay on only if NO fluid's
-    !! centered differences change sign there (symmetric in the fluids, incl. the closure fluid).
-    pure subroutine s_alpha_shared_switch(qc, ci, cj, ck, shx, shy, shz)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: qc
-        integer, intent(in)                                 :: ci, cj, ck
-        logical, intent(out)                                :: shx, shy, shz
-        integer                                             :: i
-        real(wp)                                            :: u0
-
-        shx = .true.; shy = n_glb > 0; shz = p_glb > 0
-        do i = eqn_idx%adv%beg, eqn_idx%adv%end
-            u0 = real(qc(i)%sf(ci, cj, ck), wp)
-            if ((real(qc(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(qc(i)%sf(ci - 1, cj, ck), wp)) <= 0._wp) shx = .false.
-            if (n_glb > 0) then
-                if ((real(qc(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(qc(i)%sf(ci, cj - 1, ck), wp)) <= 0._wp) shy = .false.
-            end if
-            if (p_glb > 0) then
-                if ((real(qc(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(qc(i)%sf(ci, cj, ck - 1), wp)) <= 0._wp) shz = .false.
-            end if
-        end do
-
-    end subroutine s_alpha_shared_switch
 
     !> Disblock prolongation. Guard: no-op unless amr.
     impure subroutine s_populate_amr_fine(q_cons_base)
@@ -3486,8 +3498,9 @@ contains
             ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners prolong from it below)
             if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (amr_rank_owns_block) then
+                ! the prolong is a device kernel now (writes the slot in place); no push - a host->device push here would
+                ! clobber the device result with the stale host mirror
                 call s_interpolate_coarse_to_fine()
-                $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(amr_cur))]')
                 ! non-polytropic QBMM: seed the block's quadrature side-state from the coarse fields
                 if (qbmm .and. .not. polytropic) call s_amr_prolong_pbmv()
             end if
@@ -3554,11 +3567,9 @@ contains
         call s_amr_gather_send_flush()  ! keep this site's original blocking semantics
         ! always-allocated base field, not amr_slots(1) (the parent slot is unallocated on a non-owner rank at np>1)
         if (amr_rank_owns_block) then
+            ! the prolong is a device kernel now: the persistent L2 block's device q_cons is valued in place (the historical
+            ! host-loop NaN hazard this site used to push against is gone; a push here would clobber the device result)
             call s_interpolate_coarse_to_fine()
-            ! push the host-side prolong to the device (mirror s_populate_amr_fine): s_prolong_one_var is a host loop, so without
-            ! this
-            ! the persistent L2 block's device q_cons is never valued (NaN) - a GPU-only failure invisible on CPU (host==device)
-            $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(amr_cur))]')
         end if
         ! persistent L2 block: KEEP the level-2 block in the active set (amr_num_blocks = L2, amr_num_levels = 2) so the advance
         ! driver steps it across timesteps; no free/revert.

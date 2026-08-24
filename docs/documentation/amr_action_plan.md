@@ -7,6 +7,27 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-24 (13) — PROLONG GOES DEVICE-SIDE: the rebuild now builds every slot where the store lives
+
+The last host stage of the rebuild: `s_prolong_one_var` and the two closure prolongs
+(alphas sum-to-one, species realizability) were host loops writing the cons host mirror,
+forcing a full-slot H2D push per built box at THREE call sites (the rebuild, the startup
+populate, the persistent-L2 build). All three are now GPU kernels (minmod was already
+GPU_ROUTINE-decorated; the shared alpha limiter switch is inlined and its helper
+deleted): the gathered patch's device mirror is pushed once per dispatch (patch-sized,
+8x smaller than the slot pushes it replaces; redundant-but-harmless for level>=2 where
+the patch is device-produced), the slot is built in place, and every full-slot push is
+deleted. With (12), the ENTIRE rebuild data path — stash, migration pack/unpack,
+prolong, overlap carry-forward — runs device-side: the "realloc stages through the
+HOST" structural gap vs AMReX identified in the store-fix analysis is closed for the
+data plane. CPU builds compile the kernels to the identical plain loops, so CPU results
+are unchanged; GPU arithmetic moves device-side (not bit-comparable to the host prolong
+by construction) and gates on golden tolerance.
+
+GATES: np8 S0 probe rc=0 with the [amr-xa] table byte-exact vs the landed baseline
+(slice touches no MPI); AMR-75 75/75; wall 100.1 s (parity-class). Wall pair queued
+when a QOS slot frees (the two pairs ahead of it price (11) and (12)).
+
 ## 2026-08-24 (12) — MIGRATION GOES DEVICE-SIDE: the stash chain stops staging through the host
 
 The regrid budget's migration half (rg:mig, 0.80 s/step at np8) was host-staged end to
