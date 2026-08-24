@@ -1147,7 +1147,8 @@ contains
         real(wp)                        :: max_pres
         real(wp), dimension(2)          :: Re
         real(wp), dimension(6)          :: tau_e
-        real(wp)                        :: G_local
+        real(stp), dimension(6)         :: stress_cons
+        real(wp)                        :: G_local, G_dyn
         real(wp)                        :: dyn_p, T
         real(wp)                        :: damage_state
         real(wp)                        :: ms_probe          !< damageable-solid partial mass at the probe cell
@@ -1192,7 +1193,9 @@ contains
             do s = 1, (num_dims*(num_dims + 1))/2
                 tau_e(s) = 0._wp
             end do
+            stress_cons = 0._stp
             damage_state = 0._wp
+            G_dyn = 0._wp
 
             if (n == 0) then
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
@@ -1228,6 +1231,10 @@ contains
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                     if (hypoelasticity) then
+                        do s = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
+                            stress_cons(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k, l)
+                        end do
+
                         if (cont_damage) then
                             ! Recover D = U_D/m_s, clamped to [0, 1]
                             ms_probe = 0._wp
@@ -1238,11 +1245,10 @@ contains
                             damage_state = min(max(real(q_cons_vf(eqn_idx%damage)%sf(j - 2, k, l), kind=wp)/max(ms_probe, &
                                                & verysmall), 0._wp), 1._wp)
                         end if
+                        G_dyn = G_local*max(1._wp - damage_state, 0._wp)
 
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
-                                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
-                                                & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
-                                                & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
+                                                & dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, stress_cons, G_local)
                     else
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1300,7 +1306,7 @@ contains
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, &
                                                   & 0._wp, c, qv)
-                    if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
+                    if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_dyn/rho)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1340,6 +1346,10 @@ contains
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                         if (hypoelasticity) then
+                            do s = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
+                                stress_cons(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k - 2, l)
+                            end do
+
                             if (cont_damage) then
                                 ! Recover D = U_D/m_s, clamped to [0, 1]
                                 ms_probe = 0._wp
@@ -1350,11 +1360,11 @@ contains
                                 damage_state = min(max(real(q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l), kind=wp)/max(ms_probe, &
                                                    & verysmall), 0._wp), 1._wp)
                             end if
+                            G_dyn = G_local*max(1._wp - damage_state, 0._wp)
 
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
-                                                    & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                                    & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
-                                                    & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
+                                                    & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress_cons, &
+                                                    & G_local)
                         else
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1390,7 +1400,7 @@ contains
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
                                                       & 0._wp, 0._wp, c, qv)
-                        if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
+                        if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_dyn/rho)
                     end if
                 end if
             else
@@ -1435,6 +1445,10 @@ contains
                             end if
 
                             if (hypoelasticity) then
+                                do s = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
+                                    stress_cons(s) = q_cons_vf(eqn_idx%stress%beg + s - 1)%sf(j - 2, k - 2, l - 2)
+                                end do
+
                                 if (cont_damage) then
                                     ! Recover D = U_D/m_s, clamped to [0, 1]
                                     ms_probe = 0._wp
@@ -1445,12 +1459,11 @@ contains
                                     damage_state = min(max(real(q_cons_vf(eqn_idx%damage)%sf(j - 2, k - 2, l - 2), &
                                                        & kind=wp)/max(ms_probe, verysmall), 0._wp), 1._wp)
                                 end if
+                                G_dyn = G_local*max(1._wp - damage_state, 0._wp)
 
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
-                                                        & rho, qv, rhoYks, pres, T, q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, &
-                                                        & k - 2, l - 2), q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), &
-                                                        & G_local)
+                                                        & rho, qv, rhoYks, pres, T, stress_cons, G_local)
                             else
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
@@ -1466,7 +1479,7 @@ contains
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
                                                           & 0._wp, 0._wp, c, qv)
-                            if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
+                            if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_dyn/rho)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if

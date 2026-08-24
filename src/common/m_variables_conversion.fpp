@@ -68,17 +68,17 @@ contains
     end subroutine s_convert_to_mixture_variables
 
     !> Compute the pressure from the appropriate equation of state
-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, G, pres_mag)
 
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', cray_noinline=True)
 
-        real(stp), intent(in)           :: energy, alf
-        real(wp), intent(in)            :: dyn_p
-        real(wp), intent(in)            :: pi_inf, gamma, rho, qv
-        real(wp), intent(out)           :: pres
-        real(wp), intent(inout)         :: T
-        real(stp), intent(in), optional :: stress, mom
-        real(wp), intent(in), optional  :: G, pres_mag
+        real(stp), intent(in)                         :: energy, alf
+        real(wp), intent(in)                          :: dyn_p
+        real(wp), intent(in)                          :: pi_inf, gamma, rho, qv
+        real(wp), intent(out)                         :: pres
+        real(wp), intent(inout)                       :: T
+        real(stp), dimension(6), intent(in), optional :: stress
+        real(wp), intent(in), optional                :: G, pres_mag
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
@@ -105,17 +105,17 @@ contains
             if (hypoelasticity .and. present(G)) then
                 ! Subtract elastic strain energy before computing pressure (hypoelastic model)
                 E_e = 0._wp
-                do s = eqn_idx%stress%beg, eqn_idx%stress%end
+                do s = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
                     if (G > 0) then
-                        E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
+                        E_e = E_e + ((stress(s)/rho)**2._wp)/(4._wp*G)
                         ! Double for shear stresses
-                        if (any(s == shear_indices)) then
-                            E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
+                        if (any(eqn_idx%stress%beg + s - 1 == shear_indices)) then
+                            E_e = E_e + ((stress(s)/rho)**2._wp)/(4._wp*G)
                         end if
                     end if
                 end do
 
-                pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
+                pres = (energy - dyn_p - pi_inf - qv - E_e)/gamma
             end if
         #:else
             ! Reacting mixture pressure from temperature and species
