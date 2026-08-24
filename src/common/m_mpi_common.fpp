@@ -441,6 +441,22 @@ contains
 
     end subroutine s_mpi_allreduce_min
 
+    !> Reduce a local real vector to its elementwise global minimum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_min_vec(var_loc, var_glb)
+
+        real(wp), dimension(:), intent(in)  :: var_loc
+        real(wp), dimension(:), intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, size(var_loc), mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_min_vec
+
     !> Reduce a local real value to its global maximum across all MPI ranks.
     impure subroutine s_mpi_allreduce_max(var_loc, var_glb)
 

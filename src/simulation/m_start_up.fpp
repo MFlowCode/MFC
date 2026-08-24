@@ -569,6 +569,7 @@ contains
         real(wp), intent(inout) :: time_avg
         integer                 :: i, eta_hh, eta_mm, eta_ss
         real(wp)                :: eta_sec
+        character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
@@ -601,8 +602,11 @@ contains
                 eta_hh = int(eta_sec)/3600
                 eta_mm = mod(int(eta_sec), 3600)/60
                 eta_ss = mod(int(eta_sec), 60)
-                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
-                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, t_step, wall_time_avg, wall_time, eta_hh, eta_mm, eta_ss
+                lim_str = ''
+                if (cfl_adap_dt) lim_str = ' (' // dt_limiter // ')'
+                print '(" [", I3, "%] t = ", ES11.4, " dt = ", ES11.4, A, " @ step ", I0, " t/step ", ES9.2, "s (avg ", ES9.2, "s) ETA ", I0, ":", I2.2, ":", I2.2)', &
+                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, trim(lim_str), t_step, wall_time, wall_time_avg, eta_hh, &
+                    & eta_mm, eta_ss
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
@@ -610,9 +614,9 @@ contains
                 eta_hh = int(eta_sec)/3600
                 eta_mm = mod(int(eta_sec), 3600)/60
                 eta_ss = mod(int(eta_sec), 60)
-                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
+                print '(" [", I3, "%] step ", I0, " of ", I0, " (t_step ", I0, ") t/step ", ES9.2, "s (avg ", ES9.2, "s) ETA ", I0, ":", I2.2, ":", I2.2)', &
                     & int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time_avg, wall_time, eta_hh, &
+                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time, wall_time_avg, eta_hh, &
                     & eta_mm, eta_ss
             end if
         end if

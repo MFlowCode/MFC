@@ -655,8 +655,9 @@ contains
         real(wp)               :: c        !< Cell-avg. sound speed
         real(wp)               :: H        !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
-        real(wp)               :: max_dt
-        real(wp)               :: dt_local
+        real(wp), dimension(3) :: max_dt   !< Cell dt candidates (inviscid, viscous, capillary)
+        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local
+        real(wp), dimension(3) :: dt_cfl_glb
         integer                :: j, k, l  !< Generic loop iterators
         integer                :: fl       !< Fluid loop iterator
 
@@ -664,9 +665,11 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
-        dt_local = huge(1.0_wp)
+        icfl_dt_local = huge(1.0_wp)
+        vcfl_dt_local = huge(1.0_wp)
+        ccfl_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt]', &
-                            & reduction='[[dt_local]]', reductionOp='[min]')
+                            & reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -693,17 +696,22 @@ contains
 
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
 
-                    dt_local = min(dt_local, max_dt)
+                    icfl_dt_local = min(icfl_dt_local, max_dt(1))
+                    vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
+                    ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
         if (num_procs == 1) then
-            dt = dt_local
+            dt_cfl_glb = (/icfl_dt_local, vcfl_dt_local, ccfl_dt_local/)
         else
-            call s_mpi_allreduce_min(dt_local, dt)
+            call s_mpi_allreduce_min_vec((/icfl_dt_local, vcfl_dt_local, ccfl_dt_local/), dt_cfl_glb)
         end if
+
+        dt = minval(dt_cfl_glb)
+        dt_limiter = dt_limiter_names(minloc(dt_cfl_glb, dim=1))
 
         $:GPU_UPDATE(device='[dt]')
 
