@@ -7,6 +7,26 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-24 (11) — REFLUX APPLY BATCHED: one kernel per face direction, 759 -> 15 calls/rank on the probe
+
+The verdict below ranked the reflux APPLY loop (10.4% of the np8 step — the exchange is
+the wave since I5, what remained was the per-box form's up-to-3 tiny face kernels per
+block per step) as the #2 overhead. `s_amr_apply_reflux` is now BATCHED: a host
+precompute walks the level-1 slots with the SAME select_slot + face-flags logic the
+per-box form used, fills per-slot descriptor arrays, and ONE kernel per face direction
+corrects the coarse rhs for every block — the exact mirror of the capture-side batching
+(`s_amr_capture_creg_dense_batch`) that has served the creg fill since the flat store
+landed. The per-box form is DELETED (single call site); the subcycle path's
+`s_amr_apply_reflux_state` is untouched. Legality: block corrections are disjoint (the
+merge invariant keeps blocks >= buff_size apart) and a block's x/y/z outside layers are
+distinct cells, so the per-direction regrouping preserves every read-modify-write —
+per-(face, eq, cell) arithmetic and child-sum order are IDENTICAL.
+
+GATES: step-5 full-state output BYTE-IDENTICAL to the pre-batch binary (np8 S0 probe,
+parallel-IO restart compared by sha256); [amr-xa] byte-identical (no MPI touched);
+reflux calls/rank 759 -> 15 on the 5-step probe, phase mean 2.844 -> 2.486 s
+(directional; the operating-point wall pair is queued); local AMR-75 goldens 75/75.
+
 ## 2026-08-24 (10) — THE POST-WAVE VERDICT: np8 -17.7%, top rung 1.99x -> 1.65x; rhs is now the largest phase
 
 The differenced 240-40 measurement of the full wave stack (I2a+I3+I5, pinned binary at

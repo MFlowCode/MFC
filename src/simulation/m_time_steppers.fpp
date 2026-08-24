@@ -590,22 +590,17 @@ contains
                 ! keeps blocks >= buff_size apart so their c/f corrections are disjoint; every rank still visits the same slots
                 ! in the same order, preserving the collective ordering of s_amr_p2p_reflux_faces). Interleaving the two forces
                 ! a swap/restore round trip per block, which is what blocks batching the advances - see @ref amr_block_batching.
-                ! I5-F5a: ALL level-1 face exchanges as one wave (zero-copy into the freg register mirrors), then the
-                ! applies per box - the exchange set and apply set are both order-free (disjoint register slots; disjoint
-                ! rhs corrections by the merge invariant), so the split is legal.
+                ! I5-F5a: ALL level-1 face exchanges as one wave (zero-copy into the freg register mirrors), then ONE
+                ! batched apply - the exchange set and apply set are both order-free (disjoint register slots; disjoint
+                ! rhs corrections by the merge invariant), so the split and the batching are both legal.
                 call s_phase_tic(PH_REFLUX)
                 call s_phase_tic(PH_RFP2P); call s_amr_reflux_faces_wave(); call s_phase_toc(PH_RFP2P)
+                ! coarse update sees the fine flux at c/f faces: ONE batched call corrects the L0 rhs for every level-1
+                ! block (the level walk and per-face participation moved inside s_amr_apply_reflux)
+                call s_phase_tic(PH_RFAPP)
+                call s_amr_apply_reflux(rhs_vf)
+                call s_phase_toc(PH_RFAPP)
                 call s_phase_toc(PH_REFLUX)
-                do islot = 1, amr_num_blocks
-                    if (amr_block_level(islot) == 0) cycle
-                    if (amr_block_level(islot) >= 2) cycle
-                    call s_amr_select_slot(islot)
-                    call s_phase_tic(PH_REFLUX)
-                    call s_phase_tic(PH_RFAPP)
-                    call s_amr_apply_reflux(rhs_vf)  ! coarse update sees the fine flux at c/f faces
-                    call s_phase_toc(PH_RFAPP)
-                    call s_phase_toc(PH_REFLUX)
-                end do
                 call s_amr_select_slot(1)
             end if
 
