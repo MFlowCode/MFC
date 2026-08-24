@@ -7,6 +7,25 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-24 (10) — THE POST-WAVE VERDICT: np8 -17.7%, top rung 1.99x -> 1.65x; rhs is now the largest phase
+
+The differenced 240-40 measurement of the full wave stack (I2a+I3+I5, pinned binary at
+this commit's parent, jobs 383882/383883): **np8 on the floor node = 11.174/12.105 ->
+mean 11.64 s/step vs the pre-wave 14.15 floor (-17.7%, clearing the 7.7% spread).**
+Ladder: np2 5.29 (unchanged, -1.3%), np4 7.04 (-5.6%) — gains concentrate at high rank
+counts, the comm-wave signature. Doublings vs the AMReX bar (1.20x/1.15x): np2->np4
+1.331x (was 1.392x), np4->np8 1.653x (was 1.993x); top-rung excess over the bar 1.73x
+-> 1.44x. Caveat: np8 on k004-008, np2/np4 on k004-001 (the historical ladder's node
+shape); the np8 pair is the hard claim.
+
+The np8 240-step phase budget re-ranks the program: **rhs 37.9% — physics is the
+largest share for the first time.** Overheads: regrid 17.2% (build 9.1% incl. the
+rebuild gather 4.5%; migration 7.2%), reflux 10.4% (the per-box APPLY loop — the
+exchange is now the wave), gather 6.5%, coarse halo 5.2%, seam 3.6% (imbalance 1.465 —
+residual skew parks there), ~13% residual. Next by size: (1) regrid build+migration,
+(2) reflux apply, (3) I6 plan caching for the per-stage plan rebuilds, (4) I5b/F7 is
+too small to appear — deprioritized (design note kept in amr-bench/notes/).
+
 ## 2026-08-23 (9) — I5-F5 LANDED: reflux faces + split-ownership freg as waves; message count unchanged BY DESIGN
 
 F5 was the last per-box rendezvous chain: the level-1 face exchange posted and WAITALLed
