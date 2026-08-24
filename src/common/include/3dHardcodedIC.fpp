@@ -2,6 +2,7 @@
     ! Place any declaration of intermediate variables here
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph, Mach
     real(wp) :: eps
+    real(wp) :: zlen371, kz371
 
     ! IGR Jets Arrays to stor position and radii of jets from input file
     real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
@@ -261,6 +262,24 @@
     case (370)  ! 3D extrusion of 2D profile from external data
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
+    case (371)  ! hcid=370 + closed-form spanwise (z) modulation for genuine 3D content
+        ! The (x,y) file this reads (same format as hcid=370) already carries an in-plane
+        ! velocity perturbation (see flamelet_ic.py's perturb_xy) that is y-localized and
+        ! amplitude-normalized -- but it's uniform in z (hcid=370's read extrudes across
+        ! z), so under deterministic per-cell stencils the flow would stay z-invariant
+        ! indefinitely. Rather than derive a fresh z-envelope/amplitude scale from scratch
+        ! (which would need physical parameters like vort_thickness that aren't case
+        ! parameters here), MODULATE the already-correct (x,y) perturbation by a
+        ! z-dependent factor: this inherits the right shear-layer localization and
+        ! amplitude scale automatically. The wavenumber is derived from the z domain's own
+        ! extent (not a hardcoded absolute value), so this is dimensionally correct
+        ! regardless of the case's length-scale choice -- unlike mixlayer_perturb's fixed
+        ! wavenumber range.
+        @: HardcodedReadValues()
+        zlen371 = z_cc(p) - z_cc(0)
+        kz371 = 2._wp*pi/zlen371
+        q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k)*(1._wp + 0.5_wp*cos(kz371*z_cc(k)))
+        q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = 0.5_wp*q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k)*sin(kz371*z_cc(k) + pi/3._wp)
     case (380)  ! Taylor-Green vortex
         ! This is patch is hard-coded for test suite optimization used in the 3D_TaylorGreenVortex case: This analytic patch used
         ! geometry 9
