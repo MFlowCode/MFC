@@ -376,7 +376,7 @@ CONSTRAINTS = {
     "num_fluids": {"min": 1, "max": NF},
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
-    "ib_neighborhood_radius": {"min": 1},
+    "ib_neighborhood_radius": {"min": 0},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "nb": {"min": 1},
