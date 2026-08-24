@@ -32,14 +32,13 @@ rho_post_a = rho_a * (gam_a + 1) * Ma**2 / ((gam_a - 1) * Ma**2 + 2)
 c_a = math.sqrt(gam_a * p_a / rho_a)
 vel = 2 * c_a / (gam_a + 1) * (Ma**2 - 1) / Ma
 
-rho = 1
-c_l = math.sqrt(1.4 * ps / rho)
-eps = 1e-9
+c_l = math.sqrt(gam_a * ps / rho_a)
+eps = 1e-6
 
 D = 0.048
 Ny = (300 * args.res) - 1
 Nx = (1200 * args.res) - 1
-dx = 0.25 / Nx
+dx = 24 * D / Nx
 
 # End time in units of the Ranger & Nicholls (1969) breakup time scale
 # t_breakup = D sqrt(rho_l/rho_g) / u_g, with post-shock gas conditions
@@ -85,15 +84,17 @@ print(
             "n": int(Ny),
             "p": 0,
             **time_stepping,
+            "elliptic_smoothing": "T",
+            "elliptic_smoothing_iters": 20,
             # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": "5eq",
             "alt_soundspeed": "F",
             "num_fluids": 2,
-            "mpp_lim": "T",
-            "mixture_err": "T",
+            "mpp_lim": "F",
+            "mixture_err": "F",
             "time_stepper": "rk3",
-            "weno_order": 5,
+            "weno_order": 3,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
             "weno_avg": "F",
@@ -121,8 +122,8 @@ print(
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0e00,
             "patch_icpp(1)%pres": p_a,
-            "patch_icpp(1)%alpha_rho(1)": eps * 1000,
-            "patch_icpp(1)%alpha_rho(2)": (1 - eps) * 1.17,
+            "patch_icpp(1)%alpha_rho(1)": eps * rho_w,
+            "patch_icpp(1)%alpha_rho(2)": (1 - eps) * rho_a,
             "patch_icpp(1)%alpha(1)": eps,
             "patch_icpp(1)%alpha(2)": 1 - eps,
             # Patch 2: Shocked state
@@ -135,7 +136,7 @@ print(
             "patch_icpp(2)%vel(1)": vel,
             "patch_icpp(2)%vel(2)": 0.0e00,
             "patch_icpp(2)%pres": ps,
-            "patch_icpp(2)%alpha_rho(1)": eps * 1000,
+            "patch_icpp(2)%alpha_rho(1)": eps * rho_w,
             "patch_icpp(2)%alpha_rho(2)": (1 - eps) * rho_post_a,
             "patch_icpp(2)%alpha(1)": eps,
             "patch_icpp(2)%alpha(2)": 1 - eps,
