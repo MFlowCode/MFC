@@ -24,45 +24,29 @@ parser.add_argument("--scale", type=float, default=1.0, help="Scales cross-strea
 parser.add_argument("--hot", action="store_true", help="Run the full flamelet Newton/BDF solve for a physically-converged reacting profile (slow; skipped by default).")
 args = parser.parse_args()
 
-# Physical parameters: same H2/air mixing layer as the 2D temporal case, but supersonic
-# (mach_c=1.5 instead of 0.3) -- this case exists specifically to probe compressibility
-# effects the 2D/subsonic case can't. Uses the San Diego mechanism (sandiego.yaml, shipped
-# alongside this case) rather than the 2D case's h2o2.yaml -- all tuning below (dilution,
-# resolution, flamelet chi) is calibrated against it; swapping mechanisms invalidates it.
+# The 2D temporal case's H2/air mixing layer at mach_c=1.5 instead of 0.3, to probe
+# compressibility effects the subsonic case can't. Tuning below (dilution, resolution,
+# flamelet chi) is calibrated against sandiego.yaml; swapping mechanisms invalidates it.
 pressure = 101_325.0
 temperature_ox = 500.0
 temperature_fu = 300.0
 fuel = "H2"
 mole_fraction_ox = 0.21
-# Fuel stream diluted with N2 (was 1.0, pure H2): pure H2 has such a low molecular weight
-# that its sound speed (~1318 m/s at 300K) is over 4x c_ox, so hitting mach_c=1.5 via the
-# mean-sound-speed convective-Mach definition below required an unphysically extreme
-# absolute velocity split (delta_u ~ 2650 m/s, Mach ~5.9 relative to the oxidizer stream) --
-# the two 3D production runs both crashed (VCFL=Inf) under this, and doubling y-resolution
-# barely changed the crash timing, pointing at the base flow itself rather than under-
-# resolution. Diluting to X_H2=0.5 (c_fu ~ 483 m/s, delta_u ~ 1394 m/s, Ma ~ 3.1 in the
-# oxidizer frame) also moves Z_st from near 0 (pure-fuel-side) to ~0.30, away from the
-# domain edge.
+# Diluted with N2 rather than pure H2: pure H2's sound speed (~1318 m/s at 300 K) is over
+# 4x c_ox, so reaching mach_c=1.5 demanded delta_u ~ 2650 m/s and crashed on VCFL. X_H2=0.5
+# gives delta_u ~ 1394 m/s and moves Z_st off the domain edge to ~0.30.
 mole_fraction_fu = 0.5
 vort_thickness = 1.0e-3
 mach_c = 1.5
 num_iter = 5
 
 # Grid: x = streamwise (periodic), y = cross-stream (flamelet profile axis), z = spanwise
-# (periodic). Quarter-scale of Wang et al. (C&F 2024)'s temporal mixing-layer DNS gold
-# standard: their domain is [60,80,40] delta_omega at a uniform 14 points/delta_omega in
-# all three directions (840x1120x560 -- we can't afford that budget-wise, so we keep their
-# resolution DENSITY and shrink the box to 1/4 in each direction: [15,20,10] delta_omega,
-# 210x280x140 at 14 pts/delta_omega uniform. That run crashed (VCFL=Inf, ~t_step=33000)
-# after developing Mach-1.5 shocklets in the braids (local velocities ~1500 m/s, 4-5x the
-# base stream speed) -- points_per_cross (below) doubles y's density on top of this
-# baseline to better resolve those gradients, independent of x/z.
+# (periodic). Wang et al. (C&F 2024)'s temporal mixing-layer DNS at their resolution
+# density (14 pts/delta_omega) but a quarter of their box: [15,20,10] delta_omega.
 points_per_delta = 14.0 * args.scale
 cross_min, cross_max = -10.0, 10.0  # y: 20 delta_omega
-# y carries the flame/shear-layer gradients (and now the shocklets from the Mach-1.5
-# braids that crashed the previous run) -- doubled relative to x/z instead of touching the
-# numerics (Riemann solver, WENO flux type, reaction sub-stepping) or backing off the
-# perturbation amplitude again. dt is left at 1e-9 s unchanged (per prior 2D-case experience).
+# y is doubled relative to x/z: it carries the flame gradients and the Mach-1.5 braid
+# shocklets that crashed the uniform-14 run. dt stays at 1e-9 s.
 points_per_cross = 2.0 * points_per_delta
 stream_min, stream_max = -7.5, 7.5  # x: 15 delta_omega
 num_x = round((stream_max - stream_min) * points_per_delta)
@@ -70,12 +54,13 @@ span_min, span_max = -5.0, 5.0  # z: 10 delta_omega
 num_z = round((span_max - span_min) * points_per_delta)
 
 t_step_stop = 20000000
-# Was 10000 -- at the quarter-scale grid's measured 1-GPU rate (3.82 s/step), a job would
-# need >10.6 hours just to reach the FIRST checkpoint. The run that just timed out spent 4
-# GPU-hours reaching only 3766/10000 steps -- zero recoverable progress. Lowered so real
-# progress gets banked well within a single job's walltime even at conservative (non-ideal)
-# multi-GPU scaling.
+# 5000, not 10000: at the measured 1-GPU rate (3.82 s/step) a 10000-step checkpoint
+# interval is >10 h, so a job that hits walltime banks nothing.
 t_step_save = 5000
+
+# Fixed: IC/ is gitignored and regenerated on every checkout, so an unseeded perturbation
+# would make the case irreproducible.
+perturb_seed = 20260824
 
 sol = ct.Solution(ctfile)
 cross_coord, x_coord, grid = flamelet_ic.compute_grid_3d(vort_thickness, cross_min, cross_max, points_per_cross, stream_min, stream_max, num_x, span_min, span_max, num_z)
@@ -94,6 +79,7 @@ cache_key = {
     "mole_fraction_ox": mole_fraction_ox,
     "mole_fraction_fu": mole_fraction_fu,
     "num_iter": num_iter,
+    "perturb_seed": perturb_seed,
 }
 if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(x_coord) * len(cross_coord), cache_key):
     import jax.numpy as jnp
@@ -119,6 +105,7 @@ if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(x_coord) * len(cross_coo
         mach_c=mach_c,
         num_iter=num_iter,
         cold=not args.hot,
+        perturb_seed=perturb_seed,
     )
     flamelet_ic.write_cache_key(ic_dir, cache_key)
 
@@ -134,8 +121,6 @@ case = {
     "n": grid["n"],
     "p": grid["p"],
     "cyl_coord": "F",
-    # Scaled down from the previous 1e-9 s in proportion to the finer grid spacing
-    # (8 -> 14 pts/delta_omega, dx shrinks by 8/14 ~ 0.571) to hold the same CFL margin.
     "dt": 1.0e-9,
     "t_step_start": 0,
     "t_step_stop": t_step_stop,
@@ -166,9 +151,8 @@ case = {
     "chemistry": "T",
     "chem_params%diffusion": "T",
     "chem_params%reactions": "T",
-    # Unity-Lewis, to match the flamelet solve's own diffusivity assumption (flamelet_ic.py's
-    # diffusivity() uses D_k = k/(rho*cp) for every species) -- default is 1 (mixture-averaged),
-    # which is what tmp-3D-1 ran with.
+    # Unity-Lewis, matching the flamelet solve's own assumption (flamelet_ic.py's
+    # diffusivity() uses D_k = k/(rho*cp) for every species).
     "chem_params%transport_model": 2,
     "files_dir": ic_dir,
     "file_extension": "000000",
@@ -180,16 +164,11 @@ case = {
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": 1.0 / fluid["viscosity"],
     "patch_icpp(1)%geometry": 9,
-    # hcid=371: hcid=370's read (flamelet base state + in-plane (x,y) perturbation from
-    # flamelet_ic.py's perturb_xy, ported from ../tmp-mixlyr/perturb.py) plus a closed-form
-    # spanwise (z) modulation added directly in Fortran (src/common/include/
-    # 3dHardcodedIC.fpp), so the IC has genuine 3D structure from step 0. Not
-    # MFC's own mixlayer_perturb: that routine hardcodes an absolute wavenumber range
-    # (effectively >6m wavelengths) that's meaningless for this millimeter-scale domain --
-    # confirmed by measuring essentially zero real x/z structure despite large point-wise
-    # perturbation variance, both with the Fortran default mixlayer_perturb_k0 and after
-    # trying to rescale it (that parameter only reweights an already length-scale-fixed
-    # wavenumber range, it doesn't rescale it).
+    # hcid=371: hcid=370's file read (flamelet base state + in-plane perturbation from
+    # flamelet_ic.py's perturb_xy) plus a closed-form spanwise modulation in Fortran
+    # (src/common/include/3dHardcodedIC.fpp), so the IC is 3D from step 0. Not
+    # mixlayer_perturb: its wavenumber range is fixed in absolute units (~6 m wavelengths),
+    # meaningless for this millimeter-scale domain.
     "patch_icpp(1)%hcid": 371,
     "patch_icpp(1)%x_centroid": 0.5 * (grid["x_domain_beg"] + grid["x_domain_end"]),
     "patch_icpp(1)%y_centroid": 0.5 * (grid["y_domain_beg"] + grid["y_domain_end"]),

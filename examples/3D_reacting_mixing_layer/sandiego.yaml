@@ -1,5 +1,6 @@
 description: |-
-  nits(length='cm', time='s', quantity='mol', act_energy='kJ/mol')
+  San Diego mechanism, H2/O2/N2 subset. UC San Diego Combustion Research Group,
+  https://web.eng.ucsd.edu/mae/groups/combustion/mechanism.html
 
 generator: cti2yaml
 cantera-version: 2.6.0

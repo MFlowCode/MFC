@@ -427,12 +427,14 @@ def create_simulation_fields(pyro_gas, sol, pres, temp_ox, temp_fu, cross_coord,
     return sim_fields
 
 
-def perturb_xy(x_coord, cross_coord, vort_thickness, delta_u, num_modes=10, num_blocks=5, seed=None):
-    """Solenoidal (x,y) velocity perturbation, ported from
-    ../tmp-mixlyr/perturb.py's perturb_temporally_evolving_layer. Wavenumbers are
-    computed relative to domain_length (x) and vort_thickness (y), not a hardcoded
-    absolute range, so the result is dimensionally sensible regardless of the case's
-    length-scale choice.
+def perturb_xy(x_coord, cross_coord, vort_thickness, delta_u, seed, num_modes=10, num_blocks=5):
+    """Solenoidal (x,y) velocity perturbation. Wavenumbers are computed relative to
+    domain_length (x) and vort_thickness (y), not a hardcoded absolute range, so the
+    result is dimensionally sensible regardless of the case's length-scale choice.
+
+    `seed` is mandatory: IC/ is gitignored and regenerated on every checkout, so a
+    default would reseed the mode phases from OS entropy and make the example
+    irreproducible.
 
     Returns
     -------
@@ -450,7 +452,9 @@ def perturb_xy(x_coord, cross_coord, vort_thickness, delta_u, num_modes=10, num_
     phases = np.pi * (2 * rng.uniform(0, 1, size=num_modes) - 1)
     phase_jitter = rng.uniform(0, 1, size=num_blocks)
 
-    x_int = np.clip(np.array(stream_coord // (domain_length / num_blocks), dtype=int), 0, num_blocks - 1)
+    # Bin relative to x_coord[0]: x starts negative here, and binning the raw coordinate
+    # clips every x < 0 into block 0, leaving two of five blocks unused.
+    x_int = np.clip(np.array((stream_coord - x_coord[0]) // (domain_length / num_blocks), dtype=int), 0, num_blocks - 1)
     conditions = [phase_jitter[x_int] < 0.33, (phase_jitter[x_int] > 0.33) * (phase_jitter[x_int] < 0.66), phase_jitter[x_int] > 0.66]
     f = np.select(conditions, [1, -1, 0])
 
@@ -514,13 +518,14 @@ def write_hcid370_ic(output_dir, x_coord, cross_coord, density, streamwise_veloc
     columns_2d = [density[None, :] * ones_2d, u_2d, v_2d, pressure[None, :] * ones_2d, ones_2d]
     columns_2d += [mass_fractions[k][None, :] * ones_2d for k in range(num_species)]
 
+    # savetxt, not a per-element write: the 210x560 grid is ~1.6M rows across 14 files.
+    # "%.17g" round-trips float64, so the recovered values match repr()'s exactly.
     x_grid, y_grid = np.meshgrid(x_coord, cross_coord, indexing="ij")
+    xy_flat = np.column_stack((x_grid.ravel(), y_grid.ravel()))
     for n, values_2d in enumerate(columns_2d, start=1):
         path = os.path.join(output_dir, f"prim.{n}.00.{file_extension}.dat")
-        with open(path, "w") as fh:
-            for row_x, row_y, row_v in zip(x_grid, y_grid, values_2d):
-                for x, y, v in zip(row_x, row_y, row_v):
-                    fh.write(f"{float(x)!r} {float(y)!r} {float(v)!r}\n")
+        rows = np.column_stack((xy_flat, np.asarray(values_2d, dtype=float).ravel()))
+        np.savetxt(path, rows, fmt="%.17g")
 
     return len(columns_2d), ny
 
@@ -542,6 +547,7 @@ def generate_ic_files(
     mach_c,
     num_iter,
     cold,
+    perturb_seed,
     file_extension="000000",
 ):
     """Run the flamelet solve (expensive when cold=False) and write hcid=370 IC
@@ -591,7 +597,7 @@ def generate_ic_files(
             raise ValueError("flamelet IC solve produced non-finite values; refusing to write IC")
 
         delta_u = float(velocity_1d.max() - velocity_1d.min())
-        u_perturb, v_perturb = perturb_xy(x_coord, np.asarray(cross_coord), vort_thickness, delta_u)
+        u_perturb, v_perturb = perturb_xy(x_coord, np.asarray(cross_coord), vort_thickness, delta_u, perturb_seed)
         if not (np.all(np.isfinite(u_perturb)) and np.all(np.isfinite(v_perturb))):
             raise ValueError("perturb_xy produced non-finite values; refusing to write IC")
 
