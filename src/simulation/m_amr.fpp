@@ -6984,19 +6984,21 @@ contains
     !> Size the flat store for at least nloc local slots, growing 1.25x and never shrinking, so a run pays few reallocations no
     !! matter how the block count churns (with the index space re-densified every reconcile, growth fires only on a new
     !! rebuild-transient high-water). Growth must PRESERVE the live blocks' fields, and those live on the device, so each array
-    !! makes a device -> host -> larger array -> device round trip; the same trip is what keeps the mid-rebuild HOST writes (the
-    !! migration stash) coherent across a growth, which the rebuild's overlap carry-forward reads back host-side.
+    !! stages through a DEVICE-side temporary (two on-device copies, no PCIe round trip) - the device-native remake the
+    !! store-vs-AMReX analysis called for. The old device->host->device trip existed only to carry the migration stash's host writes
+    !! across a growth; the stash chain is device-side now, so no reader depends on the host mirror through a grow.
     impure subroutine s_amr_st_reserve(nloc)
 
         integer, intent(in)    :: nloc
         integer                :: oldcap, newcap, i
+        integer                :: c5, i4, k3, j2, i1
         logical                :: want(4)
         real(stp), allocatable :: tmp(:,:,:,:,:)
 
-        ! CONTRACT: the store is DEVICE-authoritative at every call, because growth preserves the old contents by pulling
-        ! device->host before the realloc. A caller that has just written the store on the HOST (restart read, host prolongation)
-        ! must push its slot to the device before the next s_amr_alloc_slot, or that host data is silently overwritten. This is
-        ! new with the shared store: per-slot arrays could not clobber each other.
+        ! CONTRACT: the store is DEVICE-authoritative at every call; growth preserves the DEVICE contents only, and the host
+        ! mirror comes out of a growth UNDEFINED (host readers pull per slot before reading - the store's normal state between
+        ! rebuilds anyway, cf. s_amr_compact_store). A caller that has just written the store on the HOST (restart read) must
+        ! still push its slot to the device before the next s_amr_alloc_slot, or that host data is lost.
 
         ! TRIP-WIRE on the store trajectory (kept from the W8 ratchet investigation). STDERR because stdout is buffered and
         ! lost on abort - the OOM run's stdout showed nothing at all.
@@ -7019,22 +7021,56 @@ contains
         #:for ST, IDX in [('amr_cons_st', 1), ('amr_stor_st', 2), ('amr_gst_a', 3), ('amr_gst_b', 4)]
             if (want(${IDX}$)) then
                 if (oldcap > 0) then
-                    $:GPU_UPDATE(host='[' + ST + ']')
-                    allocate (tmp(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi,1:sys_size,1:oldcap))
-                    tmp = ${ST}$
+                    ! stage the live columns on the DEVICE (tmp is device-mapped by @:ALLOCATE); no PCIe traffic
+                    @:ALLOCATE(tmp(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:oldcap))
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do c5 = 1, oldcap
+                        do i4 = 1, sys_size
+                            do k3 = mbuf3_lo, mbuf3_hi
+                                do j2 = mbuf2_lo, mbuf2_hi
+                                    do i1 = mbuf1_lo, mbuf1_hi
+                                        tmp(i1, j2, k3, i4, c5) = ${ST}$(i1, j2, k3, i4, c5)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                     @:DEALLOCATE(${ST}$)
                 end if
                 @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
+                ! restore the preserved columns and zero the rest, both on the device; the host mirror stays undefined
+                ! (see the contract above - every host reader pulls its slot first). Two kernels so the zero-only path
+                ! (oldcap == 0) never references the unallocated tmp.
                 if (oldcap > 0) then
-                    ! preserved columns are fully overwritten from tmp - zero only the NEW columns
-                    ! (one full-store host pass saved per growth event; mg:slot measured 57.9 s at np=8)
-                    ${ST}$(:,:,:,:,1:oldcap) = tmp
-                    ${ST}$(:,:,:,:,oldcap + 1:newcap) = 0._stp
-                    deallocate (tmp)
-                else
-                    ${ST}$ = 0._stp
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do c5 = 1, oldcap
+                        do i4 = 1, sys_size
+                            do k3 = mbuf3_lo, mbuf3_hi
+                                do j2 = mbuf2_lo, mbuf2_hi
+                                    do i1 = mbuf1_lo, mbuf1_hi
+                                        ${ST}$(i1, j2, k3, i4, c5) = tmp(i1, j2, k3, i4, c5)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                    @:DEALLOCATE(tmp)
                 end if
-                $:GPU_UPDATE(device='[' + ST + ']')
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do c5 = oldcap + 1, newcap
+                    do i4 = 1, sys_size
+                        do k3 = mbuf3_lo, mbuf3_hi
+                            do j2 = mbuf2_lo, mbuf2_hi
+                                do i1 = mbuf1_lo, mbuf1_hi
+                                    ${ST}$(i1, j2, k3, i4, c5) = 0._stp
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
         #:endfor
 
