@@ -9,7 +9,7 @@ from glob import glob
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
-from ..build import REQUIRED_TARGETS, SIMULATION, build, get_targets
+from ..build import PRE_PROCESS, REQUIRED_TARGETS, SIMULATION, build, get_targets
 from ..common import MFC_ROOT_DIR, MFC_TEMPLATE_DIR, MFCException, does_command_exist, file_dump_yaml, file_read, file_write, format_list_to_string, isspace, system
 from ..printer import cons
 from ..state import ARG, ARGS, CFG, gpuConfigOptions
@@ -157,8 +157,13 @@ def __execute_job_script(qsystem: queues.QueueSystem):
 
 
 def run(targets=None, case=None):
+    targets_explicit = targets is not None or ARG("targets_explicit", False)
     targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
     case = case or input.load(ARG("input"), ARG("--"))
+
+    if not targets_explicit and PRE_PROCESS in targets and int(case.params.get("t_step_start", 0)) > 0:
+        cons.print("[yellow]t_step_start > 0: skipping pre_process so it doesn't overwrite the restart data being resumed from. Pass -t pre_process explicitly to force it.[/yellow]")
+        targets = [t for t in targets if t is not PRE_PROCESS]
 
     build(targets)
 
