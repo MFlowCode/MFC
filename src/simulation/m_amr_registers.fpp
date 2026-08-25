@@ -90,15 +90,59 @@ contains
 
     #:def REG_GROW(A, L2, U2, L3, U3)
         if (allocated(${A}$)) then
-            $:GPU_UPDATE(host='[' + A + ']')
-            allocate (rtmp(1:sys_size,${L2}$:${U2}$,${L3}$:${U3}$,1:oldcap))
-            rtmp = ${A}$(:,:,:,1:oldcap)
-            @:DEALLOCATE(${A}$)
-            @:ALLOCATE(${A}$(1:sys_size, ${L2}$:${U2}$, ${L3}$:${U3}$, 1:newcap))
-            ${A}$ = 0._wp
-            ${A}$(:,:,:,1:oldcap) = rtmp
-            deallocate (rtmp)
-            $:GPU_UPDATE(device='[' + A + ']')
+            if (oldcap > amr_reg_grow_dev_cap) then
+                ! near-limit fallback (mirror of s_amr_st_reserve): the device staging below transiently holds
+                ! old + tmp = 2*oldcap slots on the device and growth fires at the memory high-water mark, so above
+                ! the threshold keep the host round trip - slow, but its device peak is max(old, new).
+                $:GPU_UPDATE(host='[' + A + ']')
+                allocate (rtmp(1:sys_size,${L2}$:${U2}$,${L3}$:${U3}$,1:oldcap))
+                rtmp = ${A}$(:,:,:,1:oldcap)
+                @:DEALLOCATE(${A}$)
+                @:ALLOCATE(${A}$(1:sys_size, ${L2}$:${U2}$, ${L3}$:${U3}$, 1:newcap))
+                ${A}$ = 0._wp
+                ${A}$(:,:,:,1:oldcap) = rtmp
+                deallocate (rtmp)
+                $:GPU_UPDATE(device='[' + A + ']')
+            else
+                ! stage the live slots on the DEVICE (rtmp_d is device-mapped by @:ALLOCATE); no PCIe traffic
+                @:ALLOCATE(rtmp_d(1:sys_size, ${L2}$:${U2}$, ${L3}$:${U3}$, 1:oldcap))
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do c4 = 1, oldcap
+                    do t2 = ${L3}$, ${U3}$
+                        do t1 = ${L2}$, ${U2}$
+                            do eq = 1, sys_size
+                                rtmp_d(eq, t1, t2, c4) = ${A}$(eq, t1, t2, c4)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+                @:DEALLOCATE(${A}$)
+                @:ALLOCATE(${A}$(1:sys_size, ${L2}$:${U2}$, ${L3}$:${U3}$, 1:newcap))
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do c4 = 1, oldcap
+                    do t2 = ${L3}$, ${U3}$
+                        do t1 = ${L2}$, ${U2}$
+                            do eq = 1, sys_size
+                                ${A}$(eq, t1, t2, c4) = rtmp_d(eq, t1, t2, c4)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+                @:DEALLOCATE(rtmp_d)
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do c4 = oldcap + 1, newcap
+                    do t2 = ${L3}$, ${U3}$
+                        do t1 = ${L2}$, ${U2}$
+                            do eq = 1, sys_size
+                                ${A}$(eq, t1, t2, c4) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
     #:enddef
 
@@ -111,12 +155,20 @@ contains
     !! Contents are PRESERVED across growth, mirroring s_amr_st_reserve. Every caller of s_amr_alloc_slot today is a between-step
     !! operation (regrid, restart, slot reconcile, L0 tile build) and stage 1 overwrites the registers anyway, so discarding would
     !! probably be safe - but freg accumulates across RK stages and across subcycle substeps, so "probably" is not the right
-    !! standard for a silent conservation error. Growth is geometric and therefore rare; the round trip is free.
+    !! standard for a silent conservation error. Growth stages through a DEVICE temporary like the store (the registers are
+    !! device-authoritative; every host consumer pulls its slot to the host immediately before reading, so the host
+    !! mirror coming out of a device-path growth UNDEFINED is the store's contract, not a new one). Above the transient threshold
+    !! the old host round trip remains as the OOM-safe path.
     impure subroutine s_amr_reg_reserve(nslot)
 
-        integer, intent(in)   :: nslot
-        integer               :: oldcap, newcap
-        real(wp), allocatable :: rtmp(:,:,:,:)
+        integer, intent(in) :: nslot
+        integer             :: oldcap, newcap
+        integer             :: eq, t1, t2, c4
+        !> device staging transiently doubles one register array's footprint; register slots are faces (~1.4 MB across all 12 arrays
+        !! vs tens of MB for a store column), so the byte transient of 512 register slots matches the store's 32-column threshold.
+        !! Above it, fall back to the host round trip (device peak max(old, new)).
+        integer, parameter    :: amr_reg_grow_dev_cap = 512
+        real(wp), allocatable :: rtmp(:,:,:,:), rtmp_d(:,:,:,:)
 
         if (nslot <= amr_reg_cap) return
         oldcap = amr_reg_cap
