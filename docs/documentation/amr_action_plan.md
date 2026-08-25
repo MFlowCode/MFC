@@ -7,6 +7,24 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-24 (16) — THE ADVERSARIAL REVIEW ROUND: three findings on the day's four commits, all fixed
+
+The four rapid increments got their overdue adversarial review; it returned one
+corruption-class, one crash-class, and one contract-gap finding (migration and prolong
+came back clean against every attack): (1) the IB path re-breaks the merge invariant
+the batched reflux apply relies on — `s_amr_expand_box_over_bodies` runs after
+clustering and the follow-up merge fused only OVERLAPPING pairs, so two boxes left
+with a 1-cell gap have COINCIDENT outside coarse cells -> an unsynchronized
+read-modify-write inside one batched kernel (amr+ib configs only; no gate exercises
+them). FIX: the IB merge now fuses pairs closer than a 2-cell gap, restoring the
+separation the clusterer guarantees everywhere else. (2) the device-native grow
+transiently held old + tmp = 2x the array on device, at exactly the memory high-water
+mark — a measured OOM class. FIX: device-native staging only up to 32 old columns
+(the startup/early events where the -57% short-run win lives); above that, the old
+host round trip (device peak max(old, new)). (3) restart pushes full padded columns
+after writing only interiors, and the host pad bytes are undefined since the
+device-native grow. FIX: zero the host column before each restart read.
+
 ## 2026-08-24 (15) — I6 (plan caching) REFUTED BY MEASUREMENT: the plan walks are free
 
 New gw:plan/gw:pack/gw:wait sub-brackets inside the stage-fill wave (this commit).
