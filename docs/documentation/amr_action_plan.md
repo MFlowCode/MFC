@@ -7,6 +7,26 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-24 (14) — STORE GROWTH GOES DEVICE-NATIVE: -57% probe wall; the last host-staged store operation is gone
+
+`s_amr_st_reserve` grew the store by round-tripping the ENTIRE store over PCIe — full
+device->host pull, host realloc, full push, for each of up to four arrays per growth
+event. The round trip's one remaining justification (carrying the migration stash's
+host writes across a growth) died with (12), so growth now stages through a
+DEVICE-side temporary: two on-device copies, zero PCIe. The host mirror comes out of a
+growth UNDEFINED — within the existing contract (every host reader pulls its slot
+first; compaction already leaves the host stale by design). The 5-step np8 probe fell
+100.8 -> 43.4 s (-57%!) with BYTE-IDENTICAL output — the growth round trips were a
+huge UNTIMED cost in every short run (all earlier probe comparisons stand: both arms
+carried it equally). Honest expectation for the operating point: much smaller (int=20
+reaches its high-water early; late growth is rare) — the win concentrates in short
+runs, tests (suite -1.3 min), regrid-heavy transients, and restart spin-up.
+mg:slot 3.72 -> 0.60 s on the probe (-84%). Follow-up: the registers' REG_GROW macro
+keeps the same pull/push pattern (smaller arrays; same fix applies).
+
+GATES: step-5 output BYTE-IDENTICAL (np8 probe, sha256); AMR-75 75/75. Its wall pair
+joins the queue when a QOS slot frees.
+
 ## 2026-08-24 (13) — PROLONG GOES DEVICE-SIDE: the rebuild now builds every slot where the store lives
 
 The last host stage of the rebuild: `s_prolong_one_var` and the two closure prolongs
