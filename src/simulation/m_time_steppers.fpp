@@ -658,6 +658,7 @@ contains
         real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
         real(wp), dimension(3) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary)
         real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, coll_dt_local
+        real(wp), dimension(4) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, collision cap)
         real(wp), dimension(4) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, collision cap)
         real(wp)               :: dt_prev
         integer                :: j, k, l            !< Generic loop iterators
@@ -715,10 +716,15 @@ contains
             collisions_active = .false.
         end if
 
+        dt_candidates_loc(1) = icfl_dt_local
+        dt_candidates_loc(2) = vcfl_dt_local
+        dt_candidates_loc(3) = ccfl_dt_local
+        dt_candidates_loc(4) = coll_dt_local
+
         if (num_procs == 1) then
-            dt_candidates_glb = (/icfl_dt_local, vcfl_dt_local, ccfl_dt_local, coll_dt_local/)
+            dt_candidates_glb = dt_candidates_loc
         else
-            call s_mpi_allreduce_min_vec((/icfl_dt_local, vcfl_dt_local, ccfl_dt_local, coll_dt_local/), dt_candidates_glb)
+            call s_mpi_allreduce_min_vec(dt_candidates_loc, dt_candidates_glb)
         end if
 
         dt = minval(dt_candidates_glb)

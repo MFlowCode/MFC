@@ -189,7 +189,7 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in)                      :: c, rho
-        real(wp), dimension(3), intent(inout)     :: max_dt
+        real(wp), dimension(3), intent(out)       :: max_dt
         real(wp), dimension(2), intent(in)        :: Re_l
         integer, intent(in)                       :: j, k, l
         real(wp)                                  :: vcfl_dt, ccfl_dt
