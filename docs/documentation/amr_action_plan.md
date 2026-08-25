@@ -7,6 +7,29 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-25 (18) — THE OVERNIGHT PAIRS PRICED THE ATTRIBUTOR CLIFF; WORKAROUND ADOPTED IN-TREE
+
+The three k004-008 np8 pairs (differenced 240-40, 2 reps each) priced the 2026-08-24
+commits: rbatch (5ac7b6fa) 11.79 s/step — wall-neutral vs the 11.64 post-wave floor
+(its win is calls/rank 759->15, which pays at higher np); devmig (62bf3e11) 16.69
+(+43%!); clip HEAD (34296def) 16.37. The regression decomposes entirely into phases
+the commits NEVER touched — rhs +3.05 s/step (+70%), rk +222%, restr +52% — while
+every phase they DID touch improved (rg:mig -0.45, mg:unpk 74->11 ms/call, rg:build
+-0.51, rb:gath -47%, pg:recv -70%). Diagnosis: the migration kernels crossed the
+amdflang Attributor AAPointerInfo cap and the WHOLE image recompiled to slow ISA (the
+known link-time instability, MFlowCode/MFC#1759); none of the overnight binaries
+carried the pi16k flag (verified in every staging link.txt). Full table:
+`amr-bench/notes/overnight_0825_pricing.md`.
+
+ACTION: the workaround is adopted in-tree (`cmake/MFCTargets.cmake`, LLVMFlang link
+line, mirror of PR #1759) so every future build is immune. Fresh-configure rebuild of
+HEAD: flag on the link line, step-5 output BYTE-IDENTICAL to the unflagged clip binary
+(the flag is optimization-only). Repriced pair + the repaired np16 rung (the 384728
+failure was staging — ic/rung_np*/ lacked simulation.inp) submitted on the pinned
+`bins/simulation-clip16k-f066397c`. AMReX 2-node bar measured meanwhile: np8->np16
+weak-scaling 36.85 -> 43.93 s = 1.192x per doubling ACROSS THE NODE BOUNDARY — the bar
+holds inter-node and is what the MFC np16 rung reports against.
+
 ## 2026-08-24 (17) — RING CLIP RE-LANDED ON THE WAVES: F1 wire -61%, output byte-identical
 
 The reverted clip (proven correct, killed by the amdflang codegen bug, root-caused and
