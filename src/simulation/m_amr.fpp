@@ -23,7 +23,8 @@ module m_amr
         & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
     use m_rhs, only: s_compute_rhs
     use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
-    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg, s_amr_reg_reserve
+    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg, &
+        & s_amr_reg_reserve, f_amr_face_is_seam
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_phase_timing
     use m_amr_xchg_audit  ! I1a: per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
@@ -2518,6 +2519,35 @@ contains
 
     end function f_amr_reflux_participates
 
+    !> Per-face refinement of f_amr_reflux_participates: the faces of the CURRENT block that rank r actually APPLIES - it owns the
+    !! outside coarse layer with transverse overlap, minus fine-fine seam faces - mirroring s_amr_reflux_face_flags term for term
+    !! (same ownership formula, same f_amr_face_is_seam exclusion). The reflux-faces wave ships exactly these: sender and every
+    !! receiver derive the identical set from replicated data, so a face a rank never applies never rides the wire.
+    pure subroutine s_amr_reflux_faces_for(r, s_lo, s_hi)
+
+        integer, intent(in)  :: r
+        logical, intent(out) :: s_lo(3), s_hi(3)
+        integer              :: sidx(3), ext(3), d, t
+        logical              :: tv(3), tvd
+
+        call s_amr_rank_decomp(r, sidx, ext)
+        tv(1) = amr_region_lo(1) <= sidx(1) + ext(1) .and. amr_region_hi(1) >= sidx(1)
+        tv(2) = (n_glb == 0) .or. (amr_region_lo(2) <= sidx(2) + ext(2) .and. amr_region_hi(2) >= sidx(2))
+        tv(3) = (p_glb == 0) .or. (amr_region_lo(3) <= sidx(3) + ext(3) .and. amr_region_hi(3) >= sidx(3))
+        s_lo = .false.; s_hi = .false.
+        do d = 1, num_dims
+            tvd = .true.
+            do t = 1, num_dims
+                if (t /= d) tvd = tvd .and. tv(t)
+            end do
+            s_lo(d) = tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d) &
+                 & .and. .not. f_amr_face_is_seam(d, -1)
+            s_hi(d) = tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d) &
+                 & .and. .not. f_amr_face_is_seam(d, 1)
+        end do
+
+    end subroutine s_amr_reflux_faces_for
+
     !> Fine-level distribution: deliver the current block's fine flux registers freg (captured by the owner during the fine advance)
     !! to exactly the (SFC-local) coarse-outside-owners that apply the reflux - POINT-TO-POINT, replacing the global broadcast. The
     !! owner sends its whole freg slot (block-relative; each applier reads its own transverse slice) to every participant; non-owner
@@ -2620,18 +2650,27 @@ contains
     impure subroutine s_amr_reflux_faces_wave()
 
 #ifdef MFC_MPI
-        integer :: k, r, ierr, nreq, cnt, idx, ncand, tq, nhr, nhs, j
-        integer :: cand(num_procs), glo(3), ghi(3)
+        use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+        integer  :: k, r, ierr, nreq, cnt, idx, ncand, tq, nhr, nhs, j
+        integer  :: cand(num_procs), glo(3), ghi(3)
+        logical  :: s_lo(3), s_hi(3), u_lo(3), u_hi(3)
+        logical  :: cl(3, num_procs), ch(3, num_procs)
+        real(wp) :: nanv
 
         if (num_procs == 1) return
         call s_amr_reg_reserve(amr_num_blocks)
         tq = amr_tag_base(5) + int(mod(amr_mesh_epoch, 50_8))
+        nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
         do k = 1, amr_num_blocks
             if (amr_block_level(k) /= 1) cycle
             call s_amr_select_slot(k)
             if (amr_block_owner(k) == proc_rank) cycle
             if (.not. f_amr_reflux_participates(proc_rank)) cycle
+            ! face-selective multicast: receive exactly the faces THIS rank applies (s_amr_reflux_faces_for mirrors the
+            ! apply's own_lo/own_hi + seam gates); the owner derives the same set per participant, so the pairing is
+            ! exact with no metadata exchange. Debug arm: unreceived faces are NaN-flooded so any hidden reader aborts.
+            call s_amr_reflux_faces_for(proc_rank, s_lo, s_hi)
             if (XA_NH > 0) then
                 nhr = nhr + 1
                 call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr); call s_amr_fw_szi(amr_fw_rblk, nhr)
@@ -2645,18 +2684,32 @@ contains
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
-                    nreq = nreq + 1
-                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                    amr_fw_reqw(nreq) = cnt
-                    call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
-                    call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
-                                   & amr_fw_req(nreq), ierr)
-                    nreq = nreq + 1
-                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                    amr_fw_reqw(nreq) = cnt
-                    call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
-                    call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
-                                   & amr_fw_req(nreq), ierr)
+                    if (s_lo(${D}$)) then
+                        nreq = nreq + 1
+                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                        amr_fw_reqw(nreq) = cnt
+                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
+                        call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
+                                       & amr_fw_req(nreq), ierr)
+#ifdef MFC_DEBUG
+                    else
+                        freg(${D}$)%lo(:,:,:,amr_cur) = nanv
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+#endif
+                    end if
+                    if (s_hi(${D}$)) then
+                        nreq = nreq + 1
+                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                        amr_fw_reqw(nreq) = cnt
+                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
+                        call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
+                                       & amr_fw_req(nreq), ierr)
+#ifdef MFC_DEBUG
+                    else
+                        freg(${D}$)%hi(:,:,:,amr_cur) = nanv
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+#endif
+                    end if
                 end if
             #:endfor
         end do
@@ -2664,16 +2717,33 @@ contains
             if (amr_block_level(k) /= 1) cycle
             call s_amr_select_slot(k)
             if (amr_block_owner(k) /= proc_rank) cycle
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
-                end if
-            #:endfor
             glo = 0; ghi = 0
             glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
             if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
             if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
             call s_amr_ranks_overlapping(glo, ghi, cand, ncand)
+            ! face-selective multicast: each participant's ship set is its apply set (s_amr_reflux_faces_for), derived
+            ! here per candidate; the device->host pull covers only the UNION of shipped faces (previously every owned
+            ! block pulled all six faces every stage, participants or not).
+            u_lo = .false.; u_hi = .false.
+            do idx = 1, ncand
+                r = cand(idx)
+                cl(:,idx) = .false.; ch(:,idx) = .false.
+                if (r == proc_rank .or. .not. f_amr_reflux_participates(r)) cycle
+                call s_amr_reflux_faces_for(r, s_lo, s_hi)
+                cl(:,idx) = s_lo; ch(:,idx) = s_hi
+                u_lo = u_lo .or. s_lo; u_hi = u_hi .or. s_hi
+            end do
+            #:for D in [1, 2, 3]
+                if (${D}$ <= num_dims) then
+                    if (u_lo(${D}$)) then
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                    end if
+                    if (u_hi(${D}$)) then
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    end if
+                end if
+            #:endfor
             do idx = 1, ncand
                 r = cand(idx)
                 if (r == proc_rank .or. .not. f_amr_reflux_participates(r)) cycle
@@ -2689,16 +2759,20 @@ contains
                 #:for D in [1, 2, 3]
                     if (${D}$ <= num_dims) then
                         cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
-                        nreq = nreq + 1
-                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                        amr_fw_reqw(nreq) = -1
-                        call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
-                        call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                        nreq = nreq + 1
-                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                        amr_fw_reqw(nreq) = -1
-                        call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
-                        call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                        if (cl(${D}$, idx)) then
+                            nreq = nreq + 1
+                            call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                            amr_fw_reqw(nreq) = -1
+                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
+                            call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                        end if
+                        if (ch(${D}$, idx)) then
+                            nreq = nreq + 1
+                            call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                            amr_fw_reqw(nreq) = -1
+                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
+                            call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                        end if
                     end if
                 #:endfor
             end do
@@ -2734,9 +2808,17 @@ contains
                 @:ASSERT(amr_fw_rblk(j) == k, "reflux-faces wave: header slot order broke")
                 call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
             end if
+            ! push only the received faces; an unreceived face keeps its device content (never applied here - and
+            ! NaN-poisoned in debug, so any hidden reader aborts)
+            call s_amr_reflux_faces_for(proc_rank, s_lo, s_hi)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    if (s_lo(${D}$)) then
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                    end if
+                    if (s_hi(${D}$)) then
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    end if
                 end if
             #:endfor
         end do
