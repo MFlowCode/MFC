@@ -7,6 +7,21 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-25 (21) — THE FIRST INTER-NODE RUNG: 1.594x per doubling vs bar 1.192x
+
+Job 385465 (2 nodes, clip16k binary = HEAD-before-F2-clip + pi16k), weak-scaled S0
+family, all four arms rc=0, cadence clean: np8 differenced 12.28 s/step -> np16 19.58
+= **1.594x per weak doubling across the node boundary**, vs the AMReX bar's measured
+inter-node 1.192x (384936). Excess 1.34x — BETTER than the intra-node np4->np8 excess
+(1.44x): crossing the fabric did not blow up. Full phase accounting (sums match walls):
+the +7.29 s/step decomposes as restr +2.84 (2.56x — the NEW #1: the freg wave/
+restriction), coarse +1.53 (2.96x, imb 1.67 — the L0 RHS's internal halo absorbs
+inter-node skew; the shell-restricted-L0-RHS candidate is hereby PROMOTED), rf:wait
++0.94, regrid +0.48 (rb:gath 2.4x), gather +0.44, halo +0.31. rhs = 1.09x — the
+physics weak-scales nearly perfectly. Wire: every family grows 2.3-2.5x per doubling;
+F2 alone is 504 G-words at np16 (~half of ALL wire) — the just-landed F2 clip (-54%)
+is not in this measurement; a rung rerun with the f2clip binary is queued (385612).
+
 ## 2026-08-25 (20) — F2 RING-CLIPPED: the LARGEST wire family cut -54%, byte-identical
 
 The parent-fill wave (F2, 215 G-words at np8/240 — 3.3x F1 pre-clip) ships the padded
