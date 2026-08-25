@@ -677,7 +677,7 @@ contains
                     end if
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp

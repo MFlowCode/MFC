@@ -1238,11 +1238,11 @@ contains
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf, q_cons_vf
-        real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
-        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H, qv
-        real(wp), dimension(num_vels) :: vel
-        real(wp), dimension(num_fluids) :: adv
-        integer :: i, j, k, l, s  !< looping indices
+        real(wp)                                            :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
+        real(wp)                                            :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma
+        real(wp), dimension(num_vels)                       :: vel
+        real(wp), dimension(num_fluids)                     :: adv
+        integer                                             :: i, j, k, l, s  !< looping indices
 
         Egk = 0._wp
         Elp = 0._wp
@@ -1267,7 +1267,6 @@ contains
                     rho = 0._wp
                     gamma = 0._wp
                     pi_inf = 0._wp
-                    qv = 0._wp
                     pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
                     Egint = Egint + q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
                     do s = 1, num_vels
@@ -1283,12 +1282,9 @@ contains
                         gamma = gamma + adv(l)*gammas(l)
                         pi_inf = pi_inf + adv(l)*pi_infs(l)
                         rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
-                        qv = qv + adv(l)*q_prim_vf(l)%sf(i, j, k)*qvs(l)
                     end do
 
-                    H = ((gamma + 1._wp)*pres + pi_inf + qv)/rho
-
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, 0._wp, 0._wp, c, qv)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
 
                     Ma = maxvel/c
                     if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then

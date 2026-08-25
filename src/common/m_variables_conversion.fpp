@@ -25,7 +25,7 @@ module m_variables_conversion
         & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
-        & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_fast_magnetosonic_speed, &
+        & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, &
         & s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
@@ -44,7 +44,6 @@ module m_variables_conversion
     real(wp), allocatable, dimension(:,:,:), public :: rho_sf     !< Scalar density function
     real(wp), allocatable, dimension(:,:,:), public :: gamma_sf   !< Scalar sp. heat ratio function
     real(wp), allocatable, dimension(:,:,:), public :: pi_inf_sf  !< Scalar liquid stiffness function
-    real(wp), allocatable, dimension(:,:,:), public :: qv_sf      !< Scalar liquid energy reference function
 
 contains
 
@@ -155,7 +154,6 @@ contains
             rho_sf(i, j, k) = rho
             gamma_sf(i, j, k) = gamma
             pi_inf_sf(i, j, k) = pi_inf
-            qv_sf(i, j, k) = qv
         end if
 
     end subroutine s_convert_mixture_to_mixture_variables
@@ -189,7 +187,6 @@ contains
             rho_sf(k, l, r) = rho
             gamma_sf(k, l, r) = gamma
             pi_inf_sf(k, l, r) = pi_inf
-            qv_sf(k, l, r) = qv
         end if
 
     end subroutine s_convert_species_to_mixture_variables
@@ -339,18 +336,15 @@ contains
                     allocate (rho_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
                     allocate (gamma_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
                     allocate (pi_inf_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
-                    allocate (qv_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,-buff_size:p + buff_size))
                 else
                     allocate (rho_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
                     allocate (gamma_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
                     allocate (pi_inf_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
-                    allocate (qv_sf(-buff_size:m + buff_size,-buff_size:n + buff_size,0:0))
                 end if
             else
                 allocate (rho_sf(-buff_size:m + buff_size,0:0,0:0))
                 allocate (gamma_sf(-buff_size:m + buff_size,0:0,0:0))
                 allocate (pi_inf_sf(-buff_size:m + buff_size,0:0,0:0))
-                allocate (qv_sf(-buff_size:m + buff_size,0:0,0:0))
             end if
         end if
 
@@ -1192,7 +1186,7 @@ contains
     !> Deallocate fluid property arrays and post-processing fields allocated during module initialization.
     impure subroutine s_finalize_variables_conversion_module()
 
-        if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf, qv_sf)
+        if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
         @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
         if (allocated(bubrs_vc)) then
@@ -1204,33 +1198,35 @@ contains
 
     end subroutine s_finalize_variables_conversion_module
 
-    !> Compute the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
+    !> Compute the speed of sound of a thermodynamic state.
+    !!
+    !! The enthalpy is not an argument. For a real state it is fixed by the arguments that are, and it
+    !! cancels out of the stiffened-gas branch entirely: substituting
+    !! H = ((Gamma + 1)p + Pi + qv)/rho + |u|^2/2 into c^2 = (H - |u|^2/2 - qv/rho)/Gamma leaves
+    !! c^2 = ((Gamma + 1)p + Pi)/(Gamma rho), free of H, |u|^2 and qv alike. Asking callers to supply
+    !! those three is what let #1707 happen - five sites open-coded H and three of them dropped the qv
+    !! this routine then subtracted - and here there is nothing to open-code, so it cannot recur.
+    !!
+    !! An average of two states is not a state: its enthalpy is a free input rather than a function of
+    !! its pressure and density. Those callers use s_compute_speed_of_sound_avg.
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in) :: pres
-        real(wp), intent(in) :: rho, gamma, pi_inf, qv
-        real(wp), intent(in) :: H
+        real(wp), intent(in) :: pres, rho, gamma, pi_inf
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3), intent(in) :: adv
         #:else
             real(wp), dimension(num_fluids), intent(in) :: adv
         #:endif
-        real(wp), intent(in)  :: vel_sum
-        real(wp), intent(in)  :: c_c
         real(wp), intent(out) :: c
         real(wp)              :: blkmod1, blkmod2
         integer               :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
-            if (avg_state == avg_state_roe .and. abs(c_c) > verysmall) then
-                c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
-            else
-                c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
-            end if
-        else if (relativity) then  ! Relativistic sound speed
-            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
+            c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
+        else if (relativity) then  ! Relativistic sound speed, whose enthalpy is 1 + (Gamma + 1)p/rho
+            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/(1._wp + (gamma + 1._wp)*pres/rho))
         else
             if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
                 blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
@@ -1251,8 +1247,8 @@ contains
                 else
                     c = (1._wp/gamma + 1._wp)*(pres + pi_inf/(gamma + 1._wp))/(rho*(1._wp - adv(num_fluids)))
                 end if
-            else
-                c = (H - 5.e-1*vel_sum - qv/rho)/gamma
+            else  ! Stiffened-gas mixture, with H, |u|^2 and qv cancelled out
+                c = ((gamma + 1._wp)*pres + pi_inf)/(gamma*rho)
             end if
 
             if (mixture_err .and. c < 0._wp) then
@@ -1263,6 +1259,50 @@ contains
         end if
 
     end subroutine s_compute_speed_of_sound
+
+    !> Compute the speed of sound of an interface-averaged state.
+    !!
+    !! A Roe or arithmetic average of two states is not itself a state: the enthalpy it carries is an
+    !! average of two enthalpies, not the one its own pressure and density imply, so the caller has to
+    !! supply it - and with it |u|^2 and qv, which no longer cancel against it.
+    !!
+    !! Only the three branches below read an enthalpy. Every other equation of state is a function of
+    !! the state alone, for which an average behaves exactly like a state, so those are deferred to
+    !! s_compute_speed_of_sound rather than written out a second time. Keep the condition below in
+    !! step with the branch list there.
+    subroutine s_compute_speed_of_sound_avg(pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c, adv, c)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: adv
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: adv
+        #:endif
+        real(wp), intent(out) :: c
+
+        if (chemistry) then  ! Reacting mixture sound speed
+            if (avg_state == avg_state_roe .and. abs(c_c) > verysmall) then
+                c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
+            else
+                call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
+            end if
+        else if (relativity) then  ! Relativistic sound speed
+            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
+        else if (alt_soundspeed .or. model_eqns == model_eqns_6eq .or. (model_eqns == model_eqns_5eq .and. bubbles_euler)) then
+            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
+        else  ! Stiffened-gas mixture, the one branch where the averaged enthalpy survives
+            c = (H - 5.e-1*vel_sum - qv/rho)/gamma
+
+            if (mixture_err .and. c < 0._wp) then
+                c = 100._wp*sgm_eps
+            else
+                c = sqrt(c)
+            end if
+        end if
+
+    end subroutine s_compute_speed_of_sound_avg
 
     !> Compute the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
     subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
