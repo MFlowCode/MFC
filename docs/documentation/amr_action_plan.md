@@ -7,6 +7,17 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-24 (15) — I6 (plan caching) REFUTED BY MEASUREMENT: the plan walks are free
+
+New gw:plan/gw:pack/gw:wait sub-brackets inside the stage-fill wave (this commit).
+Probe verdict: gw:plan = 0.01 ms/call — the replicated-list walks that I6 proposed to
+cache cost NOTHING; there is nothing to cache. The wave's real residue is the pack
+copyouts (12.4 ms/call) and the WAITALL (15.9 ms/call), plus the other PH_GATHER
+paths (the parent-fill wave shares the bracket). I6 is REMOVED from the T1 list. The
+evidence now points at RING-CLIP-ON-WAVES as the next comm increment: clipping the
+71%-dead stepfill bytes out of the wave slabs shrinks pack, wire, and wait together,
+and the compiler blocker that reverted the original clip is workaround-verified.
+
 ## 2026-08-24 (14) — STORE GROWTH GOES DEVICE-NATIVE: -57% probe wall; the last host-staged store operation is gone
 
 `s_amr_st_reserve` grew the store by round-tripping the ENTIRE store over PCIe — full
