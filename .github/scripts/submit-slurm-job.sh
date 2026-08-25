@@ -92,7 +92,7 @@ esac
 # --- Time limit ---
 case "$job_type" in
     bench)     sbatch_time="#SBATCH -t $bench_time" ;;
-    buildtest) sbatch_time="#SBATCH -t $buildtest_time" ;;
+    buildtest) sbatch_time="#SBATCH -t ${buildtest_time:-$test_time}" ;;
     *)         sbatch_time="#SBATCH -t $test_time" ;;
 esac
 
