@@ -1030,33 +1030,6 @@ contains
 
     end subroutine s_calculate_bulk_stress_tensor
 
-    !> Accumulate the mixture density, specific heat ratio function, liquid stiffness function, and internal energy reference of one
-    !! Riemann state from its partial densities and volume fractions. The number of fluids is an explicit argument because the
-    !! 5-equation bubble model accumulates over num_fluids - 1 fluids.
-    subroutine s_accumulate_mixture_properties(nf, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
-
-        $:GPU_ROUTINE(function_name='s_accumulate_mixture_properties', parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in)                 :: nf  !< Number of fluids to accumulate over
-        real(wp), dimension(nf), intent(in) :: alpha_rho_K, alpha_K
-        real(wp), intent(out)               :: rho_K, gamma_K, pi_inf_K, qv_K
-        integer                             :: i   !< Loop iterator over fluids
-
-        rho_K = 0._wp
-        gamma_K = 0._wp
-        pi_inf_K = 0._wp
-        qv_K = 0._wp
-
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, nf
-            rho_K = rho_K + alpha_rho_K(i)
-            gamma_K = gamma_K + alpha_K(i)*gammas(i)
-            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-            qv_K = qv_K + alpha_rho_K(i)*qvs(i)
-        end do
-
-    end subroutine s_accumulate_mixture_properties
-
     !> Compute the shear and volume Reynolds numbers of one Riemann state by inverse-weighting the fluid Reynolds numbers with the
     !! volume fractions.
     subroutine s_compute_interface_reynolds(alpha_K, Re_K, Re_size_loc1, Re_size_loc2)

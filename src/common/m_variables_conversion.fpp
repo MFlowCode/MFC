@@ -25,8 +25,8 @@ module m_variables_conversion
         & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
-        & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, &
-        & s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+        & s_compute_species_fraction, s_accumulate_mixture_properties, s_compute_speed_of_sound, s_compute_speed_of_sound_avg, &
+        & s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -232,13 +232,7 @@ contains
                 end do
                 alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
             end if
-            rho_K = 0._wp; gamma_K = 0._wp; pi_inf_K = 0._wp; qv_K = 0._wp
-            do i = 1, num_fluids
-                rho_K = rho_K + alpha_rho_K(i)
-                gamma_K = gamma_K + alpha_K(i)*gammas(i)
-                pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
-            end do
+            call s_accumulate_mixture_properties(num_fluids, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
         end if
 
         if (present(G_K)) then
@@ -1197,6 +1191,40 @@ contains
         end if
 
     end subroutine s_finalize_variables_conversion_module
+
+    !> Accumulate stiffened-gas mixture coefficients over the first nf fluids.
+    !!
+    !! This is the only implementation of the stiffened-gas mixture rule. It is deliberately not merged
+    !! with s_convert_species_to_mixture_variables_kernel, which additionally clips and renormalises
+    !! alpha_K in place under mpp_lim, special-cases num_fluids == 1 with bubbles_euler, and optionally
+    !! returns Re_K and G_K. Merging would need a clipping flag and optional dummies on a [seq] device
+    !! routine, which is not portable across the offload backends.
+    !!
+    !! nf is not always num_fluids: the bubbles path in m_riemann_solver_hllc passes num_fluids - 1 to
+    !! exclude the gas phase, and one site passes limited volume fractions rather than the raw ones.
+    subroutine s_accumulate_mixture_properties(nf, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
+
+        $:GPU_ROUTINE(function_name='s_accumulate_mixture_properties', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in)                 :: nf  !< Number of fluids to accumulate over
+        real(wp), dimension(nf), intent(in) :: alpha_rho_K, alpha_K
+        real(wp), intent(out)               :: rho_K, gamma_K, pi_inf_K, qv_K
+        integer                             :: i   !< Loop iterator over fluids
+
+        rho_K = 0._wp
+        gamma_K = 0._wp
+        pi_inf_K = 0._wp
+        qv_K = 0._wp
+
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, nf
+            rho_K = rho_K + alpha_rho_K(i)
+            gamma_K = gamma_K + alpha_K(i)*gammas(i)
+            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+            qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+        end do
+
+    end subroutine s_accumulate_mixture_properties
 
     !> Compute the speed of sound of a thermodynamic state.
     !!
