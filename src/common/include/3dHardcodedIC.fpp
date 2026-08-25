@@ -263,20 +263,18 @@
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
     case (371)  ! hcid=370 + closed-form spanwise (z) modulation for genuine 3D content
-        ! The (x,y) file this reads (same format as hcid=370) already carries an in-plane
-        ! velocity perturbation (see flamelet_ic.py's perturb_xy) that is y-localized and
-        ! amplitude-normalized -- but it's uniform in z (hcid=370's read extrudes across
-        ! z), so under deterministic per-cell stencils the flow would stay z-invariant
-        ! indefinitely. Rather than derive a fresh z-envelope/amplitude scale from scratch
-        ! (which would need physical parameters like vort_thickness that aren't case
-        ! parameters here), MODULATE the already-correct (x,y) perturbation by a
-        ! z-dependent factor: this inherits the right shear-layer localization and
-        ! amplitude scale automatically. The wavenumber is derived from the z domain's own
-        ! extent (not a hardcoded absolute value), so this is dimensionally correct
-        ! regardless of the case's length-scale choice -- unlike mixlayer_perturb's fixed
-        ! wavenumber range.
+        ! hcid=370's read extrudes the (x,y) file uniformly across z, leaving the flow
+        ! z-invariant. Modulate the file's cross-stream (y) velocity by a z-dependent
+        ! factor and set the spanwise (w) component from the result, so both inherit the
+        ! file's shear-layer localization and amplitude scale. Streamwise (x) is left as
+        ! read. This scales the whole y-velocity, which is the perturbation alone only
+        ! when the base state has v == 0, as a temporal mixing layer does.
+        !
+        ! kz uses the GLOBAL z extent: p and z_cc(0:p) are per-rank under MPI, so a local
+        ! extent would scale kz by num_procs_z and break periodicity at the z wrap.
+        ! z_cc(k) is already absolute, so the phase needs no offset. Assumes uniform dz.
         @: HardcodedReadValues()
-        zlen371 = z_cc(p) - z_cc(0)
+        zlen371 = real(p_glb + 1, wp)*(z_cb(0) - z_cb(-1))
         kz371 = 2._wp*pi/zlen371
         q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k)*(1._wp + 0.5_wp*cos(kz371*z_cc(k)))
         q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = 0.5_wp*q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k)*sin(kz371*z_cc(k) + pi/3._wp)
