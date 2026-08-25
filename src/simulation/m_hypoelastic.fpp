@@ -716,24 +716,25 @@ contains
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         real(wp)                                               :: sigma_p  !< maximum principal Cauchy stress
-        real(wp)                                               :: pres, ms_K
+        real(wp)                                               :: pres, solid_partial_density
         real(wp)                                               :: tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz
         integer                                                :: q, l, k, i
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[sigma_p, pres, ms_K, tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz]')
+        $:GPU_PARALLEL_LOOP(collapse=3, &
+                            & private='[sigma_p, pres, solid_partial_density, tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz]')
         do q = 0, p
             do l = 0, n
                 do k = 0, m
                     ! Damageable-solid partial mass
-                    ms_K = 0._wp
+                    solid_partial_density = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
                         if (Gs_hypo(i) > verysmall) then
-                            ms_K = ms_K + q_cons_vf(eqn_idx%cont%beg + i - 1)%sf(k, l, q)
+                            solid_partial_density = solid_partial_density + q_cons_vf(eqn_idx%cont%beg + i - 1)%sf(k, l, q)
                         end if
                     end do
 
-                    if (ms_K > verysmall .and. q_prim_vf(eqn_idx%damage)%sf(k, l, q) < 1._wp) then
+                    if (solid_partial_density > verysmall .and. q_prim_vf(eqn_idx%damage)%sf(k, l, q) < 1._wp) then
                         pres = q_prim_vf(eqn_idx%E)%sf(k, l, q)
                         tau_xx = q_prim_vf(eqn_idx%stress%beg)%sf(k, l, q)
 
@@ -762,7 +763,7 @@ contains
 
                         if (sigma_p > tau_star) then
                             rhs_vf(eqn_idx%damage)%sf(k, l, q) = rhs_vf(eqn_idx%damage)%sf(k, l, &
-                                   & q) + ms_K*(alpha_bar*(sigma_p - tau_star))**cont_damage_s
+                                   & q) + solid_partial_density*(alpha_bar*(sigma_p - tau_star))**cont_damage_s
                         end if
                     end if
                 end do
@@ -776,23 +777,24 @@ contains
     subroutine s_enforce_cont_damage_bounds(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(stp)                                              :: ms_K
+        real(stp)                                              :: solid_partial_density
         integer                                                :: q, l, k, i
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ms_K]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[solid_partial_density]')
         do q = 0, p
             do l = 0, n
                 do k = 0, m
                     ! Damageable-solid partial mass
-                    ms_K = 0._stp
+                    solid_partial_density = 0._stp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
                         if (Gs_hypo(i) > verysmall) then
-                            ms_K = ms_K + q_cons_vf(eqn_idx%cont%beg + i - 1)%sf(k, l, q)
+                            solid_partial_density = solid_partial_density + q_cons_vf(eqn_idx%cont%beg + i - 1)%sf(k, l, q)
                         end if
                     end do
-                    ms_K = max(ms_K, 0._stp)
-                    q_cons_vf(eqn_idx%damage)%sf(k, l, q) = min(max(q_cons_vf(eqn_idx%damage)%sf(k, l, q), 0._stp), ms_K)
+                    solid_partial_density = max(solid_partial_density, 0._stp)
+                    q_cons_vf(eqn_idx%damage)%sf(k, l, q) = min(max(q_cons_vf(eqn_idx%damage)%sf(k, l, q), 0._stp), &
+                              & solid_partial_density)
                 end do
             end do
         end do

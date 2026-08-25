@@ -444,7 +444,7 @@ contains
         real(wp)               :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
         real(wp)               :: vftmp, nbub_sc
         real(wp)               :: G_K
-        real(wp)               :: ms_K
+        real(wp)               :: solid_partial_density
         real(wp)               :: pres
         integer                :: i, j, k, l               !< Generic loop iterators
         real(wp)               :: T
@@ -460,8 +460,8 @@ contains
         integer                :: iter                     !< Newton-Raphson iteration counter
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
-                            & rhoYks, B, pres, vftmp, nbub_sc, G_K, ms_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, &
-                            & dp_dW, df_dW, iter]')
+                            & rhoYks, B, pres, vftmp, nbub_sc, G_K, solid_partial_density, T, pres_mag, Ga, B2, m2, S, W, dW, E, &
+                            & D, f, dGa_dW, dp_dW, df_dW, iter]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -682,13 +682,15 @@ contains
 
                     if (cont_damage) then
                         ! Recover D = U_D/m_s (damageable-solid partial mass), clamped to [0, 1]
-                        ms_K = 0._wp
+                        solid_partial_density = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
-                            if (Gs_vc(i) > verysmall) ms_K = ms_K + qK_cons_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
+                            if (Gs_vc(i) > verysmall) then
+                                solid_partial_density = solid_partial_density + qK_cons_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
+                            end if
                         end do
-                        qK_prim_vf(eqn_idx%damage)%sf(j, k, l) = min(max(real(qK_cons_vf(eqn_idx%damage)%sf(j, k, l), &
-                                   & kind=wp)/max(ms_K, verysmall), 0._wp), 1._wp)
+                        qK_prim_vf(eqn_idx%damage)%sf(j, k, l) = min(max(qK_cons_vf(eqn_idx%damage)%sf(j, k, &
+                                   & l)/max(solid_partial_density, verysmall), 0._wp), 1._wp)
                     end if
 
                     if (hypoelasticity) then
@@ -746,7 +748,7 @@ contains
         real(wp)                         :: nbub, R3tmp
         real(wp), dimension(nb)          :: Rtmp
         real(wp)                         :: G
-        real(wp)                         :: ms
+        real(wp)                         :: solid_partial_density
         real(wp), dimension(2)           :: Re_K
         integer                          :: i, j, k, l  !< Generic loop iterators
         real(wp), dimension(num_species) :: Ys
@@ -954,11 +956,13 @@ contains
 
                     if (cont_damage) then
                         ! U_D = m_s*D (damageable-solid partial mass)
-                        ms = 0._wp
+                        solid_partial_density = 0._wp
                         do i = 1, num_fluids
-                            if (fluid_pp(i)%G > verysmall) ms = ms + q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
+                            if (fluid_pp(i)%G > verysmall) then
+                                solid_partial_density = solid_partial_density + q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
+                            end if
                         end do
-                        q_cons_vf(eqn_idx%damage)%sf(j, k, l) = ms*q_prim_vf(eqn_idx%damage)%sf(j, k, l)
+                        q_cons_vf(eqn_idx%damage)%sf(j, k, l) = solid_partial_density*q_prim_vf(eqn_idx%damage)%sf(j, k, l)
                     end if
 
                     if (hyper_cleaning) q_cons_vf(eqn_idx%psi)%sf(j, k, l) = q_prim_vf(eqn_idx%psi)%sf(j, k, l)
