@@ -7,6 +7,28 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-25 (20) — F2 RING-CLIPPED: the LARGEST wire family cut -54%, byte-identical
+
+The parent-fill wave (F2, 215 G-words at np8/240 — 3.3x F1 pre-clip) ships the padded
+parent patch whose runtime consumer is the SAME amr_cg ghost fill the stepfill clip's
+dead-byte proof covers (`amr_stepfill_ring_clip.md` is about the READ side of amr_cg,
+independent of which family filled it; the wave's consume calls only
+s_amr_fill_fine_ghosts_*, with prolong-feeding init/regrid gathers on their own
+unclipped paths and the subcycle asserted away). Each child's one full-patch transfer
+becomes its shell-slab list — derived by ONE shared function (s_amr_parent_shell) that
+the send walk, recv walk, and consume all call, so the wire layout cannot drift between
+sides; the pbmv contract keeps the full patch exactly as F1 does. Three bounded
+kernels (pack/unpack/local-copy over a patch-local sub-box) subsume the full-patch
+case, so the wave has one uniform path. The co-located parent copy is shell-only too,
+under the same debug NaN-poison arm.
+
+GATES: F2 words 1,628,915,568 -> 746,280,528 (-54.2%) with msgs unchanged (524) and
+every other family byte-identical; step-5 output BYTE-IDENTICAL (bitcmp); debug poison
+probe rc=0 with headers live on every transfer (int=2, so the untouched regrid F2 path
+ran too); AMR-75. The seeded-bug arm is deliberately omitted: it probes two-sided
+plan-derivation drift, which the single shared derivation function structurally
+excludes, and the live debug headers still verify every transfer's bounds on the wire.
+
 ## 2026-08-25 (19) — REG_GROW GOES DEVICE-NATIVE (the store-grow twin)
 
 `s_amr_reg_reserve`'s REG_GROW macro was the last growth path that round-tripped device
