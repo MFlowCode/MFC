@@ -947,7 +947,7 @@ contains
                                                 ${GSRC}$_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = ${FLUX}$_vf(${SF('')}$, &
                                                             & eqn_idx%cont%end + dir_idx(1)) - p_face + tau_qq_face
                                                 ! Every HLLD-legal configuration places only the volume-fraction and stress rows
-                                                ! above eqn_idx%E (see s_check_inputs_hypo_branch)
+                                                ! above eqn_idx%E (see check_hypoelasticity in toolchain/mfc/case_validator.py)
                                                 $:GPU_LOOP(parallelism='[seq]')
                                                 do i = eqn_idx%adv%beg, sys_size
                                                     ${GSRC}$_vf(${SF('')}$, i) = 0._wp

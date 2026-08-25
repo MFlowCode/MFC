@@ -421,7 +421,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
-- `ib_neighborhood_radius` controls the size of the neighborhood size. This value defaults to 1, which indicates that any given rank is aware of IBs up to 1 ranks away. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
+- `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 
 #### Particle Clouds
 
@@ -430,18 +430,25 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | Parameter         | Type    | Description |
 | ---:              | :----:  | :---        |
 | `x[y,z]_centroid` | Real    | Centre of the cloud region in the [x,y,z]-direction. |
-| `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction. |
+| `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction for `cloud_geometry = 1`; ignored by `cloud_geometry = 2`. |
 | `num_particles`   | Integer | Number of particles to place in the region. |
 | `radius`          | Real    | Radius of every particle in the cloud. |
 | `mass`            | Real    | Mass of every particle in the cloud. |
 | `min_spacing`     | Real    | Minimum surface-to-surface gap between particles (centres are `2*radius + min_spacing` apart). |
+| `cloud_geometry`  | Integer | Shape of the cloud region. |
+| `shell_inner_radius` | Real | Inner radius for hemisphere-shell clouds (`cloud_geometry = 2`). |
+| `shell_outer_radius` | Real | Outer radius for hemisphere-shell clouds (`cloud_geometry = 2`). |
 | `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`). |
 | `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
 | `packing_method`  | Integer | Algorithm used to place the particles. |
 
+- `cloud_geometry` selects the cloud region:
+  - `1` (box) uses `x[y,z]_centroid` and `length_x[y,z]` to define the region.
+  - `2` uses `x[y,z]_centroid`, `shell_inner_radius`, and `shell_outer_radius` to define a half-annulus in 2D and a hemisphere shell in 3D. Particle centres are sampled between `shell_inner_radius + radius` and `shell_outer_radius - radius`, and the flat plane is kept clear by one particle radius. The flat face is fixed at `y_centroid` in 2D and `z_centroid` in 3D; the filled region opens toward positive `y` in 2D and positive `z` in 3D. The full shell extent (`x[y,z]_centroid +/- shell_outer_radius` on the open side, and one particle radius of clearance on the flat-face side) must lie inside the computational domain; a hemisphere shell also requires at least two dimensions (`n > 0`).
 - `packing_method` selects how the `num_particles` are positioned within the cloud region:
   - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
   - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
+  - Hemisphere-shell clouds currently support rejection sampling only; `cloud_geometry = 2` with `packing_method = 2` is rejected during input validation.
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 
@@ -738,8 +745,6 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `chem_wrt_T`            | Logical | Write temperature field for chemistry output |
 | `fft_wrt`               | Logical | Enable FFT output |
 | `sim_data`              | Logical | Write interface and energy data files (post_process) |
-| `integral_wrt`          | Logical | Write integral data |
-| `num_integrals`         | Integer | Number of integral regions |
 | `down_sample`           | Logical | Enable output downsampling |
 | `fd_order`              | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)`    | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |

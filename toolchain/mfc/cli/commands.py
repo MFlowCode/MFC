@@ -719,24 +719,6 @@ COMPLETION_COMMAND = Command(
     ],
 )
 
-HELP_COMMAND = Command(
-    name="help",
-    help="Show help on a topic.",
-    positionals=[
-        Positional(
-            name="topic",
-            help="Help topic: gpu, clusters, batch, debugging, performance",
-            nargs="?",
-            default=None,
-            choices=["gpu", "clusters", "batch", "debugging", "performance"],
-            completion=Completion(
-                type=CompletionType.CHOICES,
-                choices=["gpu", "clusters", "batch", "debugging", "performance"],
-            ),
-        ),
-    ],
-)
-
 # Simple commands (shell scripts, minimal arguments)
 LOAD_COMMAND = Command(
     name="load",
@@ -813,12 +795,6 @@ PRECHECK_COMMAND = Command(
     key_options=[
         ("-j, --jobs N", "Number of parallel jobs for formatting"),
     ],
-)
-
-INTERACTIVE_COMMAND = Command(
-    name="interactive",
-    help="Launch interactive menu-driven interface.",
-    description="Launch an interactive menu for MFC operations.",
 )
 
 GENERATE_COMMAND = Command(
@@ -900,8 +876,24 @@ COUNT_COMMAND = Command(
 
 COUNT_DIFF_COMMAND = Command(
     name="count_diff",
-    help="Compare LOC between branches.",
+    help="Compare LOC between two MFC source trees.",
     include_common=["targets", "mfc_config", "jobs", "verbose", "debug_log"],
+    positionals=[
+        Positional(name="base", help="Path to the baseline MFC source tree.", completion=Completion(type=CompletionType.DIRECTORIES)),
+        Positional(name="pr", help="Path to the MFC source tree to compare against the baseline.", completion=Completion(type=CompletionType.DIRECTORIES)),
+    ],
+    arguments=[
+        Argument(
+            name="markdown",
+            help="Also write the diff as GitHub-flavored Markdown to PATH (empty if nothing changed).",
+            type=str,
+            metavar="PATH",
+            completion=Completion(type=CompletionType.FILES),
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh count_diff ../master .", "Compare this tree's LOC against another checkout"),
+    ],
 )
 
 FP_STABILITY_COMMAND = Command(
@@ -1437,28 +1429,6 @@ PARAMS_COMMAND = Command(
 )
 
 
-# HELP TOPICS
-
-HELP_TOPICS = {
-    "gpu": {
-        "title": "GPU Configuration",
-        "description": "How to configure GPU builds and runs",
-    },
-    "clusters": {
-        "title": "Cluster Configuration",
-        "description": "How to configure MFC for different HPC clusters",
-    },
-    "batch": {
-        "title": "Batch Job Submission",
-        "description": "How to submit batch jobs with MFC",
-    },
-    "debugging": {
-        "title": "Debugging & Troubleshooting",
-        "description": "Tips for debugging MFC issues",
-    },
-}
-
-
 # COMPLETE CLI SCHEMA
 
 MFC_CLI_SCHEMA = CLISchema(
@@ -1487,14 +1457,12 @@ started, run `./mfc.sh build -h`.""",
         PARAMS_COMMAND,
         PACKER_COMMAND,
         COMPLETION_COMMAND,
-        HELP_COMMAND,
         GENERATE_COMMAND,
         LOAD_COMMAND,
         LINT_COMMAND,
         FORMAT_COMMAND,
         SPELLING_COMMAND,
         PRECHECK_COMMAND,
-        INTERACTIVE_COMMAND,
         BENCH_COMMAND,
         BENCH_DIFF_COMMAND,
         COUNT_COMMAND,
@@ -1509,7 +1477,6 @@ started, run `./mfc.sh build -h`.""",
         COMMON_GPUS,
         COMMON_MFC_CONFIG,
     ],
-    help_topics=HELP_TOPICS,
 )
 
 

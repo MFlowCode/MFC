@@ -214,7 +214,7 @@ module m_global_parameters
     !> @}
     $:GPU_DECLARE(create='[fd_coeff_x, fd_coeff_y, fd_coeff_z]')
 
-    ! probe, integral: auto-generated in generated_decls.fpp
+    ! probe: auto-generated in generated_decls.fpp
 
     !> @name Reference density and pressure for Tait EOS
     !> @{
@@ -486,7 +486,7 @@ contains
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
         ! Immersed Boundaries (sim-specific extras)
-        ib_neighborhood_radius = 1
+        ib_neighborhood_radius = 0
         collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
@@ -571,23 +571,12 @@ contains
 
         fd_order = dflt_int
         probe_wrt = .false.
-        integral_wrt = .false.
         num_probes = dflt_int
-        num_integrals = dflt_int
 
         do i = 1, num_probes_max
             probe(i)%x = dflt_real
             probe(i)%y = dflt_real
             probe(i)%z = dflt_real
-        end do
-
-        do i = 1, num_probes_max
-            integral(i)%xmin = dflt_real
-            integral(i)%xmax = dflt_real
-            integral(i)%ymin = dflt_real
-            integral(i)%ymax = dflt_real
-            integral(i)%zmin = dflt_real
-            integral(i)%zmax = dflt_real
         end do
 
         ! GRCBC flags
@@ -650,9 +639,13 @@ contains
             particle_cloud(i)%radius = dflt_real
             particle_cloud(i)%mass = dflt_real
             particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%shell_inner_radius = dflt_real
+            particle_cloud(i)%shell_outer_radius = dflt_real
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
+            particle_cloud(i)%cloud_geometry = 1
             particle_cloud(i)%packing_method = dflt_int
+            particle_cloud(i)%periodic = 0
         end do
 
         do i = 1, num_ib_patches_max_namelist

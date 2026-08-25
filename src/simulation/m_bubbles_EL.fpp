@@ -1795,7 +1795,7 @@ contains
                 do i = 0, m
                     lag_void_max = max(lag_void_max, 1._wp - q_beta(1)%sf(i, j, k))
                     call s_get_char_vol(i, j, k, volcell)
-                    if ((1._wp - q_beta(1)%sf(i, j, k)) > 5.0d-11) then
+                    if ((1._wp - q_beta(1)%sf(i, j, k)) > 5.0e-11_wp) then
                         lag_void_avg = lag_void_avg + (1._wp - q_beta(1)%sf(i, j, k))*volcell
                         lag_vol = lag_vol + volcell
                     end if
