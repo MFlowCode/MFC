@@ -18,7 +18,7 @@ module m_particle_cloud
 
     private
 
-    public :: s_generate_particle_clouds
+    public :: s_generate_particle_clouds, s_add_cloud_particle
 
 contains
 

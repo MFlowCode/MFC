@@ -907,12 +907,10 @@ contains
 
                 if (cfl_dt .and. n_start > 0) then
                     call s_read_ib_restart_data(n_start)
-                    allocate (particle_cloud_ibs(0))
-                    num_particle_cloud_ibs = 0
+                    call s_restart_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
                 else if (t_step_start > 0) then
                     call s_read_ib_restart_data(t_step_start)
-                    allocate (particle_cloud_ibs(0))
-                    num_particle_cloud_ibs = 0
+                    call s_restart_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
                 else
                     call s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
                 end if
@@ -1142,8 +1140,14 @@ contains
 
     end subroutine s_finalize_modules
 
-    !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart. Rank 0 reads the last num_ibs records and
+    !> @brief Reads IB kinematic state from restart_data/ib_state.dat on restart. Rank 0 reads the last num_gbl_ibs records and
     !! broadcasts to all ranks. Overwrites patch_ib vel, angular_vel, angles, and centroid.
+    !!
+    !! num_ibs is still just the namelist-declared patch count at this point (particle-cloud patches haven't
+    !! been merged into patch_ib yet), so num_gbl_ibs is (re)computed directly from particle_cloud(:) here
+    !! rather than trusting the stale global - this is also what bounds the read/broadcast loops below.
+    !! s_restart_particle_clouds subsequently harvests the kinematic state written here into a
+    !! particle_cloud_ibs array for s_reduce_ib_patch_array, without re-running particle placement.
     impure subroutine s_read_ib_restart_data(t_step)
 
         integer, intent(in)                  :: t_step
@@ -1154,6 +1158,11 @@ contains
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
         logical                              :: file_exist
         character(len=10)                    :: t_step_string
+
+        num_gbl_ibs = num_ibs
+        do i = 1, num_particle_clouds
+            num_gbl_ibs = num_gbl_ibs + particle_cloud(i)%num_particles
+        end do
 
         if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)
@@ -1200,7 +1209,7 @@ contains
                 open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
                 if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
 
-                do i = 1, num_ibs
+                do i = 1, num_gbl_ibs
                     read (file_unit, iostat=ios) ib_buf
                     if (ios /= 0) call s_mpi_abort('Error reading IB state restart file')
 
@@ -1216,7 +1225,7 @@ contains
             end if
 
 #ifdef MFC_MPI
-            do i = 1, num_ibs
+            do i = 1, num_gbl_ibs
                 call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
                 call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
                 call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -1228,6 +1237,44 @@ contains
         end if
 
     end subroutine s_read_ib_restart_data
+
+    !> @brief Rebuilds particle_cloud_ibs after a restart from the kinematic state s_read_ib_restart_data just wrote into patch_ib
+    !! (keyed by gbl_patch_id), instead of re-running particle placement. Geometry (radius, mass, moving_ibm, etc) is uniform per
+    !! cloud and reconstructed directly from the particle_cloud(:) case parameters via s_add_cloud_particle - only
+    !! position/velocity/angles need to come from the checkpoint. The result feeds into the normal s_reduce_ib_patch_array call, so
+    !! neighborhood/local ownership is decided the usual way, just using the restart positions instead of freshly-packed ones.
+    impure subroutine s_restart_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
+
+        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
+        integer, intent(out)                                              :: num_particle_cloud_ibs
+        integer                                                           :: cloud_idx, i, ib_idx, glbl_idx, geom
+        real(wp), dimension(3)                                            :: vel, angular_vel, angles
+
+        geom = merge(2, 8, num_dims < 3)  ! circle for 2D, sphere for 3D - matches s_particle_cloud_rejection_pack/lattice
+
+        num_particle_cloud_ibs = 0
+        do cloud_idx = 1, num_particle_clouds
+            num_particle_cloud_ibs = num_particle_cloud_ibs + particle_cloud(cloud_idx)%num_particles
+        end do
+        allocate (particle_cloud_ibs(num_particle_cloud_ibs))
+
+        ib_idx = 0
+        glbl_idx = num_ibs
+        do cloud_idx = 1, num_particle_clouds
+            do i = 1, particle_cloud(cloud_idx)%num_particles
+                glbl_idx = glbl_idx + 1
+                vel = patch_ib(glbl_idx)%vel
+                angular_vel = patch_ib(glbl_idx)%angular_vel
+                angles = patch_ib(glbl_idx)%angles
+                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, patch_ib(glbl_idx)%x_centroid, &
+                                          & patch_ib(glbl_idx)%y_centroid, patch_ib(glbl_idx)%z_centroid, particle_cloud_ibs)
+                particle_cloud_ibs(ib_idx)%vel = vel
+                particle_cloud_ibs(ib_idx)%angular_vel = angular_vel
+                particle_cloud_ibs(ib_idx)%angles = angles
+            end do
+        end do
+
+    end subroutine s_restart_particle_clouds
 
     !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_cloud_ibs (already filtered by
     !! s_generate_particle_clouds to this rank's IB neighborhood, each entry already tagged with its final, absolute gbl_patch_id)
