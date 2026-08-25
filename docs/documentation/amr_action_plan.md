@@ -7,6 +7,41 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-25 (24) — SECOND INTER-NODE RUNG (f2clip): 1.544x per doubling; the clip pays MORE inter-node
+
+Job 385612, same self-contained pairwise design as (21), node set k004-[006-007]:
+np8 differenced (2428.241-120.665)/200 = **11.54 s/step**, np16 weak-scaled
+(3724.576-162.293)/200 = **17.81 s/step** -> rung = **1.544x** (was 1.594x on the
+clip16k binary; bar 1.192x; excess 1.30x, was 1.34x). The F2 clip cut np8 -6.1% but
+np16 **-9.0%** (19.57 -> 17.81): halved parent-fill wire buys more where inter-node
+bandwidth is the scarce resource — every remaining wire cut is worth MORE at scale
+than its np8 price suggests. Growth decomposition (np16-np8, s/step, vs the (21)
+table): restr +2.41 (was +2.84, still #1), coarse +1.30 (was +1.53), rf:wait +0.95
+(unchanged — F5 untouched in this binary), regrid +0.46, gather +0.32 (was +0.44),
+seam +0.26, halo +0.25; rhs ratio 1.063 (physics is BELOW the bar). The three
+wait/skew families (restr + coarse + rf:wait) are 4.7 of the 6.27 s/step growth ->
+the stage-skew/overlap increment stays the #1 major target; the rs:* sub-brackets
+riding the f5-complete rung (job 385698, SAME node set, queued behind this one) will
+decompose restr into wave/restrict/reflux-to-parent at np16 before that design is
+committed.
+
+## 2026-08-25 (23) — F5a FACE-SELECTIVE MULTICAST: F5 halves again (-49.5%), day total F5 -58%
+
+The L1 reflux-faces wave multicast ALL SIX full faces of every rank-boundary block to
+every participating rank, but a participant applies only the faces whose outside
+coarse layer it owns minus fine-fine seams (own_lo/own_hi + f_amr_face_is_seam in
+s_amr_reflux_face_flags) - typically 1-2 of 6. New s_amr_reflux_faces_for(r) mirrors
+the apply's gates term for term, parameterized by rank from the replicated
+decomposition; the owner ships exactly each participant's apply set and each
+participant posts exactly its own (identical derivation both sides, fixed order, so
+the shared-tag pairing is exact). The device->host pull now covers only the UNION of
+shipped faces (previously EVERY owned L1 block pulled all six faces every stage,
+participants or not); the consume pushes only received faces; unreceived faces are
+NaN-flooded in debug. GATES: byte-identical (bitcmp), F5 547.4M -> 276.6M words
+(-49.5%, msgs 5568 -> 2814), poison probe rc=0, AMR-75. Day total for F5 (seam clip +
+face-selectivity): 659.4M -> 276.6M = -58%. Third rung (f5-complete binary) to queue
+behind 385612 for the pairwise ladder: clip16k -> f2clip -> f5-complete.
+
 ## 2026-08-25 (22) — F5b SEAM-CLIPPED + restr SUB-BRACKETS; k004-004 ERA FLOOR = 10.48
 
 The freg wave (F5b) shipped ALL SIX faces of every split level>=2 child to its
