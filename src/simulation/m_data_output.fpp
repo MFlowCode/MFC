@@ -862,7 +862,7 @@ contains
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', time_step
         write (file_path, '(A,I0,A)') trim(t_step_dir) // '/ib_data.dat'
 
-        open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
+        open (2, FILE=trim(file_path), form='unformatted', STATUS='replace')
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
         write (2) ib_markers%sf(0:m,0:n,0:p); close (2)
