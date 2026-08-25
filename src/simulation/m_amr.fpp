@@ -5783,6 +5783,134 @@ contains
 
     end subroutine s_amr_fine_fine_halo
 
+    !> Ring clip: decompose the hollow shell of patch [plo:phi] minus its OPEN core [clo:chi] (same integer frame; collapsed dims
+    !! pass plo=phi=clo=chi=0 so they never cut the core) into at most 6 DISJOINT slabs in a FIXED order: x-low/x-high spanning the
+    !! full transverse extent, then y-low/high restricted to the core's x-interval, then z-low/high restricted in x and y. Width<=2
+    !! cores are empty (shell = whole patch, legal); the width-1 double-cover is resolved by clamping the high slab past the low
+    !! one. Both sides of every clipped exchange derive the same list from replicated metadata, so the wire layout needs no
+    !! handshake (docs/documentation/amr_stepfill_ring_clip.md).
+    impure subroutine s_amr_shell_slabs(plo, phi, clo, chi, ns, sb1, se1, sb2, se2, sb3, se3, cells)
+
+        integer, intent(in)  :: plo(3), phi(3), clo(3), chi(3)
+        integer, intent(out) :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), cells
+        integer              :: cb(3, 6), ce(3, 6), s, ss
+        integer(8)           :: words, patchw, corew
+
+        cb(:,1) = plo; ce(:,1) = [clo(1) - 1, phi(2), phi(3)]
+        cb(:,2) = [max(chi(1) + 1, clo(1)), plo(2), plo(3)]; ce(:,2) = phi
+        cb(:,3) = [clo(1), plo(2), plo(3)]; ce(:,3) = [chi(1), clo(2) - 1, phi(3)]
+        cb(:,4) = [clo(1), max(chi(2) + 1, clo(2)), plo(3)]; ce(:,4) = [chi(1), phi(2), phi(3)]
+        cb(:,5) = [clo(1), clo(2), plo(3)]; ce(:,5) = [chi(1), chi(2), clo(3) - 1]
+        cb(:,6) = [clo(1), clo(2), max(chi(3) + 1, clo(3))]; ce(:,6) = [chi(1), chi(2), phi(3)]
+        ns = 0; words = 0
+        do s = 1, 6
+            if (cb(1, s) > ce(1, s) .or. cb(2, s) > ce(2, s) .or. cb(3, s) > ce(3, s)) cycle
+            ns = ns + 1
+            sb1(ns) = cb(1, s); se1(ns) = ce(1, s)
+            sb2(ns) = cb(2, s); se2(ns) = ce(2, s)
+            sb3(ns) = cb(3, s); se3(ns) = ce(3, s)
+            words = words + int(se1(ns) - sb1(ns) + 1, 8)*int(se2(ns) - sb2(ns) + 1, 8)*int(se3(ns) - sb3(ns) + 1, 8)
+        end do
+        ! the slabs must tile the shell EXACTLY: pairwise disjoint, cells summing to patch - core
+        do s = 1, ns - 1
+            do ss = s + 1, ns
+                @:ASSERT(max(sb1(s), sb1(ss)) > min(se1(s), se1(ss)) .or. max(sb2(s), sb2(ss)) > min(se2(s), &
+                         & se2(ss)) .or. max(sb3(s), sb3(ss)) > min(se3(s), se3(ss)), "shell slabs: overlap")
+            end do
+        end do
+        patchw = int(phi(1) - plo(1) + 1, 8)*int(phi(2) - plo(2) + 1, 8)*int(phi(3) - plo(3) + 1, 8)
+        corew = int(max(chi(1) - clo(1) + 1, 0), 8)*int(max(chi(2) - clo(2) + 1, 0), 8)*int(max(chi(3) - clo(3) + 1, 0), 8)
+        @:ASSERT(words == patchw - corew, "shell slabs: coverage mismatch")
+        cells = int(words)
+
+    end subroutine s_amr_shell_slabs
+
+    !> Intersect the shell-slab list with box [bl:bh]: the surviving clipped slabs in the SAME fixed order (each exchange side
+    !! derives an identical list from replicated data, so empties drop symmetrically) plus their total cell count.
+    impure subroutine s_amr_shell_clip(ns, sb1, se1, sb2, se2, sb3, se3, bl, bh, ms, tb1, te1, tb2, te2, tb3, te3, cells)
+
+        integer, intent(in)  :: ns, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), bl(3), bh(3)
+        integer, intent(out) :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6), cells
+        integer              :: s, l1, u1, l2, u2, l3, u3
+
+        ms = 0; cells = 0
+        do s = 1, ns
+            l1 = max(sb1(s), bl(1)); u1 = min(se1(s), bh(1))
+            l2 = max(sb2(s), bl(2)); u2 = min(se2(s), bh(2))
+            l3 = max(sb3(s), bl(3)); u3 = min(se3(s), bh(3))
+            if (l1 > u1 .or. l2 > u2 .or. l3 > u3) cycle
+            ms = ms + 1
+            tb1(ms) = l1; te1(ms) = u1; tb2(ms) = l2; te2(ms) = u2; tb3(ms) = l3; te3(ms) = u3
+            cells = cells + (u1 - l1 + 1)*(u2 - l2 + 1)*(u3 - l3 + 1)
+        end do
+
+    end subroutine s_amr_shell_clip
+
+    !> Validation arm (debug builds only): flood the current patch extent of amr_cg with quiet NaN BEFORE a clipped gather writes
+    !! its shell, so a consumer read of any unshipped cell - core OR a missed shell slab - NaNs the ghost fill within a step
+    !! (mandated by docs/documentation/amr_stepfill_ring_clip.md).
+    impure subroutine s_amr_poison_patch_device(w1, w2, w3)
+
+        use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+        integer, intent(in) :: w1, w2, w3
+        integer             :: i, g1, g2, g3
+        real(stp)           :: nanv
+
+        nanv = real(ieee_value(0._wp, ieee_quiet_nan), stp)
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do g3 = 0, w3
+                do g2 = 0, w2
+                    do g1 = 0, w1
+                        amr_cg(i)%sf(g1, g2, g3) = nanv
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_poison_patch_device
+
+    !> Ring-clipped runtime own-box copy (device): the owner's shell-slab / own-box intersections [tb:te] GLOBAL from q_coarse into
+    !! amr_cg in the patch-local frame - no host round-trip, ONE fused kernel over the slab concatenation (the ghost-fill kernel's
+    !! flat-index idiom). Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch.
+    impure subroutine s_amr_gather_own_shell_device(q_coarse, ms, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
+        integer, intent(in)                                 :: ms, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6), o1, o2, o3
+        integer                                             :: lb1(6), le1(6), lb2(6), le2(6), lb3(6), le3(6), soff(6), scnt(6)
+        integer                                             :: i, s, ss, g, r, n1, n2, g1, g2, g3, stot, coff1, coff2, coff3
+
+        ! scalar/local copies: no host array may be referenced inside the device region (nvfortran/Cray demand it PRESENT)
+
+        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
+        soff(1) = 0
+        do s = 1, ms
+            lb1(s) = tb1(s); le1(s) = te1(s); lb2(s) = tb2(s); le2(s) = te2(s); lb3(s) = tb3(s); le3(s) = te3(s)
+            scnt(s) = (te1(s) - tb1(s) + 1)*(te2(s) - tb2(s) + 1)*(te3(s) - tb3(s) + 1)
+            if (s < ms) soff(s + 1) = soff(s) + scnt(s)
+        end do
+        stot = soff(ms) + scnt(ms)
+        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', &
+                            & private='[s, ss, r, n1, n2, g1, g2, g3]')
+        do i = 1, sys_size
+            do g = 0, stot - 1
+                s = 1  ! decode the flat index: ms <= 6, so a scan beats storing a per-cell slab map
+                do ss = 2, ms
+                    if (g >= soff(ss)) s = ss
+                end do
+                r = g - soff(s)
+                n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
+                g1 = lb1(s) + mod(r, n1)
+                g2 = lb2(s) + mod(r/n1, n2)
+                g3 = lb3(s) + r/(n1*n2)
+                amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_gather_own_shell_device
+
     !> Non-subcycle per-stage LEVEL-1 fill as one exchange WAVE (I2a, amr_plan_based_exchange.md): derive this stage's full (box,
     !! contributor) transfer set from the replicated caches, exchange one aggregated message per (peer, family) - F1 q_cons and,
     !! under non-polytropic QBMM, the F3 pb/mv twin - with all recvs posted first, then packs, then sends, then ONE waitall, and
@@ -5798,6 +5926,8 @@ contains
         logical :: do_pbmv
         integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, nreq, qbase, pbase, ierr
         integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff
+        integer :: clo(3), chi(3), nsh, msl, isl, scells
+        integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
         if (amr_num_blocks <= 0) return
         @:ASSERT(.not. amr_subcycle, "stage-fill wave: the subcycle path keeps its per-box sites")
@@ -5842,27 +5972,46 @@ contains
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
-            qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-            psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-            if (amr_fw_map(owner) == 0) then
-                amr_fw_snp = amr_fw_snp + 1
-                call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
-                call s_amr_fw_szi(amr_fw_spsz, amr_fw_snp); call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp)
-                call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp); call s_amr_fw_szi(amr_fw_spbase, amr_fw_snp)
-                amr_fw_map(owner) = amr_fw_snp
-                amr_fw_sprank(amr_fw_snp) = owner
+            ! ring clip (runtime q-only path): consumers of amr_cg read only the patch's hollow shell
+            ! (docs/documentation/amr_stepfill_ring_clip.md), so ship only the shell's intersection with this rank's
+            ! slice - as up to 6 sub-slab transfers, derived identically on both sides from replicated metadata. The
+            ! pbmv gather keeps its full-box wire contract, so qbmm+non-polytropic runs stay unclipped (full slab).
+            if (do_pbmv) then
+                msl = 1
+                tb1(1) = bl(1); te1(1) = bh(1); tb2(1) = bl(2); te2(1) = bh(2); tb3(1) = bl(3); te3(1) = bh(3)
+            else
+                clo = 0; chi = 0
+                clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
+                if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
+                if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
+                call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
+                call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+                if (msl == 0) cycle
             end if
-            amr_fw_snx = amr_fw_snx + 1
-            call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
-            call s_amr_fw_szi3(amr_fw_sbh, amr_fw_snx); call s_amr_fw_szi(amr_fw_spi, amr_fw_snx)
-            call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx); call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
-            amr_fw_sblk(amr_fw_snx) = k; amr_fw_sbl(:,amr_fw_snx) = bl; amr_fw_sbh(:,amr_fw_snx) = bh
-            amr_fw_spi(amr_fw_snx) = amr_fw_map(owner)
-            amr_fw_sqo(amr_fw_snx) = amr_fw_pq(owner) + amr_fw_nx(owner)*XA_NH
-            amr_fw_spo(amr_fw_snx) = amr_fw_pp(owner) + amr_fw_nx(owner)*XA_NH
-            amr_fw_pq(owner) = amr_fw_pq(owner) + qsz
-            amr_fw_pp(owner) = amr_fw_pp(owner) + psz
-            amr_fw_nx(owner) = amr_fw_nx(owner) + 1
+            do isl = 1, msl
+                bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
+                qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                if (amr_fw_map(owner) == 0) then
+                    amr_fw_snp = amr_fw_snp + 1
+                    call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
+                    call s_amr_fw_szi(amr_fw_spsz, amr_fw_snp); call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp)
+                    call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp); call s_amr_fw_szi(amr_fw_spbase, amr_fw_snp)
+                    amr_fw_map(owner) = amr_fw_snp
+                    amr_fw_sprank(amr_fw_snp) = owner
+                end if
+                amr_fw_snx = amr_fw_snx + 1
+                call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
+                call s_amr_fw_szi3(amr_fw_sbh, amr_fw_snx); call s_amr_fw_szi(amr_fw_spi, amr_fw_snx)
+                call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx); call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
+                amr_fw_sblk(amr_fw_snx) = k; amr_fw_sbl(:,amr_fw_snx) = bl; amr_fw_sbh(:,amr_fw_snx) = bh
+                amr_fw_spi(amr_fw_snx) = amr_fw_map(owner)
+                amr_fw_sqo(amr_fw_snx) = amr_fw_pq(owner) + amr_fw_nx(owner)*XA_NH
+                amr_fw_spo(amr_fw_snx) = amr_fw_pp(owner) + amr_fw_nx(owner)*XA_NH
+                amr_fw_pq(owner) = amr_fw_pq(owner) + qsz
+                amr_fw_pp(owner) = amr_fw_pp(owner) + psz
+                amr_fw_nx(owner) = amr_fw_nx(owner) + 1
+            end do
         end do
         qbase = 0; pbase = 0
         do ip = 1, amr_fw_snp
@@ -5891,32 +6040,52 @@ contains
             if (n_glb > 0) v2hi = (amr_region_hi_all(2, k) - amr_region_lo_all(2, k)) + 2*amr_cpat_mar
             if (p_glb > 0) v3hi = (amr_region_hi_all(3, k) - amr_region_lo_all(3, k)) + 2*amr_cpat_mar
             phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
+            ! ring clip: the shell is a per-box property; clip each contributor's slice against it (mirror of the
+            ! send walk, so both sides derive the identical sub-slab list)
+            if (.not. do_pbmv) then
+                clo = 0; chi = 0
+                clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
+                if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
+                if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
+                call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
+            end if
             do idx = 1, amr_ovl_gather_n(k)
                 r = amr_ovl_gather(idx, k)
                 if (r == proc_rank) cycle
                 call s_amr_rank_coarse_range(r, crlo, crhi)
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                if (amr_fw_map(r) == 0) then
-                    amr_fw_rnp = amr_fw_rnp + 1
-                    call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
-                    call s_amr_fw_szi(amr_fw_rpsz, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp)
-                    call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rpbase, amr_fw_rnp)
-                    amr_fw_map(r) = amr_fw_rnp
-                    amr_fw_rprank(amr_fw_rnp) = r
+                if (do_pbmv) then
+                    msl = 1
+                    tb1(1) = bl(1); te1(1) = bh(1); tb2(1) = bl(2); te2(1) = bh(2); tb3(1) = bl(3); te3(1) = bh(3)
+                else
+                    call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, &
+                                          & scells)
+                    if (msl == 0) cycle
                 end if
-                amr_fw_rnx = amr_fw_rnx + 1
-                call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
-                call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
-                call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
-                amr_fw_rblk(amr_fw_rnx) = k; amr_fw_rbl(:,amr_fw_rnx) = bl; amr_fw_rbh(:,amr_fw_rnx) = bh
-                amr_fw_rpi(amr_fw_rnx) = amr_fw_map(r)
-                amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-                amr_fw_rpo(amr_fw_rnx) = amr_fw_pp(r) + amr_fw_nx(r)*XA_NH
-                amr_fw_pq(r) = amr_fw_pq(r) + qsz
-                amr_fw_pp(r) = amr_fw_pp(r) + psz
-                amr_fw_nx(r) = amr_fw_nx(r) + 1
+                do isl = 1, msl
+                    bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
+                    qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    if (amr_fw_map(r) == 0) then
+                        amr_fw_rnp = amr_fw_rnp + 1
+                        call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
+                        call s_amr_fw_szi(amr_fw_rpsz, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp)
+                        call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rpbase, amr_fw_rnp)
+                        amr_fw_map(r) = amr_fw_rnp
+                        amr_fw_rprank(amr_fw_rnp) = r
+                    end if
+                    amr_fw_rnx = amr_fw_rnx + 1
+                    call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
+                    call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
+                    call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
+                    amr_fw_rblk(amr_fw_rnx) = k; amr_fw_rbl(:,amr_fw_rnx) = bl; amr_fw_rbh(:,amr_fw_rnx) = bh
+                    amr_fw_rpi(amr_fw_rnx) = amr_fw_map(r)
+                    amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+                    amr_fw_rpo(amr_fw_rnx) = amr_fw_pp(r) + amr_fw_nx(r)*XA_NH
+                    amr_fw_pq(r) = amr_fw_pq(r) + qsz
+                    amr_fw_pp(r) = amr_fw_pp(r) + psz
+                    amr_fw_nx(r) = amr_fw_nx(r) + 1
+                end do
             end do
         end do
         qbase = 0; pbase = 0
@@ -6022,8 +6191,23 @@ contains
             phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            call s_amr_gather_own_box_device(q_cons_coarse, bl, bh, o1, o2, o3)
-            if (do_pbmv) call s_amr_gather_own_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3)
+            if (do_pbmv) then
+                call s_amr_gather_own_box_device(q_cons_coarse, bl, bh, o1, o2, o3)
+                call s_amr_gather_own_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3)
+            else
+#ifdef MFC_DEBUG
+                ! validation arm: flood the patch with NaN BEFORE the clipped writes, so a consumer read of any
+                ! unshipped cell - core OR a missed shell slab - NaNs the ghost fill within a step
+                call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
+#endif
+                clo = 0; chi = 0
+                clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
+                if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
+                if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
+                call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
+                call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+                if (msl > 0) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
+            end if
             do while (ix <= amr_fw_rnx)
                 if (amr_fw_rblk(ix) /= k) exit
                 bl = amr_fw_rbl(:,ix); bh = amr_fw_rbh(:,ix)
