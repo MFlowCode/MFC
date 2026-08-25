@@ -5813,6 +5813,7 @@ contains
         tp = amr_tag_base(3) + int(mod(amr_mesh_epoch, 100_8))
 
         call s_phase_tic(PH_GATHER)
+        call s_phase_tic(PH_GWPLAN)
         ! block set changed: rebuild the cached overlap-rank lists BEFORE reading them (same lazy trigger as the per-box path)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
         if (.not. allocated(amr_fw_map)) then
@@ -5932,6 +5933,7 @@ contains
         if (do_pbmv) call s_amr_fw_szr(amr_fw_rp, pbase)
         nreq = (amr_fw_snp + amr_fw_rnp)*(1 + merge(1, 0, do_pbmv))
         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+        call s_phase_toc(PH_GWPLAN)
 
         ! post ALL recvs, then pack ALL sends (device kernels into contiguous host pool slices), then post ALL sends, then one
         ! waitall (amr_plan_based_exchange.md order-of-operations rule). [amr-xa] records payload words only, so the family
@@ -5951,6 +5953,7 @@ contains
             end if
         end do
 #endif
+        call s_phase_tic(PH_GWPACK)
         do ix = 1, amr_fw_snx
             bl = amr_fw_sbl(:,ix); bh = amr_fw_sbh(:,ix)
             qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -5964,6 +5967,7 @@ contains
                 call s_amr_pack_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3, amr_fw_sp(boff + XA_NH + 1:boff + XA_NH + psz))
             end if
         end do
+        call s_phase_toc(PH_GWPACK)
 #ifdef MFC_MPI
         do ip = 1, amr_fw_snp
             call s_xa_rec(XA_F1W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq)
@@ -5977,6 +5981,7 @@ contains
                                & amr_fw_req(nreq), ierr)
             end if
         end do
+        call s_phase_tic(PH_GWWAIT)
         if (nreq > 0) then
 #ifdef MFC_DEBUG
             block
@@ -5992,6 +5997,7 @@ contains
             call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
 #endif
         end if
+        call s_phase_toc(PH_GWWAIT)
 #endif
         call s_phase_toc(PH_GATHER)
 

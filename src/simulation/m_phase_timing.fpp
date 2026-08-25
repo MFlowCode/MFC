@@ -37,6 +37,7 @@ module m_phase_timing
     public :: PH_RFP2P, PH_RFAPP, PH_RFRECV, PH_RFWAIT
     public :: PH_RESTR, PH_RGPART, PH_RGMOVE, PH_MGWAIT
     public :: PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH
+    public :: PH_GWPLAN, PH_GWPACK, PH_GWWAIT
 
     integer, parameter :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
     integer, parameter :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
@@ -126,17 +127,23 @@ module m_phase_timing
     !> The rg:move work split (I4b pricing): slot = s_amr_alloc_slot_stash for received replicas (contains any host-staged store
     !! GROWTH - see s_amr_st_reserve), pack = host pack + ISEND posting, unpk = host unpack of received columns, push = the
     !! per-received-slot device update. The residual of rg:move minus these five is the overlap pre-passes.
-    integer, parameter          :: PH_MGSLOT = 49
-    integer, parameter          :: PH_MGPACK = 50
-    integer, parameter          :: PH_MGUNPK = 51
-    integer, parameter          :: PH_MGPUSH = 52
-    integer, parameter          :: PH_N = 52
+    integer, parameter :: PH_MGSLOT = 49
+    integer, parameter :: PH_MGPACK = 50
+    integer, parameter :: PH_MGUNPK = 51
+    integer, parameter :: PH_MGPUSH = 52
+    !> The stage-fill wave's internal split (I6 pricing): plan = the two replicated list walks, pack = the device pack kernels +
+    !! their copyout transfers, wait = the single WAITALL. The residual of `gather` minus these three is recv/send posting + consume
+    !! bookkeeping.
+    integer, parameter          :: PH_GWPLAN = 53
+    integer, parameter          :: PH_GWPACK = 54
+    integer, parameter          :: PH_GWWAIT = 55
+    integer, parameter          :: PH_N = 55
     character(len=8), parameter :: PH_NAME(PH_N) = [character(len=8)::'halo','gather', 'gfill', 'seam', 'rhs', 'rk', 'reflux', &
               & 'regrid', 'L0', 'coarse', 'rg:halo', 'rg:tag', 'rg:clus', 'rg:shape', 'rg:mig', 'rg:build', 'rb:gath', 'rb:ovl', &
               & 'rb:push', 'rb:wait', 'rb:mem', 'rb:unpk', 'swap', 'rb:own', 'rb:upd', 'rb:pack', 'rb:rsv', 'rb:seam', 'rb:post', &
               & 'rb:geo', 'rb:slot', 'rb:tail', 'rb:send', 'rb:flush', 'rb:xchg', 'rb:rec', 'rb:topo', 'pg:all', 'pg:send', &
               & 'pg:recv', 'rf:p2p', 'rf:app', 'rf:recv', 'rf:wait', 'restr', 'rg:part', 'rg:move', 'mg:wait', 'mg:slot', &
-              & 'mg:pack', 'mg:unpk', 'mg:push']
+              & 'mg:pack', 'mg:unpk', 'mg:push', 'gw:plan', 'gw:pack', 'gw:wait']
 
     real(wp) :: acc(PH_N) = 0._wp
     !> Entry count per phase. Time alone cannot distinguish "this region is slow" from "this region runs far more often than
