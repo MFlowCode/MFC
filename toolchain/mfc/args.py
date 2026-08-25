@@ -103,7 +103,7 @@ def parse(config: MFCConfig):
     # Add default arguments of other subparsers
     # This ensures all argument keys exist even for commands that don't define them
     # Only process subparsers that have common arguments we need
-    relevant_subparsers = ["run", "test", "build", "clean", "count", "count_diff", "validate", "viz"]
+    relevant_subparsers = ["run", "test", "build", "clean", "count", "validate", "viz"]
     for name in relevant_subparsers:
         if args["command"] == name:
             continue

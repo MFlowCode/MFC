@@ -81,6 +81,14 @@ PHYSICS_DOCS = {
         "math": r"m > 0, \quad n \geq 0, \quad p \geq 0",
         "explanation": ("The x-direction must have cells. Cannot have z without y. Cylindrical coordinates require odd p."),
     },
+    "check_domain_extents": {
+        "title": "Domain Extents Specified",
+        "category": "Domain and Geometry",
+        "math": r"m > 0 \Rightarrow x_{\mathrm{beg}}, x_{\mathrm{end}} \ \mathrm{set}",
+        "explanation": (
+            "Every dimension that has cells needs its physical extents so that the grid can be generated. Skipped on restarts (old_grid = T), where the mesh is read from the existing grid files."
+        ),
+    },
     "check_patch_within_domain": {
         "title": "Patch Within Domain",
         "category": "Domain and Geometry",
@@ -329,12 +337,6 @@ class CaseValidator:
             self.get("recon_type", 1) not in _recon_choices,
             f"recon_type must be one of {_recon_shown}",
         )
-
-        # Required domain parameters when m > 0
-        m = self.get("m")
-        if m is not None and m > 0:
-            self.prohibit(not self.is_set("x_domain%beg"), "x_domain%beg must be set when m > 0")
-            self.prohibit(not self.is_set("x_domain%end"), "x_domain%end must be set when m > 0")
 
     # Common Checks (All Stages)
 
@@ -643,12 +645,17 @@ class CaseValidator:
         relax = self.get("relax", "F") == "T"
         relax_model = self.get("relax_model")
         model_eqns = self.get("model_eqns")
+        num_fluids = self.get("num_fluids")
         palpha_eps = self.get("palpha_eps")
         ptgalpha_eps = self.get("ptgalpha_eps")
 
         if not relax:
             return
 
+        self.prohibit(
+            num_fluids is None or num_fluids < 2,
+            "phase change requires num_fluids >= 2 (liquid = 1, vapor = 2)",
+        )
         self.prohibit(
             (model_eqns not in (2, 3) or (model_eqns == 2 and relax_model not in (5, 6)) or (model_eqns == 3 and relax_model not in (1, 4, 5, 6))),
             "phase change requires model_eqns==2 with relax_model in [5,6] or model_eqns==3 with relax_model in [1,4,5,6]",
@@ -686,7 +693,14 @@ class CaseValidator:
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
+            n = self.get("n", 0)
+            p = self.get("p", 0)
+            geometry = self.get(f"particle_cloud({i})%cloud_geometry", 1)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
+            self.prohibit(
+                geometry not in [1, 2],
+                f"particle_cloud({i})%cloud_geometry must be 1 (box) or 2 (hemisphere shell)",
+            )
             self.prohibit(
                 packing_method is None,
                 f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
@@ -695,6 +709,118 @@ class CaseValidator:
                 packing_method is not None and packing_method not in [1, 2],
                 f"particle_cloud({i})%packing_method must be 1 (rejection sampling) or 2 (lattice)",
             )
+            shell_outer_radius = self.get(f"particle_cloud({i})%shell_outer_radius", None)
+            shell_inner_radius = self.get(f"particle_cloud({i})%shell_inner_radius", None)
+            radius = self.get(f"particle_cloud({i})%radius", None)
+            mass = self.get(f"particle_cloud({i})%mass", None)
+            num_particles = self.get(f"particle_cloud({i})%num_particles", None)
+            periodic = self.get(f"particle_cloud({i})%periodic", 0)
+            length_x = self.get(f"particle_cloud({i})%length_x", None)
+            length_y = self.get(f"particle_cloud({i})%length_y", None)
+            length_z = self.get(f"particle_cloud({i})%length_z", None)
+
+            self.prohibit(
+                periodic not in [0, 1],
+                f"particle_cloud({i})%periodic must be 0 (off) or 1 (on)",
+            )
+            self.prohibit(
+                periodic == 1 and geometry != 1,
+                f"particle_cloud({i})%periodic is only supported for box particle clouds",
+            )
+            self.prohibit(
+                periodic == 1 and packing_method != 1,
+                f"particle_cloud({i})%periodic is only supported for rejection packing",
+            )
+            self.prohibit(
+                periodic == 1
+                and (
+                    length_x is None
+                    or not self._is_numeric(length_x)
+                    or length_x <= 0
+                    or length_y is None
+                    or not self._is_numeric(length_y)
+                    or length_y <= 0
+                    or (p > 0 and (length_z is None or not self._is_numeric(length_z) or length_z <= 0))
+                ),
+                f"particle_cloud({i})%periodic requires positive box lengths in each active dimension",
+            )
+
+            # radius, mass, and num_particles are required and positive for every cloud, independent of
+            # geometry. An unset radius reaches the sampler as dflt_real, which makes min_dist negative and
+            # corrupts both the spatial-hash bin index and the overlap test; an unset mass/num_particles is
+            # meaningless. The Fortran sampler cannot re-check these cheaply, so they belong here.
+            self.prohibit(
+                num_particles is None or (self._is_numeric(num_particles) and num_particles <= 0),
+                f"particle_cloud({i})%num_particles must be specified and > 0",
+            )
+            self.prohibit(
+                radius is None or (self._is_numeric(radius) and radius <= 0),
+                f"particle_cloud({i})%radius must be specified and > 0",
+            )
+            self.prohibit(
+                mass is None or (self._is_numeric(mass) and mass <= 0),
+                f"particle_cloud({i})%mass must be specified and > 0",
+            )
+            # A hemisphere shell in 1D degenerates to a half-annulus the y-extent check below cannot see
+            # (it is skipped when n == 0), so reject it explicitly here.
+            self.prohibit(
+                geometry == 2 and n == 0,
+                f"particle_cloud({i}) hemisphere shell requires a 2D or 3D domain (n > 0)",
+            )
+            self.prohibit(
+                geometry == 2 and (shell_inner_radius is None or (self._is_numeric(shell_inner_radius) and shell_inner_radius < 0)),
+                f"particle_cloud({i}) hemisphere shell requires shell_inner_radius >= 0",
+            )
+            self.prohibit(
+                geometry == 2
+                and (
+                    shell_outer_radius is None
+                    or radius is None
+                    or shell_inner_radius is None
+                    or (all(self._is_numeric(v) for v in [shell_outer_radius, shell_inner_radius, radius]) and shell_outer_radius <= shell_inner_radius + 2 * radius)
+                ),
+                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
+            )
+            self.prohibit(
+                geometry == 2 and packing_method == 2,
+                f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
+            )
+            if geometry == 2 and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
+                x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
+                y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
+                z_centroid = self.get(f"particle_cloud({i})%z_centroid", None)
+                x_beg = self.get("x_domain%beg", None)
+                x_end = self.get("x_domain%end", None)
+                y_beg = self.get("y_domain%beg", None)
+                y_end = self.get("y_domain%end", None)
+                z_beg = self.get("z_domain%beg", None)
+                z_end = self.get("z_domain%end", None)
+
+                if all(self._is_numeric(v) for v in [x_centroid, x_beg, x_end]):
+                    self.prohibit(
+                        x_centroid - shell_outer_radius < x_beg or x_centroid + shell_outer_radius > x_end,
+                        f"particle_cloud({i}) hemisphere shell x-extent must lie within x_domain",
+                    )
+                if n > 0 and all(self._is_numeric(v) for v in [y_centroid, y_beg, y_end, radius]):
+                    if p > 0:
+                        self.prohibit(
+                            y_centroid - shell_outer_radius < y_beg or y_centroid + shell_outer_radius > y_end,
+                            f"particle_cloud({i}) hemisphere shell y-extent must lie within y_domain",
+                        )
+                    else:
+                        # 2D half-annulus opens toward +y from the flat face at y_centroid; require one
+                        # particle radius of standoff so no particle surface sits on the domain wall.
+                        self.prohibit(
+                            y_centroid - radius < y_beg or y_centroid + shell_outer_radius > y_end,
+                            f"particle_cloud({i}) half-annulus must clear y_domain by one particle radius",
+                        )
+                if p > 0 and all(self._is_numeric(v) for v in [z_centroid, z_beg, z_end, radius]):
+                    # 3D hemisphere shell opens toward +z from the flat face at z_centroid; require one
+                    # particle radius of standoff so no particle surface sits on the domain wall.
+                    self.prohibit(
+                        z_centroid - radius < z_beg or z_centroid + shell_outer_radius > z_end,
+                        f"particle_cloud({i}) hemisphere shell must clear z_domain by one particle radius",
+                    )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
@@ -1507,6 +1633,31 @@ class CaseValidator:
             num_patches > num_patches_max,
             f"num_patches must be <= {num_patches_max} (num_patches_max in m_constants.fpp)",
         )
+
+    def check_domain_extents(self):
+        """Checks that the physical extents of every active dimension are set (pre-process)
+
+        The grid generator needs (xyz)_domain%beg and (xyz)_domain%end for each
+        dimension that has cells. On a restart (old_grid = T) the mesh is read
+        from the existing grid files, so the extents are neither needed nor read.
+        """
+        if self.get("old_grid", "F") == "T":
+            return
+
+        m = self.get("m", 0)
+        if self._is_numeric(m) and m > 0:
+            self.prohibit(not self.is_set("x_domain%beg"), "x_domain%beg must be set when m > 0")
+            self.prohibit(not self.is_set("x_domain%end"), "x_domain%end must be set when m > 0")
+
+        n = self.get("n", 0)
+        if self._is_numeric(n) and n > 0:
+            self.prohibit(not self.is_set("y_domain%beg"), "y_domain%beg must be set when n > 0")
+            self.prohibit(not self.is_set("y_domain%end"), "y_domain%end must be set when n > 0")
+
+        p = self.get("p", 0)
+        if self._is_numeric(p) and p > 0:
+            self.prohibit(not self.is_set("z_domain%beg"), "z_domain%beg must be set when p > 0")
+            self.prohibit(not self.is_set("z_domain%end"), "z_domain%end must be set when p > 0")
 
     def check_qbmm_pre_process(self):
         """Checks QBMM constraints for pre-process"""
@@ -2499,6 +2650,7 @@ class CaseValidator:
         """Validate pre-process-specific parameters"""
         self.validate_common()
         self.check_restart()
+        self.check_domain_extents()
         self.check_qbmm_pre_process()
         self.check_parallel_io_pre_process()
         self.check_grid_stretching()
