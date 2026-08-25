@@ -161,7 +161,7 @@ def run(targets=None, case=None):
     targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
     case = case or input.load(ARG("input"), ARG("--"))
 
-    if not targets_explicit and PRE_PROCESS in targets and int(case.params.get("t_step_start", 0)) > 0:
+    if not targets_explicit and PRE_PROCESS in targets and (int(case.params.get("t_step_start", 0)) > 0 or int(case.params.get("n_start", 0)) > 0):
         cons.print("[yellow]t_step_start > 0: skipping pre_process so it doesn't overwrite the restart data being resumed from. Pass -t pre_process explicitly to force it.[/yellow]")
         targets = [t for t in targets if t is not PRE_PROCESS]
 
