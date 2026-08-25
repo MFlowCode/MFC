@@ -223,8 +223,8 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             else
-                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1*rho_L*vel_L_rms + qv_L
-                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1*rho_R*vel_R_rms + qv_R
+                                call s_compute_energy(pres_L, rho_L, gamma_L, pi_inf_L, qv_L, vel_L_rms, E_L)
+                                call s_compute_energy(pres_R, rho_R, gamma_R, pi_inf_R, qv_R, vel_R_rms, E_R)
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             end if

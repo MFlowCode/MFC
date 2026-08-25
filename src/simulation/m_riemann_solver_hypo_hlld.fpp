@@ -340,8 +340,8 @@ contains
                                 G_R = G_R + alpha_R(i)*Gs_rs(i)
                             end do
 
-                            E%L = gamma%L*pres%L + pi_inf%L + 5e-1_wp*rho%L*vel_rms%L + qv%L
-                            E%R = gamma%R*pres%R + pi_inf%R + 5e-1_wp*rho%R*vel_rms%R + qv%R
+                            call s_compute_energy(pres%L, rho%L, gamma%L, pi_inf%L, qv%L, vel_rms%L, E%L)
+                            call s_compute_energy(pres%R, rho%R, gamma%R, pi_inf%R, qv%R, vel_rms%R, E%R)
 
                             ! Freeze the thermal/kinetic enthalpy used by the EOS sound-speed call before
                             ! adding hypoelastic strain energy to the conservative total energy.

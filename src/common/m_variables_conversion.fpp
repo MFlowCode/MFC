@@ -25,7 +25,8 @@ module m_variables_conversion
         & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
-        & s_compute_species_fraction, s_accumulate_mixture_properties, s_compute_speed_of_sound, s_compute_speed_of_sound_avg, &
+        & s_compute_species_fraction, s_accumulate_mixture_properties, s_compute_energy, s_compute_speed_of_sound, &
+        & s_compute_speed_of_sound_avg, &
         & s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
@@ -1225,6 +1226,26 @@ contains
         end do
 
     end subroutine s_accumulate_mixture_properties
+
+    !> Total energy per unit volume of a stiffened-gas state.
+    !!
+    !! Thermodynamic contributions only. Magnetic energy (pres_mag) and elastic energy are added by the
+    !! caller, because they are not equation-of-state terms: folding them in here would make the
+    !! operator impossible to reuse for a second equation of state.
+    !!
+    !! The chemistry and relativistic branches of the Riemann solvers do not use this relation at all -
+    !! chemistry builds E from the mixture internal energy and the relativistic form is unrelated - so
+    !! those sites are deliberately left open-coded.
+    subroutine s_compute_energy(pres, rho, gamma, pi_inf, qv, vel_sum, E)
+
+        $:GPU_ROUTINE(function_name='s_compute_energy', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)  :: pres, rho, gamma, pi_inf, qv, vel_sum
+        real(wp), intent(out) :: E
+
+        E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
+
+    end subroutine s_compute_energy
 
     !> Compute the speed of sound of a thermodynamic state.
     !!

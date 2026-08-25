@@ -654,7 +654,6 @@ contains
                                 gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                             end if
                         else
-                            E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_K_sum
                         end if
 
                         ! Compute mixture sound speed
