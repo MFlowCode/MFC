@@ -455,8 +455,7 @@ jobs:
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
-        # Phoenix builds+tests in one allocation (see "Build & Test" below); every
-        # other cluster keeps the separate build job.
+        # Phoenix builds+tests in one allocation (see "Build & Test"); others build separately.
         if:   ${{ matrix.cluster != 'phoenix' && !(matrix.cluster == 'frontier_amd' && matrix.device == 'gpu') }}
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
@@ -477,8 +476,7 @@ jobs:
           exit $rc
 
       - name: Build & Test
-        # Phoenix: build and test in a single SLURM allocation so the scheduler
-        # queue wait (preemptible 'embers' QOS) is paid once instead of twice.
+        # Phoenix: build+test in one allocation so the 'embers' queue wait is paid once.
         if:   matrix.cluster == 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build-and-test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
@@ -511,9 +509,8 @@ jobs:
       - name: Print Logs
         if:   always()
         run:  |
-          # The build slug matches the plain log and, where the build is split per
-          # variant, the build-...-base/-chem ones. The combined slug matches
-          # Phoenix's single build-and-test allocation.
+          # build_slug matches the plain log (and per-variant base/chem builds);
+          # combined_slug matches Phoenix's single build-and-test allocation.
           for f in ${{ steps.log.outputs.build_slug }}*.out ${{ steps.log.outputs.combined_slug }}.out ${{ steps.log.outputs.test_slug }}.out; do
             [ -f "$f" ] && echo "=== $f ===" && cat "$f"
           done

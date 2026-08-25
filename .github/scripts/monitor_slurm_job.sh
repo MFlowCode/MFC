@@ -82,16 +82,12 @@ is_terminal_state() {
   esac
 }
 
-# Bound how long the job may sit un-started in the scheduler queue.
-# Under a contended, preemptible QOS (e.g. Phoenix 'embers') a job can stay
-# PENDING for many hours, burning the entire CI job timeout, holding a
-# self-hosted runner slot hostage, and surfacing as an opaque ~8 h 'cancelled'.
-# Give up after a bounded queue wait with a loud, greppable message so the
-# failure reads as infrastructure (queue starvation), not a code/test failure.
-# Set SLURM_MAX_QUEUE_SECONDS=0 to wait indefinitely (previous behaviour).
+# Bound how long a job may sit un-started in the queue. On a preemptible QOS
+# (Phoenix 'embers') a job can stay PENDING for hours, burning the CI job
+# timeout and holding a runner slot; fail early so it reads as queue starvation,
+# not a test failure. 0 = wait indefinitely.
 : "${SLURM_MAX_QUEUE_SECONDS:=5400}"   # 90 minutes
-# Fail loudly on a non-integer override rather than silently disabling the
-# budget (a bad `[ -gt ]` comparison would otherwise just skip the check).
+# Reject a non-integer override rather than silently skipping the budget.
 if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
   echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2
   exit 1
@@ -116,9 +112,8 @@ unknown_count=0
 while [ ! -f "$output_file" ]; do
   state=$(get_job_state "$job_id")
 
-  # Enforce the queue-wait budget. A job that has actually started
-  # (RUNNING/COMPLETING) but whose output file is merely NFS-delayed is exempt,
-  # so a job that is already doing work is never killed here.
+  # A started job (RUNNING/COMPLETING) whose output file is merely NFS-delayed
+  # is exempt, so work in progress is never killed here.
   if [ "$SLURM_MAX_QUEUE_SECONDS" -gt 0 ]; then
     case "$state" in
       RUNNING|COMPLETING) ;;

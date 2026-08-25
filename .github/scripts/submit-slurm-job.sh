@@ -48,9 +48,8 @@ case "$cluster" in
         qos="embers"
         extra_sbatch="#SBATCH --requeue"
         test_time="03:00:00"
-        # Combined build+test runs both phases in one allocation (one queue
-        # wait instead of two). It needs headroom for the build on top of the
-        # test budget; kept modest so it still backfills well under 'embers'.
+        # Combined build+test needs build headroom on top of the test budget;
+        # kept modest to still backfill under 'embers'.
         buildtest_time="03:30:00"
         bench_time="04:00:00"
         gpu_partition_dynamic=true
@@ -201,8 +200,7 @@ set -x
 cd "\$SLURM_SUBMIT_DIR"
 echo "Running in \$(pwd):"
 
-# Exported so a wrapper script (e.g. build-and-test.sh) can run build.sh and
-# test.sh as child processes that inherit these, not just inline this shell.
+# Exported so wrapper scripts (build-and-test.sh) run child scripts that inherit these.
 export job_slug="$job_slug"
 export job_device="$device"
 export job_interface="$interface"
