@@ -779,7 +779,9 @@ contains
             ! I5-F5b: the split-ownership level>=2 freg exchange as ONE wave (the registers are final after the advance);
             ! the applies keep their per-box reverse-order position in the fold below. Subcycle keeps its per-box exchange.
             if (.not. amr_subcycle) then
-                call s_phase_tic(PH_RESTR); call s_amr_freg_wave(); call s_phase_toc(PH_RESTR)
+                call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSWAVE)
+                call s_amr_freg_wave()
+                call s_phase_toc(PH_RSWAVE); call s_phase_toc(PH_RESTR)
             end if
             do islot = amr_num_blocks, 1, -1
                 if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
@@ -790,12 +792,18 @@ contains
                 ! equilibrate the fine solution (phase change) before it restricts to the coarse level
                 if (relax) call s_amr_relax_fine()
                 call s_phase_tic(PH_RESTR)
+                call s_phase_tic(PH_RSREST)
                 call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
+                call s_phase_toc(PH_RSREST)
                 ! multi-level lock-step: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the parent's
                 ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured during
                 ! the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle
                 ! multi-level reflux is future work; dt is the shared lock-step step.
-                if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) call s_amr_reflux_to_parent(dt, .false.)
+                if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) then
+                    call s_phase_tic(PH_RSRFP)
+                    call s_amr_reflux_to_parent(dt, .false.)
+                    call s_phase_toc(PH_RSRFP)
+                end if
                 ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
                 if (amr_subcycle) call s_amr_p2p_reflux_faces()
                 if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)

@@ -2753,11 +2753,14 @@ contains
     impure subroutine s_amr_freg_wave()
 
 #ifdef MFC_MPI
-        integer :: k, ierr, nreq, cnt, pblk, cowner, powner, tq, nhr, nhs, j
+        use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+        integer  :: k, ierr, nreq, cnt, pblk, cowner, powner, tq, nhr, nhs, j
+        real(wp) :: w_lo(3), w_hi(3), nanv
 
         if (num_procs == 1) return
         call s_amr_reg_reserve(amr_num_blocks)
         tq = amr_tag_base(5) + 50 + int(mod(amr_mesh_epoch, 50_8))
+        nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
         do k = 1, amr_num_blocks
             if (amr_block_level(k) < 2) cycle
@@ -2765,6 +2768,11 @@ contains
             pblk = f_amr_parent_block(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. powner /= proc_rank) cycle
+            ! seam clip: a face weighted 0 by the sibling-seam rule is never consumed by the parent-side reflux apply
+            ! (s_amr_reflux_to_parent multiplies it away), so it never ships - both sides derive the identical skip from
+            ! s_amr_sibling_face_weights on replicated metadata. Debug arm: skipped-face mirrors are NaN-flooded so any
+            ! OTHER consumer of an unshipped face aborts within the step.
+            call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
             if (XA_NH > 0) then
                 nhr = nhr + 1
                 call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr); call s_amr_fw_szi(amr_fw_rblk, nhr)
@@ -2777,16 +2785,32 @@ contains
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
-                    nreq = nreq + 1
-                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                    amr_fw_reqw(nreq) = cnt
-                    call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
-                    call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                    nreq = nreq + 1
-                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                    amr_fw_reqw(nreq) = cnt
-                    call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
-                    call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                    if (w_lo(${D}$) > 0._wp) then
+                        nreq = nreq + 1
+                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                        amr_fw_reqw(nreq) = cnt
+                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
+                        call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), &
+                                       & ierr)
+#ifdef MFC_DEBUG
+                    else
+                        freg(${D}$)%lo(:,:,:,amr_cur) = nanv
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+#endif
+                    end if
+                    if (w_hi(${D}$) > 0._wp) then
+                        nreq = nreq + 1
+                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                        amr_fw_reqw(nreq) = cnt
+                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
+                        call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), &
+                                       & ierr)
+#ifdef MFC_DEBUG
+                    else
+                        freg(${D}$)%hi(:,:,:,amr_cur) = nanv
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+#endif
+                    end if
                 end if
             #:endfor
         end do
@@ -2796,9 +2820,17 @@ contains
             pblk = f_amr_parent_block(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. cowner /= proc_rank) cycle
+            ! seam clip, send side: the identical weight derivation as the recv walk (replicated metadata), so the
+            ! posted sends pair the posted recvs exactly. Skipped faces also skip their device->host pulls.
+            call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    if (w_lo(${D}$) > 0._wp) then
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                    end if
+                    if (w_hi(${D}$) > 0._wp) then
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    end if
                 end if
             #:endfor
             if (XA_NH > 0) then
@@ -2813,16 +2845,22 @@ contains
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
-                    nreq = nreq + 1
-                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                    amr_fw_reqw(nreq) = -1
-                    call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
-                    call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                    nreq = nreq + 1
-                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                    amr_fw_reqw(nreq) = -1
-                    call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
-                    call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                    if (w_lo(${D}$) > 0._wp) then
+                        nreq = nreq + 1
+                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                        amr_fw_reqw(nreq) = -1
+                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
+                        call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), &
+                                       & ierr)
+                    end if
+                    if (w_hi(${D}$) > 0._wp) then
+                        nreq = nreq + 1
+                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+                        amr_fw_reqw(nreq) = -1
+                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
+                        call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), &
+                                       & ierr)
+                    end if
                 end if
             #:endfor
         end do
@@ -2853,9 +2891,17 @@ contains
                 @:ASSERT(amr_fw_rblk(j) == k, "freg wave: header slot order broke")
                 call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
             end if
+            ! push only the faces that shipped; a skipped face keeps its device content (dead under weight 0 - and
+            ! NaN-poisoned in debug, so any other reader aborts)
+            call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    if (w_lo(${D}$) > 0._wp) then
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                    end if
+                    if (w_hi(${D}$) > 0._wp) then
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    end if
                 end if
             #:endfor
         end do
@@ -3893,6 +3939,29 @@ contains
 
     end subroutine s_amr_p2p_freg_to_parent
 
+    !> Sibling-seam face weights for level>=2 block kb under parent pblk: 0 on a face shared with a same-parent sibling tile
+    !! (fine-fine, not c/f - refluxing there double-writes and leaks; the outside parent cell is covered by the sibling's restrict),
+    !! 1 otherwise. REPLICATED metadata only (f_amr_parent_block + f_amr_seam read amr_region_*_all), so every rank derives the same
+    !! weights - the reflux apply AND the freg wave's wire-skip both call this, so what ships and what is consumed cannot drift
+    !! apart.
+    impure subroutine s_amr_sibling_face_weights(kb, pblk, w_lo, w_hi)
+
+        integer, intent(in)   :: kb, pblk
+        real(wp), intent(out) :: w_lo(3), w_hi(3)
+        integer               :: y, d
+
+        w_lo = 1._wp; w_hi = 1._wp
+        do y = 1, amr_num_blocks  ! block outer, dim inner: f_amr_parent_block (a linear scan) is evaluated once per sibling
+            if (y == kb) cycle
+            if (f_amr_parent_block(y) /= pblk) cycle  ! same-parent sibling tile only (guarantees same level)
+            do d = 1, num_dims
+                if (f_amr_seam(kb, y, d)) w_hi(d) = 0._wp  ! sibling just above -> shared high face
+                if (f_amr_seam(y, kb, d)) w_lo(d) = 0._wp  ! sibling just below -> shared low face
+            end do
+        end do
+
+    end subroutine s_amr_sibling_face_weights
+
     !> Multi-level reflux: apply the Berger-Colella C/F flux correction from the current level>=2 block into its PARENT block's
     !! cells just OUTSIDE the block footprint, in the parent-fine frame (mirror of the L0 s_amr_apply_reflux targeted at the parent
     !! - "the coarse" is level l-1). State form: q_parent(outside) += dt*(F_coarse - Fbar_fine)/dxf on the low face and +=
@@ -3907,7 +3976,7 @@ contains
         real(wp), intent(in) :: dt_reflux
         !> exchange the split-ownership freg here (the subcycle per-box path); the lock-step driver runs s_amr_freg_wave first
         logical, intent(in) :: do_xchg
-        integer             :: pblk, d, y, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
+        integer             :: pblk, d, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
         real(wp)            :: w_lo(3), w_hi(3), mlo(3), mhi(3)
         logical             :: own_child, own_parent
 
@@ -3921,15 +3990,7 @@ contains
         ! c/f boundary - its "outside" parent cell is covered by the sibling's restrict, so refluxing there double-writes and leaks.
         ! Skip those faces (weight 0); the fine-fine halo already matched the shared seam flux. No siblings -> all weights 1
         ! (no-op).
-        w_lo = 1._wp; w_hi = 1._wp
-        do y = 1, amr_num_blocks  ! block outer, dim inner: f_amr_parent_block (a linear scan) is evaluated once per sibling
-            if (y == amr_cur) cycle
-            if (f_amr_parent_block(y) /= pblk) cycle  ! same-parent sibling tile only (guarantees same level)
-            do d = 1, num_dims
-                if (f_amr_seam(amr_cur, y, d)) w_hi(d) = 0._wp  ! sibling just above -> shared high face
-                if (f_amr_seam(y, amr_cur, d)) w_lo(d) = 0._wp  ! sibling just below -> shared low face
-            end do
-        end do
+        call s_amr_sibling_face_weights(amr_cur, pblk, w_lo, w_hi)
         ! parent-fine frame for the shared reflux kernel: outside cell = isect boundary +/-1; creg-local loop range 0:extent;
         ! transverse write at the isect origin. Per-face parent-fine cell widths - dx at the low/high OUTSIDE cell (olo/ohi),
         ! mirroring the L0/L1 s_amr_apply_reflux_state so a stretched parent grid corrects each C/F face with its own width (on a

@@ -7,6 +7,27 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-25 (22) — F5b SEAM-CLIPPED + restr SUB-BRACKETS; k004-004 ERA FLOOR = 10.48
+
+The freg wave (F5b) shipped ALL SIX faces of every split level>=2 child to its
+parent's owner, but the parent-side apply (s_amr_reflux_to_parent) multiplies
+sibling-seam faces by weight 0 — dead wire. The weight computation is extracted into
+s_amr_sibling_face_weights (replicated metadata only) and BOTH wave sides now derive
+the identical skip from it: skipped faces post no send/recv, skip their PCIe
+pulls/pushes, and are NaN-flooded in debug so any hidden consumer aborts. GATES:
+byte-identical (bitcmp), F5 words -17% on the 5-step probe (msgs drop with words —
+whole faces), poison probe rc=0, AMR-75 75/75. The modest probe cut says F5a (the L1
+face multicast) dominates F5 -> the next comm increment is F5a FACE-SELECTIVE
+multicast (scoping: notes/overnight_0825_pricing.md — each participant applies only
+the 1-2 of 6 faces whose outside coarse layer it owns; predicates pure+replicated).
+
+Also in this batch: restr sub-brackets rs:wave/rs:rest/rs:rfp (the np16 rung made
+restr the largest inter-node growth; instrument-before-optimize). And the k004-004
+held-node era FLOOR (aggressive-progress protocol): np8 differenced 10.588/10.376 ->
+**10.48 s/step** on the f2clip HEAD — prediction 10.3-10.8 CONFIRMED; trajectory
+14.15 -> 11.64 -> 10.48. Profile: rhs 42%, restr 1.61 + rf:wait 1.42 = the top pool,
+rg:build 0.12 (the rebuild pipeline is done), gather 0.79 post-F2-clip.
+
 ## 2026-08-25 (21) — THE FIRST INTER-NODE RUNG: 1.594x per doubling vs bar 1.192x
 
 Job 385465 (2 nodes, clip16k binary = HEAD-before-F2-clip + pi16k), weak-scaled S0

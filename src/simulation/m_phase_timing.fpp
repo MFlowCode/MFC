@@ -38,6 +38,7 @@ module m_phase_timing
     public :: PH_RESTR, PH_RGPART, PH_RGMOVE, PH_MGWAIT
     public :: PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH
     public :: PH_GWPLAN, PH_GWPACK, PH_GWWAIT
+    public :: PH_RSWAVE, PH_RSREST, PH_RSRFP
 
     integer, parameter :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
     integer, parameter :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
@@ -134,16 +135,21 @@ module m_phase_timing
     !> The stage-fill wave's internal split (I6 pricing): plan = the two replicated list walks, pack = the device pack kernels +
     !! their copyout transfers, wait = the single WAITALL. The residual of `gather` minus these three is recv/send posting + consume
     !! bookkeeping.
-    integer, parameter          :: PH_GWPLAN = 53
-    integer, parameter          :: PH_GWPACK = 54
-    integer, parameter          :: PH_GWWAIT = 55
-    integer, parameter          :: PH_N = 55
+    integer, parameter :: PH_GWPLAN = 53
+    integer, parameter :: PH_GWPACK = 54
+    integer, parameter :: PH_GWWAIT = 55
+    !> restr's internal split (the np16 rung made restr the largest inter-node growth): wave = s_amr_freg_wave (the F5b wire), rest
+    !! = the restrict kernels, rfp = the level>=2 reflux-to-parent applies.
+    integer, parameter          :: PH_RSWAVE = 56
+    integer, parameter          :: PH_RSREST = 57
+    integer, parameter          :: PH_RSRFP = 58
+    integer, parameter          :: PH_N = 58
     character(len=8), parameter :: PH_NAME(PH_N) = [character(len=8)::'halo','gather', 'gfill', 'seam', 'rhs', 'rk', 'reflux', &
               & 'regrid', 'L0', 'coarse', 'rg:halo', 'rg:tag', 'rg:clus', 'rg:shape', 'rg:mig', 'rg:build', 'rb:gath', 'rb:ovl', &
               & 'rb:push', 'rb:wait', 'rb:mem', 'rb:unpk', 'swap', 'rb:own', 'rb:upd', 'rb:pack', 'rb:rsv', 'rb:seam', 'rb:post', &
               & 'rb:geo', 'rb:slot', 'rb:tail', 'rb:send', 'rb:flush', 'rb:xchg', 'rb:rec', 'rb:topo', 'pg:all', 'pg:send', &
               & 'pg:recv', 'rf:p2p', 'rf:app', 'rf:recv', 'rf:wait', 'restr', 'rg:part', 'rg:move', 'mg:wait', 'mg:slot', &
-              & 'mg:pack', 'mg:unpk', 'mg:push', 'gw:plan', 'gw:pack', 'gw:wait']
+              & 'mg:pack', 'mg:unpk', 'mg:push', 'gw:plan', 'gw:pack', 'gw:wait', 'rs:wave', 'rs:rest', 'rs:rfp']
 
     real(wp) :: acc(PH_N) = 0._wp
     !> Entry count per phase. Time alone cannot distinguish "this region is slow" from "this region runs far more often than
