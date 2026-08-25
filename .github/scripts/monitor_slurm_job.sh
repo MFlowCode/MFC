@@ -90,6 +90,12 @@ is_terminal_state() {
 # failure reads as infrastructure (queue starvation), not a code/test failure.
 # Set SLURM_MAX_QUEUE_SECONDS=0 to wait indefinitely (previous behaviour).
 : "${SLURM_MAX_QUEUE_SECONDS:=5400}"   # 90 minutes
+# Fail loudly on a non-integer override rather than silently disabling the
+# budget (a bad `[ -gt ]` comparison would otherwise just skip the check).
+if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2
+  exit 1
+fi
 queue_start=$(date +%s)
 
 abort_queue_starvation() {
