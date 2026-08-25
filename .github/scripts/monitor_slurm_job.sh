@@ -82,13 +82,48 @@ is_terminal_state() {
   esac
 }
 
+# Bound how long the job may sit un-started in the scheduler queue.
+# Under a contended, preemptible QOS (e.g. Phoenix 'embers') a job can stay
+# PENDING for many hours, burning the entire CI job timeout, holding a
+# self-hosted runner slot hostage, and surfacing as an opaque ~8 h 'cancelled'.
+# Give up after a bounded queue wait with a loud, greppable message so the
+# failure reads as infrastructure (queue starvation), not a code/test failure.
+# Set SLURM_MAX_QUEUE_SECONDS=0 to wait indefinitely (previous behaviour).
+: "${SLURM_MAX_QUEUE_SECONDS:=5400}"   # 90 minutes
+queue_start=$(date +%s)
+
+abort_queue_starvation() {
+  local waited="$1"
+  echo "##[error]SLURM job $job_id did not start within ${waited}s (SLURM_MAX_QUEUE_SECONDS=$SLURM_MAX_QUEUE_SECONDS)."
+  echo "QUEUE STARVATION: the cluster scheduler could not start this job in time."
+  echo "This is an infrastructure / queue-availability problem, NOT a code or test failure."
+  echo "Cancelling the queued job so it does not keep holding a CI runner slot."
+  scancel "$job_id" 2>/dev/null || true
+  exit 75   # EX_TEMPFAIL — distinguishes queue starvation from a real test failure
+}
+
 # Wait for file to appear, using robust state checking.
-# Never give up due to transient squeue/sacct failures — the CI job timeout
-# is the ultimate backstop.
+# Never give up due to transient squeue/sacct failures — the queue-wait budget
+# above (or the CI job timeout) is the ultimate backstop.
 echo "Waiting for job to start..."
 unknown_count=0
 while [ ! -f "$output_file" ]; do
   state=$(get_job_state "$job_id")
+
+  # Enforce the queue-wait budget. A job that has actually started
+  # (RUNNING/COMPLETING) but whose output file is merely NFS-delayed is exempt,
+  # so a job that is already doing work is never killed here.
+  if [ "$SLURM_MAX_QUEUE_SECONDS" -gt 0 ]; then
+    case "$state" in
+      RUNNING|COMPLETING) ;;
+      *)
+        waited=$(( $(date +%s) - queue_start ))
+        if [ "$waited" -ge "$SLURM_MAX_QUEUE_SECONDS" ]; then
+          abort_queue_starvation "$waited"
+        fi
+        ;;
+    esac
+  fi
 
   case "$state" in
     PENDING|CONFIGURING|PREEMPTED)

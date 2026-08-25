@@ -34,8 +34,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Detect job type from submitted script basename
 script_basename="$(basename "$script_path" .sh)"
 case "$script_basename" in
-    bench*) job_type="bench" ;;
-    *)      job_type="test"  ;;
+    bench*)          job_type="bench" ;;
+    build-and-test*) job_type="buildtest" ;;
+    *)               job_type="test"  ;;
 esac
 
 # --- Cluster configuration ---
@@ -47,6 +48,10 @@ case "$cluster" in
         qos="embers"
         extra_sbatch="#SBATCH --requeue"
         test_time="03:00:00"
+        # Combined build+test runs both phases in one allocation (one queue
+        # wait instead of two). It needs headroom for the build on top of the
+        # test budget; kept modest so it still backfills well under 'embers'.
+        buildtest_time="03:30:00"
         bench_time="04:00:00"
         gpu_partition_dynamic=true
         ;;
@@ -85,11 +90,11 @@ case "$cluster" in
 esac
 
 # --- Time limit ---
-if [ "$job_type" = "bench" ]; then
-    sbatch_time="#SBATCH -t $bench_time"
-else
-    sbatch_time="#SBATCH -t $test_time"
-fi
+case "$job_type" in
+    bench)     sbatch_time="#SBATCH -t $bench_time" ;;
+    buildtest) sbatch_time="#SBATCH -t $buildtest_time" ;;
+    *)         sbatch_time="#SBATCH -t $test_time" ;;
+esac
 
 # --- Device-specific SBATCH options ---
 if [ "$device" = "cpu" ]; then
@@ -196,12 +201,14 @@ set -x
 cd "\$SLURM_SUBMIT_DIR"
 echo "Running in \$(pwd):"
 
-job_slug="$job_slug"
-job_device="$device"
-job_interface="$interface"
-job_shard="$shard"
-job_variant="$variant"
-job_cluster="$cluster"
+# Exported so a wrapper script (e.g. build-and-test.sh) can run build.sh and
+# test.sh as child processes that inherit these, not just inline this shell.
+export job_slug="$job_slug"
+export job_device="$device"
+export job_interface="$interface"
+export job_shard="$shard"
+export job_variant="$variant"
+export job_cluster="$cluster"
 export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 
 . ./mfc.sh load -c $compiler_flag -m $module_mode
