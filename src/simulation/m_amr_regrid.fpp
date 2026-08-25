@@ -879,16 +879,19 @@ contains
 
         if (ib) then
             ! body-containment expansion can make boxes overlap (bisection guarantees disjoint boxes, but two boxes near one body
-            ! both grow over it): merge overlapping pairs to a bbox until none remain - overlapping blocks would
-            ! double-restrict/reflux
+            ! both grow over it): merge pairs closer than a 2-cell gap to a bbox until none remain. Overlapping blocks would
+            ! double-restrict/reflux; a 1-cell gap with transverse overlap gives the two blocks a COINCIDENT outside coarse
+            ! cell, which the batched reflux apply writes from both blocks in ONE kernel - an unsynchronized read-modify-write
+            ! (the clusterer's min-separation merge guarantees a >= 2 gap everywhere else; this restores it after expansion).
             merged = .true.
             do while (merged)
                 merged = .false.
                 outer: do k = 1, nboxes - 1
                     do kk = k + 1, nboxes
-                        if (boxes(k)%lo(1) <= boxes(kk)%hi(1) .and. boxes(k)%hi(1) >= boxes(kk)%lo(1) .and. (n_glb == 0 &
-                            & .or. (boxes(k)%lo(2) <= boxes(kk)%hi(2) .and. boxes(k)%hi(2) >= boxes(kk)%lo(2))) .and. (p_glb == 0 &
-                            & .or. (boxes(k)%lo(3) <= boxes(kk)%hi(3) .and. boxes(k)%hi(3) >= boxes(kk)%lo(3)))) then
+                        if (boxes(k)%lo(1) <= boxes(kk)%hi(1) + 1 .and. boxes(k)%hi(1) >= boxes(kk)%lo(1) - 1 .and. (n_glb == 0 &
+                            & .or. (boxes(k)%lo(2) <= boxes(kk)%hi(2) + 1 .and. boxes(k)%hi(2) >= boxes(kk)%lo(2) - 1)) &
+                            & .and. (p_glb == 0 .or. (boxes(k)%lo(3) <= boxes(kk)%hi(3) + 1 .and. boxes(k)%hi(3) &
+                            & >= boxes(kk)%lo(3) - 1))) then
                             boxes(k)%lo = min(boxes(k)%lo, boxes(kk)%lo)
                             boxes(k)%hi = max(boxes(k)%hi, boxes(kk)%hi)
                             boxes(kk) = boxes(nboxes); nboxes = nboxes - 1

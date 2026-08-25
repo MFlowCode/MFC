@@ -270,6 +270,10 @@ contains
                     end if
                     ! serial (same rank count): had_data == this run's ownership, so this is the owned slot
                     call s_amr_alloc_slot(k)
+                    ! zero the whole host column first: the read fills only the interior, but the push below covers the
+                    ! full padded column, and since the device-native grow the host pad bytes are otherwise UNDEFINED
+                    ! (the old grow's device->host pull used to leave them as the device's zeros)
+                    amr_cons_st(:,:,:,:,amr_loc_of(k)) = 0._stp
                     do i = 1, sys_size
                         read (2) amr_cons_st(0:rm,0:rn,0:rp,i, amr_loc_of(k))
                     end do
@@ -405,6 +409,10 @@ contains
                 allocate (buf(max(cnt, 1)))
                 call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                           & status, ierr)
+                ! zero the whole host column first: the unpack fills only the interior, but the push covers the full
+                ! padded column, and since the device-native grow the host pad bytes are otherwise UNDEFINED. Owner only:
+                ! every rank walks the block loop for the collective reads, and a non-owner's amr_loc_of(k) is not a slot.
+                if (cnt > 0) amr_cons_st(:,:,:,:,amr_loc_of(k)) = 0._stp
                 idx = 0
                 do i = 1, sys_size
                     do fk = 0, amr_slots(k)%p

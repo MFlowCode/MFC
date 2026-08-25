@@ -124,9 +124,9 @@ module m_phase_timing
     !! suspected wait-bound rather than volume-bound. If mg:wait is most of rg:move, cutting migration VOLUME (SFC hysteresis) will
     !! not convert to time.
     integer, parameter :: PH_MGWAIT = 48
-    !> The rg:move work split (I4b pricing): slot = s_amr_alloc_slot_stash for received replicas (contains any host-staged store
-    !! GROWTH - see s_amr_st_reserve), pack = host pack + ISEND posting, unpk = host unpack of received columns, push = the
-    !! per-received-slot device update. The residual of rg:move minus these five is the overlap pre-passes.
+    !> The rg:move work split (I4b pricing): slot = s_amr_alloc_slot_stash for received replicas (contains any store GROWTH - see
+    !! s_amr_st_reserve), pack/unpk = the device pack/unpack kernels + their wire-slice transfers. mg:push is DEAD since the
+    !! device-side migration (the per-received-slot full push it timed is deleted); the id stays so old budgets parse.
     integer, parameter :: PH_MGSLOT = 49
     integer, parameter :: PH_MGPACK = 50
     integer, parameter :: PH_MGUNPK = 51
