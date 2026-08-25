@@ -7,6 +7,22 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-25 (19) — REG_GROW GOES DEVICE-NATIVE (the store-grow twin)
+
+`s_amr_reg_reserve`'s REG_GROW macro was the last growth path that round-tripped device
+data over PCIe: every register doubling pulled the WHOLE array (all 12 creg/freg
+arrays, ~1.4 MB/slot) to the host, restaged, and pushed back. It now mirrors
+s_amr_st_reserve exactly: below a 512-slot transient threshold (byte-equivalent of the
+store's 32-column cap) growth stages through a device temporary (copy/restore/zero
+kernels, no PCIe); above it the old host round trip remains as the OOM-safe path. The
+registers were already device-authoritative — every host consumer pulls its slot with
+GPU_UPDATE(host=...) immediately before reading (audited: m_amr.fpp wave/exchange
+paths, no whole-array host assignments exist) — so the host mirror coming out of a
+device-path growth undefined is the store's existing contract. The 5-step probe
+exercises the device branch on every rank (floor 64 -> immediate growth to the global
+block count at startup). GATES: bitcmp PASS vs the clip16k binary (byte-identical),
+AMR-75 75/75.
+
 ## 2026-08-25 (18) — THE OVERNIGHT PAIRS PRICED THE ATTRIBUTOR CLIFF; WORKAROUND ADOPTED IN-TREE
 
 The three k004-008 np8 pairs (differenced 240-40, 2 reps each) priced the 2026-08-24
