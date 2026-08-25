@@ -16,9 +16,9 @@ module m_sim_helpers
 
     private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names
 
-    !> Stability criterion currently limiting the adaptive time step (ICFL, VCFL, or CCFL)
+    !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, the collision cap, or the ramp limiter)
     character(len=4)                          :: dt_limiter = 'none'
-    character(len=4), dimension(3), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL'/)
+    character(len=4), dimension(4), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'COLL'/)
 
 contains
 

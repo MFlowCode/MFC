@@ -358,6 +358,7 @@ contains
         dt = dflt_real
         cfl_dt = .false.
         cfl_target = dflt_real
+        ramp_ratio = dflt_real
 
         t_step_stop = dflt_int
         t_step_save = dflt_int
@@ -488,6 +489,7 @@ contains
         ! Immersed Boundaries (sim-specific extras)
         ib_neighborhood_radius = 0
         collision_model = 0
+        collision_temporal_resolution = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real

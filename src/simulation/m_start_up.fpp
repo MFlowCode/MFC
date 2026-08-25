@@ -569,6 +569,7 @@ contains
         real(wp), intent(inout) :: time_avg
         integer                 :: i, eta_hh, eta_mm, eta_ss
         real(wp)                :: eta_sec
+        real(wp)                :: dt_floor
         character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
         if (cfl_dt) then
@@ -578,7 +579,14 @@ contains
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1.e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+            ! the collision restriction deliberately drops dt to collision_time/collision_temporal_resolution, so lower the
+            ! runaway-dt abort threshold below that cap when it is enabled
+            dt_floor = 1.e-3_wp*dt_init
+            if (collision_model > 0 .and. collision_temporal_resolution > 0) then
+                dt_floor = min(dt_floor, 1.e-3_wp*collision_time/real(collision_temporal_resolution, wp))
+            end if
+
+            if (dt < dt_floor .and. cfl_adap_dt .and. proc_rank == 0) then
                 print *, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if

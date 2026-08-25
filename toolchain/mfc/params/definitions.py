@@ -365,6 +365,8 @@ CONSTRAINTS = {
     "t_step_save": {"min": 1},
     "t_step_print": {"min": 1},
     "cfl_target": {"min": 0},
+    "collision_temporal_resolution": {"min": 1},
+    "ramp_ratio": {"min": 1},
     # WENO
     "weno_eps": {"min": 0},
     # MUSCL
@@ -431,6 +433,16 @@ DEPENDENCIES = {
     "collision_model": {
         "when_set": {
             "requires": ["ib", "coefficient_of_restitution", "collision_time"],
+        }
+    },
+    "collision_temporal_resolution": {
+        "when_set": {
+            "requires": ["collision_model", "cfl_adap_dt"],
+        }
+    },
+    "ramp_ratio": {
+        "when_set": {
+            "requires": ["cfl_adap_dt"],
         }
     },
     "acoustic_source": {
@@ -591,7 +603,7 @@ def _load():
         _r(n, INT, {"time"})
     _r("dt", REAL, {"time"}, math=r"\f$\Delta t\f$")
     _r("cfl_target", REAL, {"time"}, math=r"\f$\mathrm{CFL}\f$")
-    for n in ["adap_dt_tol", "t_stop", "t_save"]:
+    for n in ["adap_dt_tol", "t_stop", "t_save", "ramp_ratio"]:
         _r(n, REAL, {"time"})
     for n in ["cfl_adap_dt", "cfl_const_dt", "cfl_dt", "adap_dt"]:
         _r(n, LOG, {"time"})
@@ -664,6 +676,7 @@ def _load():
     _r("ib_neighborhood_radius", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
+    _r("collision_temporal_resolution", INT, {"ib"})
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
     _r("ib_coefficient_of_friction", REAL, {"ib"})
@@ -1386,6 +1399,8 @@ _nv(
     "turb_pos",
     "synth_L",
     "collision_model",
+    "collision_temporal_resolution",
+    "ramp_ratio",
     "coefficient_of_restitution",
     "collision_time",
     "ib_coefficient_of_friction",

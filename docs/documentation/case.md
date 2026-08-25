@@ -362,6 +362,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `coefficient_of_restitution`     | Real    | A number 0 to 1 describing how elastic IB collisions are |
 | `collision_model`     | Integer    | Integer to select the collision model being used for IB collisions. |
 | `collision_time`     | Real    | Amount of simulation time used to resolve collisions |
+| `collision_temporal_resolution`     | Integer    | Minimum number of adaptive time steps used to resolve each collision |
 | `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
@@ -411,6 +412,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collision checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
 
 - `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring constant used to apply collision forces.
+
+- `collision_temporal_resolution` restricts the adaptive time step (`cfl_adap_dt`) to at most `collision_time / collision_temporal_resolution` while any collision is occurring, so that each collision is resolved with at least that many time steps. Pairing it with `ramp_ratio` limits how quickly the time step grows back once the collision ends.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
@@ -536,6 +539,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `cfl_const_dt`             | Logical | CFL based non-adaptive time-stepping |
 | `cfl_dt`                   | Logical | Enable CFL-based time stepping |
 | `cfl_target`               | Real    | Specified CFL value |
+| `ramp_ratio`               | Real    | Maximum factor by which the adaptive time step may grow per time step |
 | `n_start`                  | Integer | Save file from which to start simulation |
 | `t_save`                   | Real    | Time duration between data output |
 | `t_stop`                   | Real    | Simulation stop time |
@@ -697,6 +701,8 @@ To restart the simulation from $k$-th time step, set `t_step_start = k`; see @re
 - `cfl_const_dt` enables constant `dt` time-stepping where `dt` results in a specified CFL for the initial condition
 
 - `cfl_target` specifies the target CFL value
+
+- `ramp_ratio` limits how much the adaptive time step can grow from one time step to the next: `dt` is capped at `ramp_ratio` times the previous `dt`. Must be at least 1. When unset, the time step growth is unlimited.
 
 - `n_start` specifies the save file to start at
 
