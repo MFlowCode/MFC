@@ -370,3 +370,21 @@ receivers H2D after the WAITALL. Tags: `amr_tag_base(5) + mod(epoch, 50)`, freg 
 per-box baseline); `amr_fw_rblk` tracks the expected box order at consume.
 `s_amr_reg_reserve(amr_num_blocks)` runs FIRST in both waves — the apply can reallocate
 `freg`, and a recv posted into a stale mirror is a silent wrong-memory write.
+
+### Ring-clip-on-waves implementation binding (2026-08-24)
+
+The stepfill clip (`amr_stepfill_ring_clip.md` — the dead-byte proof survived the
+revert) is applied inside the stage-fill wave's TWO plan walks: after each pair's
+`s_amr_box_isect`, the slab is fed through `s_amr_shell_clip` against the box's shell
+(`s_amr_shell_slabs` of the padded patch minus the open core [region_lo+1,
+region_hi-1]; collapsed dims pass 0 so they never cut). Up to 6 sub-slabs replace the
+one transfer; both walks derive the identical list from replicated metadata, so the
+no-metadata-exchange property is untouched, and pack/unpack/consume — already generic
+over (bl, bh) — need no change. Messages stay at the per-peer count; only payload
+words drop (F1 -61% on the S0 probe). The consume's own-box copy becomes shell-only
+(`s_amr_gather_own_shell_device`), which is what arms the debug NaN-poison gate
+(`s_amr_poison_patch_device` floods the patch first; any consumer read of an unshipped
+cell aborts within a step). The pbmv gather (F3) keeps its full-box wire contract, so
+`do_pbmv` runs take the unclipped single-slab path — extending the clip to qbmm needs
+its own dead-byte analysis. All four primitives are lifted verbatim from the reverted
+implementation (archived: amr-bench/notes/ringclip_original_m_amr.fpp.txt).

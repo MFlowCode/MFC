@@ -7,6 +7,26 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-24 (17) — RING CLIP RE-LANDED ON THE WAVES: F1 wire -61%, output byte-identical
+
+The reverted clip (proven correct, killed by the amdflang codegen bug, root-caused and
+workaround-verified since) is reimplemented on the wave plan walks: after each pair's
+box intersection, the slab is clipped against the patch's hollow shell (open core
+[region_lo+1, region_hi-1] is provably dead — `amr_stepfill_ring_clip.md` survived the
+revert and carries the proof), yielding up to 6 sub-slab transfers derived identically
+on both sides from replicated metadata. The primitives (`s_amr_shell_slabs`,
+`s_amr_shell_clip`, the debug NaN-poison arm, the shell-only own-box copy) are lifted
+VERBATIM from the reverted implementation; pack/unpack/consume were already generic
+over (bl, bh), so sub-slabs are just more transfers. The pbmv gather keeps its
+full-box wire contract (qbmm+non-polytropic runs stay unclipped, as the original
+deliberately did). Messages stay at the per-peer count (381); only payload drops.
+
+GATES: F1 words 1,071,084,168 -> 416,141,172 (-61%) with msgs unchanged and every
+other family byte-identical; step-5 output BYTE-IDENTICAL (the dead-byte proof holds
+on the waves); debug probe with the NaN-poison arm LIVE (any consumer read of an
+unshipped cell aborts); seeded header arm; AMR-75; wall not in the slow codegen class
+(the original blocker); the wall pair queues behind the fix/feature pairs.
+
 ## 2026-08-24 (16) — THE ADVERSARIAL REVIEW ROUND: three findings on the day's four commits, all fixed
 
 The four rapid increments got their overdue adversarial review; it returned one
