@@ -56,8 +56,17 @@ if engine == 'batch':
                     srun --ntasks ${nodes*tasks_per_node}       \
                         "${target.get_install_binpath(case)}")
             elif [ "$binary" == "mpirun" ]; then
+                # Open MPI's default slot count is the PHYSICAL core count, so a small
+                # machine (a 2-core CI runner, a laptop) refuses -np 4 outright before
+                # the binary ever runs; --oversubscribe lifts the slot cap so the run
+                # the user asked for starts. MPICH's mpirun has no slot cap and no such
+                # flag, so gate on the launcher actually being Open MPI.
+                oversub=""
+                if $binary --version 2> /dev/null | grep -q "Open MPI"; then
+                    oversub="--oversubscribe"
+                fi
                 (set -x; ${profiler}     \
-                    $binary -np ${nodes*tasks_per_node}            \
+                    $binary -np ${nodes*tasks_per_node} $oversub   \
                             "${target.get_install_binpath(case)}")
             elif [ "$binary" == "mpiexec" ]; then
                 (set -x; ${profiler}                               \
