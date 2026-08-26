@@ -504,18 +504,27 @@ contains
             ! Coexist (amr .and. l0_ntile>0): the L0 coarse RHS IS needed - after the tiles->L0 scatter above it fills L0's BC+halo
             ! (s_populate_variables_buffers), captures the c/f-face creg in the fixed L0 frame, and produces the L0 rhs the fine
             ! reflux corrects; the cross-rank copy-back then routes that corrected rhs back to the tile compute-owners.
-            if (l0_ntile == 0 .or. amr) then
+            ! LOCK-STEP COEXIST DEFERS THIS CALL past the fine advance: on that path the L0 rhs values are discarded
+            ! (zeroed at the deferred site) and the call's only externally consumed products are the c/f-face creg
+            ! captures phase 4's apply_reflux reads plus its internal PRIM ghost fill (self-contained: the fine fill
+            ! prolongs from CONS ghosts via its own exchange). Running it AFTER the fine advance absorbs cross-rank
+            ! stage skew where ranks are best synchronized (rhs imbalance ~1.14) rather than at the stage top (measured
+            ! coarse imbalance 1.58 at np16) - same inputs (q_cons_ts(1) is written only by the stage-top scatter), so
+            ! byte-identical. The monolithic and pure-AMR paths keep the original position (their rhs/prim products ARE
+            ! consumed before the fine phases), and so does subcycle coexist (its reflux runs on the fold path, not
+            ! phase 4).
+            if (l0_ntile == 0 .or. (amr .and. (amr_subcycle .or. chemistry))) then
                 call s_phase_tic(PH_COARSE)
                 call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                    & t_step, s)
                 call s_phase_toc(PH_COARSE)
             end if
 
-            ! Coexist: the tiles carry their OWN rhs, so the L0 rhs above is not consumed by the coarse RK - repurpose it as the
-            ! Berger-Colella reflux-delta accumulator. Zero the interior so the per-fine-block s_amr_apply_reflux calls below fill
-            ! rhs_vf with the PURE delta (from zero), which s_l0_add_reflux_to_tiles then routes additively to each covering tile's
-            ! rhs (the delta is nonzero only in the thin coarse-cell shell just outside each c/f face).
-            if (amr .and. l0_ntile > 0) then
+            ! Coexist subcycle/chemistry keep the stage-top call + zeroing (the deferred site below covers the rest):
+            ! subcycle refluxes on the fold path, and chemistry's coarse-vs-fine q_T_sf write order must not swap.
+            ! The tiles carry their OWN rhs, so the L0 rhs above is repurposed as the Berger-Colella reflux-delta
+            ! accumulator.
+            if (amr .and. l0_ntile > 0 .and. (amr_subcycle .or. chemistry)) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
@@ -599,6 +608,27 @@ contains
                 ! I5-F5a: ALL level-1 face exchanges as one wave (zero-copy into the freg register mirrors), then ONE
                 ! batched apply - the exchange set and apply set are both order-free (disjoint register slots; disjoint
                 ! rhs corrections by the merge invariant), so the split and the batching are both legal.
+                ! Coexist lock-step: the DEFERRED L0 coarse RHS (see the stage-top comment) - creg(L0) must exist
+                ! before the apply below reads it, and the zeroing makes rhs_vf the pure reflux-delta accumulator
+                ! (nonzero only in the thin coarse-cell shell just outside each c/f face) that
+                ! s_l0_add_reflux_to_tiles routes additively to each covering tile's rhs.
+                if (l0_ntile > 0 .and. .not. chemistry) then
+                    call s_phase_tic(PH_COARSE)
+                    call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, &
+                                       & rhs_mv, t_step, s)
+                    call s_phase_toc(PH_COARSE)
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = 1, sys_size
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    rhs_vf(i)%sf(j, k, l) = 0._wp
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
                 call s_phase_tic(PH_REFLUX)
                 call s_phase_tic(PH_RFP2P); call s_amr_reflux_faces_wave(); call s_phase_toc(PH_RFP2P)
                 ! coarse update sees the fine flux at c/f faces: ONE batched call corrects the L0 rhs for every level-1
