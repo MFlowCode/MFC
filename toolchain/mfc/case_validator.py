@@ -234,13 +234,9 @@ PHYSICS_DOCS = {
             "relaxation also runs on each fine block); num_fluids > 1 additionally requires "
             "mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha "
             "consistency). "
-            "Supports Euler-Euler bubbles (bubbles_euler), including non-polytropic (polytropic = F, "
-            "pb/mv carried as conservative moments) and polydisperse (nb > 1) configurations: the "
-            "flux-based bubble moments are refluxed and prolongation floors the positive moments "
-            "(radius, and non-polytropic partial-pressure/vapor-mass) for realizability. Polytropic QBMM "
-            "(qbmm = T, polytropic = T) is supported: its six-moment set lives in the conserved variables "
-            "(pb/mv inert) and is prolonged piecewise-constant so each fine cell inherits the coarse cell's "
-            "realizable moment set (CHyQMOM needs radius variance c20 > 0). "
+            "Euler-Euler bubbles (bubbles_euler, and with them QBMM) are not supported with amr: "
+            "their mpp_lim pre-conversion rescale and pb/mv quadrature side-state would force "
+            "per-block special cases through the batched advance, so the support was retired. "
             "Supports phase change (relax): the cell-local, mass/energy-conserving relaxation runs "
             "on the fine solution before restriction (matching the coarse once-per-step timing). "
             "Supports chemistry reactions, advection, and species diffusion (single- and multi-rank): the "
@@ -254,10 +250,8 @@ PHYSICS_DOCS = {
             "geometry, and the fine advance applies the IB state correction on the block, so the bodies "
             "are resolved on the refined level. Limited to non-STL bodies on a static block "
             "(amr_regrid_int = 0); force-driven moving IB, STL IB, and dynamic-regrid-with-IB are gated "
-            "pending validation. Hypoelasticity (with continuum damage) is supported; polytropic QBMM is "
-            "supported; non-polytropic QBMM is fully supported, including dynamic regrid and subcycling (each "
-            "block carries its own pb/mv quadrature side-state, prolonged piecewise-constant and "
-            "restricted back with the moments). Acoustic sources are supported: the source acts on the coarse grid; its support "
+            "pending validation. Hypoelasticity (with continuum damage) is supported. "
+            "Acoustic sources are supported: the source acts on the coarse grid; its support "
             "must not overlap the user-placed initial block (checked at startup), and under dynamic "
             "regrid the source region stays coarse (tags are suppressed over the support and candidate "
             "boxes are clipped clear of it). "
@@ -1467,6 +1461,7 @@ class CaseValidator:
         self.prohibit(recon_type is not None and recon_type != 1 and not igr, "amr requires WENO reconstruction (recon_type = 1) or the IGR solver")
         self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
+        self.prohibit(self.get("bubbles_euler", "F") == "T", "amr does not support Euler-Euler bubbles (bubbles_euler)")
         mpp_lim = self.get("mpp_lim", "F") == "T"
         self.prohibit(
             num_fluids is not None and num_fluids > 1 and not mpp_lim and not bubbles_lagrange,
