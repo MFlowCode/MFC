@@ -528,8 +528,8 @@ contains
                                 pres_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
                                 pres_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms
-                                E_R = gamma_R*pres_R + pi_inf_R + 5.e-1_wp*rho_R*vel_R_rms
+                                call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
+                                call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
