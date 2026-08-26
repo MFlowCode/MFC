@@ -50,6 +50,9 @@ class PlaybookEntry:
     tags: List[str]
 
 
+LEVEL_EMOJI = {"Beginner": "🟢", "Intermediate": "🟡", "Advanced": "🔴"}
+
+
 # Curated list of hero examples
 PLAYBOOK_EXAMPLES = [
     PlaybookEntry(
@@ -130,25 +133,11 @@ def summarize_case_params(params: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def get_model_name(model_eqns: int | None) -> str:
-    """Get human-friendly model name from schema."""
-    if model_eqns is None:
+def _value_label_or_default(param: str, value: int | None) -> str:
+    """Get a parameter value's human-friendly name from the schema, or "Not specified"."""
+    if value is None:
         return "Not specified"
-    return get_value_label("model_eqns", model_eqns) or "Not specified"
-
-
-def get_riemann_solver_name(solver: int | None) -> str:
-    """Get Riemann solver name from schema."""
-    if solver is None:
-        return "Not specified"
-    return get_value_label("riemann_solver", solver) or "Not specified"
-
-
-def get_time_stepper_name(stepper: int | None) -> str:
-    """Get time stepper name from schema."""
-    if stepper is None:
-        return "Not specified"
-    return get_value_label("time_stepper", stepper) or "Not specified"
+    return get_value_label(param, value) or "Not specified"
 
 
 def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:
@@ -156,7 +145,7 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:
     lines = []
 
     tags_str = " · ".join(entry.tags)
-    level_emoji = {"Beginner": "🟢", "Intermediate": "🟡", "Advanced": "🔴"}.get(entry.level, "")
+    level_emoji = LEVEL_EMOJI.get(entry.level, "")
 
     lines.append("<details>")
     lines.append(f"<summary><b>{entry.title}</b> {level_emoji} <i>{entry.level}</i> · <code>{entry.case_dir}</code></summary>\n")
@@ -164,7 +153,7 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:
     lines.append(f"**Tags:** {tags_str}\n")
 
     lines.append("**Physics Configuration:**\n")
-    lines.append(f"- **Model:** {get_model_name(summary['model_eqns'])} (`model_eqns = {summary['model_eqns']}`)")
+    lines.append(f"- **Model:** {_value_label_or_default('model_eqns', summary['model_eqns'])} (`model_eqns = {summary['model_eqns']}`)")
 
     if summary["num_fluids"] is not None:
         lines.append(f"- **Number of fluids:** {summary['num_fluids']}")
@@ -216,11 +205,11 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:
         lines.append(f"- **Reconstruction:** MUSCL (order {summary['muscl_order']})")
 
     if summary["riemann_solver"]:
-        solver_name = get_riemann_solver_name(summary["riemann_solver"])
+        solver_name = _value_label_or_default("riemann_solver", summary["riemann_solver"])
         lines.append(f"- **Riemann solver:** {solver_name} (`riemann_solver = {summary['riemann_solver']}`)")
 
     if summary["time_stepper"]:
-        stepper_name = get_time_stepper_name(summary["time_stepper"])
+        stepper_name = _value_label_or_default("time_stepper", summary["time_stepper"])
         lines.append(f"- **Time stepping:** {stepper_name}")
 
     # Links
@@ -259,13 +248,12 @@ def generate_playbook() -> str:
     )
 
     # Group by level
-    for level in ["Beginner", "Intermediate", "Advanced"]:
+    for level in LEVEL_EMOJI:
         level_entries = [e for e in PLAYBOOK_EXAMPLES if e.level == level]
         if not level_entries:
             continue
 
-        level_emoji = {"Beginner": "🟢", "Intermediate": "🟡", "Advanced": "🔴"}.get(level, "")
-        lines.append(f"\n### {level_emoji} {level} Examples\n")
+        lines.append(f"\n### {LEVEL_EMOJI[level]} {level} Examples\n")
 
         for entry in level_entries:
             try:

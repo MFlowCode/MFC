@@ -17,8 +17,6 @@ from .user_guide import (
     is_first_time_user,
     print_command_help,
     print_help,
-    print_help_topics,
-    print_topic_help,
     print_welcome,
 )
 
@@ -96,15 +94,6 @@ def parse(config: MFCConfig):
         print_help()
         sys.exit(0)
 
-    # Handle 'help' command
-    if args["command"] == "help":
-        topic = args.get("topic")
-        if topic:
-            print_topic_help(topic)
-        else:
-            print_help_topics()
-        sys.exit(0)
-
     # Resolve command aliases
     if args["command"] in COMMAND_ALIASES:
         args["command"] = COMMAND_ALIASES[args["command"]]
@@ -112,7 +101,7 @@ def parse(config: MFCConfig):
     # Add default arguments of other subparsers
     # This ensures all argument keys exist even for commands that don't define them
     # Only process subparsers that have common arguments we need
-    relevant_subparsers = ["run", "test", "build", "clean", "count", "count_diff", "validate", "viz"]
+    relevant_subparsers = ["run", "test", "build", "clean", "count", "validate", "viz"]
     for name in relevant_subparsers:
         if args["command"] == name:
             continue
