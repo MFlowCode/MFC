@@ -166,8 +166,8 @@ contains
                                 alpha_R = alpha_R/max(alpha_R_sum, sgm_eps)
                             end if
 
-                            call s_accumulate_mixture_properties(num_fluids, alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_L)
-                            call s_accumulate_mixture_properties(num_fluids, alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
+                            call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_L)
+                            call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
                             if (viscous) then
                                 call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
@@ -223,8 +223,8 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             else
-                                call s_compute_energy(pres_L, rho_L, gamma_L, pi_inf_L, qv_L, vel_L_rms, E_L)
-                                call s_compute_energy(pres_R, rho_R, gamma_R, pi_inf_R, qv_R, vel_R_rms, E_R)
+                                call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
+                                call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
                             end if

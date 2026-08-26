@@ -25,9 +25,9 @@ module m_variables_conversion
         & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
-        & s_compute_species_fraction, s_accumulate_mixture_properties, s_compute_energy, s_compute_speed_of_sound, &
-        & s_compute_speed_of_sound_avg, &
-        & s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+        & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, &
+        & s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, gammas, &
+        & gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -218,23 +218,16 @@ contains
         if (present(G_K)) G_K = 0._wp
 
         ! Constrain partial densities and volume fractions within physical bounds
-        if (num_fluids == 1 .and. bubbles_euler) then
-            rho_K = alpha_rho_K(1)
-            gamma_K = gammas(1)
-            pi_inf_K = pi_infs(1)
-            qv_K = qvs(1)
-        else
-            if (mpp_lim) then
-                alpha_K_sum = 0._wp
-                do i = 1, num_fluids
-                    alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
-                    alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
-                    alpha_K_sum = alpha_K_sum + alpha_K(i)
-                end do
-                alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
-            end if
-            call s_accumulate_mixture_properties(num_fluids, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
+        if (mpp_lim) then
+            alpha_K_sum = 0._wp
+            do i = 1, num_fluids
+                alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
+                alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
+                alpha_K_sum = alpha_K_sum + alpha_K(i)
+            end do
+            alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
         end if
+        call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
 
         if (present(G_K)) then
             G_K = 0._wp
@@ -1193,39 +1186,50 @@ contains
 
     end subroutine s_finalize_variables_conversion_module
 
-    !> Accumulate stiffened-gas mixture coefficients over the first nf fluids.
+    !> Mixture coefficients of one state: density, stiffened-gas gamma and stiffness, and heat of formation.
     !!
-    !! This is the only implementation of the stiffened-gas mixture rule. It is deliberately not merged
-    !! with s_convert_species_to_mixture_variables_kernel, which additionally clips and renormalises
-    !! alpha_K in place under mpp_lim, special-cases num_fluids == 1 with bubbles_euler, and optionally
-    !! returns Re_K and G_K. Merging would need a clipping flag and optional dummies on a [seq] device
-    !! routine, which is not portable across the offload backends.
+    !! This is the single definition of the coefficient rule, including its one special case. Under
+    !! bubbles_euler with num_fluids == 1 the sole advection slot aliases the void fraction
+    !! (eqn_idx%alf == eqn_idx%adv%end), so `alpha` there is not a composition and the mixture rule
+    !! does not apply: the coefficients are those of the liquid, fluid 1.
     !!
-    !! nf is not always num_fluids: the bubbles path in m_riemann_solver_hllc passes num_fluids - 1 to
-    !! exclude the gas phase, and one site passes limited volume fractions rather than the raw ones.
-    subroutine s_accumulate_mixture_properties(nf, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
+    !! Volume-fraction clipping is deliberately left to callers. It is not uniform - m_riemann_solver_hll
+    !! clips its local arrays while m_riemann_solver_hllc clips the shared reconstruction buffers in
+    !! place, which has consumers downstream - and it can never coincide with the special case above,
+    !! because case_validator prohibits mpp_lim with num_fluids == 1.
+    subroutine s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
 
-        $:GPU_ROUTINE(function_name='s_accumulate_mixture_properties', parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients', parallelism='[seq]', cray_inline=True)
 
-        integer, intent(in)                 :: nf  !< Number of fluids to accumulate over
-        real(wp), dimension(nf), intent(in) :: alpha_rho_K, alpha_K
-        real(wp), intent(out)               :: rho_K, gamma_K, pi_inf_K, qv_K
-        integer                             :: i   !< Loop iterator over fluids
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha_rho_K, alpha_K
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
+        #:endif
+        real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
+        integer               :: i  !< Loop iterator over fluids
 
-        rho_K = 0._wp
-        gamma_K = 0._wp
-        pi_inf_K = 0._wp
-        qv_K = 0._wp
+        if (num_fluids == 1 .and. bubbles_euler) then
+            rho_K = alpha_rho_K(1)
+            gamma_K = gammas(1)
+            pi_inf_K = pi_infs(1)
+            qv_K = qvs(1)
+        else
+            rho_K = 0._wp
+            gamma_K = 0._wp
+            pi_inf_K = 0._wp
+            qv_K = 0._wp
 
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, nf
-            rho_K = rho_K + alpha_rho_K(i)
-            gamma_K = gamma_K + alpha_K(i)*gammas(i)
-            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-            qv_K = qv_K + alpha_rho_K(i)*qvs(i)
-        end do
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                rho_K = rho_K + alpha_rho_K(i)
+                gamma_K = gamma_K + alpha_K(i)*gammas(i)
+                pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+            end do
+        end if
 
-    end subroutine s_accumulate_mixture_properties
+    end subroutine s_compute_mixture_coefficients
 
     !> Total energy per unit volume of a stiffened-gas state.
     !!
@@ -1236,12 +1240,20 @@ contains
     !! The chemistry and relativistic branches of the Riemann solvers do not use this relation at all -
     !! chemistry builds E from the mixture internal energy and the relativistic form is unrelated - so
     !! those sites are deliberately left open-coded.
-    subroutine s_compute_energy(pres, rho, gamma, pi_inf, qv, vel_sum, E)
+    subroutine s_compute_energy(pres, alpha_rho_K, alpha_K, vel_sum, E)
 
         $:GPU_ROUTINE(function_name='s_compute_energy', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in)  :: pres, rho, gamma, pi_inf, qv, vel_sum
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha_rho_K, alpha_K
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
+        #:endif
+        real(wp), intent(in)  :: pres, vel_sum
         real(wp), intent(out) :: E
+        real(wp)              :: rho, gamma, pi_inf, qv
+
+        call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho, gamma, pi_inf, qv)
 
         E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
 

@@ -122,21 +122,8 @@ contains
                                 end if
                             end if
 
-                            ! Sum properties of all fluid components
-                            rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
-                            rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                rho%L = rho%L + alpha_rho_L(i)
-                                gamma%L = gamma%L + alpha_L(i)*gammas(i)
-                                pi_inf%L = pi_inf%L + alpha_L(i)*pi_infs(i)
-                                qv%L = qv%L + alpha_rho_L(i)*qvs(i)
-
-                                rho%R = rho%R + alpha_rho_R(i)
-                                gamma%R = gamma%R + alpha_R(i)*gammas(i)
-                                pi_inf%R = pi_inf%R + alpha_R(i)*pi_infs(i)
-                                qv%R = qv%R + alpha_rho_R(i)*qvs(i)
-                            end do
+                            call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho%L, gamma%L, pi_inf%L, qv%L)
+                            call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho%R, gamma%R, pi_inf%R, qv%R)
 
                             pres_mag%L = 0.5_wp*sum(B%L**2._wp)
                             pres_mag%R = 0.5_wp*sum(B%R**2._wp)

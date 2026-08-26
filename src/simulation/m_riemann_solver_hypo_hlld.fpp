@@ -317,21 +317,8 @@ contains
                                 pTot_R = pTot_L
                             end if
 
-                            ! Sum properties of all fluid components
-                            rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
-                            rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                rho%L = rho%L + alpha_rho_L(i)
-                                gamma%L = gamma%L + alpha_L(i)*gammas(i)
-                                pi_inf%L = pi_inf%L + alpha_L(i)*pi_infs(i)
-                                qv%L = qv%L + alpha_rho_L(i)*qvs(i)
-
-                                rho%R = rho%R + alpha_rho_R(i)
-                                gamma%R = gamma%R + alpha_R(i)*gammas(i)
-                                pi_inf%R = pi_inf%R + alpha_R(i)*pi_infs(i)
-                                qv%R = qv%R + alpha_rho_R(i)*qvs(i)
-                            end do
+                            call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho%L, gamma%L, pi_inf%L, qv%L)
+                            call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho%R, gamma%R, pi_inf%R, qv%R)
 
                             G_L = 0._wp; G_R = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
@@ -340,8 +327,8 @@ contains
                                 G_R = G_R + alpha_R(i)*Gs_rs(i)
                             end do
 
-                            call s_compute_energy(pres%L, rho%L, gamma%L, pi_inf%L, qv%L, vel_rms%L, E%L)
-                            call s_compute_energy(pres%R, rho%R, gamma%R, pi_inf%R, qv%R, vel_rms%R, E%R)
+                            call s_compute_energy(pres%L, alpha_rho_L, alpha_L, vel_rms%L, E%L)
+                            call s_compute_energy(pres%R, alpha_rho_R, alpha_R, vel_rms%R, E%R)
 
                             ! Freeze the thermal/kinetic enthalpy used by the EOS sound-speed call before
                             ! adding hypoelastic strain energy to the conservative total energy.
