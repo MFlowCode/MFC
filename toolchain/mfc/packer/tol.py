@@ -6,6 +6,28 @@ from .pack import Pack
 
 Tolerance = Error
 
+# A field whose entire golden content lies within this fraction of the case's largest field
+# is zero to double precision: what it stores is roundoff seeded by the large fields, not a
+# solution. Comparing it pointwise tests the compiler's association order rather than the
+# solver, so any mathematically exact change flips the sign of a crumb and fails. The
+# property worth checking is the physical one - that the field stays zero.
+ZERO_FIELD_REL = 1e-13
+
+
+def _magnitudes(values: typing.List[float]) -> typing.List[float]:
+    return [abs(v) for v in values if not math.isnan(v)]
+
+
+def _zero_floor(golden: Pack) -> float:
+    """Magnitude below which a field carries no information, set by the case's dominant scale."""
+    scales = [max(m) for m in (_magnitudes(e.doubles) for e in golden.entries.values()) if m]
+    return ZERO_FIELD_REL * max(scales, default=0.0)
+
+
+def _is_zero_field(values: typing.List[float], floor: float) -> bool:
+    mags = _magnitudes(values)
+    return bool(mags) and max(mags) <= floor
+
 
 def is_close(error: Error, tolerance: Tolerance) -> bool:
     if error.absolute <= tolerance.absolute:
@@ -60,6 +82,8 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
     if len(candidate.entries) != len(golden.entries):
         return None, "Line count does not match."
 
+    floor = _zero_floor(golden)
+
     # For every entry in the golden's pack
     for gFilepath, gEntry in golden.entries.items():
         # Find the corresponding entry in the candidate's pack
@@ -71,6 +95,21 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
         # Compare variable-count
         if len(gEntry.doubles) != len(cEntry.doubles):
             return None, f"Variable count didn't match for {gFilepath}."
+
+        # A field that is zero in the golden is checked for staying zero, not for
+        # reproducing its roundoff. This also closes a hole: a golden value of exactly 0
+        # gives a NaN relative error, which is_close() passes unconditionally, so such a
+        # field was previously not checked at all.
+        if _is_zero_field(gEntry.doubles, floor):
+            reached = max(_magnitudes(cEntry.doubles), default=0.0)
+            if any(math.isnan(v) for v in cEntry.doubles):
+                return None, f"{gFilepath} is zero in the golden but is NaN in the pack file."
+            if reached > floor:
+                return (
+                    None,
+                    f"{gFilepath} is zero in the golden (all values below {floor:.2E}) " f"but reaches {reached:.2E} in the candidate.",
+                )
+            continue
 
         # Check if each variable is within tolerance
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):
@@ -124,9 +163,15 @@ def find_maximum_errors_among_failing(
     max_rel_error = -1.0
     max_rel_info = None
 
+    floor = _zero_floor(golden)
+
     for gFilepath, gEntry in golden.entries.items():
         cEntry = candidate.find(gFilepath)
         if cEntry is None:
+            continue
+
+        # Not compared by compare(); reporting it would point at a field that cannot fail.
+        if _is_zero_field(gEntry.doubles, floor):
             continue
 
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):
