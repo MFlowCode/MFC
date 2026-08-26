@@ -270,16 +270,22 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
 
-                                @:compute_average_state()
+                                ! Only the pressure-based wave-speed estimate reads the averaged state, and the Roe
+                                ! average costs eight square roots per face.
+                                if (wave_speeds == wave_speeds_pressure) then
+                                    @:compute_average_state()
+                                end if
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R)
 
-                                !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                ! variables are placeholders to call the subroutine.
-                                call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
-                                                                  & H_avg, 0._wp, alpha_R, c_avg)
+                                ! Only the pressure-based wave-speed estimate reads the averaged state, and building it
+                                ! costs eight square roots per face under the Roe average.
+                                if (wave_speeds == wave_speeds_pressure) then
+                                    call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
+                                                                      & H_avg, 0._wp, alpha_R, c_avg)
+                                end if
 
                                 if (viscous) then
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -627,10 +633,12 @@ contains
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R)
 
-                                !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                ! variables are placeholders to call the subroutine.
-                                call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
-                                                                  & H_avg, 0._wp, alpha_R, c_avg)
+                                ! Only the pressure-based wave-speed estimate reads the averaged state, and building it
+                                ! costs eight square roots per face under the Roe average.
+                                if (wave_speeds == wave_speeds_pressure) then
+                                    call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
+                                                                      & H_avg, 0._wp, alpha_R, c_avg)
+                                end if
 
                                 if (viscous) then
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -1030,16 +1038,22 @@ contains
                                         H_R = (E_R + pres_R)/rho_R
                                     #:endif
 
-                                    @:compute_average_state()
+                                    ! Only the pressure-based wave-speed estimate reads the averaged state, and the Roe
+                                    ! average costs eight square roots per face.
+                                    if (wave_speeds == wave_speeds_pressure) then
+                                        @:compute_average_state()
+                                    end if
 
                                     call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
 
                                     call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R)
 
-                                    !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
-                                    !  variables are placeholders to call the subroutine.
-                                    call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
-                                                                      & H_avg, c_sum_Yi_Phi, alpha_R, c_avg)
+                                    ! Only the pressure-based wave-speed estimate reads the averaged state, and building it
+                                    ! costs eight square roots per face under the Roe average.
+                                    if (wave_speeds == wave_speeds_pressure) then
+                                        call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, &
+                                                                          & vel_avg_rms, H_avg, c_sum_Yi_Phi, alpha_R, c_avg)
+                                    end if
 
                                     if (viscous) then
                                         if (chemistry) then
