@@ -45,6 +45,19 @@ if [ "$job_cluster" != "phoenix" ] && [ "$job_cluster" != "frontier_amd" ]; then
         ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
     done
     echo "=== All case-optimized binaries built ==="
+    build_opts=""
+else
+    # Nothing was built here, so `mfc.sh run` must not build either. Left to
+    # itself it re-runs `cmake --build` and `cmake --install` for every target
+    # on every case, and syscheck/pre_process/post_process hash to a single
+    # slug shared by all cases, so every shard installs to the same
+    # build/staging and build/install paths. The shards share this workspace
+    # and leave the SLURM queue together, then march through an identical
+    # startup, so those installs collide and the losing shard dies with
+    # "file INSTALL cannot copy file ... No such file or directory".
+    # The pre-build serializes its own shared-target build for this reason;
+    # here there is nothing to serialize, because there is nothing to build.
+    build_opts="--no-build"
 fi
 
 passed=0
@@ -65,8 +78,9 @@ for case in "${benchmarks[@]}"; do
     # Clean any previous output
     rm -rf "$case_dir/D" "$case_dir/p_all" "$case_dir/restart_data"
 
-    # Build + run with --case-optimization, small grid, 10 timesteps
-    if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
+    # Run with --case-optimization, small grid, 10 timesteps. Builds first
+    # unless $build_opts holds --no-build (see above).
+    if ./mfc.sh run "$case" --case-optimization $gpu_opts $build_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
         # Validate output
         if build/venv/bin/python3 .github/scripts/check_case_optimization_output.py "$case_dir"; then
             echo "PASS: $case_name"
