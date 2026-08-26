@@ -21,7 +21,8 @@ module m_amr
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, s_mpi_allreduce_min, &
         & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
-    use m_rhs, only: s_compute_rhs
+    use m_rhs, only: s_compute_rhs, q_prim_qp
+    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, s_compute_pressure, enforce_density_floor_vc
     use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
     use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg, &
         & s_amr_reg_reserve, f_amr_face_is_seam
@@ -43,9 +44,10 @@ module m_amr
         & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_stage_fill_wave, s_amr_parent_fill_wave, &
         & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, &
         & s_amr_relax_fine, s_amr_setup_ib, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, &
-        & s_amr_restrict_wave, s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, s_l0_advance_stage_rhs, &
-        & s_l0_advance_stage_rk, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_add_reflux_to_tiles, &
-        & s_l0_restrict_to_tiles, s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance, s_l0_fill_tiles_from_coarse
+        & s_amr_restrict_wave, s_amr_convert_prim_batch, amr_prim_batch, s_amr_reflux_to_parent, s_l0_tiles_init, &
+        & s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_copy_coarse_to_tiles, &
+        & s_l0_scatter_tiles_to_coarse, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_tiles_finalize, s_l0_forced_remap, &
+        & s_l0_rebalance, s_l0_fill_tiles_from_coarse
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -135,6 +137,21 @@ module m_amr
     !> local slots the store is sized for; grows and never shrinks, but plateaus at the rebuild-transient high-water because
     !! s_amr_compact_store re-densifies the index space every reconcile
     integer :: amr_st_cap = 0
+
+    !> 2a PRIM LANDING ZONE for the batched cons->prim conversion (s_amr_convert_prim_batch): the COMPUTED prim vars only - the
+    !! contiguous eqn_idx%mom%beg..eqn_idx%E range (velocities + pressure), var dim 1..num_vels+1. The aliased prim vars (cont, adv,
+    !! c, psi) ride the cons copy-in inside s_compute_rhs as always. Per-STAGE scratch: rewritten by every batch call, so store
+    !! growth discards it (no staging round trip). Sized with the store in s_amr_st_reserve, only under the amr_prim_batch gate.
+    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_prim_st
+    $:GPU_DECLARE(create='[amr_prim_st]')
+    !> per-dense-slot batch metadata: participating fine slot + its idwbuff window (host-filled each batch call)
+    integer, allocatable :: amr_bt_lo(:,:), amr_bt_hi(:,:)  !< (3, loc)
+    logical, allocatable :: amr_bt_on(:)
+    $:GPU_DECLARE(create='[amr_bt_lo, amr_bt_hi, amr_bt_on]')
+    !> 2a master gate, derived once at init: the batched conversion covers the plain multi-fluid configs (5/6-eq, WENO, with/without
+    !! viscous); every feature that adds conversion write-set members or changes its inputs (igr, chemistry, relativity,
+    !! hypoelasticity, mhd, cont_damage, ib, Lagrangian bubbles, subcycle) falls back to the per-block conversion path unchanged.
+    logical :: amr_prim_batch = .false.
 
     !> COPY BRIDGE to the shared solver. s_compute_rhs, s_ibm_correct_state, s_pressure_relaxation_procedure and
     !! s_infinite_relaxation_k all take type(scalar_field), dimension(sys_size) and serve the monolithic path too, so the flat store
@@ -409,6 +426,13 @@ contains
         if (.not. amr) return
 
         amr_dt_fine = 0.5_wp*dt
+
+        ! 2a gate (see amr_prim_batch's declaration). bubbles_euler is checker-prohibited under amr; every listed
+        ! feature either extends the conversion write set beyond mom..E or changes its inputs, and falls back to
+        ! the per-block conversion.
+        amr_prim_batch = (.not. amr_subcycle) .and. (.not. igr) .and. (.not. chemistry) .and. (.not. relativity) &
+                          & .and. (.not. hypoelasticity) .and. (.not. mhd) .and. (.not. cont_damage) .and. (.not. ib) &
+                          & .and. (.not. bubbles_lagrange)
 
         ! Fine-block cap = the case amr_max_blocks; the shared pool adds the L0 tile prefix (l0_slot_off, 0 when l0_ntile=0) ahead
         ! of
@@ -7219,6 +7243,13 @@ contains
         call s_phase_toc(PH_SWAP)
         call s_phase_tic(PH_RHS)
         call s_amr_br_load(amr_loc_of(amr_cur))
+        ! 2a: this block's computed prim vars (mom, E) were already produced by the stage-top batched conversion;
+        ! land them and let s_compute_rhs skip its per-block conversion. L0 tile slots (level 0) are not in the
+        ! batch and keep the per-block conversion.
+        if (amr_prim_batch .and. amr_block_level(amr_cur) >= 1) then
+            call s_amr_prim_load(q_prim_qp%vf, amr_loc_of(amr_cur))
+            amr_prim_preloaded = .true.
+        end if
         if (qbmm .and. .not. polytropic) then
             ! the block's OWN side-state and rhs scratch: the coarse pb_in/rhs_pb must not be touched at fine indices (the coarse
             ! stage consumes them after this fine stage)
@@ -7227,6 +7258,7 @@ contains
         else
             call s_compute_rhs(amr_cons_br, q_T_sf, q_prim_b, bc_type, rhs_b, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
         end if
+        amr_prim_preloaded = .false.
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_phase_toc(PH_RHS)
         call s_phase_tic(PH_SWAP)  ! the other half of the swap pair - keep the bracket symmetric
@@ -7963,7 +7995,138 @@ contains
             amr_br_nblk = amr_br_batch
         end if
 
+        ! 2a prim landing zone + batch metadata: per-STAGE scratch (rewritten by every s_amr_convert_prim_batch
+        ! call), so growth discards contents - no device staging round trip, unlike the stores above.
+        if (amr_prim_batch) then
+            if (allocated(amr_prim_st)) then
+                @:DEALLOCATE(amr_prim_st)
+                @:DEALLOCATE(amr_bt_lo)
+                @:DEALLOCATE(amr_bt_hi)
+                @:DEALLOCATE(amr_bt_on)
+            end if
+            allocate (amr_prim_st(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi,1:num_vels + 1,1:newcap))
+            allocate (amr_bt_lo(3, newcap), amr_bt_hi(3, newcap), amr_bt_on(newcap))
+        end if
+
     end subroutine s_amr_st_reserve
+
+    !> 2a: ONE batched cons->prim conversion over every owned fine block (all levels), straight from the flat cons store into the
+    !! flat prim landing zone. Runs once per RK stage after the fill + seam phases; each block's store bytes there are identical to
+    !! what its per-block conversion point would read (advances write only their own slots), and the kernel is per-cell with no
+    !! reductions, so the result is bit-identical to the per-block path it replaces. The cell body below is PINNED to
+    !! s_convert_conservative_to_primitive_variables (m_variables_conversion.fpp) restricted to the amr_prim_batch gate's configs:
+    !! species fractions (s_compute_species_fraction inlined against the store; igr/bubbles_euler excluded by the gate), mixture
+    !! properties, velocity + dynamic pressure, and pressure. Change the conversion and this must follow.
+    impure subroutine s_amr_convert_prim_batch()
+
+        integer :: g, loc, i, j, k, l
+        integer :: nl, nv, b1l, b1h, b2l, b2h, b3l, b3h
+
+        #:if USING_AMD and not MFC_CASE_OPTIMIZATION
+            real(wp), dimension(3) :: alpha_K, alpha_rho_K
+            real(wp)               :: rhoYks_b(1:10)
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
+            real(wp)                        :: rhoYks_b(1:num_species)
+        #:endif
+        real(wp) :: Re_K(2)
+        real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, alpha_K_sum, pres, T, pmag
+
+        if (amr_loc_n == 0) return
+        call s_phase_tic(PH_CVTB)
+        amr_bt_on(1:amr_loc_n) = .false.
+        do g = 1, amr_num_blocks
+            if (amr_block_level(g) < 1) cycle
+            if (amr_block_owner(g) /= proc_rank) cycle
+            loc = amr_loc_of(g)
+            if (loc <= 0) cycle
+            amr_bt_on(loc) = .true.
+            do i = 1, 3
+                amr_bt_lo(i, loc) = amr_slots(g)%idwbuff(i)%beg
+                amr_bt_hi(i, loc) = amr_slots(g)%idwbuff(i)%end
+            end do
+        end do
+        $:GPU_UPDATE(device='[amr_bt_on, amr_bt_lo, amr_bt_hi]')
+        ! bounds through local scalars, never GPU_DECLARE'd module state (the CCE-acc stale-device-bounds class)
+        nl = amr_loc_n; nv = num_vels
+        b1l = mbuf1_lo; b1h = mbuf1_hi; b2l = mbuf2_lo; b2h = mbuf2_hi; b3l = mbuf3_lo; b3h = mbuf3_hi
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[alpha_K, alpha_rho_K, Re_K, rhoYks_b, rho_K, gamma_K, pi_inf_K, qv_K, &
+                            & dyn_pres_K, alpha_K_sum, pres, T, pmag]', copyin='[nl, nv, b1l, b1h, b2l, b2h, b3l, b3h]')
+        do loc = 1, nl
+            do l = b3l, b3h
+                do k = b2l, b2h
+                    do j = b1l, b1h
+                        if (.not. amr_bt_on(loc)) cycle
+                        if (j < amr_bt_lo(1, loc) .or. j > amr_bt_hi(1, loc) .or. k < amr_bt_lo(2, loc) .or. k > amr_bt_hi(2, &
+                            & loc) .or. l < amr_bt_lo(3, loc) .or. l > amr_bt_hi(3, loc)) cycle
+                        if (num_fluids == 1) then
+                            alpha_rho_K(1) = amr_cons_st(j, k, l, eqn_idx%cont%beg, loc)
+                            alpha_K(1) = amr_cons_st(j, k, l, eqn_idx%adv%beg, loc)
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                alpha_rho_K(i) = amr_cons_st(j, k, l, i, loc)
+                                alpha_K(i) = amr_cons_st(j, k, l, eqn_idx%adv%beg + i - 1, loc)
+                            end do
+                        end if
+                        if (mpp_lim) then
+                            alpha_K_sum = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
+                                alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
+                                alpha_K_sum = alpha_K_sum + alpha_K(i)
+                            end do
+                            alpha_K = alpha_K/max(alpha_K_sum, 1.e-16_wp)
+                        end if
+                        call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
+                            & Re_K)
+                        if (enforce_density_floor_vc) rho_K = max(rho_K, sgm_eps)
+                        dyn_pres_K = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, nv
+                            amr_prim_st(j, k, l, i, loc) = amr_cons_st(j, k, l, eqn_idx%mom%beg + i - 1, loc)/rho_K
+                            dyn_pres_K = dyn_pres_K + 5.e-1_wp*amr_cons_st(j, k, l, eqn_idx%mom%beg + i - 1, loc)*amr_prim_st(j, &
+                                & k, l, i, loc)
+                        end do
+                        pmag = 0._wp
+                        call s_compute_pressure(amr_cons_st(j, k, l, eqn_idx%E, loc), amr_cons_st(j, k, l, eqn_idx%alf, loc), &
+                                                & dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, rhoYks_b, pres, T, pres_mag=pmag)
+                        amr_prim_st(j, k, l, nv + 1, loc) = pres
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        call s_phase_toc(PH_CVTB)
+
+    end subroutine s_amr_convert_prim_batch
+
+    !> 2a: land the current block's batch-computed prim vars (the contiguous mom%beg..E range) from the prim store into the m_rhs
+    !! conversion scratch, replacing that block's per-block conversion.
+    impure subroutine s_amr_prim_load(q_prim_b, loc)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_b
+        integer, intent(in)                                    :: loc
+        integer                                                :: i, j, k, l, i0, i1, j1l, j1h, j2l, j2h, j3l, j3h
+
+        i0 = eqn_idx%mom%beg; i1 = eqn_idx%E
+        j1l = amr_slots(amr_cur)%idwbuff(1)%beg; j1h = amr_slots(amr_cur)%idwbuff(1)%end
+        j2l = amr_slots(amr_cur)%idwbuff(2)%beg; j2h = amr_slots(amr_cur)%idwbuff(2)%end
+        j3l = amr_slots(amr_cur)%idwbuff(3)%beg; j3h = amr_slots(amr_cur)%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[loc, i0, i1, j1l, j1h, j2l, j2h, j3l, j3h]')
+        do i = i0, i1
+            do l = j3l, j3h
+                do k = j2l, j2h
+                    do j = j1l, j1h
+                        q_prim_b(i)%sf(j, k, l) = amr_prim_st(j, k, l, i - i0 + 1, loc)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_prim_load
 
     !> Allocate the pooled q_prim/rhs advance scratch (idempotent). The lockstep driver argument-associates the scratch for every
     !! block, owned or not, so it must exist on EVERY rank - including one that never allocates a slot. Called from the ONE point
@@ -8063,6 +8226,12 @@ contains
                 @:DEALLOCATE(${ST}$)
             end if
         #:endfor
+        if (allocated(amr_prim_st)) then
+            @:DEALLOCATE(amr_prim_st)
+            @:DEALLOCATE(amr_bt_lo)
+            @:DEALLOCATE(amr_bt_hi)
+            @:DEALLOCATE(amr_bt_on)
+        end if
         if (allocated(amr_cons_br)) then
             do i = 1, sys_size
                 @:ACC_TEARDOWN_SFs(amr_cons_br(i))

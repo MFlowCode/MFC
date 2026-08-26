@@ -32,9 +32,9 @@ module m_time_steppers
     use m_amr, only: amr_xchg_coarse_ghosts, s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, &
         & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, &
         & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, &
-        & s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, &
-        & s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, &
-        & s_l0_fill_tiles_from_coarse
+        & s_amr_convert_prim_batch, amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, &
+        & s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, &
+        & s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -575,6 +575,11 @@ contains
                 call s_phase_tic(PH_SEAM)
                 call s_amr_fine_fine_halo(0)  ! all levels: the lock-step driver advances every level together
                 call s_phase_toc(PH_SEAM)
+                ! 2a: ONE batched cons->prim conversion for every owned fine block (all levels) - each block's
+                ! per-block conversion inside s_compute_rhs is then skipped. Legal here: every fill is complete,
+                ! and each advance below writes only its own store slot, so the batch reads the same bytes the
+                ! per-block conversions would.
+                if (amr_prim_batch) call s_amr_convert_prim_batch()
                 ! Phase 3 - ADVANCE every block (RHS + RK update). Runs with the block's grid globals swapped in.
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)

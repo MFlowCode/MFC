@@ -43,7 +43,7 @@ module m_rhs
 
     implicit none
 
-    private; public :: s_initialize_rhs_module, s_compute_rhs, s_finalize_rhs_module
+    private; public :: s_initialize_rhs_module, s_compute_rhs, s_finalize_rhs_module, q_prim_qp
 
     type(vector_field) :: q_cons_qp  !< WENO-reconstructed cell-average conservative variables at quadrature points
     $:GPU_DECLARE(create='[q_cons_qp]')
@@ -514,7 +514,12 @@ contains
         end if
         if (.not. igr) then
             call nvtxStartRange("RHS-CONVERT")
-            call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, ab_int)
+            ! 2a: the AMR fine advance may have preloaded this block's computed prim vars from the batched
+            ! conversion (s_amr_convert_prim_batch, pinned to this kernel); the per-block conversion is then
+            ! skipped bit-identically. The aliased prim vars (cont, adv, c, psi) ride the cons copy-in above.
+            if (.not. amr_prim_preloaded) then
+                call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, ab_int)
+            end if
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")

@@ -26,7 +26,7 @@ module m_variables_conversion
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_speed_of_sound, s_compute_fast_magnetosonic_speed, &
-        & s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+        & s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, enforce_density_floor_vc
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
