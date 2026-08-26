@@ -43,9 +43,9 @@ module m_amr
         & s_restrict_fine_to_coarse, s_finalize_amr_module, s_amr_stage_fill_wave, s_amr_parent_fill_wave, &
         & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_set_amr_fine_geometry, &
         & s_amr_relax_fine, s_amr_setup_ib, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, &
-        & s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
-        & s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
-        & s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance, s_l0_fill_tiles_from_coarse
+        & s_amr_restrict_wave, s_amr_reflux_to_parent, s_l0_tiles_init, s_l0_advance_stage, s_l0_advance_stage_rhs, &
+        & s_l0_advance_stage_rk, s_l0_copy_coarse_to_tiles, s_l0_scatter_tiles_to_coarse, s_l0_add_reflux_to_tiles, &
+        & s_l0_restrict_to_tiles, s_l0_tiles_finalize, s_l0_forced_remap, s_l0_rebalance, s_l0_fill_tiles_from_coarse
     ! s_amr_swap_to_fine / s_amr_restore_coarse / s_amr_fill_fine_ghosts / amr_dt_fine are internal (no external caller); keeping
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
@@ -3975,6 +3975,406 @@ contains
 #endif
 
     end subroutine s_amr_restrict_to_parent
+
+    !> I5b: the lock-step restrict fold as plan-based waves (amr_plan_based_exchange.md). Replaces the per-box reverse fold loop on
+    !! the lock-step np>1 path: per level (finest first) the split-ownership child->parent folds become ONE aggregated message per
+    !! (child-owner, parent-owner) peer (s_amr_restrict_parent_wave), followed by the per-box reflux-to-parent applies (their freg
+    !! was already exchanged by s_amr_freg_wave); then the level-1 -> L0 covered-cell scatter becomes one aggregated message per
+    !! (owner, coarse-owner) peer (s_amr_restrict_l1_wave). Both sides derive identical transfer lists from replicated metadata (the
+    !! region-box x rank-interior intersections the per-box path already used), so the wire layout needs no handshake and F7 family
+    !! words stay EXACT; what is removed is the per-box ISEND+WAITALL / blocking-RECV chain, whose length scales with the GLOBAL
+    !! block count. Level order (finest first) preserves child-before-parent folding; within a level the covered targets are
+    !! disjoint, and the restrict/reflux interleave is order-free because sibling-shared faces carry weight 0
+    !! (s_amr_sibling_face_weights). Subcycle and np=1 keep the per-box loop (the per-box routines remain).
+    impure subroutine s_amr_restrict_wave(coarse_tgt, dt_reflux)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+        real(wp), intent(in)                                   :: dt_reflux
+        integer                                                :: lev, k
+
+        do lev = amr_max_level, 2, -1
+            if (relax) then
+                do k = amr_num_blocks, 1, -1
+                    if (amr_block_level(k) /= lev) cycle
+                    call s_amr_select_slot(k)
+                    call s_amr_relax_fine()
+                end do
+            end if
+            call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSREST)
+            call s_amr_restrict_parent_wave(lev)
+            call s_phase_toc(PH_RSREST); call s_phase_toc(PH_RESTR)
+            do k = amr_num_blocks, 1, -1
+                if (amr_block_level(k) /= lev) cycle
+                call s_amr_select_slot(k)
+                call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSRFP)
+                call s_amr_reflux_to_parent(dt_reflux, .false.)
+                call s_phase_toc(PH_RSRFP); call s_phase_toc(PH_RESTR)
+            end do
+        end do
+        if (relax) then
+            do k = amr_num_blocks, 1, -1
+                if (amr_block_level(k) /= 1) cycle
+                call s_amr_select_slot(k)
+                call s_amr_relax_fine()
+            end do
+        end if
+        call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSREST)
+        call s_amr_restrict_l1_wave(coarse_tgt)
+        call s_phase_toc(PH_RSREST); call s_phase_toc(PH_RESTR)
+        ! non-polytropic QBMM pb/mv fold-back keeps its per-box pairing (every rank walks the same reverse order, so the
+        ! blocking pairs match exactly as they did inside the per-box fold)
+        if (qbmm .and. .not. polytropic) then
+            do k = amr_num_blocks, 1, -1
+                if (amr_block_level(k) /= 1) cycle
+                call s_amr_select_slot(k)
+                call s_amr_scatter_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
+            end do
+        end if
+        call s_amr_select_slot(1)
+
+    end subroutine s_amr_restrict_wave
+
+    !> One per-level wave of the split-ownership level>=2 child->parent restrict folds (the F7B pairs). Co-located folds run inline
+    !! on the child-owner (bit-for-bit the per-box kernel); every cross-rank fold ships its parent-frame covered box in one
+    !! aggregated message per (child-owner, parent-owner) peer. Both sides walk the same replicated block list ascending with
+    !! per-peer running offsets, so the wire layout agrees with no metadata exchange.
+    impure subroutine s_amr_restrict_parent_wave(lev)
+
+        integer, intent(in) :: lev
+
+#ifdef MFC_MPI
+        integer :: k, pblk, cowner, powner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq
+        integer :: plo(3), phi(3)
+
+        rr = amr_ref_ratio
+        nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
+        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
+        tq = amr_tag_base(7) + int(mod(amr_mesh_epoch, 50_8))
+        if (.not. allocated(amr_fw_map)) then
+            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
+                      & amr_fw_pp(0:num_procs - 1))
+            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
+        end if
+        ! send plan + co-located folds (child-owner side)
+        amr_fw_snx = 0; amr_fw_snp = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= lev) cycle
+            cowner = amr_block_owner(k)
+            if (proc_rank /= cowner) cycle
+            pblk = f_amr_parent_block(k)
+            powner = amr_block_owner(pblk)
+            call s_amr_parent_foot(k, pblk, plo, phi)
+            if (plo(1) > phi(1) .or. plo(2) > phi(2) .or. plo(3) > phi(3)) cycle
+            if (cowner == powner) then
+                call s_amr_restrict_overwrite_device_st(amr_loc_of(pblk), amr_loc_of(k), plo, phi, 0, 0, 0, plo, rr, dj_hi, &
+                                                        & dk_hi, nchild)
+                cycle
+            end if
+            if (amr_fw_map(powner) == 0) then
+                amr_fw_snp = amr_fw_snp + 1
+                call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
+                call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp)
+                amr_fw_map(powner) = amr_fw_snp
+                amr_fw_sprank(amr_fw_snp) = powner
+            end if
+            cnt = sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1)
+            amr_fw_snx = amr_fw_snx + 1
+            call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
+            call s_amr_fw_szi3(amr_fw_sbh, amr_fw_snx); call s_amr_fw_szi(amr_fw_spi, amr_fw_snx)
+            call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx); call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
+            amr_fw_sblk(amr_fw_snx) = k
+            amr_fw_sbl(:,amr_fw_snx) = plo; amr_fw_sbh(:,amr_fw_snx) = phi
+            amr_fw_spo(amr_fw_snx) = cnt
+            amr_fw_spi(amr_fw_snx) = amr_fw_map(powner)
+            amr_fw_sqo(amr_fw_snx) = amr_fw_pq(powner) + amr_fw_nx(powner)*XA_NH
+            amr_fw_pq(powner) = amr_fw_pq(powner) + cnt
+            amr_fw_nx(powner) = amr_fw_nx(powner) + 1
+        end do
+        qbase = 0
+        do ip = 1, amr_fw_snp
+            r = amr_fw_sprank(ip)
+            amr_fw_snxp(ip) = amr_fw_nx(r)
+            amr_fw_sqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
+            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
+        end do
+        call s_amr_fw_szr(amr_fw_sq, qbase)
+        ! recv plan (parent-owner side): the same replicated walk, so per-peer transfer order matches the sender's
+        amr_fw_rnx = 0; amr_fw_rnp = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= lev) cycle
+            pblk = f_amr_parent_block(k)
+            cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
+            if (cowner == powner .or. proc_rank /= powner) cycle
+            call s_amr_parent_foot(k, pblk, plo, phi)
+            if (plo(1) > phi(1) .or. plo(2) > phi(2) .or. plo(3) > phi(3)) cycle
+            if (amr_fw_map(cowner) == 0) then
+                amr_fw_rnp = amr_fw_rnp + 1
+                call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
+                call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp)
+                amr_fw_map(cowner) = amr_fw_rnp
+                amr_fw_rprank(amr_fw_rnp) = cowner
+            end if
+            cnt = sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1)
+            amr_fw_rnx = amr_fw_rnx + 1
+            call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
+            call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
+            call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
+            amr_fw_rblk(amr_fw_rnx) = k
+            amr_fw_rbl(:,amr_fw_rnx) = plo; amr_fw_rbh(:,amr_fw_rnx) = phi
+            amr_fw_rpo(amr_fw_rnx) = cnt
+            amr_fw_rpi(amr_fw_rnx) = amr_fw_map(cowner)
+            amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(cowner) + amr_fw_nx(cowner)*XA_NH
+            amr_fw_pq(cowner) = amr_fw_pq(cowner) + cnt
+            amr_fw_nx(cowner) = amr_fw_nx(cowner) + 1
+        end do
+        qbase = 0
+        do ip = 1, amr_fw_rnp
+            r = amr_fw_rprank(ip)
+            amr_fw_rnxp(ip) = amr_fw_nx(r)
+            amr_fw_rqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
+            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
+        end do
+        call s_amr_fw_szr(amr_fw_rq, qbase)
+        nreq = amr_fw_snp + amr_fw_rnp
+        if (nreq == 0) return
+        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+        nreq = 0
+        do ip = 1, amr_fw_rnp
+            call s_xa_rec(XA_F7BW_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq)
+            nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
+            call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
+                           & amr_fw_req(nreq), ierr)
+        end do
+        do idx = 1, amr_fw_snx
+            cnt = amr_fw_spo(idx)
+            boff = amr_fw_sqbase(amr_fw_spi(idx)) + amr_fw_sqo(idx)
+            call s_amr_restrict_pack_device(amr_loc_of(amr_fw_sblk(idx)), amr_fw_sbl(:,idx), amr_fw_sbh(:,idx), amr_fw_sbl(:, &
+                                            & idx), rr, dj_hi, dk_hi, nchild, amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + cnt))
+            if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F7BW_SND, amr_fw_sblk(idx), amr_fw_sbl(:,idx), &
+                & amr_fw_sbh(:,idx))
+        end do
+        do ip = 1, amr_fw_snp
+            call s_xa_rec(XA_F7BW_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq)
+            nreq = nreq + 1; amr_fw_reqw(nreq) = -1
+            call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
+                           & amr_fw_req(nreq), ierr)
+        end do
+#ifdef MFC_DEBUG
+        block
+            integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+            call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+            do q = 1, nreq
+                if (amr_fw_reqw(q) < 0) cycle
+                call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
+                @:ASSERT(gotw == amr_fw_reqw(q), "restrict parent wave: received message length differs from the plan")
+            end do
+        end block
+#else
+        call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+#endif
+        do idx = 1, amr_fw_rnx
+            cnt = amr_fw_rpo(idx)
+            boff = amr_fw_rqbase(amr_fw_rpi(idx)) + amr_fw_rqo(idx)
+            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F7BW_SND, amr_fw_rblk(idx), amr_fw_rbl(:, &
+                & idx), amr_fw_rbh(:,idx))
+            ! DEVICE unpack of the covered box only (the strided-update flang trap - see s_restrict_fine_to_coarse)
+            call s_l0_pack_unpack_block_st(amr_loc_of(f_amr_parent_block(amr_fw_rblk(idx))), amr_fw_rbl(1, idx), amr_fw_rbl(2, &
+                                           & idx), amr_fw_rbl(3, idx), amr_fw_rbh(1, idx) - amr_fw_rbl(1, idx), amr_fw_rbh(2, &
+                                           & idx) - amr_fw_rbl(2, idx), amr_fw_rbh(3, idx) - amr_fw_rbl(3, idx), &
+                                           & amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + cnt), .false.)
+        end do
+#endif
+
+    end subroutine s_amr_restrict_parent_wave
+
+    !> The level-1 -> L0 covered-cell scatter (F7A) as one wave: every owned level-1 block's covered slabs for every listed
+    !! coarse-owner ship in one aggregated message per peer; the owner-local covered overwrite and the (cyl_coord) amr_rvw push stay
+    !! grouped per block during the pack walk. The receiver plan is my-interior x region(k) over the level-1 blocks I do not own -
+    !! by construction (s_amr_ranks_overlapping) exactly the sender's list membership.
+    impure subroutine s_amr_restrict_l1_wave(coarse_tgt)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+
+#ifdef MFC_MPI
+        integer :: k, owner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, o1, o2, o3, cur
+        integer :: rlo(3), rhi(3), ilo(3), ihi(3), milo(3), mihi(3), bl(3), bh(3)
+
+        tq = amr_tag_base(7) + 50 + int(mod(amr_mesh_epoch, 50_8))
+        o1 = start_idx(1); o2 = 0; o3 = 0
+        if (n_glb > 0) o2 = start_idx(2)
+        if (p_glb > 0) o3 = start_idx(3)
+        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as the per-box path)
+        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
+        if (.not. allocated(amr_fw_map)) then
+            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
+                      & amr_fw_pp(0:num_procs - 1))
+            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
+        end if
+        call s_amr_rank_interior(proc_rank, milo, mihi)
+        ! send plan (block-owner side): the same (interior x region) covered slabs the per-box path sent, k-grouped
+        amr_fw_snx = 0; amr_fw_snp = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
+            if (amr_block_owner(k) /= proc_rank) cycle
+            rlo = 0; rhi = 0
+            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
+            if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
+            if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
+            do idx = 1, amr_ovl_scatter_n(k)
+                r = amr_ovl_scatter(idx, k)
+                if (r == proc_rank) cycle
+                call s_amr_rank_interior(r, ilo, ihi)
+                call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
+                if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
+                if (amr_fw_map(r) == 0) then
+                    amr_fw_snp = amr_fw_snp + 1
+                    call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
+                    call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp)
+                    amr_fw_map(r) = amr_fw_snp
+                    amr_fw_sprank(amr_fw_snp) = r
+                end if
+                cnt = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                amr_fw_snx = amr_fw_snx + 1
+                call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
+                call s_amr_fw_szi3(amr_fw_sbh, amr_fw_snx); call s_amr_fw_szi(amr_fw_spi, amr_fw_snx)
+                call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx); call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
+                amr_fw_sblk(amr_fw_snx) = k
+                amr_fw_sbl(:,amr_fw_snx) = bl; amr_fw_sbh(:,amr_fw_snx) = bh
+                amr_fw_spo(amr_fw_snx) = cnt
+                amr_fw_spi(amr_fw_snx) = amr_fw_map(r)
+                amr_fw_sqo(amr_fw_snx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+                amr_fw_pq(r) = amr_fw_pq(r) + cnt
+                amr_fw_nx(r) = amr_fw_nx(r) + 1
+            end do
+        end do
+        qbase = 0
+        do ip = 1, amr_fw_snp
+            r = amr_fw_sprank(ip)
+            amr_fw_snxp(ip) = amr_fw_nx(r)
+            amr_fw_sqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
+            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
+        end do
+        call s_amr_fw_szr(amr_fw_sq, qbase)
+        ! recv plan (coarse-owner side): my interior x region(k) over level-1 blocks I do not own
+        amr_fw_rnx = 0; amr_fw_rnp = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
+            owner = amr_block_owner(k)
+            if (owner == proc_rank) cycle
+            rlo = 0; rhi = 0
+            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
+            if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
+            if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
+            call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
+            if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
+            if (amr_fw_map(owner) == 0) then
+                amr_fw_rnp = amr_fw_rnp + 1
+                call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
+                call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp)
+                amr_fw_map(owner) = amr_fw_rnp
+                amr_fw_rprank(amr_fw_rnp) = owner
+            end if
+            cnt = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+            amr_fw_rnx = amr_fw_rnx + 1
+            call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
+            call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
+            call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
+            amr_fw_rblk(amr_fw_rnx) = k
+            amr_fw_rbl(:,amr_fw_rnx) = bl; amr_fw_rbh(:,amr_fw_rnx) = bh
+            amr_fw_rpo(amr_fw_rnx) = cnt
+            amr_fw_rpi(amr_fw_rnx) = amr_fw_map(owner)
+            amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(owner) + amr_fw_nx(owner)*XA_NH
+            amr_fw_pq(owner) = amr_fw_pq(owner) + cnt
+            amr_fw_nx(owner) = amr_fw_nx(owner) + 1
+        end do
+        qbase = 0
+        do ip = 1, amr_fw_rnp
+            r = amr_fw_rprank(ip)
+            amr_fw_rnxp(ip) = amr_fw_nx(r)
+            amr_fw_rqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
+            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
+        end do
+        call s_amr_fw_szr(amr_fw_rq, qbase)
+        nreq = amr_fw_snp + amr_fw_rnp
+        call s_amr_fw_szi(amr_fw_req, max(nreq, 1)); call s_amr_fw_szi(amr_fw_reqw, max(nreq, 1))
+        nreq = 0
+        do ip = 1, amr_fw_rnp
+            call s_xa_rec(XA_F7W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq)
+            nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
+            call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
+                           & amr_fw_req(nreq), ierr)
+        end do
+        ! owner-local covered overwrites + device packs, grouped per owned block: amr_rvw is a single device mirror, so a
+        ! block's (cyl_coord) radii push must immediately precede that block's overwrite/pack kernels; the transfer list is
+        ! k-grouped by construction, so a monotone cursor drains each block's sends inside its group
+        cur = 1
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
+            if (amr_block_owner(k) /= proc_rank) cycle
+            rr = amr_slots(k)%amr_ref_ratio
+            nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
+            dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
+            if (cyl_coord) then
+                amr_rvw(0:amr_slots(k)%n) = amr_slots(k)%y_cc(0:amr_slots(k)%n)
+                $:GPU_UPDATE(device='[amr_rvw]')
+            end if
+            rlo = 0; rhi = 0
+            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
+            if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
+            if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
+            call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
+            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device_sf(coarse_tgt, &
+                & amr_loc_of(k), bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+            do while (cur <= amr_fw_snx)
+                if (amr_fw_sblk(cur) /= k) exit
+                cnt = amr_fw_spo(cur)
+                boff = amr_fw_sqbase(amr_fw_spi(cur)) + amr_fw_sqo(cur)
+                call s_amr_restrict_pack_device(amr_loc_of(k), amr_fw_sbl(:,cur), amr_fw_sbh(:,cur), rlo, rr, dj_hi, dk_hi, &
+                                                & nchild, amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + cnt))
+                if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F7W_SND, k, amr_fw_sbl(:,cur), &
+                    & amr_fw_sbh(:,cur))
+                cur = cur + 1
+            end do
+        end do
+        do ip = 1, amr_fw_snp
+            call s_xa_rec(XA_F7W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq)
+            nreq = nreq + 1; amr_fw_reqw(nreq) = -1
+            call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
+                           & amr_fw_req(nreq), ierr)
+        end do
+        if (nreq > 0) then
+#ifdef MFC_DEBUG
+            block
+                integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                do q = 1, nreq
+                    if (amr_fw_reqw(q) < 0) cycle
+                    call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
+                    @:ASSERT(gotw == amr_fw_reqw(q), "restrict L1 wave: received message length differs from the plan")
+                end do
+            end block
+#else
+            call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+#endif
+        end if
+        do idx = 1, amr_fw_rnx
+            cnt = amr_fw_rpo(idx)
+            boff = amr_fw_rqbase(amr_fw_rpi(idx)) + amr_fw_rqo(idx)
+            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F7W_SND, amr_fw_rblk(idx), amr_fw_rbl(:,idx), &
+                & amr_fw_rbh(:,idx))
+            ! DEVICE unpack of the covered box only (the strided-update flang trap - see s_restrict_fine_to_coarse)
+            call s_l0_pack_unpack_block_sf(coarse_tgt, amr_fw_rbl(1, idx) - o1, amr_fw_rbl(2, idx) - o2, amr_fw_rbl(3, idx) - o3, &
+                                           & amr_fw_rbh(1, idx) - amr_fw_rbl(1, idx), amr_fw_rbh(2, idx) - amr_fw_rbl(2, idx), &
+                                           & amr_fw_rbh(3, idx) - amr_fw_rbl(3, idx), &
+                                           & amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + cnt), .false.)
+        end do
+#endif
+
+    end subroutine s_amr_restrict_l1_wave
 
     !> Deliver the current level>=2 block's fine flux registers to its PARENT block's owner, which holds the matching creg and
     !! applies the correction. One blocking send/recv pair per dimension, mirroring s_amr_p2p_reflux_faces:

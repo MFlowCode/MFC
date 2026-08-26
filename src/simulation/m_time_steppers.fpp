@@ -31,9 +31,10 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: amr_xchg_coarse_ghosts, s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, &
         & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, &
-        & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_reflux_to_parent, &
-        & s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
-        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse
+        & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, &
+        & s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, &
+        & s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, &
+        & s_l0_fill_tiles_from_coarse
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -783,32 +784,41 @@ contains
                 call s_amr_freg_wave()
                 call s_phase_toc(PH_RSWAVE); call s_phase_toc(PH_RESTR)
             end if
-            do islot = amr_num_blocks, 1, -1
-                if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
-                call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
-                ! subcycle multi-level: a level>=2 block was advanced, restricted, AND Berger-Colella refluxed into its parent
-                ! INSIDE the parent's subcycle (s_amr_advance_children), so it is skipped here. Only level-1 blocks fold to L0.
-                if (amr_subcycle .and. amr_block_level(amr_cur) >= 2) cycle
-                ! equilibrate the fine solution (phase change) before it restricts to the coarse level
-                if (relax) call s_amr_relax_fine()
-                call s_phase_tic(PH_RESTR)
-                call s_phase_tic(PH_RSREST)
-                call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
-                call s_phase_toc(PH_RSREST)
-                ! multi-level lock-step: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the parent's
-                ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured during
-                ! the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle
-                ! multi-level reflux is future work; dt is the shared lock-step step.
-                if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) then
-                    call s_phase_tic(PH_RSRFP)
-                    call s_amr_reflux_to_parent(dt, .false.)
-                    call s_phase_toc(PH_RSRFP)
-                end if
-                ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
-                if (amr_subcycle) call s_amr_p2p_reflux_faces()
-                if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
-                call s_phase_toc(PH_RESTR)
-            end do
+            ! I5b: on the lock-step np>1 path the whole fold runs as per-level waves (child->parent folds, reflux-to-parent
+            ! applies, then the L1 -> L0 covered scatter) - the per-box loop's serialized P2P chain scaled with the GLOBAL
+            ! block count. Subcycle and np=1 keep the per-box loop below.
+            if (.not. amr_subcycle .and. num_procs > 1) then
+                call s_amr_restrict_wave(q_cons_ts(1)%vf, dt)
+            else
+                do islot = amr_num_blocks, 1, -1
+                    if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
+                    call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
+                    ! subcycle multi-level: a level>=2 block was advanced, restricted, AND Berger-Colella refluxed into its parent
+                    ! INSIDE the parent's subcycle (s_amr_advance_children), so it is skipped here. Only level-1 blocks fold to L0.
+                    if (amr_subcycle .and. amr_block_level(amr_cur) >= 2) cycle
+                    ! equilibrate the fine solution (phase change) before it restricts to the coarse level
+                    if (relax) call s_amr_relax_fine()
+                    call s_phase_tic(PH_RESTR)
+                    call s_phase_tic(PH_RSREST)
+                    call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
+                    call s_phase_toc(PH_RSREST)
+                    ! multi-level lock-step: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the
+                    ! parent's
+                    ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured
+                    ! during
+                    ! the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle
+                    ! multi-level reflux is future work; dt is the shared lock-step step.
+                    if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) then
+                        call s_phase_tic(PH_RSRFP)
+                        call s_amr_reflux_to_parent(dt, .false.)
+                        call s_phase_toc(PH_RSRFP)
+                    end if
+                    ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
+                    if (amr_subcycle) call s_amr_p2p_reflux_faces()
+                    if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
+                    call s_phase_toc(PH_RESTR)
+                end do
+            end if
             call s_amr_select_slot(1)
             ! Coexist: the restrict above wrote the fine-averaged solution into the L0 covered cells; route those covered cells back
             ! to the covering tiles (the authoritative store) so they carry the finest data, mirroring the monolithic level-0
