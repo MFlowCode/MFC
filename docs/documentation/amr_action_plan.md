@@ -7,6 +7,40 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-26 (27) — 2a PRICED AND GATED OFF; the coarse call deferred; np32 is MEMORY-BLOCKED
+
+**Phase 2a's mandate was pricing, and it priced decisively.** Landed 3ed9f573 (batched cons->prim,
+one launch/stage, all gates green: bitcmp byte-identical, per-rank convert launches 387 -> 30 in
+the 5-step probe, AMR-68), then the pricing pair caught a ~4x WALL regression (40-arm 458.9 s vs
+~118 baseline) while total DEVICE kernel time IMPROVED (8.79 -> 6.65 s/5-step; batch kernel 0.5 s).
+Root-caused by discrimination probe: a flag-off build with the kernel still compiled in prices at
+baseline (112.2 s) -> NOT the amdflang Attributor/codegen class; the cost is the RUNTIME host
+launch/mapping burden of the per-block PRIM BRIDGE-LOADS (both the scalar_field-array-dummy form
+and the per-var plain-array form are catastrophic). Those bridge loads are exactly what
+store-native 2b deletes — **partial batching through a bridge is NEGATIVE value on this backend;
+the finding is 2b's strongest argument, per the pre-registered decision rule.** Verdict landed
+70fea5e6: gate defaults OFF, machinery kept for the 2b experiment.
+
+**Coarse deferral landed 44edcc5b** (from the (26) wait-cluster program): the coexist L0 coarse
+RHS moves past the fine advance — its rhs values are discarded and its only external products are
+the creg captures phase 4 reads + a self-contained prim ghost fill (m_amr.fpp:338-341: the fine
+fill prolongs from CONS ghosts via its OWN exchange), so it now absorbs stage skew where ranks are
+best synchronized (rhs imb 1.14) instead of the stage top (coarse imb 1.58 at np16). bitcmp
+byte-identical; AMR-68 68/68; np16 price rides the next rung. The OTHER coarse fix class
+(shell-restricted L0 RHS) is DEAD BY ARITHMETIC at cap 64: a block's stencil-widened surface
+bands are ~84% of its volume, so the sweep cannot shrink meaningfully — the np8 coarse base is
+not reducible this way at this operating point.
+
+**np32 is memory-blocked, not harness-blocked**: both the 240-step and 140-step np32 arms die
+rc=137 (HSA_STATUS_ERROR_OUT_OF_RESOURCES, device OOM) between step 40 and 140, while per-rank
+live blocks match np16 (~75-84) — something in the allocation path grows with GLOBAL box count
+past a GCD at np32. The endstate's O(boxes)/O(boxes x ranks) allocation class (Phase-3 I7/S4)
+is now a measured 4-node blocker, not just an audit finding. np16 probe arm: 13.7 s/step
+(140-40 differenced, probe grade). The np32 ladder point waits on that fix.
+
+Toolchain lesson recorded: mfc.sh prints "Terminated" + exit 143 on BUILD FAILURE — three
+"mystery SIGTERMs" were one link error hidden by tail windows; always capture the full log.
+
 ## 2026-08-25 (26) — FOURTH RUNG (f7wave): 1.343x; THE CHAIN IS DEAD; residual growth is DIFFUSE wait
 
 Job 385918, node set k004-[005-006], f7wave binary (bc91de59): np8 differenced
