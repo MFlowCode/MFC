@@ -127,8 +127,10 @@ contains
 
                             pres_mag%L = 0.5_wp*sum(B%L**2._wp)
                             pres_mag%R = 0.5_wp*sum(B%R**2._wp)
-                            E%L = gamma%L*pres%L + pi_inf%L + 0.5_wp*rho%L*vel_rms%L + qv%L + pres_mag%L
-                            E%R = gamma%R*pres%R + pi_inf%R + 0.5_wp*rho%R*vel_rms%R + qv%R + pres_mag%R  ! includes magnetic energy
+                            call s_compute_energy(pres%L, alpha_rho_L, alpha_L, vel_rms%L, E%L)
+                            E%L = E%L + pres_mag%L
+                            call s_compute_energy(pres%R, alpha_rho_R, alpha_R, vel_rms%R, E%R)
+                            E%R = E%R + pres_mag%R  ! includes magnetic energy
                             H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
                             ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R

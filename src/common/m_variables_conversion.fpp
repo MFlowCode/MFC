@@ -1186,17 +1186,9 @@ contains
 
     end subroutine s_finalize_variables_conversion_module
 
-    !> Mixture coefficients of one state: density, stiffened-gas gamma and stiffness, and heat of formation.
-    !!
-    !! This is the single definition of the coefficient rule, including its one special case. Under
-    !! bubbles_euler with num_fluids == 1 the sole advection slot aliases the void fraction
-    !! (eqn_idx%alf == eqn_idx%adv%end), so `alpha` there is not a composition and the mixture rule
-    !! does not apply: the coefficients are those of the liquid, fluid 1.
-    !!
-    !! Volume-fraction clipping is deliberately left to callers. It is not uniform - m_riemann_solver_hll
-    !! clips its local arrays while m_riemann_solver_hllc clips the shared reconstruction buffers in
-    !! place, which has consumers downstream - and it can never coincide with the special case above,
-    !! because case_validator prohibits mpp_lim with num_fluids == 1.
+    !> Mixture coefficients of one state. Under bubbles_euler with num_fluids == 1 the sole advection slot aliases the void fraction
+    !! (eqn_idx%alf == eqn_idx%adv%end), so alpha is not a composition there and the coefficients are the liquid's. Clipping stays
+    !! with callers; it differs between solvers and cannot coincide with that case, as mpp_lim requires num_fluids > 1.
     subroutine s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
 
         $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients', parallelism='[seq]', cray_inline=True)
@@ -1231,15 +1223,8 @@ contains
 
     end subroutine s_compute_mixture_coefficients
 
-    !> Total energy per unit volume of a stiffened-gas state.
-    !!
-    !! Thermodynamic contributions only. Magnetic energy (pres_mag) and elastic energy are added by the
-    !! caller, because they are not equation-of-state terms: folding them in here would make the
-    !! operator impossible to reuse for a second equation of state.
-    !!
-    !! The chemistry and relativistic branches of the Riemann solvers do not use this relation at all -
-    !! chemistry builds E from the mixture internal energy and the relativistic form is unrelated - so
-    !! those sites are deliberately left open-coded.
+    !> Total energy per unit volume, thermodynamic terms only. Callers add magnetic and elastic energy, which are not
+    !! equation-of-state terms. The chemistry and relativistic branches use a different relation and stay open-coded.
     subroutine s_compute_energy(pres, alpha_rho_K, alpha_K, vel_sum, E)
 
         $:GPU_ROUTINE(function_name='s_compute_energy', parallelism='[seq]', cray_inline=True)
@@ -1261,15 +1246,10 @@ contains
 
     !> Compute the speed of sound of a thermodynamic state.
     !!
-    !! The enthalpy is not an argument. For a real state it is fixed by the arguments that are, and it
-    !! cancels out of the stiffened-gas branch entirely: substituting
-    !! H = ((Gamma + 1)p + Pi + qv)/rho + |u|^2/2 into c^2 = (H - |u|^2/2 - qv/rho)/Gamma leaves
-    !! c^2 = ((Gamma + 1)p + Pi)/(Gamma rho), free of H, |u|^2 and qv alike. Asking callers to supply
-    !! those three is what let #1707 happen - five sites open-coded H and three of them dropped the qv
-    !! this routine then subtracted - and here there is nothing to open-code, so it cannot recur.
-    !!
-    !! An average of two states is not a state: its enthalpy is a free input rather than a function of
-    !! its pressure and density. Those callers use s_compute_speed_of_sound_avg.
+    !! Enthalpy is not an argument: substituting H = ((Gamma + 1)p + Pi + qv)/rho + |u|^2/2 into
+    !! c^2 = (H - |u|^2/2 - qv/rho)/Gamma leaves c^2 = ((Gamma + 1)p + Pi)/(Gamma rho), so H, |u|^2
+    !! and qv all cancel. Averaged states, whose enthalpy is a free input, use
+    !! s_compute_speed_of_sound_avg.
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1323,14 +1303,10 @@ contains
 
     !> Compute the speed of sound of an interface-averaged state.
     !!
-    !! A Roe or arithmetic average of two states is not itself a state: the enthalpy it carries is an
-    !! average of two enthalpies, not the one its own pressure and density imply, so the caller has to
-    !! supply it - and with it |u|^2 and qv, which no longer cancel against it.
-    !!
-    !! Only the three branches below read an enthalpy. Every other equation of state is a function of
-    !! the state alone, for which an average behaves exactly like a state, so those are deferred to
-    !! s_compute_speed_of_sound rather than written out a second time. Keep the condition below in
-    !! step with the branch list there.
+    !! An average of two states is not a state: its enthalpy is not the one its pressure and density
+    !! imply, so the caller supplies it, along with |u|^2 and qv. Only the enthalpy-reading branches
+    !! differ; the rest defer to s_compute_speed_of_sound. Keep the condition below in step with the
+    !! branch list there.
     subroutine s_compute_speed_of_sound_avg(pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c, adv, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
