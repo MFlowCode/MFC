@@ -7,6 +7,37 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-25 (25) — THIRD RUNG (f5asel): 1.368x; restr growth is the F7 PER-BOX CHAIN, not skew
+
+Job 385698, same pairwise design, node set k004-[005,008] (NOT the (24) set — cross-rung
+phase deltas are directional only; the within-job ratio is the honest number): np8
+differenced (2452.939-119.330)/200 = **11.67 s/step**, np16 (3355.078-163.324)/200 =
+**15.96 s/step** -> rung = **1.368x** (ladder: 1.594x -> 1.544x -> 1.368x; bar 1.192x;
+excess **1.147x**, was 1.30x). F5a moved np16 -10.4% while np8 stayed flat (+1.1%,
+noise) — the wire-cuts-pay-more-inter-node rule now proven twice.
+
+**The rs:\* verdict (the (24) design gate) REDIRECTS the program.** Differenced growth
+np16-np8: restr +2.04 of which **rs:rest +1.69 (ratio 2.20, imbalance 1.13)**,
+rs:wave +0.35 (imb 1.82), rs:rfp +0.00; coarse +1.02 (imb 1.76); rf:wait +0.31;
+regrid +0.26; gather +0.24; halo +0.17; seam +0.13; rhs +0.12 (ratio 1.03 — physics
+scales BELOW the bar). Closure exact (restr = rs:rest+rs:wave+rs:rfp = 3.742).
+Low imbalance right after the synchronizing freg wave means rs:rest growth is genuine
+per-rank cost, not skew — and per-rank restrict WORK is weak-scaling-constant, so the
+cost that doubles is the **fold loop's per-global-box serialized P2P chain**
+(s_restrict_fine_to_coarse: owner ISEND+WAITALL per box, receivers blocking RECV per
+box, every rank walking ALL global slots in order — the per-box-rendezvous root cause
+surviving in the F7 family). The assumed ~4.7 s/step "stage-skew pool" was really
+~0.65 of wait (rs:wave + rf:wait) + a chain that the wave discipline already knows how
+to kill. **Stage-skew/overlap mega-design DEMOTED; next increment = I5b F7 restrict
+wave (design ready: amr-bench/notes/i5b_f7_design.md, its ladder gate now satisfied).**
+coarse (+1.02, imb 1.76, wait INSIDE the L0 s_compute_rhs) is #2 and stays skew-class.
+
+Same-day k004-001 anchor (user-held node, lpair-k1floor-f5asel-0825_1808, f5asel
+binary): reps 9.92 / 10.90 -> **floor 10.41 s/step**, rep spread 9.9% (2x the historic
+noise floor; both reps ran beside the rung job — cross-job lustre/fabric contention.
+A/B probes on this node must run arms back-to-back). Node-era spread is large: same
+binary measures np8 = 9.92-10.90 (k004-001) vs 11.67 (k004-005) — same-node A/B only.
+
 ## 2026-08-25 (24) — SECOND INTER-NODE RUNG (f2clip): 1.544x per doubling; the clip pays MORE inter-node
 
 Job 385612, same self-contained pairwise design as (21), node set k004-[006-007]:
