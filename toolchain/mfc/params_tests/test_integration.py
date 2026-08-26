@@ -263,5 +263,40 @@ class TestValidatorIntegration(unittest.TestCase):
         self.assertEqual(validator_log_params, registry_log_params)
 
 
+class TestDomainExtents(unittest.TestCase):
+    """Tests for the pre-process domain extent requirement."""
+
+    # 2D case with no (xyz)_domain entries
+    BASE = {"m": 100, "n": 50, "num_patches": 1}
+
+    def _errors(self, params, stage):
+        from ..case_validator import CaseConstraintError, CaseValidator
+
+        validator = CaseValidator(params)
+        try:
+            validator.validate(stage)
+        except CaseConstraintError:
+            pass
+        return [e for e in validator.errors if "domain%" in e and "must be set" in e]
+
+    def test_missing_extents_rejected(self):
+        """Every dimension with cells needs its extents when generating a grid."""
+        self.assertEqual(len(self._errors(self.BASE, "pre_process")), 4)
+
+    def test_restart_does_not_need_extents(self):
+        """old_grid = T reads the mesh from the grid files, so the extents are not needed."""
+        params = {**self.BASE, "old_grid": "T", "old_ic": "T", "t_step_old": 7000, "num_patches": 0}
+
+        for stage in ("pre_process", "simulation", "post_process"):
+            with self.subTest(stage=stage):
+                self.assertEqual(self._errors(params, stage), [])
+
+    def test_extents_not_required_outside_pre_process(self):
+        """(xyz)_domain is a pre-process parameter only."""
+        for stage in ("simulation", "post_process"):
+            with self.subTest(stage=stage):
+                self.assertEqual(self._errors(self.BASE, stage), [])
+
+
 if __name__ == "__main__":
     unittest.main()

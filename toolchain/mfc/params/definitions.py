@@ -27,7 +27,7 @@ def _fc(name: str, default: int) -> int:
 
 
 NF = _fc("num_fluids_max", 10)  # fluid_pp
-NPR = _fc("num_probes_max", 10)  # probe, acoustic, integral
+NPR = _fc("num_probes_max", 10)  # probe, acoustic
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max_namelist", 54000)  # patch_ib namelist array bound
@@ -129,7 +129,7 @@ TAG_DISPLAY_NAMES = {
     "acoustic": "Acoustic",
     "ib": "Immersed boundary",
     "reactive_burn": "Reactive burn",
-    "probes": "Probe/integral",
+    "probes": "Probe",
     "riemann": "Riemann solver",
     "relativity": "Relativity",
     "output": "Output",
@@ -337,9 +337,9 @@ CONSTRAINTS = {
     },
     # Model equations
     "model_eqns": {
-        "choices": [1, 2, 3, 4],
-        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation", 4: "4-Equation"},
-        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3, "4eq": 4},
+        "choices": [1, 2, 3],
+        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation"},
+        "names": {"gamma_law": 1, "5eq": 2, "6eq": 3},
     },
     # Bubbles
     "bubble_model": {
@@ -376,10 +376,9 @@ CONSTRAINTS = {
     "num_fluids": {"min": 1, "max": NF},
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
-    "ib_neighborhood_radius": {"min": 1},
+    "ib_neighborhood_radius": {"min": 0},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
-    "num_integrals": {"min": 1},
     "nb": {"min": 1},
     "m": {"min": 0},
     "n": {"min": 0},
@@ -392,7 +391,7 @@ DEPENDENCIES = {
         "when_true": {
             "recommends": ["nb", "polytropic"],
             "requires_value": {
-                "model_eqns": [2, 4],
+                "model_eqns": [2],
                 "riemann_solver": [2],
                 "avg_state": [2],
             },
@@ -402,7 +401,6 @@ DEPENDENCIES = {
         "when_value": {
             2: {"requires": ["num_fluids"]},
             3: {"requires_value": {"riemann_solver": [2], "avg_state": [2], "wave_speeds": [1]}},
-            4: {"requires": ["rhoref", "pref"], "requires_value": {"num_fluids": [1]}},
         }
     },
     "viscous": {
@@ -495,6 +493,29 @@ DEPENDENCIES = {
             "requires": ["mhd"],
         }
     },
+    "riemann_hypo_ADC": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [2, 4],
+            },
+        }
+    },
+    "hypo_hll_interface_rhs": {
+        "when_true": {
+            "requires": ["hypoelasticity"],
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
+    "hll_u_interface": {
+        "when_true": {
+            "requires_value": {
+                "riemann_solver": [1],
+            },
+        }
+    },
     "schlieren_wrt": {
         "when_true": {
             "requires": ["fd_order"],
@@ -508,11 +529,6 @@ DEPENDENCIES = {
     "cfl_dt": {
         "when_true": {
             "recommends": ["cfl_target"],
-        }
-    },
-    "integral_wrt": {
-        "when_true": {
-            "requires": ["fd_order"],
         }
     },
 }
@@ -619,6 +635,10 @@ def _load():
 
     # Hypoelasticity
     _r("hypoelasticity", LOG, {"hypoelasticity"})
+    _r("riemann_hypo_ADC", LOG, {"hypoelasticity"})
+    _r("ADC_kappa", REAL, {"hypoelasticity"})
+    _r("hypo_hll_interface_rhs", LOG, {"hypoelasticity"})
+    _r("hll_u_interface", LOG, {"riemann"})
 
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
@@ -650,10 +670,8 @@ def _load():
     _r("many_ib_patch_parallelism", LOG, {"ib"})
 
     # Probes
-    for n in ["num_probes", "num_integrals"]:
-        _r(n, INT, {"probes"})
+    _r("num_probes", INT, {"probes"})
     _r("probe_wrt", LOG, {"output", "probes"})
-    _r("integral_wrt", LOG, {"output", "probes"})
 
     # Output
     _r("precision", INT, {"output"})
@@ -770,9 +788,7 @@ def _load():
         "flux_lim",
     ]:
         _r(n, INT)
-    _r("pref", REAL, math=r"\f$p_\text{ref}\f$")
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
-    _r("rhoref", REAL, math=r"\f$\rho_\text{ref}\f$")
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
@@ -1025,9 +1041,13 @@ def _load():
     _pb_attrs["radius"] = (REAL, _pb_tags)
     _pb_attrs["mass"] = (REAL, _pb_tags)
     _pb_attrs["min_spacing"] = (REAL, _pb_tags)
+    _pb_attrs["shell_inner_radius"] = (REAL, _pb_tags)
+    _pb_attrs["shell_outer_radius"] = (REAL, _pb_tags)
     _pb_attrs["moving_ibm"] = (INT, _pb_tags)
     _pb_attrs["seed"] = (INT, _pb_tags)
+    _pb_attrs["cloud_geometry"] = (INT, _pb_tags)
     _pb_attrs["packing_method"] = (INT, _pb_tags)
+    _pb_attrs["periodic"] = (INT, _pb_tags)
     REGISTRY.register_family(
         IndexedFamily(
             base_name="particle_cloud",
@@ -1070,12 +1090,6 @@ def _load():
     for i in range(1, NPR + 1):
         for d in ["x", "y", "z"]:
             _r(f"probe({i})%{d}", REAL, {"probes"})
-
-    # integrals (5 integral regions)
-    for i in range(1, 6):
-        for d in ["x", "y", "z"]:
-            _r(f"integral({i})%{d}min", REAL, {"probes"})
-            _r(f"integral({i})%{d}max", REAL, {"probes"})
 
     # Extended BC
     for d in ["x", "y", "z"]:
@@ -1230,7 +1244,6 @@ TYPED_DECLS: dict[str, tuple] = {
     "ib_airfoil": ("type(ib_airfoil_parameters)", "num_ib_airfoils_max", True, "Per-airfoil NACA user inputs"),
     "stl_models": ("type(ib_stl_parameters)", "num_stl_models_max", True, "Per-STL model parameters"),
     "probe": ("type(vec3_dt)", "num_probes_max", False, None),
-    "integral": ("type(integral_parameters)", "num_probes_max", False, None),
     "acoustic": ("type(acoustic_parameters)", "num_probes_max", True, "Acoustic source parameters"),
     "chem_params": ("type(chemistry_parameters)", None, True, None),
     "rburn": ("type(reactive_burn_parameters)", None, True, "Condensed-phase reactive-burn (programmed detonation) parameters"),
@@ -1292,8 +1305,6 @@ _nv(
     "relax_model",
     "fluid_pp",
     "bub_pp",
-    "rhoref",
-    "pref",
     "bubbles_euler",
     "bubbles_lagrange",
     "R0ref",
@@ -1371,6 +1382,10 @@ _nv(
     "int_comp",
     "ic_eps",
     "ic_beta",
+    "riemann_hypo_ADC",
+    "ADC_kappa",
+    "hll_u_interface",
+    "hypo_hll_interface_rhs",
     "wave_speeds",
     "low_Mach",
     "hyper_cleaning_speed",
@@ -1381,9 +1396,6 @@ _nv(
     "probe_wrt",
     "num_probes",
     "probe",
-    "integral_wrt",
-    "num_integrals",
-    "integral",
     "acoustic_source",
     "num_source",
     "acoustic",

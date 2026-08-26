@@ -8,7 +8,7 @@
 # flux: --job-name="${name}"
 # flux: --output="${name}.out"
 # flux: --error="${name}.err"
-# flux: --time=${walltime}
+# flux: --time-limit=${walltime}
 # flux: --exclusive
 # flux: --setattr=thp=always
 % if account:

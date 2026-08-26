@@ -198,7 +198,7 @@ Both human reviewers and AI code reviewers reference this section.
 
 ### Physics and Model Consistency
 
-- **Pressure formula** must match `model_eqns` value. Model 2/3 (multi-fluid), model 4 (bubbles), MHD, and hypoelastic each use different EOS formulations. Wrong formula = wrong physics.
+- **Pressure formula** must match `model_eqns` value. Model 2/3 (multi-fluid), MHD, and hypoelastic each use different EOS formulations. Wrong formula = wrong physics.
 - **Conservative-primitive conversion:** Density recovery, kinetic energy, and pressure each have model-specific paths. Verify the correct branch is taken.
 - **Volume fractions** must sum to 1. `alpha_rho_K` must be non-negative. Species mass fractions should be clipped to [0,1].
 - **Boundary conditions:** Periodic BCs must match at both ends (`bc_x%%beg` and `bc_x%%end`). Cylindrical coordinates have special requirements (`bc_y%%beg = -14` for axis in 3D).

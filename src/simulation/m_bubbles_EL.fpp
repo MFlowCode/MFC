@@ -372,15 +372,14 @@ contains
         do i = 1, num_dims
             dynP = dynP + 0.5_wp*q_cons_vf(eqn_idx%cont%end + i)%sf(cell(1), cell(2), cell(3))**2/rhol
         end do
-        pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
+        ! Stiffened-gas inversion; must match s_compute_pressure in m_variables_conversion,
+        ! including the qv (heat of formation) term, which is nonzero for phase-change fluids.
+        pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf - qv)/gamma
         if (pliq < 0) print *, "Negative pressure", proc_rank, q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, &
             & pliq, cell, dynP
 
         ! Initial particle pressure
         gas_p(bub_id, 1) = pliq + 2._wp*(1._wp/Web)/bub_R0(bub_id)
-        if (.not. f_approx_equal((1._wp/Web), 0._wp)) then
-            pref = gas_p(bub_id, 1)
-        end if
 
         ! Initial particle mass
         volparticle = 4._wp/3._wp*pi*bub_R0(bub_id)**3._wp  ! volume
@@ -1797,7 +1796,7 @@ contains
                 do i = 0, m
                     lag_void_max = max(lag_void_max, 1._wp - q_beta(1)%sf(i, j, k))
                     call s_get_char_vol(i, j, k, volcell)
-                    if ((1._wp - q_beta(1)%sf(i, j, k)) > 5.0d-11) then
+                    if ((1._wp - q_beta(1)%sf(i, j, k)) > 5.0e-11_wp) then
                         lag_void_avg = lag_void_avg + (1._wp - q_beta(1)%sf(i, j, k))*volcell
                         lag_vol = lag_vol + volcell
                     end if

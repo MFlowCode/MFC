@@ -1,8 +1,5 @@
 """
 Parameter Validation Test Infrastructure.
 
-This package provides tools for:
-- Exporting parameter inventory
-- Capturing validation snapshots
-- Comparing validation behavior across refactoring
+Unit tests for the parameter registry, schema, generators, and validation.
 """

@@ -1,40 +1,21 @@
-## Description
+## Contribution Policy
 
-Summarize your changes and the motivation behind them.
+We do not accept pull requests generated primarily by AI without genuine understanding or real-world usage context.
 
-Closes #(issue number).
+All contributions are expected to demonstrate:
+- A clear understanding of the codebase
+- Alignment with product direction
+- Thoughtful reasoning behind changes
+- Evidence of real-world usage or hands-on experience with the problem
 
-### Type of change (delete unused ones)
+If these expectations are not met, we would prefer to implement the changes ourselves rather than spend time reviewing low-effort submissions.
 
-- Bug fix
-- New feature
-- Refactor
-- Documentation
-- Other (describe)
+---
 
-## Testing
+## Acknowledgement
 
-How did you test your changes?
+- [ ] I confirm this PR meets the above expectations and reflects my own understanding and real-world context.
 
-## Checklist
+---
 
-__Check these like this `[x]` to indicate which of the below applies.__
-
-- [ ] I added or updated tests for new behavior
-- [ ] I updated documentation if user-facing behavior changed
-
-See the [developer guide](https://mflowcode.github.io/documentation/contributing.html) for full coding standards.
-
-<details>
-<summary><strong>GPU changes</strong> (expand if you modified <code>src/simulation/</code>)</summary>
-
-- [ ] GPU results match CPU results
-- [ ] Tested on NVIDIA GPU or AMD GPU
-
-</details>
-
-## AI code reviews
-
-Reviews are not retriggered automatically. To request a review, comment on the PR:
-- `@claude full review` — Claude full review (also triggers on PR open/reopen/ready)
-- Or add label `claude-full-review` — Claude full review via label
+_PR template credit: junegunn_

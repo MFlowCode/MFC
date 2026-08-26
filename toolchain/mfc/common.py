@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import typing
 from os.path import abspath, dirname, join, normpath, realpath
 
@@ -135,10 +136,21 @@ def get_program_output(arguments: typing.List[str] = None, cwd=None):
 
 
 def get_py_program_output(filepath: str, arguments: typing.List[str] = None):
+    """Run a case file and capture its stdout.
+
+    sys.executable, not a bare "python3": a case file imports the same optional deps the
+    toolchain venv provides (cantera, pyrometheus, scipy, ...), so it must run under the
+    interpreter the toolchain itself is running under. Nearly every entry point activates
+    the venv first, which makes PATH's python3 the venv's -- but a caller that invokes
+    build/venv/bin/python3 DIRECTLY does not, and then case files silently ran under the
+    system interpreter instead. That is what made coverage-health.yml report 16 chemistry
+    cases as unloadable with ModuleNotFoundError: No module named 'cantera', in a job whose
+    venv had cantera installed.
+    """
     dirpath = os.path.abspath(os.path.dirname(filepath))
     filename = os.path.basename(filepath)
 
-    return get_program_output(["python3", filename] + arguments, cwd=dirpath)
+    return get_program_output([sys.executable, filename] + arguments, cwd=dirpath)
 
 
 def isspace(s: str) -> bool:

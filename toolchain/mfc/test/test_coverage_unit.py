@@ -438,12 +438,12 @@ def test_health_quiet_repo_is_not_stale_when_map_is_current():
         now="2026-05-29T00:00:00+00:00",
         max_age_days=10,
         min_fraction=0.8,
-        built_after_last_change=True,
+        verified_after_last_change=True,
     )
     assert ok, msg
 
 
-def test_health_fails_immediately_when_map_predates_last_source_change():
+def test_health_fails_immediately_when_no_refresh_ran_since_last_source_change():
     """Detects a dead refresh on the next relevant push, not 10 days later."""
     ok, msg = map_health(
         meta={"built_at": "2026-05-28T00:00:00+00:00", "n_tests": 600},
@@ -452,7 +452,7 @@ def test_health_fails_immediately_when_map_predates_last_source_change():
         now="2026-05-29T00:00:00+00:00",
         max_age_days=10,
         min_fraction=0.8,
-        built_after_last_change=False,
+        verified_after_last_change=False,
     )
     assert not ok and "stale" in msg.lower()
 
@@ -535,3 +535,97 @@ def test_guard_errors_when_the_rebuilt_map_is_missing():
         rc = _run_guard(repo)
     assert rc == 2
     assert rc != 10
+
+
+# --- check_coverage_map_health.py: the freshness signal the health workflow branches on ---
+
+HEALTH_SCRIPT = Path(__file__).resolve().parents[3] / ".github" / "scripts" / "check_coverage_map_health.py"
+
+
+def _health_module():
+    """Import the health script by path; it is a script, not an installed module."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("check_coverage_map_health", HEALTH_SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _repo_with_history(d):
+    """A throwaway repo: one commit touching src/**/*.fpp, then one that does not."""
+    repo = Path(d)
+    env = _env_without_git()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
+    subprocess.run([*git, "init", "-q", "-b", "master"], check=True, env=env)
+    (repo / "src" / "simulation").mkdir(parents=True)
+    (repo / "src" / "simulation" / "m_rhs.fpp").write_text("! v1\n")
+    subprocess.run([*git, "add", "-A"], check=True, env=env)
+    subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "relevant"], check=True, env=env)
+    relevant = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True, env=env).stdout.strip()
+    (repo / "README.md").write_text("docs\n")
+    subprocess.run([*git, "add", "-A"], check=True, env=env)
+    subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "irrelevant"], check=True, env=env)
+    later = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True, env=env).stdout.strip()
+    return repo, relevant, later
+
+
+def _set_verified(repo, sha):
+    subprocess.run(["git", "-C", str(repo), "update-ref", "refs/coverage-map/verified", sha], check=True, env=_env_without_git())
+
+
+def test_verified_sha_is_none_when_the_ref_was_never_pushed():
+    """A fork, or the window before the first refresh: undeterminable, not broken."""
+    health = _health_module()
+    with tempfile.TemporaryDirectory() as d:
+        repo, _, _ = _repo_with_history(d)
+        assert health.verified_sha(cwd=repo) is None
+        # None must reach map_health as None, which falls back to the wall-clock rule.
+        assert health.verified_after_last_change(health.verified_sha(cwd=repo), cwd=repo) is None
+
+
+def test_verified_after_last_change_true_when_a_refresh_ran_since_the_change():
+    health = _health_module()
+    with tempfile.TemporaryDirectory() as d:
+        repo, relevant, later = _repo_with_history(d)
+        _set_verified(repo, later)
+        assert health.verified_sha(cwd=repo) == later
+        assert health.verified_after_last_change(later, cwd=repo) is True
+        # The relevant commit itself counts: a refresh AT the change is current.
+        assert health.verified_after_last_change(relevant, cwd=repo) is True
+
+
+def test_verified_after_last_change_false_when_the_refresh_predates_the_change():
+    """The genuine broken-refresh case this check exists to catch."""
+    health = _health_module()
+    with tempfile.TemporaryDirectory() as d:
+        repo, relevant, _ = _repo_with_history(d)
+        env = _env_without_git()
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
+        before = subprocess.run([*git, "rev-parse", "HEAD~1"], capture_output=True, text=True, check=True, env=env).stdout.strip()
+        assert before == relevant
+        (repo / "src" / "simulation" / "m_rhs.fpp").write_text("! v2\n")
+        subprocess.run([*git, "add", "-A"], check=True, env=env)
+        subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "relevant again"], check=True, env=env)
+        _set_verified(repo, relevant)
+        assert health.verified_after_last_change(relevant, cwd=repo) is False
+
+
+def test_a_no_op_refresh_still_keeps_the_map_healthy():
+    """The regression #1683 introduced: unchanged entries push no commit, so the map's
+    _meta.git_sha stays behind while the refresh is working. The ref, not git_sha, is what
+    the health check reads -- an old git_sha must not read as STALE."""
+    health = _health_module()
+    with tempfile.TemporaryDirectory() as d:
+        repo, relevant, later = _repo_with_history(d)
+        _set_verified(repo, later)
+        ok, msg = map_health(
+            meta={"built_at": "2026-05-28T00:00:00+00:00", "git_sha": "ancient", "n_tests": 1},
+            current_keys={"a"},
+            mapped_keys={"a"},
+            now="2026-05-29T00:00:00+00:00",
+            max_age_days=10,
+            min_fraction=0.8,
+            verified_after_last_change=health.verified_after_last_change(health.verified_sha(cwd=repo), cwd=repo),
+        )
+    assert ok, msg

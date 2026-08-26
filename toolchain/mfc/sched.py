@@ -54,9 +54,7 @@ class WorkerThreadHolder:
     start: float = 0.0
     # Track which milestones we've already logged
     notified_interactive: bool = False  # First notification in interactive mode (time varies by dimensionality)
-    notified_2m: bool = False  # Headless mode: 2 minute milestone
-    notified_10m: bool = False  # Headless mode: 10 minute milestone
-    notified_30m: bool = False  # Headless mode: 30 minute milestone
+    notified_headless: typing.Set[int] = dataclasses.field(default_factory=set)  # Headless mode: HEADLESS_THRESHOLDS indices already logged
 
 
 @dataclasses.dataclass
@@ -137,22 +135,12 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Optional[typi
                         cons.print(f"  [italic yellow]Still running[/italic yellow] ({dim_label}, >{time_label}) [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
                         holder.notified_interactive = True
 
-            # headless: milestone notifications at 2, 10, 30 minutes
+            # headless: one notification per HEADLESS_THRESHOLDS milestone
             else:
-                # 2 minutes
-                if (not holder.notified_2m) and elapsed >= 2 * 60:
-                    cons.print(f"  {HEADLESS_THRESHOLDS[0][1]} [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
-                    holder.notified_2m = True
-
-                # 10 minutes
-                if (not holder.notified_10m) and elapsed >= 10 * 60:
-                    cons.print(f"  {HEADLESS_THRESHOLDS[1][1]} [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
-                    holder.notified_10m = True
-
-                # 30 minutes
-                if (not holder.notified_30m) and elapsed >= 30 * 60:
-                    cons.print(f"  {HEADLESS_THRESHOLDS[2][1]} [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
-                    holder.notified_30m = True
+                for i, (secs, message) in enumerate(HEADLESS_THRESHOLDS):
+                    if i not in holder.notified_headless and elapsed >= secs:
+                        cons.print(f"  {message} [bold magenta]{case_uuid}[/bold magenta]  {case_trace}")
+                        holder.notified_headless.add(i)
 
         # update the interactive "Running" row
         if interactive and running_tracker is not None:

@@ -85,8 +85,20 @@ class TestCheckUnknownParams(unittest.TestCase):
         errors = check_unknown_params(params)
         self.assertEqual(len(errors), 1)
         self.assertIn("Valid attributes", errors[0])
-        self.assertIn("geometry", errors[0])
         self.assertNotIn("Did you mean", errors[0])
+
+    @unittest.skipUnless(RAPIDFUZZ_AVAILABLE, "rapidfuzz not installed")
+    def test_family_attr_typo_lists_intended_attr_first(self):
+        """The intended attribute must survive truncation of the valid-attribute list.
+
+        _family_attr_error orders by similarity before truncating at 8, so this only
+        holds when rapidfuzz is installed; without it the list is plain alphabetical
+        and patch_ib's 26 attributes push 'geometry' past the cut.
+        """
+        params = {"patch_ib(1)%geometri": 1}
+        errors = check_unknown_params(params)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("geometry", errors[0])
 
     def test_family_valid_attr_no_error(self):
         """Valid family param should not generate an error."""

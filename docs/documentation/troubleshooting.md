@@ -539,8 +539,7 @@ If you can't resolve an issue:
 
 4. **Use the CLI help:**
    ```bash
-   ./mfc.sh help debugging
-   ./mfc.sh help gpu
+   ./mfc.sh --help
    ./mfc.sh <command> -h
    ```
 

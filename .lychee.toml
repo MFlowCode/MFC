@@ -32,4 +32,5 @@ exclude = [
     "https://apps\\.microsoft\\.com/store/detail/",  # Microsoft Store detail pages return 403 to automated requests
     "https://code\\.visualstudio\\.com/?$",           # Root page returns 403 to automated requests
     "https://stackoverflow\\.com",                    # Returns 403 to automated requests
+    "https://marketplace\\.visualstudio\\.com",        # Returns 503 to automated requests
 ]

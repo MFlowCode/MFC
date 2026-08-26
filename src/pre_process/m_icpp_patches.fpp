@@ -16,7 +16,7 @@ module m_icpp_patches
     use m_model  ! Subroutine(s) related to STL files
     use m_derived_types  ! Definitions of the derived types
     use m_global_parameters
-    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius, model_eqns_4eq
+    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
     use m_helper_basic
     use m_helper
     use m_mpi_common
@@ -177,14 +177,10 @@ contains
         integer :: i, j, k
 
         ! Placeholders for the cell boundary values
-        real(wp) :: pi_inf, gamma, lit_gamma
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
 
-        pi_inf = pi_infs(1)
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
         j = 0
         k = 0
 
@@ -602,15 +598,10 @@ contains
         integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k                   !< generic loop iterators
-        real(wp)                                                 :: pi_inf, gamma, lit_gamma  !< Equation of state parameters
+        integer                                                  :: i, j, k  !< generic loop iterators
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
-
-        pi_inf = pi_infs(1)
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
 
         ! Transferring the rectangle's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -638,13 +629,6 @@ contains
 
                         if (patch_icpp(patch_id)%hcid /= dflt_int) then
                             @:Hardcoded2D()
-                        end if
-
-                        if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == model_eqns_4eq)) then
-                            ! zero density, reassign according to Tait EOS
-                            q_prim_vf(1)%sf(i, j, 0) = (((q_prim_vf(eqn_idx%E)%sf(i, j, &
-                                      & 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))*rhoref*(1._wp &
-                                      & - q_prim_vf(eqn_idx%alf)%sf(i, j, 0))
                         end if
 
                         ! Updating the patch identities bookkeeping variable
@@ -728,16 +712,11 @@ contains
         integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k                   !< generic loop iterators
-        real(wp)                                                 :: pi_inf, gamma, lit_gamma  !< equation of state parameters
-        real(wp)                                                 :: L0, U0                    !< Taylor Green Vortex parameters
+        integer                                                  :: i, j, k  !< generic loop iterators
+        real(wp)                                                 :: L0, U0   !< Taylor Green Vortex parameters
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
-
-        pi_inf = pi_infs(1)
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -803,14 +782,9 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
         ! Placeholders for the cell boundary values
-        real(wp) :: pi_inf, gamma, lit_gamma
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
-
-        pi_inf = pi_infs(1)
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid

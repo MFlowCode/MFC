@@ -18,7 +18,6 @@ from .common import MFCException, create_directory, debug, delete_directory, for
 from .printer import cons
 from .run import input
 from .state import ARG, CFG, gpuConfigOptions
-from .user_guide import Tips
 
 # Regex to parse build progress
 # Ninja format: [42/156] Building Fortran object ...
@@ -506,7 +505,6 @@ class MFCTarget:
             cons.print(f"  [bold red]✗[/bold red] Configuration failed for [magenta]{self.name}[/magenta]")
             if verbosity < 2:
                 _show_build_error(result, "Configuration")
-            Tips.after_build_failure()
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
 
         cons.print(f"  [bold green]✓[/bold green] Configured [magenta]{self.name}[/magenta]")
@@ -553,7 +551,6 @@ class MFCTarget:
             cons.print(f"  [bold red]✗[/bold red] Build failed for [magenta]{self.name}[/magenta]")
             if verbosity < 2:
                 _show_build_error(result, "Build")
-            Tips.after_build_failure()
             raise MFCException(f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
 
         cons.print(f"  [bold green]✓[/bold green] Built [magenta]{self.name}[/magenta]")

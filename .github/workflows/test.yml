@@ -306,6 +306,30 @@ jobs:
             /bin/bash mfc.sh test -v --dry-run -j 2 --test-all --gpu mp
           '
 
+      # Case-optimized build guard.
+      #
+      # --case-optimization hard-codes case parameters into the generated
+      # sources, which sharply increases cross-file inlining pressure in the
+      # -Mextract/-Minline IPO pass (cmake/MFCTargets.cmake). That pass is
+      # where NVHPC fort2 has historically hit internal compiler errors, and
+      # the jobs above cannot see them: they never pass --case-optimization,
+      # and the self-hosted case-opt jobs run a single pinned NVHPC. NVHPC
+      # 25.5 shipped an ICE that was invisible to CI for exactly that reason.
+      #
+      # One 3D case is enough: the failure is at compile time, so nothing is
+      # run. 3D specifically, because m_sim_helpers.fpp guards its 3D block
+      # with "#:if not MFC_CASE_OPTIMIZATION or num_dims > 2" -- a
+      # case-optimized 2D build elides that code entirely. OpenACC only,
+      # since the two-pass IPO is disabled for OpenMP offload.
+      - name: Build (NVHPC GPU, case-optimized)
+        if:   matrix.nvhpc && matrix.target == 'gpu'
+        run: |
+          docker exec nvhpc bash -c '
+            source /etc/nvhpc-env.sh
+            /bin/bash mfc.sh build -v -j 2 --gpu acc -t simulation \
+              -i examples/3D_sphbubcollapse/case.py --case-optimization
+          '
+
       - name: Test (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
         run: |

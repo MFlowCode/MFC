@@ -16,11 +16,13 @@ module m_riemann_solvers
     use m_riemann_solver_lf
     use m_riemann_solver_hll
     use m_riemann_solver_hlld
+    use m_riemann_solver_hypo_hlld
 
     implicit none
 
     private; public :: s_initialize_riemann_solvers_module, s_riemann_solver, s_hll_riemann_solver, s_hllc_riemann_solver, &
-        & s_hlld_riemann_solver, s_lf_riemann_solver, s_finalize_riemann_solvers_module
+        & s_hlld_riemann_solver, s_hypo_hlld_riemann_solver, s_finalize_nc_iface_vel, s_lf_riemann_solver, &
+        & s_finalize_riemann_solver_hatR, s_finalize_nc_iface_vel_hatR, s_finalize_riemann_solvers_module
 
 contains
 
@@ -37,6 +39,16 @@ contains
 
         integer, intent(in)               :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
+
+        ! Hypoelasticity enters the Riemann layer in THREE distinct code shapes:
+        !   1. HLLC - inline "if (hypoelasticity)" branches inside s_hllc_riemann_solver
+        !   2. HLL  - inline "if (hypoelasticity)" branches inside s_hll_riemann_solver
+        !   3. HLLD - a separate module (m_riemann_solver_hypo_hlld), called directly from m_rhs (s_compute_directional_rhs)
+        !      under hypo_nc_mode_dual_pass
+        ! HLLD needs its own path because its anchored dual pass produces BOTH the hat_L and hat_R anchored flux
+        ! sets in one fused solve, whose partial RHS are then summed in m_rhs; HLLC/HLL instead add their
+        ! non-conservative contribution within a single-pass solve. See
+        ! misc/dev_notes/Riemann_and_RHS_source_terms_explanations.md (S5.3).
 
         #:for NAME, NUM in [('hll', 1), ('hllc', 2), ('hlld', 4), ('lf', 5)]
             if (riemann_solver == ${NUM}$) then
@@ -127,6 +139,20 @@ contains
             @:ALLOCATE(Re_avg_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:2))
         end if
 
+        if (use_nc_iface_vel) then
+            @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+        end if
+
+        if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
+            @:ALLOCATE(flux_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+            if (use_nc_iface_vel) then
+                @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+            end if
+            if (cyl_coord) then
+                @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+            end if
+        end if
+
     end subroutine s_initialize_riemann_solvers_module
 
     !> Module deallocation and/or disassociation procedures
@@ -143,8 +169,20 @@ contains
             @:DEALLOCATE(flux_gsrc_rsx_vf)
         end if
         @:DEALLOCATE(Gs_rs)
+        if (use_nc_iface_vel) then
+            @:DEALLOCATE(nc_iface_vel_rsx_vf)
+        end if
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsx_vf)
+        end if
+        if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
+            @:DEALLOCATE(flux_hatR_rsx_vf)
+            if (use_nc_iface_vel) then
+                @:DEALLOCATE(nc_iface_vel_hatR_rsx_vf)
+            end if
+            if (cyl_coord) then
+                @:DEALLOCATE(flux_gsrc_hatR_rsx_vf)
+            end if
         end if
 
     end subroutine s_finalize_riemann_solvers_module

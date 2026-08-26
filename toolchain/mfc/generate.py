@@ -91,7 +91,6 @@ def generate():
 
 def _generate_json_schema():
     """Generate JSON Schema and parameter documentation (standalone mode)."""
-    from .ide import update_vscode_settings
     from .params.generators.docs_gen import generate_parameter_docs
     from .params.generators.json_schema_gen import generate_json_schema, get_schema_stats
 
@@ -104,9 +103,6 @@ def _generate_json_schema():
     # Generate parameter documentation
     docs_path = Path(MFC_ROOT_DIR) / "docs" / "documentation" / "parameters.md"
     docs_path.write_text(generate_parameter_docs())
-
-    # Update VS Code settings
-    update_vscode_settings()
 
     stats = get_schema_stats()
 

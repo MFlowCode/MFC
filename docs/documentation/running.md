@@ -285,7 +285,7 @@ or contribute a new template.
 **SLURM systems:**
 Most clusters use SLURM. MFC automatically generates appropriate `sbatch` scripts.
 
-**LSF systems (e.g., Summit):**
+**LSF systems:**
 IBM's JSRUN does not use the traditional node-based approach. MFC constructs equivalent resource sets for task and GPU counts.
 
 ---
@@ -376,11 +376,11 @@ We have provided an example, `case.py` and `restart_case.py` in `/examples/1D_va
 
 ## Example Runs
 
-- Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
+- Oak Ridge National Laboratory's [Frontier](https://www.olcf.ornl.gov/frontier/):
 
 ```shell
 ./mfc.sh run examples/2D_shockbubble/case.py -e batch \
-               -N 2 -n 4 -t simulation -a <redacted> -c summit
+               -N 2 -n 4 -t simulation -a <redacted> -c frontier
 ```
 
 
