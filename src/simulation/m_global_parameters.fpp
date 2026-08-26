@@ -312,6 +312,9 @@ module m_global_parameters
     !> @}
 
     logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
+    !> 2a: the current fine block's computed prim vars (mom, E) were preloaded from the batched conversion
+    !! (s_amr_convert_prim_batch); s_compute_rhs skips its per-block conversion bit-identically. Host-only.
+    logical :: amr_prim_preloaded = .false.
     !> true on the current block's single owner rank: amr_block_owner(amr_cur) == proc_rank (always true at np=1); kept by
     !! s_set_amr_fine_geometry
     logical :: amr_rank_owns_block = .true.
