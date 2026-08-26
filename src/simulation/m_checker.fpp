@@ -100,16 +100,15 @@ contains
         if (amr) then
             @:PROHIBIT((.not. igr) .and. recon_type /= recon_type_weno, "amr requires WENO reconstruction (or the IGR solver)")
             @:PROHIBIT(time_stepper /= time_stepper_rk3, "amr requires time_stepper = 3 (SSP-RK3)")
+            ! Euler-Euler bubbles disabled under amr (2026-08-25): the mpp_lim pre-conversion rescale
+            ! and the pb/mv quadrature side-state force per-block special cases through the batched
+            ! advance (Phase 2); the support was retired rather than carried. qbmm requires
+            ! bubbles_euler, so this also gates all AMR QBMM paths.
+            @:PROHIBIT(bubbles_euler, "amr does not support Euler-Euler bubbles (bubbles_euler)")
             ! 6-equation: internal-energy equations prolong/restrict on the generic conservative
             ! path; cell-local per-stage pressure relaxation also runs per fine block, mirroring
             ! the coarse stage order.
             @:PROHIBIT(model_eqns /= 2 .and. model_eqns /= 3, "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
-            ! Non-polytropic QBMM carries a pb/mv quadrature side-state whose coarse<->fine coupling
-            ! (prolong + restriction) is P2P-distributed for SINGLE-LEVEL AMR via
-            ! s_amr_gather_coarse_patch_pbmv / s_amr_scatter_pbmv (mirroring q_cons). The MULTI-level
-            ! (parent-side) coupling is not yet distributed, so amr_max_level > 1 is fail-closed at np>=2.
-            @:PROHIBIT(qbmm .and. (.not. polytropic) .and. amr_max_level > 1 .and. num_procs > 1, &
-                       & "amr with non-polytropic QBMM on more than one MPI rank is only supported at amr_max_level = 1: the multi-level (parent-side) pb/mv quadrature side-state coarse/fine coupling is not yet distributed. Run multi-level non-polytropic QBMM on a single rank.")
             ! Riemann-extrapolation BCs modify the WENO coefficient rows near the domain boundary;
             ! the fine advance reuses or block-locally recomputes those arrays, and neither form
             ! carries the coarse boundary special-casing onto an interior block correctly.
@@ -157,17 +156,10 @@ contains
                        & "amr with cyl_coord supports 2D axisymmetric only: the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance")
             ! 2D axisymmetric conservation (radius-weighted restriction + area-weighted reflux) is
             ! implemented for the L0/L1 coarse frame only. Multi-level folds/refluxes in the
-            ! PARENT-FINE frame (host-only per-block coords) and non-polytropic QBMM's pb/mv
-            ! side-state fold-back are not radius-weighted - both fail-closed under cyl_coord.
+            ! PARENT-FINE frame (host-only per-block coords) are not radius-weighted - fail-closed
+            ! under cyl_coord.
             @:PROHIBIT(cyl_coord .and. amr_max_level > 1, &
                        & "amr with cyl_coord supports amr_max_level = 1 only: multi-level axisymmetric restriction/reflux in the parent-fine frame is not yet radius-weighted (conservation would drift)")
-            @:PROHIBIT(cyl_coord .and. qbmm .and. (.not. polytropic), &
-                       & "amr with cyl_coord and non-polytropic QBMM is not supported: the pb/mv quadrature side-state fold-back is not radius-weighted (conservation would drift)")
-            ! non-polytropic QBMM: each block carries its own pb/mv quadrature side-state (prolonged
-            ! piecewise-constant to preserve CHyQMOM realizability, advanced with the block's own rhs
-            ! scratch, restricted back with the moments). The subcycle time-lerps the pb/mv ghost
-            ! shell like the conservative ghosts, and regrid bounces the side-state through pb/mv_stor
-            ! like q_cons - dynamic regrid and subcycling are supported.
             ! static-body IB AMR (SP20) + prescribed-motion moving bodies (SP21): fixed or
             ! analytically-moving (moving_ibm==1) bodies resolved on a static fine block. Multi-body
             ! (num_ibs>1) supported - every body shares the one static block and reuses the
