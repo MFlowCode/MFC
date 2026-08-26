@@ -511,8 +511,10 @@ jobs:
         run:  |
           # build_slug matches the plain log (and per-variant base/chem builds);
           # combined_slug matches Phoenix's single build-and-test allocation.
+          # Use `if` (not `[ -f ] && ...`) so a missing file — e.g. test_slug on
+          # Phoenix's combined jobs — doesn't make the loop exit non-zero under -e.
           for f in ${{ steps.log.outputs.build_slug }}*.out ${{ steps.log.outputs.combined_slug }}.out ${{ steps.log.outputs.test_slug }}.out; do
-            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+            if [ -f "$f" ]; then echo "=== $f ==="; cat "$f"; fi
           done
 
       - name: Archive Logs
