@@ -71,7 +71,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp)                                               :: nR3bar
-        integer(wp)                                            :: i, j, k, l
+        integer                                                :: i, j, k, l
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, l, nR3bar]', collapse=3)
         do l = 0, p
@@ -325,5 +325,66 @@ contains
         end if
 
     end subroutine s_compute_bubble_EE_source
+
+    !> Evaluate the Euler-Euler pressure correction at cell centers and store it in ptil. This mirrors the modified mixture pressure
+    !! that the HLLC solver applies to the reconstructed face states in m_riemann_solver_hllc.fpp, following Ando (2010), Eq. (2.5).
+    !! It is a diagnostic: ptil is read only by the probe output path and never feeds back into the solution.
+    impure subroutine s_compute_ptilde(q_cons_vf, q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
+        real(wp)                                            :: R3bar, R3V2bar, PbwR3bar
+        real(wp)                                            :: myRho, myP, alf, myR, myV, myPb
+        integer                                             :: j, k, l, q, ii
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, q, ii, R3bar, R3V2bar, PbwR3bar, myRho, myP, alf, myR, myV, myPb]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    alf = q_prim_vf(eqn_idx%alf)%sf(j, k, l)
+                    myP = q_prim_vf(eqn_idx%E)%sf(j, k, l)
+
+                    myRho = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do ii = 1, num_fluids
+                        myRho = myRho + q_cons_vf(ii)%sf(j, k, l)
+                    end do
+
+                    if (qbmm) then
+                        R3bar = mom_sp(1)%sf(j, k, l)
+                        R3V2bar = mom_sp(3)%sf(j, k, l)
+                        PbwR3bar = mom_sp(4)%sf(j, k, l)
+                    else
+                        R3bar = 0._wp
+                        R3V2bar = 0._wp
+                        PbwR3bar = 0._wp
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, nb
+                            myR = q_prim_vf(rs(q))%sf(j, k, l)
+                            myV = q_prim_vf(vs(q))%sf(j, k, l)
+                            if (polytropic) then
+                                myPb = 0._wp
+                            else
+                                myPb = q_prim_vf(ps(q))%sf(j, k, l)
+                            end if
+
+                            R3bar = R3bar + weight(q)*(myR**3._wp)
+                            R3V2bar = R3V2bar + weight(q)*(myR**3._wp)*(myV**2._wp)
+                            PbwR3bar = PbwR3bar + weight(q)*f_cpbw_KM(R0(q), myR, myV, myPb)*(myR**3._wp)
+                        end do
+                    end if
+
+                    ! Same degenerate-state guard the HLLC solver uses
+                    if (alf < small_alf .or. R3bar < small_alf) then
+                        ptil(j, k, l) = alf*myP
+                    else
+                        ptil(j, k, l) = alf*(myP - PbwR3bar/R3bar - myRho*R3V2bar/R3bar)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_ptilde
 
 end module m_bubbles_EE

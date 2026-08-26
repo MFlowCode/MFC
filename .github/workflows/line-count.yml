@@ -1,58 +1,55 @@
 name: Lines of Code
 
+# pull_request_target: fork PRs are read-only under pull_request and cannot be
+# commented on. Nothing in pr/ may ever be executed.
+# Unfiltered by path: a PR that stops touching src/ must still run to clean up.
 on:
-  push:
-    branches: [master]
-  pull_request:
-  workflow_dispatch:
+  pull_request_target:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}
+  cancel-in-progress: true
 
 jobs:
-  file-changes:
-    name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
-    steps:
-      - name: Clone
-        uses: actions/checkout@v5
-
-      - name: Detect Changes
-        uses: dorny/paths-filter@v4
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-
   sz:
     name: Core MFC Line Difference
-    if: needs.file-changes.outputs.checkall == 'true'
-    needs: file-changes
     permissions:
       contents: read
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code from PR branch
+      - name: Checkout the base branch
         uses: actions/checkout@v5
         with:
-          path: pr
+          path: base
+          fetch-depth: 0
 
-      - name: Checkout code from MFC master
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ github.event.pull_request.repository }}
-          ref:        ${{ github.event.pull_request.base.ref }}
-          path:       base
-          # repository: MFlowCode/MFC
-          # ref:        master
-          # path:       base
-
+      # git worktree, not actions/checkout: no untrusted checkout in a
+      # privileged workflow. Merge base, not branch tip: a stale branch is not
+      # charged for other people's lines.
       - name: Get Line Diff
+        id: diff
+        working-directory: base
         run: |
-          BASE="$GITHUB_WORKSPACE/base"
-          PR="$GITHUB_WORKSPACE/pr"
-          cd $BASE
-          export MFC_PR=$PR
-          pwd
-          ./mfc.sh init &> tmp.txt
-          ./mfc.sh count_diff
+          git fetch --no-tags origin "+refs/pull/${{ github.event.number }}/head:refs/mfc/pr"
+          git worktree add ../pr refs/mfc/pr
+          git worktree add ../mb "$(git merge-base HEAD refs/mfc/pr)"
+          ./mfc.sh count_diff ../mb ../pr --markdown "$GITHUB_WORKSPACE/loc.md"
+          test -s "$GITHUB_WORKSPACE/loc.md" && echo "changed=true" >> "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
 
+      - name: Comment Line Diff
+        if: steps.diff.outputs.changed == 'true'
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          skip_unchanged: true
+          recreate: true
+          path: loc.md
+
+      # No diff: take down any comment an earlier push left.
+      - name: Remove Line Diff Comment
+        if: steps.diff.outputs.changed == 'false'
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          delete: true

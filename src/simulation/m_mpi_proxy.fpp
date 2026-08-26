@@ -200,16 +200,18 @@ contains
         ! manual: particle_cloud (runtime loop to num_particle_clouds; irregular member subset)
         do i = 1, num_particle_clouds
             #:for VAR in ['x_centroid', 'y_centroid', 'z_centroid', 'length_x', 'length_y', 'length_z', &
-                & 'radius', 'mass', 'min_spacing']
+                & 'radius', 'mass', 'min_spacing', 'shell_inner_radius', 'shell_outer_radius']
                 call MPI_BCAST(particle_cloud(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(particle_cloud(i)%num_particles, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%seed, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%cloud_geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%packing_method, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%periodic, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do
 
-        ! manual: acoustic/probe/integral (combined loop; complex acoustic member set)
+        ! manual: acoustic/probe (combined loop; complex acoustic member set)
         do j = 1, num_probes_max
             do i = 1, 3
                 call MPI_BCAST(acoustic(j)%loc(i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -231,10 +233,6 @@ contains
 
             #:for VAR in [ 'x','y','z' ]
                 call MPI_BCAST(probe(j)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-
-            #:for VAR in [ 'xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax' ]
-                call MPI_BCAST(integral(j)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
 

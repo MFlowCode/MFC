@@ -16,6 +16,7 @@ module m_collisions
     use m_compute_levelset
     use m_ib_patches
     use m_model
+    use m_mpi_proxy
 
     implicit none
 
@@ -65,8 +66,7 @@ contains
 
         ! get is distance used in the force calculation with each IB and each wall
         call s_detect_wall_collisions()
-        ! call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
-        call s_detect_ib_collisions_n2(num_considered_collisions)
+        call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
 
         select case (collision_model)
         case (1)  ! soft sphere model
@@ -253,7 +253,7 @@ contains
         integer                        :: num_raw, local_num_raw
 
         num_raw = 0
-        z_bound = 0; if (num_dims == 3) z_bound = 1
+        z_bound = 0; if (num_dims == 3) z_bound = 2
 
         $:GPU_PARALLEL_LOOP(private='[gp_idx, gp_patch_id, neighbor_patch_id, local_num_raw, i, j, k, ii, jj, kk]', &
                             & copy='[raw_pairs, num_raw]', copyin='[z_bound]')
@@ -264,8 +264,8 @@ contains
             gp_patch_id = ib_markers%sf(i, j, k)
 
             ! search in a cube around the BG for Ib markers belonging to another patch
-            neighbor_search: do ii = i - 1, i + 1
-                do jj = j - 1, j + 1
+            neighbor_search: do ii = i - 2, i + 2
+                do jj = j - 2, j + 2
                     do kk = k - z_bound, k + z_bound
                         neighbor_patch_id = ib_markers%sf(ii, jj, kk)
 
@@ -324,6 +324,9 @@ contains
             ! and if it is not, append it to the list of pairs
             if (.not. already_found) then
                 num_considered_collisions = num_considered_collisions + 1
+                @:PROHIBIT(num_considered_collisions > size(collision_lookup, 1) , &
+                           & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
+
                 collision_lookup(num_considered_collisions, 1) = decoded_pairs(1)
                 collision_lookup(num_considered_collisions, 2) = decoded_pairs(2)
                 collision_lookup(num_considered_collisions, 3) = raw_pairs(pair_idx, 1)
@@ -333,55 +336,6 @@ contains
         $:GPU_UPDATE(device='[collision_lookup]')
 
     end subroutine s_detect_ib_collisions
-
-    subroutine s_detect_ib_collisions_n2(num_considered_collisions)
-
-        integer, intent(out)   :: num_considered_collisions
-        integer                :: pid1, pid2, encoded_pid2, current_collisions
-        integer                :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper, xp, yp, zp
-        real(wp), dimension(3) :: centroid_1, centroid_2, distance_vec
-
-        num_considered_collisions = 0
-
-        call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
-
-        $:GPU_PARALLEL_LOOP(private='[pid1, pid2, encoded_pid2, centroid_1, centroid_2, xp, yp, zp, distance_vec, &
-                            & current_collisions]', copyin='[xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper]', copy='[num_considered_collisions]')
-        do pid1 = 1, num_ibs - 1
-            centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
-            if (num_dims == 3) centroid_1(3) = patch_ib(pid1)%z_centroid
-            do pid2 = pid1 + 1, num_ibs
-                periodic_search: do xp = xp_lower, xp_upper
-                    do yp = yp_lower, yp_upper
-                        do zp = zp_lower, zp_upper
-                            centroid_2(1) = patch_ib(pid2)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
-                            centroid_2(2) = patch_ib(pid2)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
-                            if (num_dims == 3) centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp, &
-                                & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
-                            distance_vec = centroid_2 - centroid_1
-
-                            if (norm2(distance_vec) < patch_ib(pid1)%radius + patch_ib(pid2)%radius) then
-                                $:GPU_ATOMIC(atomic='capture')
-                                num_considered_collisions = num_considered_collisions + 1
-                                current_collisions = num_considered_collisions
-                                $:END_GPU_ATOMIC_CAPTURE()
-
-                                call s_encode_patch_periodicity(patch_ib(pid2)%gbl_patch_id, xp, yp, zp, encoded_pid2)
-
-                                collision_lookup(current_collisions, 1) = pid1
-                                collision_lookup(current_collisions, 2) = pid2
-                                collision_lookup(current_collisions, 3) = patch_ib(pid1)%gbl_patch_id
-                                collision_lookup(current_collisions, 4) = encoded_pid2
-                                exit periodic_search
-                            end if
-                        end do
-                    end do
-                end do periodic_search
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_detect_ib_collisions_n2
 
     !> @brief uses boundary conditions and particle locations to check for wall conditions
     subroutine s_detect_wall_collisions()
