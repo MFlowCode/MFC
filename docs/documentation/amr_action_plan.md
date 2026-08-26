@@ -7,6 +7,36 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (29) — MASTER MERGED INTO up/mega: PR #1628 IS CI-LIVE
+
+Merge `5312e834` (upstream master `d74cc378`, unchanged since the probe) reuses the
+resolution proven on CI probe PR #1765: flat standard sweep keeps our rs arrays/AMR
+capture/active-box; master's dual-pass HLLD dispatches from m_rhs on its own vf fields;
+master's 4-way hypoelastic split is the only implementation; s_check_inputs_time_stepping
+follows master's deletion. Beyond the probe: the 2a prim-batch m_rhs guards re-applied; the
+hllc `extraOmpArgs map(alloc:)` workaround re-grafted onto BOTH dual-emission call sites
+(the probe had silently dropped it); D731AB7A golden regenerated for master's #1414
+numerics; `s_check_inputs` added to the runtime-checker lint list (validator migration =
+standing merge debt). Two root-caused fixes ride along: (a) the probe's --no-verify mystery
+— master's check_coverage_map_health.py ran git with the hook-inherited
+GIT_DIR/GIT_INDEX_FILE, so under the pre-commit hook its unit tests queried the real repo
+instead of their throwaway repos; a GIT_* scrub in the script fixes it (hook-env lint
+470/470; candidate upstream PR); (b) the docs Build & Verify lane — all 41 lychee errors
+are Doxygen auto-linking backticked `*.md` prose mentions to `*_8md.html` file pages it
+never generates; one `.lychee.toml` exclusion (`1f38c02f`). Merge-mechanics lesson: git's
+auto-merge of m_riemann_solvers/hypo_hlld silently took master's versions, which do not
+compile against our one-arg s_initialize_riemann_solver — the probe's hand-edits to those
+NON-conflicted files were required; a probe resolution is more than its conflict set, so
+the gate was a whole-tree diff against the probe (result: working tree == probe content +
+post-fork commits exactly, per file). Gates: precheck standalone AND hook-env; amdflang GPU
+build; S0 np8 bitcmp byte-identical vs cdefer2-591fe7dc — and the lustre_5.dat hash equals
+the probe-era bitcmp's, one identical output across cdefer2, the probe merge, and the
+replayed merge; AMR-68 68/68. Binary pinned bins/simulation-mergereplay-71cd6f77.
+VRAM probe 386617 (same day): np16/140 plateaus (mean ~46-51 GiB/GCD, max 57.7, flat 20
+min); np32/140 climbs through that plateau in discrete regrid-event jumps to 63.9/64 GiB —
+the O(global boxes) growth signature; analysis appended to notes/reg_locality_design.md,
+whose acceptance test (np32/140 plateauing like np16) is unchanged.
+
 ## 2026-08-26 (28) — FIFTH RUNG (cdefer): 1.241x — WITHIN 4% OF THE AMReX BAR
 
 Job 386573 (cdefer2-591fe7dc = 44edcc5b's code, node set k004-[001,008]): np8 differenced
