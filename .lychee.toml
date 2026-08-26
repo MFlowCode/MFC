@@ -33,4 +33,5 @@ exclude = [
     "https://code\\.visualstudio\\.com/?$",           # Root page returns 403 to automated requests
     "https://stackoverflow\\.com",                    # Returns 403 to automated requests
     "https://marketplace\\.visualstudio\\.com",        # Returns 503 to automated requests
+    "_8md\\.html$",  # Doxygen auto-links backticked *.md filenames in prose to per-file pages it never generates for markdown inputs; the real md_*.html page links are still checked
 ]
