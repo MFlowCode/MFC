@@ -653,7 +653,6 @@ contains
         real(wp)               :: pi_inf   !< Cell-avg. liquid stiffness function
         real(wp)               :: qv       !< Cell-avg. fluid reference energy
         real(wp)               :: c        !< Cell-avg. sound speed
-        real(wp)               :: H        !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re       !< Cell-avg. Reynolds numbers
         real(wp)               :: max_dt
         real(wp)               :: dt_local
@@ -665,15 +664,15 @@ contains
         end if
 
         dt_local = huge(1.0_wp)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, fl, max_dt]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt]', &
                             & reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     if (igr) then
-                        call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                        call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
                     else
-                        call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                        call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
                     end if
 
                     ! Compute mixture sound speed

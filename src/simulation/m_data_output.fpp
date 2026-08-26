@@ -175,7 +175,6 @@ contains
         real(wp)               :: pi_inf                      !< Cell-avg. liquid stiffness function
         real(wp)               :: qv                          !< Cell-avg. internal energy reference value
         real(wp)               :: c                           !< Cell-avg. sound speed
-        real(wp)               :: H                           !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re                          !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
         real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
@@ -190,13 +189,13 @@ contains
         ccfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
-                            & vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, icfl, vcfl, &
+                            & Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
                             & reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
 
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
 
