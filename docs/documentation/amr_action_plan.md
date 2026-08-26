@@ -7,6 +7,29 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-25 (26) — FOURTH RUNG (f7wave): 1.343x; THE CHAIN IS DEAD; residual growth is DIFFUSE wait
+
+Job 385918, node set k004-[005-006], f7wave binary (bc91de59): np8 differenced
+(1997.589-118.606)/200 = **9.40 s/step**, np16 (2680.162-156.279)/200 = **12.62** ->
+rung = **1.343x** (ladder 1.594 -> 1.544 -> 1.368 -> 1.343; bar 1.192x; excess
+**1.127x**). **The F7 wave verdict: restr np8 1.70 -> 0.53 (-69%), np16 3.74 -> 0.98
+(-74%); rs:rest growth +1.69 -> +0.18 — the per-global-box chain is dead.** Same-day
+k004-001 pair (lpair-k1-f7wave): reps {10.40, 9.48} vs f5asel {10.41, 9.92} — np8
+~-4.5% rep-matched there; the rung-to-rung np8 delta (11.67 -> 9.40 on k004-005) mixes
+the F7 gain (restr -1.18 + reflux -0.48 by phase) with day/conditions — within-job
+ratios remain the honest ladder.
+
+Residual growth (np16-np8 = 3.22 s/step): coarse +0.76 (ratio 2.35, imb 1.58, #1 as
+the coarse draft predicted), rf:wait +0.65 (imb 1.51), restr +0.46 (of which rs:wave
++0.27 at imb 2.02 — the freg-wave rendezvous absorbing advance skew; rs:rest +0.18;
+rs:rfp flat), gather +0.33, regrid +0.32, seam +0.24, rhs +0.24 (ratio 1.05 — physics
+at the bar), halo +0.19. **No single dominator: the wait cluster (coarse-wait +
+rf:wait + rs:wave ~ 1.7 of 3.22) is the top pool — the stage-skew/overlap class
+re-emerges as the #1 design now that the chains are gone**, with the coarse increment
+(amr-bench/notes/coarse_design_draft.md: shell-restricted L0 RHS for the np8 base,
+overlap/reorder for the np16 wait) as its first concrete piece. np32 rung 385968
+(f7wave, 4-node, mirrors the AMReX (4,4,2) bar 1.278x) queued the same night.
+
 ## 2026-08-25 (25) — THIRD RUNG (f5asel): 1.368x; restr growth is the F7 PER-BOX CHAIN, not skew
 
 Job 385698, same pairwise design, node set k004-[005,008] (NOT the (24) set — cross-rung
