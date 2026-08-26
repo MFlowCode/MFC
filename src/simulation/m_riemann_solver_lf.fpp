@@ -58,7 +58,6 @@ contains
         real(wp) :: rho_L, rho_R
         real(wp) :: pres_L, pres_R
         real(wp) :: E_L, E_R
-        real(wp) :: H_L, H_R
         real(wp) :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
         real(wp) :: T_L, T_R
         real(wp) :: Y_L, Y_R
@@ -107,9 +106,9 @@ contains
                                     & Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, pcorr, zcoef, vel_grad_L, &
                                     & vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, &
                                     & Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, rho_L, rho_R, &
-                                    & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, H_L, H_R, ptilde_L, &
-                                    & ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, &
-                                    & Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, ptilde_L, ptilde_R, &
+                                    & s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, &
+                                    & R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -220,13 +219,9 @@ contains
 
                                 E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
                                 E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
-                                H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
                             else
                                 call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
                                 call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
-                                H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
                             end if
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
