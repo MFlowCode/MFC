@@ -7,6 +7,25 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-26 (28) — FIFTH RUNG (cdefer): 1.241x — WITHIN 4% OF THE AMReX BAR
+
+Job 386573 (cdefer2-591fe7dc = 44edcc5b's code, node set k004-[001,008]): np8 differenced
+(1979.970-119.175)/200 = **9.30 s/step**, np16 (2471.288-161.901)/200 = **11.55** -> rung =
+**1.241x** (ladder 1.594 -> 1.544 -> 1.368 -> 1.343 -> 1.241; bar 1.192x; excess **1.041x**).
+The coarse deferral did what the (27) design predicted: np16 -8.5% at flat np8; the coarse
+phase's growth fell +0.76 -> +0.59 and its imbalance 1.58 -> 1.29 (absolute np16 cost 1.32 ->
+1.13 s/step). Residual growth 2.24 s/step and fully DIFFUSE: coarse +0.59, restr +0.43
+(rs:rest +0.22, rs:wave +0.20), rf:wait +0.33, regrid +0.32, gather +0.27, halo +0.16 - no
+family holds more than 27%. The remaining ~1 s/step of wait/comm growth is the
+overlap/skew-class program (options drafted in the bench notes); with it and the
+register-locality np32 unblock, bar parity at 2 and 4 nodes is the near-term close-out.
+
+Same day, the CI-exposure lane (probe PR #1765) caught and fixed three latent defects:
+allocated() on a pointer member (c37dea4c), a stale AMR-hypo golden vs upstream #1414, and
+grouped wave-scratch deallocates crashing every non-qbmm np>1 CPU teardown (f81239a3;
+amdflang silently tolerated all three). The master merge is fully resolved, compile-verified,
+byte-identical on S0, and exonerated of all CI failures - the replay onto up/mega is next.
+
 ## 2026-08-26 (27) — 2a PRICED AND GATED OFF; the coarse call deferred; np32 is MEMORY-BLOCKED
 
 **Phase 2a's mandate was pricing, and it priced decisively.** Landed 3ed9f573 (batched cons->prim,
