@@ -409,6 +409,7 @@ contains
         integer, intent(in)                                    :: idir
         real(wp)                                               :: cfl
         real(wp)                                               :: rho_L, gamma_L, pi_inf_L, E_L, mu_L, F_L, pres_L
+        real(wp)                                               :: qv_igr  !< discarded; IGR carries no heat of formation
         real(wp)                                               :: rho_R, gamma_R, pi_inf_R, E_R, mu_R, F_R, pres_R
         real(wp), dimension(3)                                 :: vflux_L_arr, vflux_R_arr
         real(wp), dimension(-1:1)                              :: rho_sf_small
@@ -427,9 +428,9 @@ contains
         if (idir == 1) then
             if (p == 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, &
-                                        & mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, &
-                                        & F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
+                                        & qv_igr, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, &
+                                        & alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                     do l = 0, p
                         do k = 0, n
                             do j = -1, m
@@ -584,20 +585,8 @@ contains
                                     end do
                                 end if
 
-                                rho_L = 0._wp; rho_R = 0._wp
-                                gamma_L = 0._wp; gamma_R = 0._wp
-                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
-
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    rho_L = rho_L + alpha_rho_L(i)
-                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-
-                                    rho_R = rho_R + alpha_rho_R(i)
-                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                end do
+                                call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_igr)
+                                call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_igr)
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
@@ -826,9 +815,9 @@ contains
                 #:endif
             else
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, &
-                                        & mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, &
-                                        & F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
+                                        & qv_igr, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, &
+                                        & alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                     do l = 0, p
                         do k = 0, n
                             do j = -1, m
@@ -1022,20 +1011,8 @@ contains
                                     end do
                                 end if
 
-                                rho_L = 0._wp; rho_R = 0._wp
-                                gamma_L = 0._wp; gamma_R = 0._wp
-                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
-
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    rho_L = rho_L + alpha_rho_L(i)
-                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-
-                                    rho_R = rho_R + alpha_rho_R(i)
-                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                end do
+                                call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_igr)
+                                call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_igr)
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
@@ -1316,9 +1293,9 @@ contains
         else if (idir == 2) then
             if (p == 0) then
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, &
-                                        & mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, &
-                                        & F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
+                                        & qv_igr, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, &
+                                        & alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                     do l = 0, p
                         do k = -1, n
                             do j = 0, m
@@ -1457,20 +1434,8 @@ contains
                                     end do
                                 end if
 
-                                rho_L = 0._wp; rho_R = 0._wp
-                                gamma_L = 0._wp; gamma_R = 0._wp
-                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
-
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    rho_L = rho_L + alpha_rho_L(i)
-                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-
-                                    rho_R = rho_R + alpha_rho_R(i)
-                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                end do
+                                call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_igr)
+                                call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_igr)
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
@@ -1697,9 +1662,9 @@ contains
                 #:endif
             else
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, &
-                                        & mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, &
-                                        & F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, &
+                                        & qv_igr, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, &
+                                        & alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                     do l = 0, p
                         do k = -1, n
                             do j = 0, m
@@ -1869,20 +1834,8 @@ contains
                                     end do
                                 end if
 
-                                rho_L = 0._wp; rho_R = 0._wp
-                                gamma_L = 0._wp; gamma_R = 0._wp
-                                pi_inf_L = 0._wp; pi_inf_R = 0._wp
-
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, num_fluids
-                                    rho_L = rho_L + alpha_rho_L(i)
-                                    gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                    pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-
-                                    rho_R = rho_R + alpha_rho_R(i)
-                                    gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                    pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                                end do
+                                call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_igr)
+                                call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_igr)
 
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
@@ -2165,9 +2118,9 @@ contains
             end if
         else if (idir == 3) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, &
-                                    & mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, &
-                                    & E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_igr, &
+                                    & mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, &
+                                    & F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                 do l = -1, p
                     do k = 0, n
                         do j = 0, m
@@ -2338,20 +2291,8 @@ contains
                                 end do
                             end if
 
-                            rho_L = 0._wp; rho_R = 0._wp
-                            gamma_L = 0._wp; gamma_R = 0._wp
-                            pi_inf_L = 0._wp; pi_inf_R = 0._wp
-
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                rho_L = rho_L + alpha_rho_L(i)
-                                gamma_L = gamma_L + alpha_L(i)*gammas(i)
-                                pi_inf_L = pi_inf_L + alpha_L(i)*pi_infs(i)
-
-                                rho_R = rho_R + alpha_rho_R(i)
-                                gamma_R = gamma_R + alpha_R(i)*gammas(i)
-                                pi_inf_R = pi_inf_R + alpha_R(i)*pi_infs(i)
-                            end do
+                            call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_igr)
+                            call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_igr)
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
