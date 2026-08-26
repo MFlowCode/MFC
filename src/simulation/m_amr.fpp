@@ -430,9 +430,14 @@ contains
         ! 2a gate (see amr_prim_batch's declaration). bubbles_euler is checker-prohibited under amr; every listed
         ! feature either extends the conversion write set beyond mom..E or changes its inputs, and falls back to
         ! the per-block conversion.
-        amr_prim_batch = (.not. amr_subcycle) .and. (.not. igr) .and. (.not. chemistry) .and. (.not. relativity) &
-                          & .and. (.not. hypoelasticity) .and. (.not. mhd) .and. (.not. cont_damage) .and. (.not. ib) &
-                          & .and. (.not. bubbles_lagrange)
+        ! 2a VERDICT (2026-08-26, ledger 27): OFF by default. The batched conversion kernel is cheap on
+        ! device (0.5 s / 5-step probe) and byte-identical, but the per-block PRIM BRIDGE-LOADS that land
+        ! its output in the m_rhs scratch cost ~4x wall on the amdflang offload host path (launch/mapping
+        ! burden; a flag-off build with the kernel still compiled in prices at baseline, so it is not
+        ! codegen poisoning). Bridge loads are exactly what full 2b deletes - partial batching through a
+        ! bridge is negative value, so the machinery stays for the 2b store-native consumption experiment
+        ! and this gate stays false until then.
+        amr_prim_batch = .false.
 
         ! Fine-block cap = the case amr_max_blocks; the shared pool adds the L0 tile prefix (l0_slot_off, 0 when l0_ntile=0) ahead
         ! of
@@ -8077,7 +8082,12 @@ contains
                                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
                                 alpha_K_sum = alpha_K_sum + alpha_K(i)
                             end do
-                            alpha_K = alpha_K/max(alpha_K_sum, 1.e-16_wp)
+                            ! explicit loop, not array syntax: an inline whole-array expression in a target
+                            ! region is a per-thread temporary on amdflang
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                alpha_K(i) = alpha_K(i)/max(alpha_K_sum, 1.e-16_wp)
+                            end do
                         end if
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
                             & Re_K)
@@ -8108,25 +8118,39 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_b
         integer, intent(in)                                    :: loc
-        integer                                                :: i, j, k, l, i0, i1, j1l, j1h, j2l, j2h, j3l, j3h
+        integer                                                :: i, lb(3)
 
-        i0 = eqn_idx%mom%beg; i1 = eqn_idx%E
-        j1l = amr_slots(amr_cur)%idwbuff(1)%beg; j1h = amr_slots(amr_cur)%idwbuff(1)%end
-        j2l = amr_slots(amr_cur)%idwbuff(2)%beg; j2h = amr_slots(amr_cur)%idwbuff(2)%end
-        j3l = amr_slots(amr_cur)%idwbuff(3)%beg; j3h = amr_slots(amr_cur)%idwbuff(3)%end
-        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[loc, i0, i1, j1l, j1h, j2l, j2h, j3l, j3h]')
-        do i = i0, i1
-            do l = j3l, j3h
-                do k = j2l, j2h
-                    do j = j1l, j1h
-                        q_prim_b(i)%sf(j, k, l) = amr_prim_st(j, k, l, i - i0 + 1, loc)
-                    end do
+        ! One launch per var through a PLAIN contiguous array dummy: a scalar_field-array dummy makes the
+        ! target region map the derived-type descriptors per launch (the measured per-region attach cost this
+        ! per-block path must not pay). The dummy rebases to 1, so offset from the actual's own lower bounds.
+
+        do i = eqn_idx%mom%beg, eqn_idx%E
+            lb = lbound(q_prim_b(i)%sf)
+            call s_amr_prim_load_one(q_prim_b(i)%sf, i - eqn_idx%mom%beg + 1, loc, amr_slots(amr_cur)%idwbuff(1)%beg, &
+                                     & amr_slots(amr_cur)%idwbuff(1)%end, amr_slots(amr_cur)%idwbuff(2)%beg, &
+                                     & amr_slots(amr_cur)%idwbuff(2)%end, amr_slots(amr_cur)%idwbuff(3)%beg, &
+                                     & amr_slots(amr_cur)%idwbuff(3)%end, 1 - lb(1), 1 - lb(2), 1 - lb(3))
+        end do
+
+    end subroutine s_amr_prim_load
+
+    impure subroutine s_amr_prim_load_one(dst, pv, loc, j1l, j1h, j2l, j2h, j3l, j3h, o1, o2, o3)
+
+        real(stp), dimension(:,:,:), contiguous, intent(inout) :: dst
+        integer, intent(in)                                    :: pv, loc, j1l, j1h, j2l, j2h, j3l, j3h, o1, o2, o3
+        integer                                                :: j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[pv, loc, j1l, j1h, j2l, j2h, j3l, j3h, o1, o2, o3]')
+        do l = j3l, j3h
+            do k = j2l, j2h
+                do j = j1l, j1h
+                    dst(j + o1, k + o2, l + o3) = amr_prim_st(j, k, l, pv, loc)
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_prim_load
+    end subroutine s_amr_prim_load_one
 
     !> Allocate the pooled q_prim/rhs advance scratch (idempotent). The lockstep driver argument-associates the scratch for every
     !! block, owned or not, so it must exist on EVERY rank - including one that never allocates a slot. Called from the ONE point
