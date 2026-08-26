@@ -8224,7 +8224,7 @@ contains
             end do
             @:DEALLOCATE(amr_slots(islot)%rhs)
         end if
-        if (qbmm .and. .not. polytropic .and. allocated(amr_slots(islot)%pb_f%sf)) then
+        if (qbmm .and. .not. polytropic .and. associated(amr_slots(islot)%pb_f%sf)) then
             #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
                 @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
                 @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
