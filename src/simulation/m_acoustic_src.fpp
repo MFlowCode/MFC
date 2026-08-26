@@ -134,7 +134,7 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         #:endif
-        real(wp)                            :: myRho, B_tait
+        real(wp)                            :: myRho, B_tait, qv_dummy
         real(wp)                            :: sim_time, c, small_gamma
         real(wp)                            :: frequency_local, gauss_sigma_time_local
         real(wp)                            :: mass_src_diff, mom_src_diff
@@ -205,7 +205,7 @@ contains
 
                 deallocate (phi_rn)
 
-                $:GPU_PARALLEL_LOOP(private='[myalpha, myalpha_rho, myRho, B_tait, c, small_gamma, frequency_local, &
+                $:GPU_PARALLEL_LOOP(private='[myalpha, myalpha_rho, myRho, B_tait, qv_dummy, c, small_gamma, frequency_local, &
                                     & gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q]', &
                                     & copyin = '[sum_BB, freq_conv_flag, gauss_conv_flag, sim_time]')
                 do i = 1, num_points
@@ -214,39 +214,13 @@ contains
                     l = source_spatials(ai)%coord(3, i)
 
                     ! Compute speed of sound
-                    myRho = 0._wp
-                    B_tait = 0._wp
-                    small_gamma = 0._wp
-
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
                         myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
                         myalpha(q) = q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l)
                     end do
 
-                    if (bubbles_euler) then
-                        if (num_fluids > 2) then
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do q = 1, num_fluids - 1
-                                myRho = myRho + myalpha_rho(q)
-                                B_tait = B_tait + myalpha(q)*pi_infs(q)
-                                small_gamma = small_gamma + myalpha(q)*gammas(q)
-                            end do
-                        else
-                            myRho = myalpha_rho(1)
-                            B_tait = pi_infs(1)
-                            small_gamma = gammas(1)
-                        end if
-                    end if
-
-                    if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, num_fluids
-                            myRho = myRho + myalpha_rho(q)
-                            B_tait = B_tait + myalpha(q)*pi_infs(q)
-                            small_gamma = small_gamma + myalpha(q)*gammas(q)
-                        end do
-                    end if
+                    call s_compute_mixture_coefficients(myalpha_rho, myalpha, myRho, small_gamma, B_tait, qv_dummy)
 
                     small_gamma = 1._wp/small_gamma + 1._wp
                     c = sqrt(small_gamma*(q_prim_vf(eqn_idx%E)%sf(j, k, l) + ((small_gamma - 1._wp)/small_gamma)*B_tait)/myRho)

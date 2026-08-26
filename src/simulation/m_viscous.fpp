@@ -46,6 +46,7 @@ module m_viscous
     use m_muscl
     use m_helper
     use m_finite_differences
+    use m_variables_conversion, only: s_compute_mixture_coefficients
     use m_constants, only: model_eqns_5eq, recon_type_weno, recon_type_muscl
     use m_hb_function
 
@@ -85,9 +86,9 @@ contains
         type(scalar_field), dimension(num_dims), intent(in) :: grad_x_vf, grad_y_vf, grad_z_vf
         type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
         type(int_bounds_info), intent(in) :: ix, iy, iz
-        real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
+        real(wp) :: rho_visc, gamma_visc, pi_inf_visc, qv_visc, alpha_visc_sum  !< Mixture variables
         real(wp), dimension(2) :: Re_visc
-        real(wp) :: gamma_dot_c                                        !< Effective shear rate for non-Newtonian mixture inv-Re.
+        real(wp) :: gamma_dot_c  !< Effective shear rate for non-Newtonian mixture inv-Re.
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)    :: alpha_visc, alpha_rho_visc
@@ -118,8 +119,8 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (shear_stress) then  ! Shear stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -133,58 +134,20 @@ contains
                                 end if
                             end do
 
-                            if (bubbles_euler) then
-                                rho_visc = 0._wp
-                                gamma_visc = 0._wp
-                                pi_inf_visc = 0._wp
-
-                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        rho_visc = rho_visc + alpha_rho_visc(i)
-                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                    end do
-                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids - 1
-                                        rho_visc = rho_visc + alpha_rho_visc(i)
-                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                    end do
-                                else
-                                    rho_visc = alpha_rho_visc(1)
-                                    gamma_visc = gammas(1)
-                                    pi_inf_visc = pi_infs(1)
-                                end if
-                            else
-                                rho_visc = 0._wp
-                                gamma_visc = 0._wp
-                                pi_inf_visc = 0._wp
-
+                            if (mpp_lim) then
                                 alpha_visc_sum = 0._wp
-
-                                if (mpp_lim) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
-                                        alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
-                                        alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
-                                    end do
-
-                                    alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
-                                end if
-
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    rho_visc = rho_visc + alpha_rho_visc(i)
-                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
+                                    alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                 end do
-
-                                if (viscous) then
-                                    @:compute_axis_inv_re()
-                                end if
+                                alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
+                            end if
+                            call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
+                                                                & qv_visc)
+                            if (viscous) then
+                                @:compute_axis_inv_re()
                             end if
 
                             ! Shear stress near cylindrical axis: includes v/r hoop term
@@ -210,8 +173,8 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bulk_stress) then  ! Bulk stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -225,58 +188,20 @@ contains
                                 end if
                             end do
 
-                            if (bubbles_euler) then
-                                rho_visc = 0._wp
-                                gamma_visc = 0._wp
-                                pi_inf_visc = 0._wp
-
-                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        rho_visc = rho_visc + alpha_rho_visc(i)
-                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                    end do
-                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids - 1
-                                        rho_visc = rho_visc + alpha_rho_visc(i)
-                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                    end do
-                                else
-                                    rho_visc = alpha_rho_visc(1)
-                                    gamma_visc = gammas(1)
-                                    pi_inf_visc = pi_infs(1)
-                                end if
-                            else
-                                rho_visc = 0._wp
-                                gamma_visc = 0._wp
-                                pi_inf_visc = 0._wp
-
+                            if (mpp_lim) then
                                 alpha_visc_sum = 0._wp
-
-                                if (mpp_lim) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
-                                        alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
-                                        alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
-                                    end do
-
-                                    alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
-                                end if
-
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    rho_visc = rho_visc + alpha_rho_visc(i)
-                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
+                                    alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                 end do
-
-                                if (viscous) then
-                                    @:compute_axis_inv_re()
-                                end if
+                                alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
+                            end if
+                            call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
+                                                                & qv_visc)
+                            if (viscous) then
+                                @:compute_axis_inv_re()
                             end if
 
                             tau_Re(2, 2) = (grad_x_vf(1)%sf(j, k, l) + grad_y_vf(2)%sf(j, k, &
@@ -296,8 +221,8 @@ contains
         if (p == 0) return
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (shear_stress) then  ! Shear stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -311,58 +236,20 @@ contains
                                 end if
                             end do
 
-                            if (bubbles_euler) then
-                                rho_visc = 0._wp
-                                gamma_visc = 0._wp
-                                pi_inf_visc = 0._wp
-
-                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        rho_visc = rho_visc + alpha_rho_visc(i)
-                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                    end do
-                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids - 1
-                                        rho_visc = rho_visc + alpha_rho_visc(i)
-                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                    end do
-                                else
-                                    rho_visc = alpha_rho_visc(1)
-                                    gamma_visc = gammas(1)
-                                    pi_inf_visc = pi_infs(1)
-                                end if
-                            else
-                                rho_visc = 0._wp
-                                gamma_visc = 0._wp
-                                pi_inf_visc = 0._wp
-
+                            if (mpp_lim) then
                                 alpha_visc_sum = 0._wp
-
-                                if (mpp_lim) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
-                                        alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
-                                        alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
-                                    end do
-
-                                    alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
-                                end if
-
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    rho_visc = rho_visc + alpha_rho_visc(i)
-                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
+                                    alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                 end do
-
-                                if (viscous) then
-                                    @:compute_axis_inv_re()
-                                end if
+                                alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
+                            end if
+                            call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
+                                                                & qv_visc)
+                            if (viscous) then
+                                @:compute_axis_inv_re()
                             end if
 
                             tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(1)
@@ -385,8 +272,8 @@ contains
             end if
 
             if (bulk_stress) then  ! Bulk stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, &
-                                    & alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re, gamma_dot_c]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -400,58 +287,20 @@ contains
                                 end if
                             end do
 
-                            if (bubbles_euler) then
-                                rho_visc = 0._wp
-                                gamma_visc = 0._wp
-                                pi_inf_visc = 0._wp
-
-                                if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        rho_visc = rho_visc + alpha_rho_visc(i)
-                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                    end do
-                                else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids - 1
-                                        rho_visc = rho_visc + alpha_rho_visc(i)
-                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                    end do
-                                else
-                                    rho_visc = alpha_rho_visc(1)
-                                    gamma_visc = gammas(1)
-                                    pi_inf_visc = pi_infs(1)
-                                end if
-                            else
-                                rho_visc = 0._wp
-                                gamma_visc = 0._wp
-                                pi_inf_visc = 0._wp
-
+                            if (mpp_lim) then
                                 alpha_visc_sum = 0._wp
-
-                                if (mpp_lim) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
-                                        alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
-                                        alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
-                                    end do
-
-                                    alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
-                                end if
-
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    rho_visc = rho_visc + alpha_rho_visc(i)
-                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
+                                    alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                 end do
-
-                                if (viscous) then
-                                    @:compute_axis_inv_re()
-                                end if
+                                alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
+                            end if
+                            call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
+                                                                & qv_visc)
+                            if (viscous) then
+                                @:compute_axis_inv_re()
                             end if
 
                             tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(2)
