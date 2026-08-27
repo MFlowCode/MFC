@@ -54,9 +54,13 @@ RUNTIME_CHECKER_SUBROUTINES = {
     "s_check_inputs_fft",
     # num_species is populated by Cantera at runtime.
     "s_check_inputs_ib_injection",
-    # up/mega interim: the simulation s_check_inputs still hosts the AMR/feature
-    # constraint block; migrating its input-only subset to case_validator is
-    # tracked as merge debt, not done in the integration merge itself.
+    # The AMR/active_box constraint block (57 prohibits, of which 4 read num_procs) is
+    # deliberately mirrored Fortran-side AND in case_validator, so a misconfigured AMR run
+    # fails closed at startup as well as at validation. Master's #1717 rule says the
+    # input-only majority belongs in the validator alone; migrating them is a behavioural
+    # change (it drops the runtime guard) and is tracked separately, NOT merge debt.
+    # Until then this entry is load-bearing: new input-only checks added to s_check_inputs
+    # will NOT be flagged, so add them to case_validator.py instead.
     "s_check_inputs",
 }
 

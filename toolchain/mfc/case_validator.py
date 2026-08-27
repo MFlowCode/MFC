@@ -2193,7 +2193,11 @@ class CaseValidator:
         # sentinel in the solver and silently corrupts the burn, so require each to be set.
         rk = self.get("rburn%k")
         self.prohibit(not self._is_numeric(rk) or rk <= 0, "reactive_burn requires rburn%k > 0 (rate coefficient [1/s])")
-        self.prohibit(self.get("rburn%pign") is None, "reactive_burn requires rburn%pign to be set (ignition pressure threshold [Pa])")
+        rpign = self.get("rburn%pign")
+        self.prohibit(
+            not self._is_numeric(rpign) or rpign <= 0,
+            "reactive_burn requires rburn%pign > 0 (ignition pressure threshold [Pa]); unset, or any " "non-positive value, ignites the reactant everywhere from t = 0",
+        )
         rpref = self.get("rburn%pref")
         self.prohibit(not self._is_numeric(rpref) or rpref <= 0, "reactive_burn requires rburn%pref > 0 (it normalizes the pressure drive and is used as a divisor)")
         rn = self.get("rburn%n")
