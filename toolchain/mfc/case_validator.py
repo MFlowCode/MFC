@@ -1076,7 +1076,8 @@ class CaseValidator:
 
     def check_time_stepping(self):
         """Checks time stepping parameters (simulation/post-process)"""
-        cfl_dt = self.get("cfl_dt", "F") == "T"
+        # mirrors the Fortran derivation (m_start_up.fpp): cfl_adap_dt or cfl_const_dt sets cfl_dt
+        cfl_dt = any(self.get(k, "F") == "T" for k in ("cfl_dt", "cfl_adap_dt", "cfl_const_dt"))
         cfl_adap_dt = self.get("cfl_adap_dt", "F") == "T"
         time_stepper = self.get("time_stepper")
 
@@ -1585,7 +1586,8 @@ class CaseValidator:
         time_stepper = self.get("time_stepper")
         ib = self.get("ib", "F") == "T"
         acoustic_source = self.get("acoustic_source", "F") == "T"
-        bodyForces = any(self.get(f"bf_{d}", "F") == "T" for d in ["x", "y", "z"])
+        # mirrors the Fortran derivation (m_start_up.fpp): bf_spatial_support alone also enables it
+        bodyForces = any(self.get(f"bf_{d}", "F") == "T" for d in ["x", "y", "z"]) or self.get("bf_spatial_support", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         relax = self.get("relax", "F") == "T"
         igr = self.get("igr", "F") == "T"
@@ -1599,7 +1601,8 @@ class CaseValidator:
         synthetic_turbulence = self.get("synthetic_turbulence", "F") == "T"
 
         self.prohibit(recon_type is not None and recon_type != 1, "active_box requires WENO reconstruction (recon_type = 1)")
-        self.prohibit(time_stepper is not None and time_stepper != 3, "active_box requires time_stepper = 3 (SSP-RK3)")
+        # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3
+        self.prohibit(time_stepper != 3, "active_box requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(ib, "active_box is incompatible with immersed boundaries")
         self.prohibit(acoustic_source, "active_box is incompatible with acoustic sources")
         self.prohibit(bodyForces, "active_box is incompatible with body forces")
@@ -1633,7 +1636,8 @@ class CaseValidator:
         amr = self.get("amr", "F") == "T"
         amr_subcycle = self.get("amr_subcycle", "F") == "T"
         amr_regrid_int = self.get("amr_regrid_int")
-        cfl_dt = self.get("cfl_dt", "F") == "T"
+        # mirrors the Fortran derivation (m_start_up.fpp): cfl_adap_dt or cfl_const_dt sets cfl_dt
+        cfl_dt = any(self.get(k, "F") == "T" for k in ("cfl_dt", "cfl_adap_dt", "cfl_const_dt"))
 
         # Standalone checks that apply regardless of amr=T
         self.prohibit(amr_subcycle and not amr, "amr_subcycle requires amr = T")
@@ -1685,8 +1689,9 @@ class CaseValidator:
             "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1",
         )
         self.prohibit(recon_type is not None and recon_type != 1 and not igr, "amr requires WENO reconstruction (recon_type = 1) or the IGR solver")
-        self.prohibit(time_stepper is not None and time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
-        self.prohibit(model_eqns is not None and model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
+        # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3
+        self.prohibit(time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
+        self.prohibit(model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
         self.prohibit(self.get("bubbles_euler", "F") == "T", "amr does not support Euler-Euler bubbles (bubbles_euler)")
         mpp_lim = self.get("mpp_lim", "F") == "T"
         self.prohibit(
@@ -1734,7 +1739,7 @@ class CaseValidator:
             "amr does not support characteristic (CBC) boundary conditions (bc = -5..-12): " "the fine-block advance would apply the boundary treatment at block edges inside the domain",
         )
         self.prohibit(
-            amr_regrid_int == 0 and amr_max_level is not None and amr_max_level > 2,
+            (amr_regrid_int or 0) == 0 and amr_max_level is not None and amr_max_level > 2,
             "static multi-level AMR (amr_regrid_int = 0) nests exactly one level-2 block in block 1, so it supports at most "
             "amr_max_level = 2; use amr_regrid_int > 0 for deeper or multi-block nesting",
         )
@@ -1750,8 +1755,8 @@ class CaseValidator:
                 "amr_block_end must be <= global cell max per axis",
             )
             self.prohibit(
-                beg is not None and end is not None and end <= beg,
-                "amr_block_end must exceed amr_block_beg on each active axis",
+                (end or 0) <= (beg or 0),
+                "amr_block_end must exceed amr_block_beg on each active axis (both default to 0, so an amr run must set " "the initial block)",
             )
             self.prohibit(
                 beg is not None and end is not None and glb[d] is not None and rr * (end - beg + 1) - 1 > glb[d],
@@ -1780,11 +1785,11 @@ class CaseValidator:
 
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(
-            amr_regrid_int is not None and amr_regrid_int > 0 and (amr_tag_eps is None or amr_tag_eps <= 0),
+            (amr_regrid_int or 0) > 0 and amr_tag_eps is not None and amr_tag_eps <= 0,
             "amr_tag_eps must be > 0 when amr_regrid_int > 0",
         )
         self.prohibit(
-            amr_regrid_int is not None and amr_regrid_int > 0 and (amr_buf is None or amr_buf < 1),
+            (amr_regrid_int or 0) > 0 and amr_buf is not None and amr_buf < 1,
             "amr_buf must be >= 1 when amr_regrid_int > 0",
         )
         # advisory, not a prohibit: at CFL <= 1 a feature front can cross up to one cell per step, so
