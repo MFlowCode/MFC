@@ -689,13 +689,6 @@ class CaseValidator:
         surface_tension = self.get("surface_tension", "F") == "T"
         self.prohibit(riemann_solver == 4 and viscous, "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
         self.prohibit(riemann_solver == 4 and surface_tension, "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
-        n_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
-        bc_characteristic = any(-12 <= (self.get(f"bc_{d}%{e}") or 0) <= -5 for d in "xyz"[:n_dims] for e in ("beg", "end"))
-        self.prohibit(
-            riemann_solver == 4 and hypoelasticity and bc_characteristic,
-            "HLLD hypoelasticity does not support characteristic (CBC) boundary conditions: "
-            "the dual-pass RHS assembly reads the pre-CBC Riemann fluxes, so the boundary corrections would be silently dropped",
-        )
         cont_damage = self.get("cont_damage", "F") == "T"
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
         chemistry = self.get("chemistry", "F") == "T"
