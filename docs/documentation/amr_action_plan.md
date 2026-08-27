@@ -7,6 +7,42 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (32) — FULL-PR REVIEW: NINE CONFIRMED FINDINGS FIXED, GATED, AND LANDED (c5b461f9)
+
+A full adversarially-verified review of PR #1628's diff produced 12 confirmed findings; the 9
+pure correctness/hardening ones landed in one batch (the elastic-gate per-side fix, the
+post-process reader ownership fix, and the restart-writer level-0 filter have banked designs in
+`amr-bench/notes/mrhs_merge_plan.md` and land separately with their own gates). The batch:
+
+- **`_alloc` widening**: four dual-pass/`nc_iface` allocations in `m_riemann_solvers.fpp` and
+  three UVM host-pinned fallbacks in `m_igr.fpp` were sized to `m/n/p` — under AMR's fine-grid
+  swap those are ONE block's dims at allocation time, an out-of-bounds write for any later,
+  larger block. Now sized to `m_alloc/n_alloc/p_alloc` (`idwbuff_alloc` where the buffered range
+  is indexed).
+- **Phase-change stage independence**: `s_initialize_phasechange_module` takes its allocation
+  upper bound as an explicit argument (sim passes the `_alloc` maxima when load-balance/SFC
+  output can reshape the grid, `[-1,-1,-1]` otherwise), removing a stage `#ifdef` from
+  `src/common/`.
+- **Moving-IB `num_gps` device refresh**; **coexist-safe acoustic overlap check** (skip
+  `amr_block_level(kb) == 0` tiles); **64-bit regrid clustering arithmetic** (volume accumulator
+  and two `jrem` linearized-index sites).
+- **Three prohibits** (Fortran checker + `case_validator.py` mirrors): AMR + CBC (`bc = -5..-12`)
+  — `s_cbc` is gated only on the GLOBAL bc codes with no `amr_in_fine_advance` guard, so the
+  fine-block advance fires it at interior block edges; `active_box` + `synthetic_turbulence`;
+  HLLD-hypoelasticity + CBC (the dual pass reads the pre-CBC Riemann fluxes).
+
+The AMR+CBC prohibit caught one of our own tests: `AMR -> 2D -> axisymmetric` (9640CE7F) used
+`bc_y%%end = -6` while its header claims machine-zero conservation "on a closed axisymmetric box"
+— the nonreflecting buffer contradicted the test's own documented intent. Outer BC switched to
+reflective; the regenerated golden CONFIRMS the diagnosis: every worst-case delta clusters at one
+location (the static fine block's upper y-edge), where the old golden held density 0.9947 in a
+should-be-uniform field, spurious radial momentum -7.1e-3 (now 6.7e-4), and an unphysical volume
+fraction 1.00135 > 1 (now 0.99998) — the interior-edge CBC pollution, removed.
+
+Gates: build clean; S0 np8 bitcmp vs `reglocal2-66ee40c7` BYTE-IDENTICAL (the batch touches no
+golden-path code); AMR-68 = 68/68 after the axisymmetric BC fix; precheck clean. Pinned binary:
+`bins/simulation-reviewfix-67bf6bf3`.
+
 ## 2026-08-27 (31) — SIXTH RUNG: np16->np32 = 1.274x vs THE AMReX np32 BAR 1.278x — AT SOTA; np32 UNBLOCKED
 
 Acceptance job 386892 (reglocal binary via its byte-identical pre-format twin, k004-[002-003,
