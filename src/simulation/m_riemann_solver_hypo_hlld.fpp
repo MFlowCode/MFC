@@ -7,13 +7,6 @@
 #:include 'macros.fpp'
 #:include 'inline_riemann.fpp'
 
-! Single source of truth for the per-component HLL flux on the (U_L, U_R, F_L, F_R) compact
-! basis: used by the degenerate-fan fallback and the ADC blend, which must stay consistent.
-! Textual inlining; codegen is identical to the materialized expression.
-#:def hll_flux_component(LHS, I)
-    ${LHS}$ = (S_R*F_L(${I}$) - S_L*F_R(${I}$) + S_L*S_R*(U_R(${I}$) - U_L(${I}$)))/(S_R - S_L + verysmall)
-#:enddef
-
 module m_riemann_solver_hypo_hlld
 
     use m_derived_types
@@ -53,6 +46,19 @@ contains
         end if
 
     end function f_hlld_wave_zone
+
+    !> Per-component HLL flux on the compact (U_L, U_R, F_L, F_R) basis. Shared by the degenerate-fan fallback and the ADC blend,
+    !! which must stay consistent.
+    function f_hll_flux(S_L, S_R, F_L_i, F_R_i, U_L_i, U_R_i) result(flux)
+
+        $:GPU_ROUTINE(function_name='f_hll_flux', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: S_L, S_R, F_L_i, F_R_i, U_L_i, U_R_i
+        real(wp)             :: flux
+
+        flux = (S_R*F_L_i - S_L*F_R_i + S_L*S_R*(U_R_i - U_L_i))/(S_R - S_L + verysmall)
+
+    end function f_hll_flux
 
     !> HLLD Riemann solver resolves all 5 waves for the hypoelastic equations: 1 entropy wave, 2 shear stress waves, 2 fast waves.
     subroutine s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
@@ -612,7 +618,7 @@ contains
                                     ! HLL (or one-sided) fallback for an invalid wave structure
                                     if (S_L < 0._wp .and. S_R > 0._wp) then
                                         do i = 1, ncomp
-                                            @:hll_flux_component(F_hlld(i), i)
+                                            F_hlld(i) = f_hll_flux(S_L, S_R, F_L(i), F_R(i), U_L(i), U_R(i))
                                         end do
                                     else if (S_L >= 0._wp) then
                                         F_hlld(1:ncomp) = F_L(1:ncomp)
@@ -746,7 +752,7 @@ contains
                                         ! phi is anchor-independent: computed once in the shared section above
                                         if (S_L < 0._wp .and. S_R > 0._wp) then
                                             do i = 1, ncomp
-                                                @:hll_flux_component(F_HLL_c, i)
+                                                F_HLL_c = f_hll_flux(S_L, S_R, F_L(i), F_R(i), U_L(i), U_R(i))
                                                 F_hlld(i) = F_HLL_c + phi*(F_hlld(i) - F_HLL_c)
                                             end do
                                         else
@@ -784,7 +790,7 @@ contains
                                         U_HLL_c = (S_R*U_R(11) - S_L*U_L(11) - (F_R(11) - F_L(11)))/(S_R - S_L + verysmall)
                                         tau_qq_face_HLL = U_HLL_c/(rho_HLL + verysmall)
                                         ! This branch implies S_L < 0 < S_R, so component 3 of F_HLL is the interior HLL flux
-                                        @:hll_flux_component(F_HLL_c, 3)
+                                        F_HLL_c = f_hll_flux(S_L, S_R, F_L(3), F_R(3), U_L(3), U_R(3))
                                         p_face_HLL = F_HLL_c - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
                                     end if
                                 end if
