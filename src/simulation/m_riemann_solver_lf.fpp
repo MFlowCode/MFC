@@ -79,10 +79,9 @@ contains
         real(wp) :: xi_M, xi_P
         real(wp) :: ptilde_L, ptilde_R
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
-        real(wp) :: vel_L_tmp, vel_R_tmp
         real(wp) :: Ms_L, Ms_R, pres_SL, pres_SR
         real(wp) :: alpha_L_sum, alpha_R_sum
-        real(wp) :: zcoef, pcorr  !< low Mach number correction
+        real(wp) :: pcorr  !< low Mach number correction
         integer :: i, j, k, l  !< Generic loop iterators
         integer :: Re_size_loc1, Re_size_loc2  !< host copies of Re_size; amdflang reads the declare-target original stale cross-TU
         integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
@@ -103,12 +102,12 @@ contains
             if (norm_dir == ${NORM_DIR}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
                                     & Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, &
-                                    & Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, pcorr, zcoef, vel_grad_L, &
-                                    & vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, &
-                                    & Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, rho_L, rho_R, &
-                                    & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, ptilde_L, ptilde_R, &
-                                    & s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, &
-                                    & R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, pcorr, vel_grad_L, vel_grad_R, &
+                                    & idx_right_phys, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, &
+                                    & alpha_L_sum, alpha_R_sum, c_avg, pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, &
+                                    & pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, ptilde_L, ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, &
+                                    & Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, &
+                                    & T_L, T_R, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -246,11 +245,7 @@ contains
                             s_R = s_P
 
                             ! Low Mach correction
-                            if (low_Mach == 1) then
-                                @:compute_low_Mach_correction()
-                            else
-                                pcorr = 0._wp
-                            end if
+                            pcorr = f_low_Mach_pcorr_hll(vel_L_rms, vel_R_rms, c_L, c_R, rho_L, rho_R, s_M, s_P)
 
                             ! Mass
                             $:GPU_LOOP(parallelism='[seq]')

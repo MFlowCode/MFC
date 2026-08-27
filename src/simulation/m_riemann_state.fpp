@@ -104,6 +104,83 @@ contains
 
     end function f_elastic_energy
 
+    !> Low-Mach parameter of Thornber et al. JCP (2008): the larger of the two face Mach numbers, capped at one so the correction
+    !! switches itself off once the flow is no longer low speed.
+    function f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R) result(zcoef)
+
+        $:GPU_ROUTINE(function_name='f_low_Mach_zcoef', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: vel_L_rms, vel_R_rms  !< Left and right squared velocity magnitudes
+        real(wp), intent(in) :: c_L, c_R              !< Left and right sound speeds
+        real(wp)             :: zcoef
+
+        zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
+
+    end function f_low_Mach_zcoef
+
+    !> Low-Mach pressure correction added to the HLL and Lax-Friedrichs fluxes, which restores the pressure jump that the
+    !! dissipation of those fluxes over-damps at low Mach number. Zero unless low_Mach == 1.
+    function f_low_Mach_pcorr_hll(vel_L_rms, vel_R_rms, c_L, c_R, rho_L, rho_R, s_M, s_P) result(pcorr)
+
+        $:GPU_ROUTINE(function_name='f_low_Mach_pcorr_hll', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: vel_L_rms, vel_R_rms  !< Left and right squared velocity magnitudes
+        real(wp), intent(in) :: c_L, c_R              !< Left and right sound speeds
+        real(wp), intent(in) :: rho_L, rho_R          !< Left and right densities
+        real(wp), intent(in) :: s_M, s_P              !< Clamped left and right wave speeds
+        real(wp)             :: pcorr
+
+        pcorr = 0._wp
+        if (low_Mach == 1) then
+            pcorr = -(s_P - s_M)*(rho_L + rho_R)/8._wp*(f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R) - 1._wp)
+        end if
+
+    end function f_low_Mach_pcorr_hll
+
+    !> The same correction for the HLLC flux, where the star state supplies the pressure jump directly and the correction scales
+    !! with the mass flux through the acoustic waves instead. Zero unless low_Mach == 1.
+    function f_low_Mach_pcorr_hllc(vel_L_rms, vel_R_rms, c_L, c_R, rho_L, rho_R, s_L, s_R, vel_L_norm, vel_R_norm) result(pcorr)
+
+        $:GPU_ROUTINE(function_name='f_low_Mach_pcorr_hllc', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: vel_L_rms, vel_R_rms    !< Left and right squared velocity magnitudes
+        real(wp), intent(in) :: c_L, c_R                !< Left and right sound speeds
+        real(wp), intent(in) :: rho_L, rho_R            !< Left and right densities
+        real(wp), intent(in) :: s_L, s_R                !< Left and right wave speeds
+        real(wp), intent(in) :: vel_L_norm, vel_R_norm  !< Left and right wave-normal velocities
+        real(wp)             :: pcorr
+
+        pcorr = 0._wp
+        if (low_Mach == 1) then
+            pcorr = rho_L*rho_R*(s_L - vel_L_norm)*(s_R - vel_R_norm)*(vel_R_norm - vel_L_norm)/(rho_R*(s_R - vel_R_norm) &
+                                 & - rho_L*(s_L - vel_L_norm))*(f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R) - 1._wp)
+        end if
+
+    end function f_low_Mach_pcorr_hllc
+
+    !> The alternative low-Mach treatment of Thornber et al. JCP (2008) selected by low_Mach == 2: rather than correct the flux,
+    !! blend the wave-normal velocities towards their mean before the wave speeds are computed, which is why this mutates its
+    !! arguments and must be called ahead of s_L, s_R and s_S. The tangential velocities and vel_L/R_rms are deliberately left
+    !! untouched.
+    subroutine s_apply_low_Mach_velocity(vel_L_rms, vel_R_rms, c_L, c_R, vel_L_norm, vel_R_norm)
+
+        $:GPU_ROUTINE(function_name='s_apply_low_Mach_velocity', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)    :: vel_L_rms, vel_R_rms    !< Left and right squared velocity magnitudes
+        real(wp), intent(in)    :: c_L, c_R                !< Left and right sound speeds
+        real(wp), intent(inout) :: vel_L_norm, vel_R_norm  !< Left and right wave-normal velocities, blended in place
+        real(wp)                :: zcoef, vel_L_tmp, vel_R_tmp
+
+        zcoef = f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R)
+
+        vel_L_tmp = 5.e-1_wp*((vel_L_norm + vel_R_norm) + zcoef*(vel_L_norm - vel_R_norm))
+        vel_R_tmp = 5.e-1_wp*((vel_L_norm + vel_R_norm) + zcoef*(vel_R_norm - vel_L_norm))
+
+        vel_L_norm = vel_L_tmp
+        vel_R_norm = vel_R_tmp
+
+    end subroutine s_apply_low_Mach_velocity
+
     !> Dispatch to the subroutines that are utilized to compute the viscous source fluxes for either Cartesian or cylindrical
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
