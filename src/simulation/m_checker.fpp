@@ -11,9 +11,8 @@ module m_checker
     use m_global_parameters
     use m_mpi_proxy
     use m_helper
-    use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3, BC_RIEMANN_EXTRAP, &
-        & BC_CHAR_SLIP_WALL, BC_CHAR_SUP_OUTFLOW
+    use m_constants, only: recon_type_weno, recon_type_muscl, time_stepper_rk3, BC_RIEMANN_EXTRAP, BC_CHAR_SLIP_WALL, &
+        & BC_CHAR_SUP_OUTFLOW
 
     implicit none
 
@@ -35,28 +34,6 @@ contains
                 call s_check_inputs_muscl
             end if
         end if
-
-        @:PROHIBIT(chemistry .and. chem_params%reaction_substeps < 0, &
-                   & "chem_params%reaction_substeps must be >= 0 (0 = reaction source in the flow RHS; > 0 = operator-split sub-stepping)")
-
-        @:PROHIBIT(chemistry .and. igr .and. chem_params%reaction_substeps > 0, &
-                   & "operator-split reaction sub-stepping (reaction_substeps > 0) is not supported with igr: the reactor reads the post-flow (rho, e, T) state, which the IGR update path does not guarantee")
-
-        @:PROHIBIT(chemistry .and. chem_params%adap_substeps .and. chem_params%reaction_substeps < 1, &
-                   & "chem_params%adap_substeps requires reaction_substeps >= 1 (the operator-split floor)")
-
-        @:PROHIBIT(chemistry .and. chem_params%adap_substeps &
-                   & .and. chem_params%reaction_substeps_max < chem_params%reaction_substeps, &
-                   & "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T")
-
-        ! Chemistry with Euler bubbles is not currently supported: the IBM image-point
-        ! interpolation selects the bubbles/QBMM branch before the chemistry branch, so the
-        ! species state (Ys_IP) is not carried when both are enabled. Disallow until implemented.
-        @:PROHIBIT(chemistry .and. (bubbles_euler .or. qbmm), &
-                   & "chemistry is not currently supported with Euler bubbles (bubbles_euler/qbmm)")
-
-        @:PROHIBIT(ib_state_wrt .and. .not. ib, "ib_state_wrt requires ib to be enabled")
-        @:PROHIBIT(many_ib_patch_parallelism .and. .not. ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         if (active_box) then
             ! Declared limitation rather than a silent runtime downgrade: the active box is a single global region, so under
@@ -226,36 +203,6 @@ contains
         @:PROHIBIT(.not. amr .and. amr_regrid_int > 0, "amr_regrid_int requires amr")
         @:PROHIBIT(amr_subcycle .and. .not. amr, "amr_subcycle requires amr")
         @:PROHIBIT(amr_subcycle .and. cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
-
-        @:PROHIBIT(bf_spatial_support .and. (n == 0 .or. p /= 0), &
-                   & "bf_spatial_support is implemented for 2D only (it forces mom%beg and mom%beg+1)")
-
-        ! Condensed-phase reactive burn assumes exactly two fluids (reactant=1, product=2) that share the
-        ! stiffened-gas EOS and differ only in qv; violating these silently corrupts the mass/energy balance.
-        @:PROHIBIT(reactive_burn .and. num_fluids /= 2, "reactive_burn requires num_fluids = 2 (reactant then product)")
-        @:PROHIBIT(reactive_burn .and. .not. f_approx_equal(fluid_pp(1)%gamma, fluid_pp(2)%gamma), &
-                   & "reactive_burn requires fluid_pp(1)%gamma == fluid_pp(2)%gamma (reactant and product share the EOS)")
-        @:PROHIBIT(reactive_burn .and. .not. f_approx_equal(fluid_pp(1)%pi_inf, fluid_pp(2)%pi_inf), &
-                   & "reactive_burn requires fluid_pp(1)%pi_inf == fluid_pp(2)%pi_inf (reactant and product share the EOS)")
-        @:PROHIBIT(reactive_burn .and. fluid_pp(1)%qv <= fluid_pp(2)%qv, &
-                   & "reactive_burn requires fluid_pp(1)%qv > fluid_pp(2)%qv (reactant releases energy on conversion to product)")
-        @:PROHIBIT(reactive_burn .and. rburn%pref <= 0._wp, &
-                   & "reactive_burn requires rburn%pref > 0 (it normalizes the pressure drive (p - rburn%pign)/rburn%pref and is used as a divisor)")
-        ! The rate uses rburn%k, rburn%pign, rburn%n directly; each defaults to the sentinel dflt_real,
-        ! so an unset value silently produces spurious ignition (pign), NaN via drive**n (n), or a
-        ! backward reaction (k). Require each to be set to a physical value.
-        @:PROHIBIT(reactive_burn .and. rburn%k <= 0._wp, &
-                   & "reactive_burn requires rburn%k > 0 (rate coefficient [1/s]; unset defaults to a negative sentinel that runs the reaction backward)")
-        @:PROHIBIT(reactive_burn .and. f_is_default(rburn%pign), &
-                   & "reactive_burn requires rburn%pign to be set (ignition pressure threshold [Pa]; unset defaults to a negative sentinel, so the reactant ignites everywhere from t = 0)")
-        @:PROHIBIT(reactive_burn .and. rburn%n < 0._wp, &
-                   & "reactive_burn requires rburn%n >= 0 (pressure-drive exponent; unset defaults to a negative sentinel, so drive**n overflows to Inf and the field goes NaN)")
-        @:PROHIBIT(reactive_burn .and. model_eqns /= 2 .and. model_eqns /= 3, &
-                   & "reactive_burn requires model_eqns = 2 or 3 (the 5-equation pressure-equilibrium or 6-equation multi-fluid model)")
-        @:PROHIBIT(reactive_burn .and. rburn%ta < 0._wp, &
-                   & "reactive_burn requires rburn%ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
-        @:PROHIBIT(reactive_burn .and. rburn%ta > 0._wp .and. fluid_pp(1)%cv <= 0._wp, &
-                   & "reactive_burn with rburn%ta > 0 requires fluid_pp(1)%cv > 0 (the reactant temperature T = (p + pi_inf)/((gamma - 1) cv rho) needs a physical heat capacity; cv = 0 silently disables the Arrhenius factor)")
 
         if (ib .and. chemistry) then
             call s_check_inputs_ib_injection
