@@ -82,13 +82,52 @@ is_terminal_state() {
   esac
 }
 
+# Optionally bound how long a job may sit un-started in the queue. On the
+# preemptible Phoenix 'embers' QOS a job routinely stays PENDING for hours and
+# needs most of the job-level `timeout-minutes` (480m) window to backfill onto a
+# free node; that job timeout is the real backstop. Default to 0 (wait
+# indefinitely, up to the job timeout) so ordinary queue pressure does not turn
+# otherwise-healthy jobs into red CI. Set SLURM_MAX_QUEUE_SECONDS>0 to opt into
+# an earlier queue-starvation cutoff where the scheduler is not preemptible.
+: "${SLURM_MAX_QUEUE_SECONDS:=0}"   # 0 = wait indefinitely (job timeout is the backstop)
+# Reject a non-integer override rather than silently skipping the budget.
+if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2
+  exit 1
+fi
+queue_start=$(date +%s)
+
+abort_queue_starvation() {
+  local waited="$1"
+  echo "##[error]SLURM job $job_id did not start within ${waited}s (SLURM_MAX_QUEUE_SECONDS=$SLURM_MAX_QUEUE_SECONDS)."
+  echo "QUEUE STARVATION: the cluster scheduler could not start this job in time."
+  echo "This is an infrastructure / queue-availability problem, NOT a code or test failure."
+  echo "Cancelling the queued job so it does not keep holding a CI runner slot."
+  scancel "$job_id" 2>/dev/null || true
+  exit 75   # EX_TEMPFAIL — distinguishes queue starvation from a real test failure
+}
+
 # Wait for file to appear, using robust state checking.
-# Never give up due to transient squeue/sacct failures — the CI job timeout
-# is the ultimate backstop.
+# Never give up due to transient squeue/sacct failures — the queue-wait budget
+# above (or the CI job timeout) is the ultimate backstop.
 echo "Waiting for job to start..."
 unknown_count=0
 while [ ! -f "$output_file" ]; do
   state=$(get_job_state "$job_id")
+
+  # A started job (RUNNING/COMPLETING) whose output file is merely NFS-delayed
+  # is exempt, so work in progress is never killed here.
+  if [ "$SLURM_MAX_QUEUE_SECONDS" -gt 0 ]; then
+    case "$state" in
+      RUNNING|COMPLETING) ;;
+      *)
+        waited=$(( $(date +%s) - queue_start ))
+        if [ "$waited" -ge "$SLURM_MAX_QUEUE_SECONDS" ]; then
+          abort_queue_starvation "$waited"
+        fi
+        ;;
+    esac
+  fi
 
   case "$state" in
     PENDING|CONFIGURING|PREEMPTED)
