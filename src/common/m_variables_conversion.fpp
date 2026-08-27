@@ -68,7 +68,7 @@ contains
     end subroutine s_convert_to_mixture_variables
 
     !> Compute the pressure from the appropriate equation of state
-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, G, pres_mag)
 
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', cray_noinline=True)
 
@@ -77,7 +77,7 @@ contains
         real(wp), intent(in)            :: pi_inf, gamma, rho, qv
         real(wp), intent(out)           :: pres
         real(wp), intent(inout)         :: T
-        real(stp), intent(in), optional :: stress, mom
+        real(stp), intent(in), optional :: stress
         real(wp), intent(in), optional  :: G, pres_mag
 
         ! Chemistry
@@ -114,7 +114,7 @@ contains
                     end if
                 end do
 
-                e_int = energy - 0.5_wp*(mom**2._wp)/rho - E_e
+                e_int = energy - dyn_p - E_e
             end if
 
             pres = f_pressure(e_int, gamma, pi_inf, qv)

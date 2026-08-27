@@ -148,6 +148,7 @@ contains
         integer :: i, j, k, l, q, r                                          !< Iterator variables
         integer :: patch_id, patch_id_temp                                   !< Patch ID of ghost point
         real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
+        real(wp) :: vel_sum_g, E_ghost                                       !< Ghost-point velocity magnitude and energy
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
         real(wp) :: qv_K
@@ -222,7 +223,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff]')
+                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, vel_sum_g, E_ghost]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -361,11 +362,13 @@ contains
                 end if
 
                 ! Set momentum
+                vel_sum_g = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = eqn_idx%mom%beg, eqn_idx%mom%end
                     q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - eqn_idx%mom%beg + 1)
-                    dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)*vel_g(q - eqn_idx%mom%beg + 1)/2._wp
+                    vel_sum_g = vel_sum_g + vel_g(q - eqn_idx%mom%beg + 1)**2._wp
                 end do
+                dyn_pres = 5.e-1_wp*rho*vel_sum_g
 
                 ! Set continuity and adv vars
                 $:GPU_LOOP(parallelism='[seq]')
@@ -394,10 +397,16 @@ contains
                         q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
                     end do
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_IP + dyn_pres
-                else if (bubbles_euler) then
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
                 else
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
+                    call s_compute_energy(pres_IP, alpha_rho_IP, alpha_IP, vel_sum_g, E_ghost)
+                    if (bubbles_euler) then
+                        ! Only the liquid carries the mixture energy, and the dynamic pressure sits
+                        ! outside that scaling - the inverse s_compute_pressure applies is
+                        ! E = (gamma p + pi_inf + qv)(1 - alf) + dyn_p, with alf the void fraction.
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = (E_ghost - dyn_pres)*(1._wp - alpha_IP(num_fluids)) + dyn_pres
+                    else
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = E_ghost
+                    end if
                 end if
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then
