@@ -7,6 +7,28 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (31) — SIXTH RUNG: np16->np32 = 1.274x vs THE AMReX np32 BAR 1.278x — AT SOTA; np32 UNBLOCKED
+
+Acceptance job 386892 (reglocal binary via its byte-identical pre-format twin, k004-[002-003,
+007-008]): ALL FOUR ARMS rc=0. np16 differenced (1385.551-138.608)/100 = **12.47 s/step**;
+np32 (1752.075-163.192)/100 = **15.89** -> rung = **1.274x** vs AMReX's own np16->np32
+degradation **1.278x** (job 385522) - **excess 0.997x, AT the bar on the third doubling.**
+LADDER: 1.594 -> 1.544 -> 1.368 -> 1.343 -> 1.241 (np8->np16, excess 1.041) -> 1.274
+(np16->np32, excess 0.997). Caveat: 140-step arms ((140-40)/100), not the 240-step
+ledger-grade form; within-job pairwise design as always; cadence tags match the 386617
+baseline runs EXACTLY (55,650,766 np16/140; 111,298,856 np32/140; escaped 0) so the physics
+trajectory is identical. VRAM PLATEAU CONFIRMED: np32/140 ends at mean 37-44 / max 44.7-47.8
+GiB and FLATTENS over its final 20 min (np16-plateau shape) vs the baseline's 63.9/64 crash
+(rc=137). ~16 GiB reclaimed - far above the ~3.5 GB static register estimate, which
+retro-explains the baseline's discrete +12 GiB jump events: they were REG_GROW device-staged
+capacity doublings toward the GLOBAL count, a growth class the participation-local map
+deletes outright. The np32 memory blocker is CLOSED; the residual-term worry (ledger 29) is
+retired. Cross-node wall observations (np16/140 -16.6%, np32/40 -11.7% vs baseline) are
+DIRECTIONAL (different node set); the same-node np8 A/B (reglocal 7.84 s/step, mergereplay
+arm in flight on k004-005) is the honest neutrality read. Remaining above a bar: ONLY the
+second doubling (1.241 vs 1.192); the rf:wait overlap increment (option B,
+notes/rfwait_overlap_design.md) is the one candidate left, and it is optional.
+
 ## 2026-08-27 (30) — PARTICIPATION-LOCAL REGISTERS LANDED; THE ONE RED CI TEST WAS A RUNNER SLOT CAP
 
 Register locality landed `0acad7bd` (all gates: S0 np8 bitcmp byte-identical; [amr-xa]
