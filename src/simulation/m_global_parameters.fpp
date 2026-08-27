@@ -327,7 +327,6 @@ module m_global_parameters
     !> @{!
     !> @}
 
-    logical :: amr_in_fine_advance = .false.  !< true only inside the AMR fine-level advance (skips BC population)
     !> 2a: the current fine block's computed prim vars (mom, E) were preloaded from the batched conversion
     !! (s_amr_convert_prim_batch); s_compute_rhs skips its per-block conversion bit-identically. Host-only.
     logical :: amr_prim_preloaded = .false.
@@ -587,8 +586,6 @@ contains
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
-        load_weight_wrt = .false.
-        sfc_partition_wrt = .false.
         load_balance = .false.
         rank_time_wrt = .false.
         amr = .false.

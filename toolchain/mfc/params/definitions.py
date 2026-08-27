@@ -1340,8 +1340,6 @@ _nv(
     "t_save",
     "cfl_target",
     "prim_vars_wrt",
-    "load_weight_wrt",
-    "sfc_partition_wrt",
     "load_balance",
     "rank_time_wrt",
     "partition_tile_size",
@@ -1360,6 +1358,9 @@ _nv(
     "pi_fac",
 )
 _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "nb", "igr", "igr_order", "sigR")
+# The load-weight/SFC diagnostic writers are read by src/common/m_phase_change, which compiles into
+# every target, so they are declared for all three rather than guarded by a stage ifdef.
+_nv(_ALL, "load_weight_wrt", "sfc_partition_wrt")
 _nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")

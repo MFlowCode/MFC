@@ -96,11 +96,7 @@ contains
 
         ! starting equilibrium solver
 
-#ifdef MFC_SIMULATION
         count_pc_iters = load_weight_wrt .or. sfc_partition_wrt
-#else
-        count_pc_iters = .false.
-#endif
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infpT, sk, hk, gk, ek, rhok, pS, TS, rhoe, dynE, rhos, rho, rM, &
                             & m1, m2, MCT, TvF, ns_pc, ns_tmp]', copyin='[count_pc_iters]')
@@ -200,11 +196,9 @@ contains
                         rhos = rhos + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*sk(i)
                     end do
 
-#ifdef MFC_SIMULATION
                     ! Accumulate Newton iteration count for the load-weight diagnostic (matches the
                     ! allocation condition; no-op when neither writer is enabled).
                     if (count_pc_iters) pc_iter_count(j, k, l) = real(ns_pc, stp)
-#endif
                 end do
             end do
         end do
