@@ -1094,14 +1094,14 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_hypoelastic_interface_energy', parallelism='[seq]', cray_inline=True)
 
-        integer, intent(in)                 :: nf                  !< Number of fluids to mix the shear modulus over
-        real(wp), dimension(nf), intent(in) :: alpha_L, alpha_R    !< Left and right volume fractions
-        real(wp), intent(in)                :: damage_L, damage_R  !< Continuum damage states (referenced only when cont_damage)
-        real(wp), dimension(6), intent(in)  :: tau_e_L, tau_e_R    !< Left and right elastic shear stresses
-        real(wp), intent(out)               :: G_L, G_R            !< Left and right mixture shear moduli
-        real(wp), intent(inout)             :: E_L, E_R            !< Left and right state energies
-        integer                             :: i                   !< Loop iterator
-        logical                             :: elastic_LR          !< Both sides retain elastic energy (not damage-collapsed)
+        integer, intent(in)                 :: nf                    !< Number of fluids to mix the shear modulus over
+        real(wp), dimension(nf), intent(in) :: alpha_L, alpha_R      !< Left and right volume fractions
+        real(wp), intent(in)                :: damage_L, damage_R    !< Continuum damage states (referenced only when cont_damage)
+        real(wp), dimension(6), intent(in)  :: tau_e_L, tau_e_R      !< Left and right elastic shear stresses
+        real(wp), intent(out)               :: G_L, G_R              !< Left and right mixture shear moduli
+        real(wp), intent(inout)             :: E_L, E_R              !< Left and right state energies
+        integer                             :: i                     !< Loop iterator
+        logical                             :: elastic_L, elastic_R  !< Side retains elastic energy (not damage-collapsed)
 
         G_L = 0._wp; G_R = 0._wp
 
@@ -1122,20 +1122,23 @@ contains
         ! where damage has collapsed the modulus (the blow-up mechanism), treating > 99.9% damaged as failed.
         ! Dimensionless, so soft/nondimensionalized materials (G <= O(1e3)) keep their energy term; pristine
         ! states keep master's verysmall gate regardless of material stiffness.
-        elastic_LR = .true.
-        if (cont_damage) elastic_LR = (1._wp - damage_L > damage_energy_cutoff) .and. (1._wp - damage_R > damage_energy_cutoff)
+        elastic_L = .true.; elastic_R = .true.
+        if (cont_damage) then
+            elastic_L = (1._wp - damage_L > damage_energy_cutoff)
+            elastic_R = (1._wp - damage_R > damage_energy_cutoff)
+        end if
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
             ! Elastic contribution to energy if G large enough
-            if ((G_L > verysmall) .and. (G_R > verysmall) .and. elastic_LR) then
+            if ((G_L > verysmall) .and. elastic_L) then
                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 ! Double for shear stresses
                 if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
                     E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 end if
             end if
-            if (G_R > verysmall) then
+            if ((G_R > verysmall) .and. elastic_R) then
                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 ! Double for shear stresses
                 if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
