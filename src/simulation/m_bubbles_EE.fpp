@@ -146,7 +146,7 @@ contains
         type(scalar_field), intent(in) :: divu_in  !< matrix for div(u)
         real(wp) :: rddot
         real(wp) :: pb_local, mv_local, vflux, pbdot
-        real(wp) :: n_tait, B_tait
+        real(wp) :: n_tait, B_tait, qv_bub
         real(wp) :: chi_vw_l, k_mw_l, rho_mw_l     !< Per-thread bubble-wall scratch (avoid module-scalar race)
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -183,7 +183,7 @@ contains
 
         adap_dt_stop_sum = 0
         $:GPU_PARALLEL_LOOP(private='[j, k, l, Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, &
-                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, adap_dt_stop, chi_vw_l, k_mw_l, &
+                            & pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, qv_bub, adap_dt_stop, chi_vw_l, k_mw_l, &
                             & rho_mw_l]', collapse=3, copy='[adap_dt_stop_sum]')
         do l = 0, p
             do k = 0, n
@@ -226,22 +226,8 @@ contains
                             myalpha(ii) = q_cons_vf(eqn_idx%adv%beg + ii - 1)%sf(j, k, l)
                         end do
 
-                        if (num_fluids == 1) then
-                            myRho = myalpha_rho(1)
-                            n_tait = gammas(1)
-                            B_tait = pi_infs(1)/pi_fac
-                        else
-                            myRho = 0._wp
-                            n_tait = 0._wp
-                            B_tait = 0._wp
-
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do ii = 1, num_fluids
-                                myRho = myRho + myalpha_rho(ii)
-                                n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)/pi_fac
-                            end do
-                        end if
+                        call s_compute_mixture_coefficients(myalpha_rho, myalpha, myRho, n_tait, B_tait, qv_bub)
+                        B_tait = B_tait/pi_fac
 
                         n_tait = 1._wp/n_tait + 1._wp  ! make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait - 1)/n_tait  ! make this the usual pi_inf
