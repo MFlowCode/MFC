@@ -6,27 +6,18 @@ from .pack import Pack
 
 Tolerance = Error
 
-# A field whose entire golden content lies within this fraction of the case's largest field
-# is zero to double precision: what it stores is roundoff seeded by the large fields, not a
-# solution. Comparing it pointwise tests the compiler's association order rather than the
-# solver, so any mathematically exact change flips the sign of a crumb and fails. The
-# property worth checking is the physical one - that the field stays zero.
-ZERO_FIELD_REL = 1e-13
-
 
 def _magnitudes(values: typing.List[float]) -> typing.List[float]:
     return [abs(v) for v in values if not math.isnan(v)]
 
 
-def _zero_floor(golden: Pack) -> float:
-    """Magnitude below which a field carries no information, set by the case's dominant scale."""
-    scales = [max(m) for m in (_magnitudes(e.doubles) for e in golden.entries.values()) if m]
-    return ZERO_FIELD_REL * max(scales, default=0.0)
-
-
-def _is_zero_field(values: typing.List[float], floor: float) -> bool:
+def _is_zero_field(values: typing.List[float], atol: float) -> bool:
+    """A field the test cannot resolve from zero: every value is within the absolute tolerance
+    of it. What such a field stores is roundoff, and which way that roundoff falls depends on
+    the compiler's association order, so comparing it pointwise tests the compiler rather than
+    the solver. The candidate is held to the same band instead."""
     mags = _magnitudes(values)
-    return bool(mags) and max(mags) <= floor
+    return bool(mags) and max(mags) <= atol
 
 
 def is_close(error: Error, tolerance: Tolerance) -> bool:
@@ -82,8 +73,6 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
     if len(candidate.entries) != len(golden.entries):
         return None, "Line count does not match."
 
-    floor = _zero_floor(golden)
-
     # For every entry in the golden's pack
     for gFilepath, gEntry in golden.entries.items():
         # Find the corresponding entry in the candidate's pack
@@ -100,14 +89,14 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
         # reproducing its roundoff. This also closes a hole: a golden value of exactly 0
         # gives a NaN relative error, which is_close() passes unconditionally, so such a
         # field was previously not checked at all.
-        if _is_zero_field(gEntry.doubles, floor):
+        if _is_zero_field(gEntry.doubles, tol.absolute):
             reached = max(_magnitudes(cEntry.doubles), default=0.0)
             if any(math.isnan(v) for v in cEntry.doubles):
                 return None, f"{gFilepath} is zero in the golden but is NaN in the pack file."
-            if reached > floor:
+            if reached > tol.absolute:
                 return (
                     None,
-                    f"{gFilepath} is zero in the golden (all values below {floor:.2E}) " f"but reaches {reached:.2E} in the candidate.",
+                    f"{gFilepath} is zero in the golden (all values within the {tol.absolute:.2E} absolute " f"tolerance of it) but reaches {reached:.2E} in the candidate.",
                 )
             continue
 
@@ -163,15 +152,13 @@ def find_maximum_errors_among_failing(
     max_rel_error = -1.0
     max_rel_info = None
 
-    floor = _zero_floor(golden)
-
     for gFilepath, gEntry in golden.entries.items():
         cEntry = candidate.find(gFilepath)
         if cEntry is None:
             continue
 
         # Not compared by compare(); reporting it would point at a field that cannot fail.
-        if _is_zero_field(gEntry.doubles, floor):
+        if _is_zero_field(gEntry.doubles, tol.absolute):
             continue
 
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):
