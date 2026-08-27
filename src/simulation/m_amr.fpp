@@ -25,7 +25,7 @@ module m_amr
     use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, s_compute_pressure, enforce_density_floor_vc
     use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
     use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg, &
-        & s_amr_reg_reserve, f_amr_face_is_seam
+        & s_amr_reg_prepare, f_amr_face_is_seam
     use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_phase_timing
     use m_amr_xchg_audit  ! I1a: per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
@@ -194,11 +194,8 @@ module m_amr
     integer, allocatable :: amr_seam_pairs(:,:)
     integer              :: amr_num_seam_pairs, amr_seam_pairs_nblk
     logical              :: amr_seam_pairs_dirty
-    !! monotone mesh epoch (plan-based exchange, amr_plan_based_exchange.md): incremented at EVERY site that sets
-    !! amr_seam_pairs_dirty and at the end of each slot reconciliation (exchange plans bake local slot indices, so a
-    !! renumbering invalidates them even when the box set is unchanged). The boolean cannot serve as plan staleness:
-    !! it is CONSUMED by whichever lazy seam-cache rebuild fires first, and ownership can change with no regrid.
-    integer(8) :: amr_mesh_epoch = 0
+    !! amr_mesh_epoch now lives in m_global_parameters (m_amr_registers keys its participation-map rebuild on it and
+    !! cannot use m_amr); it is use-associated here and re-exported, so importers of m_amr are unchanged.
     !! per-family plan message tag bases (families F1..F7, amr_plan_based_exchange.md): amr_max_blocks + 100*f keeps
     !! the plan tag space disjoint from the legacy per-box space (tags in [1..amr_max_blocks]) while families convert;
     !! the epoch is folded in as base + mod(amr_mesh_epoch, 100). The init MPI_TAG_UB assert is the scale tripwire;
@@ -2525,7 +2522,9 @@ contains
     !> True iff rank r is a reflux applier for the current block: it owns the coarse cell layer just OUTSIDE some block face AND its
     !! subdomain overlaps the block transversely. Mirrors s_amr_reflux_face_flags, but parameterized by r's subdomain from the
     !! computed decomposition (s_amr_rank_decomp, so the block owner can decide which ranks to send freg to, and each rank agrees on
-    !! whether it receives). Uses amr_region_lo/hi (the current block, set on every rank by s_amr_select_slot).
+    !! whether it receives). Uses amr_region_lo/hi (the current block, set on every rank by s_amr_select_slot). NOTE: deliberately
+    !! NO f_amr_face_is_seam clip (unlike the flags) - and the participation-map build (s_amr_reg_prepare, m_amr_registers) copies
+    !! THIS unclipped formula for its clause (c), because both exchange paths gate their freg receives on it. Keep lockstep.
     pure logical function f_amr_reflux_participates(r) result(part)
 
         integer, intent(in) :: r
@@ -2594,7 +2593,8 @@ contains
         if (proc_rank == owner) then
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
+                                 & + ')%hi(:, :, :, amr_reg_cur)]')
                 end if
             #:endfor
             ! participating ranks by O(overlap) inversion (region grown by 1) filtered by the UNCHANGED predicate, in place of the
@@ -2617,14 +2617,15 @@ contains
                     if (r == owner .or. .not. f_amr_reflux_participates(r)) cycle
                     #:for D in [1, 2, 3]
                         if (${D}$ <= num_dims) then
-                            cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                            cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
                             nreq = nreq + 1
                             call s_xa_rec(XA_F5_FACE_SND, 1, cnt, ${2*D}$)
-                            call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, r, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
+                            call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, r, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), &
+                                           & ierr)
                             nreq = nreq + 1
                             call s_xa_rec(XA_F5_FACE_SND, 1, cnt, ${2*D + 1}$)
-                            call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, r, ${2*D + 1}$, MPI_COMM_WORLD, reqs(nreq), &
-                                           & ierr)
+                            call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, r, ${2*D + 1}$, MPI_COMM_WORLD, &
+                                           & reqs(nreq), ierr)
                         end if
                     #:endfor
                 end do
@@ -2636,20 +2637,21 @@ contains
         else if (f_amr_reflux_participates(proc_rank)) then
             ! Post all 2*num_dims receives, then ONE wait. The blocking form serialised the six faces
             ! against the owner's send order and cost 6.3%% of wall (rf:recv, 4010 calls). The slice
-            ! (:,:,:,amr_cur) is contiguous - amr_cur is the last dimension - and the owner side
+            ! (:,:,:,amr_reg_cur) is contiguous - the dense register slot is the last dimension - and the owner side
             ! already ISENDs the identical shape, so no temporary-buffer hazard is introduced.
             call s_phase_tic(PH_RFRECV)
             allocate (reqs(2*num_dims))
             nreq = 0
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
                     nreq = nreq + 1
                     call s_xa_rec(XA_F5_FACE_RCV, 2, cnt, ${2*D}$)
-                    call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
+                    call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, owner, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
                     nreq = nreq + 1
                     call s_xa_rec(XA_F5_FACE_RCV, 2, cnt, ${2*D + 1}$)
-                    call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, owner, ${2*D + 1}$, MPI_COMM_WORLD, reqs(nreq), ierr)
+                    call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, owner, ${2*D + 1}$, MPI_COMM_WORLD, reqs(nreq), &
+                                   & ierr)
                 end if
             #:endfor
             call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
@@ -2657,7 +2659,8 @@ contains
             ! Device update only AFTER the wait: the buffers hold nothing valid until then.
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
+                                 & + ')%hi(:, :, :, amr_reg_cur)]')
                 end if
             #:endfor
             call s_phase_toc(PH_RFRECV)
@@ -2675,7 +2678,7 @@ contains
     !! (amr_block_owner + the replicated region mirrors + the pure participation test). Under MFC_DEBUG the identity headers travel
     !! as separate 8-word COMPANION messages, one per (box, peer) group ahead of its payloads (a prefix cannot ride a zero-copy
     !! payload); they are never recorded in [amr-xa], so the family words stay exactly comparable. The register arrays are sized UP
-    !! FRONT: the apply can REALLOCATE them, so nothing may post into freg before s_amr_reg_reserve.
+    !! FRONT: the apply can REALLOCATE them, so nothing may post into freg before s_amr_reg_prepare.
     impure subroutine s_amr_reflux_faces_wave()
 
 #ifdef MFC_MPI
@@ -2687,7 +2690,7 @@ contains
         real(wp) :: nanv
 
         if (num_procs == 1) return
-        call s_amr_reg_reserve(amr_num_blocks)
+        call s_amr_reg_prepare()
         tq = amr_tag_base(5) + int(mod(amr_mesh_epoch, 50_8))
         nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
@@ -2712,18 +2715,18 @@ contains
             end if
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
                     if (s_lo(${D}$)) then
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
                         call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
-                        call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
+                        call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
                     else
-                        freg(${D}$)%lo(:,:,:,amr_cur) = nanv
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                        freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
 #endif
                     end if
                     if (s_hi(${D}$)) then
@@ -2731,12 +2734,12 @@ contains
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
                         call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
-                        call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
+                        call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
                     else
-                        freg(${D}$)%hi(:,:,:,amr_cur) = nanv
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                        freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
 #endif
                     end if
                 end if
@@ -2766,10 +2769,10 @@ contains
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     if (u_lo(${D}$)) then
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
                     end if
                     if (u_hi(${D}$)) then
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
                     end if
                 end if
             #:endfor
@@ -2787,20 +2790,22 @@ contains
                 end if
                 #:for D in [1, 2, 3]
                     if (${D}$ <= num_dims) then
-                        cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                        cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
                         if (cl(${D}$, idx)) then
                             nreq = nreq + 1
                             call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                             amr_fw_reqw(nreq) = -1
                             call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
-                            call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                            call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, &
+                                           & amr_fw_req(nreq), ierr)
                         end if
                         if (ch(${D}$, idx)) then
                             nreq = nreq + 1
                             call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                             amr_fw_reqw(nreq) = -1
                             call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
-                            call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                            call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, &
+                                           & amr_fw_req(nreq), ierr)
                         end if
                     end if
                 #:endfor
@@ -2843,10 +2848,10 @@ contains
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     if (s_lo(${D}$)) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
                     end if
                     if (s_hi(${D}$)) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
                     end if
                 end if
             #:endfor
@@ -2869,7 +2874,7 @@ contains
         real(wp) :: w_lo(3), w_hi(3), nanv
 
         if (num_procs == 1) return
-        call s_amr_reg_reserve(amr_num_blocks)
+        call s_amr_reg_prepare()
         tq = amr_tag_base(5) + 50 + int(mod(amr_mesh_epoch, 50_8))
         nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
@@ -2895,18 +2900,18 @@ contains
             end if
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
                     if (w_lo(${D}$) > 0._wp) then
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
                         call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
-                        call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), &
-                                       & ierr)
+                        call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
+                                       & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
                     else
-                        freg(${D}$)%lo(:,:,:,amr_cur) = nanv
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                        freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
 #endif
                     end if
                     if (w_hi(${D}$) > 0._wp) then
@@ -2914,12 +2919,12 @@ contains
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
                         call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
-                        call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), &
-                                       & ierr)
+                        call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
+                                       & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
                     else
-                        freg(${D}$)%hi(:,:,:,amr_cur) = nanv
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                        freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
 #endif
                     end if
                 end if
@@ -2937,10 +2942,10 @@ contains
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     if (w_lo(${D}$) > 0._wp) then
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
                     end if
                     if (w_hi(${D}$) > 0._wp) then
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
                     end if
                 end if
             #:endfor
@@ -2955,22 +2960,22 @@ contains
             end if
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
                     if (w_lo(${D}$) > 0._wp) then
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = -1
                         call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
-                        call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), &
-                                       & ierr)
+                        call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, &
+                                       & amr_fw_req(nreq), ierr)
                     end if
                     if (w_hi(${D}$) > 0._wp) then
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = -1
                         call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
-                        call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), &
-                                       & ierr)
+                        call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, &
+                                       & amr_fw_req(nreq), ierr)
                     end if
                 end if
             #:endfor
@@ -3008,10 +3013,10 @@ contains
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     if (w_lo(${D}$) > 0._wp) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur)]')
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
                     end if
                     if (w_hi(${D}$) > 0._wp) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
                     end if
                 end if
             #:endfor
@@ -4424,25 +4429,27 @@ contains
         if (proc_rank == cowner) then
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
-                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
+                                 & + ')%hi(:, :, :, amr_reg_cur)]')
                     call s_xa_rec(XA_F5_FREG_SND, 1, cnt, ${40 + 2*D}$)
-                    call MPI_SEND(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, powner, ${40 + 2*D}$, MPI_COMM_WORLD, ierr)
+                    call MPI_SEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, powner, ${40 + 2*D}$, MPI_COMM_WORLD, ierr)
                     call s_xa_rec(XA_F5_FREG_SND, 1, cnt, ${41 + 2*D}$)
-                    call MPI_SEND(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, powner, ${41 + 2*D}$, MPI_COMM_WORLD, ierr)
+                    call MPI_SEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, powner, ${41 + 2*D}$, MPI_COMM_WORLD, ierr)
                 end if
             #:endfor
         else
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_cur))
+                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
                     call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${40 + 2*D}$)
-                    call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_cur), cnt, mpi_p, cowner, ${40 + 2*D}$, MPI_COMM_WORLD, &
+                    call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, ${40 + 2*D}$, MPI_COMM_WORLD, &
                                   & MPI_STATUS_IGNORE, ierr)
                     call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${41 + 2*D}$)
-                    call MPI_RECV(freg(${D}$)%hi(:,:,:,amr_cur), cnt, mpi_p, cowner, ${41 + 2*D}$, MPI_COMM_WORLD, &
+                    call MPI_RECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, ${41 + 2*D}$, MPI_COMM_WORLD, &
                                   & MPI_STATUS_IGNORE, ierr)
-                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_cur), freg(' + str(D) + ')%hi(:, :, :, amr_cur)]')
+                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
+                                 & + ')%hi(:, :, :, amr_reg_cur)]')
                 end if
             #:endfor
         end if
@@ -4521,8 +4528,8 @@ contains
         if (n_glb > 0) then; mlo(2) = amr_slots(pblk)%dy(olo(2)); mhi(2) = amr_slots(pblk)%dy(ohi(2)); end if
         if (p_glb > 0) then; mlo(3) = amr_slots(pblk)%dz(olo(3)); mhi(3) = amr_slots(pblk)%dz(ohi(3)); end if
         call s_amr_br_load(amr_loc_of(pblk))
-        call s_amr_reflux_apply_faces(amr_cons_br, amr_cur, amr_ref_ratio, dt_reflux, olo, ohi, glo, ghi, woff, w_lo, w_hi, mlo, &
-                                      & mhi)
+        call s_amr_reflux_apply_faces(amr_cons_br, amr_reg_cur, amr_ref_ratio, dt_reflux, olo, ohi, glo, ghi, woff, w_lo, w_hi, &
+                                      & mlo, mhi)
         call s_amr_br_store(amr_loc_of(pblk))
 
     end subroutine s_amr_reflux_to_parent
