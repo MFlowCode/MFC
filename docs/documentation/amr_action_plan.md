@@ -7,6 +7,32 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (30) — PARTICIPATION-LOCAL REGISTERS LANDED; THE ONE RED CI TEST WAS A RUNNER SLOT CAP
+
+Register locality landed `0acad7bd` (all gates: S0 np8 bitcmp byte-identical; [amr-xa]
+families identical; debug/NaN-poison rc=0; AMR-68 68/68; formatted-tree rebuild twin-bitcmp'd
+byte-identical, so the queued acceptance evidence transfers). The 12 creg/freg arrays now
+index by a dense participation-local slot (own / parent-owned / reflux-face-participate) with
+a mesh-epoch-keyed lazy rebuild (s_amr_reg_prepare) and dense kernel sweeps; the mesh epoch
+moved to m_global_parameters (m_amr re-exports). DESIGN CATCH during the site audit: both
+freg exchange paths gate receives on f_amr_reflux_participates' UNCLIPPED formula (no seam
+clip), so the map's clause (c) copies that formula - the seam-clipped flags predicate would
+have under-covered a seam-only participant (an IRECV into dense slot 0). ACCEPTANCE = job
+386892 (np32_accept.sbatch, np32/140 must plateau like np16), queued; pre-fix baseline:
+np32/140 rc=137 at 63.9/64 GiB (386617, trajectory in notes/reg_locality_design.md).
+np8 wall-neutrality pair (reglocal vs mergereplay, k004-005) in flight.
+
+CI: #1628's first cycle reduced to ONE failing test - D127EC91 (AMR churn np=4, the suite's
+only np=4 case; upstream has none) - ROOT-CAUSED as an Open MPI slot cap on 2-core GitHub
+runners: syscheck's `mpirun -np 4` is refused before MFC runs ("not enough slots"), on every
+GNU/Intel/NVHPC-cpu lane, both opt levels. NOT a code bug: the test passes on the local
+gfortran CPU lane. Fix `60b931f2`: the default template passes --oversubscribe when the
+launcher is Open MPI (MPICH has no slot cap and no such flag), validated locally through the
+mpirun path. Teardown fix f81239a3 confirmed clearing the other 4 CPU crashes in CI.
+Build & Verify green on #1628 (the lychee exclusion held). Frontier lanes still the site
+outage. Upstream moved (#1763 Phoenix CI infra; merged into up/mega and the probe by the
+user mid-evening - both my commits rebased on top cleanly).
+
 ## 2026-08-27 (29) — MASTER MERGED INTO up/mega: PR #1628 IS CI-LIVE
 
 Merge `5312e834` (upstream master `d74cc378`, unchanged since the probe) reuses the
