@@ -54,6 +54,13 @@ Three options were weighed:
 
 ## 3. The end state, stated as invariants
 
+> **The "today" column below is a SNAPSHOT and drifts.** It was written 2026-08-20 and was a week
+> stale when re-audited on 2026-08-27 (ledger 35: W1 is O(global boxes^2), not O(global boxes); W8
+> now holds through np32). Do not trust it - **run `amr-bench/invariant_scorecard.py <arm dirs>`**,
+> which computes the invariant-facing quantities from the `[amr-scale]` counters the code already
+> emits. The program drifted for five days onto a wall-clock metric that is structurally blind to
+> W4; a scorecard you have to remember to consult is one that stops being consulted.
+
 A weak-scaling AMR arm satisfies, at fixed per-rank work as ranks and problem grow together:
 
 | # | invariant | today | end state |
@@ -222,19 +229,34 @@ strategy for #1628.
 
 ## 8. Decision points (user)
 
-- **D-phase2: DECIDED 2026-08-20 — full commitment.** The user approved the whole ladder through
-  the rhs-tree conversion ("yes full commitment we need to get this done"). 2a still runs first,
-  but as de-risking and pricing, not as a go/no-go gate.
+- **D-phase2: RE-SEQUENCED 2026-08-27 — 2b is required but is NOT next.** The 2026-08-20 decision
+  ("yes full commitment we need to get this done") stands on WHETHER; ledger 35 changed WHEN. W2 is
+  FLAT in P (75 boxes/rank at np8/16/32 alike): a ~173x launch constant is a permanent efficiency
+  tax at every scale, but it is not what fails at 1e5 ranks. W4 and W1 are, and both have far
+  smaller fixes. Order: W4 -> W1 -> W5 -> W3 -> W2 (2b) -> W6/W7. 2a stays gated off
+  (`amr_prim_batch = .false.`); its bridge-load regression is the argument FOR store-native 2b, not
+  against Phase 2.
 - **D-node: CONSTRAINED 2026-08-20 — nodes are scarce here.** Weak-scaling validation is designed
   single-node-first: S0 sweeps problem size and rank count (1..8 GCDs) at fixed per-rank work,
   which exposes every O(boxes) and O(P) term without a second node. Multi-node becomes a final
   spot-check if and when an allocation window exists; nothing in the ladder blocks on it.
-- **D-l0:** delete or keep the L0 tiling machinery (section 6) — still open.
+- **D-l0: DECIDED 2026-08-27 — DELETE.** MFC's level 0 is balanced BY CONSTRUCTION (a Cartesian
+  decomposition hands every rank one equal-sized chunk), so L0 tiling load-balances something that
+  cannot be imbalanced in the uniform-cost case. AMReX boxes level 0 only because there boxes ARE
+  the decomposition, which is also why the literature's ">=4 boxes/rank" floor does not transfer.
+  Measured: tiling costs 28-35% wall, rebalancing recovers 0.6% (inside noise). **RE-ENTRY
+  CONDITION, and it is live rather than hypothetical:** a measured level-0 work imbalance above
+  ~10% on an IB, chemistry, or Lagrangian-bubble case, with `[amr-balance]` extended to level 0 —
+  MFC's own fine-block cost model already carries `K_ib`/`K_pc` terms, so the code encodes that
+  per-cell cost is NOT uniform once those physics are on; level 0 just gets no equivalent. Before
+  deleting, check what the 12 L0/coexist tests cover incidentally. The L0 restart-writer filter is
+  DROPPED - do not repair save/restart for machinery being removed.
 
 ## 9. Planning discipline: just-in-time contracts, one phase ahead
 
-Only one phase carries a detailed implementation contract at a time (today: Phase 1 =
-`amr_plan_based_exchange.md`). When phase N is roughly 70% landed, phase N+1 gets its own
+Only one phase carries a detailed implementation contract at a time (as of 2026-08-27: the W4 fix =
+`amr-bench/notes/s3_distributed_clustering_design.md`; Phase 1's `amr_plan_based_exchange.md` is
+landed and no longer the active contract). When phase N is roughly 70% landed, phase N+1 gets its own
 contract at the same resolution — family/kernel inventory, data-layout contract, portability
 constraints, increments with gates — written against the code as it exists *then*, and put
 through the independent multi-reviewer audit ritual before its first increment (v1 of the

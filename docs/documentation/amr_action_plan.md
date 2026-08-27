@@ -7,6 +7,70 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (36) — THE HYGIENE BATCH: CHECKER MIGRATION, STACK AUTOMATICS, AND THE SEAM SCAN DE-QUADRATIFIED
+
+Four commits, all byte-identical or golden-holding, all gated.
+
+**`82dd12f5` - the merge regression fixed.** Upstream `55fb1b14` migrated input-only checks out of
+`m_checker` into `case_validator` and added a lint rule to enforce the split; our merge resolved the
+conflicted region as "ours", restoring 19 of them, then allowlisted `s_check_inputs` so the new rule
+could not fire. The 19 are deleted, with the now-unused `m_helper_basic` import and the already-dead
+`muscl_order_first_order` one. One of the 19 was doing real work the validator did not replicate:
+the Fortran `pign` check fires on the `dflt_real` SENTINEL while the validator fired only on an
+ABSENT key, so a case writing `rburn%%pign` as the sentinel passed `./mfc.sh validate` and then
+ignited everywhere from t=0. The validator now rejects any non-positive `pign`, matching the pattern
+`rburn%%k`/`rburn%%pref` already use - **that fix landed BEFORE the Fortran check was removed.**
+Gates: 10/10 (three reactive-burn + chemistry AMR), precheck.
+
+**`f702fb27` - AMR input constraints moved to Python** (user: "i like the AMR prohibits in the mfc
+toolchain (python) when possible"). 53 of the 57 prohibits in `s_check_inputs` deleted; the 4 that
+survive all read `num_procs` (MPI_Comm_size, invisible to the validator) and each carries a
+`! lint: runtime-check` marker. With only those left, `s_check_inputs` came OFF
+`RUNTIME_CHECKER_SUBROUTINES` - **upstream's rule is armed here for the first time**, so a new
+input-only check added Fortran-side is now flagged. Nine validator checks were corrected FIRST,
+because deleting their counterparts would otherwise have opened silent holes: `cfl_dt` and
+`bodyForces` are DERIVED in `s_read_input_file` (from `cfl_adap_dt`/`cfl_const_dt`, and from
+`bf_spatial_support`) while the validator read only the literal keys - so `amr_subcycle` with
+`cfl_const_dt` passed validation and aborted in the solver; `time_stepper`/`model_eqns` default to
+the `dflt_int` sentinel, which Fortran rejects and the validator skipped on an absent key; and
+`amr_tag_eps`/`amr_buf` were over-strict the other way, erroring on unset keys whose Fortran
+defaults are valid. **Trade recorded:** the validator runs on the `./mfc.sh run` path, so a built
+binary invoked directly against a hand-edited `simulation.inp` no longer gets these checks.
+**Also removed undefined behaviour:** `s_check_inputs` read `num_dims` - not assigned until
+`s_initialize_parallel_io_common` 25 lines later - and sliced `amr_block_beg(1:num_dims)` with it.
+Gates: 15/15 (AMR + active_box + coexist + load-balance + diagnostic writers), all examples valid.
+
+**`4e21d0f3` - W1, the crash half.** Twelve O(global boxes) AUTOMATIC arrays moved to the heap:
+seven in `s_amr_assign_block_owners` (~48 bytes/block between them, ~48 MB at 1e6 blocks) and five
+in `s_amr_regrid`. These OVERFLOW a default stack long before the box count itself becomes the
+bottleneck - a crash, not a slowdown. Gates: bitcmp byte-identical, AMR 10/10.
+
+**`5ec798ed` - W1, one of the two quadratic paths.** `s_amr_build_seam_pairs` ran two nested loops
+over `amr_num_blocks` per regrid (count then fill) = 2N^2 in the GLOBAL block count. **It was never
+a search:** `f_amr_seam` demands exact equality of region lo AND hi on both transverse dims plus
+`lo(d,yb) = hi(d,xb)+1`, and blocks are disjoint, so `(level, lo)` names a block uniquely and those
+conditions FIX the neighbour's lo corner given `xb` and `d`. Morton-sort the lo corners once (the
+stable merge sort `s_amr_sfc_cut` already uses - whose own comment makes exactly this O(n^2)
+argument about its predecessor), then binary-search the single candidate per (block, dim) and verify
+the predicate: **O(N log N)**. Emission order preserved exactly (xb ascending, each block's <=3
+matches insertion-sorted into ascending yb) because the list drives paired MPI_SENDRECVs - a
+reordered list DEADLOCKS rather than producing wrong numbers. Equal-key runs are rescanned against
+the full lo vector (f_morton keeps 21 bits/dim). Gates: bitcmp byte-identical; 17 AMR tests covering
+tiled seams, tiled L2, multi-block, three-level, np=2 multi-level, and the coexist set that
+exercises the l0 periodic-wrap branch.
+
+**Remaining in W1:** the regrid nesting loops (`m_amr_regrid.fpp`), whose pass 2 is parents x GLOBAL
+TAGGED CELLS - a worse shape than boxes x boxes. **Do not fix it standalone:** it iterates the global
+tag list that S3 deletes, so it is subsumed by the W4 work.
+
+**Upstream issue to file (NOT patched here):** `s_check_inputs_weno`/`_muscl` carry
+`! lint: runtime-check m/n/p are per-rank extents after MPI decomposition` markers, but they are
+called from `s_check_inputs` at `m_start_up.fpp:1070`, BEFORE
+`s_mpi_decompose_computational_domain` at `:1097` - so m/n/p are the GLOBAL case-file values there
+and those checks are input-only, not runtime. Upstream's checks, upstream's markers: report it,
+do not quietly change upstream checker semantics inside a merge branch. That is how the regression
+in the first paragraph happened.
+
 ## 2026-08-27 (35) — THE LADDER IS NOT THE SCORECARD: W1/W2/W4/W7 UNMET; D-l0 = DELETE; D-phase2 = NOT NEXT
 
 **Retraction.** (34) concluded "declare the performance program done," reasoned from the six-rung
