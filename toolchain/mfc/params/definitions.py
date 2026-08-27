@@ -1006,9 +1006,13 @@ def _load():
     _pb_attrs["radius"] = (REAL, _pb_tags)
     _pb_attrs["mass"] = (REAL, _pb_tags)
     _pb_attrs["min_spacing"] = (REAL, _pb_tags)
+    _pb_attrs["shell_inner_radius"] = (REAL, _pb_tags)
+    _pb_attrs["shell_outer_radius"] = (REAL, _pb_tags)
     _pb_attrs["moving_ibm"] = (INT, _pb_tags)
     _pb_attrs["seed"] = (INT, _pb_tags)
+    _pb_attrs["cloud_geometry"] = (INT, _pb_tags)
     _pb_attrs["packing_method"] = (INT, _pb_tags)
+    _pb_attrs["periodic"] = (INT, _pb_tags)
     REGISTRY.register_family(
         IndexedFamily(
             base_name="particle_cloud",
