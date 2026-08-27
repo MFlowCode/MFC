@@ -163,7 +163,7 @@ contains
         real(wp)            :: phi
         real(wp), parameter :: ADC_power = 1.0_wp
         real(wp)            :: alpha_L_sum, alpha_R_sum
-        logical             :: degenerate, shear_degenerate, fan_fallback
+        logical             :: degenerate, shear_degenerate, fan_fallback, shear_cond
         integer             :: i, j, k, l, ipass, zone
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -186,7 +186,7 @@ contains
                 ! (_hlld_p1..p4) are ONLY for source readability; fypp concatenates them into one
                 ! clause below. That wrapping is FOLD_DIRECTIVE's job -- its within-clause comma split
                 ! exists for exactly this case -- not the fragments'.
-                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,shear_degenerate,fan_fallback,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,G_eff,G_eff_tol,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
+                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,shear_degenerate,fan_fallback,shear_cond,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,G_eff,G_eff_tol,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
                 #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
@@ -341,9 +341,9 @@ contains
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                @:compute_hypo_elastic_energy(E%L, E%R, &
-                                                              & (n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 &
-                                                              & .or. i == 4 .or. i == 5)))
+                                shear_cond = (n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))
+                                E%L = E%L + f_elastic_energy(tau_e_L(i), G_L, shear_cond)
+                                E%R = E%R + f_elastic_energy(tau_e_R(i), G_R, shear_cond)
                             end do
 
                             ! Compute Riemann states

@@ -73,6 +73,37 @@ module m_riemann_state
 
 contains
 
+    !> Elastic signal speed of Rodriguez et al. JCP (2019): the acoustic speed stiffened by the shear modulus and the normal elastic
+    !! stress. Callers subtract it for the left-going wave and add it for the right-going one.
+    function f_elastic_signal_speed(c, G, tau, rho) result(a)
+
+        $:GPU_ROUTINE(function_name='f_elastic_signal_speed', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: c, G, tau, rho
+        real(wp)             :: a
+
+        a = sqrt(max(verysmall, c*c + (((4._wp*G)/3._wp) + tau)/rho))
+
+    end function f_elastic_signal_speed
+
+    !> Elastic strain energy carried by one stress component, doubled for a shear component because the tensor holds it once but the
+    !! energy counts both off-diagonal entries. Zero where the material has no shear modulus.
+    function f_elastic_energy(tau, G, is_shear) result(dE)
+
+        $:GPU_ROUTINE(function_name='f_elastic_energy', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: tau, G
+        logical, intent(in)  :: is_shear
+        real(wp)             :: dE
+
+        dE = 0._wp
+        if (G > verysmall) then
+            dE = (tau*tau)/max(4._wp*G, verysmall)
+            if (is_shear) dE = dE + (tau*tau)/max(4._wp*G, verysmall)
+        end if
+
+    end function f_elastic_energy
+
     !> Dispatch to the subroutines that are utilized to compute the viscous source fluxes for either Cartesian or cylindrical
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux

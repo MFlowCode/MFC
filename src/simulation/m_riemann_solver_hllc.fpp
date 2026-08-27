@@ -1074,7 +1074,14 @@ contains
                                     if (wave_speeds == wave_speeds_direct) then
                                         #:if HYPO
                                             ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                            @:compute_elastic_wave_speeds_lr()
+                                            s_L = min(vel_L(dir_idx(1)) - f_elastic_signal_speed(c_L, G_L, &
+                                                      & tau_e_L(dir_idx_tau(1)), rho_L), &
+                                                      & vel_R(dir_idx(1)) - f_elastic_signal_speed(c_R, G_R, &
+                                                      & tau_e_R(dir_idx_tau(1)), rho_R))
+                                            s_R = max(vel_R(dir_idx(1)) + f_elastic_signal_speed(c_R, G_R, &
+                                                      & tau_e_R(dir_idx_tau(1)), rho_R), &
+                                                      & vel_L(dir_idx(1)) + f_elastic_signal_speed(c_L, G_L, &
+                                                      & tau_e_L(dir_idx_tau(1)), rho_L))
                                             s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + tau_e_L(dir_idx_tau(1)) &
                                                    & + rho_L*vel_L(dir_idx(1))*(s_L - vel_L(dir_idx(1))) - rho_R*vel_R(dir_idx(1)) &
                                                    & *(s_R - vel_R(dir_idx(1))))/(rho_L*(s_L - vel_L(dir_idx(1))) - rho_R*(s_R &

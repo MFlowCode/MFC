@@ -358,7 +358,12 @@ contains
                                     s_R = max(vel_R(dir_idx(1)) + c_fast%R, vel_L(dir_idx(1)) + c_fast%L)
                                 else if (hypoelasticity) then
                                     ! Elastic wave speed, Rodriguez et al. JCP (2019)
-                                    @:compute_elastic_wave_speeds_lr()
+                                    s_L = min(vel_L(dir_idx(1)) - f_elastic_signal_speed(c_L, G_L, tau_e_L(dir_idx_tau(1)), &
+                                              & rho_L), vel_R(dir_idx(1)) - f_elastic_signal_speed(c_R, G_R, &
+                                              & tau_e_R(dir_idx_tau(1)), rho_R))
+                                    s_R = max(vel_R(dir_idx(1)) + f_elastic_signal_speed(c_R, G_R, tau_e_R(dir_idx_tau(1)), &
+                                              & rho_R), vel_L(dir_idx(1)) + f_elastic_signal_speed(c_L, G_L, &
+                                              & tau_e_L(dir_idx_tau(1)), rho_L))
                                 else
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
