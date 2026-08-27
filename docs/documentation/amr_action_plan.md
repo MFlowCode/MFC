@@ -34,16 +34,40 @@ F5 still per-(box,face,participant)). W8 holds through np32.
 
 **W4 is the top blocker on a STRUCTURAL argument, not a measured coefficient.** Each rank receives
 every rank's tagged cells, so at fixed per-rank work the received volume is O(P) per rank - derivable
-from the code, and the reason it cannot be tuned away. The specific per-rank MiB figures circulated
-during this audit are NOT yet trustworthy: `[amr-scale]` counters are cumulative and the arms differ
-in step count, so they need the differenced instrument (two from-scratch runs) before any number is
-quoted. **Re-measure before citing.**
+from the code, and the reason it cannot be tuned away. **NOW MEASURED INDEPENDENTLY AND CONFIRMED**, via the new
+`amr-bench/invariant_scorecard.py` on the matched np16/np32 arms of job 386892 (9 regrids each,
+cells/rank constant at 8M): ntag **39.29 -> 78.59 MiB per rank per regrid = 2.00x**, gwin
+8.60 -> 17.06 = 1.98x. Extrapolating the confirmed law from np32: **~240 GiB per rank per regrid at
+1e5 ranks.** Two traps the tool now documents, because both produced wrong readings during this
+audit: `amr_gb_tag` accumulates the GLOBAL tag list and is printed from rank 0, but every rank
+RECEIVES that list, so it is ALREADY per-rank - do not divide by np; and a `**/*.log` glob already
+matches `run.log`, so scanning both double-counts regrids. The tool refuses to compare arms with
+mismatched regrid counts rather than silently averaging them.
 
 **THE INVERSION.** Phase 2b - "the largest single investment in the program" - addresses W2, which is
 FLAT in P (75 boxes/rank at np8/16/32 alike). It is a ~173x launch constant: a permanent efficiency
-tax at every scale, but not what fails at 1e5 ranks. **Corrected order: W4 (S1 block-lattice tag
-coarsening, ~60 LOC, never attempted - only re-listed) -> W1 (de-quadratify + heap the stack
-automatics) -> W5 (I7) -> W3 (F5) -> W2 (2b) -> W6/W7.** D-phase2 resolves: 2b stays on the roadmap
+tax at every scale, but not what fails at 1e5 ranks. **Corrected order: W4 -> W1 (de-quadratify + heap the stack
+automatics) -> W5 (I7) -> W3 (F5) -> W2 (2b) -> W6/W7.**
+
+**CORRECTION to this entry's first draft: S1 is NOT the W4 fix.** W4 requires the tag exchange be
+O(local + peers). Block-lattice coarsening shrinks each rank's contribution but leaves the
+ALLGATHERV in place - every rank still receives every rank's tags, so received volume stays O(P).
+It moves the curve down ~512x (about nine doublings of headroom, reaching ~1e4 ranks from np32);
+it does not change the slope. Its own pre-registered gate - "judged on ntag bytes/rank going flat"
+(line ~1464) - is therefore UNSATISFIABLE by it: under weak scaling the domain grows with P, so a
+coarsened lattice grows with P too. Nobody noticed because S1 was never attempted.
+**The genuine W4 fix is architectural, and the code says why.** `s_amr_union_gtag`
+(`m_amr_regrid.fpp:408-412`) all-gathers so that "every rank decodes the same gathered index set
+into the same list, so the bisection is rank-invariant" - the collective buys RANK-INVARIANCE of
+the box decomposition, which the goldens depend on. A neighbor-scoped exchange breaks that
+property outright: each rank would cluster from a different tag subset. The fix is therefore
+**S3 (local clustering + boundary reconciliation), already scheduled in endstate Phase 3** - pull
+it forward, with determinism as its hardest requirement, not as an afterthought.
+**Recommendation: SKIP S1 and go straight to S3.** Coarsening the tag lattice changes which cells
+are tagged, hence the box set, hence the goldens; S3 changes the box set too. Doing both means two
+golden churns for one architectural outcome. S1 remains available as a stopgap ONLY if a deadline
+demands headroom before S3 is ready, and must then be labelled a coefficient fix with an explicit
+headroom number. D-phase2 resolves: 2b stays on the roadmap
 as the parity item, NOT as the next increment. Ordering it later is a claim about *when*, not about
 whether it is needed.
 
