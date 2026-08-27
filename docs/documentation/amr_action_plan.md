@@ -7,6 +7,100 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (34) — MERGE AUDIT + STRATEGY SHIFT: THE PERFORMANCE PROGRAM IS COMPLETE; WHAT REMAINS IS CORRECTNESS AND MERGE HYGIENE
+
+**Strategy.** The scaling ladder is finished. Six rungs: 1.594 -> 1.544 -> 1.368 -> 1.343 ->
+1.241 -> 1.274. Five sit at or below the AMReX bar, and the third doubling (np16->np32, 1.274 vs
+AMReX's own 1.278) degrades slightly LESS than AMReX. Exactly one rung is above a bar: np8->np16
+at 1.241 vs 1.192, a 4.1% excess, addressed only by the optional rf:wait overlap increment
+(option B, `notes/rfwait_overlap_design.md`). That excess is smaller than the ~5% single-run
+noise floor these runs have historically shown; the rungs use a tighter differenced within-job
+pairwise design so it is not pure noise, but it is close enough to the floor that chasing it
+spends effort without producing evidence. **Recommendation adopted: declare the performance
+program done and spend the remaining effort on correctness and merge hygiene.** The claim to
+carry into review is "at SOTA on the third doubling, within 4% on the second."
+
+**Merge audit of `5312e834` (base `0c9a1d43`, master `d74cc378`).** Structure is sound: every
+upstream commit is a true ancestor of HEAD, all 8 master-deleted files are gone, all master-added
+files present. Of 33 files both sides modified, an automated two-way scan (master deletions that
+reappear at HEAD / master additions missing at HEAD) flagged 14; three clusters were then audited
+individually and cleared. The Riemann 4-way split is intact (all six modules, `hypo_hlld` differs
+from master by one line, every hat_R buffer allocated under renamed `_alloc` bounds, no duplicated
+solver bodies); `model_eqns_4eq` removal fully honored and the symbol appears nowhere in src/ or
+toolchain/; `qbmm_idx`, `m_variables_conversion`, IB neighborhood (`f5d2b4cc` + `b7d78838` both
+intact), `module_categories.json` (a 4->2 space reindent, all 83 modules present), and the
+HardcodedIC `pRef` casing fix all survive. Scan false-positive modes, for future reuse: line-level
+matching against code master RELOCATED, and a whole-file reindent making an unchanged file look
+rewritten.
+
+**ONE CONFIRMED REGRESSION.** Master `55fb1b14` (#1717) migrated ~120 `@:PROHIBIT` lines out of
+`src/simulation/m_checker.fpp` into `case_validator.py` AND added a lint rule
+(`check_checker_input_constraints`) that fails precheck on any `@:PROHIBIT` in `m_checker*.fpp`
+unless allowlisted or marked `! lint: runtime-check`. Our merge resolved the conflicted region as
+"ours", restoring 21 of them (`m_checker.fpp:39-59, :230-231, :235-258`) — `reactive_burn` count
+is 0 at master, 21 at HEAD, plus 16 in the validator — and then added `"s_check_inputs"` to
+`RUNTIME_CHECKER_SUBROUTINES`, silencing the guard master built for exactly this. That exemption
+sits directly beneath the INHERITED docstring stating such mixed subroutines are "deliberately NOT
+listed" because allowlisting one "would have let its replacement back in unnoticed." It is a
+disabled alarm, not static debt: it already admitted two new prohibits of our own
+(`m_checker.fpp:92` active_box+synthetic turbulence, `:129` AMR+CBC, both from `c5b461f9`, both
+input-only and both duplicated into the validator). Two of the duplicated pairs have already
+drifted, in both cases with the validator STRICTER than the solver: `reactive_burn` gamma/pi_inf
+uses `f_approx_equal` (|a-b|/(|a|+|b|)) in Fortran vs `math.isclose` (rel_tol) in Python, ~2x
+different, so a case in the 1e-10..2e-10 relative band is rejected by `validate` yet accepted by
+the solver; and `rburn%%pign` fires on the `dflt_real` sentinel in Fortran but only on an ABSENT
+key in the validator, so a case writing `rburn%%pign: -1e6` passes `./mfc.sh validate` and then
+aborts at runtime. `muscl_order_first_order` is imported at `m_checker.fpp:15` and used nowhere —
+the fingerprint of an import hunk resolved as "ours" without rechecking uses.
+
+**Stage guards in src/common (pre-existing, NOT merge damage).** Master carries ZERO
+`MFC_PRE_PROCESS`/`MFC_SIMULATION`/`MFC_POST_PROCESS` anywhere under src/; we carry three
+(`m_phase_change.fpp:99, :203`; `m_boundary_common.fpp:99`). Provenance traced: the count was 4 at
+the pre-merge tip `c5abe1b9`, 4 through the merge, 3 after `c5b461f9` — our own additions, never a
+merge conflict. Not a silent-else bug: the build still defines `MFC_<TARGET>`
+(`cmake/MFCTargets.cmake:88-92`). They exist because `load_weight_wrt`/`sfc_partition_wrt` are
+generated for simulation and post_process but NOT pre_process, which also compiles
+`src/common/m_phase_change.fpp`. Fix is a choice: register those two params for pre_process (one
+line in `definitions.py`, collapses two of the three) or thread arguments as
+`s_initialize_phasechange_module` now does. `amr_in_fine_advance` (simulation-only,
+`m_global_parameters.fpp:330`) needs the argument/policy route regardless.
+
+**COVERAGE GAP: the post_process AMR reader has no value-level regression coverage.** Under `-a`,
+post_process does run per test with `parallel_io = T`, but its output is only written to
+`out_post.txt` and passed through `_process_silo_file` (`test.py:692-706`) — it is NEVER compared
+against a golden; goldens hold simulation `D/*.dat` only. So the `-a` lane catches crashes and
+non-zero exits and is structurally blind to wrong values. A clean pre-fix baseline over the six
+np=2 AMR cases (27DEC5B6, 4644A339, 78314D65, ADA042A2, 2C46C59A, F57C3A5B) is 6/6 GREEN, which
+therefore proves only that the ownership bug's spurious-abort half does not fire in those configs
+— its silent halves (stream desync, displaced block coordinates) could never have been caught by
+that suite at any np. **Consequence for the post-reader fix: do not gate it on the suite.** Gate
+it on a direct np=2 A/B of the actual silo overlay values and block coordinates, pre- and
+post-fix, and say plainly in the commit message that the reader has no value-level coverage.
+Worth an upstream issue independent of this PR.
+
+**Work order adopted.** (1) The checker/lint regression: verify per-check that the validator
+covers each of the 21, delete them plus the two now-dead imports, remove `"s_check_inputs"` from
+the allowlist and mark the genuinely-runtime AMR prohibits with `! lint: runtime-check`, and move
+our own two input-only prohibits to validator-only — the re-armed lint rule is itself the gate,
+plus AMR-68 and a bitcmp (startup-path only, expect byte-identical). (2) Audit the newer merge
+`9c9e0a75` with the same method while it is fresh. (3) Post-reader ownership fix, gated as above
+(patch drafted, `notes/postreader_final.md`). (4) L0 restart-writer filter (`notes/l0filter_patch.md`)
+— the one item here with a real discriminator, since coexist tests under `-a` should hit post's
+`lvl < 1` abort today, and a crash is precisely what that lane CAN catch. Two open decisions for
+the user: whether to upstream the branch-local `damage_energy_cutoff` gate (ours since `91a6f6b4`,
+living inside master's own `s_compute_hypoelastic_interface_energy`, which already damage-scales G
+— a silent numerical divergence inside an upstream routine is how the NEXT merge gets resolved
+wrong), and which stage-guard route to take.
+
+**Method note.** Two `./mfc.sh test` sweeps ran concurrently on this tree for ~20 minutes because
+``pgrep -fc 'mfc\|flang\|ld.lld'`` matched nothing — pgrep patterns are EREs, so `\|` is a literal
+pipe — and the resulting "no processes" reading was taken as "the job died with the node." Both
+sweeps shared the build/staging dir, the `tests/<UUID>/` dirs, and (via `>`) one log path; both
+results were discarded and the baseline rerun alone. Same class as the HypoShearContact
+cross-contamination in ledger (33). Standing rules added: never conclude a process died from a
+count alone (print the matches, `pgrep -fa`), one sweep at a time per tree, and a distinct log
+path per run so a second writer is self-evident.
+
 ## 2026-08-27 (33) — ELASTIC-GATE PER-SIDE FIX LANDED; ONE REVIEW PROHIBIT RETRACTED AS WRONG
 
 The elastic-gate fix (review finding #10) landed: `s_compute_hypoelastic_interface_energy` now
