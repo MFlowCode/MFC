@@ -7,6 +7,55 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (37) — AUDIT OF THE S3 PLAN: A GATE THAT ONLY TESTED ONE DIRECTION, AND AN UNVERIFIED DEPTH ASSUMPTION
+
+**The gate on ledger (36)'s migration was one-sided.** 15/15 tests confirmed that VALID cases still
+run; nothing confirmed that INVALID cases are still rejected. Having deleted 53 checks, that is only
+half a gate: every one of them could have been a no-op and the suite would still be green.
+Negative-testing closes it - perturbing `examples/2D_amr_droplet` and running `./mfc.sh validate`:
+`time_stepper = 1` -> "amr requires time_stepper = 3" (the B8 fix); `cfl_const_dt = T` alongside
+`amr_subcycle` -> "amr_subcycle requires a fixed dt", **which is exactly the case the OLD validator
+let through and the solver aborted on** - the derived-`cfl_dt` fix is doing real work. A fourth
+probe (`amr_max_level = 3`) correctly reported nothing: the deleted check bounded STATIC AMR
+(`amr_regrid_int == 0`) and that example sets `amr_regrid_int = 10`, so three levels is legal.
+**STANDING RULE: deleting or relocating a check requires a negative test. A suite that only proves
+good cases still pass cannot distinguish a working check from a deleted one.**
+
+**S3's central performance claim is UNVERIFIED, and it is now the first increment.** The design
+argues fusion gives "~17 fused collectives per regrid" from tree depth being O(log nboxes). But
+Berger-Rigoutsos splits at signature holes and Laplacian inflections, not midpoints, so the tree is
+not balanced by construction; its worst case peels one box at a time, giving depth O(nboxes) and
+reinstating the latency blow-up fusion exists to prevent. **Nothing in this ledger measures BR tree
+depth.** So S3.0a is now instrumentation, not code: carry a depth per stack entry in `s_amr_cluster`,
+report max depth and node count per regrid, run it over the S0 arms. Pre-registered rule: depth
+within ~`4*log2(nboxes)` -> fusion proceeds as designed; depth growing like `nboxes` -> the design
+needs a different shape (cap the depth, batch sibling subtrees, or fall back to S1 as a coefficient
+stopgap). **Do not write S3.2 before that number exists.**
+
+**Also marked INFERRED rather than established:** the claim that S3 deletes the remaining W1
+quadratic (the regrid pass-2 loops over parents x global tagged cells). That was reasoned from their
+structure, not from reading them. Confirm at `m_amr_regrid.fpp:1118` and `:1130` before relying on
+it; if those loops need the global list for more than locating each parent's slice, W1 keeps a
+separate increment.
+
+**Ordering adopted:** S3.0a (depth measurement, go/no-go) -> S3.0b (emit reduced-buffer bytes) ->
+S3.1 (path 1 on reductions, judged on bit-identity ONLY, expected slower) -> S3.2 (fusion, blocked on
+S3.0a, watch the `amr_max_blocks` force path whose `nacc + nwork + 1` test means different things
+under a LIFO stack and a depth level) -> S3.3 (path 2 as a fused forest) -> S3.4 (delete the
+gathers). Then W5 (I7), W3 (F5), W2 (2b), W6/W7. The L0 deletion and the post-process reader fix are
+unblocked but not on the exascale path; the upstream `s_check_inputs_weno`/`_muscl` marker issue is
+to be reported, not patched here.
+
+**A tooling pattern worth naming, five instances in one day.** Each was a check that looked like
+verification while measuring something else: ``pgrep -fc 'a\|b'`` matching nothing (ERE, so `\|` is a
+literal pipe) read as "the job died"; two `grep -c` calls whose zero-match exit status read as
+"build failed"; a `-x` test performed before the `cd` that would invalidate the path; and a negative
+probe whose injected text broke Python syntax, so all four cases "failed validation" for the wrong
+reason. None were reasoning errors. **Rule: when a check misleads, harden the check - do not resolve
+to be more careful.** Done for `bitcmp_probe.sh` (absolute paths; "did not run" now distinguished
+from "differs") and for the scorecard (documents the per-rank and double-count traps, refuses
+mismatched arms). The counts themselves are never the evidence: print what matched.
+
 ## 2026-08-27 (36) — THE HYGIENE BATCH: CHECKER MIGRATION, STACK AUTOMATICS, AND THE SEAM SCAN DE-QUADRATIFIED
 
 Four commits, all byte-identical or golden-holding, all gated.
