@@ -139,17 +139,19 @@ contains
             @:ALLOCATE(Re_avg_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:2))
         end if
 
+        ! _alloc bounds like every rs sibling above: the AMR fine advance swaps m/n/p to fine-block
+        ! extents that can exceed the coarse subdomain when amr_max_grid_size pins a larger block
         if (use_nc_iface_vel) then
-            @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+            @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_dims))
         end if
 
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
-            @:ALLOCATE(flux_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+            @:ALLOCATE(flux_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
             if (use_nc_iface_vel) then
-                @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+                @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_dims))
             end if
             if (cyl_coord) then
-                @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+                @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
             end if
         end if
 

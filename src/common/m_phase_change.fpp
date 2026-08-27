@@ -50,17 +50,17 @@ contains
 
     end subroutine s_relaxation_solver
 
-    !> Initialize the phase change module (no module-level state to set up; the pT/pTg relaxation solvers are self-contained)
-    impure subroutine s_initialize_phasechange_module
+    !> Initialize the phase change module. pc_count_ub carries the iteration-count field's upper bounds as an initialization policy
+    !! (src/common carries no stage guards): simulation passes its allocation extents (m_alloc/n_alloc/p_alloc - the AMR fine
+    !! advance swaps m/n/p to fine-block extents before s_amr_relax_fine writes the field) when the load-weight/SFC writers need it;
+    !! other targets, and simulation runs without those writers, pass -1 = no field.
+    impure subroutine s_initialize_phasechange_module(pc_count_ub)
 
-#ifdef MFC_SIMULATION
-        ! the load-weight field is computed for load_weight_wrt AND for sfc_partition_wrt:
-        ! allocate and populate under the same condition, else the sfc-only path reads
-        ! unallocated (or allocated-but-never-written) iteration counts
-        if (relax .and. (load_weight_wrt .or. sfc_partition_wrt)) then
-            @:ALLOCATE(pc_iter_count(0:m, 0:n, 0:p))
+        integer, intent(in) :: pc_count_ub(3)
+
+        if (pc_count_ub(1) >= 0) then
+            @:ALLOCATE(pc_iter_count(0:pc_count_ub(1), 0:pc_count_ub(2), 0:pc_count_ub(3)))
         end if
-#endif
 
     end subroutine s_initialize_phasechange_module
 

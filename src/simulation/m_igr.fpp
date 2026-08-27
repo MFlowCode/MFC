@@ -123,17 +123,20 @@ contains
                        & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             @:PREFER_GPU(jac)
         else
-            allocate (jac_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
+            ! _alloc bounds mirroring the on-GPU branch: the AMR fine advance can exceed coarse extents
+            allocate (jac_host(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end,idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                      & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
 
-            jac(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end) => jac_host(:,:,:)
+            jac(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end,idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end) => jac_host(:,:,:)
         end if
 
         if (nv_uvm_temp_on_gpu(2) == 1) then
             @:ALLOCATE(jac_rhs(-1:m_alloc,-1:n_alloc,-1:p_alloc))
             @:PREFER_GPU(jac_rhs)
         else
-            allocate (jac_rhs_host(-1:m,-1:n,-1:p))
-            jac_rhs(-1:m,-1:n,-1:p) => jac_rhs_host(:,:,:)
+            allocate (jac_rhs_host(-1:m_alloc,-1:n_alloc,-1:p_alloc))
+            jac_rhs(-1:m_alloc,-1:n_alloc,-1:p_alloc) => jac_rhs_host(:,:,:)
         end if
 
         if (igr_iter_solver == 1) then  ! Jacobi iteration
@@ -142,10 +145,11 @@ contains
                            & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 @:PREFER_GPU(jac_old)
             else
-                allocate (jac_old_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
+                allocate (jac_old_host(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end,idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                          & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
 
-                jac_old(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end) => jac_old_host(:,:,:)
+                jac_old(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end,idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                        & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end) => jac_old_host(:,:,:)
             end if
         end if
 #endif

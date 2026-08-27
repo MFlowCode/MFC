@@ -689,6 +689,13 @@ class CaseValidator:
         surface_tension = self.get("surface_tension", "F") == "T"
         self.prohibit(riemann_solver == 4 and viscous, "HLLD hypoelasticity does not support viscous effects (the dual-pass omits the viscous source term)")
         self.prohibit(riemann_solver == 4 and surface_tension, "HLLD hypoelasticity does not support surface tension (the dual-pass omits the surface-tension source term)")
+        n_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
+        bc_characteristic = any(-12 <= (self.get(f"bc_{d}%{e}") or 0) <= -5 for d in "xyz"[:n_dims] for e in ("beg", "end"))
+        self.prohibit(
+            riemann_solver == 4 and hypoelasticity and bc_characteristic,
+            "HLLD hypoelasticity does not support characteristic (CBC) boundary conditions: "
+            "the dual-pass RHS assembly reads the pre-CBC Riemann fluxes, so the boundary corrections would be silently dropped",
+        )
         cont_damage = self.get("cont_damage", "F") == "T"
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
         chemistry = self.get("chemistry", "F") == "T"
@@ -1596,6 +1603,7 @@ class CaseValidator:
         mhd = self.get("mhd", "F") == "T"
         chemistry = self.get("chemistry", "F") == "T"
         bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        synthetic_turbulence = self.get("synthetic_turbulence", "F") == "T"
 
         self.prohibit(recon_type is not None and recon_type != 1, "active_box requires WENO reconstruction (recon_type = 1)")
         self.prohibit(time_stepper is not None and time_stepper != 3, "active_box requires time_stepper = 3 (SSP-RK3)")
@@ -1612,6 +1620,7 @@ class CaseValidator:
         self.prohibit(mhd, "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
         self.prohibit(chemistry, "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
         self.prohibit(bubbles_euler, "active_box is incompatible with bubbles_euler (cell-local bubble sources in a non-equilibrium ambient violate the static-uniform-exterior assumption)")
+        self.prohibit(synthetic_turbulence, "active_box is incompatible with synthetic turbulence (the volumetric forcing writes the whole domain every step, so the exterior is not static)")
 
     def check_load_balance(self):
         """Checks load_balance requirements (simulation)"""
@@ -1725,6 +1734,11 @@ class CaseValidator:
             bc_riemann_extrap,
             "amr does not support Riemann-extrapolation boundary conditions (bc = -4): "
             "they alter the WENO coefficient rows near the boundary, which the fine-block reconstruction cannot inherit correctly",
+        )
+        bc_characteristic = any(-12 <= (self.get(f"bc_{d}%{e}") or 0) <= -5 for d in "xyz"[:num_dims] for e in ("beg", "end"))
+        self.prohibit(
+            bc_characteristic,
+            "amr does not support characteristic (CBC) boundary conditions (bc = -5..-12): " "the fine-block advance would apply the boundary treatment at block edges inside the domain",
         )
         self.prohibit(
             amr_regrid_int == 0 and amr_max_level is not None and amr_max_level > 2,

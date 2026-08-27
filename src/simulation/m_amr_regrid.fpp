@@ -418,7 +418,8 @@ contains
         integer                           :: ci, cj, ck, gi, gj, gk
 
 #ifdef MFC_MPI
-        integer                 :: i, jrem, nloc, ierr
+        integer                 :: i, nloc, ierr
+        integer(8)              :: jrem  !< decode remainder spans an xy plane, which can exceed 2**31 cells
         integer, allocatable    :: rcnt(:), rdsp(:)
         integer(8), allocatable :: locidx(:), allidx(:)
 
@@ -443,9 +444,9 @@ contains
             call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER8, allidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
             do i = 1, ntag
                 gk = int(allidx(i)/(int(mg + 1, 8)*int(ng + 1, 8)))
-                jrem = int(allidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8))
-                gj = jrem/(mg + 1)
-                gi = jrem - gj*(mg + 1)
+                jrem = allidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8)
+                gj = int(jrem/int(mg + 1, 8))
+                gi = int(jrem - int(gj, 8)*int(mg + 1, 8))
                 tags(1, i) = gi; tags(2, i) = gj; tags(3, i) = gk
             end do
             deallocate (locidx, rcnt, rdsp, allidx)
@@ -538,7 +539,8 @@ contains
         integer, allocatable                  :: slo(:,:), shi(:,:), alo(:,:), ahi(:,:)
         integer, allocatable                  :: sts(:), ste(:), wt(:,:)
         integer                               :: mg, ng, pg, t
-        integer                               :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag, vol
+        integer                               :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag
+        integer(8)                            :: vol  !< box volume; a global-bbox first pass can exceed 2**31 cells
         integer                               :: blo(3), bhi(3), ts, te, lo, hi, tmp(3)
         logical                               :: ok, force, capped, changed, tooclose
         real(wp)                              :: eff
@@ -565,9 +567,9 @@ contains
             if (.not. ok) cycle
             ! invariant: [ts:te] holds exactly the tags in this box, and trim only shrinks to their bbox => count is the range size
             ntag = te - ts + 1
-            vol = 1
-            do d = 1, num_dims; vol = vol*(bhi(d) - blo(d) + 1); end do
-            eff = real(ntag, wp)/real(max(vol, 1), wp)
+            vol = 1_8
+            do d = 1, num_dims; vol = vol*int(bhi(d) - blo(d) + 1, 8); end do
+            eff = real(ntag, wp)/real(max(vol, 1_8), wp)
             call s_amr_find_split(wt, ts, te, blo, bhi, sax, spos, ok)
             force = (nacc + nwork + 1 >= cap)  ! splitting now could overflow the amr_max_blocks cap
             if (eff >= amr_cluster_eff .or. .not. ok .or. force) then
@@ -965,7 +967,8 @@ contains
             end if
             block
                 integer                  :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
-                integer                  :: mg, ng, pg, nct, np_lev, nloc_send, gi, gj, gk, jrem, ntot_g
+                integer                  :: mg, ng, pg, nct, np_lev, nloc_send, gi, gj, gk, ntot_g
+                integer(8)               :: jrem  !< decode remainder spans an xy plane, which can exceed 2**31 cells
                 integer, allocatable     :: ctags(:,:), skb(:), gkb(:)
                 integer(8), allocatable  :: sidx(:), gidx(:)
                 logical, allocatable     :: gwin(:,:,:), covered(:)
@@ -1127,9 +1130,9 @@ contains
                         do i = 1, ntot_g
                             if (gkb(i) /= kb) cycle
                             gk = int(gidx(i)/(int(mg + 1, 8)*int(ng + 1, 8)))
-                            jrem = int(gidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8))
-                            gj = jrem/(mg + 1)
-                            gi = jrem - gj*(mg + 1)
+                            jrem = gidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8)
+                            gj = int(jrem/int(mg + 1, 8))
+                            gi = int(jrem - int(gj, 8)*int(mg + 1, 8))
                             gwin(gi, gj, gk) = .true.
                         end do
                         nct = 0

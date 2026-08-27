@@ -481,6 +481,9 @@ contains
                 ! restart-restored regridded boxes - a source moved between write and restart could
                 ! otherwise overlap a restored block and silently drop the source inside it)
                 do kb = 1, amr_num_blocks
+                    ! a level-0 L0 tile is the base grid itself, not a refined region: every source
+                    ! necessarily lies inside one, so testing tiles would reject all coexist runs
+                    if (amr_block_level(kb) == 0) cycle
                     do j = 1, count
                         if (int(source_spatials(ai)%coord(1, j)) + sidx_supp(1) >= amr_region_lo_all(1, &
                             & kb) .and. int(source_spatials(ai)%coord(1, j)) + sidx_supp(1) <= amr_region_hi_all(1, &
