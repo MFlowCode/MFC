@@ -82,13 +82,57 @@ is_terminal_state() {
   esac
 }
 
+# Bound how long a job may sit un-started in the queue. On a preemptible QOS
+# (Phoenix 'embers') a job can stay PENDING for hours, burning the CI job
+# timeout and holding a runner slot; fail early so it reads as queue starvation,
+# not a test failure. 0 = wait indefinitely.
+#
+# The budget has to clear a normal bad day on a busy machine, or it converts
+# routine queue pressure into red CI. Frontier's own numbers make the case:
+# over one week, MFC jobs on `batch` waited p50=1m but p90=96m and p95=176m,
+# with a 466m tail. A 90-minute budget cut into that distribution, tripping on
+# 11% of the jobs that did eventually start -- plus the ones that never did.
+# Four hours clears p95 with room to spare while staying well inside the 480m
+# job-level `timeout-minutes`, which remains the real backstop.
+: "${SLURM_MAX_QUEUE_SECONDS:=14400}"   # 4 hours
+# Reject a non-integer override rather than silently skipping the budget.
+if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2
+  exit 1
+fi
+queue_start=$(date +%s)
+
+abort_queue_starvation() {
+  local waited="$1"
+  echo "##[error]SLURM job $job_id did not start within ${waited}s (SLURM_MAX_QUEUE_SECONDS=$SLURM_MAX_QUEUE_SECONDS)."
+  echo "QUEUE STARVATION: the cluster scheduler could not start this job in time."
+  echo "This is an infrastructure / queue-availability problem, NOT a code or test failure."
+  echo "Cancelling the queued job so it does not keep holding a CI runner slot."
+  scancel "$job_id" 2>/dev/null || true
+  exit 75   # EX_TEMPFAIL — distinguishes queue starvation from a real test failure
+}
+
 # Wait for file to appear, using robust state checking.
-# Never give up due to transient squeue/sacct failures — the CI job timeout
-# is the ultimate backstop.
+# Never give up due to transient squeue/sacct failures — the queue-wait budget
+# above (or the CI job timeout) is the ultimate backstop.
 echo "Waiting for job to start..."
 unknown_count=0
 while [ ! -f "$output_file" ]; do
   state=$(get_job_state "$job_id")
+
+  # A started job (RUNNING/COMPLETING) whose output file is merely NFS-delayed
+  # is exempt, so work in progress is never killed here.
+  if [ "$SLURM_MAX_QUEUE_SECONDS" -gt 0 ]; then
+    case "$state" in
+      RUNNING|COMPLETING) ;;
+      *)
+        waited=$(( $(date +%s) - queue_start ))
+        if [ "$waited" -ge "$SLURM_MAX_QUEUE_SECONDS" ]; then
+          abort_queue_starvation "$waited"
+        fi
+        ;;
+    esac
+  fi
 
   case "$state" in
     PENDING|CONFIGURING|PREEMPTED)
