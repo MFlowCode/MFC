@@ -6152,30 +6152,151 @@ contains
     !! paired MPI_SENDRECVs in s_amr_fine_fine_halo stay matched. Count then fill for an exact-size list (no cap, no overflow). Also
     !! rebuilds the per-block gather/scatter overlap-rank lists (amr_ovl_gather/scatter) by O(overlap) inversion of the computed
     !! decomposition (s_amr_ranks_overlapping), sized to the max overlap - no O(num_procs) scan or table.
-    impure subroutine s_amr_build_seam_pairs()
+    !> Binary-search the Morton-sorted block lo corners (ord/mkey) for the block whose region lo equals clo, verify the full
+    !! same-level seam predicate against xb, and record it in (mb, md, nm). Blocks are disjoint, so at most one block carries a
+    !! given lo corner at a level; f_amr_seam_dim takes the LAST true dim, so a block already recorded is raised to the higher d
+    !! rather than duplicated.
+    pure subroutine s_amr_seam_probe(xb, d, clo, mkey, ord, nblk, mb, md, nm)
 
-        integer :: xb, yb, d, np, k, mx
-        integer :: plo(3), phi(3), rlo(3), rhi(3)
+        integer, intent(in)         :: xb, d, clo(3), nblk
+        integer(kind=8), intent(in) :: mkey(:)
+        integer, intent(in)         :: ord(:)
+        integer, intent(inout)      :: mb(3), md(3), nm
+        integer                     :: yb, t, i, lo_s, hi_s, mid_s
+        integer(kind=8)             :: ck
+        logical                     :: ok
 
-        if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
-        np = 0
-        do xb = 1, amr_num_blocks
-            do yb = 1, amr_num_blocks
-                if (f_amr_seam_dim(xb, yb) > 0) np = np + 1
-            end do
+        ck = f_morton(clo(1), clo(2), clo(3))
+        lo_s = 1; hi_s = nblk
+        do while (lo_s <= hi_s)
+            mid_s = (lo_s + hi_s)/2
+            if (mkey(ord(mid_s)) < ck) then
+                lo_s = mid_s + 1
+            else
+                hi_s = mid_s - 1
+            end if
         end do
-        amr_num_seam_pairs = np
-        allocate (amr_seam_pairs(3, max(np, 1)))
-        np = 0
-        do xb = 1, amr_num_blocks
-            do yb = 1, amr_num_blocks
-                d = f_amr_seam_dim(xb, yb)
-                if (d > 0) then
-                    np = np + 1
-                    amr_seam_pairs(1, np) = xb; amr_seam_pairs(2, np) = yb; amr_seam_pairs(3, np) = d
+        ! lo_s is the first index with key >= ck; scan the equal-key run. f_morton keeps 21 bits/dim, so
+        ! above 2**21 cells/dim a run can hold distinct corners - the explicit lo check rejects those.
+        do i = lo_s, nblk
+            if (mkey(ord(i)) /= ck) exit
+            yb = ord(i)
+            if (yb == xb) cycle
+            if (amr_block_level(yb) /= amr_block_level(xb)) cycle
+            ok = .true.
+            do t = 1, 3
+                if (amr_region_lo_all(t, yb) /= clo(t)) ok = .false.
+                if (t /= d) then
+                    if (amr_region_hi_all(t, yb) /= amr_region_hi_all(t, xb)) ok = .false.
                 end if
             end do
+            if (.not. ok) cycle
+            do t = 1, nm
+                if (mb(t) == yb) then
+                    md(t) = max(md(t), d)
+                    return
+                end if
+            end do
+            nm = nm + 1
+            mb(nm) = yb; md(nm) = d
+            return
         end do
+
+    end subroutine s_amr_seam_probe
+
+    impure subroutine s_amr_build_seam_pairs()
+
+        integer                      :: xb, d, np, k, mx, pass, nm, im, jm, tb, td, nb
+        integer                      :: plo(3), phi(3), rlo(3), rhi(3)
+        integer                      :: mb(3), md(3), clo(3), gc
+        integer                      :: width, lo_m, mid_m, hi_m, i_m, j_m, t_m
+        integer(kind=8), allocatable :: mkey(:)
+        integer, allocatable         :: ord(:), mrg(:)
+
+        if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
+
+        ! Blocks are disjoint, so (level, region lo) names one uniquely - and the seam predicate FIXES the
+        ! neighbour's lo corner: transverse lo equal to xb's, and lo(d) = hi(d, xb) + 1. The all-pairs
+        ! O(nblocks^2) scan is therefore a lookup. Morton-sort the lo corners once, then binary-search the
+        ! single candidate per (block, dim) and verify the predicate on it. Emission order is unchanged (xb
+        ! ascending, yb ascending within xb), which the paired MPI_SENDRECVs in s_amr_fine_fine_halo depend
+        ! on - a reordered list mismatches sends to receives and deadlocks.
+        nb = max(amr_num_blocks, 1)
+        allocate (mkey(nb), ord(nb), mrg(nb))
+        do k = 1, amr_num_blocks
+            mkey(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
+            ord(k) = k
+        end do
+
+        ! Bottom-up STABLE merge sort by Morton key (same form as s_amr_sfc_cut): a pure function of the
+        ! replicated region metadata, so every rank builds the identical order.
+        width = 1
+        do while (width < amr_num_blocks)
+            lo_m = 1
+            do while (lo_m <= amr_num_blocks - width)
+                mid_m = lo_m + width - 1
+                hi_m = min(lo_m + 2*width - 1, amr_num_blocks)
+                i_m = lo_m; j_m = mid_m + 1; t_m = lo_m
+                do while (i_m <= mid_m .and. j_m <= hi_m)
+                    if (mkey(ord(i_m)) <= mkey(ord(j_m))) then
+                        mrg(t_m) = ord(i_m); i_m = i_m + 1
+                    else
+                        mrg(t_m) = ord(j_m); j_m = j_m + 1
+                    end if
+                    t_m = t_m + 1
+                end do
+                do while (i_m <= mid_m); mrg(t_m) = ord(i_m); i_m = i_m + 1; t_m = t_m + 1; end do
+                do while (j_m <= hi_m); mrg(t_m) = ord(j_m); j_m = j_m + 1; t_m = t_m + 1; end do
+                ord(lo_m:hi_m) = mrg(lo_m:hi_m)
+                lo_m = lo_m + 2*width
+            end do
+            width = 2*width
+        end do
+
+        ! pass 1 counts, pass 2 fills: keeps amr_seam_pairs exactly sized, as the nested scan did
+        do pass = 1, 2
+            np = 0
+            do xb = 1, amr_num_blocks
+                nm = 0
+                do d = 1, 3
+                    if (d == 2 .and. n_glb <= 0) cycle
+                    if (d == 3 .and. p_glb <= 0) cycle
+                    clo = amr_region_lo_all(:,xb)
+                    clo(d) = amr_region_hi_all(d, xb) + 1
+                    call s_amr_seam_probe(xb, d, clo, mkey, ord, amr_num_blocks, mb, md, nm)
+                    ! periodic wrap (l0 tiling only): xb on the domain high face pairs with lo(d) = 0
+                    if (l0_ntile > 0) then
+                        if (f_l0_dim_periodic(d)) then
+                            gc = merge(m_glb, merge(n_glb, p_glb, d == 2), d == 1)
+                            if (amr_region_hi_all(d, xb) == gc) then
+                                clo(d) = 0
+                                call s_amr_seam_probe(xb, d, clo, mkey, ord, amr_num_blocks, mb, md, nm)
+                            end if
+                        end if
+                    end if
+                end do
+                ! ascending yb within xb, matching the old inner loop's emission order (nm <= 3)
+                do im = 2, nm
+                    tb = mb(im); td = md(im); jm = im - 1
+                    do while (jm >= 1)
+                        if (mb(jm) <= tb) exit
+                        mb(jm + 1) = mb(jm); md(jm + 1) = md(jm); jm = jm - 1
+                    end do
+                    mb(jm + 1) = tb; md(jm + 1) = td
+                end do
+                do im = 1, nm
+                    np = np + 1
+                    if (pass == 2) then
+                        amr_seam_pairs(1, np) = xb; amr_seam_pairs(2, np) = mb(im); amr_seam_pairs(3, np) = md(im)
+                    end if
+                end do
+            end do
+            if (pass == 1) then
+                amr_num_seam_pairs = np
+                allocate (amr_seam_pairs(3, max(np, 1)))
+            end if
+        end do
+        deallocate (mkey, ord, mrg)
         ! per-block P2P overlap-rank lists by O(overlap) inversion (gather: rank coarse range vs the amr_cpat_mar-padded patch box;
         ! scatter: rank interior vs the region box), rank-ascending so iterating a list preserves the replaced 0..num_procs-1 scans'
         ! MPI send/recv order. The clamped interior-frame coord range reproduces both frames (see s_amr_coord_range). Bounded first
