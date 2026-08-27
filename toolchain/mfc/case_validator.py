@@ -693,7 +693,14 @@ class CaseValidator:
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
+            n = self.get("n", 0)
+            p = self.get("p", 0)
+            geometry = self.get(f"particle_cloud({i})%cloud_geometry", 1)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
+            self.prohibit(
+                geometry not in [1, 2],
+                f"particle_cloud({i})%cloud_geometry must be 1 (box) or 2 (hemisphere shell)",
+            )
             self.prohibit(
                 packing_method is None,
                 f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
@@ -702,6 +709,118 @@ class CaseValidator:
                 packing_method is not None and packing_method not in [1, 2],
                 f"particle_cloud({i})%packing_method must be 1 (rejection sampling) or 2 (lattice)",
             )
+            shell_outer_radius = self.get(f"particle_cloud({i})%shell_outer_radius", None)
+            shell_inner_radius = self.get(f"particle_cloud({i})%shell_inner_radius", None)
+            radius = self.get(f"particle_cloud({i})%radius", None)
+            mass = self.get(f"particle_cloud({i})%mass", None)
+            num_particles = self.get(f"particle_cloud({i})%num_particles", None)
+            periodic = self.get(f"particle_cloud({i})%periodic", 0)
+            length_x = self.get(f"particle_cloud({i})%length_x", None)
+            length_y = self.get(f"particle_cloud({i})%length_y", None)
+            length_z = self.get(f"particle_cloud({i})%length_z", None)
+
+            self.prohibit(
+                periodic not in [0, 1],
+                f"particle_cloud({i})%periodic must be 0 (off) or 1 (on)",
+            )
+            self.prohibit(
+                periodic == 1 and geometry != 1,
+                f"particle_cloud({i})%periodic is only supported for box particle clouds",
+            )
+            self.prohibit(
+                periodic == 1 and packing_method != 1,
+                f"particle_cloud({i})%periodic is only supported for rejection packing",
+            )
+            self.prohibit(
+                periodic == 1
+                and (
+                    length_x is None
+                    or not self._is_numeric(length_x)
+                    or length_x <= 0
+                    or length_y is None
+                    or not self._is_numeric(length_y)
+                    or length_y <= 0
+                    or (p > 0 and (length_z is None or not self._is_numeric(length_z) or length_z <= 0))
+                ),
+                f"particle_cloud({i})%periodic requires positive box lengths in each active dimension",
+            )
+
+            # radius, mass, and num_particles are required and positive for every cloud, independent of
+            # geometry. An unset radius reaches the sampler as dflt_real, which makes min_dist negative and
+            # corrupts both the spatial-hash bin index and the overlap test; an unset mass/num_particles is
+            # meaningless. The Fortran sampler cannot re-check these cheaply, so they belong here.
+            self.prohibit(
+                num_particles is None or (self._is_numeric(num_particles) and num_particles <= 0),
+                f"particle_cloud({i})%num_particles must be specified and > 0",
+            )
+            self.prohibit(
+                radius is None or (self._is_numeric(radius) and radius <= 0),
+                f"particle_cloud({i})%radius must be specified and > 0",
+            )
+            self.prohibit(
+                mass is None or (self._is_numeric(mass) and mass <= 0),
+                f"particle_cloud({i})%mass must be specified and > 0",
+            )
+            # A hemisphere shell in 1D degenerates to a half-annulus the y-extent check below cannot see
+            # (it is skipped when n == 0), so reject it explicitly here.
+            self.prohibit(
+                geometry == 2 and n == 0,
+                f"particle_cloud({i}) hemisphere shell requires a 2D or 3D domain (n > 0)",
+            )
+            self.prohibit(
+                geometry == 2 and (shell_inner_radius is None or (self._is_numeric(shell_inner_radius) and shell_inner_radius < 0)),
+                f"particle_cloud({i}) hemisphere shell requires shell_inner_radius >= 0",
+            )
+            self.prohibit(
+                geometry == 2
+                and (
+                    shell_outer_radius is None
+                    or radius is None
+                    or shell_inner_radius is None
+                    or (all(self._is_numeric(v) for v in [shell_outer_radius, shell_inner_radius, radius]) and shell_outer_radius <= shell_inner_radius + 2 * radius)
+                ),
+                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
+            )
+            self.prohibit(
+                geometry == 2 and packing_method == 2,
+                f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
+            )
+            if geometry == 2 and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
+                x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
+                y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
+                z_centroid = self.get(f"particle_cloud({i})%z_centroid", None)
+                x_beg = self.get("x_domain%beg", None)
+                x_end = self.get("x_domain%end", None)
+                y_beg = self.get("y_domain%beg", None)
+                y_end = self.get("y_domain%end", None)
+                z_beg = self.get("z_domain%beg", None)
+                z_end = self.get("z_domain%end", None)
+
+                if all(self._is_numeric(v) for v in [x_centroid, x_beg, x_end]):
+                    self.prohibit(
+                        x_centroid - shell_outer_radius < x_beg or x_centroid + shell_outer_radius > x_end,
+                        f"particle_cloud({i}) hemisphere shell x-extent must lie within x_domain",
+                    )
+                if n > 0 and all(self._is_numeric(v) for v in [y_centroid, y_beg, y_end, radius]):
+                    if p > 0:
+                        self.prohibit(
+                            y_centroid - shell_outer_radius < y_beg or y_centroid + shell_outer_radius > y_end,
+                            f"particle_cloud({i}) hemisphere shell y-extent must lie within y_domain",
+                        )
+                    else:
+                        # 2D half-annulus opens toward +y from the flat face at y_centroid; require one
+                        # particle radius of standoff so no particle surface sits on the domain wall.
+                        self.prohibit(
+                            y_centroid - radius < y_beg or y_centroid + shell_outer_radius > y_end,
+                            f"particle_cloud({i}) half-annulus must clear y_domain by one particle radius",
+                        )
+                if p > 0 and all(self._is_numeric(v) for v in [z_centroid, z_beg, z_end, radius]):
+                    # 3D hemisphere shell opens toward +z from the flat face at z_centroid; require one
+                    # particle radius of standoff so no particle surface sits on the domain wall.
+                    self.prohibit(
+                        z_centroid - radius < z_beg or z_centroid + shell_outer_radius > z_end,
+                        f"particle_cloud({i}) hemisphere shell must clear z_domain by one particle radius",
+                    )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
