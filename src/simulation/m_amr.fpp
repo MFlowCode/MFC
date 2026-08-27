@@ -3185,11 +3185,17 @@ contains
     !! s_set_amr_fine_geometry applies it as amr_rank_owns_block = (amr_block_owner(amr_cur) == proc_rank).
     impure subroutine s_amr_assign_block_owners()
 
-        integer         :: k, a, lev, maxlev, na, aidx(amr_num_blocks), aown(amr_num_blocks)
-        integer(kind=8) :: key(amr_num_blocks), akey(amr_num_blocks)
-        real(wp)        :: wt(amr_num_blocks), cost(amr_num_blocks), awt(amr_num_blocks)
+        integer :: k, a, lev, maxlev, na
+        ! heap, not stack: these are O(global boxes) and at 1e6 blocks the seven together are ~48 MB,
+        ! which overflows a default stack long before the box count itself becomes a problem
+        integer, allocatable         :: aidx(:), aown(:)
+        integer(kind=8), allocatable :: key(:), akey(:)
+        real(wp), allocatable        :: wt(:), cost(:), awt(:)
 
         if (amr_num_blocks < 1) return
+
+        allocate (aidx(amr_num_blocks), aown(amr_num_blocks), key(amr_num_blocks), akey(amr_num_blocks), wt(amr_num_blocks), &
+                  & cost(amr_num_blocks), awt(amr_num_blocks))
 
         call s_amr_block_cost(cost)
 
@@ -3243,6 +3249,8 @@ contains
 
         call s_amr_validate_owner()
         call s_amr_report_balance(wt, maxlev)
+
+        deallocate (aidx, aown, key, akey, wt, cost, awt)
 
     end subroutine s_amr_assign_block_owners
 
