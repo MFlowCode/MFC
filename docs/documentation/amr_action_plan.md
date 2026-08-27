@@ -7,7 +7,107 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (35) — THE LADDER IS NOT THE SCORECARD: W1/W2/W4/W7 UNMET; D-l0 = DELETE; D-phase2 = NOT NEXT
+
+**Retraction.** (34) concluded "declare the performance program done," reasoned from the six-rung
+matched-point ladder under a parity framing. The user has confirmed the goal is the end-state
+architecture and exascale scaling ("this is just the computer I have for you to use"). The ladder
+measures wall degradation per np-doubling on ONE node and does not measure any of W1-W7's defining
+quantities except W3/W4 - both of which the same jobs' counters show still growing. The scorecard is
+`amr_endstate.md` section 3.
+
+**Invariants re-audited against code (the section 3 "today" column was a week stale).** W1 **UNMET
+and worse than documented**: two O(global boxes^2) paths - `m_amr.fpp:6154-6170` (seam-pairs, nested
+`do xb`/`do yb` over `amr_num_blocks`, run twice per regrid) and `m_amr_regrid.fpp:1017,1033,1118,1130`
+(nesting; pass 2 is parents x global tagged cells) - plus per-stage O(global boxes) plan walks and
+O(boxes)/O(P) **automatic STACK** arrays (`m_amr_regrid.fpp:638-642`, `m_amr.fpp:3188-3190,2687-2689`)
+which overflow (crash) before anything merely slows. W2 **UNMET, structurally unchanged**: the advance
+is still one `s_compute_rhs` per box per stage; 2a is compiled but hard-gated (`amr_prim_batch = .false.`,
+`m_amr.fpp:437`). W4 **UNMET**: `s_amr_union_gtag` still ALLGATHERVs every tagged cell globally and
+allocates `allidx` at the GLOBAL count (`m_amr_regrid.fpp:438-444`). W5 **PARTIAL**: per-step families
+use (family, epoch) bases but the base is still offset by the global cap
+(`amr_tag_base(f) = amr_max_blocks + 100*f`, `m_amr.fpp:803-804`), with a loud init assert at ~2.1M
+blocks on Cray. W6 **PARTIAL**: store growth reverts to a full HOST round trip above 32 columns
+(`m_amr.fpp:7897`) and ranks hold 72-75 boxes, so the host path is the one that runs. W7 **UNMET**:
+weight is work-only, no migration term, no hysteresis. W3 **PARTIAL** (per-box WAITALL chain dead;
+F5 still per-(box,face,participant)). W8 holds through np32.
+
+**W4 is the top blocker on a STRUCTURAL argument, not a measured coefficient.** Each rank receives
+every rank's tagged cells, so at fixed per-rank work the received volume is O(P) per rank - derivable
+from the code, and the reason it cannot be tuned away. The specific per-rank MiB figures circulated
+during this audit are NOT yet trustworthy: `[amr-scale]` counters are cumulative and the arms differ
+in step count, so they need the differenced instrument (two from-scratch runs) before any number is
+quoted. **Re-measure before citing.**
+
+**THE INVERSION.** Phase 2b - "the largest single investment in the program" - addresses W2, which is
+FLAT in P (75 boxes/rank at np8/16/32 alike). It is a ~173x launch constant: a permanent efficiency
+tax at every scale, but not what fails at 1e5 ranks. **Corrected order: W4 (S1 block-lattice tag
+coarsening, ~60 LOC, never attempted - only re-listed) -> W1 (de-quadratify + heap the stack
+automatics) -> W5 (I7) -> W3 (F5) -> W2 (2b) -> W6/W7.** D-phase2 resolves: 2b stays on the roadmap
+as the parity item, NOT as the next increment. Ordering it later is a claim about *when*, not about
+whether it is needed.
+
+**Why 2b is so large (scoped):** the per-box advance SWAPS module-global grid state -
+`s_amr_swap_to_fine` (`m_amr.fpp:5270`, 17 call sites) replaces m/n/p, idwint, idwbuff, the whole
+x_cb/x_cc/dx family, and feature flags - then calls the ordinary `s_compute_rhs`. So ~270 GPU parallel
+regions across ~10,500 lines read grid extents from module globals. The swap is also a CORRECTNESS
+contract (it disables coarse-indexed `acoustic_source`/`ab_active` and depth-guards nesting) that any
+box-indexed rewrite must reproduce explicitly. Ledger (27)'s 2a bridge-load regression IS that swap
+boundary appearing as runtime cost - so any increment batching kernels WITHOUT removing the swap will
+regress.
+
+**D-l0 = DELETE.** MFC's level 0 is balanced BY CONSTRUCTION: a Cartesian decomposition hands every
+rank one equal-sized chunk. AMReX boxes level 0 only because there boxes ARE the decomposition, which
+is also why the literature's ">=4 boxes/rank" floor does not transfer - MFC meets its intent with one
+*exactly equal* box per rank. Tiling costs 28-35% wall (three reps) and rebalancing recovers 0.6%,
+inside noise. Every surveyed framework ships base-level rebalancing off or slow, and over-decomposition
+is expensive on GPUs. **Correction to the study that produced this: its claim that coexist computes the
+level-0 RHS twice is WRONG** - `m_amr.fpp:8569` states the monolithic L0 RHS is skipped for
+`l0_ntile>0` (which is exactly why the spike aborts on `run_time_info`/`probe_wrt`). The conclusion
+survives without that pillar. **RE-ENTRY CONDITION, and it is live rather than hypothetical:** a
+measured level-0 work imbalance above ~10% on an IB, chemistry, or Lagrangian-bubble case, with
+`[amr-balance]` extended to level 0. MFC's own fine-block cost model already carries `K_ib`/`K_pc`
+terms - the code encodes that per-cell cost is NOT uniform once those physics are on; level 0 simply
+gets no equivalent treatment. Before deleting, check what the 12 L0/coexist tests cover incidentally.
+Consequence: the L0 restart-writer filter is DROPPED - do not fix save/restart for machinery being
+removed.
+
+**Landed here: the last stage ifdefs are gone from src/common (`caabd06d`).** `load_weight_wrt` and
+`sfc_partition_wrt` are registered for all three targets with their default in
+`s_assign_common_defaults`; `amr_in_fine_advance` is declared in `m_global_parameters_common`. `src/`
+now has ZERO `MFC_PRE_PROCESS`/`MFC_SIMULATION`/`MFC_POST_PROCESS`, matching master. Net -4 LOC. Also
+fixes a latent gap where post_process declared both flags with no initializer and no default. Gates:
+all three targets build clean (pre_process is the real gate), 71/71 (AMR-68 + diagnostic writers
+`4D5E2869` + load-balance + SFC), precheck clean.
+
+**Folded in, per the standing rule that a pending verification lands with the next change: the np8
+wall-neutrality A/B for participation-local registers is RESOLVED and NEUTRAL.** Differenced 240-40
+arms on k004-005: reglocal 7.836 s/step vs mergereplay 7.652, +2.4% - inside the ~5% noise floor. The
+`[amr-xa]` exchange audit is byte-identical between arms (same msgs, same words, at both step counts),
+so the change is comms-neutral as designed. Its payoff was never np8 wall; it was the ~16 GiB that
+unblocked np32 (ledger 31).
+
+**A REASONING-ERROR CLASS, recorded because we made it twice.** Ledger (15) "I6 plan caching REFUTED -
+the plan walks are free" was correct at 600-2400 boxes and wrong as a SCALING conclusion: those walks
+are `do k = 1, amr_num_blocks` per family per stage. (34)'s "performance program complete" is the same
+error at larger scale. **Rule: a measurement at the current operating point can retire a COST, never an
+ASYMPTOTE.** Asymptotic claims need a law measured over >=3 points at fixed per-rank work, or an
+analytical argument with a measured coefficient. Corollary adopted this session: no agent-sourced or
+tool-sourced specific enters this ledger, a commit message, or a decision without independent
+verification of that exact claim - two of six audit agents today returned confident load-bearing
+claims that were false, and both were caught only by spot-checking.
+
+**Verification limit on this machine.** S0 sweeps ranks at fixed per-rank work on ONE node: it exposes
+O(boxes) and O(P) terms but cannot exercise inter-node collectives, network topology, or the tag
+ceiling. W4's law is measurable here; W5's ceiling is not reachable here at all. Decide per invariant
+what "done" means before starting it.
+
 ## 2026-08-27 (34) — MERGE AUDIT + STRATEGY SHIFT: THE PERFORMANCE PROGRAM IS COMPLETE; WHAT REMAINS IS CORRECTNESS AND MERGE HYGIENE
+
+> **STRATEGY SECTION RETRACTED by (35).** The merge-audit and coverage findings below stand. The
+> strategy did not: it declared the performance program complete on a *benchmark-parity* framing.
+> The goal is the END-STATE ARCHITECTURE and exascale scaling, on which the matched-point ladder is
+> a waypoint. See (35) for the invariant scorecard and the corrected work order.
 
 **Strategy.** The scaling ladder is finished. Six rungs: 1.594 -> 1.544 -> 1.368 -> 1.343 ->
 1.241 -> 1.274. Five sit at or below the AMReX bar, and the third doubling (np16->np32, 1.274 vs
