@@ -890,7 +890,15 @@ contains
 
         if (surface_tension) call s_initialize_surface_tension_module()
 
-        if (relax) call s_initialize_phasechange_module()
+        if (relax) then
+            ! the load-weight field is computed for load_weight_wrt AND for sfc_partition_wrt: allocate under the
+            ! same condition, else the sfc-only path reads unallocated (or never-written) iteration counts
+            if (load_weight_wrt .or. sfc_partition_wrt) then
+                call s_initialize_phasechange_module([m_alloc, n_alloc, p_alloc])
+            else
+                call s_initialize_phasechange_module([-1, -1, -1])
+            end if
+        end if
 
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()

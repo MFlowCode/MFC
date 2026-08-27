@@ -4763,7 +4763,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_x%beg": -1,
                 "bc_x%end": -1,
                 "bc_y%beg": -2,
-                "bc_y%end": -6,
+                "bc_y%end": -2,
                 "num_patches": 2,
                 "mixture_err": "T",
                 "mapped_weno": "T",

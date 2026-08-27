@@ -1113,6 +1113,9 @@ contains
         ! list here, or the fine slot's own (larger) list when the AMR advance has swapped it in.
         @:PROHIBIT(num_gps > size(ghost_points), &
                    & "moving IB: the ghost-point count outgrew the ghost-point array capacity; the body's surface-cell count increased beyond the setup-time sizing")
+        ! num_gps is GPU_DECLARE'd and the on-device insertion sort (and any kernel reading it) uses the
+        ! device copy - mirror the init path's update or a changed count leaves the device one step stale
+        $:GPU_UPDATE(device='[num_gps]')
         call s_find_ghost_points()
         call nvtxEndRange
 

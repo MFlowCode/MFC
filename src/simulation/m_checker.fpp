@@ -12,7 +12,8 @@ module m_checker
     use m_mpi_proxy
     use m_helper
     use m_helper_basic
-    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3, BC_RIEMANN_EXTRAP
+    use m_constants, only: recon_type_weno, recon_type_muscl, muscl_order_first_order, time_stepper_rk3, BC_RIEMANN_EXTRAP, &
+        & BC_CHAR_SLIP_WALL, BC_CHAR_SUP_OUTFLOW
 
     implicit none
 
@@ -87,6 +88,8 @@ contains
                        & "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
             @:PROHIBIT(bubbles_euler, &
                        & "active_box is incompatible with bubbles_euler (cell-local bubble sources in a non-equilibrium ambient violate the static-uniform-exterior assumption)")
+            @:PROHIBIT(synthetic_turbulence, &
+                       & "active_box is incompatible with synthetic turbulence (the volumetric forcing writes the whole domain every step, so the exterior is not static)")
         end if
 
         @:PROHIBIT(sfc_partition_wrt .and. partition_tile_size < 1, "partition_tile_size must be >= 1")
@@ -114,6 +117,16 @@ contains
                        & .and. (bc_y%beg == BC_RIEMANN_EXTRAP .or. bc_y%end == BC_RIEMANN_EXTRAP)) .or. (p_glb > 0 &
                        & .and. (bc_z%beg == BC_RIEMANN_EXTRAP .or. bc_z%end == BC_RIEMANN_EXTRAP)), &
                        & "amr does not support Riemann-extrapolation boundary conditions (bc = -4): they alter the WENO coefficient rows near the boundary, which the fine-block reconstruction cannot inherit correctly")
+            ! The s_cbc call sites key on the bc value alone: during the fine advance they would apply the
+            ! characteristic treatment at fine-block edges in the DOMAIN INTERIOR, against CBC scratch sized to
+            ! the coarse subdomain. Support needs an advance-aware gate, not inheritance.
+            @:PROHIBIT((bc_x%beg <= BC_CHAR_SLIP_WALL .and. bc_x%beg >= BC_CHAR_SUP_OUTFLOW) .or. (bc_x%end <= BC_CHAR_SLIP_WALL &
+                       & .and. bc_x%end >= BC_CHAR_SUP_OUTFLOW) .or. (n_glb > 0 .and. ((bc_y%beg <= BC_CHAR_SLIP_WALL &
+                       & .and. bc_y%beg >= BC_CHAR_SUP_OUTFLOW) .or. (bc_y%end <= BC_CHAR_SLIP_WALL &
+                       & .and. bc_y%end >= BC_CHAR_SUP_OUTFLOW))) .or. (p_glb > 0 .and. ((bc_z%beg <= BC_CHAR_SLIP_WALL &
+                       & .and. bc_z%beg >= BC_CHAR_SUP_OUTFLOW) .or. (bc_z%end <= BC_CHAR_SLIP_WALL &
+                       & .and. bc_z%end >= BC_CHAR_SUP_OUTFLOW))), &
+                       & "amr does not support characteristic (CBC) boundary conditions (bc = -5..-12): the fine-block advance would apply the boundary treatment at block edges inside the domain")
             @:PROHIBIT(num_fluids > 1 .and. (.not. mpp_lim) .and. (.not. bubbles_lagrange), &
                        & "amr with num_fluids > 1 requires mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency); Lagrangian bubbles are exempt (their alphas sum to the local liquid fraction and prolong without the sum-to-one closure)")
             @:PROHIBIT(surface_tension, &
