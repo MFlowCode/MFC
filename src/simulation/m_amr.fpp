@@ -119,12 +119,25 @@ module m_amr
     !! wall), so they are counted explicitly. amr_gb_tag = the union_gtag ALLGATHERV, amr_gb_win = the gwin-pair ALLGATHERVs,
     !! amr_gb_cost = the per-box cost ALLREDUCE.
     integer(8) :: amr_gb_tag = 0, amr_gb_win = 0, amr_gb_cost = 0
+    !> S3.0a/S3.0b instrumentation: shape and reduction cost of the Berger-Rigoutsos clustering tree (`s_amr_cluster`). Named
+    !! amr_cl_ (clustering), NOT amr_br_ -- that prefix already means the batched BRIDGE in this module. Tree DEPTH decides whether
+    !! S3 can fuse one collective per tree LEVEL; BR splits at signature holes, not midpoints, so the tree is not balanced by
+    !! construction and depth must be measured. TWO independent maxima are kept: one running max with a tie-break would pair a deep
+    !! tiny subtree with the wrong leaf count and could fake either verdict. amr_cl_maxdep / amr_cl_maxdep_leaf = the DEEPEST call
+    !! and its leaf count (catches a one-box-at-a-time peel chain). amr_cl_lmax / amr_cl_ldepth = the LARGEST call and its depth
+    !! (the tree that actually dominates the cost). amr_cl_nodes = nodes visited = the collectives a per-node distributed recursion
+    !! pays. amr_cl_rb = bytes that recursion would ALLREDUCE: one fused reduction per node carrying the 1D signature of every
+    !! splittable axis. Sized on the UNTRIMMED box, because trim only shrinks to the contained tags own bbox, so the trimmed
+    !! signature is a slice of the untrimmed one and that single reduction serves trim, count AND split.
+    integer    :: amr_cl_maxdep = 0, amr_cl_maxdep_leaf = 0, amr_cl_lmax = 0, amr_cl_ldepth = 0
+    integer(8) :: amr_cl_nodes = 0, amr_cl_rb = 0
     !> TRACK T (T0b gate): regrid migration volume. An old block is ISENT to EVERY new-owner rank whose box overlaps it, so the cost
     !! is fan-out x block bytes, not one send per block. amr_mig_blk counts blocks that had to move at all, amr_mig_snd counts the
     !! sends, amr_gb_mig the bytes. fan-out = snd/blk is the reducible quantity: if it is ~1 the volume is inherent and hysteresis
     !! buys nothing.
     integer(8) :: amr_gb_mig = 0, amr_mig_snd = 0, amr_mig_blk = 0
     public :: amr_gb_tag, amr_gb_win, amr_gb_cost
+    public :: amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb
     public :: amr_gb_mig, amr_mig_snd, amr_mig_blk
     integer :: amr_loc_nfree = 0  !< depth of the recycle stack
 
