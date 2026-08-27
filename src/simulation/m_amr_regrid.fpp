@@ -28,7 +28,8 @@ module m_amr_regrid
         & s_amr_assign_block_owners, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
         & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
         & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
-        & amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed
+        & amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed, &
+        & amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -538,9 +539,12 @@ contains
         integer, intent(out)                  :: nboxes
         integer, allocatable                  :: slo(:,:), shi(:,:), alo(:,:), ahi(:,:)
         integer, allocatable                  :: sts(:), ste(:), wt(:,:)
+        integer, allocatable                  :: sdep(:)  !< S3.0a: recursion depth carried with each stack entry
+        integer                               :: dep, mxdep, nred
+        integer(8)                            :: nnode
         integer                               :: mg, ng, pg, t
         integer                               :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag
-        integer(8)                            :: vol  !< box volume; a global-bbox first pass can exceed 2**31 cells
+        integer(8)                            :: vol      !< box volume; a global-bbox first pass can exceed 2**31 cells
         integer                               :: blo(3), bhi(3), ts, te, lo, hi, tmp(3)
         logical                               :: ok, force, capped, changed, tooclose
         real(wp)                              :: eff
@@ -553,16 +557,25 @@ contains
 
         cap = amr_max_fine
         allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
-        allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in))
+        allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in), sdep(4*cap + 8))
         ! working copy of the tag list, partitioned in place as the tree descends so each node scans only its tags
         do t = 1, ntag_in
             wt(:,t) = tags(:,t)
         end do
         nwork = 1; slo(:,1) = [0, 0, 0]; shi(:,1) = [mg, ng, pg]  ! first pop trims to the global tagged bbox
         sts(1) = 1; ste(1) = ntag_in
+        sdep(1) = 0; mxdep = 0; nnode = 0_8
         nacc = 0; capped = .false.
         do while (nwork > 0)
-            blo = slo(:,nwork); bhi = shi(:,nwork); ts = sts(nwork); te = ste(nwork); nwork = nwork - 1
+            blo = slo(:,nwork); bhi = shi(:,nwork); ts = sts(nwork); te = ste(nwork); dep = sdep(nwork); nwork = nwork - 1
+            ! S3.0a/b: one node = one fused ALLREDUCE in the distributed form. Price it here, before the trim, because the
+            ! reduced signature IS what the trim would be derived from. Axes below 2*min_child are skipped by s_amr_find_split.
+            nnode = nnode + 1_8; mxdep = max(mxdep, dep)
+            nred = 0
+            do d = 1, num_dims
+                if (bhi(d) - blo(d) + 1 >= 4) nred = nred + (bhi(d) - blo(d) + 1)
+            end do
+            amr_cl_rb = amr_cl_rb + int(nred + 7, 8)*4_8  ! signatures + bbox(6) + count(1), int4
             call s_amr_trim_box(wt, ts, te, blo, bhi, ok)
             if (.not. ok) cycle
             ! invariant: [ts:te] holds exactly the tags in this box, and trim only shrinks to their bbox => count is the range size
@@ -588,12 +601,22 @@ contains
                 end do
                 ! low child = [ts:lo-1], high child = [lo:te]; every parent tag lands in exactly one (box just trimmed+split)
                 slo(:,nwork + 1) = blo; shi(:,nwork + 1) = bhi; shi(sax, nwork + 1) = spos - 1
-                sts(nwork + 1) = ts; ste(nwork + 1) = lo - 1
+                sts(nwork + 1) = ts; ste(nwork + 1) = lo - 1; sdep(nwork + 1) = dep + 1
                 slo(:,nwork + 2) = blo; shi(:,nwork + 2) = bhi; slo(sax, nwork + 2) = spos
-                sts(nwork + 2) = lo; ste(nwork + 2) = te
+                sts(nwork + 2) = lo; ste(nwork + 2) = te; sdep(nwork + 2) = dep + 1
                 nwork = nwork + 2
             end if
         end do
+
+        ! S3.0a: record tree shape BEFORE the merge, so nacc is still the BR leaf count (the log2 denominator). Two independent
+        ! maxima -- the deepest call and the largest call -- because a single max cannot say whether a deep tree was also big.
+        amr_cl_nodes = amr_cl_nodes + nnode
+        if (mxdep > amr_cl_maxdep) then
+            amr_cl_maxdep = mxdep; amr_cl_maxdep_leaf = nacc
+        end if
+        if (nacc > amr_cl_lmax) then
+            amr_cl_lmax = nacc; amr_cl_ldepth = mxdep
+        end if
 
         ! min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their bounding box
         thr = buff_size + 2*amr_buf
@@ -622,7 +645,7 @@ contains
         do i = 1, nboxes
             boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
         end do
-        deallocate (slo, shi, alo, ahi, sts, ste, wt)
+        deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep)
 
     end subroutine s_amr_cluster
 
@@ -683,6 +706,8 @@ contains
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
                 & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
             print '(A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', amr_mig_blk, ' sends ', amr_mig_snd, ' bytes ', amr_gb_mig
+            print '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-tree] maxdep ', amr_cl_maxdep, ' maxdep_leaf ', amr_cl_maxdep_leaf, &
+                & ' lmax ', amr_cl_lmax, ' ldepth ', amr_cl_ldepth, ' nodes ', amr_cl_nodes, ' rbytes ', amr_cl_rb
         end if
 
     end subroutine s_amr_regrid
