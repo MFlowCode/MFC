@@ -635,12 +635,19 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
         logical, allocatable                                   :: tag_grid(:,:,:)
         type(t_box), allocatable                               :: boxes(:)
-        integer                                                :: sidx(3), nboxes, box_level(amr_max_fine)
+        integer                                                :: sidx(3), nboxes
         integer                                                :: old_np
-        integer                                                :: old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks)
-        integer                                                :: old_level(amr_max_blocks)
-        logical                                                :: old_owns(amr_max_blocks), same
-        integer                                                :: i
+        ! heap, not stack: these are O(global boxes) and overflow a default stack at large box
+        ! counts. Unsaved local allocatables are deallocated automatically on every return path.
+        integer, allocatable :: box_level(:)
+        integer, allocatable :: old_ilo(:,:), old_ext(:,:)
+        integer, allocatable :: old_level(:)
+        logical, allocatable :: old_owns(:)
+        logical              :: same
+        integer              :: i
+
+        allocate (box_level(amr_max_fine), old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks), old_level(amr_max_blocks), &
+                  & old_owns(amr_max_blocks))
 
         ! valid coarse CONS ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the rebuild prolongation
         ! reads past the new intersection (ALL ranks call: pairwise per-direction exchange; complete no-op at np=1).
