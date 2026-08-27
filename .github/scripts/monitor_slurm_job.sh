@@ -86,7 +86,15 @@ is_terminal_state() {
 # (Phoenix 'embers') a job can stay PENDING for hours, burning the CI job
 # timeout and holding a runner slot; fail early so it reads as queue starvation,
 # not a test failure. 0 = wait indefinitely.
-: "${SLURM_MAX_QUEUE_SECONDS:=5400}"   # 90 minutes
+#
+# The budget has to clear a normal bad day on a busy machine, or it converts
+# routine queue pressure into red CI. Frontier's own numbers make the case:
+# over one week, MFC jobs on `batch` waited p50=1m but p90=96m and p95=176m,
+# with a 466m tail. A 90-minute budget cut into that distribution, tripping on
+# 11% of the jobs that did eventually start -- plus the ones that never did.
+# Four hours clears p95 with room to spare while staying well inside the 480m
+# job-level `timeout-minutes`, which remains the real backstop.
+: "${SLURM_MAX_QUEUE_SECONDS:=14400}"   # 4 hours
 # Reject a non-integer override rather than silently skipping the budget.
 if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
   echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2

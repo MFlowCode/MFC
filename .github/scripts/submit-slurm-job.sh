@@ -62,7 +62,10 @@ case "$cluster" in
         # CFD154; submitting under it now fails outright with "Invalid qos
         # specification". "normal" is the only QOS on this allocation without a
         # one-job-at-a-time cap, so it is the only one that can run the CI
-        # matrix concurrently.
+        # matrix concurrently. Note that the g1 partition carries its own
+        # partition QOS (also named "g1"), which slurmctld applies on its own
+        # when a job lands there. Do not add --qos=g1: CFD154 has no
+        # association with it and sbatch rejects the job outright.
         qos="normal"
         # Let each job's slurmstepd broker its own steps instead of routing
         # every srun through slurmctld. The in-job test suite launches ~1700+
@@ -105,9 +108,11 @@ if [ "$device" = "cpu" ]; then
 #SBATCH --mem-per-cpu=8G"
             ;;
         frontier|frontier_amd)
+            # g1 is a dedicated 64-node carve-out; its nodes are not in batch,
+            # so CI starts promptly instead of queueing behind the machine.
             sbatch_device_opts="\
 #SBATCH -n 32
-#SBATCH -p batch"
+#SBATCH -p g1"
             ;;
     esac
 elif [ "$device" = "gpu" ]; then
@@ -135,7 +140,7 @@ elif [ "$device" = "gpu" ]; then
         frontier|frontier_amd)
             sbatch_device_opts="\
 #SBATCH -n 8
-#SBATCH -p batch"
+#SBATCH -p g1"
             ;;
     esac
 else
