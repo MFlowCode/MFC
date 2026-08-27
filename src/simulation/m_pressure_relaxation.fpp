@@ -11,43 +11,13 @@ module m_pressure_relaxation
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: model_eqns_5eq
+    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, f_pressure, f_phase_internal_energy
 
     implicit none
 
-    private; public :: s_pressure_relaxation_procedure, s_initialize_pressure_relaxation_module, &
-        & s_finalize_pressure_relaxation_module
-
-    real(wp), allocatable, dimension(:,:) :: Res_pr
-    $:GPU_DECLARE(create='[Res_pr]')
+    private; public :: s_pressure_relaxation_procedure
 
 contains
-
-    !> Initialize the pressure relaxation module
-    impure subroutine s_initialize_pressure_relaxation_module
-
-        integer :: i, j
-
-        if (viscous) then
-            @:ALLOCATE(Res_pr(1:2, 1:Re_size_max))
-            do i = 1, 2
-                do j = 1, Re_size(i)
-                    Res_pr(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
-                end do
-            end do
-            $:GPU_UPDATE(device='[Res_pr, Re_idx, Re_size]')
-        end if
-
-    end subroutine s_initialize_pressure_relaxation_module
-
-    !> Finalize the pressure relaxation module
-    impure subroutine s_finalize_pressure_relaxation_module
-
-        if (viscous) then
-            @:DEALLOCATE(Res_pr)
-        end if
-
-    end subroutine s_finalize_pressure_relaxation_module
 
     !> The main pressure relaxation procedure
     subroutine s_pressure_relaxation_procedure(q_cons_vf)
@@ -225,9 +195,8 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: alpha_rho, alpha
         #:endif
-        real(wp)               :: rho, dyn_pres, gamma, pi_inf, pres_relax, sum_alpha, qv_mix
-        real(wp), dimension(2) :: Re
-        integer                :: i, q
+        real(wp) :: rho, dyn_pres, gamma, pi_inf, pres_relax, qv_mix
+        integer  :: i
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
@@ -235,63 +204,10 @@ contains
             alpha(i) = q_cons_vf(eqn_idx%E + i)%sf(j, k, l)
         end do
 
-        ! Compute mixture properties (combined bubble and standard logic)
-        rho = 0._wp
-        gamma = 0._wp
-        pi_inf = 0._wp
-
-        if (bubbles_euler) then
-            if (mpp_lim .and. (model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = 1, num_fluids
-                    rho = rho + alpha_rho(i)
-                    gamma = gamma + alpha(i)*gammas(i)
-                    pi_inf = pi_inf + alpha(i)*pi_infs(i)
-                end do
-            else if ((model_eqns == model_eqns_5eq) .and. (num_fluids > 2)) then
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = 1, num_fluids - 1
-                    rho = rho + alpha_rho(i)
-                    gamma = gamma + alpha(i)*gammas(i)
-                    pi_inf = pi_inf + alpha(i)*pi_infs(i)
-                end do
-            else
-                rho = alpha_rho(1)
-                gamma = gammas(1)
-                pi_inf = pi_infs(1)
-            end if
-        else
-            sum_alpha = 0._wp
-            if (mpp_lim) then
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = 1, num_fluids
-                    alpha_rho(i) = max(0._wp, alpha_rho(i))
-                    alpha(i) = min(max(0._wp, alpha(i)), 1._wp)
-                    sum_alpha = sum_alpha + alpha(i)
-                end do
-                alpha = alpha/max(sum_alpha, sgm_eps)
-            end if
-
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                rho = rho + alpha_rho(i)
-                gamma = gamma + alpha(i)*gammas(i)
-                pi_inf = pi_inf + alpha(i)*pi_infs(i)
-            end do
-
-            if (viscous) then
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = 1, 2
-                    Re(i) = dflt_real
-                    if (Re_size(i) > 0) Re(i) = 0._wp
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, Re_size(i)
-                        Re(i) = alpha(Re_idx(i, q))/Res_pr(i, q) + Re(i)
-                    end do
-                    Re(i) = 1._wp/max(Re(i), sgm_eps)
-                end do
-            end if
-        end if
+        ! This routine runs only at model_eqns = 6eq, and the case validator rejects bubbles_euler
+        ! there, so the bubble branch this used to carry was unreachable. What is left is the plain
+        ! rule - clip under mpp_lim, then accumulate - which is what the kernel does, qv included.
+        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_mix, alpha, alpha_rho)
 
         ! Compute dynamic pressure and update internal energies
         dyn_pres = 0._wp
@@ -300,20 +216,13 @@ contains
             dyn_pres = dyn_pres + 5.e-1_wp*q_cons_vf(i)%sf(j, k, l)*q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
         end do
 
-        ! Mixture formation energy: the relaxed mixture pressure is recovered from the
-        ! conserved total energy with the qv reference removed (consistent with s_compute_pressure).
-        qv_mix = 0._wp
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_fluids
-            qv_mix = qv_mix + alpha_rho(i)*qvs(i)
-        end do
-
-        pres_relax = (q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres - qv_mix - pi_inf)/gamma
+        pres_relax = f_pressure(q_cons_vf(eqn_idx%E)%sf(j, k, l) - dyn_pres, gamma, pi_inf, qv_mix)
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                      & l)*(gammas(i)*pres_relax + pi_infs(i)) + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
+            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = f_phase_internal_energy(pres_relax, &
+                      & q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), &
+                      & gammas(i), pi_infs(i), qvs(i))
         end do
 
     end subroutine s_correct_internal_energies

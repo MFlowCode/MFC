@@ -541,8 +541,6 @@ contains
             end do
         end if
 
-        call s_initialize_pressure_relaxation_module
-
         ! Spatial body force source arrays - sized to include ghost cells so the
         ! same indexing as q_*_vf is valid; iteration is restricted to interior
         ! cells via the `bounds` argument in m_body_forces. Only allocated when the
@@ -2100,8 +2098,6 @@ contains
     impure subroutine s_finalize_rhs_module
 
         integer :: i, j, l
-
-        call s_finalize_pressure_relaxation_module
 
         if (.not. igr) then
             do j = eqn_idx%cont%beg, eqn_idx%cont%end
