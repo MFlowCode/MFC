@@ -522,8 +522,8 @@ contains
                                 K_hat = 0._wp
                                 if (alt_soundspeed) then
                                     pres_hat = q_prim_vf(eqn_idx%E)%sf(${HATIDX}$)
-                                    blkmod1_hat = ((gammas(1) + 1._wp)*pres_hat + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_rs(1)
-                                    blkmod2_hat = ((gammas(2) + 1._wp)*pres_hat + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_rs(2)
+                                    blkmod1_hat = f_bulk_modulus(pres_hat, gammas(1), pi_infs(1)) + (4._wp/3._wp)*Gs_rs(1)
+                                    blkmod2_hat = f_bulk_modulus(pres_hat, gammas(2), pi_infs(2)) + (4._wp/3._wp)*Gs_rs(2)
                                     K_hat = alpha_hat(1)*alpha_hat(2)*(blkmod2_hat - blkmod1_hat)/(alpha_hat(1)*blkmod2_hat &
                                                       & + alpha_hat(2)*blkmod1_hat + verysmall)
                                 end if

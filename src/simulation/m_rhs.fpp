@@ -1072,10 +1072,10 @@ contains
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
-                        blkmod1(k_loop, l_loop, q_loop) = ((gammas(1) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop) + pi_infs(1))/gammas(1) + (4._wp/3._wp)*G1_eff
-                        blkmod2(k_loop, l_loop, q_loop) = ((gammas(2) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop) + pi_infs(2))/gammas(2) + (4._wp/3._wp)*G2_eff
+                        blkmod1(k_loop, l_loop, q_loop) = f_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop), &
+                                & gammas(1), pi_infs(1)) + (4._wp/3._wp)*G1_eff
+                        blkmod2(k_loop, l_loop, q_loop) = f_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop), &
+                                & gammas(2), pi_infs(2)) + (4._wp/3._wp)*G2_eff
                         alpha1(k_loop, l_loop, q_loop) = q_cons_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop)
 
                         if (bubbles_euler) then

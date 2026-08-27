@@ -25,9 +25,9 @@ module m_variables_conversion
         & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
-        & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, &
-        & s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, gammas, &
-        & gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+        & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, f_bulk_modulus, &
+        & f_pressure, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, &
+        & gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -83,23 +83,22 @@ contains
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
         real(wp), dimension(1:num_species)             :: Y_rs
-        real(wp)                                       :: E_e
+        real(wp)                                       :: E_e, e_int
         real(wp)                                       :: e_Per_Kg, Pdyn_Per_Kg
         real(wp)                                       :: T_guess
         integer                                        :: s  !< Generic loop iterator
         #:if not chemistry
-            ! Depending on model_eqns and bubbles_euler, the appropriate procedure for computing pressure is targeted by the
-            ! procedure pointer
-
+            ! What is the internal energy? The magnetic, elastic and kinetic parts are model
+            ! bookkeeping rather than equation of state, so they come off here and the inversion runs once.
             if (mhd) then
-                ! MHD pressure: subtract magnetic pressure from total energy
-                pres = (energy - dyn_p - pi_inf - qv - pres_mag)/gamma
+                ! MHD: the magnetic energy is not an equation-of-state term
+                e_int = energy - dyn_p - pres_mag
             else if (bubbles_euler .neqv. .true.) then
-                ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002): p from mixture EOS
-                pres = (energy - dyn_p - pi_inf - qv)/gamma
+                ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002)
+                e_int = energy - dyn_p
             else
-                ! Bubble-augmented pressure with void fraction correction
-                pres = ((energy - dyn_p)/(1._wp - alf) - pi_inf - qv)/gamma
+                ! Bubble-augmented, with the void fraction correction
+                e_int = (energy - dyn_p)/(1._wp - alf)
             end if
 
             if (hypoelasticity .and. present(G)) then
@@ -115,8 +114,10 @@ contains
                     end if
                 end do
 
-                pres = (energy - 0.5_wp*(mom**2._wp)/rho - pi_inf - qv - E_e)/gamma
+                e_int = energy - 0.5_wp*(mom**2._wp)/rho - E_e
             end if
+
+            pres = f_pressure(e_int, gamma, pi_inf, qv)
         #:else
             ! Reacting mixture pressure from temperature and species
             Y_rs(:) = rhoYks(:)/rho
@@ -1075,8 +1076,8 @@ contains
                             ! checker prohibits hypoelastic HLLD there, so the block is dead code.
                             #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
                                 if (alt_soundspeed) then
-                                    blkmod1_K = ((gammas(1) + 1._wp)*pres_K + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_vc(1)
-                                    blkmod2_K = ((gammas(2) + 1._wp)*pres_K + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_vc(2)
+                                    blkmod1_K = f_bulk_modulus(pres_K, gammas(1), pi_infs(1)) + (4._wp/3._wp)*Gs_vc(1)
+                                    blkmod2_K = f_bulk_modulus(pres_K, gammas(2), pi_infs(2)) + (4._wp/3._wp)*Gs_vc(2)
                                     K_K = alpha_K(1)*alpha_K(2)*(blkmod2_K - blkmod1_K)/(alpha_K(1)*blkmod2_K + alpha_K(2) &
                                                   & *blkmod1_K + verysmall)
                                 end if
@@ -1250,6 +1251,33 @@ contains
     !! c^2 = (H - |u|^2/2 - qv/rho)/Gamma leaves c^2 = ((Gamma + 1)p + Pi)/(Gamma rho), so H, |u|^2
     !! and qv all cancel. Averaged states, whose enthalpy is a free input, use
     !! s_compute_speed_of_sound_avg.
+    !> Pressure of a stiffened gas from its internal energy density: the inverse of the energy that s_compute_energy builds. Callers
+    !! subtract the kinetic, magnetic and elastic energy first, since none of those are equation-of-state terms.
+    function f_pressure(e_int, gamma, pi_inf, qv) result(pres)
+
+        $:GPU_ROUTINE(function_name='f_pressure', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: e_int, gamma, pi_inf, qv
+        real(wp)             :: pres
+
+        pres = (e_int - pi_inf - qv)/gamma
+
+    end function f_pressure
+
+    !> Isentropic bulk modulus of a material with the given stiffened-gas coefficients. Takes the coefficients rather than a fluid
+    !! index so that a mixture, whose effective gamma and pi_inf come from s_compute_mixture_coefficients, is the same call as a
+    !! single fluid. Callers working with an elastic material add their own shear term; it is not part of the equation of state.
+    function f_bulk_modulus(pres, gamma, pi_inf) result(blkmod)
+
+        $:GPU_ROUTINE(function_name='f_bulk_modulus', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: pres, gamma, pi_inf
+        real(wp)             :: blkmod
+
+        blkmod = ((gamma + 1._wp)*pres + pi_inf)/gamma
+
+    end function f_bulk_modulus
+
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1261,7 +1289,6 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: adv
         #:endif
         real(wp), intent(out) :: c
-        real(wp)              :: blkmod1, blkmod2
         integer               :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
@@ -1269,27 +1296,25 @@ contains
         else if (relativity) then  ! Relativistic sound speed, whose enthalpy is 1 + (Gamma + 1)p/rho
             c = sqrt((1._wp + 1._wp/gamma)*pres/rho/(1._wp + (gamma + 1._wp)*pres/rho))
         else
-            if (alt_soundspeed) then  ! Wood's mixture sound speed via bulk moduli
-                blkmod1 = ((gammas(1) + 1._wp)*pres + pi_infs(1))/gammas(1)
-                blkmod2 = ((gammas(2) + 1._wp)*pres + pi_infs(2))/gammas(2)
-                c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
-            else if (model_eqns == model_eqns_6eq) then  ! Six-equation model sound speed
+            ! Every case below is a bulk modulus over a density. The equation of state enters
+            ! only through f_bulk_modulus; the cases differ in how the phases are mixed.
+            if (alt_soundspeed) then  ! Wood's law: volume-weighted harmonic mean
+                c = 1._wp/(rho*(adv(1)/f_bulk_modulus(pres, gammas(1), pi_infs(1)) + adv(2)/f_bulk_modulus(pres, gammas(2), &
+                           & pi_infs(2))))
+            else if (model_eqns == model_eqns_6eq) then  ! volume-weighted arithmetic mean
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
-                    c = c + adv(q)*gs_min(q)*(pres + pi_infs(q)/(gammas(q) + 1._wp))
+                    c = c + adv(q)*f_bulk_modulus(pres, gammas(q), pi_infs(q))
                 end do
                 c = c/rho
-            else if (model_eqns == model_eqns_5eq .and. bubbles_euler) then
-                ! Sound speed for bubble mixture to order O(\alpha)
+            else  ! the mixture coefficients already carry the mixing
+                c = f_bulk_modulus(pres, gamma, pi_inf)/rho
 
-                if (mpp_lim .and. (num_fluids > 1)) then
-                    c = (1._wp/gamma + 1._wp)*(pres + pi_inf/(gamma + 1._wp))/rho
-                else
-                    c = (1._wp/gamma + 1._wp)*(pres + pi_inf/(gamma + 1._wp))/(rho*(1._wp - adv(num_fluids)))
+                ! Bubble mixture to order O(\alpha): the void fraction dilutes the stiffness
+                if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 1)) then
+                    c = c/(1._wp - adv(num_fluids))
                 end if
-            else  ! Stiffened-gas mixture, with H, |u|^2 and qv cancelled out
-                c = ((gamma + 1._wp)*pres + pi_inf)/(gamma*rho)
             end if
 
             if (mixture_err .and. c < 0._wp) then

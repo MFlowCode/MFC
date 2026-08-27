@@ -371,9 +371,7 @@ contains
         do i = 1, num_dims
             dynP = dynP + 0.5_wp*q_cons_vf(eqn_idx%cont%end + i)%sf(cell(1), cell(2), cell(3))**2/rhol
         end do
-        ! Stiffened-gas inversion; must match s_compute_pressure in m_variables_conversion,
-        ! including the qv (heat of formation) term, which is nonzero for phase-change fluids.
-        pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf - qv)/gamma
+        pliq = f_pressure(q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP, gamma, pi_inf, qv)
         if (pliq < 0) print *, "Negative pressure", proc_rank, q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, &
             & pliq, cell, dynP
 
