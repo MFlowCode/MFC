@@ -7,6 +7,48 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 
+## 2026-08-27 (33) — ELASTIC-GATE PER-SIDE FIX LANDED; ONE REVIEW PROHIBIT RETRACTED AS WRONG
+
+The elastic-gate fix (review finding #10) landed: `s_compute_hypoelastic_interface_energy` now
+gates each side's elastic energy on its own state — E_L on `G_L > verysmall` and the left damage
+cutoff, E_R on `G_R > verysmall` and the right damage cutoff. The old hybrid joint-gated E_L on
+BOTH sides (a damage-collapsed or fluid right state suppressed the left side's stored energy) and
+gave E_R no damage cutoff at all (a collapsed right modulus kept contributing energy — the NaN
+mechanism the cutoff exists to prevent). One golden moved, exactly the test that exercises the
+changed regime: AMR 1D hypoelastic static block with `cont_damage` (D731AB7A), deltas
+concentrated in the stress and damage fields near the damaged region (worst rel 2.3e-3 on the
+stress trace; densities at O(1e-6)). Regenerated with that delta analysis as justification.
+
+**Retraction:** the batch (32) prohibit on HLLD-hypoelasticity + CBC is REMOVED. Its gate run
+blocked an UPSTREAM test (#1414's "CBC uniform preservation", 2274CB4E) whose own comment records
+that a pre-fix version of the case drifted O(1e-3) in five steps — proof the CBC path is live and
+consequential under HLLD, which the review finding's "corrections silently dropped" reading said
+was impossible. Fresh code walk: the claim is only half-true. The conservative rows DO read the
+separately-stored `flux_n` (finalized before `s_cbc` corrects `flux_rsx_vf`), but the
+advection-source path consumes the s_cbc-corrected `flux_src_rsx_vf`, and #1414 deliberately
+supports, fixed, and tests the combination with documented usage limits ("characteristic
+boundaries are limited to fluid regions"). Outlawing an upstream-shipped configuration on a
+partial static reading was wrong for this PR; the conservative-flux question is an upstream
+discussion. The two prohibits covering THIS PR's own findings — AMR + CBC (the interior
+fine-block-edge pollution proven by the 9640CE7F golden forensics) and active_box + synthetic
+turbulence — stand untouched. LESSON (pairs with (32)'s): a prohibit that trips an existing
+green test indicts the golden OR the prohibit — this time it was the prohibit, and the
+discriminator was the same both times: read what the test's own history and comments claim,
+then verify the mechanism end-to-end, not just the half that supports the finding.
+
+**Suite forensics:** the 131-test gate run (hypo-65 + AMR-68) had two more failures, both false:
+the HypoShearContact convergence pair (26660584 HLLD, D0AC8751 HLLC) ran concurrently under
+`-j`, and their sweeps — both staged from `examples/2D_hypo_shear_contact/` — cross-contaminated:
+each log held the OTHER test's Linf values (one value bit-identical across both logs was the
+tell). Rerun solo: HLLD fits order 2.000 (needs 2.0±0.1), HLLC 0.998 (needs 1.0±0.2). Same class
+as the known chemistry-test example-cache clobbering; convergence tests sharing an example
+directory must not run concurrently — rerun solo before believing a convergence failure.
+
+Gates: S0 np8 bitcmp vs the accepted binary **byte-identical** (pinned
+`bins/simulation-elasticgate-22c01bd7`; the retraction is validator-Python only, no binary
+change); hypo-65 + AMR-68 all green after triage (127 direct + D731AB7A on the regenerated
+golden + 2274CB4E unblocked + the two convergence tests solo); precheck clean.
+
 ## 2026-08-27 (32) — FULL-PR REVIEW: NINE CONFIRMED FINDINGS FIXED, GATED, AND LANDED (c5b461f9)
 
 A full adversarially-verified review of PR #1628's diff produced 12 confirmed findings; the 9
