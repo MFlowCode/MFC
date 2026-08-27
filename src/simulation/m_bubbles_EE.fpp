@@ -229,8 +229,9 @@ contains
                         call s_compute_mixture_coefficients(myalpha_rho, myalpha, myRho, n_tait, B_tait, qv_bub)
                         B_tait = B_tait/pi_fac
 
-                        n_tait = 1._wp/n_tait + 1._wp  ! make this the usual little 'gamma'
-                        B_tait = B_tait*(n_tait - 1)/n_tait  ! make this the usual pi_inf
+                        ! n_tait still holds the mixture gamma here, which the reference pressure needs
+                        B_tait = f_isentrope_pressure(B_tait, n_tait)
+                        n_tait = f_isentrope_exponent(n_tait)
 
                         myP = q_prim_vf(eqn_idx%E)%sf(j, k, l)
                         alf = q_prim_vf(eqn_idx%alf)%sf(j, k, l)

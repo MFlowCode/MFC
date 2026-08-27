@@ -401,18 +401,19 @@ contains
                                 ! energy flux
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    p_K_Star = xi_M*(xi_MP*((pres_L + pi_infs(i)/(1._wp + gammas(i)))*xi_L**(1._wp/gammas(i) &
-                                                     & + 1._wp) - pi_infs(i)/(1._wp + gammas(i)) - pres_L) + pres_L) &
-                                                     & + xi_P*(xi_PP*((pres_R + pi_infs(i)/(1._wp + gammas(i))) &
-                                                     & *xi_R**(1._wp/gammas(i) + 1._wp) - pi_infs(i)/(1._wp + gammas(i)) - pres_R) &
+                                    ! Stiffened-gas isentrope p* = (p + B) xi**n - B, with the Tait exponent and pressure
+                                    ! already precomputed as gs_min = 1/gamma + 1 and ps_inf = pi_inf/(1 + gamma).
+                                    p_K_Star = xi_M*(xi_MP*((pres_L + ps_inf(i))*xi_L**gs_min(i) - ps_inf(i) - pres_L) + pres_L) &
+                                                     & + xi_P*(xi_PP*((pres_R + ps_inf(i))*xi_R**gs_min(i) - ps_inf(i) - pres_R) &
                                                      & + pres_R)
 
-                                    flux_rsx_vf(${SF('')}$, i + eqn_idx%int_en%beg - 1) = ((xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                    flux_rsx_vf(${SF('')}$, i + eqn_idx%int_en%beg - 1) = f_phase_internal_energy(p_K_Star, &
+                                                & xi_M*qL_prim_rsx_vf(${SF('')}$, &
                                                 & i + eqn_idx%adv%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                & i + eqn_idx%adv%beg - 1))*(gammas(i)*p_K_Star + pi_infs(i)) &
-                                                & + (xi_M*qL_prim_rsx_vf(${SF('')}$, &
+                                                & i + eqn_idx%adv%beg - 1), xi_M*qL_prim_rsx_vf(${SF('')}$, &
                                                 & i + eqn_idx%cont%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                & i + eqn_idx%cont%beg - 1))*qvs(i))*vel_K_Star + (s_M/s_L)*(s_P/s_R) &
+                                                & i + eqn_idx%cont%beg - 1), gammas(i), pi_infs(i), &
+                                                & qvs(i))*vel_K_Star + (s_M/s_L)*(s_P/s_R) &
                                                 & *pcorr*s_S*(xi_M*qL_prim_rsx_vf(${SF('')}$, &
                                                 & i + eqn_idx%adv%beg - 1) + xi_P*qR_prim_rsx_vf(${SF(' + 1')}$, &
                                                 & i + eqn_idx%adv%beg - 1))

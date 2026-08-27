@@ -26,8 +26,8 @@ module m_variables_conversion
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, f_bulk_modulus, &
-        & f_pressure, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, &
-        & gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+        & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, s_compute_speed_of_sound_avg, &
+        & s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -288,10 +288,10 @@ contains
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
-            gs_min(i) = 1.0_wp/gammas(i) + 1.0_wp
+            gs_min(i) = f_isentrope_exponent(gammas(i))
             pi_infs(i) = fluid_pp(i)%pi_inf
             Gs_vc(i) = fluid_pp(i)%G
-            ps_inf(i) = pi_infs(i)/(1.0_wp + gammas(i))
+            ps_inf(i) = f_isentrope_pressure(pi_infs(i), gammas(i))
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
@@ -1251,6 +1251,43 @@ contains
     !! c^2 = (H - |u|^2/2 - qv/rho)/Gamma leaves c^2 = ((Gamma + 1)p + Pi)/(Gamma rho), so H, |u|^2
     !! and qv all cancel. Averaged states, whose enthalpy is a free input, use
     !! s_compute_speed_of_sound_avg.
+    !> Exponent of the stiffened-gas isentrope p + B = const rho**n. Precomputed per fluid as gs_min.
+    function f_isentrope_exponent(gamma) result(n)
+
+        $:GPU_ROUTINE(function_name='f_isentrope_exponent', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: gamma
+        real(wp)             :: n
+
+        n = 1._wp/gamma + 1._wp
+
+    end function f_isentrope_exponent
+
+    !> Reference pressure of that isentrope. Precomputed per fluid as ps_inf.
+    function f_isentrope_pressure(pi_inf, gamma) result(B)
+
+        $:GPU_ROUTINE(function_name='f_isentrope_pressure', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: pi_inf, gamma
+        real(wp)             :: B
+
+        B = pi_inf/(1._wp + gamma)
+
+    end function f_isentrope_pressure
+
+    !> Internal energy of one phase of the six-equation model: its volume-fraction-weighted stiffened-gas energy plus the heat of
+    !! formation carried by its partial density. No kinetic term - that belongs to the mixture, not to a phase.
+    function f_phase_internal_energy(pres, alpha, alpha_rho, gamma, pi_inf, qv) result(e_phase)
+
+        $:GPU_ROUTINE(function_name='f_phase_internal_energy', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: pres, alpha, alpha_rho, gamma, pi_inf, qv
+        real(wp)             :: e_phase
+
+        e_phase = alpha*(gamma*pres + pi_inf) + alpha_rho*qv
+
+    end function f_phase_internal_energy
+
     !> Pressure of a stiffened gas from its internal energy density: the inverse of the energy that s_compute_energy builds. Callers
     !! subtract the kinetic, magnetic and elastic energy first, since none of those are equation-of-state terms.
     function f_pressure(e_int, gamma, pi_inf, qv) result(pres)

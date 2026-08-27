@@ -772,8 +772,9 @@ contains
                     rho = q_prim_vf(eqn_idx%cont%beg)%sf(id1, id2, id3)
 
                     if (bubble_model == bubble_model_keller_miksis) then
-                        n_tait = 1._wp/gammas(1) + 1._wp
-                        B_tait = pi_infs(1)*(n_tait - 1)/n_tait
+                        ! gs_min and ps_inf are these two already: 1/gamma + 1 and pi_inf/(1 + gamma)
+                        n_tait = gs_min(1)
+                        B_tait = ps_inf(1)
                         c = n_tait*(pres + B_tait)*(1._wp - alf)/(rho)
                         c = merge(sqrt(c), sgm_eps, c > 0._wp)
                     end if
