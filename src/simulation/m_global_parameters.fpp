@@ -376,6 +376,25 @@ module m_global_parameters
     !! ranks. See docs/documentation/amr_fine_distribution.md.
     integer, allocatable :: amr_block_owner(:)
 
+    !> Monotone mesh epoch (plan-based exchange, amr_plan_based_exchange.md): incremented at EVERY site that sets
+    !! amr_seam_pairs_dirty and at the end of each slot reconciliation (exchange plans bake local slot indices, so a renumbering
+    !! invalidates them even when the box set is unchanged). The boolean cannot serve as plan staleness: it is CONSUMED by whichever
+    !! lazy seam-cache rebuild fires first, and ownership can change with no regrid. Declared here (not m_amr) so m_amr_registers
+    !! can key its participation-map rebuild on it without a use-cycle; m_amr re-exports it, so its historical importers are
+    !! unchanged.
+    integer(8) :: amr_mesh_epoch = 0
+
+    !> Participation-local flux-register index (m_amr_registers): global block slot -> dense register slot, 0 when this rank neither
+    !! owns block g, owns g's parent, nor reflux-face-participates in it. The 12 flux-register arrays are sized and swept by
+    !! amr_reg_n (the dense count), not amr_num_blocks - the register footprint was the O(GLOBAL boxes) device-memory term that
+    !! killed weak scaling at np32. Rebuilt by s_amr_reg_prepare on every mesh-epoch change; per-rank CONTENT differs (it is a local
+    !! index). Host-only: every device kernel receives dense slots by value or sweeps 1..amr_reg_n directly.
+    integer, allocatable :: amr_reg_of(:)
+    integer              :: amr_reg_n = 0
+    !> Dense register slot of the working block (amr_reg_of(amr_cur), 0 if unmapped); kept by s_amr_select_slot so the per-block
+    !! register sites read it exactly where they read amr_cur today.
+    integer :: amr_reg_cur = 0
+
 contains
 
     !> Make block slot islot the working slot: set amr_cur and copy its stored mirrors (region, intersection, ownership) into the
@@ -389,6 +408,7 @@ contains
         amr_region_lo = amr_region_lo_all(:,islot); amr_region_hi = amr_region_hi_all(:,islot)
         amr_isect_lo = amr_isect_lo_all(:,islot); amr_isect_hi = amr_isect_hi_all(:,islot)
         amr_rank_owns_block = amr_owns_all(islot)
+        if (allocated(amr_reg_of)) amr_reg_cur = amr_reg_of(islot)
 
     end subroutine s_amr_select_slot
 
