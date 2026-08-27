@@ -82,19 +82,14 @@ is_terminal_state() {
   esac
 }
 
-# Bound how long a job may sit un-started in the queue. On a preemptible QOS
-# (Phoenix 'embers') a job can stay PENDING for hours, burning the CI job
-# timeout and holding a runner slot; fail early so it reads as queue starvation,
-# not a test failure. 0 = wait indefinitely.
-#
-# The budget has to clear a normal bad day on a busy machine, or it converts
-# routine queue pressure into red CI. Frontier's own numbers make the case:
-# over one week, MFC jobs on `batch` waited p50=1m but p90=96m and p95=176m,
-# with a 466m tail. A 90-minute budget cut into that distribution, tripping on
-# 11% of the jobs that did eventually start -- plus the ones that never did.
-# Four hours clears p95 with room to spare while staying well inside the 480m
-# job-level `timeout-minutes`, which remains the real backstop.
-: "${SLURM_MAX_QUEUE_SECONDS:=14400}"   # 4 hours
+# Optionally bound how long a job may sit un-started in the queue. On the
+# preemptible Phoenix 'embers' QOS a job routinely stays PENDING for hours and
+# needs most of the job-level `timeout-minutes` (480m) window to backfill onto a
+# free node; that job timeout is the real backstop. Default to 0 (wait
+# indefinitely, up to the job timeout) so ordinary queue pressure does not turn
+# otherwise-healthy jobs into red CI. Set SLURM_MAX_QUEUE_SECONDS>0 to opt into
+# an earlier queue-starvation cutoff where the scheduler is not preemptible.
+: "${SLURM_MAX_QUEUE_SECONDS:=0}"   # 0 = wait indefinitely (job timeout is the backstop)
 # Reject a non-integer override rather than silently skipping the budget.
 if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
   echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2
