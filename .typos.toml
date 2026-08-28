@@ -7,6 +7,9 @@ extend-ignore-identifiers-re = [
 AttributeIDSupressMenu = "AttributeIDSupressMenu"
 
 [default.extend-words]
+# Cray CCE spells it this way in the lib-4425 runtime error; quoted verbatim in the AMR ledger so the
+# message stays greppable against what the machine actually prints.
+Unitialized = "Unitialized"
 INOUT = "INOUT"
 WRONLY = "WRONLY"
 nd = "nd"

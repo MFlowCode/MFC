@@ -7,45 +7,143 @@
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
 >
-> ## CURRENT STATE (2026-08-27) — read this before picking work
+> ## CURRENT STATE (2026-08-28 EOD) — read this before picking work
 >
-> **The live increment plan is `amr_plan_based_exchange.md`** (~3100 LOC over I0-I8, priced, with
-> per-increment gates). Work FROM it; do not re-derive scope. Landed: I0, I1a, I1b, I2a, I3, I4a,
-> I4b, I5. **Outstanding: I2b, I5b (~250), I6 (~200), I7 (~600), I8 (unpriced).**
+> This block supersedes everything above it. Ledgers 40-43 below record how these conclusions were
+> reached, including four that were WRONG when first written; read them for method, not for status.
 >
-> **W4 (per-cell global collectives) — half done, and RESTATED in ledger 40.** S3.1 deleted the
-> level-1 tag ALLGATHERV (`ntag_bytes` 185 MB -> 0 per rank per regrid, box set bit-identical). The
-> residual wall is **not volume**: differencing per regrid shows the level-1 reducing path is FLAT in P
-> in both per-rank bytes (1.39 M) and collective count (16,383), because that tree is cap-limited. It is
-> **~16,383 global `MPI_ALLREDUCE`s per regrid, of which 99.93% are on nodes lying wholly inside one
-> rank** and therefore buy nothing but a full-machine sync. The `rbytes` growth of 1.67x/1.83x per
-> doubling that earlier motivated "S3.1 is still O(P)" lives entirely in the **level-2 forest**, which
-> does zero collectives today. **W4 is NOT met**; the thing to remove is the collective COUNT. Remaining:
-> **S3.2's design contract is written below ("S3.2 DESIGN CONTRACT") — read it before writing any
-> S3.2 code; it records that depth-fusion ALONE is still O(P) per rank.** Sequencing matters and is
-> NOT free: the level-2 forest runs `reduce = .false.` on a replicated list and performs **zero
-> collectives today**, so converting it first (S3.3) would ADD ~22-28k collectives per regrid with no
-> mechanism to scope them. **S3.2's mechanism must therefore be proven on the level-1 path, where the
-> collectives already exist, and S3.3 then moves the forest onto it.**
+> ### Landed today (8 commits, each gated 69/69 on the AMR suite)
 >
-> **W5 is the second wall, at ~28k ranks**, and it is BIGGER than one increment: 19 of 41 AMR p2p
-> call sites still tag per box, F1 is only partially converted (I2b unlanded), and the subcycle
-> sites are an explicit deferral to I8. See `amr_plan_based_exchange.md`.
+> | commit | change |
+> |---|---|
+> | `eb6b…` | **B1** — canonical Morton merge order; the merge depends on the box SET, not traversal order |
+> | `58aa0867` | **S3.3** — level->=2 forest clustered per OWNER, tags exchanged point-to-point |
+> | `263730c9` | **W1a** — six per-stage loops iterate this rank's own blocks, not the global list |
+> | `cefd3176` | **Restart format v2** — per-block (owner, m, n, p), not a per-RANK extent vector |
 >
-> **Adopted ordering (ledger 41, with its premise CORRECTED by the Arm B verdict — BOTH the forest and
-> level 1 are O(P); S3.3 went first on absolute size and readiness, not on a difference in exponent):** B0 -> **B1
-> (canonicalise the merge)** -> **B0b (`amr_blocking_factor` default 1 -> 4, so the box cap stops being
-> load-bearing)** -> **S3.3 (forest ownership split — deletes `gwin_bytes`, 1.44 GB/rank at np32 and
-> doubling with P; also retires W1's pass-2 loops)** -> S3.2b (level-1 depth batching; a latency
-> constant, 16,383 flat collectives per regrid) -> W5 (I2b/I7/I8) ->
-> W3 (F5 aggregation, measured live at **71.7%% of all messages** and the smallest at ~0.8 MB/msg) ->
-> W6 (chunked device-side store growth) -> W7 (needs a cost model chosen first). **W2 (batched
-> advance) is FLAT IN P and is therefore an efficiency/parity item, NOT on the scaling critical
-> path** — a scope decision, since it is also the largest and least-bounded item.
+> ### Measured, not argued
+>
+> | quantity | before | after |
+> |---|---|---|
+> | `gwin_bytes` (level>=2 gather) | 2.00x per np-doubling | **FLAT over 8x in P** |
+> | per-rank clustering work | 3,016 / 5,888 / 11,632 / 23,128 | **378 at all four rungs** |
+> | level-1 collectives per regrid | 3,038 -> 23,310 | **~130x fewer at every rung** |
+> | checkpoint header at 75k ranks | 7.4 GB | **128 KB** |
+> | `MPI_TAG_UB` headroom | *assumed* 28k ranks | **measured 7.2e6 ranks** (Cray MPICH 2**29 - 1) |
+>
+> ### The plan of attack
+>
+> | # | item | size | gate |
+> |---|---|---|---|
+> | 1 | ~~Restart format v2~~ | — | **DONE** |
+> | 2 | **B0b** — `amr_blocking_factor` 1 -> 4 | 1 line | goldens REGENERATE (the only golden-moving item) |
+> | 3 | **S3.2b** — rank-local nodes skip the collective; owner-only descent; box union | ~50 LOC, written | bit-identity ON TOP OF B0b |
+> | 4 | **S3.3c** — `covered` from owned blocks + one `ALLREDUCE(LOR)`; guard the dense window | ~60 LOC | bit-identity |
+> | 5 | **Subcycle** — SCOPED 2026-08-28, see below; the np>1 gate is ALREADY LIFTED | 2 parts, one cheap | goldens; test (q) already covers np>1 |
+> | 6 | **S3.2b-2** — depth-batch the residual shared nodes | ~80 LOC | collectives per regrid = `shr_maxdep` |
+>
+> **W5 is OFF the critical path** (measured tag headroom, above). Converting the remaining per-box tag
+> sites and dropping the `amr_max_blocks` base term stay worthwhile for the end state; they gate nothing.
+>
+> ### Subcycle, scoped (2026-08-28) — smaller than the plan assumed
+>
+> The plan carried subcycle as unsized and "checker-gated at np>1". Reading the code and the test
+> generator, that is out of date on the part that mattered:
+>
+> - **np>1 correctness is DONE.** Golden **(q) `AMR -> 1D -> multi-level dynamic subcycle wide L2 np=2`**
+>   exists and passes. Its comment records that the checker gated this combination only *until*
+>   `s_amr_advance_children` walked whole levels, and that it deliberately exercises a child owned by a
+>   DIFFERENT rank than its parent -- the case where a missed P2P post is a deadlock rather than a
+>   tolerance failure. So there is no gate to lift and no correctness work to do.
+> - **W1, cheap.** `s_amr_advance_fine_subcycle_all` has 3 x `do islot = 1, amr_num_blocks`. The
+>   `amr_my_blk` list from W1a converts them the same way, once `s_amr_select_slot`'s side effect is
+>   handled (it precedes the filter at these sites, which is exactly the case W1a left unconverted).
+> - **The real work: the per-box rendezvous.** `s_amr_subcycle_setup_block` is called once per block and
+>   calls `s_amr_gather_coarse_patch` followed by a BLOCKING `s_amr_gather_send_flush`, twice per block
+>   (`q_old` and `q_new`, plus the pbmv pair under QBMM). That is precisely the per-box gather this
+>   ledger identifies as the original root cause, and the wave program already replaced it three times
+>   on the lockstep path (I2a, I3, I5 -- all landed). **I8 is that conversion with three worked
+>   precedents**, not new design. The wave routines' `@:ASSERT(.not. amr_subcycle)` marks the boundary.
+> - **It IS needed for the demonstration** (the subcycle path is required, user 2026-08-28): left as a
+>   per-box rendezvous it would dominate at scale, exactly as F1/F2/F6 did before their waves.
+>
+> ### Deferred, deliberately
+>
+> - **W1 memory** — `amr_region_lo_all`/`hi_all`/`owns_all`/`block_level` are all sized `amr_max_blocks`,
+>   so every rank holds every block: ~180 MB/rank at Frontier. Survivable on 64 GB. This is the real
+>   end-state item (distribute the metadata, query through `f_amr_owner`) and it is what bounds W1 from
+>   below -- W1a and S3.3c take the TIME to O(local), they cannot touch the MEMORY.
+> - The five W1a sites where `s_amr_select_slot(k)` precedes the owner filter (side effect on `amr_cur`).
+> - **W2** (batched advance) — flat in P, an efficiency item, not a scaling one.
+> - W3, W6, W7 — unchanged, behind the above.
+>
+> ### ITEM #1 (2026-08-28): AMR aborts on Frontier under CCE — see the section below the header
+>
+> Frontier BUILDS but every AMR test aborts at init with `lib-4425 ... Unitialized descriptor for
+> ALLOCATE statement argument`. **Bisected on the machine: pre-existing, NOT from today's commits**
+> (`dc27e4a6` fails identically). This outranks every scaling item in the table above.
+>
+> ### The one open input
+>
+> **ANSWERED 2026-08-28: it builds and syscheck passes, but every AMR test aborts at runtime.** See
+> the CCE section below. The open input is now a LINE NUMBER from a CCE `--debug` build.
+>
+> ### Method rules earned today, each from a wrong conclusion
+>
+> 1. **No growth exponent on fewer than three points.** Cost two retractions in one day.
+> 2. **Before believing a FLAT result, ask what limit was pinned.** "Level-1 is flat at 16,383" was
+>    `2*8192-1`, a tree clipped by a fixed `amr_max_blocks` in every rung. A suspiciously round number is
+>    the tell.
+> 3. **Compare final-to-final.** The counters are cumulative; a mid-run `nboxes` against a completed
+>    run's last line looks exactly like a divergence.
+> 4. **Verify the artifact, not the exit code.** `RC=143` hid a link error; `RC=0` shipped no
+>    `pre_process`; `run -t X -t Y` silently skipped a target; the sticky lock resolved an unbuilt variant.
+> 5. **Grep before asserting a property in a comment.** "s_amr_assign_block_owners is the sole authority
+>    for ownership" was false (tiled L2 inherits, restart/migration assign) and the gate caught it.
 >
 > **Working practice (measured 2026-08-27):** `amr-bench/fcheck.sh` structurally checks one .fpp in
-> ~4 s versus ~18 min for a GPU build and catches what `ffmt`/`lint_source` pass; a gfortran CPU
-> build in an isolated worktree is ~13 s incremental; build in one worktree and measure in another.
+> ~4 s versus ~18 min for a GPU build and catches what `ffmt`/`lint_source` pass. CPU verification builds
+> go in `mfc-amr-cpu`, **never in `mfc-amr`** — a `--no-gpu` build there flips the sticky lock and the next
+> `test` dies at a compiler feature probe. `amr-bench/cpu/ladder.sh` runs a np8-128 weak-scaling ladder on
+> one node; `amr-bench/cpu/roundtrip.sh` is the restart write-then-read gate the np<=2 goldens cannot give.
+
+
+### 2026-08-28: AMR DOES NOT RUN ON FRONTIER — pre-existing CCE runtime abort, and it is now item #1
+
+Measured on Frontier (`-c frontier`, Cray CCE, OpenMP offload, `cpe/25.03 rocm/6.3.1`):
+
+- **It BUILDS.** `pre_process`, `simulation` and `syscheck` all build and install; syscheck PASSES including
+  `omp_get_num_devices() > 0` and the MPI checks.
+- **Every AMR test aborts at runtime**, 12 of 12, immediately after AMR init and before any time step:
+
+```
+lib-4425 : UNRECOVERABLE library error
+  INTERNAL ERROR-Unitialized descriptor for ALLOCATE statement argument.
+srun: error: task 0: Aborted (core dumped)          # exit 134
+```
+
+**It is NOT a regression from the 2026-08-28 work.** Bisected on the machine: `dc27e4a6` (the HEAD before
+B1 / S3.3 / W1a / restart-v2 landed) fails with the identical error on the same test. The simplest case
+fails too -- `21C71558 AMR -> 1D -> static block`, a 63-cell 1D case with `amr_regrid_int = 0` -- so the
+fault is in AMR INITIALISATION, not in the clustering, regrid or exchange paths.
+
+**Why nobody knew.** The local validation bar is amdflang OpenMP-offload correctness only; other compilers
+are CI's job, and the AMR suite is not run under CCE anywhere in this ledger. Every "69/69 goldens" in
+this document is amdflang. **A green local gate says nothing about Frontier.**
+
+**Hypothesis tried and DISCARDED:** allocatable/pointer components of `t_level` (`amr_slots` is
+`allocate`d as an array of a type holding `type(scalar_field)`/`type(pres_field)` members). Both of those
+types declare `real(stp), pointer, dimension(...) :: sf => null()`, i.e. they ARE default-initialised, so
+allocating through them is legal and this is not the cause. Do not re-try it.
+
+**Next step is localisation, not more speculation:** a CCE `--debug` build normally reports the failing
+source line for `lib-4425`; failing that, `ATP_ENABLED=1` gives a traceback. Until there is a line number
+this is unattributable from a non-CCE machine.
+
+**Consequence for the plan: this moves ahead of every scaling item.** No exascale demonstration is
+possible while AMR aborts on the target machine at 1 rank, and every increment below is being validated
+on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
+exists, or the same class of breakage will keep accumulating undetected.
 
 ## 2026-08-28 (41) — np32 closes the sweep, and it REORDERS the program: the forest, not level 1, is the O(P) term
 
