@@ -10,7 +10,7 @@
 module m_amr_regrid
 
 #ifdef MFC_MPI
-    use mpi  !< allgather/point-to-point for the rank-invariant tag union and the fine-state migration
+    use mpi  !< per-node signature ALLREDUCE for the rank-invariant clustering, point-to-point for the fine-state migration
 #endif
 
     use m_derived_types  ! scalar_field, t_box
@@ -154,43 +154,80 @@ contains
 
     end subroutine s_amr_check_box_disjoint
 
-    !> Shrink box [blo:bhi] to the tight bbox of its tagged cells. ok=.false. if none tagged. Collapsed dims (lo=hi=0) survive
-    !! unchanged. Deterministic (integer scan of the identical sparse tag list).
-    impure subroutine s_amr_trim_box(tags, ts, te, blo, bhi, ok)
+    !> Concatenated 1D tag signatures of box [blo0:bhi0], built from the tag range [ts:te] in ONE pass. Axis d occupies sig(off(d) :
+    !! off(d) + ext(d) - 1), and sig(off(d) + t - blo0(d)) counts the in-box tagged cells at position t along d. One signature
+    !! serves the trim, the in-box count AND every candidate split, replacing the up-to-num_dims+1 separate rescans of the tag list
+    !! the previous form needed. nsig returns the used length.
+    impure subroutine s_amr_box_sig(tags, ts, te, blo0, bhi0, sig, off, nsig)
 
-        integer, intent(in)    :: tags(:,:), ts, te
+        integer, intent(in)  :: tags(:,:), ts, te, blo0(3), bhi0(3)
+        integer, intent(out) :: sig(:), off(3), nsig
+        integer              :: d, t, c(3)
+
+        nsig = 0
+        do d = 1, 3
+            off(d) = nsig + 1
+            if (d <= num_dims) nsig = nsig + (bhi0(d) - blo0(d) + 1)
+        end do
+        sig(1:nsig) = 0
+        do t = ts, te
+            c = tags(:,t)
+            if (c(1) < blo0(1) .or. c(1) > bhi0(1)) cycle
+            if (c(2) < blo0(2) .or. c(2) > bhi0(2)) cycle
+            if (c(3) < blo0(3) .or. c(3) > bhi0(3)) cycle
+            do d = 1, num_dims
+                sig(off(d) + c(d) - blo0(d)) = sig(off(d) + c(d) - blo0(d)) + 1
+            end do
+        end do
+
+    end subroutine s_amr_box_sig
+
+    !> Shrink box [blo:bhi] to the tight bbox of its tagged cells and return their count, both read off the signature of
+    !! [blo0:bhi0]. Equivalent to scanning the tag list: the per-axis MIN/MAX of the contained tags ARE the first and last nonzero
+    !! of that axis signature, and "any tagged" is "the signature sums nonzero". ok=.false. if none tagged. Collapsed dims (lo=hi=0)
+    !! survive unchanged, their signature being a single bin.
+    pure subroutine s_amr_trim_from_sig(sig, off, blo0, bhi0, blo, bhi, ok, ntag)
+
+        integer, intent(in)    :: sig(:), off(3), blo0(3), bhi0(3)
         integer, intent(inout) :: blo(3), bhi(3)
         logical, intent(out)   :: ok
-        integer                :: tlo(3), thi(3), t, i, j, k
+        integer, intent(out)   :: ntag
+        integer                :: d, t, lo, hi
 
-        tlo = huge(1); thi = -huge(1)
-        do t = ts, te
-            i = tags(1, t); j = tags(2, t); k = tags(3, t)
-            if (i < blo(1) .or. i > bhi(1)) cycle
-            if (j < blo(2) .or. j > bhi(2)) cycle
-            if (k < blo(3) .or. k > bhi(3)) cycle
-            tlo(1) = min(tlo(1), i); thi(1) = max(thi(1), i)
-            tlo(2) = min(tlo(2), j); thi(2) = max(thi(2), j)
-            tlo(3) = min(tlo(3), k); thi(3) = max(thi(3), k)
+        ok = .false.
+        ntag = 0
+        do t = blo0(1), bhi0(1)
+            ntag = ntag + sig(off(1) + t - blo0(1))
         end do
-        ok = thi(1) >= tlo(1)
-        if (ok) then; blo = tlo; bhi = thi; end if
+        if (ntag == 0) return  ! no tags in the box; every axis signature is empty too
+        do d = 1, num_dims
+            lo = -1; hi = -1
+            do t = blo0(d), bhi0(d)
+                if (sig(off(d) + t - blo0(d)) > 0) then
+                    if (lo < 0) lo = t
+                    hi = t
+                end if
+            end do
+            blo(d) = lo; bhi(d) = hi
+        end do
+        ok = .true.
 
-    end subroutine s_amr_trim_box
+    end subroutine s_amr_trim_from_sig
 
-    !> Berger-Rigoutsos bisection of one (already tagged-trimmed) candidate box on the global tag field: pick the longest splittable
-    !! axis, prefer a zero-signature hole (widest interior run), else the strongest signature inflection (Laplacian sign change).
-    !! ok=.false. if no axis admits a split leaving both children >= 2 cells. Integer-only => identical on all ranks.
-    impure subroutine s_amr_find_split(tags, ts, te, blo, bhi, sax, spos, ok)
+    !> Berger-Rigoutsos bisection of one (already tagged-trimmed) candidate box, read off the signature of [blo0:bhi0]: pick the
+    !! longest splittable axis, prefer a zero-signature hole (widest interior run), else the strongest signature inflection
+    !! (Laplacian sign change). ok=.false. if no axis admits a split leaving both children >= 2 cells. Slicing the signature to the
+    !! TRIMMED range is exact: trim shrinks only to the tags' own bbox, so no tag leaves the box. Integer-only => identical on all
+    !! ranks.
+    pure subroutine s_amr_find_split_sig(sig, off, blo0, blo, bhi, sax, spos, ok)
 
-        integer, intent(in)  :: tags(:,:), ts, te
+        integer, intent(in)  :: sig(:), off(3), blo0(3)
         integer, intent(in)  :: blo(3), bhi(3)
         integer, intent(out) :: sax, spos
         logical, intent(out) :: ok
         integer, parameter   :: min_child = 2
-        integer              :: axord(3), ext(3), d, ax, t, i, j, k, s
+        integer              :: axord(3), ext(3), d, ax, t, s, b
         integer              :: run, run_start, best_run, best_start, lap, prevlap, bestmag, bestpos
-        integer, allocatable :: sig(:)
 
         ok = .false.; sax = 0; spos = 0
         ext = bhi - blo + 1
@@ -202,30 +239,15 @@ contains
                 end if
             end do
         end do
-        allocate (sig(0:maxval(bhi)))
         do d = 1, 3
             ax = axord(d)
             if (ax > num_dims) cycle
             if (ext(ax) < 2*min_child) cycle
-            ! 1D signature sig(t) = count of in-box tagged cells at axis-position t (sum over the two transverse dims)
-            do t = blo(ax), bhi(ax)
-                sig(t) = 0
-            end do
-            do t = ts, te
-                i = tags(1, t); j = tags(2, t); k = tags(3, t)
-                if (i < blo(1) .or. i > bhi(1)) cycle
-                if (j < blo(2) .or. j > bhi(2)) cycle
-                if (k < blo(3) .or. k > bhi(3)) cycle
-                select case (ax)
-                case (1); sig(i) = sig(i) + 1
-                case (2); sig(j) = sig(j) + 1
-                case (3); sig(k) = sig(k) + 1
-                end select
-            end do
+            b = off(ax) - blo0(ax)  ! signature of position t on this axis is sig(b + t)
             ! (1) widest interior zero run (box is trimmed => sig(blo)>0 and sig(bhi)>0, so any run is interior)
             best_run = 0; best_start = -1; run = 0; run_start = -1
             do t = blo(ax), bhi(ax)
-                if (sig(t) == 0) then
+                if (sig(b + t) == 0) then
                     if (run == 0) run_start = t
                     run = run + 1
                 else
@@ -236,13 +258,13 @@ contains
             if (best_start > blo(ax)) then
                 spos = best_start
                 if (spos - blo(ax) >= min_child .and. bhi(ax) - spos + 1 >= min_child) then
-                    sax = ax; ok = .true.; deallocate (sig); return
+                    sax = ax; ok = .true.; return
                 end if
             end if
             ! (2) strongest inflection: Laplacian sign change with the largest jump
             bestmag = -1; bestpos = -1; prevlap = 0
             do t = blo(ax) + 1, bhi(ax) - 1
-                lap = sig(t - 1) - 2*sig(t) + sig(t + 1)
+                lap = sig(b + t - 1) - 2*sig(b + t) + sig(b + t + 1)
                 if (t > blo(ax) + 1) then
                     if (((lap < 0) .neqv. (prevlap < 0)) .and. abs(lap - prevlap) > bestmag .and. t - blo(ax) >= min_child &
                         & .and. bhi(ax) - t + 1 >= min_child) then
@@ -252,12 +274,11 @@ contains
                 prevlap = lap
             end do
             if (bestpos > 0) then
-                sax = ax; spos = bestpos; ok = .true.; deallocate (sig); return
+                sax = ax; spos = bestpos; ok = .true.; return
             end if
         end do
-        deallocate (sig)
 
-    end subroutine s_amr_find_split
+    end subroutine s_amr_find_split_sig
 
     !> True iff global level-0 cell (gi, gj, gk) lies inside any acoustic source support bbox.
     pure logical function f_in_acoustic_support(gi, gj, gk) result(insup)
@@ -406,55 +427,18 @@ contains
 
     end subroutine s_amr_check_active_box_containment
 
-    !> Rank-invariant SPARSE tag list for level clustering (SP7a): all-gathers each rank's tagged-cell global linear indices, then
-    !! decodes them into a coordinate list tags(1:3, 1:ntag). Replaces the O(global-grid) dense tag field, so per-rank memory scales
-    !! with tagged-cell count. At np=1 built directly from tag_grid (no allgather). Deterministic: every rank decodes the same
-    !! gathered index set into the same list, so the bisection is rank-invariant.
-    impure subroutine s_amr_union_gtag(tags, ntag, tag_grid, mg, ng, pg, sidx)
+    !> This rank's OWN tagged cells as GLOBAL level-0 coordinates. Each rank scans only its interior (0:m, 0:n, 0:p), which the
+    !! level-0 decomposition makes disjoint, so no global cell is emitted twice and a SUM reduction over these lists counts every
+    !! tagged cell exactly once. This replaces the ALLGATHERV of the global tag list (W4): per-rank memory and wire volume now scale
+    !! with the rank's OWN tag count instead of the global one.
+    impure subroutine s_amr_local_tags(tag_grid, sidx, tags, ntag)
 
+        logical, intent(in)               :: tag_grid(0:,0:,0:)
+        integer, intent(in)               :: sidx(3)
         integer, allocatable, intent(out) :: tags(:,:)
         integer, intent(out)              :: ntag
-        logical, intent(in)               :: tag_grid(0:,0:,0:)
-        integer, intent(in)               :: mg, ng, pg, sidx(3)
-        integer                           :: ci, cj, ck, gi, gj, gk
+        integer                           :: ci, cj, ck
 
-#ifdef MFC_MPI
-        integer                 :: i, nloc, ierr
-        integer(8)              :: jrem  !< decode remainder spans an xy plane, which can exceed 2**31 cells
-        integer, allocatable    :: rcnt(:), rdsp(:)
-        integer(8), allocatable :: locidx(:), allidx(:)
-
-        if (num_procs > 1) then
-            allocate (locidx((m + 1)*(n + 1)*(p + 1)), rcnt(num_procs), rdsp(num_procs))
-            nloc = 0
-            do ck = 0, p; do cj = 0, n; do ci = 0, m
-                if (tag_grid(ci, cj, ck)) then
-                    gi = ci + sidx(1); gj = 0; gk = 0
-                    if (n_glb > 0) gj = cj + sidx(2)
-                    if (p_glb > 0) gk = ck + sidx(3)
-                    nloc = nloc + 1
-                    locidx(nloc) = int(gi, 8) + int(mg + 1, 8)*(int(gj, 8) + int(ng + 1, 8)*int(gk, 8))
-                end if
-            end do; end do; end do
-            call MPI_ALLGATHER(nloc, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-            rdsp(1) = 0
-            do i = 2, num_procs; rdsp(i) = rdsp(i - 1) + rcnt(i - 1); end do
-            ntag = rdsp(num_procs) + rcnt(num_procs)
-            amr_gb_tag = amr_gb_tag + int(ntag, 8)*(8_8 + 3_8*4_8)  ! allidx int8 + tags 3x int4
-            allocate (allidx(max(ntag, 1)), tags(3, max(ntag, 1)))
-            call MPI_ALLGATHERV(locidx, nloc, MPI_INTEGER8, allidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
-            do i = 1, ntag
-                gk = int(allidx(i)/(int(mg + 1, 8)*int(ng + 1, 8)))
-                jrem = allidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8)
-                gj = int(jrem/int(mg + 1, 8))
-                gi = int(jrem - int(gj, 8)*int(mg + 1, 8))
-                tags(1, i) = gi; tags(2, i) = gj; tags(3, i) = gk
-            end do
-            deallocate (locidx, rcnt, rdsp, allidx)
-            return
-        end if
-#endif
-        ! np=1: the whole global tag field is local; decode tag_grid directly into the list
         ntag = 0
         do ck = 0, p; do cj = 0, n; do ci = 0, m
             if (tag_grid(ci, cj, ck)) ntag = ntag + 1
@@ -463,15 +447,16 @@ contains
         ntag = 0
         do ck = 0, p; do cj = 0, n; do ci = 0, m
             if (tag_grid(ci, cj, ck)) then
-                gi = ci + sidx(1); gj = 0; gk = 0
-                if (n_glb > 0) gj = cj + sidx(2)
-                if (p_glb > 0) gk = ck + sidx(3)
                 ntag = ntag + 1
-                tags(1, ntag) = gi; tags(2, ntag) = gj; tags(3, ntag) = gk
+                tags(1, ntag) = ci + sidx(1)
+                tags(2, ntag) = 0
+                tags(3, ntag) = 0
+                if (n_glb > 0) tags(2, ntag) = cj + sidx(2)
+                if (p_glb > 0) tags(3, ntag) = ck + sidx(3)
             end if
         end do; end do; end do
 
-    end subroutine s_amr_union_gtag
+    end subroutine s_amr_local_tags
 
     !> Grow the per-level pack buffers sidx(:) (int8 linear index) / skb(:) (parent box id) geometrically so at least nloc+extra
     !! slots fit; preserves the first nloc entries. Amortized O(1) append for s_amr_pack_gwin_pairs.
@@ -526,31 +511,42 @@ contains
 
     end subroutine s_amr_pack_gwin_pairs
 
-    !> Cluster a rank-invariant SPARSE tag list (global level-0 cell coords, tags(1:3, 1:ntag_in)) into a LIST of separated block
-    !! boxes, identically on every rank. Caller builds the list (s_amr_union_gtag / s_amr_pack_gwin_pairs); per-rank memory is
-    !! O(#tagged), not O(global grid). Berger-Rigoutsos recursive bisection until each box's tag efficiency reaches amr_cluster_eff
-    !! (or it is atomic / the amr_max_blocks cap is hit), then merges any two boxes whose amr_buf-padded extents come within
-    !! buff_size (so no fine-fine adjacency: separated boxes stay >= buff_size apart, nearby ones collapse to one box == the legacy
-    !! bounding box). Boxes are raw tagged extents; the caller pads, clamps, size-caps each.
-    impure subroutine s_amr_cluster(tags, ntag_in, boxes, nboxes)
+    !> Cluster a SPARSE tag list (level-0 cell coords, tags(1:3, 1:ntag_in)) into a LIST of separated block boxes, identically on
+    !! every rank. Caller builds the list (s_amr_local_tags / s_amr_pack_gwin_pairs); per-rank memory is O(#tagged), not O(global
+    !! grid). Berger-Rigoutsos recursive bisection until each box's tag efficiency reaches amr_cluster_eff (or it is atomic / the
+    !! amr_max_blocks cap is hit), then merges any two boxes whose amr_buf-padded extents come within buff_size (so no fine-fine
+    !! adjacency: separated boxes stay >= buff_size apart, nearby ones collapse to one box == the legacy bounding box). Boxes are
+    !! raw tagged extents; the caller pads, clamps, size-caps each.
+    impure subroutine s_amr_cluster(tags, ntag_in, boxes, nboxes, reduce)
 
-        integer, intent(in)                   :: tags(:,:), ntag_in
+        integer, intent(in) :: tags(:,:), ntag_in
+        !> .true.: `tags` is this rank's LOCAL list and each node's signature is ALLREDUCEd, so the tree is driven by global counts
+        !! without any rank holding the global tag list. .false.: `tags` is already replicated on every rank.
+        logical, intent(in)                   :: reduce
         type(t_box), allocatable, intent(out) :: boxes(:)
         integer, intent(out)                  :: nboxes
         integer, allocatable                  :: slo(:,:), shi(:,:), alo(:,:), ahi(:,:)
         integer, allocatable                  :: sts(:), ste(:), wt(:,:)
         integer, allocatable                  :: sdep(:)  !< S3.0a: recursion depth carried with each stack entry
-        integer                               :: dep, mxdep, nred
-        integer(8)                            :: nnode
-        integer                               :: mg, ng, pg, t
-        integer                               :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag
-        integer(8)                            :: vol      !< box volume; a global-bbox first pass can exceed 2**31 cells
-        integer                               :: blo(3), bhi(3), ts, te, lo, hi, tmp(3)
-        logical                               :: ok, force, capped, changed, tooclose
-        real(wp)                              :: eff
+        integer                               :: dep, mxdep
+        integer, allocatable                  :: sig(:)   !< concatenated per-axis tag signature of the node's box
+        integer                               :: blo0(3), bhi0(3), off(3), nsig
+
+#ifdef MFC_MPI
+        integer :: ierr
+#endif
+        integer(8) :: nnode
+        integer    :: mg, ng, pg, t
+        integer    :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag
+        integer(8) :: vol  !< box volume; a global-bbox first pass can exceed 2**31 cells
+        integer    :: blo(3), bhi(3), ts, te, lo, hi, tmp(3)
+        logical    :: ok, force, capped, changed, tooclose
+        real(wp)   :: eff
 
         nboxes = 0
-        if (ntag_in == 0) return
+        ! In reduce mode a rank with no local tags must still walk the tree and enter every ALLREDUCE, contributing zeros;
+        ! returning early here would deadlock the ranks that do have tags. An all-empty list ends the loop via the trim.
+        if (.not. reduce .and. ntag_in == 0) return
         mg = m_glb; ng = 0; pg = 0
         if (n_glb > 0) ng = n_glb
         if (p_glb > 0) pg = p_glb
@@ -558,6 +554,7 @@ contains
         cap = amr_max_fine
         allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
         allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in), sdep(4*cap + 8))
+        allocate (sig(mg + ng + pg + 3))  ! bound: the three full domain extents; reused by every node
         ! working copy of the tag list, partitioned in place as the tree descends so each node scans only its tags
         do t = 1, ntag_in
             wt(:,t) = tags(:,t)
@@ -568,22 +565,26 @@ contains
         nacc = 0; capped = .false.
         do while (nwork > 0)
             blo = slo(:,nwork); bhi = shi(:,nwork); ts = sts(nwork); te = ste(nwork); dep = sdep(nwork); nwork = nwork - 1
-            ! S3.0a/b: one node = one fused ALLREDUCE in the distributed form. Price it here, before the trim, because the
-            ! reduced signature IS what the trim would be derived from. Axes below 2*min_child are skipped by s_amr_find_split.
             nnode = nnode + 1_8; mxdep = max(mxdep, dep)
-            nred = 0
-            do d = 1, num_dims
-                if (bhi(d) - blo(d) + 1 >= 4) nred = nred + (bhi(d) - blo(d) + 1)
-            end do
-            amr_cl_rb = amr_cl_rb + int(nred + 7, 8)*4_8  ! signatures + bbox(6) + count(1), int4
-            call s_amr_trim_box(wt, ts, te, blo, bhi, ok)
+            ! ONE pass over this node's tags yields the signature; trim, count and split all read it (no rescans).
+            blo0 = blo; bhi0 = bhi
+            call s_amr_box_sig(wt, ts, te, blo0, bhi0, sig, off, nsig)
+#ifdef MFC_MPI
+            ! integer SUM is exact and order-independent => every rank obtains a bit-identical signature and therefore makes
+            ! bit-identical trim/accept/split decisions. One fused reduction per node covers trim, count AND split.
+            if (reduce .and. num_procs > 1) then
+                call MPI_ALLREDUCE(MPI_IN_PLACE, sig, nsig, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+            end if
+#endif
+            ! S3.0b: one node = one fused ALLREDUCE of exactly this buffer in the distributed form. nsig is the true length, so
+            ! the count is exact rather than the earlier splittable-axes-only lower bound.
+            amr_cl_rb = amr_cl_rb + int(nsig, 8)*4_8
+            call s_amr_trim_from_sig(sig, off, blo0, bhi0, blo, bhi, ok, ntag)
             if (.not. ok) cycle
-            ! invariant: [ts:te] holds exactly the tags in this box, and trim only shrinks to their bbox => count is the range size
-            ntag = te - ts + 1
             vol = 1_8
             do d = 1, num_dims; vol = vol*int(bhi(d) - blo(d) + 1, 8); end do
             eff = real(ntag, wp)/real(max(vol, 1_8), wp)
-            call s_amr_find_split(wt, ts, te, blo, bhi, sax, spos, ok)
+            call s_amr_find_split_sig(sig, off, blo0, blo, bhi, sax, spos, ok)
             force = (nacc + nwork + 1 >= cap)  ! splitting now could overflow the amr_max_blocks cap
             if (eff >= amr_cluster_eff .or. .not. ok .or. force) then
                 if (nacc < cap) then; nacc = nacc + 1; alo(:,nacc) = blo; ahi(:,nacc) = bhi; end if
@@ -645,7 +646,7 @@ contains
         do i = 1, nboxes
             boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
         end do
-        deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep)
+        deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep, sig)
 
     end subroutine s_amr_cluster
 
@@ -817,7 +818,7 @@ contains
 
     end subroutine s_amr_cad_count
 
-    !> Regrid phase 2: union the per-rank tag fields into the rank-invariant sparse global tag list, then cluster it into a list of
+    !> Regrid phase 2: build this rank's OWN sparse tag list, then cluster it with per-node signature reductions into a list of
     !! separated candidate boxes (nboxes = 0 if nothing is tagged on any rank).
     impure subroutine s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes)
 
@@ -826,16 +827,13 @@ contains
         type(t_box), allocatable, intent(out) :: boxes(:)
         integer, intent(out)                  :: nboxes
         integer, allocatable                  :: tags(:,:)
-        integer                               :: mg0, ng0, pg0, ntag
+        integer                               :: ntag
 
-        ! 2) build the rank-invariant sparse global tag list, then cluster into a list of separated boxes
+        ! 2) build this rank's LOCAL tag list, then cluster it; the tree is driven by reduced signatures, so it stays rank-invariant
 
-        mg0 = m_glb; ng0 = 0; pg0 = 0
-        if (n_glb > 0) ng0 = n_glb
-        if (p_glb > 0) pg0 = p_glb
-        call s_amr_union_gtag(tags, ntag, tag_grid, mg0, ng0, pg0, sidx)
+        call s_amr_local_tags(tag_grid, sidx, tags, ntag)
         deallocate (tag_grid)
-        call s_amr_cluster(tags, ntag, boxes, nboxes)
+        call s_amr_cluster(tags, ntag, boxes, nboxes, .true.)
         deallocate (tags)
 
     end subroutine s_amr_regrid_cluster_tags
@@ -1187,7 +1185,7 @@ contains
 
                         if (covered(kb)) then
                             ! cluster the fine-tagged L0 cells into child boxes, pad by amr_buf, clamp into the nesting window
-                            call s_amr_cluster(ctags, nct, cboxes, ncb)
+                            call s_amr_cluster(ctags, nct, cboxes, ncb, .false.)  ! ctags is already replicated on every rank
                             deallocate (ctags)
                             do kc = 1, ncb
                                 if (nboxes + 1 > amr_max_fine) exit

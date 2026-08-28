@@ -115,9 +115,10 @@ module m_amr
     !! instead of one per slot alloc (~224/regrid/rank would both flood stderr and perturb the run).
     integer :: amr_st_hw = 0
     !> TRACK S instrumentation: bytes each rank ALLOCATES for, and RECEIVES from, global collectives during one regrid. These are
-    !! the quantities that must stay O(1) in problem size; wall time at a single problem size cannot see them (rg:clus is 2.2%% of
-    !! wall), so they are counted explicitly. amr_gb_tag = the union_gtag ALLGATHERV, amr_gb_win = the gwin-pair ALLGATHERVs,
-    !! amr_gb_cost = the per-box cost ALLREDUCE.
+    !! the quantities that must stay O(1) in problem size; wall time at a single problem size cannot see them (rg:clus measured
+    !! 0.6%% of wall), so they are counted explicitly. amr_gb_tag counted the level-1 tag ALLGATHERV and is now permanently 0: S3.1
+    !! deleted that collective, so a nonzero value means the gather came back. amr_gb_win = the gwin-pair ALLGATHERVs (levels >= 2,
+    !! still live -- S3.3), amr_gb_cost = the per-box cost ALLREDUCE.
     integer(8) :: amr_gb_tag = 0, amr_gb_win = 0, amr_gb_cost = 0
     !> S3.0a/S3.0b instrumentation: shape and reduction cost of the Berger-Rigoutsos clustering tree (`s_amr_cluster`). Named
     !! amr_cl_ (clustering), NOT amr_br_ -- that prefix already means the batched BRIDGE in this module. Tree DEPTH decides whether
@@ -211,8 +212,11 @@ module m_amr
     !! cannot use m_amr); it is use-associated here and re-exported, so importers of m_amr are unchanged.
     !! per-family plan message tag bases (families F1..F7, amr_plan_based_exchange.md): amr_max_blocks + 100*f keeps
     !! the plan tag space disjoint from the legacy per-box space (tags in [1..amr_max_blocks]) while families convert;
-    !! the epoch is folded in as base + mod(amr_mesh_epoch, 100). The init MPI_TAG_UB assert is the scale tripwire;
-    !! the amr_max_blocks term disappears with the last per-box family (increment I7).
+    !! the epoch is folded in as base + mod(amr_mesh_epoch, 100). The init MPI_TAG_UB assert is the scale tripwire: it caps
+    !! GLOBAL blocks near 2**21/1 ~ 2.1e6, i.e. about 28k ranks at ~75 boxes/rank, which is the SECOND scaling wall after W4.
+    !! The amr_max_blocks term can only go once NO family uses per-box tags. Verified 2026-08-27: 19 of 41 AMR p2p call sites
+    !! still tag per box (F1's unconverted path uses amr_cur, migration uses the column index), and the subcycle sites are an
+    !! EXPLICIT deferral to increment I8, not I7 -- I7's own boundary is that any family left per-box keeps its tables.
     integer :: amr_tag_base(7) = 0
     !! cached per-block P2P overlap-rank lists (rebuilt with the seam list - same dirty flag): amr_ovl_gather(:,k) = ranks whose
     !! owned coarse range (s_amr_rank_coarse_range) intersects block k's amr_cpat_mar-padded patch box (gather contributors);
