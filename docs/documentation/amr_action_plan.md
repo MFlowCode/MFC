@@ -488,6 +488,41 @@ measured ~75 boxes/rank**, which is exactly the wall the module comment records.
 Step 2 is one line and is the whole point; step 1 is the work that unblocks it.
 
 
+
+### DE-RISK ANSWERS 2026-08-28 (user-confirmed) — one wall may not exist, one new item, one constraint
+
+**1. `MPI_TAG_UB` is NOT 2**21 on the MPI we have.** Measured on hpcfund Open MPI 4.1.8:
+**`MPI_TAG_UB = 2147483647` (2**31 - 1)**, so the assert
+`amr_tag_base(7) + 100 <= tag_ub` admits `amr_max_blocks` up to ~2.1e9 -- about **28 MILLION ranks** at
+75 blocks/rank, not the 28 thousand the module comment states. **That comment's "2**21 ~ 2.1e6, about 28k
+ranks" is an ASSUMED tag ceiling, not a measured one**, and the code has carried it as fact.
+
+Probe (verified locally, `cc` + `srun -n1`):
+
+```c
+#include <mpi.h>
+#include <stdio.h>
+int main(int c,char**v){int f;void*p;MPI_Init(&c,&v);MPI_Comm_get_attr(MPI_COMM_WORLD,MPI_TAG_UB,&p,&f);
+printf("MPI_TAG_UB = %d (flag=%d)\n",*(int*)p,f);MPI_Finalize();return 0;}
+```
+
+**Pending the same probe on Frontier's Cray MPICH.** If it also reports >= ~2**25, **W5 leaves the critical
+path**: the per-box tags and the `amr_max_blocks` base term remain worth cleaning up for the end state,
+but they stop being a hard abort and the demonstration does not wait on them. If Cray MPICH really is
+2**21, W5 returns to its previous position. **Do not re-plan around 28k ranks until that number is in.**
+
+**2. Subcycling IS required for the demonstration (user, 2026-08-28).** That adds an item the ladder had
+deferred: subcycle + dynamic regrid at np>1 is CHECKER-GATED today, and the subcycle p2p sites are an
+explicit deferral to increment I8. So the demo needs the gate lifted and those sites converted -- and the
+I8 sites are per-box tagged, which couples this to W5 whichever way the tag probe lands. Treat as a
+sixth item, sized after the tag answer.
+
+**3. Old checkpoints MUST stay readable (user, 2026-08-28).** So the restart format fix (item 1) keeps a
+LEGACY READER PATH: version-stamp the new layout, read both, write only the new one. That raises its cost
+from "change the format" to "change the format and keep the old reader alive", but it is still bounded and
+it stays first -- it is the only item on the list whose failure mode is SILENT CORRUPTION of saved state
+rather than a crash.
+
 ### DE-RISK 2026-08-28: a FOURTH wall, in the RESTART writer, and it is the worst one found so far
 
 Asked to de-risk the true challenges rather than keep incrementing, I audited the paths a real run needs
