@@ -14,6 +14,7 @@ module m_amr_regrid
 #endif
 
     use m_derived_types  ! scalar_field, t_box
+    use m_box, only: f_morton  ! B1: canonical merge order (shared 3D Morton key)
     use m_global_parameters
     use m_constants, only: mapCells
     use m_mpi_proxy, only: s_mpi_abort
@@ -31,7 +32,8 @@ module m_amr_regrid
         & amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed, &
         & amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, &
         & amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, &
-        & amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r
+        & amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, &
+        & amr_cl_me_rb_r
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -548,13 +550,15 @@ contains
 #ifdef MFC_MPI
         integer :: ierr
 #endif
-        integer(8) :: nnode
-        integer    :: mg, ng, pg, t
-        integer    :: cap, nwork, nacc, i, j, d, sax, spos, thr, ntag
-        integer(8) :: vol  !< box volume; a global-bbox first pass can exceed 2**31 cells
-        integer    :: blo(3), bhi(3), ts, te, lo, hi, tmp(3)
-        logical    :: ok, force, capped, changed, tooclose
-        real(wp)   :: eff
+        integer(8)              :: nnode
+        integer                 :: mg, ng, pg, t
+        integer                 :: cap, nwork, nacc, i, j, k, d, sax, spos, thr, ntag
+        integer(8), allocatable :: akey(:)  !< B1: Morton key of each accepted box's lo, the canonical merge order
+        integer(8)              :: bkey
+        integer(8)              :: vol      !< box volume; a global-bbox first pass can exceed 2**31 cells
+        integer                 :: blo(3), bhi(3), ts, te, lo, hi, tmp(3), tmp2(3)
+        logical                 :: ok, force, capped, changed, tooclose
+        real(wp)                :: eff
 
         nboxes = 0
         ! In reduce mode a rank with no local tags must still walk the tree and enter every ALLREDUCE, contributing zeros;
@@ -569,6 +573,7 @@ contains
         allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in), sdep(4*cap + 8))
         allocate (sig(mg + ng + pg + 3))  ! bound: the three full domain extents; reused by every node
         allocate (ovr(max(num_procs, 1)))  ! S3.2a scratch
+        allocate (akey(cap))  ! B1 scratch
         ! working copy of the tag list, partitioned in place as the tree descends so each node scans only its tags
         do t = 1, ntag_in
             wt(:,t) = tags(:,t)
@@ -602,6 +607,11 @@ contains
                 if (reduce) then
                     amr_cl_shr_nodes_r = amr_cl_shr_nodes_r + 1_8; amr_cl_shr_rb_r = amr_cl_shr_rb_r + int(nsig, 8)*4_8
                     amr_cl_shr_maxdep_r = max(amr_cl_shr_maxdep_r, dep)
+                    ! S3.2a-2: under the sparse per-depth exchange this rank pays for a shared node only if the node's box
+                    ! reaches into its subdomain. Everything else is somebody else's message.
+                    if (any(ovr(1:novr) == proc_rank)) then
+                        amr_cl_me_nodes_r = amr_cl_me_nodes_r + 1_8; amr_cl_me_rb_r = amr_cl_me_rb_r + int(nsig, 8)*4_8
+                    end if
                 end if
             else
                 amr_cl_loc_nodes = amr_cl_loc_nodes + 1_8; amr_cl_loc_rb = amr_cl_loc_rb + int(nsig, 8)*4_8
@@ -649,6 +659,28 @@ contains
             amr_cl_lmax = nacc; amr_cl_ldepth = mxdep
         end if
 
+        ! B1: canonicalise the merge input. The merge below scans in list order and fuses the FIRST too-close pair, so its
+        ! output is a function of the order boxes were ACCEPTED -- i.e. of the traversal. Sorting by Morton of lo makes it a
+        ! function of the box SET alone, which is what lets a scoped clusterer (S3.2) complete local subtrees in parallel, in
+        ! a different acceptance order, and still agree across ranks. Accepted boxes are disjoint, so their lo corners are
+        ! distinct and the key is a total order under f_morton's 21 bits/dim -- the same bound the block partition assumes.
+        ! The sort is stable, so even a key collision above that bound would only fall back to acceptance order, never split
+        ! the ranks. Morton rather than lexicographic because it keeps spatial neighbours adjacent, so the merge fuses near
+        ! pairs first and the fused bounding boxes stay compact.
+        do i = 1, nacc
+            akey(i) = f_morton(alo(1, i), alo(2, i), alo(3, i))
+        end do
+        do i = 2, nacc
+            bkey = akey(i); tmp = alo(:,i); tmp2 = ahi(:,i)
+            j = i - 1
+            do while (j >= 1)
+                if (akey(j) <= bkey) exit
+                akey(j + 1) = akey(j); alo(:,j + 1) = alo(:,j); ahi(:,j + 1) = ahi(:,j)
+                j = j - 1
+            end do
+            akey(j + 1) = bkey; alo(:,j + 1) = tmp; ahi(:,j + 1) = tmp2
+        end do
+
         ! min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their bounding box
         thr = buff_size + 2*amr_buf
         changed = .true.
@@ -662,7 +694,11 @@ contains
                     end do
                     if (tooclose) then
                         alo(:,i) = min(alo(:,i), alo(:,j)); ahi(:,i) = max(ahi(:,i), ahi(:,j))
-                        alo(:,j) = alo(:,nacc); ahi(:,j) = ahi(:,nacc)
+                        ! B1: remove by shifting down, not by swapping with the last entry, so the list stays in the
+                        ! canonical order the sort established and later fusions keep preferring spatial neighbours.
+                        do k = j, nacc - 1
+                            alo(:,k) = alo(:,k + 1); ahi(:,k) = ahi(:,k + 1)
+                        end do
                         nacc = nacc - 1; changed = .true.
                         exit outer
                     end if
@@ -676,7 +712,7 @@ contains
         do i = 1, nboxes
             boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
         end do
-        deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep, sig, ovr)
+        deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep, sig, ovr, akey)
 
     end subroutine s_amr_cluster
 
@@ -699,6 +735,11 @@ contains
         logical, allocatable :: old_owns(:)
         logical              :: same
         integer              :: i
+        integer(8)           :: me_l(2), me_g(2)  !< S3.2a-2: this rank's shallow-phase participation, and its max over ranks
+
+#ifdef MFC_MPI
+        integer :: mierr
+#endif
 
         allocate (box_level(amr_max_fine), old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks), old_level(amr_max_blocks), &
                   & old_owns(amr_max_blocks))
@@ -733,7 +774,18 @@ contains
 
         ! TRACK S: the quantities that must stay O(1) in problem size. Reported per regrid on rank 0
         ! because wall time at one problem size cannot see them.
+        ! S3.2a-2: rank_time_wrt is a namelist flag, so this branch is entered by every rank and the reduction is safe here.
+        ! MAX rather than rank 0's own value: rank 0 owns a domain CORNER and overlaps the fewest shared boxes of anyone.
+        if (rank_time_wrt) then
+            me_l = [amr_cl_me_nodes_r, amr_cl_me_rb_r]
+            me_g = me_l
+#ifdef MFC_MPI
+            call MPI_ALLREDUCE(me_l, me_g, 2, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mierr)
+#endif
+        end if
         if (rank_time_wrt .and. proc_rank == 0) then
+            print '(A,I0,A,I0,A,I0,A,I0)', '[amr-scope-me] me_nodes_max ', me_g(1), ' me_rb_max ', me_g(2), ' shr_nodes_all ', &
+                & amr_cl_shr_nodes_r, ' shr_rb_all ', amr_cl_shr_rb_r
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
                 & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
             print '(A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', amr_mig_blk, ' sends ', amr_mig_snd, ' bytes ', amr_gb_mig
