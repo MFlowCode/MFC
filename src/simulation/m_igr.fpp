@@ -2588,30 +2588,32 @@ contains
         real(wp)                                  :: a_L, a_R
 
         if (num_dims == 2) then
-            pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp))/gamma_L
-            pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp))/gamma_R
+            pres_L = f_pressure(E_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp), gamma_L, pi_inf_L, 0._wp)
+            pres_R = f_pressure(E_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp), gamma_R, pi_inf_R, 0._wp)
 
             if (igr_pres_lim) then
                 pres_L = max(pres_L, 0._wp)
                 pres_R = max(pres_R, 0._wp)
             end if
 
-            a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L/gamma_L)/rho_L)
-            a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R/gamma_R)/rho_R)
+            a_L = sqrt(f_bulk_modulus(pres_L, gamma_L, pi_inf_L)/rho_L)
+            a_R = sqrt(f_bulk_modulus(pres_R, gamma_R, pi_inf_R)/rho_R)
 
             cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp), sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp)) + max(a_L, a_R)
         else if (num_dims == 3) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                pres_L = (E_L - pi_inf_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp))/gamma_L
-                pres_R = (E_R - pi_inf_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp))/gamma_R
+                pres_L = f_pressure(E_L - 0.5_wp*rho_L*(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp), gamma_L, pi_inf_L, &
+                                    & 0._wp)
+                pres_R = f_pressure(E_R - 0.5_wp*rho_R*(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp), gamma_R, pi_inf_R, &
+                                    & 0._wp)
 
                 if (igr_pres_lim) then
                     pres_L = max(pres_L, 0._wp)
                     pres_R = max(pres_R, 0._wp)
                 end if
 
-                a_L = sqrt((pres_L*(1._wp/gamma_L + 1._wp) + pi_inf_L/gamma_L)/rho_L)
-                a_R = sqrt((pres_R*(1._wp/gamma_R + 1._wp) + pi_inf_R/gamma_R)/rho_R)
+                a_L = sqrt(f_bulk_modulus(pres_L, gamma_L, pi_inf_L)/rho_L)
+                a_R = sqrt(f_bulk_modulus(pres_R, gamma_R, pi_inf_R)/rho_R)
 
                 cfl = max(sqrt(vel_L(1)**2._wp + vel_L(2)**2._wp + vel_L(3)**2._wp), &
                           & sqrt(vel_R(1)**2._wp + vel_R(2)**2._wp + vel_R(3)**2._wp)) + max(a_L, a_R)
