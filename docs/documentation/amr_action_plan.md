@@ -1,11 +1,92 @@
 # AMR performance plan (2026-08-19 — post-diagnosis execution plan)
 
-> **2026-08-20 RE-FOUNDING: read `amr_endstate.md` first.** The program is now derived from the
-> end-state architecture (four pillars, weak-scaling invariants W1-W7), not from phase shares at
-> the matched point. This document remains the evidence ledger and detailed work list; where its
+> **2026-08-20 RE-FOUNDING: read `amr_endstate.md` first.** The program is derived from the
+> end-state architecture (four pillars, weak-scaling invariants W1-W8), not from phase shares at
+> the matched point. This document is the evidence ledger and detailed work list; where its
 > sequencing conflicts with the endstate ladder (notably: the batched advance is REINSTATED as
 > Phase 2, the "kills batching-the-advance" reading was an operating-point artifact), the endstate
 > document wins.
+>
+> ## CURRENT STATE (2026-08-27) — read this before picking work
+>
+> **The live increment plan is `amr_plan_based_exchange.md`** (~3100 LOC over I0-I8, priced, with
+> per-increment gates). Work FROM it; do not re-derive scope. Landed: I0, I1a, I1b, I2a, I3, I4a,
+> I4b, I5. **Outstanding: I2b, I5b (~250), I6 (~200), I7 (~600), I8 (unpriced).**
+>
+> **W4 (per-cell global collectives) — half done.** S3.1 deleted the level-1 tag ALLGATHERV
+> (`ntag_bytes` 185 MB -> 0 per rank per regrid, box set bit-identical). Measured after it:
+> `rbytes` grows **1.66x per np-doubling (P^0.73)** against the gather's 2.00x, i.e. S3 improves the
+> exponent as well as the coefficient, but is **NOT flat and does not satisfy W4**. Remaining:
+> **S3.2 must be a SPLIT-COMMUNICATOR recursion, not depth fusion alone**, and its target is the
+> **level-2 FOREST (~85%% of tree nodes), not the level-1 tree** (measured: an 8x block cap changes
+> node count 1.6x and the box set by 0.7%%). Then S3.3 (path 2 + the IB ownership gate).
+>
+> **W5 is the second wall, at ~28k ranks**, and it is BIGGER than one increment: 19 of 41 AMR p2p
+> call sites still tag per box, F1 is only partially converted (I2b unlanded), and the subcycle
+> sites are an explicit deferral to I8. See `amr_plan_based_exchange.md`.
+>
+> **Adopted ordering:** B0 (blocking factor) -> S3.2 (redesigned) -> S3.3 -> W5 (I2b/I7/I8) ->
+> W3 (F5 aggregation, measured live at **71.7%% of all messages** and the smallest at ~0.8 MB/msg) ->
+> W6 (chunked device-side store growth) -> W7 (needs a cost model chosen first). **W2 (batched
+> advance) is FLAT IN P and is therefore an efficiency/parity item, NOT on the scaling critical
+> path** — a scope decision, since it is also the largest and least-bounded item.
+>
+> **Working practice (measured 2026-08-27):** `amr-bench/fcheck.sh` structurally checks one .fpp in
+> ~4 s versus ~18 min for a GPU build and catches what `ffmt`/`lint_source` pass; a gfortran CPU
+> build in an isolated worktree is ~13 s incremental; build in one worktree and measure in another.
+
+## 2026-08-27 (38) — S3.1 LANDED: THE LEVEL-1 W4 COLLECTIVE IS GONE, AND THE SCALING LAW MEASURED
+
+**S3.1.** `s_amr_union_gtag` and its ALLGATHERV are deleted, replaced by `s_amr_local_tags` (each
+rank scans only its own disjoint interior) plus ONE fused `MPI_ALLREDUCE` per tree node carrying the
+per-axis signatures. Reading all three routines showed one reduction suffices for trim, count AND
+split: `s_amr_trim_box` takes the per-axis MIN/MAX of contained tags, which IS the first/last nonzero
+of the signature, and its ok test IS sum > 0. Gated four ways: restart output byte-identical, tree
+reproduced exactly (`lmax 8192 ldepth 31 nodes 66354` in both arms), **`ntag_bytes` 185,241,240 -> 0**,
+and **69/69 AMR goldens** (which cover the 1D/2D, np=1 and multi-level paths the np8 probe cannot).
+
+**The scaling law (np8 -> np16, matched at 10 regrids).** ntag 92.77 -> 185.53 MB/rank/regrid =
+2.000x per doubling. rbytes 4.53 -> 7.53 MB = **1.660x = P^0.73**. nboxes 594 -> 1206. So S3 improves
+the COEFFICIENT (~20-25x) **and** the EXPONENT — better than the audit feared — but is **not flat, so
+W4 is not satisfied**. At 1e5 ranks: ntag would have been ~1.16 TB/rank/regrid, rbytes ~4.4 GB.
+Mechanism confirmed twice over: `rbytes ~ nboxes^(2/3)` predicts 1.60x against 1.66x measured.
+
+**Three corrections to my own earlier claims, all from measurement:**
+1. **The unfused collective count is 44,691/regrid at np8 and 72,255 at np16** — the design estimate
+   was ~1,200, wrong by 50x. That is what makes S3.2 fusion mandatory rather than an optimisation.
+2. **S3's value is MEMORY, not wall.** `rg:clus` is 0.6 percent of wall; `regrid` is 53.7 percent but
+   `rg:build` is 37.8 percent of it. My guess that cap saturation might explain regrid's share is
+   **WRONG and retracted** — saturation drives node count, and node count lives in rg:clus.
+3. **The block cap is the WRONG KNOB.** Five caps at fixed domain: 16x cap gives 2.10x nodes and
+   2.10x reduction bytes for a **3.7 percent** change in the box set (nboxes 598/598/598/594/576).
+   The cap bounds only the level-1 tree, ~15 percent of nodes; **the level-2 FOREST is ~85 percent**.
+   **So S3.2's split-communicator target is the forest, not the level-1 tree.**
+
+**The clusterer saturates EVERY cap** (warning on every regrid at all five settings): with
+`amr_cluster_eff = 0.9` and no minimum box size the bisection never converges on its own, it splits
+until something stops it and the merge undoes most of it. `rg:clus` grows 13x across the sweep while
+nodes grow 2.1x — superlinear, consistent with the O(n^2) merge running at n = cap. **That is B0's
+case: not wall share, but waste and the lever on nboxes.**
+
+**AMReX does not solve W4 either** (read from source): `TagBoxArray::collate` Gathers every tagged
+cell to the I/O rank, `ClusterList::chop` runs SERIALLY there, and the BoxList is broadcast — with a
+hard `amrex::Abort` above INT_MAX tags, marked `xxxxx todo`, whose suggested mitigation is a larger
+blocking factor (i.e. S1). There is no distributed clustering in the SOTA to copy, and on this axis
+MFC was WORSE: every rank received what only AMReX's root did.
+
+**Deferred deliberately: the IB ownership gate.** It is correct and reduces `amr_gb_win`, but it
+lives behind `amr_max_level >= 2` and every case available runs at level 1, so no test could execute
+it. Shipping it unverified was the wrong trade; it goes with S3.3, which needs it. The new ppn=2
+AMR+IB case (`E4F6CE1E`) landed anyway — it is the only distributed AMR+IB coverage in the suite.
+
+**Process failures and the guards they bought.** (a) Two builds ran concurrently in one tree; the
+survivor was probably correct but not provably so. (b) A revert left unbalanced `end do`/`end block`
+that `ffmt` and `lint_source` BOTH passed — neither parses Fortran — so the compiler was the first
+thing that could say no, and the failing build still reported success to a wrapper. (c) My own
+binary-provenance guard passed a STALE artifact, because symbol presence is necessary and not
+sufficient; the discriminating question is "is this a different artifact than the last pin". Guards
+added: RUNBOOK 3b/3c, `format.sh` now surfaces ffmt stderr and fails on unmatched structure, and
+`amr-bench/fcheck.sh` structurally checks one .fpp in ~4 s versus ~18 min.
 
 ## 2026-08-27 (37) — AUDIT OF THE S3 PLAN: A GATE THAT ONLY TESTED ONE DIRECTION, AND AN UNVERIFIED DEPTH ASSUMPTION
 

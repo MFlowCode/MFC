@@ -231,6 +231,26 @@ Verified property worth one assert: old blocks ARE pairwise disjoint (cluster pa
 threshold + IB overlap-merge), so per-peer unpack reordering is safe for migration/overlap
 destinations. Enforce with `@:ASSERT` after `shape_boxes`, don't inherit it as folklore.
 
+## STATUS (verified against commits and source, 2026-08-27)
+
+**Landed:** I0, I1a, I1b, I2a, I3, I4a, I4b, I5.
+**Outstanding:** I2b, I5b (~250 LOC), I6 (~200), I7 (~600), I8 (unpriced).
+
+Verified against the code, not inferred: **19 of 41 AMR p2p call sites still tag per box** (22 use
+plan tags `tq`). F1 retains an unconverted path that passes the block index `amr_cur` as the MPI tag,
+and migration (F4) passes the column index. The `.not. amr_subcycle` assert in the stage-fill wave
+confirms the subcycle deferral recorded below is still in force.
+
+**CONTRADICTION TO RESOLVE.** `m_amr.fpp` states the `amr_max_blocks` term leaves the tag base "with
+the last per-box family (increment **I7**)". That cannot be right as written: I7's own boundary below
+says "any family left per-box (subcycle) keeps its tables", and subcycle conversion is **I8**. So the
+tag space -- and with it the ~28k-rank W5 wall -- does not clear until **I8**, not I7. The source
+comment has been corrected; this note records why.
+
+**Relation to S3 (W4).** S3.1 deleted the level-1 tag ALLGATHERV. The clustering tag union is
+explicitly OUT of scope for I7 ("tag-union/clustering stay global (that is S3)") and that boundary
+still holds -- S3.2/S3.3 own it.
+
 ## Increments, re-staged and re-priced
 
 | # | content | LOC | gate |
