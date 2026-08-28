@@ -15,17 +15,22 @@
 >
 > **W4 (per-cell global collectives) — half done.** S3.1 deleted the level-1 tag ALLGATHERV
 > (`ntag_bytes` 185 MB -> 0 per rank per regrid, box set bit-identical). Measured after it:
-> `rbytes` grows **1.66x per np-doubling (P^0.73)** against the gather's 2.00x, i.e. S3 improves the
-> exponent as well as the coefficient, but is **NOT flat and does not satisfy W4**. Remaining:
-> **S3.2 must be a SPLIT-COMMUNICATOR recursion, not depth fusion alone**, and its target is the
-> **level-2 FOREST (~85%% of tree nodes), not the level-1 tree** (measured: an 8x block cap changes
-> node count 1.6x and the box set by 0.7%%). Then S3.3 (path 2 + the IB ownership gate).
+> `rbytes` grows 1.66x then 1.827x per np-doubling across np8/16/32 -- the exponent RISING toward 1.0,
+> because the forest term grows exactly with P while the cap-fixed level-1 term stays constant. **S3.1
+> is therefore asymptotically O(P): a 20-27x COEFFICIENT cut, not an exponent fix. W4 is NOT met.** Remaining:
+> **S3.2's design contract is written below ("S3.2 DESIGN CONTRACT") — read it before writing any
+> S3.2 code; it records that depth-fusion ALONE is still O(P) per rank.** Sequencing matters and is
+> NOT free: the level-2 forest runs `reduce = .false.` on a replicated list and performs **zero
+> collectives today**, so converting it first (S3.3) would ADD ~22-28k collectives per regrid with no
+> mechanism to scope them. **S3.2's mechanism must therefore be proven on the level-1 path, where the
+> collectives already exist, and S3.3 then moves the forest onto it.**
 >
 > **W5 is the second wall, at ~28k ranks**, and it is BIGGER than one increment: 19 of 41 AMR p2p
 > call sites still tag per box, F1 is only partially converted (I2b unlanded), and the subcycle
 > sites are an explicit deferral to I8. See `amr_plan_based_exchange.md`.
 >
-> **Adopted ordering:** B0 (blocking factor) -> S3.2 (redesigned) -> S3.3 -> W5 (I2b/I7/I8) ->
+> **Adopted ordering:** B0 (min box size) -> **B1 (canonicalise the merge; the ONLY planned change
+> that moves goldens, and a prerequisite for S3.2's gate to mean anything)** -> S3.2a -> S3.2b -> S3.3 -> W5 (I2b/I7/I8) ->
 > W3 (F5 aggregation, measured live at **71.7%% of all messages** and the smallest at ~0.8 MB/msg) ->
 > W6 (chunked device-side store growth) -> W7 (needs a cost model chosen first). **W2 (batched
 > advance) is FLAT IN P and is therefore an efficiency/parity item, NOT on the scaling critical
@@ -34,6 +39,97 @@
 > **Working practice (measured 2026-08-27):** `amr-bench/fcheck.sh` structurally checks one .fpp in
 > ~4 s versus ~18 min for a GPU build and catches what `ffmt`/`lint_source` pass; a gfortran CPU
 > build in an isolated worktree is ~13 s incremental; build in one worktree and measure in another.
+
+## S3.2 DESIGN CONTRACT (2026-08-27) — scoping the clustering reductions
+
+Written after S3.1 measured asymptotically O(P). This is the next design contract; S3.3 then applies
+the same mechanism to the level-2 forest, which is the term that actually scales.
+
+### Depth-fusion alone FAILS — the arithmetic that kills the obvious design
+
+Fusing all nodes at tree depth d into one allreduce gives ~32 collectives per regrid instead of
+16k-127k, which fixes LATENCY and nothing else: **an allreduce delivers the whole buffer to every
+rank**, so per-rank volume is the TOTAL signature volume at that depth, `~3 * L * N^(2/3)`. At fixed
+per-rank work (`L ~ P^(1/3)`, `N ~ P`) that is **O(P) per rank — the slope S3.1 already has.**
+Recorded because it is the design the earlier "~17 fused collectives per regrid" note implies, and it
+would have failed its own gate only after being built.
+
+### The property that makes scoping possible
+
+A rank can hold tags only inside its own subdomain, so:
+
+1. near the root a node spans many ranks, but there are FEW such nodes (at most 2^d at depth d);
+2. **below roughly depth log2(P) a node's box fits inside ONE rank's subdomain**, that rank holds
+   every tag in the subtree, and **the whole remaining subtree needs ZERO communication** — it
+   recurses locally exactly as the serial code does today.
+
+At np32 that is ~5 shared levels against a measured `ldepth` of 32: **most of the tree should never
+touch MPI at all.**
+
+### The mechanism: sparse per-depth exchange, no communicator per node
+
+Within the shallow phase a rank needs the reduced signature only for nodes its subdomain overlaps —
+its own path down the tree, O(1) per depth, not all 2^d. So: **one sparse exchange per shared depth**
+(~log2 P per regrid), each rank contributing and receiving only its own nodes. Per-rank volume becomes
+`O(log P * local extent)` — **sublinear in P, which is what W4 requires.** Implement with
+`MPI_Neighbor_alltoallv` on a graph communicator built once per regrid, or point-to-point to the
+overlapping ranks; the overlap inversion already exists (`s_amr_ranks_overlapping`, `amr_ovl_gather`).
+**`MPI_Comm_split` is the wrong tool and is not needed anywhere** — that open question dissolves.
+
+### Assembling the box list
+
+No rank holds the whole set, so close with ONE `ALLGATHERV` of the resulting BOXES — per-box global
+data, which the endstate explicitly permits. Determinism needs a canonical sort key (Morton of `lo`,
+then level) so every rank builds an identically ordered list regardless of arrival order; `f_morton`
+is injective below 2^21 per dimension.
+
+### What this does NOT solve — stated up front
+
+- **`force` reads GLOBAL `nacc + nwork`** against the block cap, which a rank finishing a local
+  subtree cannot see. **B0 is the dependency:** if a minimum box size stops the bisection reaching the
+  cap, `force` never fires. If it does not, the cap needs a per-subtree budget, which moves the box
+  set and breaks bit-identity.
+- **Bit-identity is NOT free.** The serial recursion visits nodes in a deterministic LIFO order and
+  accept/force depend on `nacc`; local subtrees completing in parallel change that order. Whether the
+  box SET is identical must be PROVEN, and it is the gate.
+
+### PREREQUISITE FOUND 2026-08-27: the merge is ORDER-DEPENDENT, so S3.2 cannot be bit-identical
+
+Reading every use of `nacc` in `s_amr_cluster` — the state that carries traversal order into the
+result — finds three, and the third is fatal to the bit-identity plan:
+
+1. `force = (nacc + nwork + 1 >= cap)` — order-dependent, but **B0 makes it inert** by keeping the
+   bisection away from the cap.
+2. `if (nacc < cap)` — likewise inert once the cap is not approached.
+3. **the min-separation merge** — scans the accepted boxes IN INSERTION ORDER, fuses the FIRST
+   too-close pair, removes it by swapping with the last element, and restarts. If A-B and B-C are
+   both within `thr` the outcome depends on which is found first, and the swap-with-last removal
+   permutes the list every iteration.
+
+**So the merged box set is a function of the order boxes were accepted.** S3.2 completes local
+subtrees in parallel, changing that order. Bit-identity is therefore not merely unproven — it is
+**unachievable** while the merge consumes insertion order.
+
+**B1, its own increment, BEFORE S3.2.** Canonicalise the merge input: sort the accepted boxes by a
+deterministic key (Morton of `lo`, then extent) before the min-separation pass, and make removal
+order-preserving instead of swap-with-last. The merge then depends only on the box SET.
+**This moves the box set once and is NOT bit-identical**, so it lands alone with goldens regenerated
+and the diff explained. Folding it into S3.2 would confound "did the scoping break something" with
+"did canonicalisation move the boxes", and every S3 gate so far has relied on bit-identity being a
+clean signal.
+
+**Revised S3 order: B0 -> B1 -> S3.2a -> S3.2b -> S3.3.** B0 and B1 together remove every order
+dependence from the clusterer, which is what makes S3.2's gate mean anything.
+
+### Increments
+
+- **S3.2a (next, cheap):** measure the depth at which nodes become rank-local, and the node/volume
+  split above versus below it. The depth instrumentation already exists. **This sizes the whole
+  design before any of it is written.**
+- **S3.2b:** shallow phase on the sparse per-depth exchange, deep phase local. Gate: bit-identical box
+  set, `[amr-tree] nodes` unchanged, and **per-rank reduced bytes FLAT across np8/16/32** — the first
+  time that gate can actually be met.
+- **S3.3:** the same mechanism on the level-2 forest.
 
 ## 2026-08-27 (38) — S3.1 LANDED: THE LEVEL-1 W4 COLLECTIVE IS GONE, AND THE SCALING LAW MEASURED
 
@@ -51,6 +147,29 @@ the COEFFICIENT (~20-25x) **and** the EXPONENT — better than the audit feared 
 W4 is not satisfied**. At 1e5 ranks: ntag would have been ~1.16 TB/rank/regrid, rbytes ~4.4 GB.
 Mechanism confirmed twice over: `rbytes ~ nboxes^(2/3)` predicts 1.60x against 1.66x measured.
 
+**THREE-POINT LADDER, and it OVERTURNS the two-point law.** np8/16/32 at matched 10 regrids:
+ntag 92.77 -> 185.53 -> 371.04 MB/rank/regrid (2.000x, 2.000x -- clean P^1.0). rbytes 4.53 -> 7.53
+-> 13.75 MB = **1.660x then 1.827x**, i.e. the implied exponent RISING 0.73 -> 0.87. Decomposing the
+node count settles why: the level-1 tree is CONSTANT at 16,383 nodes (cap-fixed at 8192 leaves) while
+the forest goes 28,308 -> 55,872 -> 111,112, i.e. **1.97x, 1.99x -- exactly proportional to P**. Total
+= constant + O(P), so the constant dilutes and the exponent climbs toward 1.0.
+
+**So S3.1 is asymptotically O(P): a COEFFICIENT cut (20.5x -> 24.7x -> 27.0x, growing slowly but
+converging), NOT an exponent improvement.** The earlier "P^0.73" was a small-np artifact of the
+cap-fixed level-1 term and is RETRACTED -- it was published on two points, and the third refuted it.
+The standing rule (>=3 points at fixed per-rank work before any asymptotic claim) is what caught it.
+
+**Consequence for S3.2/S3.3.** The forest is the term that grows, so it is where W4 is actually won;
+but it performs zero collectives today, so the split-communicator mechanism must still be PROVEN on
+the level-1 path first and then applied to the forest by S3.3. Both statements hold at once.
+
+**What `rbytes` actually measures, corrected.** `amr_cl_rb` is incremented OUTSIDE the `if (reduce)`
+guard, so it prices every tree node in BOTH paths -- but only the level-1 path reduces today. It is
+therefore a **projection of the fully distributed design (S3.1 + S3.3), not today's wire volume**.
+That is the right quantity for projecting W4 and the wrong one to call a measurement of current cost.
+Today's actual added collectives are the level-1 tree only: ~16,383 per regrid at cap 8192, not the
+44,691 total node count.
+
 **Three corrections to my own earlier claims, all from measurement:**
 1. **The unfused collective count is 44,691/regrid at np8 and 72,255 at np16** — the design estimate
    was ~1,200, wrong by 50x. That is what makes S3.2 fusion mandatory rather than an optimisation.
@@ -59,8 +178,10 @@ Mechanism confirmed twice over: `rbytes ~ nboxes^(2/3)` predicts 1.60x against 1
    **WRONG and retracted** — saturation drives node count, and node count lives in rg:clus.
 3. **The block cap is the WRONG KNOB.** Five caps at fixed domain: 16x cap gives 2.10x nodes and
    2.10x reduction bytes for a **3.7 percent** change in the box set (nboxes 598/598/598/594/576).
-   The cap bounds only the level-1 tree, ~15 percent of nodes; **the level-2 FOREST is ~85 percent**.
-   **So S3.2's split-communicator target is the forest, not the level-1 tree.**
+   The cap bounds only the level-1 tree; the forest is parent-driven and cap-independent, measured
+   FLAT at ~21,800 nodes/regrid across all five caps. Absolute split at cap 8192: level-1 ~16,383
+   (43 percent), forest ~21,872 (57 percent) -- at cap 1024 the forest is 91 percent. **An earlier
+   "~85 percent" figure was a marginal-increment reading, not the absolute split; corrected.**
 
 **The clusterer saturates EVERY cap** (warning on every regrid at all five settings): with
 `amr_cluster_eff = 0.9` and no minimum box size the bisection never converges on its own, it splits
