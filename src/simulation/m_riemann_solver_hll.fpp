@@ -206,6 +206,9 @@ contains
                             end if
 
                             if (chemistry) then
+                                ! Only the Roe-average path writes this; zero it so the
+                                ! arithmetic path never reads an undefined value.
+                                c_sum_Yi_Phi = 0._wp
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%species%beg, eqn_idx%species%end
                                     Ys_L(i - eqn_idx%species%beg + 1) = qL_prim_rsx_vf(${SF('')}$, i)

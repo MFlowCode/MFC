@@ -35,6 +35,16 @@ PHYSICS_DOCS = {
         "explanation": "The equation-of-state parameters must satisfy basic positivity requirements for thermodynamic stability.",
         "references": ["Wilfong26"],
     },
+    "check_eos_selector": {
+        "title": "Equation of State Selector",
+        "category": "Thermodynamic Constraints",
+        "math": r"\Pi_\infty = 0 \;\; \text{for an ideal gas}",
+        "explanation": (
+            "An ideal gas is the stiffened-gas equation of state with no stiffness, so selecting it and also supplying a "
+            "nonzero pi_inf is contradictory. The selector determines the stiffness, not the input."
+        ),
+        "references": ["Wilfong26"],
+    },
     "check_eos_parameter_sanity": {
         "title": "EOS Parameter Sanity (Transformed Gamma)",
         "category": "Thermodynamic Constraints",
@@ -380,6 +390,14 @@ class CaseValidator:
 
         if not igr:
             return
+
+        # m_igr.fpp discards qv (qv_igr), so a nonzero value would be silently dropped from
+        # the pressure rather than applied.
+        num_fluids = self.get("num_fluids")
+        if num_fluids is not None:
+            for i in range(1, num_fluids + 1):
+                qv = self.get(f"fluid_pp({i})%qv")
+                self.prohibit(qv is not None and qv != 0, f"igr does not support fluid_pp({i})%qv (heat of formation); it is discarded")
 
         igr_order = self.get("igr_order")
         self.prohibit(igr_order not in [None, 3, 5], "igr_order must be 3 or 5")
@@ -890,6 +908,26 @@ class CaseValidator:
                     )
             elif model_id is not None and model_id > 0:
                 self.prohibit(True, f"patch_icpp({i})%model_id is set but geometry ({geometry}) is not an STL model (21)")
+
+    def check_eos_selector(self):
+        """Restricts fluid_pp(i)%eos to implemented backends and enforces their parameter requirements"""
+        num_fluids = self.get("num_fluids")
+        if num_fluids is None:
+            return
+        eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
+        eos_ideal_gas = eos_names["ideal_gas"]
+        eos_values = set(eos_names.values())
+        bub_fac = 1 if self.get("bubbles_euler", "F") == "T" else 0
+        for i in range(1, num_fluids + 1 + bub_fac):
+            eos = self.get(f"fluid_pp({i})%eos")
+            if eos is None:
+                continue
+            self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas' or 'ideal_gas'")
+            pi_inf = self.get(f"fluid_pp({i})%pi_inf")
+            self.prohibit(
+                eos == eos_ideal_gas and pi_inf is not None and pi_inf != 0,
+                f"fluid_pp({i})%eos = 'ideal_gas' requires fluid_pp({i})%pi_inf = 0 (an ideal gas has no stiffness)",
+            )
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
@@ -2613,6 +2651,7 @@ class CaseValidator:
         self.check_hypoelasticity()
         self.check_phase_change()
         self.check_ibm()
+        self.check_eos_selector()
         self.check_stiffened_eos()
         self.check_eos_parameter_sanity()
         self.check_surface_tension()

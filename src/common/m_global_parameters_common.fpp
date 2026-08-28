@@ -202,7 +202,9 @@ contains
                 ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
                 sys_size = eqn_idx%stress%end
 
-                ! shear stress index is 2 for 2D and 2,4,5 for 3D
+                ! shear stress index is 2 for 2D and 2,4,5 for 3D. Readers test the whole array
+                ! rather than the first shear_num entries, so unused slots must not be garbage.
+                shear_indices = 0
                 if (num_dims == 1) then
                     shear_num = 0
                 else if (num_dims == 2) then
