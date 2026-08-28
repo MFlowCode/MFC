@@ -540,6 +540,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, "avg_state=1", {"avg_state": 1}))
                 cases.append(define_case_d(stack, "wave_speeds=2", {"wave_speeds": 2}))
 
+                # The averaged state is only read by the pressure-based wave speeds, so neither
+                # case above reaches the Roe average: one computes it and discards it, the other
+                # takes the arithmetic branch. Combining them is the only coverage it gets.
+                if num_fluids == 1:
+                    stack.push("avg_state=1", {"avg_state": 1})
+                    cases.append(define_case_d(stack, "wave_speeds=2", {"wave_speeds": 2}))
+                    stack.pop()
+
                 if riemann_solver == 2:
                     cases.append(define_case_d(stack, "model_eqns=3", {"model_eqns": 3}))
 
