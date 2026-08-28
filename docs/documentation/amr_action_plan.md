@@ -13,11 +13,14 @@
 > per-increment gates). Work FROM it; do not re-derive scope. Landed: I0, I1a, I1b, I2a, I3, I4a,
 > I4b, I5. **Outstanding: I2b, I5b (~250), I6 (~200), I7 (~600), I8 (unpriced).**
 >
-> **W4 (per-cell global collectives) — half done.** S3.1 deleted the level-1 tag ALLGATHERV
-> (`ntag_bytes` 185 MB -> 0 per rank per regrid, box set bit-identical). Measured after it:
-> `rbytes` grows 1.66x then 1.827x per np-doubling across np8/16/32 -- the exponent RISING toward 1.0,
-> because the forest term grows exactly with P while the cap-fixed level-1 term stays constant. **S3.1
-> is therefore asymptotically O(P): a 20-27x COEFFICIENT cut, not an exponent fix. W4 is NOT met.** Remaining:
+> **W4 (per-cell global collectives) — half done, and RESTATED in ledger 40.** S3.1 deleted the
+> level-1 tag ALLGATHERV (`ntag_bytes` 185 MB -> 0 per rank per regrid, box set bit-identical). The
+> residual wall is **not volume**: differencing per regrid shows the level-1 reducing path is FLAT in P
+> in both per-rank bytes (1.39 M) and collective count (16,383), because that tree is cap-limited. It is
+> **~16,383 global `MPI_ALLREDUCE`s per regrid, of which 99.93% are on nodes lying wholly inside one
+> rank** and therefore buy nothing but a full-machine sync. The `rbytes` growth of 1.67x/1.83x per
+> doubling that earlier motivated "S3.1 is still O(P)" lives entirely in the **level-2 forest**, which
+> does zero collectives today. **W4 is NOT met**; the thing to remove is the collective COUNT. Remaining:
 > **S3.2's design contract is written below ("S3.2 DESIGN CONTRACT") — read it before writing any
 > S3.2 code; it records that depth-fusion ALONE is still O(P) per rank.** Sequencing matters and is
 > NOT free: the level-2 forest runs `reduce = .false.` on a replicated list and performs **zero
@@ -29,8 +32,11 @@
 > call sites still tag per box, F1 is only partially converted (I2b unlanded), and the subcycle
 > sites are an explicit deferral to I8. See `amr_plan_based_exchange.md`.
 >
-> **Adopted ordering:** B0 (min box size) -> **B1 (canonicalise the merge; the ONLY planned change
-> that moves goldens, and a prerequisite for S3.2's gate to mean anything)** -> S3.2a -> S3.2b -> S3.3 -> W5 (I2b/I7/I8) ->
+> **Adopted ordering (REORDERED by ledger 41 — the forest carries the only O(P) term):** B0 -> **B1
+> (canonicalise the merge)** -> **B0b (`amr_blocking_factor` default 1 -> 4, so the box cap stops being
+> load-bearing)** -> **S3.3 (forest ownership split — deletes `gwin_bytes`, 1.44 GB/rank at np32 and
+> doubling with P; also retires W1's pass-2 loops)** -> S3.2b (level-1 depth batching; a latency
+> constant, 16,383 flat collectives per regrid) -> W5 (I2b/I7/I8) ->
 > W3 (F5 aggregation, measured live at **71.7%% of all messages** and the smallest at ~0.8 MB/msg) ->
 > W6 (chunked device-side store growth) -> W7 (needs a cost model chosen first). **W2 (batched
 > advance) is FLAT IN P and is therefore an efficiency/parity item, NOT on the scaling critical
@@ -39,6 +45,207 @@
 > **Working practice (measured 2026-08-27):** `amr-bench/fcheck.sh` structurally checks one .fpp in
 > ~4 s versus ~18 min for a GPU build and catches what `ffmt`/`lint_source` pass; a gfortran CPU
 > build in an isolated worktree is ~13 s incremental; build in one worktree and measure in another.
+
+## 2026-08-28 (41) — np32 closes the sweep, and it REORDERS the program: the forest, not level 1, is the O(P) term
+
+Three points, per rank, weak-scaled (400^3 -> 800x400x400 -> 800x800x400):
+
+| | np8 | np16 | np32 | growth |
+|---|---|---|---|---|
+| **`gwin_bytes`** (level>=2 window `ALLGATHERV`) | 360 MB | 719 MB | **1,440 MB** | **1.997x, 2.001x = O(P)** |
+| level-1 global `ALLREDUCE`s / regrid | 16,383 | 16,383 | 16,383 | flat |
+| level-1 shared nodes / regrid | 7 | 11 | 15 | **+4 per doubling = O(log P)** |
+| level-1 shared bytes / regrid | 19 KB | 35 KB | 58 KB | 1.865x then 1.645x, i.e. ~O(log P) |
+| `shr_maxdep` (exchange rounds) | 3 | 5 | 7 | +2 per doubling = 2 log2 P - 3 |
+| forest nodes that are rank-local | 99.79% | 99.79% | 99.77% | **constant** |
+
+**The only O(P) term left in W4 is `gwin_bytes`.** It is 1.44 GB per rank per run at np32 (~144 MB per
+rank per regrid) and it doubles exactly with P. Extrapolated to 1e5 ranks that is ~450 GB per rank per
+regrid. It is also LARGER than the 185 MB `ntag_bytes` gather S3.1 deleted -- S3.1 removed the smaller
+of the two per-cell gathers.
+
+**Level 1 is not the exascale wall.** Its collective COUNT is flat (cap-fixed at 16,383) and everything
+about its shared set grows logarithmically. It is a latency constant worth removing, not an exponent.
+
+**I made the two-point error again, and the third point caught it again.** Earlier this session I read
+shared nodes as "1.57x per doubling ~ P^0.65, the rank-boundary surface" from np8 and np16 alone, and
+extrapolated ~3,000 shared nodes per regrid at 1e5 ranks. With np32 the sequence is 7, 11, 15 --
+**linear in log2 P**, giving ~63 at 1e5 ranks. Same failure mode as the retracted `P^0.73`: a ratio
+between two points is not an exponent. The rule now is that no growth exponent enters this ledger on
+fewer than three points.
+
+**`shr_maxdep` came back 7** -- the value ledger 39 pre-registered as "the design needs rethinking".
+It does not, and ledger 40 demoted that statistic on mechanism grounds BEFORE this number existed
+(written while the np32 job was still running with zero scope lines in its log). The demotion stands
+on its own reasoning: 7 = 2 log2 P - 3 gives ~31 exchange ROUNDS at 1e5 ranks, and rounds are not
+volume.
+
+
+### CORRECTION 2026-08-28 — "level-1 collectives are FLAT in P" is a CAP ARTIFACT, not a property
+
+Prompted by "are you sure you're running the right input decks?", the decks were audited. **They are
+correct**, and the audit is worth recording because it validates every number above:
+
+- IC `hcid 306` is `1 + 4*exp(-(cos(pi x)^2 + cos(pi y)^2 + cos(pi z)^2)/0.15)` -- **periodic with period 1**,
+  so it is a BLOB LATTICE: 8 blobs at 2x2x2 (np8), 16 at 4x2x2 (np16), 32 at 4x4x2 (np32). The feature
+  count scales exactly with P.
+- Resolution is constant at 200 cells per unit length in all three rungs, and the final box count scales
+  with P: **594 / 1206 / 2405 = 2.03x, 1.99x.**
+- Restart decks match their rungs exactly: `lustre_0.dat` is 6 vars x cells x 8 B (3.07 / 6.14 / 12.29 GB),
+  and `x/y/z_cb` hold m+2 / n+2 / p+2 doubles. `simulation.inp` as-run confirms m/n/p, `t_step_stop = 200`,
+  `amr_regrid_int = 20` identical, and `amr_blocking_factor` 1 in all three.
+
+**But `amr_max_blocks = 8192` is held FIXED across the rungs, and the tree SATURATES it in every one:**
+`[amr-tree] lmax` is exactly 8192, the `capped` warning fires on 10 of 10 regrids, and the node count is
+**16,383 = 2 x 8192 - 1 -- exactly a full binary tree pinned by the cap.**
+
+**So level-1's collective count could not have grown with P in this experiment no matter what the
+algorithm does.** "Flat in P" above is measuring the cap, not the clusterer. The final box count DOES
+scale with P (594 -> 2405), so the natural uncapped tree is larger at np32 and is being clipped back to
+8192 leaves in every rung.
+
+**What this does and does not change.**
+- **`gwin_bytes` O(P) STANDS.** It is driven by tagged cells inside parent windows, which scale with the
+  blob lattice; the cap bounds BOXES, not tagged cells. Its 1.997x / 2.001x is genuine.
+- **The claim that level 1 is asymptotically harmless does NOT stand.** After B0b makes the recursion
+  self-terminating, level-1 node count should track the physics and grow with P -- which would make the
+  level-1 collectives O(P) too and weaken the argument for putting S3.3 ahead of S3.2b.
+- Ledger 41's "+4 per doubling" for SHARED nodes is a ratio between rungs whose trees are the same size
+  by construction, so it measures how the FIXED tree splits across more ranks. That is still the right
+  quantity for the shared/local split, but it is not evidence about how the tree itself scales.
+
+**FIRST RESULT IN (job 388669, np8, bf=4): B0b's premise CONFIRMED.** Zero `clustering capped`
+warnings against 10-of-10 at bf=1, and `lmax` 6872-7438 rather than pinned at 8192 -- **the recursion
+self-terminates at bf=4.** Level-1 nodes/regrid 13,825; boxes 576 vs bf=1's 594 (3%). Cross-check that
+matters: **`gwin_bytes` per regrid is ~40 MB at BOTH bf=1 and bf=4**, so the forest gather is insensitive
+to the blocking factor -- confirming it is driven by tagged cells, not by the tree or the cap, and that
+its O(P) is not a cap artifact.
+
+**Note the ordering decision is ROBUST to how this comes out.** Both S3.2b and S3.3 are required for W4;
+the experiment decides the JUSTIFICATION for doing S3.3 first, not the action. S3.3 removes a measured
+1.44 GB/rank term with a verified np>1 golden gate and a bounded design, so it is the right next code
+change whether or not level 1 also turns out to be O(P). Do not block S3.3 on these jobs.
+
+**Caveat on B0b at scale:** bf=4 gives `lmax` 7438 against a cap of 8192 at np8. If the tree scales with
+P, a fixed `amr_max_blocks = 8192` will bind again at np16/np32 -- `amr_max_blocks` is a user-set case
+parameter and is NOT auto-scaled. B0b makes the recursion self-terminating at the sizes the goldens and
+this benchmark use; it does not remove the need to size the cap with the problem.
+
+**ARM A CONFIRMS THE CONFOUND DIRECTLY (jobs 388669/388670).** At `bf=4` with the cap left at 8192:
+np8 gives 13,825 level-1 nodes/regrid and **0** capped warnings; np16 gives **16,383 and 5 capped
+warnings** -- it RE-SATURATED. So the level-1 tree genuinely grows with P (np8 sat below the cap, np16
+wanted more and was clipped back to exactly 2*8192-1), and `bf=4` alone does NOT keep the cap out of the
+way at larger P. **This is direct evidence that the earlier "flat in P" was the cap, not the clusterer.**
+Arm B (`amr_max_blocks = 65536`, jobs 388698/388699/388700) is therefore the only unconfounded arm and is
+the one to read for the growth rate.
+
+**Consequence for B0b:** raising the blocking factor makes the recursion self-terminating at a GIVEN
+problem size; it does not stop a fixed `amr_max_blocks` from binding as the problem grows. B0b remains
+correct and necessary (it is what makes `force` inert so S3.2b/S3.3 can be bit-identical at the sizes we
+test), but it is not a substitute for sizing the cap with the problem.
+
+**Settled by experiment, not argument:** jobs 388669/388670/388671 re-run np8/16/32 with
+`amr_blocking_factor = 4` (a RUNTIME namelist parameter -- no rebuild needed) on the pinned B1 binary
+`simulation-b1-54da9155`. If level-1 node count then scales with P, S3.2b returns to the critical path
+and the S3.3-first ordering must be re-argued on absolute size rather than on exponent.
+
+### The reordering
+
+The plan sequenced S3.2 (level 1) before S3.3 (forest) on the argument that "the forest performs zero
+collectives today, so converting it first would ADD ~22-28k collectives with no mechanism to scope
+them". That argument modelled S3.3 as *making the forest reduce-driven like level 1*. The measurement
+says the forest does not need that:
+
+- The forest is **99.8% rank-local, and the fraction is constant in P** (0.206%, 0.208%, 0.234%
+  shared). The `ALLGATHERV` exists only so that EVERY rank can cluster EVERY parent's window --
+  replicated global work whose input is gathered globally.
+- So the bulk of S3.3 is **"each rank clusters only the windows of the parents it owns"**, which adds
+  no collectives at all, deletes the gather for the 99.8% case, and deletes the replicated work with
+  it. Only the ~0.2% of windows that straddle ranks need the shallow mechanism.
+- Rank-invariance of the resulting box set then comes from **one `ALLGATHERV` of BOXES plus B1's
+  canonical order** -- which is why B1 was worth landing first, and is already written.
+
+**Caveat, stated so the reordering is not oversold: `gwin_bytes` is not today's wall-time bottleneck.**
+At np32 it is ~144 MB per rank per regrid, roughly 15 ms of wire time -- small against a 42 s regrid.
+Its phase (`rg:build`, 9.2% at np32) does not stand out, and regrid wall is not even monotone across
+the sweep (400 / 278 / 420 s), which is the MPI-wait variance this ledger has documented before. The
+case for S3.3 is **asymptotic**: 144 MB/rank/regrid doubling with every doubling of P reaches ~450 GB
+per rank per regrid at 1e5 ranks, and no other measured term does that. Prioritising it is a bet on
+the exascale goal, not a claim about the current operating point -- and it is the right bet only
+because the goal is the end-state architecture rather than the matched-point ladder.
+
+**Revised order: B1 -> B0b -> S3.3 (forest ownership split) -> S3.2b (level-1 depth batching).**
+S3.3 moves first because it carries the only O(P) term and, at 144 MB per rank per regrid, the largest
+absolute number on the board. S3.2b stays, demoted to a latency-constant fix. S3.3 also retires W1's
+regrid pass-2 loops (parents x global tagged cells), so it closes two invariants.
+
+## 2026-08-28 (40) — B1 landed, and W4's level-1 problem restated: it is COLLECTIVE COUNT, not volume
+
+**Per-regrid decomposition of the level-1 reducing path** (differencing consecutive `[amr-scope-r]`
+prints instead of reading the cumulative totals — the counters turn out to be near-constant regrid to
+regrid, 7,7,7,... at np8, so a 60-step run measures this as well as a 200-step one):
+
+| per regrid | np8 | np16 | ratio |
+|---|---|---|---|
+| global `MPI_ALLREDUCE`s | 16,383 | 16,383 | 1.00x |
+| ...on nodes spanning >1 rank | 7 | 11 | 1.57x |
+| local bytes | 1.39 M | 1.39 M | 1.00x |
+| shared bytes | 18,960 | 35,360 | 1.87x |
+| `shr_maxdep` | 3 | 5 | +2 |
+
+**99.93% of the level-1 global collectives are on nodes that lie wholly inside one rank.** That rank
+already holds every tag in the subtree, so the reduction changes nothing and costs a full-machine
+synchronisation. The count and the per-rank volume are both EXACTLY FLAT in P under weak scaling
+(16,376 -> 16,372 local nodes; 1.39 M -> 1.39 M bytes) because the level-1 tree is cap-limited.
+
+**This corrects how W4 was being scored.** The wall is not bytes — per-rank level-1 volume is already
+flat. It is ~16,383 global collectives per regrid, each synchronising all P ranks, so the cost grows
+as (fixed count) x (latency ~ log P). At 1e5 ranks that is ~1.6 s per regrid of pure synchronisation.
+The earlier `[amr-tree] rbytes` growth of 1.67x/1.83x per doubling that motivated "S3.1 is still O(P)"
+is real but lives entirely in the **level-2 forest**, which runs `reduce = .false.` and performs zero
+collectives today. Level 1 -- the only path that communicates -- is flat.
+
+**Consequence for the S3.2b gate.** The gate recorded below as "per-rank reduced bytes FLAT across
+np8/16/32" measures a quantity that is ALREADY flat and therefore cannot discriminate. **The gate is
+now: level-1 global collectives per regrid drop from 16,383 to the shared-node count (7/11/...), and
+those residual exchanges are sparse (only the overlapping ranks) rather than over MPI_COMM_WORLD.**
+Box-set identity and `[amr-tree] nodes` unchanged still stand as correctness gates.
+
+**`shr_maxdep` is DEMOTED, and this is a deliberate revision of a pre-registered rule.** Ledger 39
+pre-registered "np32 = 6 -> the log2 model holds and S3.2 proceeds; 7 -> the design needs rethinking".
+That rule treated `shr_maxdep` as a proxy for how much of the tree stays shared. It is not one: it is
+a MAXIMUM over a geometry-dependent quantity (a box straddling a rank boundary stays shared however
+small it gets), and in the sparse per-depth exchange it sets only the number of latency ROUNDS, since
+all shared nodes at one depth exchange concurrently. At 1e5 ranks, `log2 P` rounds is ~17 and
+`2 log2 P` is ~34; both are negligible against 16,383 global collectives. **So np32 = 7 would not
+collapse the design.** The revision is grounded in mechanism read out of the code (`s_amr_find_split_sig`
+scans a node's whole signature, so a participating rank needs the full 1D signature -- a box EXTENT,
+not a volume -- and depth-batching makes rounds = maxdep), not in the number being inconvenient; and
+it makes np32 LESS decisive rather than more. The statistic that does decide is per-rank
+participation, which ledger 40 instruments below.
+
+**S3.2a-2 (instrumentation, golden-neutral).** `amr_cl_me_nodes_r` / `amr_cl_me_rb_r` count the shared
+nodes whose box actually reaches into THIS rank's subdomain -- what the sparse exchange would cost a
+rank, as opposed to `shr_*_r` which prices the allreduce form where every shared node lands on every
+rank. Reduced with MAX across ranks (rank 0 owns a domain corner and understates it) and printed as
+`[amr-scope-me]`. **Pre-registered reading:** the design holds if `me_rb_max` grows at roughly the
+domain-extent rate (~1.26x/doubling = P^(1/3) in 3D) while `shr_rb_all` grows ~1.87x, i.e. the ratio
+me/all FALLS with P; it is in trouble if `me_rb_max` tracks `shr_rb_all`, meaning ranks participate in
+nearly every shared node and sparsity buys little.
+
+**What the golden suite can and cannot say about B1.** The 69 AMR goldens ran clean through B1 with no
+box-set movement. That is evidence B1 BREAKS nothing; it is NOT evidence the property is exercised. The
+merge's order-dependence needs ambiguous chains of too-close boxes, which need many boxes: the test cases
+carry a handful, the benchmark carries 594-2405. So the suite cannot distinguish B1 from a no-op, and the
+evidence that B1 is NEEDED remains the code reading of `nacc`'s three uses, not a test. Do not let a green
+suite be reported as validating the canonicalisation.
+
+**B1 (canonicalise the merge) implemented.** `s_amr_cluster` now sorts the accepted boxes by Morton of
+`lo` (a stable insertion sort; accepted boxes are disjoint so their `lo` corners are distinct) before
+the min-separation pass, and the pass removes a fused box by shifting down rather than swapping with
+the last entry. The merge therefore depends only on the box SET, not on the traversal order that
+produced it -- the precondition for S3.2 completing local subtrees in parallel. +34/-4 lines. **Moves
+the box set; goldens regenerated in the same commit and the diff explained.**
 
 ## 2026-08-27 (39) — B0 + S3.2a: GOLDEN GATE CLOSED, and the np32 question that decides S3.2
 
@@ -148,14 +355,187 @@ clean signal.
 **Revised S3 order: B0 -> B1 -> S3.2a -> S3.2b -> S3.3.** B0 and B1 together remove every order
 dependence from the clusterer, which is what makes S3.2's gate mean anything.
 
+### PREREQUISITE FOUND 2026-08-28: at the DEFAULT `amr_blocking_factor = 1` the cap is load-bearing, so S3.2b cannot be bit-identical
+
+Ledger 39 priced B0 and noted the cap-saturation warning "stops at `bf >= 4`", but left the DEFAULT at
+`bf = 1`. Re-reading `s_amr_cluster` against the logs shows what that costs S3.2b:
+
+- `force = (nacc + nwork + 1 >= cap)` accepts a node unsplit to protect the `amr_max_blocks` array
+  bound. It reads **global** `nacc`, i.e. how many boxes the whole traversal has accepted so far.
+- At `bf = 1` the recursion does not converge on its own -- it splits until the cap stops it. The
+  np16 run emits `[amr] WARNING: tag clustering capped` on **10 of 10 regrids**, and `[amr-tree] lmax`
+  is exactly 8192 = `amr_max_blocks`. So `force` is live at the default, on every regrid.
+- S3.2b's deep phase is PRIVATE: a rank finishing its own subtree cannot see global `nacc`. Enforcing
+  the cap per rank is a different box set; ignoring it overflows.
+
+**So B0 is not optional and not merely a latency win: making the recursion self-terminating is a
+PRECONDITION for S3.2b's bit-identity gate to be meetable at all.** This was scoped wrongly in ledger 39,
+which treated B0 as "latency, plus making `force` inert" without noticing that the shipped default
+leaves it un-inert.
+
+**B0b, its own increment: change the `amr_blocking_factor` default from 1 to 4.** Ledger 39's sweep is
+the evidence -- saturation stops at `bf >= 4`, and `bf = 8` produces 576 boxes against `bf = 1`'s 594
+(a 0.7% change in the final box set) from 26x fewer tree nodes. **4 rather than 8 or 16** because the
+69 AMR goldens run on small grids (128^2 and below), where a minimum child extent of 8-16 cells would
+distort refinement; 4 is the smallest value the measurement supports.
+
+**Moves the box set, so it lands with goldens regenerated -- as its own commit, after B1.** Two
+regenerations rather than one bundled commit: B1 (Morton merge order) and B0b (minimum box size) move
+the boxes for unrelated reasons, and a combined diff could not be explained.
+
+**Revised S3 order: B0 -> B1 -> B0b -> S3.2a -> S3.2b -> S3.3.**
+
+### S3.3 DESIGN CONTRACT (written 2026-08-28, from reading the level->=2 block at m_amr_regrid.fpp:1118-1300)
+
+**What the code does today.** For each level >= 2, with `plo = 1, phi = nboxes` spanning EVERY box at the
+previous level globally:
+
+- **Pass 1** builds each parent's dense window `gwin`, tags it from old level-(lev-1) blocks, but
+  contributes only from blocks this rank owns (`if (amr_owns_all(ob))`), and packs those cells as
+  `(int8 linear index, parent kb)` pairs.
+- **One `MPI_ALLGATHERV` per level** sends every rank every parent's pairs. **This is `gwin_bytes`:
+  360 / 719 / 1440 MB per rank at np8/16/32, exactly O(P).**
+- **Pass 2 runs on every rank for every parent**, and rebuilds each parent's window with
+  `do i = 1, ntot_g; if (gkb(i) /= kb) cycle`. That is a full scan of the GLOBAL pair list once per
+  parent: **O(parents x global tags) replicated work** -- ~2,400 parents x ~9 M pairs per regrid at np32.
+  This is exactly the "regrid pass-2 loops (parents x global tagged cells)" that W1 names.
+
+**The change: give each parent an OWNER and exchange point-to-point instead of gathering globally.**
+
+1. Assign parent `kb` to a rank deterministically and identically on every rank -- round-robin
+   `mod(kb - 1, num_procs)` both balances and needs no communication to agree on.
+2. Pass 1 packs as today, but buckets each pair by `owner(kb)` instead of appending to one list.
+3. Replace the `ALLGATHERV` with **`MPI_Alltoallv`**. Per-rank send volume becomes O(this rank's own
+   tagged cells) and receive volume O(the tags of the parents it was assigned) -- both O(local), which
+   is exactly what W4 asks for. The measurement says 99.8% of forest nodes are rank-local at a constant
+   fraction in P, so most of this traffic is self-to-self and never hits the wire.
+4. Pass 2 loops over **assigned parents only**. The `do i = 1, ntot_g` filter disappears with it: the
+   received buffer already contains only this rank's parents, so sorting it once by `kb` replaces the
+   per-parent rescan. **That retires W1's pass-2 term in the same change.**
+5. Close with **one `ALLGATHERV` of the resulting child BOXES** -- per-box global data, which the
+   endstate permits, ~24 B x 2,400 boxes = 58 KB against 144 MB today -- then B1's canonical Morton
+   order makes the assembled list identical on every rank regardless of arrival order.
+
+**Why this does not need S3.2b first.** Ledger 39 sequenced S3.2 ahead of S3.3 on the argument that the
+forest "performs zero collectives today, so converting it first would ADD ~22-28k collectives". That
+modelled S3.3 as making the forest reduce-driven per node. It is not: ownership plus one alltoallv adds
+NO per-node collectives, and the residual cross-rank windows are the same ~0.2% the scope instrument
+already measures.
+
+**SPLIT INTO TWO GATED INCREMENTS (2026-08-28), because you cannot target the exchange until you know
+who needs what:**
+
+- **S3.3a — pass 2 by ownership, keeping the `ALLGATHERV`.** Assign `powner(kb) = mod(kb - plo, num_procs)`
+  (a pure function of `kb`, so every rank agrees with no communication); pass 2 processes ONLY its own
+  parents. This deletes the per-parent rescan of the whole gathered pair list — `do i = 1, ntot_g` inside
+  `do kb = plo, phi`, i.e. **O(parents x global tags) on EVERY rank**, which is W1's pass-2 term — and the
+  replicated clustering with it. The global `nboxes + 1 > amr_max_fine` guard cannot be evaluated per rank
+  any more, so children are emitted uncapped into a local list and **replayed in (kb, emission) order**
+  after ONE `ALLGATHERV` of the child BOXES (7 ints each, ~67 KB against the 144 MB per-cell gather). Each
+  parent has exactly one owner emitting in order, so a stable counting sort by `kb` reproduces the serial
+  append order exactly — **same box list, same truncation, same `box_level`. Gate: bit-identity.**
+- **S3.3b — replace the pass-1 `ALLGATHERV` with `MPI_Alltoallv`.** Now that a rank only needs its own
+  parents' tags, bucket the packed pairs by `powner(skb(i))` (stable counting sort), exchange counts with
+  `MPI_Alltoall`, then `Alltoallv`. Send volume becomes O(this rank's tagged cells), receive volume
+  O(its assigned parents' tags). **`gwin_bytes` stops being O(P).** Pass 2's remaining per-parent scan
+  becomes O(parents/P x tags/P) = **O(1) per rank under weak scaling**, closing W1's term completely.
+
+
+### S3.3c FOUND 2026-08-28 (reviewing my own S3.3a/b diff): pass 1 is STILL fully replicated, and it is O(P^2)
+
+S3.3a/b fix the gather and pass 2. **They do not close W1.** Re-reading pass 1 after writing them, every
+rank still does this for EVERY parent, regardless of ownership or of whether it holds any relevant data:
+
+```
+do kb = plo, phi
+    allocate (gwin(mlo(1):mhi(1), mlo(2):mhi(2), mlo(3):mhi(3)))   ! dense window, per parent, per rank
+    gwin = .false.
+    do ob = 1, amr_num_blocks                                       ! the REPLICATED GLOBAL block list
+```
+
+Two residual terms, neither touched by S3.3a/b:
+
+1. **`allocate`+zero of a dense window per parent** -> O(parents x window volume) = **O(P)** memory traffic
+   per rank per regrid.
+2. **`do ob = 1, amr_num_blocks` inside `do kb = plo, phi`** -> O(parents x global blocks). Parents scale
+   with P and the global block list scales with P, so this is **O(P^2) per rank** -- asymptotically the
+   WORST term in the regrid, worse than the `gwin_bytes` gather S3.3b removes. It is only cheap today
+   because it is a metadata test (~5.8 M iterations per level per regrid at np32).
+
+**Why it cannot simply be skipped:** `covered(kb)` is replicated metadata -- every rank must agree on it --
+and it is set inside that same `ob` loop, so the loop cannot be made owner-only as written.
+
+**S3.3c, its own increment.** Two independent fixes:
+- **Invert the loop.** Iterate this rank's OWNED old blocks and tag the parents each one overlaps, instead
+  of iterating all parents x all blocks. Cost becomes O(owned blocks x parents touched).
+- **Compute `covered` once, spatially.** This is the same shape as the seam all-pairs scan that W1 records
+  as already FIXED (`5ec798ed`), so the binning machinery to do it exists and the precedent is set.
+- Then guard the `gwin` allocation on "this rank actually contributes", which removes term 1 for free.
+
+**Do not report S3.3 as closing W1 until S3.3c lands.** S3.3a removes W1's pass-2 rescan
+(O(parents x global TAGS)); the pass-1 terms above are what remain.
+
+**Two implementation details verified by reading the code, because both are easy to get wrong.**
+(1) The `Alltoallv` needs the pairs contiguous per destination, but `s_amr_pack_gwin_pairs` appends them
+grouped by `kb` in increasing order. A stable counting sort by `owner(skb(i))` fixes that in O(n) and is
+the only reordering needed. (2) **That reordering is safe**: pass 2 rebuilds a DENSE `gwin` from the
+pairs and re-extracts in `(k,j,i)` order, so `ctags` is already independent of the order pairs arrive in
+— the existing comment's "setting .true. once per gathered cell reproduces the old per-parent dedup" is
+exactly that property. So S3.3 does not perturb `ctags` and its box set should be bit-identical to the
+post-B1/B0b baseline, which makes the gate a clean signal.
+
+**Gate.** `gwin_bytes` falls from 1.44 GB to O(local) and stops doubling with P (the three-point sweep
+re-run is the proof); child box set bit-identical to the post-B1/B0b baseline; 69/69 AMR goldens; and the
+suite ALREADY carries the right np>1 gate — verified 2026-08-28 by reading `cases.py`: case (m)
+**"AMR -> 1D -> multi-level dynamic regrid np=2"** runs `amr_regrid_int=2, amr_max_level=2` at `ppn=2`,
+which is precisely the cross-rank dynamic nesting path that carries the `ALLGATHERV`. Cases (l), (l'),
+(n) and the `amr_max_level=3` case add static and 2D/3-level coverage at `ppn=2`. So S3.3 does NOT need
+a new test — a single-rank golden could not see a broken alltoallv, but these can.
+
+### S3.2b DESIGN, REVISED 2026-08-28 — depth-batched, and much smaller than the version above
+
+The measurement changes the design. With 99.93% of level-1 nodes rank-local and only 7-11 shared per
+regrid, the expensive part is not making the shared exchange sparse — it is *not doing the other
+16,372*. That splits the clusterer in two, and the shallow half can stay on `MPI_COMM_WORLD`:
+
+- **Shallow phase (`novr > 1`), replicated.** Every rank already agrees on this part of the tree: it
+  descends from the global bbox, and `s_amr_ranks_overlapping` is a pure function of the box and the
+  decomposition, so `novr` needs no communication to evaluate. Walk it **breadth-first by depth** and
+  issue **ONE fused `ALLREDUCE` per depth** carrying the concatenated signatures of every shared node
+  at that depth. All ranks hold identical shallow state, so they agree on the node list and hence on
+  the concatenation layout. Collectives per regrid become `shr_maxdep` — **3 at np8, 5 at np16** —
+  against 16,383 today.
+- **Deep phase (`novr == 1`), private.** The moment a node fits inside one rank, that rank holds every
+  tag in the subtree: it finishes the subtree alone with **zero communication**, and no other rank
+  descends into it at all.
+- **Close with one `ALLGATHERV` of the resulting BOXES** — per-box global data, which the endstate
+  explicitly permits, and which B1 makes order-independent.
+
+**What this drops from the earlier design.** No graph communicator, no `MPI_Neighbor_alltoallv`, no
+per-node sparsity. Those were aimed at making each shared node's exchange cheap; depth-batching instead
+makes the NUMBER of exchanges `O(shr_maxdep)` regardless, and the measured volume that has to move is
+~35 KB per regrid, which no amount of sparsity would meaningfully improve. Sparsity becomes a later
+refinement, not a prerequisite.
+
+**Why this survives growth.** Shared nodes grow ~1.57x per np-doubling (~P^0.65, the rank-boundary
+SURFACE, exactly as geometry predicts), so ~3,000 shared nodes per regrid at 1e5 ranks. Un-batched that
+would be 3,000 collectives; batched by depth it is `shr_maxdep` ~ 2 log2 P ~ **34**. This is why
+`shr_maxdep` still matters and why its growth rate is worth knowing -- but it sets the ROUND count, not
+the volume, and 34 rounds is not a wall.
+
+**Gate.** Level-1 global collectives per regrid = `shr_maxdep` (not 16,383); box set identical to the
+post-B1 baseline; `[amr-tree] nodes` unchanged; `[amr-scope-me]` confirming the deep phase is genuinely
+private. Bit-identity against post-B1 is achievable here because B0 made `force`/the cap inert and B1
+made the merge order-independent -- which is the whole reason those two landed first.
+
 ### Increments
 
 - **S3.2a (next, cheap):** measure the depth at which nodes become rank-local, and the node/volume
   split above versus below it. The depth instrumentation already exists. **This sizes the whole
   design before any of it is written.**
-- **S3.2b:** shallow phase on the sparse per-depth exchange, deep phase local. Gate: bit-identical box
-  set, `[amr-tree] nodes` unchanged, and **per-rank reduced bytes FLAT across np8/16/32** — the first
-  time that gate can actually be met.
+- **S3.2b:** shallow phase depth-batched, deep phase local — see "S3.2b DESIGN, REVISED 2026-08-28"
+  below, which supersedes the neighbour-communicator sketch above and the bytes-flat gate (level-1
+  per-rank bytes are ALREADY flat, so that gate cannot discriminate).
 - **S3.3:** the same mechanism on the level-2 forest.
 
 ## 2026-08-27 (38) — S3.1 LANDED: THE LEVEL-1 W4 COLLECTIVE IS GONE, AND THE SCALING LAW MEASURED
