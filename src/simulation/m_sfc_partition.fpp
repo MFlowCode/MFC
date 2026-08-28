@@ -25,10 +25,10 @@ module m_sfc_partition
     !! UNRECOVERABLE library error: Unitialized descriptor for ALLOCATE statement argument`. amdflang tolerates it, which is why
     !! only Frontier saw this.
     real(wp), allocatable :: tile_weight(:)  !< global per-tile aggregated cost (linear index)
+    integer, allocatable  :: tile_rank(:)    !< proposed owning rank per tile
+    integer, allocatable  :: sfc_order(:)    !< tile linear indices in Morton order
     $:GPU_DECLARE(create='[tile_weight, tile_rank, sfc_order]')
-    integer, allocatable :: tile_rank(:)  !< proposed owning rank per tile
-    integer, allocatable :: sfc_order(:)  !< tile linear indices in Morton order
-    real(wp)             :: cur_w_max     !< current static per-rank max weight (existing decomposition)
+    real(wp) :: cur_w_max  !< current static per-rank max weight (existing decomposition)
 
 contains
 
