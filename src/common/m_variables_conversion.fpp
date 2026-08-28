@@ -309,7 +309,7 @@ contains
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eos_types]')
+        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -1190,7 +1190,7 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc)
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eos_types)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
