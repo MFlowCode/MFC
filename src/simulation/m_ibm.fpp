@@ -184,6 +184,18 @@ contains
         type(ghost_point)      :: gp
         type(ghost_point)      :: innerp
 
+        ! Per-ghost-point image-point interpolation results, stashed between the interpolation
+        ! kernel and the correction kernel below so that the correction kernel never reads
+        ! q_prim_vf (or pb_in/mv_in) at a cell another ghost point's correction may have already
+        ! overwritten this stage - i.e. so the two kernels never race on those shared fields.
+        real(wp), allocatable :: alpha_rho_IP_buf(:,:), alpha_IP_buf(:,:)
+        real(wp), allocatable :: pres_IP_buf(:), c_IP_buf(:)
+        real(wp), allocatable :: vel_IP_buf(:,:)
+        real(wp), allocatable :: r_IP_buf(:,:), v_IP_buf(:,:), pb_IP_buf(:,:), mv_IP_buf(:,:)
+        real(wp), allocatable :: nmom_IP_buf(:,:)
+        real(wp), allocatable :: presb_IP_buf(:,:), massv_IP_buf(:,:)
+        real(wp), allocatable :: Ys_IP_buf(:,:)
+
         ! set the Moving IBM interior conservative variables
         $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', collapse=3)
         do l = 0, p
@@ -219,6 +231,56 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
+            @:ALLOCATE(alpha_rho_IP_buf(1:num_fluids, 1:num_gps), alpha_IP_buf(1:num_fluids, 1:num_gps), &
+                       & pres_IP_buf(1:num_gps), c_IP_buf(1:num_gps), vel_IP_buf(1:3, 1:num_gps), &
+                       & r_IP_buf(1:nb, 1:num_gps), v_IP_buf(1:nb, 1:num_gps), pb_IP_buf(1:nb, 1:num_gps), &
+                       & mv_IP_buf(1:nb, 1:num_gps), nmom_IP_buf(1:nb*nmom, 1:num_gps), &
+                       & presb_IP_buf(1:nb*nnode, 1:num_gps), massv_IP_buf(1:nb*nnode, 1:num_gps), &
+                       & Ys_IP_buf(1:num_species, 1:num_gps))
+
+            ! Phase 1: interpolate image-point primitives for every ghost point from the pre-correction field only. Kept in its
+            ! own kernel (rather than fused with phase 2 below) so the kernel-launch boundary between them guarantees every
+            ! interpolation here happens-before any q_prim_vf/q_cons_vf write in phase 2 - otherwise, with densely-packed ghost
+            ! regions, one ghost point's image-point stencil can land on a cell that is itself another ghost point being
+            ! corrected in the same parallel loop, racing the read against that write.
+            $:GPU_PARALLEL_LOOP(private='[i, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
+                                & nmom_IP, presb_IP, massv_IP, Ys_IP]')
+            do i = 1, num_gps
+                gp = ghost_points(i)
+
+                ! Interpolate primitive variables at image point associated w/ GP
+                if (bubbles_euler .and. .not. qbmm) then
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
+                                                   & pb_IP, mv_IP)
+                else if (qbmm .and. polytropic) then
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
+                                                   & pb_IP, mv_IP, nmom_IP)
+                else if (qbmm .and. .not. polytropic) then
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
+                                                   & pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                else if (chemistry) then
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, Ys_IP=Ys_IP)
+                else
+                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
+                end if
+
+                alpha_rho_IP_buf(:, i) = alpha_rho_IP(1:num_fluids)
+                alpha_IP_buf(:, i) = alpha_IP(1:num_fluids)
+                pres_IP_buf(i) = pres_IP
+                vel_IP_buf(:, i) = vel_IP
+                c_IP_buf(i) = c_IP
+                r_IP_buf(:, i) = r_IP(1:nb)
+                v_IP_buf(:, i) = v_IP(1:nb)
+                pb_IP_buf(:, i) = pb_IP(1:nb)
+                mv_IP_buf(:, i) = mv_IP(1:nb)
+                nmom_IP_buf(:, i) = nmom_IP(1:nb*nmom)
+                presb_IP_buf(:, i) = presb_IP(1:nb*nnode)
+                massv_IP_buf(:, i) = massv_IP(1:nb*nnode)
+                Ys_IP_buf(:, i) = Ys_IP(1:num_species)
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            ! Phase 2: apply the buffered image-point results as ghost-point corrections to q_prim_vf/q_cons_vf.
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
@@ -237,21 +299,20 @@ contains
                     physical_loc = [x_cc(j), y_cc(k), 0._wp]
                 end if
 
-                ! Interpolate primitive variables at image point associated w/ GP
-                if (bubbles_euler .and. .not. qbmm) then
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
-                                                   & pb_IP, mv_IP)
-                else if (qbmm .and. polytropic) then
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
-                                                   & pb_IP, mv_IP, nmom_IP)
-                else if (qbmm .and. .not. polytropic) then
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, &
-                                                   & pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
-                else if (chemistry) then
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, Ys_IP=Ys_IP)
-                else
-                    call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
-                end if
+                ! Recover the image-point interpolation computed for this ghost point in phase 1
+                alpha_rho_IP(1:num_fluids) = alpha_rho_IP_buf(:, i)
+                alpha_IP(1:num_fluids) = alpha_IP_buf(:, i)
+                pres_IP = pres_IP_buf(i)
+                vel_IP = vel_IP_buf(:, i)
+                c_IP = c_IP_buf(i)
+                r_IP(1:nb) = r_IP_buf(:, i)
+                v_IP(1:nb) = v_IP_buf(:, i)
+                pb_IP(1:nb) = pb_IP_buf(:, i)
+                mv_IP(1:nb) = mv_IP_buf(:, i)
+                nmom_IP(1:nb*nmom) = nmom_IP_buf(:, i)
+                presb_IP(1:nb*nnode) = presb_IP_buf(:, i)
+                massv_IP(1:nb*nnode) = massv_IP_buf(:, i)
+                Ys_IP(1:num_species) = Ys_IP_buf(:, i)
 
                 ! Injecting (burning) surface: replace the mirrored ghost composition with pure
                 ! injected fuel at the local pressure and the ambient (image-point) temperature.
@@ -449,6 +510,9 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
+
+            @:DEALLOCATE(alpha_rho_IP_buf, alpha_IP_buf, pres_IP_buf, c_IP_buf, vel_IP_buf, r_IP_buf, v_IP_buf, pb_IP_buf, &
+                        & mv_IP_buf, nmom_IP_buf, presb_IP_buf, massv_IP_buf, Ys_IP_buf)
         end if
 
     end subroutine s_ibm_correct_state
