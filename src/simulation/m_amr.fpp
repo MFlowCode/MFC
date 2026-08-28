@@ -142,6 +142,10 @@ module m_amr
     integer(8) :: amr_cl_shr_nodes = 0, amr_cl_shr_rb = 0, amr_cl_loc_nodes = 0, amr_cl_loc_rb = 0
     integer(8) :: amr_cl_shr_nodes_r = 0, amr_cl_shr_rb_r = 0, amr_cl_loc_nodes_r = 0, amr_cl_loc_rb_r = 0
     integer    :: amr_cl_shr_maxdep = 0, amr_cl_shr_maxdep_r = 0
+    !> S3.2a-2: what the shallow phase would cost THIS rank. shr_rb_r counts every shared node and so prices the ALLREDUCE form,
+    !! where each node's whole signature lands on every rank. Under S3.2's sparse per-depth exchange a rank touches only the shared
+    !! nodes its own subdomain OVERLAPS, so these count that subset -- the quantity that has to be sublinear in P for W4.
+    integer(8) :: amr_cl_me_nodes_r = 0, amr_cl_me_rb_r = 0
     !> TRACK T (T0b gate): regrid migration volume. An old block is ISENT to EVERY new-owner rank whose box overlaps it, so the cost
     !! is fan-out x block bytes, not one send per block. amr_mig_blk counts blocks that had to move at all, amr_mig_snd counts the
     !! sends, amr_gb_mig the bytes. fan-out = snd/blk is the reducible quantity: if it is ~1 the volume is inherent and hysteresis
@@ -151,6 +155,7 @@ module m_amr
     public :: amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now
     public :: amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep
     public :: amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r
+    public :: amr_cl_me_nodes_r, amr_cl_me_rb_r
     public :: s_amr_ranks_overlapping  !< exported for the S3.2a scope measurement in m_amr_regrid
     public :: amr_gb_mig, amr_mig_snd, amr_mig_blk
     integer :: amr_loc_nfree = 0  !< depth of the recycle stack
