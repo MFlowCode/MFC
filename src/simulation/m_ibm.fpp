@@ -101,9 +101,9 @@ module m_ibm
     !! that was never `declare target` leaves the runtime no descriptor to attach to, and Cray CCE aborts with `lib-4425
     !! UNRECOVERABLE library error: Unitialized descriptor for ALLOCATE statement argument`. amdflang tolerates it, which is why
     !! only Frontier saw this.
-    integer, allocatable :: send_ids(:), recv_ids(:)
-    $:GPU_DECLARE(create='[send_ids, send_ft]')
+    integer, allocatable  :: send_ids(:), recv_ids(:)
     real(wp), allocatable :: send_ft(:,:), recv_ft(:,:)
+    $:GPU_DECLARE(create='[send_ids, send_ft]')
     real(wp), allocatable :: recv_forces_snap(:,:), recv_torques_snap(:,:)
 
 contains
