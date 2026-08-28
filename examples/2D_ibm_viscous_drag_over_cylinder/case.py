@@ -77,6 +77,7 @@ case = {
     "patch_icpp(1)%alpha(1)": 1.0,
     # --- Fluid properties (calorically perfect air) ---
     "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),  # MFC: 1/(gamma-1)
+    "fluid_pp(1)%eos": "ideal_gas",
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": Re_p / (d_cyl * U_inf),
     # --- Boundary conditions ---
