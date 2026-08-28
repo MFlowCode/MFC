@@ -16,7 +16,7 @@ module m_global_parameters_common
     use m_derived_types
     use m_thermochem, only: num_species
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, recon_type_weno, recon_type_muscl, name_len, &
-        & dflt_int, dflt_real
+        & dflt_int, dflt_real, eos_stiffened_gas, eos_ideal_gas
 
     implicit none
 
@@ -53,7 +53,8 @@ module m_global_parameters_common
     !> gammas is the stored form 1/(gamma - 1), not the ratio of specific heats; isentrope_n and isentrope_B are the same EOS
     !! written as p + B = const*rho**n.
     real(wp), allocatable, dimension(:) :: gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
-    $:GPU_DECLARE(create='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps]')
+    integer, allocatable, dimension(:)  :: eos_types  !< Per-fluid equation of state (eos_* in m_constants)
+    $:GPU_DECLARE(create='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, eos_types]')
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity

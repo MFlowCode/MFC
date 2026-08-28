@@ -285,19 +285,31 @@ contains
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
+        @:ALLOCATE(eos_types(1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             isentrope_n(i) = f_isentrope_exponent(gammas(i))
-            pi_infs(i) = fluid_pp(i)%pi_inf
+            eos_types(i) = fluid_pp(i)%eos
+
+            ! Each equation of state supplies its own coefficients: the stiffened gas has a stiffness
+            ! term, an ideal gas has none. Resolved here rather than per cell because a branch in the
+            ! mixture-coefficient loop costs registers in the pressure-heavy Riemann kernels; an EOS
+            ! whose coefficients depend on state has to be evaluated per cell instead.
+            select case (fluid_pp(i)%eos)
+            case (eos_ideal_gas)
+                pi_infs(i) = 0._wp
+            case default
+                pi_infs(i) = fluid_pp(i)%pi_inf
+            end select
             Gs_vc(i) = fluid_pp(i)%G
             isentrope_B(i) = f_isentrope_pressure(pi_infs(i), gammas(i))
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc]')
+        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eos_types]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
