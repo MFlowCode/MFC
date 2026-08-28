@@ -829,6 +829,42 @@ LIBOMPTARGET_JIT_SKIP_OPT=1
 - If set, the image will only be passed through the backend.
 - The backend is invoked with the `LIBOMPTARGET_JIT_OPT_LEVEL` flag.
 
+## AMD flang (amdflang) Known Issues
+
+### Whole-image device codegen instability (worked around in the build)
+
+amdflang generates device code for the whole image at link time. Once the image carries
+enough OpenMP target regions, the device link's `Attributor` pass exceeds its
+`AAPointerInfo` access cap on a heavily shared object; pointer information goes
+pessimistic and `OpenMPOpt`'s `__kmpc_parallel` cleanup then fails for the whole module.
+The visible effect: adding (or removing) ANY kernel anywhere silently regenerates
+UNTOUCHED kernels with far worse ISA — measured 2.4-4.5x slower, with register spills
+and an extra 512 B of LDS in every kernel. A wall-time A/B between two commits that
+differ in target-region count is confounded by this whole-image effect.
+
+MFC's build raises the cap (`-attributor-max-pi-accesses=16384`, passed to the offload
+linker in `cmake/MFCTargets.cmake`), which restores full pointer precision for the whole
+image and makes kernel quality independent of unrelated edits. The cost is a longer
+device link. If a build's device link is unexpectedly slow, this flag is why — do not
+remove it; kernel performance becomes nondeterministic across commits without it.
+
+The failure signature without the flag: after adding a kernel, unrelated kernels'
+resource usage shifts image-wide (uniform LDS increase, scratch/spill jumps visible in
+`rocprofv3` dispatch records) and previously fast kernels slow several-fold.
+
+### Target regions inside Fortran BLOCK constructs are silently dropped
+
+A `GPU_PARALLEL_LOOP` (OpenMP target region) written inside a Fortran `block ...
+end block` construct compiles cleanly, but amdflang omits it from the device image
+while the host still registers it. The first launch aborts with
+
+    hsa_executable_get_symbol_by_name(__omp_offloading_..._l<line>.kd):
+    HSA_STATUS_ERROR_INVALID_SYMBOL_NAME
+    omptarget error: Failed to load kernel ...
+
+followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
+hoist it into its own (module) subroutine with the locals passed as arguments.
+
 ## Compiler Documentation
 
 - [Cray & OpenMP Docs](https://cpe.ext.hpe.com/docs/24.11/cce/man7/intro_openmp.7.html#environment-variables)

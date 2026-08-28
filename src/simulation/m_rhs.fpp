@@ -275,7 +275,7 @@ contains
                     if (adv_src_mode == adv_src_mode_vel_iface) then
                         ! u-interface: flux_src(adv%beg) holds one shared face-normal velocity. Pointer-alias adv%beg+1:adv%end to
                         ! the same memory so loops over adv%beg:adv%end can keep fluid indexing while still reading one value. This
-                        ! saves (num_fluids - 1) 3D field allocations.
+                        ! saves (num_fluids - 1) 3D field allocations
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(eqn_idx%adv%beg)%sf
                             $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
