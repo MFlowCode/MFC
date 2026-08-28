@@ -506,10 +506,16 @@ int main(int c,char**v){int f;void*p;MPI_Init(&c,&v);MPI_Comm_get_attr(MPI_COMM_
 printf("MPI_TAG_UB = %d (flag=%d)\n",*(int*)p,f);MPI_Finalize();return 0;}
 ```
 
-**Pending the same probe on Frontier's Cray MPICH.** If it also reports >= ~2**25, **W5 leaves the critical
-path**: the per-box tags and the `amr_max_blocks` base term remain worth cleaning up for the end state,
-but they stop being a hard abort and the demonstration does not wait on them. If Cray MPICH really is
-2**21, W5 returns to its previous position. **Do not re-plan around 28k ranks until that number is in.**
+**MEASURED ON FRONTIER 2026-08-28: `MPI_TAG_UB = 536870911` (2**29 - 1), Cray MPICH.** That admits ~537e6
+global blocks, i.e. **~7.2 MILLION ranks** at ~75 boxes/rank, against Frontier's ~75,000 GCDs -- about
+**95x headroom**. **W5 IS OFF THE CRITICAL PATH.** The `2**21 / 28k ranks` figure was wrong by 256x and
+had been carried as fact in the module comment (now corrected in `m_amr.fpp`) and through this plan.
+Converting the remaining per-box tag sites and dropping the `amr_max_blocks` base term stay worthwhile
+for the end state -- they are what makes the tag space O(1) rather than O(global blocks) -- but they no
+longer gate the demonstration and no longer couple to the subcycle work.
+
+(Superseded text kept for the reasoning: If it also reports >= ~2**25, **W5 leaves the critical path**: the per-box tags and the `amr_max_blocks` base term remain worth cleaning up for the end state,
+but they stop being a hard abort and the demonstration does not wait on them. If Cray MPICH really is 2**21, W5 returns to its previous position.) **That number is now in: it is 2**29 - 1.**
 
 **2. Subcycling IS required for the demonstration (user, 2026-08-28).** That adds an item the ladder had
 deferred: subcycle + dynamic regrid at np>1 is CHECKER-GATED today, and the subcycle p2p sites are an
