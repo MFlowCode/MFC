@@ -1550,6 +1550,7 @@ contains
             pack_pos = storage_size(0)/8 + new_count*patch_bytes
 
             ! Post all receives first, then sends
+            ! TODO :: THIS NEEDS TO ITERATE OVER -ib_neighborhood_radius to ib_neighborhood_radius, not -1 to 1
             nreqs = 0
             nbr_idx = 0
             do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3)
@@ -1597,6 +1598,7 @@ contains
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
                         patch_ib(num_ibs) = tmp_patch
+                        ib_gbl_idx_lookup(tmp_patch%gbl_patch_id) = num_ibs
                     end if
                 end do
             end do
