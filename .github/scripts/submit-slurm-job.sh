@@ -221,7 +221,7 @@ $sbatch_script_contents
 EOT
 )
 
-# --- Submit + monitor, resubmitting on preemption -------------------------
+# --- Submit + monitor, resubmitting on preemption
 # Phoenix preempts 'embers' jobs with PreemptMode=CANCEL (not REQUEUE), so a
 # preempted job is killed outright and `--requeue` never restarts it. When the
 # monitor reports preemption (exit 76), submit a fresh job and monitor again.
