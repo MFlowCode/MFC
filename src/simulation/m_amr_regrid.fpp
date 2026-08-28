@@ -1091,9 +1091,25 @@ contains
                 integer, allocatable     :: mlo_all(:,:), mhi_all(:,:)
                 logical                  :: any_tag
                 type(t_box), allocatable :: cboxes(:)
+                !> S3.3a: one rank CLUSTERS each parent's window instead of every rank clustering every parent. powner is the
+                !! assignment (replicated, computed with no communication); mych_* is this rank's own children, emitted without the
+                !! global slot cap because a rank cannot see the global count mid-pass; gch_* is the assembled global list. The
+                !! children are replayed into `boxes` in (kb, emission) order afterwards, which is exactly the order the serial loop
+                !! produced them in -- so the box list, its truncation at amr_max_fine, and box_level are unchanged.
+                integer, allocatable :: powner(:)
+                integer, allocatable :: mych(:,:)            !< (7, n): lo(3), hi(3), kb
+                integer, allocatable :: gch(:,:)
+                integer              :: nmych, ntot_ch, ich, jch
+                integer, allocatable :: chhead(:), chord(:)  !< counting-sort scratch for the canonical child order
+                !> S3.3b: the pair exchange is TARGETED -- a rank sends each parent's tags only to that parent's owner, so send
+                !! volume is O(this rank's tagged cells) and receive volume O(its assigned parents' tags), instead of every rank
+                !! receiving every rank's pairs (the O(P) `gwin_bytes` term).
+                integer, allocatable    :: phead(:), pord(:)
+                integer(8), allocatable :: tidx(:)
+                integer, allocatable    :: tkb(:)
 #ifdef MFC_MPI
                 integer              :: ierr, ip
-                integer, allocatable :: rcnt(:), rdsp(:)
+                integer, allocatable :: rcnt(:), rdsp(:), scnt(:), sdsp(:)
 #endif
 
                 ! host-refresh the live (old) blocks' conserved state: the fine sensor below reads the flat store on the host,
@@ -1129,6 +1145,15 @@ contains
                     allocate (covered(plo:phi), mlo_all(3,plo:phi), mhi_all(3,plo:phi))
                     covered = .false.
                     nloc_send = 0
+                    ! S3.3a: assign each parent a clustering owner. Round-robin over kb both balances the parents across ranks
+                    ! and is a pure function of kb and num_procs, so every rank agrees without communicating. Pass 2 below then
+                    ! processes ONLY its own parents, which deletes the per-parent rescan of the whole gathered pair list
+                    ! (O(parents x global tags) on EVERY rank) and the replicated clustering along with it.
+                    allocate (powner(plo:phi), mych(7, amr_max_fine))
+                    do kb = plo, phi
+                        powner(kb) = mod(kb - plo, max(num_procs, 1))
+                    end do
+                    nmych = 0
                     ! Pass 1: collect (no comm)
                     do kb = plo, phi
                         ! nesting window: children keep an amr_cpat_mar margin from the parent boundary so their ghost
@@ -1207,18 +1232,40 @@ contains
                     end if
 #ifdef MFC_MPI
                     if (num_procs > 1) then
-                        allocate (rcnt(num_procs), rdsp(num_procs))
-                        call MPI_ALLGATHER(nloc_send, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        ! S3.3b: bucket this rank's pairs by the DESTINATION owner (stable counting sort -- pass 1 appends in
+                        ! kb order, and round-robin ownership interleaves the destinations), then exchange only what each rank
+                        ! actually needs. Pass 2 rebuilds a DENSE window and re-extracts in (k,j,i) order, so ctags does not
+                        ! depend on the order pairs arrive in and the box set is unchanged.
+                        allocate (rcnt(num_procs), rdsp(num_procs), scnt(num_procs), sdsp(num_procs))
+                        allocate (phead(num_procs), pord(max(nloc_send, 1)))
+                        phead = 0
+                        do i = 1, nloc_send
+                            ip = powner(skb(i)) + 1; phead(ip) = phead(ip) + 1
+                        end do
+                        scnt = phead
+                        sdsp(1) = 0
+                        do ip = 2, num_procs
+                            sdsp(ip) = sdsp(ip - 1) + scnt(ip - 1)
+                        end do
+                        phead = sdsp + 1
+                        do i = 1, nloc_send
+                            ip = powner(skb(i)) + 1; pord(phead(ip)) = i; phead(ip) = phead(ip) + 1
+                        end do
+                        allocate (tidx(max(nloc_send, 1)), tkb(max(nloc_send, 1)))
+                        do i = 1, nloc_send
+                            tidx(i) = sidx(pord(i)); tkb(i) = skb(pord(i))
+                        end do
+                        call MPI_ALLTOALL(scnt, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                         rdsp(1) = 0
                         do ip = 2, num_procs
                             rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
                         end do
                         ntot_g = rdsp(num_procs) + rcnt(num_procs)
-                        amr_gb_win = amr_gb_win + int(ntot_g, 8)*(8_8 + 8_8)  ! gidx + gkb, both int8
+                        amr_gb_win = amr_gb_win + int(ntot_g, 8)*(8_8 + 8_8)  ! now the RECEIVED volume, i.e. O(local)
                         allocate (gidx(max(ntot_g, 1)), gkb(max(ntot_g, 1)))
-                        call MPI_ALLGATHERV(sidx, nloc_send, MPI_INTEGER8, gidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
-                        call MPI_ALLGATHERV(skb, nloc_send, MPI_INTEGER, gkb, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        deallocate (rcnt, rdsp)
+                        call MPI_ALLTOALLV(tidx, scnt, sdsp, MPI_INTEGER8, gidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
+                        call MPI_ALLTOALLV(tkb, scnt, sdsp, MPI_INTEGER, gkb, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        deallocate (rcnt, rdsp, scnt, sdsp, phead, pord, tidx, tkb)
                     else
                         call move_alloc(sidx, gidx); call move_alloc(skb, gkb)
                         ntot_g = nloc_send
@@ -1230,9 +1277,13 @@ contains
                     if (allocated(sidx)) deallocate (sidx)
                     if (allocated(skb)) deallocate (skb)
 
-                    ! Pass 2: process (no comm)
+                    ! Pass 2: process (no comm). S3.3a: OWN PARENTS ONLY. The global `nboxes + 1 > amr_max_fine` guard cannot
+                    ! be evaluated here any more -- a rank does not see the other ranks' children -- so children are emitted into
+                    ! mych without a cap and the replay below applies the cap in the canonical order, which is the same order and
+                    ! therefore the same truncation the serial loop performed.
                     do kb = plo, phi
-                        if (nboxes + 1 > amr_max_fine) exit  ! pool full - stop nesting
+                        if (powner(kb) /= proc_rank) cycle
+                        if (nmych + 1 > amr_max_fine) exit  ! local buffer full (bounded by the same global cap)
                         mlo = mlo_all(:,kb); mhi = mhi_all(:,kb)
                         if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
                         if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
@@ -1321,10 +1372,9 @@ contains
                                     call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, &
                                                         & amr_maxc_fit/amr_ref_ratio**(lev - 1))
                                     do it = 1, nl2
-                                        if (nboxes + 1 > amr_max_fine) exit
-                                        nboxes = nboxes + 1
-                                        boxes(nboxes)%lo = l2t(it)%lo; boxes(nboxes)%hi = l2t(it)%hi
-                                        box_level(nboxes) = lev
+                                        if (nmych + 1 > amr_max_fine) exit
+                                        nmych = nmych + 1
+                                        mych(1:3,nmych) = l2t(it)%lo; mych(4:6,nmych) = l2t(it)%hi; mych(7, nmych) = kb
                                     end do
                                 end block
                             end do
@@ -1353,14 +1403,63 @@ contains
                                 nnr = 0; nrc = 0
                                 call s_amr_tile_box(clo, chi, nrt, nnr, amr_max_blocks, nrc, amr_maxc_fit/amr_ref_ratio**(lev - 1))
                                 do it2 = 1, nnr
-                                    if (nboxes + 1 > amr_max_fine) exit
-                                    nboxes = nboxes + 1
-                                    boxes(nboxes)%lo = nrt(it2)%lo; boxes(nboxes)%hi = nrt(it2)%hi
-                                    box_level(nboxes) = lev
+                                    if (nmych + 1 > amr_max_fine) exit
+                                    nmych = nmych + 1
+                                    mych(1:3,nmych) = nrt(it2)%lo; mych(4:6,nmych) = nrt(it2)%hi; mych(7, nmych) = kb
                                 end do
                             end block
                         end if
                     end do
+
+                    ! S3.3a: assemble the children. Every parent has exactly ONE owner and that owner emitted its children in
+                    ! order, so ONE allgatherv of the child BOXES (7 ints each: lo, hi, parent kb -- per-box global data, which
+                    ! the endstate permits, ~67 KB against the 144 MB per-cell gather above) plus a STABLE sort by kb reproduces
+                    ! the (kb ascending, emission) order the serial loop appended in. Box list, truncation at amr_max_fine and
+                    ! box_level are therefore unchanged -- the gate for this increment is bit-identity.
+#ifdef MFC_MPI
+                    if (num_procs > 1) then
+                        allocate (rcnt(num_procs), rdsp(num_procs))
+                        call MPI_ALLGATHER(nmych, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        rdsp(1) = 0
+                        do ip = 2, num_procs
+                            rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
+                        end do
+                        ntot_ch = rdsp(num_procs) + rcnt(num_procs)
+                        allocate (gch(7, max(ntot_ch, 1)))
+                        rcnt = rcnt*7; rdsp = rdsp*7
+                        call MPI_ALLGATHERV(mych, nmych*7, MPI_INTEGER, gch, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        deallocate (rcnt, rdsp)
+                    else
+                        ntot_ch = nmych
+                        allocate (gch(7, max(ntot_ch, 1))); gch(:,1:ntot_ch) = mych(:,1:ntot_ch)
+                    end if
+#else
+                    ntot_ch = nmych
+                    allocate (gch(7, max(ntot_ch, 1))); gch(:,1:ntot_ch) = mych(:,1:ntot_ch)
+#endif
+                    ! stable counting sort by parent kb
+                    allocate (chhead(plo:phi), chord(max(ntot_ch, 1)))
+                    chhead = 0
+                    do ich = 1, ntot_ch
+                        chhead(gch(7, ich)) = chhead(gch(7, ich)) + 1
+                    end do
+                    jch = 1
+                    do kb = plo, phi
+                        ich = chhead(kb); chhead(kb) = jch; jch = jch + ich
+                    end do
+                    do ich = 1, ntot_ch
+                        kb = gch(7, ich)
+                        chord(chhead(kb)) = ich; chhead(kb) = chhead(kb) + 1
+                    end do
+                    do jch = 1, ntot_ch
+                        ich = chord(jch)
+                        if (nboxes + 1 > amr_max_fine) exit  ! pool full - stop nesting (same order, same truncation)
+                        nboxes = nboxes + 1
+                        boxes(nboxes)%lo = gch(1:3,ich); boxes(nboxes)%hi = gch(4:6,ich)
+                        box_level(nboxes) = lev
+                    end do
+                    deallocate (gch, chhead, chord, powner, mych)
+
                     deallocate (gidx, gkb, covered, mlo_all, mhi_all)  ! per-level scratch - freed every level (no leak)
                     plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
                     if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
