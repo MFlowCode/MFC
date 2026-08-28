@@ -487,6 +487,66 @@ measured ~75 boxes/rank**, which is exactly the wall the module comment records.
 
 Step 2 is one line and is the whole point; step 1 is the work that unblocks it.
 
+
+### DE-RISK 2026-08-28: a FOURTH wall, in the RESTART writer, and it is the worst one found so far
+
+Asked to de-risk the true challenges rather than keep incrementing, I audited the paths a real run needs
+but the benchmark does not exercise. The parallel-IO checkpoint writer
+(`m_amr_restart.fpp`, the `parallel_io` branch) contains:
+
+```
+allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
+...
+call MPI_EXSCAN   (my_cnt_vec, my_off_vec,  amr_num_blocks, MPI_OFFSET, ...)
+call MPI_ALLREDUCE(my_cnt_vec, tot_cnt_vec, amr_num_blocks, MPI_OFFSET, ...)
+call MPI_ALLGATHER(myext_all, 3*amr_num_blocks, MPI_INTEGER, wext_all, 3*amr_num_blocks, ...)
+```
+
+**`wext_all` is `3 x num_procs x amr_num_blocks` integers, allocated PER RANK**, and the `ALLGATHER`
+that fills it moves that much to every rank. This is **O(P x global blocks) memory per rank** -- the only
+quadratic ALLOCATION found anywhere in the code, and strictly worse than the O(P) metadata replication
+that limits the rest of the system.
+
+| ranks | `amr_max_blocks` | `wext_all` per rank |
+|---|---|---|
+| 1,024 | 8,192 | 100 MB |
+| 8,192 | 8,192 | 805 MB |
+| 75,000 (Frontier) | 8,192 | **7.4 GB** |
+| 75,000 | 65,536 (uncapped, as the ladder needs) | **59 GB -- exceeds the GCD** |
+
+**Why it was invisible.** The AMR benchmark runs FROM a restart but never WRITES one at scale, and the
+goldens that exercise restart (`(h)` and the `(l-prime)` parallel_io case) run at np<=2. So no measurement in this ledger touches it.
+It would have surfaced for the first time at the Frontier demonstration, on the first checkpoint.
+
+**CORRECTION, 20 minutes later, on reading the consumer: it is WORSE than "a consistency check".**
+`wext` is not merely compared -- it is **WRITTEN INTO THE FILE**, once per block:
+
+```
+call MPI_FILE_WRITE_AT(ifile, disp0 + amr_restart_blk_hdr_ints*ibytes, wext, 3*num_procs, MPI_INTEGER, ...)
+```
+
+**So the CHECKPOINT FORMAT is O(global blocks x num_procs).** At 75k ranks x 8192 blocks that is
+3 x 75000 x 8192 x 4 B = **7.4 GB of header written into every checkpoint**, and the reader
+(`:396-401`) parses the same layout and aborts on mismatch. Both directions carry it, and the benchmark
+restarts from file every run, so the READ path is on the hot path already.
+
+**The array is almost entirely zeros**: only the OWNER of block k has a nonzero extent triple, so the
+information content is `(owner, m, n, p)` per block -- O(blocks x 4) rather than O(blocks x 3P). At
+Frontier scale that is a ~19,000x reduction.
+
+**But it is a FILE FORMAT change, not a local optimisation.** That is the part I got wrong the first
+time and it changes the cost: it needs a format version bump (`amr_restart_blk_hdr_ints` is already
+single-sourced in `m_constants`, so there is a place to put one), a reader that accepts both layouts, and
+the restart goldens ((h) multi-level restart, and the (l-prime) multi-level parallel_io restart) as the gate.
+Old checkpoints stay readable only if the reader keeps the legacy path.
+
+**Priority: this is the first thing to fix before any scale test**, because it is fatal on the first
+checkpoint AND on the first restart, and because getting it wrong silently corrupts saved state rather
+than crashing.
+
+**Added to the de-risk list, and it moves ahead of the W1 memory item:** a run that cannot checkpoint
+cannot be demonstrated, regardless of how well the step loop scales.
+
 ### ARM B VERDICT 2026-08-28 (three points, cap raised to 65536 so it never binds): LEVEL 1 IS O(P)
 
 | per regrid | np8 | np16 | np32 | growth |

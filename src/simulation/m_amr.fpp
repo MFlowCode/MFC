@@ -243,6 +243,19 @@ module m_amr
     !! their owner skip), so iterating a list reproduces the replaced per-call 0..num_procs-1 scan's MPI send/recv order exactly.
     !> (max-overlap, amr_max_blocks); sized in s_amr_build_seam_pairs
     integer, allocatable :: amr_ovl_gather(:,:), amr_ovl_scatter(:,:)
+    !> W1a: the block indices THIS rank owns, ascending. The stage-path waves used to scan the whole GLOBAL block list (`do k = 1,
+    !! amr_num_blocks`) and filter to their own ~75 -- ~48 such scans per step under RK3, so ~360 M predicate evaluations per rank
+    !! per step at 1e5 ranks, linear in P while the real work is fixed. Iterating this list instead is O(local). Built ASCENDING in
+    !! s_amr_assign_block_owners, which is the single authority for ownership (regrid, init and both restart paths all route through
+    !! it), so skipping the non-owned blocks a converted loop would have `cycle`d anyway leaves the iteration ORDER identical --
+    !! which the paired MPI_SENDRECVs depend on.
+    integer, allocatable :: amr_my_blk(:)
+    integer              :: amr_n_my = 0
+    !> Set wherever amr_block_owner is WRITTEN. s_amr_assign_block_owners is NOT the only writer -- a tiled level-2 block inherits
+    !! its parent's owner (s_amr_add_l2_tile), and the restart/migration paths assign directly -- so a list built only in the
+    !! assigner goes stale and a converted loop then visits the wrong blocks. Caught by the tiled-L2 multi-level dynamic-regrid
+    !! golden, which is the one test that exercises the inherit path.
+    logical              :: amr_myblk_dirty = .true.
     integer, allocatable :: amr_ovl_gather_n(:), amr_ovl_scatter_n(:)  !< per-block list lengths
     !> Rebuild gather PLAN (gather-batching step 1): the whole rebuild's gather message set, derived up front by
     !! s_amr_build_gather_plan from the replicated caches. Per level-1 slot: contributor count/ranks/message sizes (owner excluded,
@@ -3218,6 +3231,27 @@ contains
     !! concentrating IB or phase-change work weigh more than equal-size quiescent ones. The cost vector is allreduced (one
     !! collective; every rank must call this), after which the assignment is deterministic and identical on every rank.
     !! s_set_amr_fine_geometry applies it as amr_rank_owns_block = (amr_block_owner(amr_cur) == proc_rank).
+    !> W1a: refresh the owned-block list if any owner write has happened since the last refresh. Rebuilt lazily rather than in
+    !! s_amr_assign_block_owners because that routine is NOT the only writer of amr_block_owner.
+    impure subroutine s_amr_refresh_my_blocks()
+
+        integer :: b
+
+        if (.not. amr_myblk_dirty) return
+        if (allocated(amr_my_blk)) then
+            if (size(amr_my_blk) < amr_max_blocks) deallocate (amr_my_blk)
+        end if
+        if (.not. allocated(amr_my_blk)) allocate (amr_my_blk(amr_max_blocks))
+        amr_n_my = 0
+        do b = 1, amr_num_blocks
+            if (amr_block_owner(b) /= proc_rank) cycle
+            amr_n_my = amr_n_my + 1
+            amr_my_blk(amr_n_my) = b
+        end do
+        amr_myblk_dirty = .false.
+
+    end subroutine s_amr_refresh_my_blocks
+
     impure subroutine s_amr_assign_block_owners()
 
         integer :: k, a, lev, maxlev, na
@@ -3277,7 +3311,7 @@ contains
             if (na < 1) cycle
             call s_amr_sfc_cut(akey, awt, na, amr_fine_cut(:,lev), aown)
             do a = 1, na
-                amr_block_owner(aidx(a)) = aown(a)
+                amr_block_owner(aidx(a)) = aown(a); amr_myblk_dirty = .true.
             end do
             if (lev == 1 .and. l0_slot_off == 0) amr_owner_cut = amr_fine_cut(:,1)
         end do
@@ -3834,7 +3868,7 @@ contains
             & // '(2*L0-extent > amr_maxc_fit); static multi-level does not tile the level-2 block - use a smaller base amr ' &
             & // 'block or the dynamic regrid path (amr_regrid_int > 0)')
         amr_block_level(L2) = 2
-        amr_block_owner(L2) = amr_block_owner(par)
+        amr_block_owner(L2) = amr_block_owner(par); amr_myblk_dirty = .true.
         amr_num_blocks = L2; amr_num_levels = 2
         call s_amr_reconcile_slots()
         amr_cur = L2
@@ -4120,7 +4154,7 @@ contains
         integer, intent(in) :: lev
 
 #ifdef MFC_MPI
-        integer :: k, pblk, cowner, powner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq
+        integer :: k, pblk, cowner, powner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, kk
         integer :: plo(3), phi(3)
 
         rr = amr_ref_ratio
@@ -4134,10 +4168,11 @@ contains
         end if
         ! send plan + co-located folds (child-owner side)
         amr_fw_snx = 0; amr_fw_snp = 0
-        do k = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do kk = 1, amr_n_my
+            k = amr_my_blk(kk)
             if (amr_block_level(k) /= lev) cycle
             cowner = amr_block_owner(k)
-            if (proc_rank /= cowner) cycle
             pblk = f_amr_parent_block(k)
             powner = amr_block_owner(pblk)
             call s_amr_parent_foot(k, pblk, plo, phi)
@@ -4275,7 +4310,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
 
 #ifdef MFC_MPI
-        integer :: k, owner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, o1, o2, o3, cur
+        integer :: k, owner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, o1, o2, o3, cur, kk
         integer :: rlo(3), rhi(3), ilo(3), ihi(3), milo(3), mihi(3), bl(3), bh(3)
 
         tq = amr_tag_base(7) + 50 + int(mod(amr_mesh_epoch, 50_8))
@@ -4292,9 +4327,10 @@ contains
         call s_amr_rank_interior(proc_rank, milo, mihi)
         ! send plan (block-owner side): the same (interior x region) covered slabs the per-box path sent, k-grouped
         amr_fw_snx = 0; amr_fw_snp = 0
-        do k = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do kk = 1, amr_n_my
+            k = amr_my_blk(kk)
             if (amr_block_level(k) /= 1) cycle
-            if (amr_block_owner(k) /= proc_rank) cycle
             rlo = 0; rhi = 0
             rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
             if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
@@ -4389,9 +4425,10 @@ contains
         ! block's (cyl_coord) radii push must immediately precede that block's overwrite/pack kernels; the transfer list is
         ! k-grouped by construction, so a monotone cursor drains each block's sends inside its group
         cur = 1
-        do k = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do kk = 1, amr_n_my
+            k = amr_my_blk(kk)
             if (amr_block_level(k) /= 1) cycle
-            if (amr_block_owner(k) /= proc_rank) cycle
             rr = amr_slots(k)%amr_ref_ratio
             nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
             dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
@@ -6739,7 +6776,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
         real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
         logical :: do_pbmv
-        integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, nreq, qbase, pbase, ierr
+        integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, nreq, qbase, pbase, ierr, kk
         integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff
         integer :: clo(3), chi(3), nsh, msl, isl, scells
         integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
@@ -6844,9 +6881,10 @@ contains
         ! RECV side: for every level-1 box I own, each listed contributor's slice (owner excluded - the own box is a device
         ! copy at consume). Both sides enumerate boxes ascending with per-rank running offsets, so the offsets agree.
         amr_fw_rnx = 0; amr_fw_rnp = 0
-        do k = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do kk = 1, amr_n_my
+            k = amr_my_blk(kk)
             if (amr_block_level(k) /= 1) cycle
-            if (amr_block_owner(k) /= proc_rank) cycle
             plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; plo(2) = 0; plo(3) = 0
             if (n_glb > 0) plo(2) = amr_region_lo_all(2, k) - amr_cpat_mar
             if (p_glb > 0) plo(3) = amr_region_lo_all(3, k) - amr_cpat_mar
@@ -7089,7 +7127,7 @@ contains
     impure subroutine s_amr_parent_fill_wave(lev)
 
         integer, intent(in) :: lev
-        integer             :: k, r, ix, ip, pblk, powner, cowner, boxsz, tq, nreq, qbase, ierr
+        integer             :: k, r, ix, ip, pblk, powner, cowner, boxsz, tq, nreq, qbase, ierr, kk
         integer             :: w1, w2, w3, plo(3), phi(3), boff, bl(3), bh(3)
         integer             :: msl, isl
         integer             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
@@ -7159,9 +7197,10 @@ contains
         ! one full-patch transfer under the pbmv contract). Both sides enumerate boxes ascending, slabs in the fixed
         ! s_amr_parent_shell order, with per-rank running offsets, so the wire layout agrees with no metadata exchange.
         amr_fw_rnx = 0; amr_fw_rnp = 0
-        do k = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do kk = 1, amr_n_my
+            k = amr_my_blk(kk)
             if (amr_block_level(k) /= lev) cycle
-            if (amr_block_owner(k) /= proc_rank) cycle
             pblk = f_amr_parent_block(k)
             powner = amr_block_owner(pblk)
             if (powner == proc_rank) cycle
@@ -8195,7 +8234,7 @@ contains
     !! properties, velocity + dynamic pressure, and pressure. Change the conversion and this must follow.
     impure subroutine s_amr_convert_prim_batch()
 
-        integer :: g, loc, i, j, k, l
+        integer :: g, loc, i, j, k, l, gg
         integer :: nl, nv, b1l, b1h, b2l, b2h, b3l, b3h
 
         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
@@ -8211,9 +8250,10 @@ contains
         if (amr_loc_n == 0) return
         call s_phase_tic(PH_CVTB)
         amr_bt_on(1:amr_loc_n) = .false.
-        do g = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do gg = 1, amr_n_my
+            g = amr_my_blk(gg)
             if (amr_block_level(g) < 1) cycle
-            if (amr_block_owner(g) /= proc_rank) cycle
             loc = amr_loc_of(g)
             if (loc <= 0) cycle
             amr_bt_on(loc) = .true.
@@ -8862,7 +8902,7 @@ contains
                             tlo(3) = rsidx(3) + f_l0_lo(rext(3) + 1, nt(3), iz)
                             thi(3) = rsidx(3) + f_l0_lo(rext(3) + 1, nt(3), iz + 1) - 1
                         end if
-                        amr_block_owner(k) = r
+                        amr_block_owner(k) = r; amr_myblk_dirty = .true.
                         amr_tile_l0_owner(k) = r  ! L0 storage owner = init owner; stays fixed under migration
                         amr_owns_all(k) = (r == proc_rank)
                         amr_region_lo_all(:,k) = tlo; amr_region_hi_all(:,k) = thi
@@ -8893,7 +8933,7 @@ contains
             end do
             call s_amr_sfc_cut(tkey, twt, l0_ntiles_tot, amr_owner_cut, sfco)
             do kk = 1, l0_ntiles_tot
-                amr_block_owner(kk) = sfco(kk)
+                amr_block_owner(kk) = sfco(kk); amr_myblk_dirty = .true.
                 amr_owns_all(kk) = (sfco(kk) == proc_rank)
             end do
             ! allocate slot data for the tiles this rank COMPUTES (deferred from the cartesian loop above). s_l0_build_tile_slot
