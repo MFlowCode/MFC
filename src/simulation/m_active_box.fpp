@@ -19,8 +19,13 @@ module m_active_box
 
     type(int_bounds_info) :: ab_x, ab_y, ab_z     !< Active-box interior cell ranges
     logical               :: ab_active = .false.  !< Whether the optimization is engaged
-    real(wp), allocatable :: ab_ambient(:)        !< Uniform ambient conserved state
-    real(wp), parameter   :: tol_ab = 1.e-10_wp   !< Ambient-deviation threshold
+    !> Device-declared because `@:ALLOCATE` issues a `GPU_ENTER_DATA(create=)` on the variable itself; mapping a module allocatable
+    !! that was never `declare target` leaves the runtime no descriptor to attach to, and Cray CCE aborts with `lib-4425
+    !! UNRECOVERABLE library error: Unitialized descriptor for ALLOCATE statement argument`. amdflang tolerates it, which is why
+    !! only Frontier saw this.
+    real(wp), allocatable :: ab_ambient(:)  !< Uniform ambient conserved state
+    $:GPU_DECLARE(create='[ab_ambient]')
+    real(wp), parameter :: tol_ab = 1.e-10_wp  !< Ambient-deviation threshold
 
     $:GPU_DECLARE(create='[ab_x, ab_y, ab_z, ab_active]')
 
