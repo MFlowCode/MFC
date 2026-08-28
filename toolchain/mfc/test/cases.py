@@ -4501,6 +4501,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # overlapping expansions merge, and the fine IB state rebuilds from geometry every regrid
         stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2, "t_step_stop": 20, "t_step_save": 20})
         cases.append(define_case_d(stack, "", {}))
+        # The ONLY distributed AMR+IB coverage in the suite. At ppn=1 the level-1 tag path and the
+        # per-level (index, parent) gather are both skipped by their num_procs > 1 guard, so the IB
+        # tags' trip through a collective is exercised by nothing. Guards specifically that each rank
+        # filling only its OWN level-0 cells of the body bbox yields the same box set as every rank
+        # filling all of it -- the two differ on the wire, and a signature reduction cannot collapse
+        # the duplicates the way the dense per-parent window does.
+        # Grid/body are resized ONLY for this arm to satisfy the un-tiled IB block constraint in
+        # m_amr.fpp: amr_ref_ratio*(block_end - block_beg + 1) - 1 must fit each rank's LOCAL extent,
+        # because an IB block is owned whole. At ppn=2 the local extent halves, so the parent case
+        # (64^2, 24-cell block) is invalid here by construction: 2*24 - 1 = 47 > 31. At 128^2 the
+        # same 24-cell block gives 47 <= 63, and radius 0.05 leaves ~5 cells of margin per side.
+        cases.append(
+            define_case_d(
+                stack,
+                "2 MPI Ranks",
+                {
+                    "m": 127,
+                    "n": 127,
+                    "patch_ib(1)%radius": 0.05,
+                    "amr_block_beg(1)": 52,
+                    "amr_block_beg(2)": 52,
+                    "amr_block_end(1)": 75,
+                    "amr_block_end(2)": 75,
+                },
+                ppn=2,
+            )
+        )
         stack.pop()
         stack.pop()
 
