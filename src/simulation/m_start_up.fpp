@@ -1241,28 +1241,33 @@ contains
     !> @brief Rebuilds particle_cloud_ibs after a restart from the kinematic state s_read_ib_restart_data just wrote into patch_ib
     !! (keyed by gbl_patch_id), instead of re-running particle placement. Geometry (radius, mass, moving_ibm, etc) is uniform per
     !! cloud and reconstructed directly from the particle_cloud(:) case parameters via s_add_cloud_particle - only
-    !! position/velocity/angles need to come from the checkpoint. The result feeds into the normal s_reduce_ib_patch_array call, so
-    !! neighborhood/local ownership is decided the usual way, just using the restart positions instead of freshly-packed ones.
+    !! position/velocity/angles need to come from the checkpoint. Every rank walks the full global particle list but only keeps
+    !! entries this rank's IB neighborhood owns (f_neighborhood_ranks_own_location, same test s_reduce_particle_cloud_ibs applies
+    !! after fresh packing) - s_reduce_ib_patch_array trusts particle_cloud_ibs to already be neighborhood-filtered and does not
+    !! recheck it, so skipping this filter here would silently inflate num_ibs on every rank to the full global particle count.
     impure subroutine s_restart_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
         integer, intent(out)                                              :: num_particle_cloud_ibs
-        integer                                                           :: cloud_idx, i, ib_idx, glbl_idx, geom
-        real(wp), dimension(3)                                            :: vel, angular_vel, angles
+        integer                                                           :: cloud_idx, i, ib_idx, glbl_idx, geom, n_total_particles
+        real(wp), dimension(3)                                            :: vel, angular_vel, angles, centroid
 
         geom = merge(2, 8, num_dims < 3)  ! circle for 2D, sphere for 3D - matches s_particle_cloud_rejection_pack/lattice
 
-        num_particle_cloud_ibs = 0
+        n_total_particles = 0
         do cloud_idx = 1, num_particle_clouds
-            num_particle_cloud_ibs = num_particle_cloud_ibs + particle_cloud(cloud_idx)%num_particles
+            n_total_particles = n_total_particles + particle_cloud(cloud_idx)%num_particles
         end do
-        allocate (particle_cloud_ibs(num_particle_cloud_ibs))
+        allocate (particle_cloud_ibs(min(num_ib_patches_max_namelist, n_total_particles)))
 
         ib_idx = 0
         glbl_idx = num_ibs
         do cloud_idx = 1, num_particle_clouds
             do i = 1, particle_cloud(cloud_idx)%num_particles
                 glbl_idx = glbl_idx + 1
+                centroid = [patch_ib(glbl_idx)%x_centroid, patch_ib(glbl_idx)%y_centroid, 0._wp]
+                if (num_dims == 3) centroid(3) = patch_ib(glbl_idx)%z_centroid
+                if (.not. f_neighborhood_ranks_own_location(centroid)) cycle
                 vel = patch_ib(glbl_idx)%vel
                 angular_vel = patch_ib(glbl_idx)%angular_vel
                 angles = patch_ib(glbl_idx)%angles
@@ -1273,6 +1278,7 @@ contains
                 particle_cloud_ibs(ib_idx)%angles = angles
             end do
         end do
+        num_particle_cloud_ibs = ib_idx
 
     end subroutine s_restart_particle_clouds
 

@@ -1443,6 +1443,8 @@ contains
                     ! check if in local domain
                     if (f_local_rank_owns_location(centroid)) then
                         local_output_idx = local_output_idx + 1
+                        @:PROHIBIT(local_output_idx > num_local_ibs_max, &
+                                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
                         local_ib_patch_ids(local_output_idx) = output_idx
                     end if
                 end if

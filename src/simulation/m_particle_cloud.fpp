@@ -182,8 +182,9 @@ contains
     !> Draws one rejection-sampling candidate centre (rx, ry, rz) for cloud_idx, advancing seed in place. For box geometry the
     !! candidate is uniform in the box and never rejected. For a hemisphere shell the candidate is uniform in the shell volume - 2D
     !! uses theta uniform on [0, pi] with the sqrt radial CDF; 3D uses uniform phi, uniform cos(polar) on [0, 1], and the cube-root
-    !! radial CDF - and reject is set when it lands within one particle radius of the flat face (the plane at y_centroid in 2D,
-    !! z_centroid in 3D), a hard geometric cut applied after sampling that preserves uniformity over the remaining region.
+    !! radial CDF - and reject is set when it lands within one particle radius of the flat face (the plane through the centroid
+    !! perpendicular to shell_axis: 1=x, 2=y, 3=z; 2D has no z-axis so any value other than 1 falls back to y, matching the
+    !! pre-shell_axis default), a hard geometric cut applied after sampling that preserves uniformity over the remaining region.
     subroutine s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
 
         integer, intent(in)    :: cloud_idx
@@ -219,20 +220,39 @@ contains
                 theta = pi*f_xorshift(seed)
                 u = f_xorshift(seed)
                 r_shell = sqrt((r_outer**2 - r_inner**2)*u + r_inner**2)
-                rx = particle_cloud(cloud_idx)%x_centroid + r_shell*cos(theta)
-                ry = particle_cloud(cloud_idx)%y_centroid + r_shell*sin(theta)
                 rz = particle_cloud(cloud_idx)%z_centroid
-                if (ry < particle_cloud(cloud_idx)%y_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+                if (particle_cloud(cloud_idx)%shell_axis == 1) then
+                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*sin(theta)
+                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*cos(theta)
+                    if (rx < particle_cloud(cloud_idx)%x_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+                else
+                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*cos(theta)
+                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*sin(theta)
+                    if (ry < particle_cloud(cloud_idx)%y_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+                end if
             else
                 phi = 2._wp*pi*f_xorshift(seed)
                 zdir = f_xorshift(seed)
                 rho = sqrt(max(0._wp, 1._wp - zdir**2))
                 u = f_xorshift(seed)
                 r_shell = ((r_outer**3 - r_inner**3)*u + r_inner**3)**(1._wp/3._wp)
-                rx = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
-                ry = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*sin(phi)
-                rz = particle_cloud(cloud_idx)%z_centroid + r_shell*zdir
-                if (rz < particle_cloud(cloud_idx)%z_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+                select case (particle_cloud(cloud_idx)%shell_axis)
+                case (1)  ! opens toward +x
+                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*zdir
+                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*cos(phi)
+                    rz = particle_cloud(cloud_idx)%z_centroid + r_shell*rho*sin(phi)
+                    if (rx < particle_cloud(cloud_idx)%x_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+                case (2)  ! opens toward +y
+                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*zdir
+                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
+                    rz = particle_cloud(cloud_idx)%z_centroid + r_shell*rho*sin(phi)
+                    if (ry < particle_cloud(cloud_idx)%y_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+                case default  ! 3: opens toward +z
+                    rz = particle_cloud(cloud_idx)%z_centroid + r_shell*zdir
+                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
+                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*sin(phi)
+                    if (rz < particle_cloud(cloud_idx)%z_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
+                end select
             end if
         case default
             call s_mpi_abort("Particle cloud geometry is not a known cloud geometry of MFC. Exiting.")
