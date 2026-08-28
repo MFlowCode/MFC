@@ -15,7 +15,7 @@ module m_amr_restart
 
     use m_derived_types  ! scalar_field
     use m_global_parameters
-    use m_constants, only: amr_restart_blk_hdr_ints
+    use m_constants, only: amr_restart_blk_hdr_ints, amr_restart_blk_own_ints
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min
     use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_cons_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, &
@@ -45,7 +45,7 @@ contains
 #ifdef MFC_MPI
         integer :: ifile, ierr, cnt, idx, fi, fj, fk, reg(6), bhdr(amr_restart_blk_hdr_ints), ibytes, sbytes
         integer :: myext(3)
-        integer, allocatable :: wext(:), myext_all(:), wext_all(:)
+        integer, allocatable :: myown_all(:)
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(kind=MPI_OFFSET_KIND) :: my_cnt, my_off, disp0, ddisp
         integer(kind=MPI_OFFSET_KIND), allocatable :: my_cnt_vec(:), my_off_vec(:), tot_cnt_vec(:)
@@ -90,29 +90,33 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
             ! MPI-IO file handles default to MPI_ERRORS_RETURN: failures silent unless checked
             if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart write: MPI_FILE_OPEN failed for ' // trim(file_loc))
-            if (proc_rank == 0) call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), [num_procs, amr_num_blocks, sys_size], 3, &
+            ! FORMAT v2: NEGATIVE rank count marks the compact per-block ownership record (see m_constants). A v1 reader
+            ! sees a rank mismatch and aborts with its existing message rather than misparsing the block records.
+            if (proc_rank == 0) call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), [-num_procs, amr_num_blocks, sys_size], 3, &
                 & MPI_INTEGER, status, ierr)
             disp0 = int(3*ibytes, MPI_OFFSET_KIND)  ! running byte offset past the 3-int global header
             ! hoist per-block metadata collectives: one EXSCAN/ALLREDUCE/ALLGATHER over ALL blocks
             allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks), tot_cnt_vec(amr_num_blocks))
-            allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
+            allocate (myown_all(amr_restart_blk_own_ints*amr_num_blocks))
             do k = 1, amr_num_blocks
                 cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
                 if (.not. amr_owns_all(k)) cnt = 0
                 my_cnt_vec(k) = int(cnt, MPI_OFFSET_KIND)
-                myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = 0
-                if (amr_owns_all(k)) myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
+                myown_all(amr_restart_blk_own_ints*(k - 1) + 1:amr_restart_blk_own_ints*k) = 0
+                if (amr_owns_all(k)) myown_all(amr_restart_blk_own_ints*(k - 1) + 1:amr_restart_blk_own_ints*k) = [proc_rank + 1, &
+                    & amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
             end do
             my_off_vec = int(0, MPI_OFFSET_KIND)
             call MPI_EXSCAN(my_cnt_vec, my_off_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
             if (proc_rank == 0) my_off_vec = int(0, MPI_OFFSET_KIND)
             call MPI_ALLREDUCE(my_cnt_vec, tot_cnt_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
-            ! per-rank fine extents (0s for non-owning ranks): readers rebuild this vector from their own decomposition and abort on
-            ! mismatch - a different rank count, ownership pattern, or load_balance split would otherwise silently misalign the
-            ! concatenated per-rank data slices below
-            call MPI_ALLGATHER(myext_all, 3*amr_num_blocks, MPI_INTEGER, wext_all, 3*amr_num_blocks, MPI_INTEGER, MPI_COMM_WORLD, &
-                               & ierr)
-            if (.not. allocated(wext)) allocate (wext(3*num_procs))
+            ! Per-block (owner + 1, m, n, p): every rank contributes zeros except the one owner, so a MAX reduction recovers the
+            ! record exactly. This carries the same information the v1 3*num_procs extent vector did -- readers rebuild it from
+            ! their own decomposition and abort on mismatch, catching a different ownership pattern or load_balance split that
+            ! would otherwise silently misalign the concatenated per-rank data slices below -- in O(blocks) rather than
+            ! O(blocks x ranks), in memory AND in the file.
+            call MPI_ALLREDUCE(MPI_IN_PLACE, myown_all, amr_restart_blk_own_ints*amr_num_blocks, MPI_INTEGER, MPI_MAX, &
+                               & MPI_COMM_WORLD, ierr)
             do k = 1, amr_num_blocks
                 cnt = int(my_cnt_vec(k), kind(cnt))
                 my_off = my_off_vec(k)
@@ -124,15 +128,12 @@ contains
                     bhdr(amr_restart_blk_hdr_ints) = amr_block_level(k)
                     call MPI_FILE_WRITE_AT(ifile, disp0, bhdr, amr_restart_blk_hdr_ints, MPI_INTEGER, status, ierr)
                 end if
-                ! wext_all layout: rank r's extents for block k at wext_all(3*amr_num_blocks*r + 3*(k-1) + 1 : +3)
-                do i = 0, num_procs - 1
-                    wext(3*i + 1:3*i + 3) = wext_all(3*amr_num_blocks*i + 3*(k - 1) + 1:3*amr_num_blocks*i + 3*(k - 1) + 3)
-                end do
                 if (proc_rank == 0) then
-                    call MPI_FILE_WRITE_AT(ifile, disp0 + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), wext, &
-                                           & 3*num_procs, MPI_INTEGER, status, ierr)
+                    call MPI_FILE_WRITE_AT(ifile, disp0 + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), &
+                                           & myown_all(amr_restart_blk_own_ints*(k - 1) + 1), amr_restart_blk_own_ints, &
+                                           & MPI_INTEGER, status, ierr)
                 end if
-                ddisp = disp0 + int((amr_restart_blk_hdr_ints + 3*num_procs)*ibytes, MPI_OFFSET_KIND)
+                ddisp = disp0 + int((amr_restart_blk_hdr_ints + amr_restart_blk_own_ints)*ibytes, MPI_OFFSET_KIND)
                 allocate (buf(max(cnt, 1)))
                 idx = 0
                 ! cnt == 0 on a non-owning rank, where buf is the 1-element placeholder and this slot's q_cons is not allocated
@@ -157,7 +158,7 @@ contains
                 deallocate (buf)
                 disp0 = ddisp + tot_cnt_vec(k)*int(sbytes, MPI_OFFSET_KIND)
             end do
-            deallocate (my_cnt_vec, my_off_vec, tot_cnt_vec, myext_all, wext_all)
+            deallocate (my_cnt_vec, my_off_vec, tot_cnt_vec, myown_all)
             ! close is where buffered MPI-IO data flushes on many stacks - a failure here truncates the file
             call MPI_FILE_CLOSE(ifile, ierr)
             if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart write: MPI_FILE_CLOSE failed; the file may be truncated')
@@ -184,7 +185,9 @@ contains
 #ifdef MFC_MPI
         integer :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes, np_old, bhdr(amr_restart_blk_hdr_ints)
         integer :: myext(3)
-        integer, allocatable :: wext(:), rext(:), myext_all(:), wext_all(:)
+        integer, allocatable :: wext(:), rext(:), myext_all(:), wext_all(:), myown_all(:)
+        integer :: orec, fown(amr_restart_blk_own_ints), mown(amr_restart_blk_own_ints)
+        logical :: v2
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(kind=MPI_OFFSET_KIND) :: my_cnt, my_off, disp0, ddisp, fsz
         integer(kind=MPI_OFFSET_KIND), allocatable :: blk_base(:), my_cnt_vec(:), my_off_vec(:)
@@ -315,7 +318,11 @@ contains
             ! it
             ! - pass 2 re-assigns owners for THIS run and each new owner reads its whole blocks. np_old == num_procs is
             ! byte-identical to the same-rank path (and keeps the layout check).
-            np_old = ghdr(1)
+            ! FORMAT: a NEGATIVE rank count marks v2, whose per-block record is (owner + 1, m, n, p) -- 4 ints instead of the
+            ! v1 3*np_old extent vector that made the FILE O(blocks x ranks). v1 files stay readable; only v2 is written.
+            v2 = ghdr(1) < 0
+            np_old = abs(ghdr(1))
+            orec = merge(amr_restart_blk_own_ints, 3*np_old, v2)
             if (ghdr(3) /= sys_size) then
                 write (msg, '(A,I0,A,I0,A)') 'amr restart sys_size mismatch: the AMR restart file has ', ghdr(3), &
                        & ' conserved variables but this run has ', sys_size, &
@@ -353,7 +360,7 @@ contains
                 ! data size is region-derived per level: a level-l block covers amr_ref_ratio**l fine cells per L0 cell
                 cnt = sys_size*((amr_ref_ratio**lvl)*(reg(4) - reg(1) + 1))*merge((amr_ref_ratio**lvl)*(reg(5) - reg(2) + 1), 1, &
                                 & n_glb > 0)*merge((amr_ref_ratio**lvl)*(reg(6) - reg(3) + 1), 1, p_glb > 0)
-                disp0 = disp0 + int((amr_restart_blk_hdr_ints + 3*np_old)*ibytes, MPI_OFFSET_KIND) + int(cnt, &
+                disp0 = disp0 + int((amr_restart_blk_hdr_ints + orec)*ibytes, MPI_OFFSET_KIND) + int(cnt, &
                                     & MPI_OFFSET_KIND)*int(sbytes, MPI_OFFSET_KIND)
             end do
             ! PASS 2: rebuild whole-block owners from the regions, then per block build geometry under the correct owner, validate
@@ -368,13 +375,24 @@ contains
             call s_amr_reduce_xchg_flag()
             ! hoist per-block metadata collectives: one ALLGATHER/EXSCAN over ALL blocks
             allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks))
-            allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
+            ! v1 needs the O(blocks x ranks) gather to reproduce the file's layout record; v2 needs O(blocks).
+            if (v2) then
+                allocate (myown_all(amr_restart_blk_own_ints*amr_num_blocks))
+            else
+                allocate (myext_all(3*amr_num_blocks), wext_all(3*num_procs*amr_num_blocks))
+            end if
             do k = 1, amr_num_blocks
                 cnt = sys_size*(amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1)
                 if (.not. amr_owns_all(k)) cnt = 0
                 my_cnt_vec(k) = int(cnt, MPI_OFFSET_KIND)
-                myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = 0
-                if (amr_owns_all(k)) myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
+                if (v2) then
+                    myown_all(amr_restart_blk_own_ints*(k - 1) + 1:amr_restart_blk_own_ints*k) = 0
+                    if (amr_owns_all(k)) myown_all(amr_restart_blk_own_ints*(k - 1) + 1:amr_restart_blk_own_ints*k) = [proc_rank &
+                        & + 1, amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
+                else
+                    myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = 0
+                    if (amr_owns_all(k)) myext_all(3*(k - 1) + 1:3*(k - 1) + 3) = [amr_slots(k)%m, amr_slots(k)%n, amr_slots(k)%p]
+                end if
             end do
             my_off_vec = int(0, MPI_OFFSET_KIND)
             call MPI_EXSCAN(my_cnt_vec, my_off_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
@@ -385,15 +403,29 @@ contains
             ! chunk
             ! the new owner reads wholly, and the file-size check below still fails closed on a truncated/corrupt file.
             if (np_old == num_procs) then
-                call MPI_ALLGATHER(myext_all, 3*amr_num_blocks, MPI_INTEGER, wext_all, 3*amr_num_blocks, MPI_INTEGER, &
-                                   & MPI_COMM_WORLD, ierr)
+                if (v2) then
+                    call MPI_ALLREDUCE(MPI_IN_PLACE, myown_all, amr_restart_blk_own_ints*amr_num_blocks, MPI_INTEGER, MPI_MAX, &
+                                       & MPI_COMM_WORLD, ierr)
+                else
+                    call MPI_ALLGATHER(myext_all, 3*amr_num_blocks, MPI_INTEGER, wext_all, 3*amr_num_blocks, MPI_INTEGER, &
+                                       & MPI_COMM_WORLD, ierr)
+                end if
             end if
             if (.not. allocated(wext)) allocate (wext(3*np_old))
             if (.not. allocated(rext)) allocate (rext(3*num_procs))
             do k = 1, amr_num_blocks
                 cnt = int(my_cnt_vec(k), kind(cnt))
                 my_off = my_off_vec(k)
-                if (np_old == num_procs) then
+                if (np_old == num_procs .and. v2) then
+                    call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), fown, &
+                                              & amr_restart_blk_own_ints, MPI_INTEGER, status, ierr)
+                    mown = myown_all(amr_restart_blk_own_ints*(k - 1) + 1:amr_restart_blk_own_ints*k)
+                    if (any(fown /= mown)) then
+                        call s_mpi_abort('amr restart: the per-block owner/extent record in the file does not match ' &
+                                         & // 'this run''s decomposition; with the same rank count the ownership and ' &
+                                         & // '(with load_balance) the weighted splits must match the run that wrote the restart')
+                    end if
+                else if (np_old == num_procs) then
                     call MPI_FILE_READ_AT_ALL(ifile, blk_base(k) + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), wext, &
                                               & 3*np_old, MPI_INTEGER, status, ierr)
                     do i = 0, num_procs - 1
@@ -405,7 +437,7 @@ contains
                                          & // '(with load_balance) the weighted splits must match the run that wrote the restart')
                     end if
                 end if
-                ddisp = blk_base(k) + int((amr_restart_blk_hdr_ints + 3*np_old)*ibytes, MPI_OFFSET_KIND)
+                ddisp = blk_base(k) + int((amr_restart_blk_hdr_ints + orec)*ibytes, MPI_OFFSET_KIND)
                 allocate (buf(max(cnt, 1)))
                 call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                           & status, ierr)
@@ -426,7 +458,10 @@ contains
                 end do
                 deallocate (buf)
             end do
-            deallocate (blk_base, my_cnt_vec, my_off_vec, myext_all, wext_all)
+            deallocate (blk_base, my_cnt_vec, my_off_vec)
+            if (allocated(myown_all)) deallocate (myown_all)
+            if (allocated(myext_all)) deallocate (myext_all)
+            if (allocated(wext_all)) deallocate (wext_all)
             ! disp0 now equals the exact byte count a complete file must have: a truncated file (crashed writer, filesystem hiccup)
             ! passes every layout check above but returns short reads with garbage tails - fail closed instead of restoring
             ! uninitialized data as the fine level
