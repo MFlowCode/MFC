@@ -50,8 +50,10 @@ module m_global_parameters_common
     !> @name Material properties derived from fluid_pp
     !> @{ One declaration is shared by all executables and initialized by m_variables_conversion after the case parameters have been
     !! read.
-    real(wp), allocatable, dimension(:) :: gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
-    $:GPU_DECLARE(create='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps]')
+    !> gammas is the stored form 1/(gamma - 1), not the ratio of specific heats; isentrope_n and isentrope_B are the same EOS
+    !! written as p + B = const*rho**n.
+    real(wp), allocatable, dimension(:) :: gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+    $:GPU_DECLARE(create='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps]')
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity

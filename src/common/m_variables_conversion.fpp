@@ -26,8 +26,9 @@ module m_variables_conversion
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, f_bulk_modulus, &
-        & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, s_compute_speed_of_sound_avg, &
-        & s_compute_fast_magnetosonic_speed, s_finalize_variables_conversion_module, gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps
+        & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_pressure_on_isentrope, &
+        & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, &
+        & s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -278,9 +279,9 @@ contains
         $:GPU_UPDATE(device='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
         @:ALLOCATE(gammas (1:num_fluids))
-        @:ALLOCATE(gs_min (1:num_fluids))
+        @:ALLOCATE(isentrope_n (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
-        @:ALLOCATE(ps_inf(1:num_fluids))
+        @:ALLOCATE(isentrope_B(1:num_fluids))
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
@@ -288,15 +289,15 @@ contains
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
-            gs_min(i) = f_isentrope_exponent(gammas(i))
+            isentrope_n(i) = f_isentrope_exponent(gammas(i))
             pi_infs(i) = fluid_pp(i)%pi_inf
             Gs_vc(i) = fluid_pp(i)%G
-            ps_inf(i) = f_isentrope_pressure(pi_infs(i), gammas(i))
+            isentrope_B(i) = f_isentrope_pressure(pi_infs(i), gammas(i))
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-        $:GPU_UPDATE(device='[gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc]')
+        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -1177,7 +1178,7 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1224,6 +1225,40 @@ contains
 
     end subroutine s_compute_mixture_coefficients
 
+    !> Time derivative of the mixture coefficients, mirroring s_compute_mixture_coefficients.
+    subroutine s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt)
+
+        $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients_dt', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: dalpha_rho_dt, dadv_dt
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: dalpha_rho_dt, dadv_dt
+        #:endif
+        real(wp), intent(out) :: drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt
+        integer               :: i  !< Loop iterator over fluids
+
+        dgamma_dt = 0._wp
+        dpi_inf_dt = 0._wp
+        dqv_dt = 0._wp
+
+        if (num_fluids == 1 .and. bubbles_euler) then
+            ! Fluid 1's coefficients are constants here, so only rho varies.
+            drho_dt = dalpha_rho_dt(1)
+        else
+            drho_dt = 0._wp
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                drho_dt = drho_dt + dalpha_rho_dt(i)
+                dgamma_dt = dgamma_dt + dadv_dt(i)*gammas(i)
+                dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_infs(i)
+                dqv_dt = dqv_dt + dalpha_rho_dt(i)*qvs(i)
+            end do
+        end if
+
+    end subroutine s_compute_mixture_coefficients_dt
+
     !> Total energy per unit volume, thermodynamic terms only. Callers add magnetic and elastic energy, which are not
     !! equation-of-state terms. The chemistry and relativistic branches use a different relation and stay open-coded.
     subroutine s_compute_energy(pres, alpha_rho_K, alpha_K, vel_sum, E)
@@ -1251,7 +1286,7 @@ contains
     !! c^2 = (H - |u|^2/2 - qv/rho)/Gamma leaves c^2 = ((Gamma + 1)p + Pi)/(Gamma rho), so H, |u|^2
     !! and qv all cancel. Averaged states, whose enthalpy is a free input, use
     !! s_compute_speed_of_sound_avg.
-    !> Exponent of the stiffened-gas isentrope p + B = const rho**n. Precomputed per fluid as gs_min.
+    !> Exponent of the stiffened-gas isentrope p + B = const rho**n. Precomputed per fluid as isentrope_n.
     function f_isentrope_exponent(gamma) result(n)
 
         $:GPU_ROUTINE(function_name='f_isentrope_exponent', parallelism='[seq]', cray_inline=True)
@@ -1263,7 +1298,7 @@ contains
 
     end function f_isentrope_exponent
 
-    !> Reference pressure of that isentrope. Precomputed per fluid as ps_inf.
+    !> Reference pressure of that isentrope. Precomputed per fluid as isentrope_B.
     function f_isentrope_pressure(pi_inf, gamma) result(B)
 
         $:GPU_ROUTINE(function_name='f_isentrope_pressure', parallelism='[seq]', cray_inline=True)
@@ -1274,6 +1309,30 @@ contains
         B = pi_inf/(1._wp + gamma)
 
     end function f_isentrope_pressure
+
+    !> Stiffened-gas thermal law p + B = (n - 1)*cv*rho*T. Pass rho to get T, or T to get rho.
+    function f_sg_thermal(pres, rho_or_T, n, B, cv) result(T_or_rho)
+
+        $:GPU_ROUTINE(function_name='f_sg_thermal', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: pres, rho_or_T, n, B, cv
+        real(wp)             :: T_or_rho
+
+        T_or_rho = (pres + B)/((n - 1._wp)*cv*rho_or_T)
+
+    end function f_sg_thermal
+
+    !> Pressure after isentropic compression from `pres` through density ratio `xi`.
+    function f_pressure_on_isentrope(pres, xi, n, B) result(p_isen)
+
+        $:GPU_ROUTINE(function_name='f_pressure_on_isentrope', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: pres, xi, n, B
+        real(wp)             :: p_isen
+
+        p_isen = (pres + B)*xi**n - B
+
+    end function f_pressure_on_isentrope
 
     !> Internal energy of one phase of the six-equation model: its volume-fraction-weighted stiffened-gas energy plus the heat of
     !! formation carried by its partial density. No kinetic term - that belongs to the mixture, not to a phase.

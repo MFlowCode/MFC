@@ -835,20 +835,8 @@ contains
                             #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
                                 dpi_inf_dt = dadv_dt(2)
                             #:endif
-                        else if (num_fluids == 1 .and. bubbles_euler) then
-                            ! The sole advection slot is the void fraction, so the mixture rule takes
-                            ! gamma, pi_inf and qv from fluid 1 unweighted (see
-                            ! s_compute_mixture_coefficients). Those are constants, so only the
-                            ! density derivative survives.
-                            drho_dt = dalpha_rho_dt(1)
                         else
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                drho_dt = drho_dt + dalpha_rho_dt(i)
-                                dgamma_dt = dgamma_dt + dadv_dt(i)*gammas(i)
-                                dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_infs(i)
-                                dqv_dt = dqv_dt + dalpha_rho_dt(i)*qvs(i)
-                            end do
+                            call s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt)
                         end if
 
                         ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2

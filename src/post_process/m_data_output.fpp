@@ -1264,7 +1264,6 @@ contains
                 do i = 0, m
                     dV = dx(i)*dy(j)*dz(k)
                     pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
-                    Egint = Egint + q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
                     do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                         Egk = Egk + 0.5_wp*q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
@@ -1277,6 +1276,8 @@ contains
                         adv(l) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)
                         alpha_rho(l) = q_prim_vf(l)%sf(i, j, k)
                     end do
+
+                    Egint = Egint + f_phase_internal_energy(pres, adv(2), alpha_rho(2), gammas(2), pi_infs(2), qvs(2))*dV
 
                     call s_compute_mixture_coefficients(alpha_rho, adv, rho, gamma, pi_inf, qv)
 

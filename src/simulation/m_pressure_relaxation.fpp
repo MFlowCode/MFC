@@ -135,8 +135,8 @@ contains
                 ! phasic pressure by rho_k*qv_k/gamma_k (this is what breaks the reactive burn).
                 pres_K_init(i) = ((q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, &
                             & k, l)*qvs(i))/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
-                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) pres_K_init(i) = -(1._wp - 1.e-8_wp)*ps_inf(i) &
-                    & + 1.e-8_wp
+                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*isentrope_B(i) + 1.e-8_wp) pres_K_init(i) = -(1._wp - 1.e-8_wp) &
+                    & *isentrope_B(i) + 1.e-8_wp
             else
                 pres_K_init(i) = 0._wp
             end if
@@ -153,8 +153,8 @@ contains
 
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
-                    if (pres_relax <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) pres_relax = -(1._wp - 1.e-8_wp)*ps_inf(i) &
-                        & + 1.e-8_wp
+                    if (pres_relax <= -(1._wp - 1.e-8_wp)*isentrope_B(i) + 1.e-8_wp) pres_relax = -(1._wp - 1.e-8_wp) &
+                        & *isentrope_B(i) + 1.e-8_wp
                 end do
 
                 ! Newton-Raphson step
@@ -165,10 +165,11 @@ contains
                     if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
                         ! Isentropic relation: rho = rho0 * (p/p0)^(1/gamma), Saurel et al. JFM (2009)
                         rho_K_s(i) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/max(q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, &
-                                & k, l), sgm_eps)*((pres_relax + ps_inf(i))/(pres_K_init(i) + ps_inf(i)))**(1._wp/gs_min(i))
+                                & k, l), &
+                                & sgm_eps)*((pres_relax + isentrope_B(i))/(pres_K_init(i) + isentrope_B(i)))**(1._wp/isentrope_n(i))
                         f_pres = f_pres + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
                         df_pres = df_pres - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
-                                                      & l)/(gs_min(i)*rho_K_s(i)*(pres_relax + ps_inf(i)))
+                                                      & l)/(isentrope_n(i)*rho_K_s(i)*(pres_relax + isentrope_B(i)))
                     end if
                 end do
             end if

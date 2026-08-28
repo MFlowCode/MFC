@@ -378,7 +378,7 @@ contains
         end if
 
         gamma = gammas(1)
-        lit_gamma = gs_min(1)
+        lit_gamma = isentrope_n(1)
         pi_inf = pi_infs(1)
         qv = qvs(1)
 

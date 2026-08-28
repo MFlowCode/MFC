@@ -13,7 +13,7 @@ module m_riemann_state
     use m_global_parameters
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, verysmall
     use m_hb_function
-    use m_thermochem, only: gas_constant, molecular_weights, get_species_enthalpies_rt, get_species_specific_heats_r
+    use m_thermochem, only: get_species_enthalpies_rt, get_species_specific_heats_r
 
     implicit none
 
@@ -235,17 +235,21 @@ contains
     !! average: it replaces gamma_avg with the mixture Cp/Cv and builds the c_sum_Yi_Phi term that s_compute_speed_of_sound_avg
     !! needs for the reacting sound speed. vel_avg_rms must be the full squared velocity magnitude - the Phi_avg term and the
     !! vel_sum term in that routine are built to cancel, leaving c^2 = gamma*R*T, and they only do so for the full magnitude.
-    subroutine s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
+    subroutine s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, MW, R_univ, vel_avg_rms, gamma_avg, &
+        & c_sum_Yi_Phi)
 
         $:GPU_ROUTINE(function_name='s_compute_chemistry_average_state', parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(in) :: rho_L, rho_R  !< Left and right densities
         real(wp), intent(in) :: T_L, T_R      !< Left and right temperatures
-        real(wp), intent(in) :: vel_avg_rms   !< Squared magnitude of the averaged velocity
+        !> Universal gas constant, passed rather than taken from m_thermochem: CCE rejects a module global referenced inside a
+        !! declare-target routine
+        real(wp), intent(in) :: R_univ
+        real(wp), intent(in) :: vel_avg_rms  !< Squared magnitude of the averaged velocity
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10), intent(in) :: Ys_L, Ys_R
+            real(wp), dimension(10), intent(in) :: Ys_L, Ys_R, MW
         #:else
-            real(wp), dimension(num_species), intent(in) :: Ys_L, Ys_R
+            real(wp), dimension(num_species), intent(in) :: Ys_L, Ys_R, MW
         #:endif
         real(wp), intent(out) :: gamma_avg  !< Mixture Cp/Cv, replacing the density-weighted average
         real(wp), intent(out) :: c_sum_Yi_Phi
@@ -261,8 +265,8 @@ contains
 
         call get_species_enthalpies_rt(T_L, h_iL)
         call get_species_enthalpies_rt(T_R, h_iR)
-        h_iL = h_iL*gas_constant/molecular_weights*T_L
-        h_iR = h_iR*gas_constant/molecular_weights*T_R
+        h_iL = h_iL*R_univ/MW*T_L
+        h_iR = h_iR*R_univ/MW*T_R
         call get_species_specific_heats_r(T_L, Cp_iL)
         call get_species_specific_heats_r(T_R, Cp_iR)
 
@@ -272,18 +276,17 @@ contains
 
         if (abs(T_L - T_R) < eps) then
             ! Case when T_L and T_R are very close
-            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
-            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) &
-                         & - gas_constant/molecular_weights(:)))
+            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*R_univ/MW(:))
+            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*R_univ/MW(:) - R_univ/MW(:)))
         else
             ! Normal calculation when T_L and T_R are sufficiently different
             Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
-            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/molecular_weights(:)))
+            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - R_univ/MW(:)))
         end if
 
         gamma_avg = Cp_avg/Cv_avg
 
-        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/molecular_weights(:)*T_avg
+        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*R_univ/MW(:)*T_avg
         c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
 
     end subroutine s_compute_chemistry_average_state

@@ -273,7 +273,8 @@ contains
                                     call s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, qv_L, &
                                                                  & qv_R, rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                     if (chemistry .and. avg_state == avg_state_roe) then
-                                        call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, vel_avg_rms, &
+                                        call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, &
+                                                                               & molecular_weights, gas_constant, vel_avg_rms, &
                                                                                & gamma_avg, c_sum_Yi_Phi)
                                     end if
                                 end if
@@ -402,10 +403,11 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     ! Stiffened-gas isentrope p* = (p + B) xi**n - B, with the Tait exponent and pressure
-                                    ! already precomputed as gs_min = 1/gamma + 1 and ps_inf = pi_inf/(1 + gamma).
-                                    p_K_Star = xi_M*(xi_MP*((pres_L + ps_inf(i))*xi_L**gs_min(i) - ps_inf(i) - pres_L) + pres_L) &
-                                                     & + xi_P*(xi_PP*((pres_R + ps_inf(i))*xi_R**gs_min(i) - ps_inf(i) - pres_R) &
-                                                     & + pres_R)
+                                    ! already precomputed as isentrope_n = 1/gamma + 1 and isentrope_B = pi_inf/(1 + gamma).
+                                    p_K_Star = xi_M*(xi_MP*(f_pressure_on_isentrope(pres_L, xi_L, isentrope_n(i), &
+                                                     & isentrope_B(i)) - pres_L) + pres_L) &
+                                                     & + xi_P*(xi_PP*(f_pressure_on_isentrope(pres_R, xi_R, isentrope_n(i), &
+                                                     & isentrope_B(i)) - pres_R) + pres_R)
 
                                     flux_rsx_vf(${SF('')}$, i + eqn_idx%int_en%beg - 1) = f_phase_internal_energy(p_K_Star, &
                                                 & xi_M*qL_prim_rsx_vf(${SF('')}$, &
@@ -1044,6 +1046,7 @@ contains
                                                                      & qv_L, qv_R, rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                         if (chemistry .and. avg_state == avg_state_roe) then
                                             call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, &
+                                                                                   & molecular_weights, gas_constant, &
                                                                                    & vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
                                         end if
                                     end if

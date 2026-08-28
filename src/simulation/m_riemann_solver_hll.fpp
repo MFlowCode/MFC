@@ -324,8 +324,8 @@ contains
                                 call s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, qv_L, qv_R, &
                                                              & rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                 if (chemistry .and. avg_state == avg_state_roe) then
-                                    call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, vel_avg_rms, &
-                                                                           & gamma_avg, c_sum_Yi_Phi)
+                                    call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, molecular_weights, &
+                                                                           & gas_constant, vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
                                 end if
                             end if
 
