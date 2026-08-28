@@ -32,7 +32,8 @@
 > call sites still tag per box, F1 is only partially converted (I2b unlanded), and the subcycle
 > sites are an explicit deferral to I8. See `amr_plan_based_exchange.md`.
 >
-> **Adopted ordering (REORDERED by ledger 41 — the forest carries the only O(P) term):** B0 -> **B1
+> **Adopted ordering (ledger 41, with its premise CORRECTED by the Arm B verdict — BOTH the forest and
+> level 1 are O(P); S3.3 went first on absolute size and readiness, not on a difference in exponent):** B0 -> **B1
 > (canonicalise the merge)** -> **B0b (`amr_blocking_factor` default 1 -> 4, so the box cap stops being
 > load-bearing)** -> **S3.3 (forest ownership split — deletes `gwin_bytes`, 1.44 GB/rank at np32 and
 > doubling with P; also retires W1's pass-2 loops)** -> S3.2b (level-1 depth batching; a latency
@@ -59,7 +60,9 @@ Three points, per rank, weak-scaled (400^3 -> 800x400x400 -> 800x800x400):
 | `shr_maxdep` (exchange rounds) | 3 | 5 | 7 | +2 per doubling = 2 log2 P - 3 |
 | forest nodes that are rank-local | 99.79% | 99.79% | 99.77% | **constant** |
 
-**The only O(P) term left in W4 is `gwin_bytes`.** It is 1.44 GB per rank per run at np32 (~144 MB per
+**`gwin_bytes` is an O(P) term in W4** (and, when this was written, believed to be the ONLY one --
+**CORRECTED by the Arm B verdict below: level 1 is O(P) too; the 'flat' reading was a pinned cap**).
+It is It is 1.44 GB per rank per run at np32 (~144 MB per
 rank per regrid) and it doubles exactly with P. Extrapolated to 1e5 ranks that is ~450 GB per rank per
 regrid. It is also LARGER than the 185 MB `ntag_bytes` gather S3.1 deleted -- S3.1 removed the smaller
 of the two per-cell gathers.
@@ -175,7 +178,7 @@ the exascale goal, not a claim about the current operating point -- and it is th
 because the goal is the end-state architecture rather than the matched-point ladder.
 
 **Revised order: B1 -> B0b -> S3.3 (forest ownership split) -> S3.2b (level-1 depth batching).**
-S3.3 moves first because it carries the only O(P) term and, at 144 MB per rank per regrid, the largest
+S3.3 moves first because it carries a MEASURED O(P) term and, at 144 MB per rank per regrid, the largest
 absolute number on the board. S3.2b stays, demoted to a latency-constant fix. S3.3 also retires W1's
 regrid pass-2 loops (parents x global tagged cells), so it closes two invariants.
 
@@ -440,6 +443,173 @@ who needs what:**
   O(its assigned parents' tags). **`gwin_bytes` stops being O(P).** Pass 2's remaining per-parent scan
   becomes O(parents/P x tags/P) = **O(1) per rank under weak scaling**, closing W1's term completely.
 
+
+
+
+
+
+### W5 SCOPED FROM THE CODE 2026-08-28: the wall is the tag BASE, not only the per-box sites
+
+Auditing every AMR point-to-point tag argument (continuations joined, 57 calls in `m_amr.fpp`):
+
+| tag form | calls | verdict |
+|---|---|---|
+| `tq = amr_tag_base(f) + mod(amr_mesh_epoch, 50 or 100)` | 22 | **already the end-state (family, epoch) form** |
+| `tp = amr_tag_base(3) + mod(...)` | 2 | same |
+| `amr_cur` (mesh slot index) | 11 | bounded by the slot pool, not the global block count |
+| `k`, `4400 + k`, `cblk`, `ks` | ~12 | per-object |
+
+The per-object sites are concentrated, not scattered: the **L0 tile family** --
+`s_l0_fill_tiles_from_coarse`, `s_l0_scatter_tiles_to_coarse`, `s_l0_add_reflux_to_tiles`,
+`s_l0_restrict_to_tiles` (2 calls each, and all four use BLOCKING `MPI_SEND`/`MPI_RECV`) -- plus the
+chunked gather (`s_amr_gather_chunk_post`/`_send`, `s_amr_gather_from_parent_field_*`).
+
+**But the binding constraint is the BASE, and this is the part worth internalising:**
+
+```
+amr_tag_base(f) = amr_max_blocks + 100*f          ! m_amr.fpp:839
+@:ASSERT(amr_tag_base(size(amr_tag_base)) + 100 <= tag_ub, ...)   ! :849, the tripwire
+```
+
+**Every family's tag base carries an `amr_max_blocks` offset**, reserving `[1..amr_max_blocks]` for the
+legacy per-box space while families convert. So even a FULLY converted family has a base that grows with
+the problem, and the `MPI_TAG_UB` assert caps global blocks near `2**21` ~ 2.1e6 -- **~28k ranks at the
+measured ~75 boxes/rank**, which is exactly the wall the module comment records.
+
+**So W5 is two steps, and only the second removes the wall:**
+1. Convert the remaining families off per-object tags -- and note this is NOT a tag rename: per-object
+   tags exist to match multiple messages between the same pair, so each family needs its messages
+   AGGREGATED per peer first, the same shape as I2a/I3/I5. The L0 tile family additionally needs its
+   blocking SEND/RECV pairs converted.
+2. **Then drop the `amr_max_blocks` term from `amr_tag_base`.** The module comment states the condition
+   exactly: "The amr_max_blocks term can only go once NO family uses per-box tags." After that the tag
+   space is O(families x epoch) = O(1) and the 28k-rank wall disappears.
+
+Step 2 is one line and is the whole point; step 1 is the work that unblocks it.
+
+### ARM B VERDICT 2026-08-28 (three points, cap raised to 65536 so it never binds): LEVEL 1 IS O(P)
+
+| per regrid | np8 | np16 | np32 | growth |
+|---|---|---|---|---|
+| level-1 tree nodes = **global `ALLREDUCE`s** | 13,825 | 27,537 | **54,961** | **1.992x, 1.996x = O(P)** |
+| level-1 SHARED nodes | 11 | 23 | **47** | 2.09x, 2.04x = **O(P)** |
+| `shr_maxdep` | 3 | 5 | 7 | +2 per doubling |
+| `capped` warnings | 0 | 0 | 0 | cap never binds |
+
+**This overturns TWO of my earlier readings, both of which were pure cap artifact:**
+
+1. "Level-1 collective count is FLAT in P (16,383)" -- it is **O(P)**. The 16,383 was `2 x 8192 - 1`, a
+   full binary tree pinned by `amr_max_blocks`, identical in every rung by construction.
+2. "The level-1 shared set grows as O(log P) (+4 per doubling: 7, 11, 15)" -- it is **O(P)** (11, 23, 47).
+   That sequence was measured on cap-pinned trees, so it was reporting how a FIXED tree splits across more
+   ranks, not how the tree grows.
+
+**Consequences.**
+- **S3.2b is not a latency constant.** It removes an O(P) count of global collectives -- 54,961 per regrid
+  at np32 and doubling with P. It is as important as S3.3, not a follow-on.
+- **The reordering argument in ledger 41 is dead.** It rested on "the forest is O(P) while level 1 is
+  flat". Both are O(P). S3.3 was still the right thing to land first -- it removed a *measured* 1.44 GB
+  per rank of O(P) volume with a bounded, bit-identical design -- but the justification is now absolute
+  size and readiness, not a difference in exponent.
+- **Depth-batching becomes essential rather than an optimisation.** With shared nodes O(P), an
+  un-batched sparse exchange would be O(P) collectives; batching by depth gives `shr_maxdep` (~2 log2 P,
+  so ~31 rounds at 1e5 ranks) regardless. The remaining question S3.2b must answer is the shared VOLUME
+  per rank, which `[amr-scope-me]` now instruments.
+- **B0b is more important than recorded.** At the shipped `bf = 1` the cap binds on every regrid, which is
+  precisely why this was invisible for so long.
+
+**Method note.** Three "flat in P" readings tonight were a pinned limit, and the tell each time was a
+round number (16,383 = 2 x 8192 - 1). Added to the three-point rule: before believing a flat result, ask
+whether a cap, pool or table was fixed across the sweep -- and check whether the value is suspiciously
+round.
+
+### W1 SIZED PROPERLY 2026-08-28: ~48 full scans of the GLOBAL block list PER STEP
+
+Following the replicated-metadata finding, an audit of every `do ... = 1, amr_num_blocks` in the AMR
+sources: **44 sites across 22 routines.** The ones that matter are on the RK stage path, called from
+`m_time_steppers.fpp` (`s_amr_stage_fill_wave` :579, `s_amr_parent_fill_wave` :581 per level,
+`s_amr_reflux_faces_wave` :633, `s_amr_freg_wave` :819), not in the regrid:
+
+| routine | scans | per |
+|---|---|---|
+| `s_amr_stage_fill_wave` | 2 | stage |
+| `s_amr_parent_fill_wave` | 2 | stage x (levels-1) |
+| `s_amr_reflux_faces_wave` | 3 | stage |
+| `s_amr_freg_wave` | 3 | stage |
+| `s_amr_restrict_l1_wave` | 3 | stage |
+| `s_amr_restrict_parent_wave` | 2 | stage |
+| `s_amr_convert_prim_batch` | 1 | stage |
+
+~16 scans per stage at `amr_max_level = 2`, so **~48 per step under RK3**. Every one walks the whole
+machine's block list and filters to this rank's own ~75:
+
+```
+do k = 1, amr_num_blocks
+    if (amr_block_level(k) /= 1) cycle
+    if (amr_block_owner(k) == proc_rank) cycle     ! or /= , for the send side
+```
+
+At np32 that is ~2,500 blocks x 48 = 120 k predicate evaluations per step -- invisible. At 1e5 ranks with
+the measured 75 blocks/rank it is 7.5 M blocks x 48 = **~360 M evaluations per rank per step**, roughly
+0.4-0.7 s of pure metadata scanning per step, growing linearly in P while the real work stays fixed.
+**This is the direct W1 violation** -- "per-rank STEP cost = f(local cells, peers)" -- and it is a bigger
+practical problem than the regrid pass-1 O(P^2), because it runs every step rather than every 20th.
+
+**Two fixes, and the cheap one is mechanical.**
+
+- **W1a (cheap, no architecture change): an owned-block index list.** Maintain `amr_my_blocks(:)` /
+  `amr_n_my`, rebuilt once per regrid, and convert the ownership-filtered loops to
+  `do kk = 1, amr_n_my; k = amr_my_blocks(kk)`. **10 sites are directly convertible** (grep-verified:
+  reflux_faces_wave, freg_wave x3, restrict_l1_wave x2, stage_fill_wave, parent_fill_wave x2,
+  convert_prim_batch), plus `restrict_parent_wave` whose filter is written `proc_rank /= cowner`. The
+  RECEIVE-side loops (`amr_block_owner(k) == proc_rank` -> cycle) need the complementary list: the peer
+  blocks this rank participates in, which is exactly the "peers" W1 allows -- build it in the same pass.
+- **W1b (architectural): distribute the metadata itself.** See the root-cause section above. W1a takes
+  per-step cost to O(local + peers) but leaves the O(P) MEMORY; only W1b removes that.
+
+**Free win found in the same read:** `s_amr_reflux_faces_wave` BUILDS `amr_fw_rblk` inside its first
+global scan (`amr_fw_rblk(nhr) = k`, :2744) and then its SECOND global scan (:2870) walks the whole block
+list AGAIN purely to re-derive the same index order, asserting agreement
+(`@:ASSERT(amr_fw_rblk(j) == k, ...)`). The same shape repeats in `s_amr_freg_wave` (:2930 / :3042).
+**Those second scans are removable outright** -- iterate `j = 1, nhr` over `amr_fw_rblk` directly. That is
+4 of the ~48 scans deleted with no new data structure and no behaviour change.
+
+### W1's ROOT CAUSE, found 2026-08-28 while scoping S3.3c: the block metadata is REPLICATED GLOBALLY
+
+Scoping S3.3c sent me to `5ec798ed` (the seam all-pairs fix) for reusable machinery. It does not transfer
+-- that fix worked because `f_amr_seam`'s predicate FIXES the neighbour's `lo` corner exactly, making it a
+lookup rather than a search, whereas pass 1 needs a genuine range-overlap query. But reading it led
+somewhere more important:
+
+```
+allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
+allocate (amr_owns_all(amr_max_blocks))
+allocate (amr_block_level(amr_max_blocks))
+```
+
+**Every rank holds the geometry, ownership and level of EVERY block in the machine.** That is O(P) memory
+per rank by construction -- at 1e5 ranks with the measured ~75 blocks/rank, ~7.5 M blocks x 8 ints x 4 B
+is **~240 MB per rank of pure metadata**, before any of it is scanned. The O(P^2) pass-1 scan is a
+SYMPTOM of this: a loop over all blocks is only writable because all blocks are locally addressable.
+
+**So W1 cannot be fully met by restructuring loops.** Every "iterate `1, amr_num_blocks`" site in the
+regrid is bounded below by this array's existence. Closing W1 needs the metadata itself distributed --
+each rank holding its own blocks plus a halo of neighbours, with remote queries going through the
+existing owner map (`f_amr_owner`'s Morton cut-point search) instead of a local array read. That is an
+architectural increment on the scale of the store flattening, not a loop fix, and it should be scoped
+separately before any more W1 loop work is done.
+
+**Revised S3.3c (still worth doing, and small).** It takes the pass-1 scan from O(P^2) to O(P) without
+touching the metadata layout:
+- Compute `mine(kb)` -- does this rank hold data for parent `kb` -- by iterating this rank's OWNED blocks
+  only, which is O(local blocks) = O(1) per rank.
+- Compute `covered(kb)` the same way, then **one `MPI_ALLREDUCE(MPI_LOR)` over the parents array**
+  (~2,400 logicals, per-box global data, which the endstate permits) instead of every rank scanning every
+  block. This is the step that removes the O(P^2).
+- Guard the dense `gwin` allocation on `mine(kb)`, which removes the O(P) window-zeroing traffic for free.
+
+Residual after S3.3c is O(parents) per rank -- the loop over `plo:phi` itself -- which is exactly the
+replicated-metadata bound above and cannot go lower until that is fixed.
 
 ### S3.3c FOUND 2026-08-28 (reviewing my own S3.3a/b diff): pass 1 is STILL fully replicated, and it is O(P^2)
 
