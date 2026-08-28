@@ -1166,10 +1166,12 @@ contains
         end do
 
         ! apply the summed forces
-        $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
+        $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
         do i = 1, num_ibs
-            patch_ib(i)%force(:) = forces(i,:)
-            patch_ib(i)%torque(:) = torques(i,:)
+            do l = 1, 3
+                patch_ib(i)%force(l) = forces(i,l)
+                patch_ib(i)%torque(l) = torques(i,l)
+            end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -1353,7 +1355,7 @@ contains
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
 #ifdef MFC_MPI
-        integer                       :: i, j, k, pack_pos, unpack_pos, buf_size, ierr
+        integer                       :: i, j, k, l, pack_pos, unpack_pos, buf_size, ierr
         integer                       :: send_neighbor, recv_neighbor, recv_count, tag
         character(len=1), allocatable :: ib_force_send_buf(:), ib_force_recv_buf(:)
 
@@ -1375,11 +1377,13 @@ contains
                 do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
                     ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
                     pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
+                    $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
                     do i = 1, num_ibs
                         send_ids(i) = patch_ib(i)%gbl_patch_id
-                        send_ft(1:3,i) = forces(i,:)
-                        send_ft(4:6,i) = torques(i,:)
+                        do l = 1, 3
+                            send_ft(l,i) = forces(i,l)
+                            send_ft(l + 3,i) = torques(i,l)
+                        end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                     $:GPU_UPDATE(host='[send_ids, send_ft]')
@@ -1395,16 +1399,18 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques, &
+                        $:GPU_PARALLEL_LOOP(private='[i, j, l]', copyin='[recv_ft, recv_ids]', copy='[forces, torques, &
                                             & recv_forces_snap, recv_torques_snap]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
                                 ! add forces and subtract recv_snap prevent double-counting
-                                forces(j,:) = forces(j,:) + recv_ft(1:3,i) - recv_forces_snap(j,:)
-                                torques(j,:) = torques(j,:) + recv_ft(4:6,i) - recv_torques_snap(j,:)
-                                recv_forces_snap(j,:) = recv_ft(1:3,i)
-                                recv_torques_snap(j,:) = recv_ft(4:6,i)
+                                do l = 1, 3
+                                    forces(j,l) = forces(j,l) + recv_ft(l,i) - recv_forces_snap(j,l)
+                                    torques(j,l) = torques(j,l) + recv_ft(l + 3,i) - recv_torques_snap(j,l)
+                                    recv_forces_snap(j,l) = recv_ft(l,i)
+                                    recv_torques_snap(j,l) = recv_ft(l + 3,i)
+                                end do
                             end if
                         end do
                         $:END_GPU_PARALLEL_LOOP()
@@ -1422,11 +1428,13 @@ contains
 
                 do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
                     pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i]', copyin='[forces, torques]')
+                    $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
                     do i = 1, num_ibs
                         send_ids(i) = patch_ib(i)%gbl_patch_id
-                        send_ft(1:3,i) = forces(i,:)
-                        send_ft(4:6,i) = torques(i,:)
+                        do l = 1, 3
+                            send_ft(l,i) = forces(i,l)
+                            send_ft(l + 3,i) = torques(i,l)
+                        end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                     $:GPU_UPDATE(host='[send_ids, send_ft]')
@@ -1441,12 +1449,14 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
+                        $:GPU_PARALLEL_LOOP(private='[i, j, l]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
-                                forces(j,:) = recv_ft(1:3,i)
-                                torques(j,:) = recv_ft(4:6,i)
+                                do l = 1, 3
+                                    forces(j,l) = recv_ft(l,i)
+                                    torques(j,l) = recv_ft(l + 3,i)
+                                end do
                             end if
                         end do
                         $:END_GPU_PARALLEL_LOOP()
@@ -1550,12 +1560,11 @@ contains
             pack_pos = storage_size(0)/8 + new_count*patch_bytes
 
             ! Post all receives first, then sends
-            ! TODO :: THIS NEEDS TO ITERATE OVER -ib_neighborhood_radius to ib_neighborhood_radius, not -1 to 1
             nreqs = 0
             nbr_idx = 0
-            do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3)
-                do dy = -1, 1
-                    do dx = -1, 1
+            do dz = merge(-ib_neighborhood_radius, 0, num_dims == 3), merge(ib_neighborhood_radius, 0, num_dims == 3)
+                do dy = -ib_neighborhood_radius, ib_neighborhood_radius
+                    do dx = -ib_neighborhood_radius, ib_neighborhood_radius
                         if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
                         nbr_idx = nbr_idx + 1
                         tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
@@ -1570,9 +1579,9 @@ contains
                 end do
             end do
 
-            do dz = merge(-1, 0, num_dims == 3), merge(1, 0, num_dims == 3)
-                do dy = -1, 1
-                    do dx = -1, 1
+            do dz = merge(-ib_neighborhood_radius, 0, num_dims == 3), merge(ib_neighborhood_radius, 0, num_dims == 3)
+                do dy = -ib_neighborhood_radius, ib_neighborhood_radius
+                    do dx = -ib_neighborhood_radius, ib_neighborhood_radius
                         if (dx == 0 .and. dy == 0 .and. dz == 0) cycle
                         tag = 200 + (dx + 1)*9 + (dy + 1)*3 + (dz + 1)
                         send_neighbor = ib_neighbor_ranks(dx, dy, dz)
@@ -1586,7 +1595,7 @@ contains
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
             ! Unpack all received buffers
-            do nbr_idx = 1, merge(26, 8, num_dims == 3)
+            do nbr_idx = 1, ((2*ib_neighborhood_radius+1)**num_dims) - 1
                 if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
                 unpack_pos = 0
                 call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -1611,6 +1620,171 @@ contains
 
     end subroutine s_handoff_ib_ownership
 
+    !> TEMPORARY DEBUG INSTRUMENTATION (remove once the cross-rank IB divergence bug is found). Gathers every rank's tracked
+    !! patch_ib states and, for every gbl_patch_id two or more ranks both track, logs a full side-by-side dump to
+    !! ib_divergence_rank<N>.log whenever their dynamic (kinematic/force) fields disagree at all.
+    subroutine s_debug_log_ib_divergence(t_step)
+
+        integer, intent(in) :: t_step
+
+#ifdef MFC_MPI
+        integer                                    :: ierr, patch_bytes, i, j, r, unpack_pos, unit_num
+        integer, dimension(0:num_procs - 1)        :: rank_counts, rank_counts_bytes, rank_displs_bytes
+        character(len=1), allocatable              :: send_buf(:), recv_buf(:)
+        type(ib_patch_parameters)                  :: other_patch
+        character(len=64)                           :: fname
+        logical                                     :: mismatch
+        integer, dimension(9)                       :: topo_local
+        integer, dimension(9, 0:num_procs - 1)      :: topo_all
+        integer                                     :: r2, jr, roster_unpack_pos
+        logical                                     :: found
+        type(ib_patch_parameters)                   :: roster_patch
+
+        if (num_procs == 1) return
+
+        ! Gather each rank's Cartesian coords + flow-field boundary neighbor ranks (bc_x/y/z%beg/end) so a divergence dump can
+        ! show the real adjacency graph instead of an assumed one.
+        topo_local = -999
+        topo_local(1:num_dims) = proc_coords(1:num_dims)
+        topo_local(4) = bc_x%beg; topo_local(5) = bc_x%end
+        if (num_dims >= 2) then
+            topo_local(6) = bc_y%beg; topo_local(7) = bc_y%end
+        end if
+        if (num_dims >= 3) then
+            topo_local(8) = bc_z%beg; topo_local(9) = bc_z%end
+        end if
+        call MPI_ALLGATHER(topo_local, 9, MPI_INTEGER, topo_all, 9, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+
+        call MPI_ALLGATHER(num_ibs, 1, MPI_INTEGER, rank_counts, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+
+        patch_bytes = storage_size(patch_ib(1))/8
+        rank_counts_bytes = rank_counts*patch_bytes
+        rank_displs_bytes(0) = 0
+        do r = 1, num_procs - 1
+            rank_displs_bytes(r) = rank_displs_bytes(r - 1) + rank_counts_bytes(r - 1)
+        end do
+
+        allocate (send_buf(max(1, num_ibs*patch_bytes)))
+        allocate (recv_buf(max(1, sum(rank_counts_bytes))))
+
+        unpack_pos = 0
+        do i = 1, num_ibs
+            call MPI_PACK(patch_ib(i), patch_bytes, MPI_BYTE, send_buf, size(send_buf), unpack_pos, MPI_COMM_WORLD, ierr)
+        end do
+
+        call MPI_ALLGATHERV(send_buf, num_ibs*patch_bytes, MPI_PACKED, recv_buf, rank_counts_bytes, rank_displs_bytes, &
+                            & MPI_PACKED, MPI_COMM_WORLD, ierr)
+
+        write (fname, '(A,I0,A)') 'ib_divergence_rank', proc_rank, '.log'
+        unit_num = 900 + proc_rank
+
+        do r = 0, num_procs - 1
+            if (r == proc_rank) cycle
+            unpack_pos = rank_displs_bytes(r)
+            do j = 1, rank_counts(r)
+                call MPI_UNPACK(recv_buf, size(recv_buf), unpack_pos, other_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, ierr)
+
+                do i = 1, num_ibs
+                    if (patch_ib(i)%gbl_patch_id /= other_patch%gbl_patch_id) cycle
+
+                    mismatch = (patch_ib(i)%x_centroid /= other_patch%x_centroid) .or. &
+                               & (patch_ib(i)%y_centroid /= other_patch%y_centroid) .or. &
+                               & (patch_ib(i)%z_centroid /= other_patch%z_centroid) .or. &
+                               & any(patch_ib(i)%vel /= other_patch%vel) .or. &
+                               & any(patch_ib(i)%angular_vel /= other_patch%angular_vel) .or. &
+                               & any(patch_ib(i)%angles /= other_patch%angles) .or. &
+                               & any(patch_ib(i)%force /= other_patch%force) .or. &
+                               & any(patch_ib(i)%torque /= other_patch%torque) .or. &
+                               & (patch_ib(i)%step_x_centroid /= other_patch%step_x_centroid) .or. &
+                               & (patch_ib(i)%step_y_centroid /= other_patch%step_y_centroid) .or. &
+                               & (patch_ib(i)%step_z_centroid /= other_patch%step_z_centroid) .or. &
+                               & any(patch_ib(i)%step_vel /= other_patch%step_vel) .or. &
+                               & any(patch_ib(i)%step_angular_vel /= other_patch%step_angular_vel) .or. &
+                               & any(patch_ib(i)%step_angles /= other_patch%step_angles)
+
+                    if (mismatch) then
+                        open (unit=unit_num, file=fname, position='append', action='write', status='unknown')
+                        write (unit_num, '(A)') '===================================================================='
+                        write (unit_num, '(A,I0,A,ES23.15,A,I0,A,I0,A,I0)') 'DIVERGENCE t_step=', t_step, ' mytime=', mytime, &
+                            & ' gbl_patch_id=', patch_ib(i)%gbl_patch_id, ' rank_A=', proc_rank, ' rank_B=', r
+                        write (unit_num, '(A,I0,A,I0,A,I0,A,I0,A,I0)') 'num_procs_x=', num_procs_x, ' num_procs_y=', &
+                            & num_procs_y, ' num_procs_z=', num_procs_z, ' ib_neighborhood_radius=', ib_neighborhood_radius, &
+                            & ' num_dims=', num_dims
+                        write (unit_num, '(A,I0,A,3I3,A,4I5,A,2I5)') '--- rank ', proc_rank, &
+                            & ' coords=', topo_all(1:3, proc_rank), ' bc_x(beg,end)/bc_y(beg,end)=', &
+                            & topo_all(4:5, proc_rank), topo_all(6:7, proc_rank), ' bc_z(beg,end)=', topo_all(8:9, proc_rank)
+                        call s_debug_write_ib_state(unit_num, patch_ib(i))
+                        write (unit_num, '(A,I0,A,3I3,A,4I5,A,2I5)') '--- rank ', r, &
+                            & ' coords=', topo_all(1:3, r), ' bc_x(beg,end)/bc_y(beg,end)=', &
+                            & topo_all(4:5, r), topo_all(6:7, r), ' bc_z(beg,end)=', topo_all(8:9, r)
+                        call s_debug_write_ib_state(unit_num, other_patch)
+
+                        ! Full roster: every rank's tracking status for this gbl_patch_id, not just the mismatching pair, so a
+                        ! rank silently sending 0s (or not tracking at all) shows up instead of being inferred from absence.
+                        write (unit_num, '(A)') '--- full roster for this gbl_patch_id ---'
+                        do r2 = 0, num_procs - 1
+                            if (r2 == proc_rank) then
+                                found = .false.
+                                do jr = 1, num_ibs
+                                    if (patch_ib(jr)%gbl_patch_id == patch_ib(i)%gbl_patch_id) then
+                                        found = .true.
+                                        write (unit_num, '(A,I0,A,3I3)') 'rank ', r2, ' TRACKS coords=', topo_all(1:3, r2)
+                                        call s_debug_write_ib_state(unit_num, patch_ib(jr))
+                                        exit
+                                    end if
+                                end do
+                                if (.not. found) write (unit_num, '(A,I0,A,3I3)') 'rank ', r2, &
+                                    & ' NOT TRACKED coords=', topo_all(1:3, r2)
+                            else
+                                found = .false.
+                                roster_unpack_pos = rank_displs_bytes(r2)
+                                do jr = 1, rank_counts(r2)
+                                    call MPI_UNPACK(recv_buf, size(recv_buf), roster_unpack_pos, roster_patch, patch_bytes, &
+                                                    & MPI_BYTE, MPI_COMM_WORLD, ierr)
+                                    if (roster_patch%gbl_patch_id == patch_ib(i)%gbl_patch_id) then
+                                        found = .true.
+                                        write (unit_num, '(A,I0,A,3I3)') 'rank ', r2, ' TRACKS coords=', topo_all(1:3, r2)
+                                        call s_debug_write_ib_state(unit_num, roster_patch)
+                                        exit
+                                    end if
+                                end do
+                                if (.not. found) write (unit_num, '(A,I0,A,3I3)') 'rank ', r2, &
+                                    & ' NOT TRACKED coords=', topo_all(1:3, r2)
+                            end if
+                        end do
+
+                        close (unit_num)
+                    end if
+                end do
+            end do
+        end do
+
+        deallocate (send_buf, recv_buf)
+#endif
+
+    end subroutine s_debug_log_ib_divergence
+
+    !> TEMPORARY DEBUG INSTRUMENTATION helper for s_debug_log_ib_divergence: dumps every dynamic field of an IB patch state.
+    subroutine s_debug_write_ib_state(unit_num, patch)
+
+        integer, intent(in)                   :: unit_num
+        type(ib_patch_parameters), intent(in) :: patch
+
+        write (unit_num, '(A,3ES23.15)') '  centroid           = ', patch%x_centroid, patch%y_centroid, patch%z_centroid
+        write (unit_num, '(A,3ES23.15)') '  step_centroid      = ', patch%step_x_centroid, patch%step_y_centroid, &
+            & patch%step_z_centroid
+        write (unit_num, '(A,3ES23.15)') '  vel                = ', patch%vel
+        write (unit_num, '(A,3ES23.15)') '  step_vel           = ', patch%step_vel
+        write (unit_num, '(A,3ES23.15)') '  angular_vel        = ', patch%angular_vel
+        write (unit_num, '(A,3ES23.15)') '  step_angular_vel   = ', patch%step_angular_vel
+        write (unit_num, '(A,3ES23.15)') '  angles             = ', patch%angles
+        write (unit_num, '(A,3ES23.15)') '  step_angles        = ', patch%step_angles
+        write (unit_num, '(A,3ES23.15)') '  force              = ', patch%force
+        write (unit_num, '(A,3ES23.15)') '  torque             = ', patch%torque
+        write (unit_num, '(A,ES23.15)') '  moment             = ', patch%moment
+
+    end subroutine s_debug_write_ib_state
+
     subroutine s_get_neighborhood_idx(gbl_idx, neighborhood_idx)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1627,9 +1801,14 @@ contains
 
         integer :: i
 
-        ib_gbl_idx_lookup = -1
-        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
+        ! reset the lookup
+        $:GPU_PARALLEL_LOOP(private='[i]')
+        do i = 1, num_gbl_ibs
+            ib_gbl_idx_lookup(i) = -1
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
+        ! populate the table
         $:GPU_PARALLEL_LOOP(private='[i]')
         do i = 1, num_ibs
             ib_gbl_idx_lookup(patch_ib(i)%gbl_patch_id) = i

@@ -589,6 +589,7 @@ contains
             if (moving_immersed_boundary_flag) then
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
                 call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
+                call s_debug_log_ib_divergence(t_step)  ! TEMPORARY: logs any cross-rank IB state mismatch
             else if (ib_state_wrt) then
                 call s_compute_ib_forces(q_prim_vf, fluid_pp)
             end if
