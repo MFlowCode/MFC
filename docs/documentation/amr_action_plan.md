@@ -40,6 +40,33 @@
 > ~4 s versus ~18 min for a GPU build and catches what `ffmt`/`lint_source` pass; a gfortran CPU
 > build in an isolated worktree is ~13 s incremental; build in one worktree and measure in another.
 
+## 2026-08-27 (39) — B0 + S3.2a: GOLDEN GATE CLOSED, and the np32 question that decides S3.2
+
+`320fe106` was committed with the caveat that the 69-test AMR suite had not finished before the node
+allocation expired. **It finished: 69 passed, 0 failed.** B0 (at the `bf = 1` default) and the S3.2a
+scope instrumentation are therefore gated by the full suite, not only by bit-identity. The caveat
+still stands for `bf > 1`, which no test exercises — that remains evidence-backed by the sweep only.
+
+**B0 priced (np8, per regrid):** `bf=1` 38,255 nodes / 594 boxes; `bf=8` 6,475 / 576; `bf=16`
+1,466 / 576. **26x fewer tree nodes produce the SAME answer**, and the cap-saturation warning stops
+at `bf >= 4`. But B0 is NOT a W4 lever: at np8 it cuts LOCAL (free) nodes 5x and leaves the SHARED
+set untouched (7 -> 8.8 nodes, 18,966 -> 21,547 B), because it prunes leaves and leaves are already
+rank-local. Its value is latency, plus making `force` inert so B1 and S3.2 can be gated.
+
+**THE OPEN QUESTION, and this machine can answer it.** `shr_maxdep` went 3 (np8) -> 5 (np16), i.e.
+**+2 per doubling, not the +1 that log2(P) predicts**. If that rate persists, at 1e5 ranks the shared
+phase would be ~31 levels — essentially the whole tree — and S3.2's premise collapses. np32
+(job 388355) discriminates: **6 means the log2 model holds and S3.2 proceeds as designed; 7 means +2
+is real and the design needs rethinking BEFORE it is written.**
+
+**Do NOT spend big-machine allocation yet.** The need for the scoping technique is already
+established here with a mechanism, not an extrapolation: the forest term grows 1.97x/1.99x (exactly
+P) while the cap-fixed level-1 term is constant, so S3.1 is asymptotically O(P). Frontier would
+refine WHERE it breaks, not WHETHER. The right moment for big-machine time is AFTER S3.2+S3.3, to
+demonstrate per-rank reduced bytes actually flat at 1-4k ranks — a short counters-only run. The one
+exception: if np32 returns `shr_maxdep = 7`, a small probe (np64-np256, minutes each) is the cheapest
+way to distinguish "+2 forever" from "+2 then flattening".
+
 ## S3.2 DESIGN CONTRACT (2026-08-27) — scoping the clustering reductions
 
 Written after S3.1 measured asymptotically O(P). This is the next design contract; S3.3 then applies
