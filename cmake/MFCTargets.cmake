@@ -269,10 +269,17 @@ exit 0
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-		        find_library(HIP_LIB amdhip64
-                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib" REQUIRED)
+                # Search the AFAR drop first: the ROCm module also ships
+                # libhipfort-amdgcn.a, and HINTS lose to CMAKE_PREFIX_PATH, which
+                # would pair the drop's .mod files with another flang's archive.
+                find_library(HIP_LIB amdhip64
+                    PATHS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib"
+                    NO_DEFAULT_PATH)
+                find_library(HIP_LIB amdhip64 REQUIRED)
                 find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
-                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib" REQUIRED)
+                    PATHS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib"
+                    NO_DEFAULT_PATH)
+                find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn REQUIRED)
                 # The hipfort module dir moved to lib/llvm/include in newer AFAR
                 # (therock) drops; keep the classic path for Frontier's layout.
                 target_include_directories(${a_target} PRIVATE
