@@ -221,16 +221,43 @@ $sbatch_script_contents
 EOT
 )
 
-job_id=$(retry_sbatch "$_sbatch_script")
+# --- Submit + monitor, resubmitting on preemption
+# Phoenix preempts 'embers' jobs with PreemptMode=CANCEL (not REQUEUE), so a
+# preempted job is killed outright and `--requeue` never restarts it. When the
+# monitor reports preemption (exit 76), submit a fresh job and monitor again.
+# Bounded by MAX_PREEMPT_RESUBMITS as a runaway guard; the job-level
+# `timeout-minutes` (480m) remains the real backstop.
+: "${MAX_PREEMPT_RESUBMITS:=10}"
+preempt_attempt=0
+while :; do
+    job_id=$(retry_sbatch "$_sbatch_script")
+    echo "Submitted batch job $job_id"
+    echo "$job_id" > "$id_file"
+    echo "Job ID written to $id_file"
+
+    # SUBMIT_ONLY=1 (parallel submission, e.g. benchmarks): the caller monitors
+    # each job and handles its own preemption resubmits.
+    if [ "${SUBMIT_ONLY:-0}" = "1" ]; then
+        echo "SUBMIT_ONLY mode: skipping monitor (job_id=$job_id output=$output_file)"
+        break
+    fi
+
+    monitor_rc=0
+    bash "$SCRIPT_DIR/run_monitored_slurm_job.sh" "$job_id" "$output_file" || monitor_rc=$?
+    if [ "$monitor_rc" -eq 0 ]; then
+        break
+    fi
+    if [ "$monitor_rc" -eq 76 ]; then
+        if [ "$preempt_attempt" -lt "$MAX_PREEMPT_RESUBMITS" ]; then
+            preempt_attempt=$((preempt_attempt + 1))
+            echo "::warning::SLURM job $job_id was preempted (Phoenix embers). Resubmitting a fresh job (attempt ${preempt_attempt}/${MAX_PREEMPT_RESUBMITS})."
+            rm -f "$output_file"
+            continue
+        fi
+        echo "::error::SLURM job preempted ${MAX_PREEMPT_RESUBMITS} times without completing; giving up."
+        exit 1
+    fi
+    # Genuine failure (not preemption).
+    exit "$monitor_rc"
+done
 unset _sbatch_script
-
-echo "Submitted batch job $job_id"
-echo "$job_id" > "$id_file"
-echo "Job ID written to $id_file"
-
-# --- Monitor (skip if SUBMIT_ONLY=1, e.g. for parallel submission) ---
-if [ "${SUBMIT_ONLY:-0}" = "1" ]; then
-    echo "SUBMIT_ONLY mode: skipping monitor (job_id=$job_id output=$output_file)"
-else
-    bash "$SCRIPT_DIR/run_monitored_slurm_job.sh" "$job_id" "$output_file"
-fi
