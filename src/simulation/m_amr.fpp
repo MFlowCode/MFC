@@ -230,8 +230,11 @@ module m_amr
     !! cannot use m_amr); it is use-associated here and re-exported, so importers of m_amr are unchanged.
     !! per-family plan message tag bases (families F1..F7, amr_plan_based_exchange.md): amr_max_blocks + 100*f keeps
     !! the plan tag space disjoint from the legacy per-box space (tags in [1..amr_max_blocks]) while families convert;
-    !! the epoch is folded in as base + mod(amr_mesh_epoch, 100). The init MPI_TAG_UB assert is the scale tripwire: it caps
-    !! GLOBAL blocks near 2**21/1 ~ 2.1e6, i.e. about 28k ranks at ~75 boxes/rank, which is the SECOND scaling wall after W4.
+    !! the epoch is folded in as base + mod(amr_mesh_epoch, 100). The init MPI_TAG_UB assert is the scale tripwire, and its
+    !! headroom is an implementation property that must be MEASURED, not assumed: this comment previously asserted a 2**21 ceiling
+    !! (~2.1e6 blocks, ~28k ranks) and called it the second scaling wall after W4. Measured 2026-08-28: Open MPI 4.1.8 reports
+    !! MPI_TAG_UB = 2**31 - 1 and Frontier's Cray MPICH reports 2**29 - 1 = 536870911, i.e. ~537e6 global blocks or ~7.2e6 ranks at
+    !! ~75 boxes/rank -- about 95x headroom over Frontier's ~75k GCDs. So the tag space is NOT a wall on either MPI we target.
     !! The amr_max_blocks term can only go once NO family uses per-box tags. Verified 2026-08-27: 19 of 41 AMR p2p call sites
     !! still tag per box (F1's unconverted path uses amr_cur, migration uses the column index), and the subcycle sites are an
     !! EXPLICIT deferral to increment I8, not I7 -- I7's own boundary is that any family left per-box keeps its tables.
