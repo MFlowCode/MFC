@@ -5,7 +5,6 @@
 !> @brief Lax-Friedrichs (Rusanov) approximate Riemann solver
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'inline_riemann.fpp'
 
 module m_riemann_solver_lf
 

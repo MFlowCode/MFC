@@ -5,7 +5,6 @@
 !> @brief Dual-pass HLLD approximate Riemann solver for hypoelastic flows, with non-conservative interface-velocity coupling
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'inline_riemann.fpp'
 
 module m_riemann_solver_hypo_hlld
 

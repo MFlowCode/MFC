@@ -13,6 +13,7 @@ module m_riemann_state
     use m_global_parameters
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, verysmall
     use m_hb_function
+    use m_thermochem, only: gas_constant, molecular_weights, get_species_enthalpies_rt, get_species_specific_heats_r
 
     implicit none
 
@@ -180,6 +181,112 @@ contains
         vel_R_norm = vel_R_tmp
 
     end subroutine s_apply_low_Mach_velocity
+
+    !> Interface-averaged state that the pressure-based wave-speed estimate reads. avg_state selects between the density-weighted
+    !! Roe average, which costs eight square roots per face, and the plain arithmetic mean; unlike the other solver switches this
+    !! one is not implied by the call site, so the dispatch stays here.
+    subroutine s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, qv_L, qv_R, rho_avg, vel_avg_rms, &
+                                       & H_avg, gamma_avg, qv_avg)
+
+        $:GPU_ROUTINE(function_name='s_compute_average_state', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: rho_L, rho_R      !< Left and right densities
+        real(wp), intent(in) :: H_L, H_R          !< Left and right total enthalpies
+        real(wp), intent(in) :: gamma_L, gamma_R  !< Left and right specific heat ratio functions
+        real(wp), intent(in) :: qv_L, qv_R        !< Left and right reference energies
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: vel_L, vel_R
+        #:else
+            real(wp), dimension(num_vels), intent(in) :: vel_L, vel_R
+        #:endif
+        real(wp), intent(out) :: rho_avg, H_avg, gamma_avg, qv_avg
+        real(wp), intent(out) :: vel_avg_rms  !< Squared magnitude of the averaged velocity, summed over all components
+        integer               :: i
+
+        vel_avg_rms = 0._wp
+
+        if (avg_state == avg_state_roe) then
+            rho_avg = sqrt(rho_L*rho_R)
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_vels
+                vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))**2._wp/(sqrt(rho_L) + sqrt(rho_R))**2._wp
+            end do
+
+            H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/(sqrt(rho_L) + sqrt(rho_R))
+            gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/(sqrt(rho_L) + sqrt(rho_R))
+            qv_avg = (sqrt(rho_L)*qv_L + sqrt(rho_R)*qv_R)/(sqrt(rho_L) + sqrt(rho_R))
+        else
+            rho_avg = 5.e-1_wp*(rho_L + rho_R)
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_vels
+                vel_avg_rms = vel_avg_rms + (5.e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
+            end do
+
+            H_avg = 5.e-1_wp*(H_L + H_R)
+            gamma_avg = 5.e-1_wp*(gamma_L + gamma_R)
+            qv_avg = 5.e-1_wp*(qv_L + qv_R)
+        end if
+
+    end subroutine s_compute_average_state
+
+    !> Roe-averaged reacting-mixture quantities. Split out from s_compute_average_state because it is reached only under the Roe
+    !! average: it replaces gamma_avg with the mixture Cp/Cv and builds the c_sum_Yi_Phi term that s_compute_speed_of_sound_avg
+    !! needs for the reacting sound speed. vel_avg_rms must be the full squared velocity magnitude - the Phi_avg term and the
+    !! vel_sum term in that routine are built to cancel, leaving c^2 = gamma*R*T, and they only do so for the full magnitude.
+    subroutine s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
+
+        $:GPU_ROUTINE(function_name='s_compute_chemistry_average_state', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: rho_L, rho_R  !< Left and right densities
+        real(wp), intent(in) :: T_L, T_R      !< Left and right temperatures
+        real(wp), intent(in) :: vel_avg_rms   !< Squared magnitude of the averaged velocity
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10), intent(in) :: Ys_L, Ys_R
+        #:else
+            real(wp), dimension(num_species), intent(in) :: Ys_L, Ys_R
+        #:endif
+        real(wp), intent(out) :: gamma_avg  !< Mixture Cp/Cv, replacing the density-weighted average
+        real(wp), intent(out) :: c_sum_Yi_Phi
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10) :: h_iL, h_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_avg_2
+        #:else
+            real(wp), dimension(num_species) :: h_iL, h_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_avg_2
+        #:endif
+        real(wp) :: Cp_avg, Cv_avg, T_avg, eps
+
+        eps = 0.001_wp
+
+        call get_species_enthalpies_rt(T_L, h_iL)
+        call get_species_enthalpies_rt(T_R, h_iR)
+        h_iL = h_iL*gas_constant/molecular_weights*T_L
+        h_iR = h_iR*gas_constant/molecular_weights*T_R
+        call get_species_specific_heats_r(T_L, Cp_iL)
+        call get_species_specific_heats_r(T_R, Cp_iR)
+
+        h_avg_2 = (sqrt(rho_L)*h_iL + sqrt(rho_R)*h_iR)/(sqrt(rho_L) + sqrt(rho_R))
+        Yi_avg = (sqrt(rho_L)*Ys_L + sqrt(rho_R)*Ys_R)/(sqrt(rho_L) + sqrt(rho_R))
+        T_avg = (sqrt(rho_L)*T_L + sqrt(rho_R)*T_R)/(sqrt(rho_L) + sqrt(rho_R))
+
+        if (abs(T_L - T_R) < eps) then
+            ! Case when T_L and T_R are very close
+            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
+            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) &
+                         & - gas_constant/molecular_weights(:)))
+        else
+            ! Normal calculation when T_L and T_R are sufficiently different
+            Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
+            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/molecular_weights(:)))
+        end if
+
+        gamma_avg = Cp_avg/Cv_avg
+
+        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*gas_constant/molecular_weights(:)*T_avg
+        c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
+
+    end subroutine s_compute_chemistry_average_state
 
     !> Dispatch to the subroutines that are utilized to compute the viscous source fluxes for either Cartesian or cylindrical
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)

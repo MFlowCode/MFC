@@ -5,7 +5,6 @@
 !> @brief HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'inline_riemann.fpp'
 
 module m_riemann_solver_hllc
 
@@ -271,7 +270,12 @@ contains
                                 ! Only the pressure-based wave-speed estimate reads the averaged state, and the Roe
                                 ! average costs eight square roots per face.
                                 if (wave_speeds == wave_speeds_pressure) then
-                                    @:compute_average_state()
+                                    call s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, qv_L, &
+                                                                 & qv_R, rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
+                                    if (chemistry .and. avg_state == avg_state_roe) then
+                                        call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, vel_avg_rms, &
+                                                                               & gamma_avg, c_sum_Yi_Phi)
+                                    end if
                                 end if
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
@@ -1036,7 +1040,12 @@ contains
                                     ! Only the pressure-based wave-speed estimate reads the averaged state, and the Roe
                                     ! average costs eight square roots per face.
                                     if (wave_speeds == wave_speeds_pressure) then
-                                        @:compute_average_state()
+                                        call s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, &
+                                                                     & qv_L, qv_R, rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
+                                        if (chemistry .and. avg_state == avg_state_roe) then
+                                            call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, &
+                                                                                   & vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
+                                        end if
                                     end if
 
                                     call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
