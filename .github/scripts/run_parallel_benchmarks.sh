@@ -55,10 +55,43 @@ echo "Both SLURM jobs submitted — running concurrently on compute nodes."
 echo "Monitoring sequentially to conserve login node memory."
 
 # --- Phase 2: Monitor sequentially (one at a time on login node) ---
+# On Phoenix 'embers' a long benchmark job can be preempted (PreemptMode=CANCEL,
+# so it is killed rather than requeued). On preemption (run_monitored exit 76)
+# resubmit a fresh job in the same tree and re-monitor, bounded by
+# MAX_PREEMPT_RESUBMITS (the 480m job timeout is the real backstop). Note: a
+# resubmitted job no longer overlaps its counterpart, slightly reducing
+# same-load fairness -- still preferable to failing the run on an infra preempt.
+: "${MAX_PREEMPT_RESUBMITS:=10}"
+monitor_bench_with_resubmit() {  # arg: <dir> (pr|master); sets BENCH_MON_RC
+    local dir="$1"
+    local out="${dir}/${job_slug}.out"
+    local jobid attempt=0 rc
+    jobid=$(cat "${dir}/${job_slug}.slurm_job_id")
+    while :; do
+        rc=0
+        bash "${SCRIPT_DIR}/run_monitored_slurm_job.sh" "$jobid" "$out" || rc=$?
+        if [ "$rc" -ne 76 ]; then
+            BENCH_MON_RC="$rc"
+            return
+        fi
+        if [ "$attempt" -ge "$MAX_PREEMPT_RESUBMITS" ]; then
+            echo "::error::${dir} benchmark preempted ${MAX_PREEMPT_RESUBMITS}x without completing; giving up."
+            BENCH_MON_RC=1
+            return
+        fi
+        attempt=$((attempt + 1))
+        echo "::warning::${dir} benchmark job $jobid was preempted; resubmitting (attempt ${attempt}/${MAX_PREEMPT_RESUBMITS})."
+        rm -f "$out"
+        ( cd "$dir" && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster" )
+        jobid=$(cat "${dir}/${job_slug}.slurm_job_id")
+        echo "${dir} benchmark resubmitted as job $jobid"
+    done
+}
+
 echo ""
 echo "=== Monitoring PR job $pr_job_id ==="
-pr_exit=0
-bash "${SCRIPT_DIR}/run_monitored_slurm_job.sh" "$pr_job_id" "pr/${job_slug}.out" || pr_exit=$?
+monitor_bench_with_resubmit pr
+pr_exit=$BENCH_MON_RC
 if [ "$pr_exit" -ne 0 ]; then
     echo "PR job exited with code: $pr_exit"
     tail -n 50 "pr/${job_slug}.out" 2>/dev/null || echo "  Could not read PR log"
@@ -74,8 +107,8 @@ fi
 
 echo ""
 echo "=== Monitoring master job $master_job_id ==="
-master_exit=0
-bash "${SCRIPT_DIR}/run_monitored_slurm_job.sh" "$master_job_id" "master/${job_slug}.out" || master_exit=$?
+monitor_bench_with_resubmit master
+master_exit=$BENCH_MON_RC
 if [ "$master_exit" -ne 0 ]; then
     echo "Master job exited with code: $master_exit"
     tail -n 50 "master/${job_slug}.out" 2>/dev/null || echo "  Could not read master log"
