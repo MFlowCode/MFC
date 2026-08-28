@@ -131,6 +131,7 @@ DESCRIPTIONS = {
     "amr_max_grid_size": "Absolute cap on a refined block's coarse-cell extent per dim; 0 (default) derives it from the decomposition. Set it to make the box set rank-independent",
     "amr_max_level": "Maximum AMR refinement depth (refined levels above L0); >= 1, default 1. Multi-level (>= 2) supported: static (amr_regrid_int=0) up to 2, dynamic regrid (>0) deeper",
     "amr_cluster_eff": "Berger-Rigoutsos min tag efficiency (tagged/total) a clustered block box must reach before splitting stops (0 < eff <= 1)",
+    "amr_blocking_factor": "Minimum block-box extent in coarse cells the Berger-Rigoutsos bisection may produce; stops over-generation (>= 1, default 1 = none)",
     "amr_ref_ratio": "AMR refinement ratio between coarse and fine levels (2 or 4; default 2; only 2 supported with multi-level or subcycling in v1)",
     "l0_ntile": "L0-as-blocks spike: tiles per dimension per rank the base grid is split into (0 = off, monolithic base grid)",
     "l0_migrate_step": "L0-as-blocks spike: time step at which a forced test migration moves the last tile to rank 0 (0 = off)",
