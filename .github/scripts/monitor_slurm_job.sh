@@ -70,9 +70,13 @@ get_job_state() {
   echo "UNKNOWN"
 }
 
-# Check if a state is terminal (job is done, for better or worse)
-# PREEMPTED is intentionally excluded: with --requeue the job restarts under
-# the same job ID and we must keep monitoring rather than exiting early.
+# Check if a state is terminal (job is done, for better or worse).
+# PREEMPTED is handled separately (below): Phoenix preempts 'embers' jobs with
+# PreemptMode=CANCEL, not REQUEUE (verified via `scontrol show config`), so a
+# preempted job is killed outright and never restarts under the same ID.
+# --requeue is a no-op for it. It is surfaced via PREEMPT_EXIT so the submit
+# wrapper can resubmit a fresh job instead of failing the CI step.
+PREEMPT_EXIT=76
 is_terminal_state() {
   case "$1" in
     COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE|REVOKED)
@@ -130,7 +134,13 @@ while [ ! -f "$output_file" ]; do
   fi
 
   case "$state" in
-    PENDING|CONFIGURING|PREEMPTED)
+    PREEMPTED)
+      # Preempted before producing output (embers, PreemptMode=CANCEL): the job
+      # is dead and will not requeue. Signal the caller to resubmit a fresh job.
+      echo "[$(date +%H:%M:%S)] Job $job_id PREEMPTED before start/output — signaling resubmit."
+      exit "$PREEMPT_EXIT"
+      ;;
+    PENDING|CONFIGURING)
       unknown_count=0
       sleep 5
       ;;
@@ -176,6 +186,12 @@ tail_pid=$!
 last_heartbeat=$(date +%s)
 while true; do
   state=$(get_job_state "$job_id")
+
+  if [ "$state" = "PREEMPTED" ]; then
+    # Preempted mid-run (embers, PreemptMode=CANCEL): dead, will not requeue.
+    echo "[$(date +%H:%M:%S)] Job $job_id PREEMPTED mid-run — signaling resubmit."
+    exit "$PREEMPT_EXIT"
+  fi
 
   if is_terminal_state "$state"; then
     echo "[$(date +%H:%M:%S)] Job $job_id reached terminal state: $state"
