@@ -603,6 +603,7 @@ contains
         amr_max_grid_size = 0  ! 0 = derive the cap from the decomposition (rank-dependent, the historical behaviour)
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
+        amr_blocking_factor = 1  ! 1 = today's behaviour exactly (coarsen by 1 is the identity)
         amr_ref_ratio = 2
         l0_ntile = 0
         l0_migrate_step = 0

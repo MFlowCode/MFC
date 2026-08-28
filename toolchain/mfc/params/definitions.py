@@ -707,6 +707,7 @@ def _load():
     _r("amr_max_grid_size", INT)
     _r("amr_max_level", INT)
     _r("amr_cluster_eff", REAL)
+    _r("amr_blocking_factor", INT)
     _r("amr_ref_ratio", INT)
     _r("l0_ntile", INT)
     _r("l0_migrate_step", INT)
@@ -1452,6 +1453,7 @@ _nv(
     "amr_max_grid_size",
     "amr_max_level",
     "amr_cluster_eff",
+    "amr_blocking_factor",
     "amr_ref_ratio",
     "l0_ntile",
     "l0_migrate_step",

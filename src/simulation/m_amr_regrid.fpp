@@ -29,7 +29,9 @@ module m_amr_regrid
         & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
         & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
         & amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed, &
-        & amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb
+        & amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, &
+        & amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, &
+        & amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -225,10 +227,19 @@ contains
         integer, intent(in)  :: blo(3), bhi(3)
         integer, intent(out) :: sax, spos
         logical, intent(out) :: ok
-        integer, parameter   :: min_child = 2
-        integer              :: axord(3), ext(3), d, ax, t, s, b
-        integer              :: run, run_start, best_run, best_start, lap, prevlap, bestmag, bestpos
+        !> Minimum child extent along the split axis, i.e. the smallest box the bisection may produce. 2 is the algorithmic floor;
+        !! amr_blocking_factor raises it, which is what stops the bisection over-generating. Measured 2026-08-27: with the floor at
+        !! 2 and amr_cluster_eff = 0.9 the recursion never converges on its own -- it splits until the amr_max_blocks cap stops it
+        !! (warning on EVERY regrid at five different caps), and the min-separation merge then collapses the result back. An 8x cap
+        !! bought 61%% more tree nodes for a 0.7%% change in the final box set. NOTE this is a minimum SIZE, not AMReX's blocking
+        !! factor: AMReX coarsens the TAG LATTICE, which also shrinks its global tag gather. S3.1 already deleted that gather here,
+        !! and coarsening a rank-local sparse list cannot dedup coarse cells that straddle a rank boundary without an extra
+        !! exchange, so the size floor is both simpler and the part that actually stops the over-generation.
+        integer :: min_child
+        integer :: axord(3), ext(3), d, ax, t, s, b
+        integer :: run, run_start, best_run, best_start, lap, prevlap, bestmag, bestpos
 
+        min_child = max(2, amr_blocking_factor)
         ok = .false.; sax = 0; spos = 0
         ext = bhi - blo + 1
         axord = [1, 2, 3]  ! sort axes by descending extent (deterministic bubble)
@@ -530,6 +541,8 @@ contains
         integer, allocatable                  :: sdep(:)  !< S3.0a: recursion depth carried with each stack entry
         integer                               :: dep, mxdep
         integer, allocatable                  :: sig(:)   !< concatenated per-axis tag signature of the node's box
+        integer, allocatable                  :: ovr(:)   !< S3.2a scratch: ranks overlapping the node's box
+        integer                               :: novr
         integer                               :: blo0(3), bhi0(3), off(3), nsig
 
 #ifdef MFC_MPI
@@ -555,6 +568,7 @@ contains
         allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
         allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in), sdep(4*cap + 8))
         allocate (sig(mg + ng + pg + 3))  ! bound: the three full domain extents; reused by every node
+        allocate (ovr(max(num_procs, 1)))  ! S3.2a scratch
         ! working copy of the tag list, partitioned in place as the tree descends so each node scans only its tags
         do t = 1, ntag_in
             wt(:,t) = tags(:,t)
@@ -579,6 +593,22 @@ contains
             ! S3.0b: one node = one fused ALLREDUCE of exactly this buffer in the distributed form. nsig is the true length, so
             ! the count is exact rather than the earlier splittable-axes-only lower bound.
             amr_cl_rb = amr_cl_rb + int(nsig, 8)*4_8
+            if (reduce) amr_cl_rb_now = amr_cl_rb_now + int(nsig, 8)*4_8
+            ! S3.2a: a node whose box lies inside ONE rank needs no exchange -- its whole subtree is local
+            call s_amr_ranks_overlapping(blo0, bhi0, ovr, novr)
+            if (novr > 1) then
+                amr_cl_shr_nodes = amr_cl_shr_nodes + 1_8; amr_cl_shr_rb = amr_cl_shr_rb + int(nsig, 8)*4_8
+                amr_cl_shr_maxdep = max(amr_cl_shr_maxdep, dep)
+                if (reduce) then
+                    amr_cl_shr_nodes_r = amr_cl_shr_nodes_r + 1_8; amr_cl_shr_rb_r = amr_cl_shr_rb_r + int(nsig, 8)*4_8
+                    amr_cl_shr_maxdep_r = max(amr_cl_shr_maxdep_r, dep)
+                end if
+            else
+                amr_cl_loc_nodes = amr_cl_loc_nodes + 1_8; amr_cl_loc_rb = amr_cl_loc_rb + int(nsig, 8)*4_8
+                if (reduce) then
+                    amr_cl_loc_nodes_r = amr_cl_loc_nodes_r + 1_8; amr_cl_loc_rb_r = amr_cl_loc_rb_r + int(nsig, 8)*4_8
+                end if
+            end if
             call s_amr_trim_from_sig(sig, off, blo0, bhi0, blo, bhi, ok, ntag)
             if (.not. ok) cycle
             vol = 1_8
@@ -646,7 +676,7 @@ contains
         do i = 1, nboxes
             boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
         end do
-        deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep, sig)
+        deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep, sig, ovr)
 
     end subroutine s_amr_cluster
 
@@ -707,6 +737,10 @@ contains
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
                 & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
             print '(A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', amr_mig_blk, ' sends ', amr_mig_snd, ' bytes ', amr_gb_mig
+            print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope] shr_nodes ', amr_cl_shr_nodes, ' shr_rb ', amr_cl_shr_rb, &
+                & ' loc_nodes ', amr_cl_loc_nodes, ' loc_rb ', amr_cl_loc_rb, ' shr_maxdep ', amr_cl_shr_maxdep
+            print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope-r] shr_nodes ', amr_cl_shr_nodes_r, ' shr_rb ', amr_cl_shr_rb_r, &
+                & ' loc_nodes ', amr_cl_loc_nodes_r, ' loc_rb ', amr_cl_loc_rb_r, ' shr_maxdep ', amr_cl_shr_maxdep_r
             print '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-tree] maxdep ', amr_cl_maxdep, ' maxdep_leaf ', amr_cl_maxdep_leaf, &
                 & ' lmax ', amr_cl_lmax, ' ldepth ', amr_cl_ldepth, ' nodes ', amr_cl_nodes, ' rbytes ', amr_cl_rb
         end if

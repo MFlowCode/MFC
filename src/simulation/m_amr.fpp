@@ -131,14 +131,27 @@ module m_amr
     !! splittable axis. Sized on the UNTRIMMED box, because trim only shrinks to the contained tags own bbox, so the trimmed
     !! signature is a slice of the untrimmed one and that single reduction serves trim, count AND split.
     integer    :: amr_cl_maxdep = 0, amr_cl_maxdep_leaf = 0, amr_cl_lmax = 0, amr_cl_ldepth = 0
-    integer(8) :: amr_cl_nodes = 0, amr_cl_rb = 0
+    integer(8) :: amr_cl_nodes = 0, amr_cl_rb = 0, amr_cl_rb_now = 0
+    !> S3.2a: does a tree node's box fit inside ONE rank's subdomain? If so the owning rank holds every tag in the subtree and the
+    !! whole remaining subtree needs NO communication -- that is the property the S3.2 design rests on, and this measures how much
+    !! of the tree has it. shr = nodes spanning >1 rank (must be exchanged), loc = rank-local (free). amr_cl_shr_maxdep is the depth
+    !! of the deepest node still shared, i.e. the number of levels S3.2 must communicate. SPLIT BY PATH. The level-2 forest clusters
+    !! inside a parent window, so its boxes are small and mostly rank-local BY CONSTRUCTION; folding it in with the level-1 tree
+    !! would inflate the local fraction and make S3.2's premise look true even if level-1 -- the only path that reduces today -- is
+    !! mostly shared. `_r` = the reducing (level-1) path.
+    integer(8) :: amr_cl_shr_nodes = 0, amr_cl_shr_rb = 0, amr_cl_loc_nodes = 0, amr_cl_loc_rb = 0
+    integer(8) :: amr_cl_shr_nodes_r = 0, amr_cl_shr_rb_r = 0, amr_cl_loc_nodes_r = 0, amr_cl_loc_rb_r = 0
+    integer    :: amr_cl_shr_maxdep = 0, amr_cl_shr_maxdep_r = 0
     !> TRACK T (T0b gate): regrid migration volume. An old block is ISENT to EVERY new-owner rank whose box overlaps it, so the cost
     !! is fan-out x block bytes, not one send per block. amr_mig_blk counts blocks that had to move at all, amr_mig_snd counts the
     !! sends, amr_gb_mig the bytes. fan-out = snd/blk is the reducible quantity: if it is ~1 the volume is inherent and hysteresis
     !! buys nothing.
     integer(8) :: amr_gb_mig = 0, amr_mig_snd = 0, amr_mig_blk = 0
     public :: amr_gb_tag, amr_gb_win, amr_gb_cost
-    public :: amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb
+    public :: amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now
+    public :: amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep
+    public :: amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r
+    public :: s_amr_ranks_overlapping  !< exported for the S3.2a scope measurement in m_amr_regrid
     public :: amr_gb_mig, amr_mig_snd, amr_mig_blk
     integer :: amr_loc_nfree = 0  !< depth of the recycle stack
 
