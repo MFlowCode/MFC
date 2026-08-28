@@ -52,6 +52,12 @@ module m_constants
     !> m_data_input:s_read_amr_data) must agree on this layout - a mismatch silently misaligns every
     !> per-block record (see the post-process off-by-one that read the level field as the x-extent).
     integer, parameter :: amr_restart_blk_hdr_ints = 7
+    !> AMR restart FORMAT v2 per-block ownership record: [owner + 1, m, n, p]. v1 wrote a 3*num_procs extent vector per block, of
+    !! which only the owner's triple was ever nonzero -- O(blocks x ranks) in the FILE and in memory (7.4 GB of header at 75k ranks
+    !! x 8192 blocks). v2 stores the same information in 4 ints. A v2 file is marked by a NEGATIVE rank count in the 3-int global
+    !! header, which a v1 reader rejects with its existing rank-mismatch error rather than misparsing. owner is stored +1 so that
+    !! rank 0 is distinguishable from an unwritten slot under a MAX reduction.
+    integer, parameter :: amr_restart_blk_own_ints = 4
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6
     !> Spatial support width of acoustic source, used in s_source_spatial
