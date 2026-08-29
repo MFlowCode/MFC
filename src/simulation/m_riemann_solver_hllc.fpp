@@ -60,13 +60,11 @@ contains
         real(wp) :: E_L, E_R
         real(wp) :: H_L, H_R
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
-            real(wp), dimension(10) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+            real(wp), dimension(10) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species
         #:else
-            real(wp), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
-            real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+            real(wp), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species
         #:endif
-        real(wp)               :: Cp_avg, Cv_avg, T_avg, c_sum_Yi_Phi, eps
+        real(wp)               :: c_sum_Yi_Phi
         real(wp)               :: T_L, T_R
         real(wp)               :: MW_L, MW_R
         real(wp)               :: R_gas_L, R_gas_R
@@ -178,13 +176,13 @@ contains
                     ! 6-equation model (model_eqns=3): separate phasic internal energies
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, &
                                         & alpha_rho_L, alpha_rho_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, &
-                                        & Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, pcorr, rho_L, rho_R, pres_L, pres_R, E_L, E_R, &
-                                        & H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, &
-                                        & R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, &
-                                        & pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, &
-                                        & ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
-                                        & alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, &
-                                        & xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & R_species, pcorr, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, c_sum_Yi_Phi, T_L, &
+                                        & T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, &
+                                        & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, rho_avg, H_avg, &
+                                        & c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, &
+                                        & pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, &
+                                        & vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, &
+                                        & xi_PP]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -273,9 +271,9 @@ contains
                                     call s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, qv_L, &
                                                                  & qv_R, rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                     if (chemistry .and. avg_state == avg_state_roe) then
-                                        call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, &
-                                                                               & molecular_weights, gas_constant, vel_avg_rms, &
-                                                                               & gamma_avg, c_sum_Yi_Phi)
+                                        R_species = gas_constant/molecular_weights
+                                        call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, &
+                                                                               & vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
                                     end if
                                 end if
 
@@ -478,8 +476,7 @@ contains
                                         & vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, &
                                         & s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, nbub_L, nbub_R, &
                                         & PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar, Ys_L, Ys_R, Cp_iL, Cp_iR, &
-                                        & Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]', &
-                                        & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & Xs_L, Xs_R, Gamma_iL, Gamma_iR]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -839,13 +836,13 @@ contains
                         ! pinned it at the GPU register ceiling for every HLLC user.
                         #:if HYPO
                             ! Private list split across _hllc_p1/p2/p3 for Fypp line-length limits
-                            #:set _hllc_p1 = '[i, j, k, l, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, ptilde_L, ptilde_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, damage_L, damage_R,'
+                            #:set _hllc_p1 = '[i, j, k, l, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, c_sum_Yi_Phi, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, ptilde_L, ptilde_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, tau_e_L, tau_e_R, G_L, G_R, damage_L, damage_R,'
                             #:set _hllc_p2 = 'U_L, U_R, F_L, F_R, F_star_L, F_star_R, F_HLLC, u_n_HLLC, u_t_HLLC, u_t2_HLLC, pres_tot_L, pres_tot_R, u_n_L, u_n_R, u_t_L, u_t_R, u_t2_L, u_t2_R, tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R, tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R, tau_qq_L, tau_qq_R, p_face, tau_qq_face, A_L, A_R, denom_A, u_t_star, tau_nt_star, u_t2_star, tau_nt2_star, pres_tot_star,'
                             #:set _hllc_p3 = 'F_HLL, u_n_HLL_trace, u_t_HLL_trace, u_t2_HLL_trace, p_face_HLL, tau_qq_face_HLL, tau_nn_HLL, phi, Sigma_L, Sigma_R, dSigma, Sigma_ref, a_L_ref, a_R_ref, a_ref, du_t, dtau_nt, du_t2, dtau_nt2, sensor_ptot, sensor_vt, sensor_tnt, sensor_combined, idx_phys]'
                             #:set _hllc_priv = _hllc_p1 + _hllc_p2 + _hllc_p3
                         #:else
                             ! Master's pure-fluid private list, unchanged
-                            #:set _hllc_priv = '[i, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2]'
+                            #:set _hllc_priv = '[i, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, vel_avg_rms, pcorr, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species]'
                         #:endif
                         ! The two calls below are identical on purpose. An offload kernel is named
                         ! after the .fpp line of its GPU_PARALLEL_LOOP, so one shared call would give
@@ -1045,8 +1042,8 @@ contains
                                         call s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, &
                                                                      & qv_L, qv_R, rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                         if (chemistry .and. avg_state == avg_state_roe) then
-                                            call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, &
-                                                                                   & molecular_weights, gas_constant, &
+                                            R_species = gas_constant/molecular_weights
+                                            call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, &
                                                                                    & vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
                                         end if
                                     end if

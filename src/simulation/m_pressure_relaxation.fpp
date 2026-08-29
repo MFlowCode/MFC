@@ -44,6 +44,13 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, alpha
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, alpha
+        #:endif
+        real(wp) :: rho, gamma, pi_inf, qv_mix
+        integer  :: i
 
         ! Volume fraction correction
         if (mpp_lim) call s_correct_volume_fractions(q_cons_vf, j, k, l)
@@ -53,8 +60,20 @@ contains
             call s_equilibrate_pressure(q_cons_vf, j, k, l)
         end if
 
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
+            alpha(i) = q_cons_vf(eqn_idx%E + i)%sf(j, k, l)
+        end do
+
+        ! This routine runs only at model_eqns = 6eq, and the case validator rejects bubbles_euler there, so the bubble branch
+        ! this used to carry was unreachable. What is left is the plain rule - clip under mpp_lim, then accumulate - which is
+        ! what the kernel does, qv included. The mixture is formed at this level rather than one call deeper because CCE rejects
+        ! a local array whose bound is a device global once a nested device routine passes it on.
+        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_mix, alpha, alpha_rho)
+
         ! Internal energy correction
-        call s_correct_internal_energies(q_cons_vf, j, k, l)
+        call s_correct_internal_energies(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv_mix)
 
     end subroutine s_relax_cell_pressure
 
@@ -185,30 +204,15 @@ contains
     end subroutine s_equilibrate_pressure
 
     !> Correct internal energies using equilibrated pressure
-    subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
+    subroutine s_correct_internal_energies(q_cons_vf, j, k, l, rho, gamma, pi_inf, qv_mix)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho, alpha
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_rho, alpha
-        #:endif
-        real(wp) :: rho, dyn_pres, gamma, pi_inf, pres_relax, qv_mix
-        integer  :: i
-
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_fluids
-            alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
-            alpha(i) = q_cons_vf(eqn_idx%E + i)%sf(j, k, l)
-        end do
-
-        ! This routine runs only at model_eqns = 6eq, and the case validator rejects bubbles_euler
-        ! there, so the bubble branch this used to carry was unreachable. What is left is the plain
-        ! rule - clip under mpp_lim, then accumulate - which is what the kernel does, qv included.
-        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_mix, alpha, alpha_rho)
+        real(wp), intent(in)                                   :: rho, gamma, pi_inf, qv_mix
+        real(wp)                                               :: dyn_pres, pres_relax
+        integer                                                :: i
 
         ! Compute dynamic pressure and update internal energies
         dyn_pres = 0._wp
