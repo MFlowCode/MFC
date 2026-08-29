@@ -157,6 +157,7 @@ module m_amr
     public :: amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r
     public :: amr_cl_me_nodes_r, amr_cl_me_rb_r
     public :: s_amr_ranks_overlapping  !< exported for the S3.2a scope measurement in m_amr_regrid
+    public :: amr_my_blk, amr_n_my, s_amr_refresh_my_blocks  !< S3.3c: the regrid pass-1 scan needs the owned-block list too
     public :: amr_gb_mig, amr_mig_snd, amr_mig_blk
     integer :: amr_loc_nfree = 0  !< depth of the recycle stack
 

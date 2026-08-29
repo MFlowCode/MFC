@@ -33,7 +33,7 @@ module m_amr_regrid
         & amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, &
         & amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, &
         & amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, &
-        & amr_cl_me_rb_r
+        & amr_cl_me_rb_r, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -1124,12 +1124,17 @@ contains
                 end block
             end if
             block
-                integer                  :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
-                integer                  :: mg, ng, pg, nct, np_lev, nloc_send, gi, gj, gk, ntot_g
-                integer(8)               :: jrem  !< decode remainder spans an xy plane, which can exceed 2**31 cells
-                integer, allocatable     :: ctags(:,:), skb(:), gkb(:)
-                integer(8), allocatable  :: sidx(:), gidx(:)
-                logical, allocatable     :: gwin(:,:,:), covered(:)
+                integer                 :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
+                integer                 :: mg, ng, pg, nct, np_lev, nloc_send, gi, gj, gk, ntot_g
+                integer(8)              :: jrem  !< decode remainder spans an xy plane, which can exceed 2**31 cells
+                integer, allocatable    :: ctags(:,:), skb(:), gkb(:)
+                integer(8), allocatable :: sidx(:), gidx(:)
+                logical, allocatable    :: gwin(:,:,:), covered(:)
+                !> S3.3c: does THIS rank hold any level-(lev-1) block overlapping parent kb? Only then does it need the parent's
+                !! dense window at all. `covered` stays REPLICATED (every rank must agree) and is recovered with ONE LOR reduction
+                !! over the parents: the union over ranks of "my blocks overlapping kb" is exactly "all blocks overlapping kb",
+                !! since each block has exactly one owner.
+                logical, allocatable     :: mine(:)
                 integer, allocatable     :: mlo_all(:,:), mhi_all(:,:)
                 logical                  :: any_tag
                 type(t_box), allocatable :: cboxes(:)
@@ -1184,8 +1189,32 @@ contains
                     ! boxes) is byte-identical.
                     np_lev = phi - plo + 1
                     if (np_lev < 1) exit  ! nothing nested at the previous level -> no deeper levels possible
-                    allocate (covered(plo:phi), mlo_all(3,plo:phi), mhi_all(3,plo:phi))
-                    covered = .false.
+                    allocate (covered(plo:phi), mlo_all(3,plo:phi), mhi_all(3,plo:phi), mine(plo:phi))
+                    covered = .false.; mine = .false.
+                    ! S3.3c: ONE pass over this rank's OWNED level-(lev-1) blocks, not `do ob = 1, amr_num_blocks` inside
+                    ! `do kb = plo, phi`. That nested form was O(parents x GLOBAL blocks) on every rank -- both factors scale
+                    ! with P, so it was the O(P^2) term in the regrid. Here the outer loop is O(local blocks) and `covered`,
+                    ! which must stay replicated, is recovered with a single LOR over the parents.
+                    call s_amr_refresh_my_blocks()
+                    do obi = 1, amr_n_my
+                        ob = amr_my_blk(obi)
+                        if (amr_block_level(ob) /= lev - 1) cycle
+                        do kb = plo, phi
+                            if (boxes(kb)%lo(1) > amr_region_hi_all(1, ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, ob)) cycle
+                            if (n_glb > 0) then
+                                if (boxes(kb)%lo(2) > amr_region_hi_all(2, ob) .or. boxes(kb)%hi(2) < amr_region_lo_all(2, &
+                                    & ob)) cycle
+                            end if
+                            if (p_glb > 0) then
+                                if (boxes(kb)%lo(3) > amr_region_hi_all(3, ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, &
+                                    & ob)) cycle
+                            end if
+                            mine(kb) = .true.; covered(kb) = .true.
+                        end do
+                    end do
+#ifdef MFC_MPI
+                    if (num_procs > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, covered, np_lev, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+#endif
                     nloc_send = 0
                     ! S3.3a: assign each parent a clustering owner. Round-robin over kb both balances the parents across ranks
                     ! and is a pure function of kb and num_procs, so every rank agrees without communicating. Pass 2 below then
@@ -1209,11 +1238,17 @@ contains
                         if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
                         if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
 
-                        ! sensor-on-fine: tag from every OLD level-(lev-1) block overlapping this parent window (amr_block_level
-                        ! still holds the old levels here - it is reset to box_level at step 5b, below)
+                        ! sensor-on-fine: tag from this rank's OWNED level-(lev-1) blocks overlapping the parent window
+                        ! (amr_block_level still holds the old levels here - it is reset to box_level at step 5b, below).
+                        ! S3.3c: `covered` and `mine` are already known from the pre-pass above, so this no longer scans the
+                        ! global block list, and a rank with nothing to contribute allocates no dense window at all -- that
+                        ! allocate+zero was O(parents x window volume) of pure waste on every non-contributing rank.
+                        ! The parent's OWNER still builds a window when IB is on, because the body tags are its to add.
+                        if (.not. (mine(kb) .or. (ib .and. powner(kb) == proc_rank))) cycle
                         allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
                         gwin = .false.; any_tag = .false.
-                        do ob = 1, amr_num_blocks
+                        do obi = 1, amr_n_my
+                            ob = amr_my_blk(obi)
                             if (amr_block_level(ob) /= lev - 1) cycle
                             if (boxes(kb)%lo(1) > amr_region_hi_all(1, ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, ob)) cycle
                             if (n_glb > 0) then
@@ -1224,8 +1259,7 @@ contains
                                 if (boxes(kb)%lo(3) > amr_region_hi_all(3, ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, &
                                     & ob)) cycle
                             end if
-                            covered(kb) = .true.  ! replicated (metadata) - identical on every rank regardless of ownership
-                            if (amr_owns_all(ob)) call s_amr_tag_child_from_fine(ob, mlo, mhi, gwin, any_tag)
+                            call s_amr_tag_child_from_fine(ob, mlo, mhi, gwin, any_tag)
                         end do
                         ! IB: always refine the body region at this level, even where the density sensor is quiet - mark the body's
                         ! L0-frame bbox into gwin so it is clustered into a child (mirrors the L1 expand at :3836). Containment
@@ -1502,7 +1536,7 @@ contains
                     end do
                     deallocate (gch, chhead, chord, powner, mych)
 
-                    deallocate (gidx, gkb, covered, mlo_all, mhi_all)  ! per-level scratch - freed every level (no leak)
+                    deallocate (gidx, gkb, covered, mine, mlo_all, mhi_all)  ! per-level scratch - freed every level
                     plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
                     if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
                 end do
