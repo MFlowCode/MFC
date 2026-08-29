@@ -12,10 +12,13 @@
 > This block supersedes everything above it. Ledgers 40-43 below record how these conclusions were
 > reached, including four that were WRONG when first written; read them for method, not for status.
 >
-> ### Landed today (8 commits, each gated 69/69 on the AMR suite)
+> ### Landed 2026-08-28 (12 commits; code ones gated 69/69 on the AMR suite)
 >
 > | commit | change |
 > |---|---|
+> | `b055b0db` | **Cray debug bounds checking** — the only compiler whose Debug build had none |
+> | `8e10b445` | device-declare the module allocatables `@:ALLOCATE` maps (consistency, NOT the CCE fix) |
+> | `fa20cbae` | **NVHPC build fix** — a `GPU_DECLARE` must follow every symbol it names |
 > | `eb6b…` | **B1** — canonical Morton merge order; the merge depends on the box SET, not traversal order |
 > | `58aa0867` | **S3.3** — level->=2 forest clustered per OWNER, tags exchanged point-to-point |
 > | `263730c9` | **W1a** — six per-stage loops iterate this rank's own blocks, not the global list |
@@ -41,6 +44,15 @@
 > | 4 | **S3.3c** — `covered` from owned blocks + one `ALLREDUCE(LOR)`; guard the dense window | ~60 LOC | bit-identity |
 > | 5 | **Subcycle** — SCOPED 2026-08-28, see below; the np>1 gate is ALREADY LIFTED | 2 parts, one cheap | goldens; test (q) already covers np>1 |
 > | 6 | **S3.2b-2** — depth-batch the residual shared nodes | ~80 LOC | collectives per regrid = `shr_maxdep` |
+> | **P** | **WALL-TIME weak scaling, 256-1024 ranks on Frontier, against the AMReX 1.20x/doubling bar** | machine time, no code | **s/step per rung** |
+>
+> **AUDIT FINDING 2026-08-28: item P was MISSING and it is the one that decides the program.** Every other
+> row above removes an ASYMPTOTIC term -- counted collectives, counted bytes -- and each was justified
+> explicitly as "an asymptotic bet, not a current-performance fix". **Nothing in this plan measures whether
+> any of it made MFC faster.** The goal metric is the AMReX bar of 1.20x/1.15x per np-doubling; the last
+> MFC number is a **6.81x tax measured before ALL of today's work** (`amr-tax-now-11x`). If the constant
+> factor is still ~6x, the next program is profiling, not scaling, and items 5-6 are premature. Run P after
+> items 2-4 land and before committing to any further asymptotic work.
 >
 > **W5 is OFF the critical path** (measured tag headroom, above). Converting the remaining per-box tag
 > sites and dropping the `amr_max_blocks` base term stay worthwhile for the end state; they gate nothing.
@@ -83,12 +95,35 @@
 > ALLOCATE statement argument`. **Bisected on the machine: pre-existing, NOT from today's commits**
 > (`dc27e4a6` fails identically). This outranks every scaling item in the table above.
 >
-> ### The one open input
+> ### CCE on Frontier: ANSWERED 2026-08-28
+>
+> AMR aborted at init on Frontier under CCE (`lib-4425`, uninitialised descriptor) -- **pre-existing, not
+> from this work** (bisected: `dc27e4a6` failed identically). Root cause: CCE leaves a bare module-scope
+> derived-type allocatable's descriptor uninitialised, so a direct `allocate` aborts. **The workaround was
+> already in this file** for `amr_cg` (see the comment at its allocation): allocate a LOCAL, hand it over
+> with `move_alloc`, then map. Applied to `amr_scr_prim`, `amr_scr_rhs`, `amr_cons_br`.
+> **Result: 64 of 66 non-chemistry AMR tests PASS under CCE.** The two failures are tolerance only --
+> abs 1.04e-12 against a 1e-12 bound, agreeing to 13 significant digits, with np=2 and np=4 producing
+> IDENTICAL values (so compiler reassociation, not a decomposition-dependent defect). Both now carry
+> `override_tol=1e-11`. **This is the first evidence the AMR implementation is correct under a second
+> compiler and offload stack.**
+>
+> ### The remaining open input
+>
+> **Wall-time, not counts.** Everything measured today is a COUNT — collectives, bytes, tree nodes walked.
+> No wall-time comparison has been made since before this work began, and the goal metric is the AMReX bar
+> (1.20x/1.15x per np-doubling) against MFC's last-measured 6.81x tax. Item P is the measurement; until it
+> runs we do not know whether any of today's asymptotic wins translate into speed.
 >
 > **ANSWERED 2026-08-28: it builds and syscheck passes, but every AMR test aborts at runtime.** See
-> the CCE section below. The open input is now a LINE NUMBER from a CCE `--debug` build.
+> **RESOLVED** — see the CCE section above: `move_alloc` fixes it, 64/66 pass under CCE.
 >
 > ### Method rules earned today, each from a wrong conclusion
+>
+> 0. **A change touching GPU directives cannot be validated on one compiler.** The local bar is amdflang;
+>    it is 1 of 4 CI-gated compilers. Today it passed 69/69 while carrying (a) a CCE runtime abort and
+>    (b) an NVHPC BUILD BREAK introduced by a `GPU_DECLARE` placed above the symbol it names. Green here
+>    is necessary and says nothing about the others.
 >
 > 1. **No growth exponent on fewer than three points.** Cost two retractions in one day.
 > 2. **Before believing a FLAT result, ask what limit was pinned.** "Level-1 is flat at 16,383" was
