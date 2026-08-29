@@ -8109,9 +8109,10 @@ contains
         !> device-native staging doubles the array's device footprint transiently; above this many old columns, fall back to the
         !! host round trip (device peak max(old, new)). 32 covers the startup/early-regrid growth events whose round trips dominated
         !! short runs, while near-limit late growth keeps the OOM-safe path.
-        integer, parameter     :: amr_grow_dev_cap = 32
-        logical                :: want(4)
-        real(stp), allocatable :: tmp(:,:,:,:,:), hstage(:,:,:,:,:)
+        integer, parameter              :: amr_grow_dev_cap = 32
+        logical                         :: want(4)
+        real(stp), allocatable          :: tmp(:,:,:,:,:), hstage(:,:,:,:,:)
+        type(scalar_field), allocatable :: tmp_br(:)  !< CCE descriptor workaround, see below
 
         ! CONTRACT: the store is DEVICE-authoritative at every call; growth preserves the DEVICE contents only, and the host
         ! mirror comes out of a growth UNDEFINED (host readers pull per slot before reading - the store's normal state between
@@ -8214,7 +8215,10 @@ contains
         ! whole batch instead of one block; it rides the same pool lifetime and is rebuilt only if the window changes
         amr_br_w = mbuf3_hi - mbuf3_lo + 1
         if (.not. allocated(amr_cons_br)) then
-            @:ALLOCATE(amr_cons_br(1:sys_size))
+            ! Same CCE descriptor defect as amr_cg / amr_scr_prim: a bare module-scope derived-type allocatable must be given a
+            ! valid descriptor by allocating a LOCAL and handing it over with move_alloc, then mapped.
+            allocate (tmp_br(1:sys_size)); call move_alloc(tmp_br, amr_cons_br)
+            $:GPU_ENTER_DATA(create='[amr_cons_br]')
             do i = 1, sys_size
                 @:ALLOCATE(amr_cons_br(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_lo + amr_br_batch*amr_br_w - 1))
                 @:ACC_SETUP_SFs(amr_cons_br(i))
@@ -8382,11 +8386,18 @@ contains
     !! allocation would undersize the scratch). rhs mirrors the per-slot igr widening.
     impure subroutine s_amr_scr_init()
 
-        integer :: i
+        integer                         :: i
+        type(scalar_field), allocatable :: tmp_p(:), tmp_r(:)
 
         if (allocated(amr_scr_prim)) return
-        @:ALLOCATE(amr_scr_prim(1:sys_size))
-        @:ALLOCATE(amr_scr_rhs(1:sys_size))
+        ! CCE OpenMP-offload leaves a bare module-scope derived-type allocatable's descriptor uninitialized, so a direct
+        ! allocate here aborts with `lib-4425 INTERNAL ERROR-Unitialized descriptor for ALLOCATE statement argument`. Same
+        ! defect, same workaround as amr_cg above: allocate a LOCAL, which gets a valid descriptor, then hand it over with
+        ! move_alloc and map afterwards. Verified on Frontier 2026-08-28 -- the abort was here, with sys_size and the mbuf
+        ! bounds all sane, on the HOST allocate rather than the device map. GPU_DECLARE alone does NOT avoid it.
+        allocate (tmp_p(1:sys_size)); call move_alloc(tmp_p, amr_scr_prim)
+        allocate (tmp_r(1:sys_size)); call move_alloc(tmp_r, amr_scr_rhs)
+        $:GPU_ENTER_DATA(create='[amr_scr_prim, amr_scr_rhs]')
         do i = 1, sys_size
             @:ALLOCATE(amr_scr_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
             if (igr) then
