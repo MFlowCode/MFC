@@ -50,6 +50,11 @@ covered in `docs/documentation/contributing.md`.
 - nvfortran 23.11/24.1 segfault (`fort2 TERMINATED by signal 11`) on a caller that passes a
   `parameter` array from `m_thermochem` (e.g. `molecular_weights`) into a declare-target routine.
   Read such arrays directly in the kernel, or pass a plain local computed from them.
+- The same "call it from the loop body" rule covers `m_thermochem`: calling `get_species_*` from
+  inside a `GPU_ROUTINE` rather than from the kernel gave CCE OpenMP a runtime
+  `Memory access fault by GPU node-N ... Reason: Unknown` on the first step (exit 134), while every
+  other backend ran. Evaluate them at the call site and pass the arrays in. Note this one only shows
+  at runtime, and only on a case that reaches the path - the build is clean.
 
 ## Parameters
 
