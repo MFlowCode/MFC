@@ -2807,7 +2807,13 @@ contains
                         call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
-                    else
+                        ! amr_reg_cur is 0 when this rank holds NO register for the block (s_amr_select_slot's unmapped
+                        ! sentinel). There is then no buffer to poison, and nothing that could read one. Only this DEBUG
+                        ! branch ever met that case -- the receives above are posted under s_lo/s_hi, which are false for a
+                        ! block this rank has no register for -- so release builds never indexed freg with 0 and only the
+                        ! reldebug lane failed, with `Index '0' of dimension 4 of array 'freg'` (Intel reported the same
+                        ! defect as `corrupted size vs. prev_size`). Predates the S3.2b/S3.3c work: reproduced at dc27e4a6~1.
+                    else if (amr_reg_cur > 0) then
                         freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
                         $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
 #endif
@@ -2820,7 +2826,7 @@ contains
                         call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
-                    else
+                    else if (amr_reg_cur > 0) then
                         freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
                         $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
 #endif
@@ -2992,7 +2998,7 @@ contains
                         call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
-                    else
+                    else if (amr_reg_cur > 0) then
                         freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
                         $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
 #endif
@@ -3005,7 +3011,7 @@ contains
                         call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
-                    else
+                    else if (amr_reg_cur > 0) then
                         freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
                         $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
 #endif
