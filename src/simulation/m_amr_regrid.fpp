@@ -34,7 +34,7 @@ module m_amr_regrid
         & amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, &
         & amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, &
         & amr_cl_me_rb_r, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, &
-        & amr_tag_base, amr_mesh_epoch, amr_cl_wire_r
+        & amr_tag_base, amr_mesh_epoch, amr_cl_wire_r, amr_gb_box
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -908,6 +908,7 @@ contains
             end do
             gcnt = gcnt*6; gdsp = gdsp*6
             call MPI_ALLGATHERV(sbx, nacc*6, MPI_INTEGER, gbx, gcnt, gdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            amr_gb_box = amr_gb_box + int(ntot, 8)*6_8*4_8  ! every rank receives the WHOLE global box list
             ! the accepted-box array is sized to the cap; B0b keeps the bisection away from it, and a run that still reaches it
             ! truncates here exactly as the serial `if (nacc < cap)` guard did.
             nacc = min(ntot, cap)
@@ -1045,8 +1046,9 @@ contains
         if (rank_time_wrt .and. proc_rank == 0) then
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope-me] me_nodes_max ', me_g(1), ' me_rb_max ', me_g(2), ' wire_max ', &
                 & me_g(3), ' shr_nodes_all ', amr_cl_shr_nodes_r, ' shr_rb_all ', amr_cl_shr_rb_r
-            print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
-                & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
+            print '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
+                & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' box_bytes ', amr_gb_box, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, &
+                & 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
             print '(A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', amr_mig_blk, ' sends ', amr_mig_snd, ' bytes ', amr_gb_mig
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope] shr_nodes ', amr_cl_shr_nodes, ' shr_rb ', amr_cl_shr_rb, &
                 & ' loc_nodes ', amr_cl_loc_nodes, ' loc_rb ', amr_cl_loc_rb, ' shr_maxdep ', amr_cl_shr_maxdep
@@ -1721,6 +1723,7 @@ contains
                         allocate (gch(7, max(ntot_ch, 1)))
                         rcnt = rcnt*7; rdsp = rdsp*7
                         call MPI_ALLGATHERV(mych, nmych*7, MPI_INTEGER, gch, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                        amr_gb_box = amr_gb_box + int(ntot_ch, 8)*7_8*4_8  ! likewise: the whole global child list
                         deallocate (rcnt, rdsp)
                     else
                         ntot_ch = nmych
