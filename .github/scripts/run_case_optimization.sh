@@ -80,23 +80,33 @@ for case in "${benchmarks[@]}"; do
 
     # Run with --case-optimization, small grid, 10 timesteps. On phoenix and
     # frontier_amd $build_opts is --no-build, so the run reuses the pre-build's
-    # binaries. On phoenix (a single, unsharded job) a prebuilt binary can still
-    # be missing at run time (the pre-build and run SLURM jobs may be separated
-    # by a long embers queue wait, or clean_build on a retry may have wiped
-    # build/), which would hard-fail a bare --no-build run; fall back to a
-    # rebuild-and-run so a lost artifact degrades to a slower run instead of a
-    # red CI. frontier_amd is excluded: its run is sharded across concurrent
-    # jobs sharing one workspace, so a fallback rebuild would race on the shared
-    # install paths (the collision the --no-build guard above prevents).
-    if ./mfc.sh run "$case" --case-optimization $gpu_opts $build_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
+    # binaries. On phoenix (a single, unsharded job) a prebuilt binary can go
+    # missing at run time (the pre-build and run SLURM jobs may be separated by
+    # a long embers queue wait, or clean_build on a retry may have wiped
+    # build/), which makes mpirun fail to launch it. Only that specific failure
+    # triggers a rebuild-and-rerun, so a lost artifact degrades to a slower run
+    # instead of a red CI; any other failure (a real crash, a NaN, an MPI fault)
+    # is reported as-is and never masked by the retry. frontier_amd is excluded:
+    # its run is sharded across concurrent jobs sharing one workspace, so a
+    # fallback rebuild would race on the shared install paths (the collision the
+    # --no-build guard above prevents).
+    run_log="$(mktemp)"
+    ./mfc.sh run "$case" --case-optimization $gpu_opts $build_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10 2>&1 | tee "$run_log"
+    run_rc=${PIPESTATUS[0]}
+    if [ "$run_rc" -eq 0 ]; then
         run_ok=1
-    elif [ "$job_cluster" = phoenix ] && \
-         ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
-        echo "NOTE: $case_name rebuilt in-run (prebuilt binary was unavailable)"
-        run_ok=1
+    elif [ "$job_cluster" = phoenix ] && grep -q "could not access or execute" "$run_log"; then
+        echo "NOTE: $case_name rebuilding in-run (prebuilt binary was unavailable)"
+        rm -rf "$case_dir/D" "$case_dir/p_all" "$case_dir/restart_data"
+        if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
+            run_ok=1
+        else
+            run_ok=0
+        fi
     else
         run_ok=0
     fi
+    rm -f "$run_log"
 
     if [ "$run_ok" = 1 ]; then
         # Validate output
