@@ -265,6 +265,10 @@ contains
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
 
+                                ! Only the Roe path writes this, and chemistry is unreachable at model_eqns = 6eq; zero it
+                                ! so the sound speed below never reads an undefined value.
+                                c_sum_Yi_Phi = 0._wp
+
                                 ! Only the pressure-based wave-speed estimate reads the averaged state, and the Roe
                                 ! average costs eight square roots per face.
                                 if (wave_speeds == wave_speeds_pressure) then

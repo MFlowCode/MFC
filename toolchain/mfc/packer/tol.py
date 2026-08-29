@@ -12,12 +12,17 @@ def _magnitudes(values: typing.List[float]) -> typing.List[float]:
 
 
 def _is_zero_field(values: typing.List[float], atol: float) -> bool:
-    """A field the test cannot resolve from zero: every value is within the absolute tolerance
-    of it. What such a field stores is roundoff, and which way that roundoff falls depends on
-    the compiler's association order, so comparing it pointwise tests the compiler rather than
-    the solver. The candidate is held to the same band instead."""
+    """A field the test cannot resolve from zero: every value is strictly inside the absolute
+    tolerance. What such a field stores is roundoff, and which way that roundoff falls depends on the
+    compiler's association order, so comparing it pointwise tests the compiler rather than the solver.
+    The candidate is held to the same band instead.
+
+    Strictly inside, because a field whose magnitude *equals* the tolerance is the one case where a
+    real field cannot be told from roundoff: `1e8 * 1e-10` gives QBMM a 1e-2 tolerance in single
+    precision, and its initial bubble field is the constant 1e-2 exactly. Reading that as zero then
+    failed the candidate for exceeding it by a few ulps."""
     mags = _magnitudes(values)
-    return bool(mags) and max(mags) <= atol
+    return bool(mags) and max(mags) < atol
 
 
 def is_close(error: Error, tolerance: Tolerance) -> bool:
