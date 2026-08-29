@@ -36,6 +36,20 @@ covered in `docs/documentation/contributing.md`.
 - `@:ACC_SETUP_VFs(...)`/`@:ACC_SETUP_SFs(...)` GPU pointer setup compiles only under
   Cray. Around MPI: `GPU_UPDATE(host=...)` before send, `GPU_UPDATE(device=...)` after
   receive.
+- An array whose bound is a device global (`dimension(num_fluids)`, `dimension(num_species)`) may be
+  passed to a device routine **from a parallel-loop body, but not from inside another
+  `GPU_ROUTINE(parallelism='[seq]')`**. CCE OpenACC rejects the second form with
+  `ftn-7066 ... Global in accelerator routine without declare -- num_fluids`, and reports it at
+  whatever line it gave up on: remove one trigger and the message *walks forward* to the next call,
+  so the reported line is not the cause. Only the plain lanes fail - under `--case-optimization`
+  those bounds are `parameter`s, so a green Case Opt lane beside a failing plain one is the
+  signature. Every accepted call site in the tree already obeys this (`m_cbc`, `m_ibm`,
+  `m_bubbles_EL`, `s_compute_cell_state`): form such a call in the loop body and pass scalars
+  deeper. Neither `cray_inline` nor a `num_fluids_max` bound nor dropping optional dummies helps -
+  all three were measured.
+- nvfortran 23.11/24.1 segfault (`fort2 TERMINATED by signal 11`) on a caller that passes a
+  `parameter` array from `m_thermochem` (e.g. `molecular_weights`) into a declare-target routine.
+  Read such arrays directly in the kernel, or pass a plain local computed from them.
 
 ## Parameters
 
