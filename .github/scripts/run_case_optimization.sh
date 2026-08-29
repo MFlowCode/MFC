@@ -80,14 +80,17 @@ for case in "${benchmarks[@]}"; do
 
     # Run with --case-optimization, small grid, 10 timesteps. On phoenix and
     # frontier_amd $build_opts is --no-build, so the run reuses the pre-build's
-    # binaries. A prebuilt binary can be missing at run time (the pre-build and
-    # run SLURM jobs may be separated by a long embers queue wait, or clean_build
-    # on a retry may have wiped build/), and a bare --no-build run would then
-    # hard-fail. Fall back to a rebuild-and-run for that case so a lost prebuild
-    # artifact degrades to a slower run instead of a red CI.
+    # binaries. On phoenix (a single, unsharded job) a prebuilt binary can still
+    # be missing at run time (the pre-build and run SLURM jobs may be separated
+    # by a long embers queue wait, or clean_build on a retry may have wiped
+    # build/), which would hard-fail a bare --no-build run; fall back to a
+    # rebuild-and-run so a lost artifact degrades to a slower run instead of a
+    # red CI. frontier_amd is excluded: its run is sharded across concurrent
+    # jobs sharing one workspace, so a fallback rebuild would race on the shared
+    # install paths (the collision the --no-build guard above prevents).
     if ./mfc.sh run "$case" --case-optimization $gpu_opts $build_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
         run_ok=1
-    elif [ -n "$build_opts" ] && \
+    elif [ "$job_cluster" = phoenix ] && \
          ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
         echo "NOTE: $case_name rebuilt in-run (prebuilt binary was unavailable)"
         run_ok=1
