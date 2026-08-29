@@ -2978,16 +2978,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        # The reacting Roe sound speed - roe_avg's chemistry branch, c_sum_Yi_Phi, and the
+        # The reacting Roe sound speed - the chemistry average state, c_sum_Yi_Phi, and the
         # c = sqrt(c_c - (gamma - 1)*(vel_sum - H)) branch of s_compute_speed_of_sound_avg - is
         # reached only with avg_state = 1 AND wave_speeds = 2. Every other chemistry case sets
-        # wave_speeds = 1, so none of it had coverage. HLL rather than HLLC because the HLLC base
-        # path passes a literal 0 for c_sum_Yi_Phi and never takes the branch (MFlowCode/MFC#1774).
+        # wave_speeds = 1, so none of it had coverage. Both solvers: HLLC used to pass a literal 0
+        # here and take the frozen branch instead, which is why the gap went unseen (#1774).
         cases.append(
             define_case_f(
                 "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average",
                 "examples/1D_inert_shocktube/case.py",
                 mods={**common_mods, "riemann_solver": 1, "avg_state": 1, "wave_speeds": 2, "weno_order": 3, "mapped_weno": "F", "mp_weno": "F"},
+                override_tol=10 ** (-10),
+            )
+        )
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average -> HLLC",
+                "examples/1D_inert_shocktube/case.py",
+                mods={**common_mods, "riemann_solver": 2, "avg_state": 1, "wave_speeds": 2, "weno_order": 3, "mapped_weno": "F", "mp_weno": "F"},
                 override_tol=10 ** (-10),
             )
         )

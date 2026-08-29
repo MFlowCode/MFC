@@ -285,7 +285,7 @@ contains
                                 ! costs eight square roots per face under the Roe average.
                                 if (wave_speeds == wave_speeds_pressure) then
                                     call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
-                                                                      & H_avg, 0._wp, alpha_R, c_avg)
+                                                                      & H_avg, c_sum_Yi_Phi, alpha_R, c_avg)
                                 end if
 
                                 if (viscous) then
@@ -636,6 +636,8 @@ contains
                                 ! Only the pressure-based wave-speed estimate reads the averaged state, and building it
                                 ! costs eight square roots per face under the Roe average.
                                 if (wave_speeds == wave_speeds_pressure) then
+                                    ! Zero, not c_sum_Yi_Phi: this loop never forms the chemistry average, and
+                                    ! chemistry with bubbles_euler/qbmm is prohibited, so the branch is unreachable.
                                     call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
                                                                       & H_avg, 0._wp, alpha_R, c_avg)
                                 end if
