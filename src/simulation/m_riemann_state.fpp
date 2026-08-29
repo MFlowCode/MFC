@@ -13,7 +13,6 @@ module m_riemann_state
     use m_global_parameters
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, verysmall
     use m_hb_function
-    use m_thermochem, only: get_species_enthalpies_rt, get_species_specific_heats_r
 
     implicit none
 
@@ -216,8 +215,8 @@ contains
     !> Roe-averaged reacting-mixture quantities: replaces gamma_avg with the mixture Cp/Cv and builds the c_sum_Yi_Phi term
     !! s_compute_speed_of_sound_avg needs. vel_avg_rms must be the full squared magnitude - its Phi_avg and vel_sum terms cancel to
     !! leave the Roe sound speed, and only do so for the full magnitude.
-    subroutine s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, vel_avg_rms, gamma_avg, &
-        & c_sum_Yi_Phi)
+    subroutine s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR, &
+        & vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
 
         $:GPU_ROUTINE(function_name='s_compute_chemistry_average_state', parallelism='[seq]', cray_inline=True)
 
@@ -226,29 +225,24 @@ contains
         real(wp), intent(in) :: vel_avg_rms   !< Squared magnitude of the averaged velocity
         !> Per-species gas constants, formed by the caller: nvfortran cannot compile a caller that passes the constant
         !! molecular_weights array into a declare-target routine.
+        !> Species enthalpies and heat capacities, evaluated by the caller. m_thermochem is called from the loop body rather than
+        !! from here: CCE faults the GPU on that call one routine deeper.
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10), intent(in) :: Ys_L, Ys_R, R_species
+            real(wp), dimension(10), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
         #:else
-            real(wp), dimension(num_species), intent(in) :: Ys_L, Ys_R, R_species
+            real(wp), dimension(num_species), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
         #:endif
         real(wp), intent(out) :: gamma_avg  !< Mixture Cp/Cv, replacing the density-weighted average
         real(wp), intent(out) :: c_sum_Yi_Phi
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10) :: h_iL, h_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_avg_2
+            real(wp), dimension(10) :: Yi_avg, Phi_avg, h_avg_2
         #:else
-            real(wp), dimension(num_species) :: h_iL, h_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_avg_2
+            real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_avg_2
         #:endif
         real(wp) :: Cp_avg, Cv_avg, T_avg, eps
 
         eps = 0.001_wp
-
-        call get_species_enthalpies_rt(T_L, h_iL)
-        call get_species_enthalpies_rt(T_R, h_iR)
-        h_iL = h_iL*R_species*T_L
-        h_iR = h_iR*R_species*T_R
-        call get_species_specific_heats_r(T_L, Cp_iL)
-        call get_species_specific_heats_r(T_R, Cp_iR)
 
         h_avg_2 = (sqrt(rho_L)*h_iL + sqrt(rho_R)*h_iR)/(sqrt(rho_L) + sqrt(rho_R))
         Yi_avg = (sqrt(rho_L)*Ys_L + sqrt(rho_R)*Ys_R)/(sqrt(rho_L) + sqrt(rho_R))

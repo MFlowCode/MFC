@@ -44,13 +44,13 @@ contains
             real(wp), dimension(3)  :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(3)  :: vel_L, vel_R
             real(wp), dimension(3)  :: alpha_L, alpha_R
-            real(wp), dimension(10) :: Ys_L, Ys_R, R_species
+            real(wp), dimension(10) :: Ys_L, Ys_R, R_species, h_iL, h_iR
             real(wp), dimension(10) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(num_vels)    :: vel_L, vel_R
             real(wp), dimension(num_fluids)  :: alpha_L, alpha_R
-            real(wp), dimension(num_species) :: Ys_L, Ys_R, R_species
+            real(wp), dimension(num_species) :: Ys_L, Ys_R, R_species, h_iL, h_iR
             real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         #:endif
         real(wp) :: rho_L, rho_R
@@ -110,13 +110,13 @@ contains
             if (norm_dir == ${NORM_DIR}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, &
                                     & tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, Ys_L, Ys_R, R_species, &
-                                    & Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, &
-                                    & pcorr, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, &
-                                    & MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, &
-                                    & pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, damage_R, rho_avg, &
-                                    & H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, &
-                                    & pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]', &
-                                    & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & h_iL, h_iR, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, c_fast, pres_mag, B, Ga, vdotB, &
+                                    & B2, b4, cm, pcorr, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, c_sum_Yi_Phi, T_L, &
+                                    & T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, &
+                                    & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, &
+                                    & damage_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
+                                    & vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, &
+                                    & flux_tau_R]', copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -324,8 +324,13 @@ contains
                                                              & rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                 if (chemistry .and. avg_state == avg_state_roe) then
                                     R_species = gas_constant/molecular_weights
-                                    call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, &
-                                                                           & vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
+                                    call get_species_enthalpies_rt(T_L, h_iL)
+                                    call get_species_enthalpies_rt(T_R, h_iR)
+                                    h_iL = h_iL*R_species*T_L
+                                    h_iR = h_iR*R_species*T_R
+                                    call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, h_iL, &
+                                                                           & h_iR, Cp_iL, Cp_iR, vel_avg_rms, gamma_avg, &
+                                                                           & c_sum_Yi_Phi)
                                 end if
                             end if
 
