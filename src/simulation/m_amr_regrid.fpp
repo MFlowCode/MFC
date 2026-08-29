@@ -33,7 +33,8 @@ module m_amr_regrid
         & amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, &
         & amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, &
         & amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, &
-        & amr_cl_me_rb_r, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, s_amr_fw_szi
+        & amr_cl_me_rb_r, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, &
+        & amr_tag_base, amr_mesh_epoch, amr_cl_wire_r
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -560,10 +561,20 @@ contains
         !! that depth's SHARED nodes into the single buffer the one reduction covers, with bofs/blen/boff their slices.
         integer, allocatable :: kpos(:), kbat(:), bofs(:), blen(:), boff(:,:), bsig(:)
         integer              :: ncur, nnxt, nkeep, nbat, nbuf
+        !> S3.2b-2b: a node is WIDE when its box spans more than this many ranks. Wide nodes keep the batched collective (every rank
+        !! overlaps them and needs the answer); narrow ones reduce among their few overlapping ranks. The threshold only has to keep
+        !! the WIDE COUNT at O(log P) -- measured, a rank participates in 6/8/10 shared nodes at np8/16/32 while the shared total is
+        !! 11/23/47 -- and 8 is one 2x2x2 brick of ranks, the shape a seam node actually has.
+        integer, parameter   :: amr_cl_wide = 8
+        integer, allocatable :: bnov(:), bovr(:,:), wbuf(:)
+        logical, allocatable :: bwide(:)
+        integer, allocatable :: pidx(:), plist(:), scnt(:), rcnt(:), sdsp2(:), rdsp2(:), soff(:), roff(:)
+        integer, allocatable :: sbuf(:), rbuf(:), creq(:)
+        integer              :: np2, q, rr, nsnd, nrcv, nreq2, tagc, nwb, o1  ! t is already a loop variable above
         integer(8)           :: bkey
         integer(8)           :: vol  !< box volume; a global-bbox first pass can exceed 2**31 cells
         integer              :: blo(3), bhi(3), ts, te, lo, hi, tmp(3), tmp2(3)
-        logical              :: ok, force, capped, changed, tooclose
+        logical              :: ok, force, capped, changed, tooclose, mine
         real(wp)             :: eff
 
         nboxes = 0
@@ -578,7 +589,7 @@ contains
         allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
         allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in), sdep(4*cap + 8))
         allocate (sig(mg + ng + pg + 3))  ! bound: the three full domain extents; reused by every node
-        allocate (ovr(max(num_procs, 1)))  ! S3.2a scratch
+        allocate (ovr(amr_cl_wide))  ! S3.2b-2b: only NARROW nodes are ever enumerated, so this no longer sizes with P
         allocate (akey(cap))  ! B1 scratch
         ! working copy of the tag list, partitioned in place as the tree descends so each node scans only its tags
         do t = 1, ntag_in
@@ -590,6 +601,12 @@ contains
         nacc = 0; capped = .false.
         allocate (kpos(4*cap + 8), kbat(4*cap + 8), bofs(4*cap + 8), blen(4*cap + 8), boff(3, 4*cap + 8))
         allocate (bsig(4*(mg + ng + pg + 3)))
+        allocate (bnov(4*cap + 8), bwide(4*cap + 8), bovr(amr_cl_wide, 4*cap + 8))
+        allocate (pidx(0:max(num_procs - 1, 0)), plist(max(num_procs, 1)))
+        allocate (scnt(max(num_procs, 1)), rcnt(max(num_procs, 1)), sdsp2(max(num_procs, 1)), rdsp2(max(num_procs, 1)))
+        allocate (soff(max(num_procs, 1)), roff(max(num_procs, 1)))
+        allocate (wbuf(1), sbuf(1), rbuf(1), creq(1))
+        pidx = 0
         ! S3.2b-2: LEVEL-ORDER descent. The old stack held mixed depths, so each SHARED node paid its own global reduction, and
         ! the shared set grows with P (measured per regrid: 11/23/47/91 at np8/16/32/64) -- O(P) full-machine syncs, ~147,000 at
         ! 1e5 ranks. Walking one whole depth at a time lets every shared node at that depth ride ONE reduction, so the count
@@ -611,13 +628,24 @@ contains
                 blo0 = slo(:,i); bhi0 = shi(:,i)
                 ! S3.2b: a rank-local node's tags are ALL held by its one overlapping rank -- every other rank would contribute
                 ! zeros, so the reduction cannot change the answer and the subtree is that rank's alone.
-                call s_amr_ranks_overlapping(blo0, bhi0, ovr, novr)
+                ! S3.2b-2b: how many ranks the box spans, and whether THIS rank is one of them, both without enumerating the
+                ! set -- the enumeration writes one entry per overlapping rank, which is O(P) on a box spanning the machine.
+                novr = f_amr_overlap_count(blo0, bhi0)
+                mine = (num_procs == 1) .or. f_amr_rank_overlaps(blo0, bhi0, proc_rank)
                 ! counted BEFORE the drop, as the stack walk did: amr_cl_nodes/amr_cl_maxdep describe the TREE, which is the
-                ! same tree whether or not this rank descends its rank-local parts, and the [amr-tree] gate compares across runs
+                ! same tree whether or not this rank descends the parts it does not overlap, and [amr-tree] compares across runs
                 nnode = nnode + 1_8; mxdep = max(mxdep, sdep(i))
-                if (reduce .and. num_procs > 1 .and. novr == 1) then
-                    if (ovr(1) /= proc_rank) cycle
-                end if
+                ! A rank holds tags only inside its own subdomain, so a node its subdomain does not reach is one it would
+                ! contribute nothing but zeros to: drop the subtree and let the closing box ALLGATHERV carry back anything
+                ! accepted inside it. S3.2b did this for novr == 1; the scoped exchange below extends it to every NARROW node.
+                !
+                ! WIDE nodes are deliberately NOT dropped, and that is load-bearing rather than conservative. They are settled by
+                ! a collective over MPI_COMM_WORLD, which every rank must enter with the identical buffer length; if a rank
+                ! skipped a wide node it did not overlap, its batch would be short and the reduction would mismatch -- a hang or
+                ! silent corruption that appears only once some rank stops overlapping some wide box, i.e. only at scale. A wide
+                ! node's ancestors are all wide (ovr only shrinks downward), so every rank reaches every wide node and the batch
+                ! stays identical. A narrow node's members all walked its parent for the same reason, so p2p pairing is complete.
+                if (reduce .and. num_procs > 1 .and. .not. mine .and. novr <= amr_cl_wide) cycle
                 ! ONE pass over this node's tags yields the signature; trim, count and split all read it (no rescans).
                 call s_amr_box_sig(wt, sts(i), ste(i), blo0, bhi0, sig, off, nsig)
                 nkeep = nkeep + 1; kpos(nkeep) = i; kbat(nkeep) = 0
@@ -631,7 +659,7 @@ contains
                         amr_cl_shr_maxdep_r = max(amr_cl_shr_maxdep_r, sdep(i))
                         ! S3.2a-2: under the sparse per-depth exchange this rank pays for a shared node only if the node's box
                         ! reaches into its subdomain. Everything else is somebody else's message.
-                        if (any(ovr(1:novr) == proc_rank)) then
+                        if (mine) then
                             amr_cl_me_nodes_r = amr_cl_me_nodes_r + 1_8; amr_cl_me_rb_r = amr_cl_me_rb_r + int(nsig, 8)*4_8
                         end if
                     end if
@@ -642,19 +670,157 @@ contains
                     end if
                 end if
                 if (reduce .and. num_procs > 1 .and. novr > 1) then
-                    call s_amr_fw_szi(bsig, nbuf + nsig)  ! identical batch on every rank, so every rank grows identically
+                    call s_amr_fw_szi(bsig, nbuf + nsig)
                     nbat = nbat + 1; kbat(nkeep) = nbat
                     bofs(nbat) = nbuf; blen(nbat) = nsig; boff(:,nbat) = off
+                    bnov(nbat) = novr; bwide(nbat) = (novr > amr_cl_wide)
+                    bovr(1, nbat) = -1  ! defined for wide nodes too: Fortran does not promise .or. short-circuits
+                    if (.not. bwide(nbat)) then
+                        call s_amr_ranks_overlapping(blo0, bhi0, ovr, novr)  ! bounded by amr_cl_wide, so never O(P)
+                        bovr(1:novr,nbat) = ovr(1:novr)
+                    end if
                     bsig(nbuf + 1:nbuf + nsig) = sig(1:nsig)
                     nbuf = nbuf + nsig
                 end if
             end do
 #ifdef MFC_MPI
-            ! ONE reduction for the whole depth. Integer SUM is exact and order-independent, so every rank obtains a
-            ! bit-identical buffer and therefore makes bit-identical trim/accept/split decisions, exactly as the per-node
-            ! reduction did -- concatenating the nodes changes who is in the message, never the arithmetic.
-            if (nbuf > 0) then
-                call MPI_ALLREDUCE(MPI_IN_PLACE, bsig, nbuf, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+            ! S3.2b-2b: the depth's reduction, SPLIT by how many ranks a node's box actually spans.
+            !
+            ! WIDE nodes are the shallow ones near the root. Every rank overlaps them and genuinely needs the answer, so they
+            ! ride ONE batched collective per depth (that is 2a). There are only O(log P) of them, and their volume is the
+            ! domain extent, which grows as P^(1/3) under weak scaling -- not as P.
+            !
+            ! NARROW nodes are the deep ones straddling a rank seam, and they are where the O(P) growth in the shared set lives
+            ! (measured per regrid: 11/23/47/91 shared at np8/16/32/64). Their overlap set is a small rank-coordinate brick, so
+            ! they reduce POINT-TO-POINT among exactly those ranks: each member ships its contribution to ovr(1), which sums and
+            ! ships the total back. Per-rank received volume then follows what a rank actually overlaps -- measured 17,280 /
+            ! 27,840 / 41,600 B at np8/16/32 (1.61x, 1.49x per doubling and decelerating) against 26,920 / 59,240 / 127,080 B
+            ! (2.20x, 2.15x) for what an ALLREDUCE hands every rank.
+            !
+            ! Both ends agree on message contents with NO negotiation: a rank's node list at a depth is a SUBSEQUENCE of the one
+            ! globally-ordered tree walk (ovr_child is contained in ovr_parent, so a rank that needs a child necessarily walked
+            ! its parent), and both sides enumerate nodes in ascending j -- so the nodes common to a pair appear in the same
+            ! relative order on both sides, and one aggregated message per peer per phase matches unambiguously.
+            nwb = 0
+            do j = 1, nbat
+                if (bwide(j)) nwb = nwb + blen(j)
+            end do
+            if (nwb > 0) then
+                call s_amr_fw_szi(wbuf, nwb)
+                o1 = 0
+                do j = 1, nbat
+                    if (.not. bwide(j)) cycle
+                    wbuf(o1 + 1:o1 + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)); o1 = o1 + blen(j)
+                end do
+                call MPI_ALLREDUCE(MPI_IN_PLACE, wbuf, nwb, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+                amr_cl_wire_r = amr_cl_wire_r + int(nwb, 8)*4_8  ! a collective hands the WHOLE buffer to every rank
+                o1 = 0
+                do j = 1, nbat
+                    if (.not. bwide(j)) cycle
+                    bsig(bofs(j) + 1:bofs(j) + blen(j)) = wbuf(o1 + 1:o1 + blen(j)); o1 = o1 + blen(j)
+                end do
+            end if
+            ! peers for the narrow nodes: whoever roots a node I hold, plus whoever holds a node I root
+            np2 = 0
+            do j = 1, nbat
+                if (bwide(j)) cycle
+                if (bovr(1, j) == proc_rank) then
+                    do t = 2, bnov(j)
+                        rr = bovr(t, j)
+                        if (pidx(rr) == 0) then; np2 = np2 + 1; plist(np2) = rr; pidx(rr) = np2; end if
+                    end do
+                else
+                    rr = bovr(1, j)
+                    if (pidx(rr) == 0) then; np2 = np2 + 1; plist(np2) = rr; pidx(rr) = np2; end if
+                end if
+            end do
+            if (np2 > 0) then
+                scnt(1:np2) = 0; rcnt(1:np2) = 0
+                do j = 1, nbat
+                    if (bwide(j)) cycle
+                    if (bovr(1, j) == proc_rank) then
+                        do t = 2, bnov(j); q = pidx(bovr(t, j)); rcnt(q) = rcnt(q) + blen(j); end do
+                    else
+                        q = pidx(bovr(1, j)); scnt(q) = scnt(q) + blen(j)
+                    end if
+                end do
+                sdsp2(1) = 0; rdsp2(1) = 0
+                do q = 2, np2
+                    sdsp2(q) = sdsp2(q - 1) + scnt(q - 1); rdsp2(q) = rdsp2(q - 1) + rcnt(q - 1)
+                end do
+                nsnd = sdsp2(np2) + scnt(np2); nrcv = rdsp2(np2) + rcnt(np2)
+                ! received: the members' contributions I sum as a root (phase A) + the totals sent back to me (phase B)
+                amr_cl_wire_r = amr_cl_wire_r + int(nrcv, 8)*4_8 + int(nsnd, 8)*4_8
+                call s_amr_fw_szi(sbuf, max(nsnd, 1)); call s_amr_fw_szi(rbuf, max(nrcv, 1))
+                call s_amr_fw_szi(creq, 2*np2)
+                ! phase A: every member ships its own contribution up to the node's root
+                soff(1:np2) = sdsp2(1:np2)
+                do j = 1, nbat
+                    if (bwide(j) .or. bovr(1, j) == proc_rank) cycle
+                    q = pidx(bovr(1, j))
+                    sbuf(soff(q) + 1:soff(q) + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)); soff(q) = soff(q) + blen(j)
+                end do
+                tagc = amr_tag_base(4) + int(mod(amr_mesh_epoch, 50_8))
+                nreq2 = 0
+                do q = 1, np2
+                    if (rcnt(q) > 0) then
+                        nreq2 = nreq2 + 1
+                        call MPI_IRECV(rbuf(rdsp2(q) + 1), rcnt(q), MPI_INTEGER, plist(q), tagc, MPI_COMM_WORLD, creq(nreq2), ierr)
+                    end if
+                end do
+                do q = 1, np2
+                    if (scnt(q) > 0) then
+                        nreq2 = nreq2 + 1
+                        call MPI_ISEND(sbuf(sdsp2(q) + 1), scnt(q), MPI_INTEGER, plist(q), tagc, MPI_COMM_WORLD, creq(nreq2), ierr)
+                    end if
+                end do
+                if (nreq2 > 0) call MPI_WAITALL(nreq2, creq, MPI_STATUSES_IGNORE, ierr)
+                ! the root sums its members in. Integer SUM is exact and order-independent, so the total is bit-identical to what
+                ! the machine-wide reduction produced -- the change is who is in the message, never the arithmetic.
+                roff(1:np2) = rdsp2(1:np2)
+                do j = 1, nbat
+                    if (bwide(j) .or. bovr(1, j) /= proc_rank) cycle
+                    do t = 2, bnov(j)
+                        q = pidx(bovr(t, j))
+                        bsig(bofs(j) + 1:bofs(j) + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)) + rbuf(roff(q) + 1:roff(q) &
+                             & + blen(j))
+                        roff(q) = roff(q) + blen(j)
+                    end do
+                end do
+                ! phase B: the total goes back down. Counts mirror phase A exactly, so the buffers swap roles.
+                roff(1:np2) = rdsp2(1:np2)
+                do j = 1, nbat
+                    if (bwide(j) .or. bovr(1, j) /= proc_rank) cycle
+                    do t = 2, bnov(j)
+                        q = pidx(bovr(t, j))
+                        rbuf(roff(q) + 1:roff(q) + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)); roff(q) = roff(q) + blen(j)
+                    end do
+                end do
+                nreq2 = 0
+                do q = 1, np2
+                    if (scnt(q) > 0) then
+                        nreq2 = nreq2 + 1
+                        call MPI_IRECV(sbuf(sdsp2(q) + 1), scnt(q), MPI_INTEGER, plist(q), tagc + 50, MPI_COMM_WORLD, &
+                                       & creq(nreq2), ierr)
+                    end if
+                end do
+                do q = 1, np2
+                    if (rcnt(q) > 0) then
+                        nreq2 = nreq2 + 1
+                        call MPI_ISEND(rbuf(rdsp2(q) + 1), rcnt(q), MPI_INTEGER, plist(q), tagc + 50, MPI_COMM_WORLD, &
+                                       & creq(nreq2), ierr)
+                    end if
+                end do
+                if (nreq2 > 0) call MPI_WAITALL(nreq2, creq, MPI_STATUSES_IGNORE, ierr)
+                soff(1:np2) = sdsp2(1:np2)
+                do j = 1, nbat
+                    if (bwide(j) .or. bovr(1, j) == proc_rank) cycle
+                    q = pidx(bovr(1, j))
+                    bsig(bofs(j) + 1:bofs(j) + blen(j)) = sbuf(soff(q) + 1:soff(q) + blen(j)); soff(q) = soff(q) + blen(j)
+                end do
+                do q = 1, np2  ! clear only what was touched: a full wipe would be O(P) per depth
+                    pidx(plist(q)) = 0
+                end do
             end if
 #endif
             ! pass 2: trim, accept or split every node kept at this depth
@@ -709,7 +875,8 @@ contains
             end do
             ncur = nnxt
         end do
-        deallocate (kpos, kbat, bofs, blen, boff, bsig)
+        deallocate (kpos, kbat, bofs, blen, boff, bsig, bnov, bwide, bovr, pidx, plist)
+        deallocate (scnt, rcnt, sdsp2, rdsp2, soff, roff, wbuf, sbuf, rbuf, creq)
 
         ! S3.0a: record tree shape BEFORE the merge, so nacc is still the BR leaf count (the log2 denominator). Two independent
         ! maxima -- the deepest call and the largest call -- because a single max cannot say whether a deep tree was also big.
@@ -827,7 +994,7 @@ contains
         logical, allocatable :: old_owns(:)
         logical              :: same
         integer              :: i
-        integer(8)           :: me_l(2), me_g(2)  !< S3.2a-2: this rank's shallow-phase participation, and its max over ranks
+        integer(8)           :: me_l(3), me_g(3)  !< S3.2a-2: this rank's shallow-phase participation, and its max over ranks
 
 #ifdef MFC_MPI
         integer :: mierr
@@ -869,15 +1036,15 @@ contains
         ! S3.2a-2: rank_time_wrt is a namelist flag, so this branch is entered by every rank and the reduction is safe here.
         ! MAX rather than rank 0's own value: rank 0 owns a domain CORNER and overlaps the fewest shared boxes of anyone.
         if (rank_time_wrt) then
-            me_l = [amr_cl_me_nodes_r, amr_cl_me_rb_r]
+            me_l = [amr_cl_me_nodes_r, amr_cl_me_rb_r, amr_cl_wire_r]
             me_g = me_l
 #ifdef MFC_MPI
-            call MPI_ALLREDUCE(me_l, me_g, 2, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mierr)
+            call MPI_ALLREDUCE(me_l, me_g, 3, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mierr)
 #endif
         end if
         if (rank_time_wrt .and. proc_rank == 0) then
-            print '(A,I0,A,I0,A,I0,A,I0)', '[amr-scope-me] me_nodes_max ', me_g(1), ' me_rb_max ', me_g(2), ' shr_nodes_all ', &
-                & amr_cl_shr_nodes_r, ' shr_rb_all ', amr_cl_shr_rb_r
+            print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope-me] me_nodes_max ', me_g(1), ' me_rb_max ', me_g(2), ' wire_max ', &
+                & me_g(3), ' shr_nodes_all ', amr_cl_shr_nodes_r, ' shr_rb_all ', amr_cl_shr_rb_r
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
                 & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
             print '(A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', amr_mig_blk, ' sends ', amr_mig_snd, ' bytes ', amr_gb_mig

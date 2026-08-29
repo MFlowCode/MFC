@@ -146,6 +146,10 @@ module m_amr
     !! where each node's whole signature lands on every rank. Under S3.2's sparse per-depth exchange a rank touches only the shared
     !! nodes its own subdomain OVERLAPS, so these count that subset -- the quantity that has to be sublinear in P for W4.
     integer(8) :: amr_cl_me_nodes_r = 0, amr_cl_me_rb_r = 0
+    !> S3.2b-2b: bytes this rank ACTUALLY received settling the clustering tree -- the wide batch (which every rank receives in
+    !! full) plus only the narrow slices addressed to it. amr_cl_me_rb_r is a PREDICTION of what scoping should cost; this is the
+    !! measurement, and the two agreeing is what says the exchange delivers what the design claims.
+    integer(8) :: amr_cl_wire_r = 0
     !> TRACK T (T0b gate): regrid migration volume. An old block is ISENT to EVERY new-owner rank whose box overlaps it, so the cost
     !! is fan-out x block bytes, not one send per block. amr_mig_blk counts blocks that had to move at all, amr_mig_snd counts the
     !! sends, amr_gb_mig the bytes. fan-out = snd/blk is the reducible quantity: if it is ~1 the volume is inherent and hysteresis
@@ -155,8 +159,9 @@ module m_amr
     public :: amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now
     public :: amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep
     public :: amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r
-    public :: amr_cl_me_nodes_r, amr_cl_me_rb_r
+    public :: amr_cl_me_nodes_r, amr_cl_me_rb_r, amr_cl_wire_r
     public :: s_amr_ranks_overlapping  !< exported for the S3.2a scope measurement in m_amr_regrid
+    public :: f_amr_overlap_count, f_amr_rank_overlaps  !< S3.2b-2b: node width and membership without the O(P) enumeration
     public :: amr_my_blk, amr_n_my, s_amr_refresh_my_blocks  !< S3.3c: the regrid pass-1 scan needs the owned-block list too
     public :: s_amr_fw_szi  !< S3.2b-2: the clusterer's per-depth signature batch grows with the same doubling helper
     public :: amr_gb_mig, amr_mig_snd, amr_mig_blk
@@ -2304,6 +2309,22 @@ contains
         end do
 
     end subroutine s_amr_ranks_overlapping
+
+    !> S3.2b-2b: does rank r's subdomain overlap coarse box [blo:bhi]? Answers membership WITHOUT enumerating the overlap set, which
+    !! s_amr_ranks_overlapping must do and which costs O(num_procs) writes on a box spanning the machine -- the clusterer asks this
+    !! of every node it walks, the root included, so the enumeration was itself an O(P) term.
+    pure logical function f_amr_rank_overlaps(blo, bhi, r) result(hit)
+
+        integer, intent(in) :: blo(3), bhi(3), r
+        integer             :: clo(3), chi(3), c(3)
+
+        call s_amr_coord_range(blo, bhi, clo, chi)
+        c(1) = r/(num_procs_y*num_procs_z)  ! same coord -> rank map the enumeration uses: r = cx*(Py*Pz) + cy*Pz + cz
+        c(2) = mod(r/num_procs_z, num_procs_y)
+        c(3) = mod(r, num_procs_z)
+        hit = all(c >= clo) .and. all(c <= chi)
+
+    end function f_amr_rank_overlaps
 
     !> Overlap count only (allocation sizing), = product of the per-dim coord-range widths.
     pure integer function f_amr_overlap_count(blo, bhi) result(nr)
