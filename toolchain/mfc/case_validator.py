@@ -1691,7 +1691,7 @@ class CaseValidator:
         amr_blocking_factor = self.get("amr_blocking_factor")
         self.prohibit(
             amr_blocking_factor is not None and amr_blocking_factor < 1,
-            "amr_blocking_factor must be >= 1 (1 = no minimum box size, the default)",
+            "amr_blocking_factor must be >= 1 (1 = no minimum box size; the default is 4)",
         )
         self.prohibit(recon_type is not None and recon_type != 1 and not igr, "amr requires WENO reconstruction (recon_type = 1) or the IGR solver")
         # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3

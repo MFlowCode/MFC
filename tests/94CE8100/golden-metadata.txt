@@ -1,16 +1,16 @@
-This file was created on 2026-08-01 12:48:53.715088.
+This file was created on 2026-08-28 17:54:16.164593.
 
 mfc.sh:
 
-    Invocation: test --generate --only 94CE8100 -j 1
+    Invocation: test -j 8 --gpu mp --no-debug --no-reldebug --mpi --generate --only 00E15144 1CBACEB5 1DBD439A 259E5A84 2C46C59A 33060D84 3A474BEE 3F6F9E4F 79B334C7 83CC5C6D 94CE8100 B7704247 F0DDE1B4 F57C3A5B
     Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        2f8e51c06528d57633313ab9168800873ea25152 on up/mega (dirty)
+    Git:        8e10b445fb4860059aedd2934928c55ee81048aa on up/mega (dirty)
 
 simulation:
 
     CMake Configuration:
     
-        CMake v3.25.2 on k004-006.hpcfund
+        CMake v3.25.2 on k004-004.hpcfund
     
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
@@ -74,7 +74,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
@@ -83,9 +83,9 @@ post_process:
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -108,7 +108,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
@@ -117,9 +117,9 @@ pre_process:
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -163,7 +163,7 @@ CPU:
     Frequency boost:                         enabled
     CPU max MHz:                             3530.4929
     CPU min MHz:                             1500.0000
-    BogoMIPS:                                4890.63
+    BogoMIPS:                                4891.01
     Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm debug_swap
     Virtualization:                          AMD-V
     L1d cache:                               4 MiB (128 instances)

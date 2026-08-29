@@ -603,7 +603,12 @@ contains
         amr_max_grid_size = 0  ! 0 = derive the cap from the decomposition (rank-dependent, the historical behaviour)
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
-        amr_blocking_factor = 1  ! 1 = today's behaviour exactly (coarsen by 1 is the identity)
+        ! B0b: 4, not 1. At 1 the floor is the algorithmic minimum of 2 and the bisection does not converge on its own --
+        ! it splits until amr_max_blocks stops it (measured: the `clustering capped` warning on 10 of 10 regrids, and lmax
+        ! exactly = amr_max_blocks), so `force`, which reads the GLOBAL accepted count, is live on every regrid. That blocks
+        ! any scoped clustering, where a rank finishing a private subtree cannot see that count. 4 is the smallest value
+        ! measured to stop the saturation; 8/16 would distort the 128^2-and-smaller test grids.
+        amr_blocking_factor = 4
         amr_ref_ratio = 2
         l0_ntile = 0
         l0_migrate_step = 0
