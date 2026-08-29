@@ -11,18 +11,27 @@ def _magnitudes(values: typing.List[float]) -> typing.List[float]:
     return [abs(v) for v in values if not math.isnan(v)]
 
 
-def _is_zero_field(values: typing.List[float], atol: float) -> bool:
-    """A field the test cannot resolve from zero: every value is strictly inside the absolute
-    tolerance. What such a field stores is roundoff, and which way that roundoff falls depends on the
-    compiler's association order, so comparing it pointwise tests the compiler rather than the solver.
-    The candidate is held to the same band instead.
+#: How far past the band a candidate may drift before a zero field counts as changed. The band is the
+#: larger of the tolerance and the golden's own magnitude, so a field that merely sits near the
+#: tolerance is judged against itself rather than against the tolerance it happens to be close to.
+_ZERO_FIELD_HEADROOM = 10.0
 
-    Strictly inside, because a field whose magnitude *equals* the tolerance is the one case where a
-    real field cannot be told from roundoff: `1e8 * 1e-10` gives QBMM a 1e-2 tolerance in single
-    precision, and its initial bubble field is the constant 1e-2 exactly. Reading that as zero then
-    failed the candidate for exceeding it by a few ulps."""
+
+def _is_zero_field(values: typing.List[float], atol: float) -> bool:
+    """A field the test cannot resolve from zero: every value is within the absolute tolerance of it.
+    What such a field stores is roundoff, and which way that roundoff falls depends on the compiler's
+    association order, so comparing it pointwise tests the compiler rather than the solver. The
+    candidate is held to a band instead, see _zero_field_bound."""
     mags = _magnitudes(values)
-    return bool(mags) and max(mags) < atol
+    return bool(mags) and max(mags) <= atol
+
+
+def _zero_field_bound(values: typing.List[float], atol: float) -> float:
+    """The band a zero field's candidate must stay inside. Scaled by the golden's own magnitude, not
+    the tolerance alone: single precision scales QBMM's 1e-10 by 1e8, so its tolerance is 1e-2 and
+    its bubble fields are constants a hair under that. Held to the bare tolerance, those fail for
+    drifting a few ulps, while a field storing genuine roundoff is orders below and unaffected."""
+    return max(atol, _ZERO_FIELD_HEADROOM * max(_magnitudes(values), default=0.0))
 
 
 def is_close(error: Error, tolerance: Tolerance) -> bool:
@@ -96,12 +105,13 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
         # field was previously not checked at all.
         if _is_zero_field(gEntry.doubles, tol.absolute):
             reached = max(_magnitudes(cEntry.doubles), default=0.0)
+            bound = _zero_field_bound(gEntry.doubles, tol.absolute)
             if any(math.isnan(v) for v in cEntry.doubles):
                 return None, f"{gFilepath} is zero in the golden but is NaN in the pack file."
-            if reached > tol.absolute:
+            if reached > bound:
                 return (
                     None,
-                    f"{gFilepath} is zero in the golden (all values within the {tol.absolute:.2E} absolute " f"tolerance of it) but reaches {reached:.2E} in the candidate.",
+                    f"{gFilepath} is zero in the golden (all values within the {tol.absolute:.2E} absolute " f"tolerance of it) but reaches {reached:.2E} in the candidate, past its {bound:.2E} band.",
                 )
             continue
 
