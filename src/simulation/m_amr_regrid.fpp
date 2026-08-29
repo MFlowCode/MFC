@@ -554,8 +554,10 @@ contains
         integer                 :: mg, ng, pg, t
         integer                 :: cap, nwork, nacc, i, j, k, d, sax, spos, thr, ntag
         integer(8), allocatable :: akey(:)  !< B1: Morton key of each accepted box's lo, the canonical merge order
+        integer, allocatable    :: gcnt(:), gdsp(:), sbx(:,:), gbx(:,:)  !< S3.2b: union of the per-rank accepted boxes
+        integer                 :: ntot
         integer(8)              :: bkey
-        integer(8)              :: vol      !< box volume; a global-bbox first pass can exceed 2**31 cells
+        integer(8)              :: vol  !< box volume; a global-bbox first pass can exceed 2**31 cells
         integer                 :: blo(3), bhi(3), ts, te, lo, hi, tmp(3), tmp2(3)
         logical                 :: ok, force, capped, changed, tooclose
         real(wp)                :: eff
@@ -588,10 +590,21 @@ contains
             ! ONE pass over this node's tags yields the signature; trim, count and split all read it (no rescans).
             blo0 = blo; bhi0 = bhi
             call s_amr_box_sig(wt, ts, te, blo0, bhi0, sig, off, nsig)
+            ! S3.2b: does this node's box lie inside ONE rank's subdomain? Evaluated BEFORE the reduction, because that is what
+            ! decides whether a reduction is needed at all. s_amr_ranks_overlapping is a pure function of the box and the
+            ! decomposition, so every rank answers identically with no communication.
+            call s_amr_ranks_overlapping(blo0, bhi0, ovr, novr)
+            ! A rank-local node's tags are ALL held by its one overlapping rank: every other rank contributes zeros, so the
+            ! reduction cannot change the answer and the subtree is that rank's alone. Skip the collective, and let the other
+            ! ranks DROP the subtree rather than walk it with an empty tag range -- that is the O(P) work this removes.
+            ! Measured: 99.93% of level-1 nodes are rank-local, so this is ~13,825 collectives per regrid becoming ~47.
+            if (reduce .and. num_procs > 1 .and. novr == 1) then
+                if (ovr(1) /= proc_rank) cycle
+            end if
 #ifdef MFC_MPI
             ! integer SUM is exact and order-independent => every rank obtains a bit-identical signature and therefore makes
             ! bit-identical trim/accept/split decisions. One fused reduction per node covers trim, count AND split.
-            if (reduce .and. num_procs > 1) then
+            if (reduce .and. num_procs > 1 .and. novr > 1) then
                 call MPI_ALLREDUCE(MPI_IN_PLACE, sig, nsig, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
             end if
 #endif
@@ -600,7 +613,6 @@ contains
             amr_cl_rb = amr_cl_rb + int(nsig, 8)*4_8
             if (reduce) amr_cl_rb_now = amr_cl_rb_now + int(nsig, 8)*4_8
             ! S3.2a: a node whose box lies inside ONE rank needs no exchange -- its whole subtree is local
-            call s_amr_ranks_overlapping(blo0, bhi0, ovr, novr)
             if (novr > 1) then
                 amr_cl_shr_nodes = amr_cl_shr_nodes + 1_8; amr_cl_shr_rb = amr_cl_shr_rb + int(nsig, 8)*4_8
                 amr_cl_shr_maxdep = max(amr_cl_shr_maxdep, dep)
@@ -658,6 +670,36 @@ contains
         if (nacc > amr_cl_lmax) then
             amr_cl_lmax = nacc; amr_cl_ldepth = mxdep
         end if
+
+#ifdef MFC_MPI
+        ! S3.2b: with rank-local subtrees walked ONLY by their owner, each rank now holds just the boxes from the subtrees it
+        ! owns. Union them once here. This is per-BOX global data, which the endstate permits, and it is tiny -- 6 ints per box
+        ! against the ~13,825 per-cell signature reductions per regrid it replaces. Ranks contribute in rank order, which is not
+        ! the order the serial traversal accepted them in; B1's canonical Morton sort immediately below is what makes the merged
+        ! result independent of that, and is the reason B1 had to land first.
+        if (reduce .and. num_procs > 1) then
+            allocate (gcnt(num_procs), gdsp(num_procs))
+            call MPI_ALLGATHER(nacc, 1, MPI_INTEGER, gcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            gdsp(1) = 0
+            do i = 2, num_procs
+                gdsp(i) = gdsp(i - 1) + gcnt(i - 1)
+            end do
+            ntot = gdsp(num_procs) + gcnt(num_procs)
+            allocate (sbx(6, max(nacc, 1)), gbx(6, max(ntot, 1)))
+            do i = 1, nacc
+                sbx(1:3,i) = alo(:,i); sbx(4:6,i) = ahi(:,i)
+            end do
+            gcnt = gcnt*6; gdsp = gdsp*6
+            call MPI_ALLGATHERV(sbx, nacc*6, MPI_INTEGER, gbx, gcnt, gdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            ! the accepted-box array is sized to the cap; B0b keeps the bisection away from it, and a run that still reaches it
+            ! truncates here exactly as the serial `if (nacc < cap)` guard did.
+            nacc = min(ntot, cap)
+            do i = 1, nacc
+                alo(:,i) = gbx(1:3,i); ahi(:,i) = gbx(4:6,i)
+            end do
+            deallocate (gcnt, gdsp, sbx, gbx)
+        end if
+#endif
 
         ! B1: canonicalise the merge input. The merge below scans in list order and fuses the FIRST too-close pair, so its
         ! output is a function of the order boxes were ACCEPTED -- i.e. of the traversal. Sorting by Morton of lo makes it a
