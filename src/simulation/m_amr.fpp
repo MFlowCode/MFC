@@ -120,6 +120,13 @@ module m_amr
     !! deleted that collective, so a nonzero value means the gather came back. amr_gb_win = the gwin-pair ALLGATHERVs (levels >= 2,
     !! still live -- S3.3), amr_gb_cost = the per-box cost ALLREDUCE.
     integer(8) :: amr_gb_tag = 0, amr_gb_win = 0, amr_gb_cost = 0
+    !> Bytes each rank RECEIVES from the two box-list ALLGATHERVs per regrid: the clusterer's accepted-box union (m_amr_regrid.fpp
+    !! `gbx(6,ntot)`) and the nesting pass's child list (`gch(7,ntot_ch)`). These are what keeps the block metadata replicated, and
+    !! they are O(GLOBAL BOXES) -- the "limit 3" that amr_per_level_distribution.md audited on 2026-07-31 and deferred with an
+    !! explicit bar: "do not trade that away without a measurement showing it binds". That doc priced limit 3 as MEMORY (5.6 MB/rank
+    !! at 1e5 boxes); this counter prices the GATHER that maintains it every regrid, which is the term that actually binds. Judge
+    !! the SLOPE across np, not the value.
+    integer(8) :: amr_gb_box = 0
     !> S3.0a/S3.0b instrumentation: shape and reduction cost of the Berger-Rigoutsos clustering tree (`s_amr_cluster`). Named
     !! amr_cl_ (clustering), NOT amr_br_ -- that prefix already means the batched BRIDGE in this module. Tree DEPTH decides whether
     !! S3 can fuse one collective per tree LEVEL; BR splits at signature holes, not midpoints, so the tree is not balanced by
@@ -155,7 +162,7 @@ module m_amr
     !! sends, amr_gb_mig the bytes. fan-out = snd/blk is the reducible quantity: if it is ~1 the volume is inherent and hysteresis
     !! buys nothing.
     integer(8) :: amr_gb_mig = 0, amr_mig_snd = 0, amr_mig_blk = 0
-    public :: amr_gb_tag, amr_gb_win, amr_gb_cost
+    public :: amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_box
     public :: amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now
     public :: amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep
     public :: amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r
