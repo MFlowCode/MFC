@@ -213,10 +213,9 @@ contains
 
     end subroutine s_compute_average_state
 
-    !> Roe-averaged reacting-mixture quantities. Split out from s_compute_average_state because it is reached only under the Roe
-    !! average: it replaces gamma_avg with the mixture Cp/Cv and builds the c_sum_Yi_Phi term that s_compute_speed_of_sound_avg
-    !! needs for the reacting sound speed. vel_avg_rms must be the full squared velocity magnitude - the Phi_avg term and the
-    !! vel_sum term in that routine are built to cancel, leaving c^2 = gamma*R*T, and they only do so for the full magnitude.
+    !> Roe-averaged reacting-mixture quantities: replaces gamma_avg with the mixture Cp/Cv and builds the c_sum_Yi_Phi term
+    !! s_compute_speed_of_sound_avg needs. vel_avg_rms must be the full squared magnitude - its Phi_avg and vel_sum terms cancel to
+    !! leave the Roe sound speed, and only do so for the full magnitude.
     subroutine s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, vel_avg_rms, gamma_avg, &
         & c_sum_Yi_Phi)
 
@@ -225,8 +224,8 @@ contains
         real(wp), intent(in) :: rho_L, rho_R  !< Left and right densities
         real(wp), intent(in) :: T_L, T_R      !< Left and right temperatures
         real(wp), intent(in) :: vel_avg_rms   !< Squared magnitude of the averaged velocity
-        !> Per-species gas constants, formed by the caller: CCE rejects m_thermochem globals referenced inside a declare-target
-        !! routine, and nvfortran fails to compile a caller that passes the constant molecular_weights array into one.
+        !> Per-species gas constants, formed by the caller: nvfortran cannot compile a caller that passes the constant
+        !! molecular_weights array into a declare-target routine.
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(10), intent(in) :: Ys_L, Ys_R, R_species
         #:else

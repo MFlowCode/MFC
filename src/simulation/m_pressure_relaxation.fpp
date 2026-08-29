@@ -32,8 +32,8 @@ contains
         #:endif
         real(wp) :: rho, gamma, pi_inf, qv_mix
 
-        ! The mixture is formed here rather than one call deeper: CCE OpenACC accepts a num_fluids-sized array passed to a device
-        ! routine from a parallel-loop body, and rejects the same call from inside another acc routine seq.
+        ! Formed here, not one call deeper: CCE OpenACC accepts a num_fluids-sized array passed to a device routine from a
+        ! parallel-loop body, and rejects the same call from inside another acc routine seq.
         $:GPU_PARALLEL_LOOP(private='[i, j, k, l, alpha_rho, alpha, rho, gamma, pi_inf, qv_mix]', collapse=3)
         do l = 0, p
             do k = 0, n
@@ -197,7 +197,6 @@ contains
         real(wp)                                               :: dyn_pres, pres_relax
         integer                                                :: i
 
-        ! Compute dynamic pressure and update internal energies
         dyn_pres = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = eqn_idx%mom%beg, eqn_idx%mom%end

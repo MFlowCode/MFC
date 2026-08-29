@@ -280,10 +280,8 @@ contains
             isentrope_n(i) = f_isentrope_exponent(gammas(i))
             eos_types(i) = fluid_pp(i)%eos
 
-            ! Each equation of state supplies its own coefficients: the stiffened gas has a stiffness
-            ! term, an ideal gas has none. Resolved here rather than per cell because a branch in the
-            ! mixture-coefficient loop costs registers in the pressure-heavy Riemann kernels; an EOS
-            ! whose coefficients depend on state has to be evaluated per cell instead.
+            ! Each EOS supplies its own coefficients. Resolved once here, not per cell: a branch in the mixture loop costs
+            ! registers in the Riemann kernels. An EOS whose coefficients depend on state must move to per-cell evaluation.
             select case (fluid_pp(i)%eos)
             case (eos_ideal_gas)
                 pi_infs(i) = 0._wp
@@ -1272,12 +1270,6 @@ contains
 
     end subroutine s_compute_energy
 
-    !> Compute the speed of sound of a thermodynamic state.
-    !!
-    !! Enthalpy is not an argument: substituting H = ((Gamma + 1)p + Pi + qv)/rho + |u|^2/2 into
-    !! c^2 = (H - |u|^2/2 - qv/rho)/Gamma leaves c^2 = ((Gamma + 1)p + Pi)/(Gamma rho), so H, |u|^2
-    !! and qv all cancel. Averaged states, whose enthalpy is a free input, use
-    !! s_compute_speed_of_sound_avg.
     !> Exponent of the stiffened-gas isentrope p + B = const rho**n. Precomputed per fluid as isentrope_n.
     function f_isentrope_exponent(gamma) result(n)
 
@@ -1326,8 +1318,8 @@ contains
 
     end function f_pressure_on_isentrope
 
-    !> Internal energy of one phase of the six-equation model: its volume-fraction-weighted stiffened-gas energy plus the heat of
-    !! formation carried by its partial density. No kinetic term - that belongs to the mixture, not to a phase.
+    !> Internal energy of one six-equation phase: volume-fraction-weighted stiffened-gas energy plus the heat of formation its
+    !! partial density carries. No kinetic term - that belongs to the mixture, not a phase.
     function f_phase_internal_energy(pres, alpha, alpha_rho, gamma, pi_inf, qv) result(e_phase)
 
         $:GPU_ROUTINE(function_name='f_phase_internal_energy', parallelism='[seq]', cray_inline=True)
@@ -1339,8 +1331,8 @@ contains
 
     end function f_phase_internal_energy
 
-    !> Elastic strain energy carried by one stress component, doubled for a shear component because the tensor holds it once but the
-    !! energy counts both off-diagonal entries. Zero where the material has no shear modulus.
+    !> Elastic strain energy of one stress component, doubled for a shear component: the tensor stores it once, the energy counts
+    !! both off-diagonal entries. Zero without a shear modulus.
     function f_elastic_energy(tau, G, is_shear) result(dE)
 
         $:GPU_ROUTINE(function_name='f_elastic_energy', parallelism='[seq]', cray_inline=True)
@@ -1373,8 +1365,8 @@ contains
 
     end function f_hypoelastic_energy
 
-    !> Pressure of a stiffened gas from its internal energy density: the inverse of the energy that s_compute_energy builds. Callers
-    !! subtract the kinetic, magnetic and elastic energy first, since none of those are equation-of-state terms.
+    !> Pressure of a stiffened gas from its internal energy density - the inverse of s_compute_energy. Callers subtract the kinetic,
+    !! magnetic and elastic energy first; none of those are equation-of-state terms.
     function f_pressure(e_int, gamma, pi_inf, qv) result(pres)
 
         $:GPU_ROUTINE(function_name='f_pressure', parallelism='[seq]', cray_inline=True)
@@ -1386,9 +1378,8 @@ contains
 
     end function f_pressure
 
-    !> Isentropic bulk modulus of a material with the given stiffened-gas coefficients. Takes the coefficients rather than a fluid
-    !! index so that a mixture, whose effective gamma and pi_inf come from s_compute_mixture_coefficients, is the same call as a
-    !! single fluid. Callers working with an elastic material add their own shear term; it is not part of the equation of state.
+    !> Isentropic bulk modulus. Takes coefficients rather than a fluid index, so a mixture - whose effective gamma and pi_inf come
+    !! from s_compute_mixture_coefficients - is the same call as a single fluid. Elastic callers add their own shear term.
     function f_bulk_modulus(pres, gamma, pi_inf) result(blkmod)
 
         $:GPU_ROUTINE(function_name='f_bulk_modulus', parallelism='[seq]', cray_inline=True)
@@ -1400,6 +1391,8 @@ contains
 
     end function f_bulk_modulus
 
+    !> Speed of sound of a thermodynamic state. Enthalpy is not an argument: for a real state H, |u|^2 and qv all cancel out of c^2
+    !! = ((Gamma + 1)p + Pi)/(Gamma rho). Averaged states, whose enthalpy is a free input, use the _avg variant.
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1448,12 +1441,9 @@ contains
 
     end subroutine s_compute_speed_of_sound
 
-    !> Compute the speed of sound of an interface-averaged state.
-    !!
-    !! An average of two states is not a state: its enthalpy is not the one its pressure and density
-    !! imply, so the caller supplies it, along with |u|^2 and qv. Only the enthalpy-reading branches
-    !! differ; the rest defer to s_compute_speed_of_sound. Keep the condition below in step with the
-    !! branch list there.
+    !> Speed of sound of an interface-averaged state. An average of two states is not a state - its enthalpy is not the one its
+    !! pressure and density imply - so the caller supplies H, |u|^2 and qv. Only the enthalpy-reading branches differ from
+    !! s_compute_speed_of_sound; keep the condition below in step with the branch list there.
     subroutine s_compute_speed_of_sound_avg(pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c, adv, c)
 
         $:GPU_ROUTINE(parallelism='[seq]')
