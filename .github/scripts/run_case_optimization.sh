@@ -78,9 +78,24 @@ for case in "${benchmarks[@]}"; do
     # Clean any previous output
     rm -rf "$case_dir/D" "$case_dir/p_all" "$case_dir/restart_data"
 
-    # Run with --case-optimization, small grid, 10 timesteps. Builds first
-    # unless $build_opts holds --no-build (see above).
+    # Run with --case-optimization, small grid, 10 timesteps. On phoenix and
+    # frontier_amd $build_opts is --no-build, so the run reuses the pre-build's
+    # binaries. A prebuilt binary can be missing at run time (the pre-build and
+    # run SLURM jobs may be separated by a long embers queue wait, or clean_build
+    # on a retry may have wiped build/), and a bare --no-build run would then
+    # hard-fail. Fall back to a rebuild-and-run for that case so a lost prebuild
+    # artifact degrades to a slower run instead of a red CI.
     if ./mfc.sh run "$case" --case-optimization $gpu_opts $build_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
+        run_ok=1
+    elif [ -n "$build_opts" ] && \
+         ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
+        echo "NOTE: $case_name rebuilt in-run (prebuilt binary was unavailable)"
+        run_ok=1
+    else
+        run_ok=0
+    fi
+
+    if [ "$run_ok" = 1 ]; then
         # Validate output
         if build/venv/bin/python3 .github/scripts/check_case_optimization_output.py "$case_dir"; then
             echo "PASS: $case_name"
