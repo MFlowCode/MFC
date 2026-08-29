@@ -5112,19 +5112,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_beg(2)": 20,
             "amr_block_end(2)": 56,
         }
-        # override_tol, REVISED 2026-08-29 after 1e-11 proved to be a number fitted to one toolchain rather than to the
-        # mechanism. These goldens hold 1,430 values (1.3%%) at or below 1e-11 against a FIELD MAXIMUM of 12.5 -- i.e. below
-        # 1e-12 relative, which is double-precision noise. is_close tests `abs <= tol` OR `rel <= tol`, and a RELATIVE
-        # criterion on a value that is numerically zero is meaningless: two toolchains disagree on it by arbitrary factors
-        # (the reported rel error is 1.32e+03 on a golden of ~1.2e-13). So the absolute branch has to carry these, and it
-        # must be scaled to the FIELD, not to the individual value.
-        # What is actually measured: max abs error 1.04e-12 (Frontier CCE) and 1.59e-10 (CI ubuntu GNU). The GNU figure is
-        # 1.3e-11 RELATIVE TO THE FIELD MAX -- the solution agrees to ~11 significant digits. A genuinely different box set
-        # would show O(1e-3) differences, not 1e-10, so this is roundoff and not a mesh divergence.
-        # 1e-9 covers the worst observed toolchain by 6x while the relative branch still holds the other 98.7%% of values to
-        # 9 significant digits. Both tests PASS locally on amdflang GPU and on gfortran CPU; only CI's GNU exceeds 1e-11.
+        # NO override_tol. Two earlier attempts (1e-11, then 1e-9) were BOTH fitted to a misread number: I took
+        # the absolute error printed in the MAX-RELATIVE diagnostic block (1.59e-10) as if it were the maximum
+        # absolute error. It is not -- those two blocks report DIFFERENT variables. The real max abs error on CI
+        # ubuntu GNU is 7.07e-05 (rel 5.82e-06), five orders of magnitude larger, so neither tolerance ever made
+        # the test pass.
+        #
+        # And no tolerance should. Measured 2026-08-29: amdflang GPU and gfortran CPU (gnu12/12.2) both MATCH the
+        # golden exactly; Frontier CCE differs by 1.04e-12 (roundoff); CI ubuntu GNU differs by 7.07e-05. That gap
+        # is bimodal, not a continuum -- the signature of a FLIPPED TAG, not of precision. `amr_tag_eps = 0.05` on
+        # a blast wave puts cells near the threshold, and `g/(2*r0) > amr_tag_eps` resolves differently on one
+        # toolchain, producing a DIFFERENT BOX SET and therefore a different mesh. A loose tolerance would hide a
+        # real 5.8e-6 relative difference rather than explain it. (`clustering capped` does NOT fire, so the small
+        # amr_max_blocks = 128 and the `force` path are ruled out.)
+        #
+        # The fix is to make tagging NON-MARGINAL for this case (move amr_tag_eps or the IC off the threshold) and
+        # regenerate -- not to widen the bound. Not done here because CI's GNU cannot be reproduced locally, and a
+        # blind fix to a case whose failure mode is a mesh flip is how goldens get regenerated over real bugs.
         stack.push("AMR -> 2D -> churn growth np=2", churn_blast)
-        cases.append(define_case_d(stack, "", {}, ppn=2, override_tol=1e-9))
+        cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
         # The FIRST golden in the ENTIRE suite at np>2 (v2 review finding: at np=2 every exchange plan degenerates to
@@ -5132,7 +5138,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # unexercised; a ppn=4 dynamic-regrid case is mandatory before increment I2). The 2x2 split adds y-direction
         # rank seams and multi-peer coarse gathers on top of the same churn+growth dynamics as the np=2 twin.
         stack.push("AMR -> 2D -> churn growth np=4", churn_blast)
-        cases.append(define_case_d(stack, "", {}, ppn=4, override_tol=1e-9))  # same roundoff population as the np=2 twin
+        cases.append(define_case_d(stack, "", {}, ppn=4))  # same tag-flip exposure as the np=2 twin
         stack.pop()
 
         # L0-as-blocks dynamic load balancer: the base grid is tiled into migratable blocks (l0_ntile), and a FORCED
