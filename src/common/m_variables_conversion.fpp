@@ -27,8 +27,8 @@ module m_variables_conversion
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, f_bulk_modulus, &
         & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_pressure_on_isentrope, &
-        & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, &
-        & s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+        & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
+        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -69,25 +69,23 @@ contains
     end subroutine s_convert_to_mixture_variables
 
     !> Compute the pressure from the appropriate equation of state
-    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, G, pres_mag)
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, E_e_in, pres_mag)
 
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', cray_noinline=True)
 
-        real(stp), intent(in)           :: energy, alf
-        real(wp), intent(in)            :: dyn_p
-        real(wp), intent(in)            :: pi_inf, gamma, rho, qv
-        real(wp), intent(out)           :: pres
-        real(wp), intent(inout)         :: T
-        real(stp), intent(in), optional :: stress
-        real(wp), intent(in), optional  :: G, pres_mag
+        real(stp), intent(in)          :: energy, alf
+        real(wp), intent(in)           :: dyn_p
+        real(wp), intent(in)           :: pi_inf, gamma, rho, qv
+        real(wp), intent(out)          :: pres
+        real(wp), intent(inout)        :: T
+        real(wp), intent(in), optional :: E_e_in, pres_mag
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
         real(wp), dimension(1:num_species)             :: Y_rs
-        real(wp)                                       :: E_e, e_int
+        real(wp)                                       :: e_int
         real(wp)                                       :: e_Per_Kg, Pdyn_Per_Kg
         real(wp)                                       :: T_guess
-        integer                                        :: s  !< Generic loop iterator
         #:if not chemistry
             ! What is the internal energy? The magnetic, elastic and kinetic parts are model
             ! bookkeeping rather than equation of state, so they come off here and the inversion runs once.
@@ -102,20 +100,9 @@ contains
                 e_int = (energy - dyn_p)/(1._wp - alf)
             end if
 
-            if (hypoelasticity .and. present(G)) then
+            if (hypoelasticity .and. present(E_e_in)) then
                 ! Subtract elastic strain energy before computing pressure (hypoelastic model)
-                E_e = 0._wp
-                do s = eqn_idx%stress%beg, eqn_idx%stress%end
-                    if (G > 0) then
-                        E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
-                        ! Double for shear stresses
-                        if (any(s == shear_indices)) then
-                            E_e = E_e + ((stress/rho)**2._wp)/(4._wp*G)
-                        end if
-                    end if
-                end do
-
-                e_int = energy - dyn_p - E_e
+                e_int = energy - dyn_p - E_e_in
             end if
 
             pres = f_pressure(e_int, gamma, pi_inf, qv)
@@ -1358,6 +1345,40 @@ contains
         e_phase = alpha*(gamma*pres + pi_inf) + alpha_rho*qv
 
     end function f_phase_internal_energy
+
+    !> Elastic strain energy carried by one stress component, doubled for a shear component because the tensor holds it once but the
+    !! energy counts both off-diagonal entries. Zero where the material has no shear modulus.
+    function f_elastic_energy(tau, G, is_shear) result(dE)
+
+        $:GPU_ROUTINE(function_name='f_elastic_energy', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: tau, G
+        logical, intent(in)  :: is_shear
+        real(wp)             :: dE
+
+        dE = 0._wp
+        if (G > verysmall) then
+            dE = (tau*tau)/max(4._wp*G, verysmall)
+            if (is_shear) dE = dE + (tau*tau)/max(4._wp*G, verysmall)
+        end if
+
+    end function f_elastic_energy
+
+    !> Hypoelastic strain energy at one cell, summed over the stress components.
+    function f_hypoelastic_energy(q_cons_vf, j, k, l, rho, G) result(E_e)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        integer, intent(in)                                 :: j, k, l
+        real(wp), intent(in)                                :: rho, G
+        real(wp)                                            :: E_e
+        integer                                             :: s
+
+        E_e = 0._wp
+        do s = eqn_idx%stress%beg, eqn_idx%stress%end
+            E_e = E_e + f_elastic_energy(real(q_cons_vf(s)%sf(j, k, l), wp)/rho, G, any(s == shear_indices))
+        end do
+
+    end function f_hypoelastic_energy
 
     !> Pressure of a stiffened gas from its internal energy density: the inverse of the energy that s_compute_energy builds. Callers
     !! subtract the kinetic, magnetic and elastic energy first, since none of those are equation-of-state terms.

@@ -1435,6 +1435,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             cases.append(define_case_d(stack, "", {}))
 
+            if len(dimInfo[0]) == 2 and num_fluids == 1:
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "probe -> nonuniform stress",
+                        {
+                            "probe_wrt": "T",
+                            "num_probes": 1,
+                            "probe(1)%x": 0.5,
+                            "probe(1)%y": 0.5,
+                            "patch_icpp(1)%tau_e(1)": 1.0e04,
+                            "patch_icpp(1)%tau_e(2)": 5.0e03,
+                            "patch_icpp(1)%tau_e(3)": 2.0e03,
+                            "patch_icpp(2)%tau_e(1)": -1.0e04,
+                            "patch_icpp(2)%tau_e(2)": 3.0e03,
+                            "patch_icpp(2)%tau_e(3)": -2.0e03,
+                        },
+                    )
+                )
+
             reflective_params = {"bc_x%beg": -2, "bc_x%end": -2, "bc_y%beg": -2, "bc_y%end": -2}
             if len(dimInfo[0]) == 3:
                 reflective_params.update({"bc_z%beg": -2, "bc_z%end": -2})
@@ -2957,6 +2977,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-10),
                 )
             )
+
+        # The reacting Roe sound speed - roe_avg's chemistry branch, c_sum_Yi_Phi, and the
+        # c = sqrt(c_c - (gamma - 1)*(vel_sum - H)) branch of s_compute_speed_of_sound_avg - is
+        # reached only with avg_state = 1 AND wave_speeds = 2. Every other chemistry case sets
+        # wave_speeds = 1, so none of it had coverage. HLL rather than HLLC because the HLLC base
+        # path passes a literal 0 for c_sum_Yi_Phi and never takes the branch (MFlowCode/MFC#1774).
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average",
+                "examples/1D_inert_shocktube/case.py",
+                mods={**common_mods, "riemann_solver": 1, "avg_state": 1, "wave_speeds": 2, "weno_order": 3, "mapped_weno": "F", "mp_weno": "F"},
+                override_tol=10 ** (-10),
+            )
+        )
 
         # 1D -> Chemistry -> Flamelet: temporarily removed from the suite. The stiff flamelet
         # integration is the most FP-sensitive chemistry case; on the Frontier CCE OpenMP-offload

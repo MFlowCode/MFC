@@ -87,24 +87,6 @@ contains
 
     end function f_elastic_signal_speed
 
-    !> Elastic strain energy carried by one stress component, doubled for a shear component because the tensor holds it once but the
-    !! energy counts both off-diagonal entries. Zero where the material has no shear modulus.
-    function f_elastic_energy(tau, G, is_shear) result(dE)
-
-        $:GPU_ROUTINE(function_name='f_elastic_energy', parallelism='[seq]', cray_inline=True)
-
-        real(wp), intent(in) :: tau, G
-        logical, intent(in)  :: is_shear
-        real(wp)             :: dE
-
-        dE = 0._wp
-        if (G > verysmall) then
-            dE = (tau*tau)/max(4._wp*G, verysmall)
-            if (is_shear) dE = dE + (tau*tau)/max(4._wp*G, verysmall)
-        end if
-
-    end function f_elastic_energy
-
     !> Low-Mach parameter of Thornber et al. JCP (2008): the larger of the two face Mach numbers, capped at one so the correction
     !! switches itself off once the flow is no longer low speed.
     function f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R) result(zcoef)
