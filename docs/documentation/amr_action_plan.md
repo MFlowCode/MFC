@@ -12,7 +12,7 @@
 > This block supersedes everything above it. Ledgers 40-43 below record how these conclusions were
 > reached, including four that were WRONG when first written; read them for method, not for status.
 >
-> ### Landed 2026-08-28 (12 commits; code ones gated 69/69 on the AMR suite)
+> ### Landed 2026-08-28 (19 commits; every code one gated on the AMR suite, most 69/69)
 >
 > | commit | change |
 > |---|---|
@@ -23,6 +23,13 @@
 > | `58aa0867` | **S3.3** — level->=2 forest clustered per OWNER, tags exchanged point-to-point |
 > | `263730c9` | **W1a** — six per-stage loops iterate this rank's own blocks, not the global list |
 > | `cefd3176` | **Restart format v2** — per-block (owner, m, n, p), not a per-RANK extent vector |
+> | `4ade13c3` | **CCE `move_alloc`** — a bare module-scope derived-type allocatable aborts on CCE (`lib-4425`). This is why AMR had NEVER run on Frontier; 64/66 pass after |
+> | `a72c125b` | **B0b** — `amr_blocking_factor` default 1 -> 4, + 14 regenerated goldens |
+> | `79fe684b` | `override_tol=1e-11` on the two churn-growth goldens (CCE reassociation, not a parallel defect) |
+> | `e2cb6078` | **S3.2b** — a rank-local node skips its global reduction; only the owner descends |
+> | `299c3686` | **S3.3c** — level-2 nesting coverage from OWNED blocks + one `ALLREDUCE(LOR)`; O(P^2) -> O(P) |
+> | `4a2edfbd` | **S3.2b-2a** — LEVEL-ORDER descent: one reduction per tree DEPTH, not per node |
+> | `b865a9a0` | **S3.2b-2b** — a NARROW node reduces among the ranks it spans (p2p), not the whole machine |
 >
 > ### Measured, not argued
 >
@@ -36,23 +43,62 @@
 >
 > ### The plan of attack
 >
-> | # | item | size | gate |
+> | # | item | size | status |
 > |---|---|---|---|
-> | 1 | ~~Restart format v2~~ | — | **DONE** |
-> | 2 | **B0b** — `amr_blocking_factor` 1 -> 4 | 1 line | goldens REGENERATE (the only golden-moving item) |
-> | 3 | **S3.2b** — rank-local nodes skip the collective; owner-only descent; box union | ~50 LOC, written | bit-identity ON TOP OF B0b |
-> | 4 | **S3.3c** — `covered` from owned blocks + one `ALLREDUCE(LOR)`; guard the dense window | ~60 LOC | bit-identity |
-> | 5 | **Subcycle** — SCOPED 2026-08-28, see below; the np>1 gate is ALREADY LIFTED | 2 parts, one cheap | goldens; test (q) already covers np>1 |
-> | 6 | **S3.2b-2** — depth-batch the residual shared nodes | ~80 LOC | collectives per regrid = `shr_maxdep` |
-> | **P** | **WALL-TIME weak scaling, 256-1024 ranks on Frontier, against the AMReX 1.20x/doubling bar** | machine time, no code | **s/step per rung** |
+> | 1 | Restart format v2 | — | **DONE** `cefd3176` |
+> | 2 | B0b — `amr_blocking_factor` 1 -> 4 | 1 line | **DONE** `a72c125b`, 14 goldens moved |
+> | 3 | S3.2b — rank-local nodes skip the collective | ~50 LOC | **DONE** `e2cb6078` |
+> | 4 | S3.3c — `covered` from owned blocks | ~60 LOC | **DONE** `299c3686` |
+> | 6 | S3.2b-2 — depth-batch, then scope, the shared nodes | ~250 LOC | **DONE** `4a2edfbd` + `b865a9a0` |
+> | 5 | Subcycle — scoped below; the np>1 gate is ALREADY LIFTED | 2 parts | open, cheap |
+> | 7 | **W1's ~19 remaining PER-STEP global block scans** | mechanical | open — key the cache on `amr_mesh_epoch`, NOT the owner-only dirty flag |
+> | **P'** | **Tax + payoff RE-BASELINE, matched AND production physics** | machine time | **next; see below** |
 >
-> **AUDIT FINDING 2026-08-28: item P was MISSING and it is the one that decides the program.** Every other
-> row above removes an ASYMPTOTIC term -- counted collectives, counted bytes -- and each was justified
-> explicitly as "an asymptotic bet, not a current-performance fix". **Nothing in this plan measures whether
-> any of it made MFC faster.** The goal metric is the AMReX bar of 1.20x/1.15x per np-doubling; the last
-> MFC number is a **6.81x tax measured before ALL of today's work** (`amr-tax-now-11x`). If the constant
-> factor is still ~6x, the next program is profiling, not scaling, and items 5-6 are premature. Run P after
-> items 2-4 land and before committing to any further asymptotic work.
+> ### THE W4 GATE WAS BROKEN, and item P is RESTATED
+>
+> **`amr-bench/invariant_scorecard.py` computed its verdict from the `ntag` slope alone, with a
+> `max(lo, 1)` denominator. S3.1 deleted `ntag` to zero, so the ratio was `0/1 = 0.00x` on every arm and
+> the gate was PINNED TO MET — structurally incapable of reporting UNMET. Every post-S3.1 "W4 MET"
+> reading is void.** Fixed 2026-08-28: the verdict is now the worst of {`ntag`, `gwin`, `shr_nodes`,
+> `shr_bytes`}, a deleted term is excluded rather than scoring 0.00x, and the COLLECTIVE-COUNT axis is
+> read from `[amr-scope-r]`. General rule: *a gate whose verdict divides by a term the program is trying
+> to delete will report success the moment the work succeeds.*
+>
+> With it fixed, the shared level-1 path was UNMET on both axes — nodes 11/23/47/91 and bytes 2.20x/2.15x
+> per doubling, i.e. O(P) — which is what items 6a/6b then fixed.
+>
+> **Item P as written ("wall-time weak scaling 256-1024 ranks vs the AMReX 1.20x bar") is RETRACTED and
+> replaced by P'.** Two reasons, both from the docs themselves: `amr_endstate.md` section 3 records that
+> this program already lost five days to a wall-clock metric *structurally blind to W4*, and decision
+> D-node states weak-scaling validation is single-node-by-design. Wall time at np <= 8 cannot see the
+> terms items 3/4/6 removed. Sized: the shared-reduce term is 0.3 MB/rank/regrid at np64, 6 MB at np1024,
+> 29 MB at np4096 and only 740 MB at 75k — **it is irrelevant below ~4k ranks and targets full-machine
+> runs specifically.**
+>
+> **P' is the measurement that actually decides what comes next:** tax and payoff are 6.81x / 2.23x from
+> 08-22 and predate B1, S3.3, W1a, B0b, S3.2b and 2a/2b — and B0b DELIBERATELY MOVED THE BOX SET, so the
+> old number cannot be carried forward. `amr-bench/tax_rebaseline.sh` runs the same differenced protocol
+> at the matched point AND adds the production arms (WENO5+HLLC, int=20) the harness has described in a
+> comment since 08-21 without ever running — regrid frequency alone moves the tax ~3.8x, so the matched
+> point is not a proxy. **Note the trap it fixes: the original resolved the binary with
+> `ls -t .../bin/simulation | head -1`, which after a gate that also builds the chemistry variant selects
+> the CHEM binary — verified live.**
+>
+> ### THE ~1e7-BOX CEILING (recorded design limit, 2026-08-28)
+>
+> All ten regrid collectives sized at 1e5 ranks x 75 boxes/rank: the shared-signature reduction was the
+> largest at ~970 MB/rank/regrid (item 6 takes it to ~3.6 MB), after which **~390 MB remains in two
+> `ALLGATHERV`s of the box list** — `gbx(6, ntot)` at the clusterer's close and `gch(7, ntot_ch)` in the
+> nesting pass. Both are the *replicated box list* that `amr_endstate.md` deliberately KEEPS and calls
+> "tolerable to ~10^7 boxes". 1e5 ranks x 75 boxes IS 7.5M. **So the architecture has a ~10^7-box ceiling
+> and this program walks up to it, not through it.** That is parity with AMReX, which hits the same wall
+> from the other side (`TagBoxArray::collate` gathers every tagged cell to the I/O rank and hard-aborts
+> above INT_MAX tags). Going further is a re-founding of the box-list decision, not an increment.
+>
+> **The other half of the goal is untouched by all of the above.** Everything here is SCALING. Parity is
+> tax 6.81x against AMReX 3.13x on the same 15.2x geometric advantage — AMReX's AMR returns ~4.9x over
+> brute force where MFC's returns 2.23x. That gap is W2 (launch count), FLAT in P, and is paid on every
+> run at every rank count. Finishing the scaling program does NOT reach "at or near SOTA".
 >
 > **W5 is OFF the critical path** (measured tag headroom, above). Converting the remaining per-box tag
 > sites and dropping the `amr_max_blocks` base term stay worthwhile for the end state; they gate nothing.
