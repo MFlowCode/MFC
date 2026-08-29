@@ -2793,14 +2793,10 @@ contains
             ! apply's own_lo/own_hi + seam gates); the owner derives the same set per participant, so the pairing is
             ! exact with no metadata exchange. Debug arm: unreceived faces are NaN-flooded so any hidden reader aborts.
             call s_amr_reflux_faces_for(proc_rank, s_lo, s_hi)
-            ! W1: record the block. The apply pass below iterates THIS list rather than rescanning every block in the machine
-            ! to re-derive the same order -- an O(global blocks) walk that ran on every RK stage. Built unconditionally: it
-            ! used to sit inside `XA_NH > 0`, which is 0 in a release build, so the list existed only under the audit.
-            nhr = nhr + 1
-            call s_amr_fw_szi(amr_fw_rblk, nhr)
-            amr_fw_rblk(nhr) = k
             if (XA_NH > 0) then
-                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr)
+                nhr = nhr + 1
+                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr); call s_amr_fw_szi(amr_fw_rblk, nhr)
+                amr_fw_rblk(nhr) = k
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = XA_NH
@@ -2931,12 +2927,15 @@ contains
 #endif
         end if
         call s_phase_tic(PH_RFRECV)
-        ! W1: the post pass recorded exactly the blocks this rank receives, in this order, so iterate that list. The
-        ! ASSERT this replaces checked that a second global scan re-derived the same order; that now holds by construction.
-        do j = 1, nhr
-            k = amr_fw_rblk(j)
+        j = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) /= 1) cycle
             call s_amr_select_slot(k)
+            if (amr_block_owner(k) == proc_rank) cycle
+            if (.not. f_amr_reflux_participates(proc_rank)) cycle
             if (XA_NH > 0) then
+                j = j + 1
+                @:ASSERT(amr_fw_rblk(j) == k, "reflux-faces wave: header slot order broke")
                 call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
             end if
             ! push only the received faces; an unreceived face keeps its device content (never applied here - and
@@ -2986,12 +2985,10 @@ contains
             ! s_amr_sibling_face_weights on replicated metadata. Debug arm: skipped-face mirrors are NaN-flooded so any
             ! OTHER consumer of an unshipped face aborts within the step.
             call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
-            ! W1: same as the faces wave -- record the block so the apply pass need not rescan the machine's block list
-            nhr = nhr + 1
-            call s_amr_fw_szi(amr_fw_rblk, nhr)
-            amr_fw_rblk(nhr) = k
             if (XA_NH > 0) then
-                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr)
+                nhr = nhr + 1
+                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr); call s_amr_fw_szi(amr_fw_rblk, nhr)
+                amr_fw_rblk(nhr) = k
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = XA_NH
@@ -3094,13 +3091,16 @@ contains
             call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
 #endif
         end if
-        ! W1: iterate the recorded receive list, as the faces wave does
-        do j = 1, nhr
-            k = amr_fw_rblk(j)
+        j = 0
+        do k = 1, amr_num_blocks
+            if (amr_block_level(k) < 2) cycle
             call s_amr_select_slot(k)
             pblk = f_amr_parent_block(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
+            if (cowner == powner .or. powner /= proc_rank) cycle
             if (XA_NH > 0) then
+                j = j + 1
+                @:ASSERT(amr_fw_rblk(j) == k, "freg wave: header slot order broke")
                 call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
             end if
             ! push only the faces that shipped; a skipped face keeps its device content (dead under weight 0 - and
