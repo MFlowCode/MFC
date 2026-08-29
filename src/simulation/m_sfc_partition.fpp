@@ -19,16 +19,11 @@ module m_sfc_partition
     private
     public :: s_initialize_sfc_partition_module, s_finalize_sfc_partition_module, s_compute_sfc_partition, s_report_sfc_partition
 
-    integer :: n_tiles_x, n_tiles_y, n_tiles_z, n_tiles
-    !> Device-declared because `@:ALLOCATE` issues a `GPU_ENTER_DATA(create=)` on the variable itself; mapping a module allocatable
-    !! that was never `declare target` leaves the runtime no descriptor to attach to, and Cray CCE aborts with `lib-4425
-    !! UNRECOVERABLE library error: Unitialized descriptor for ALLOCATE statement argument`. amdflang tolerates it, which is why
-    !! only Frontier saw this.
+    integer               :: n_tiles_x, n_tiles_y, n_tiles_z, n_tiles
     real(wp), allocatable :: tile_weight(:)  !< global per-tile aggregated cost (linear index)
     integer, allocatable  :: tile_rank(:)    !< proposed owning rank per tile
     integer, allocatable  :: sfc_order(:)    !< tile linear indices in Morton order
-    $:GPU_DECLARE(create='[tile_weight, tile_rank, sfc_order]')
-    real(wp) :: cur_w_max  !< current static per-rank max weight (existing decomposition)
+    real(wp)              :: cur_w_max       !< current static per-rank max weight (existing decomposition)
 
 contains
 
