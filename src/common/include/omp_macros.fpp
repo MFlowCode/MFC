@@ -70,8 +70,9 @@
     #! OpenMP has no no_create equivalent, so this is a documented no-op: the variable is
     #! left to whatever mapping the enclosing region already applies to it. Note that is
     #! NOT equivalent to no_create on most targets -- OMP_DEFAULT_STR emits nothing unless
-    #! the caller passes default='present', and even then only CCE maps present; NVHPC/PGI
-    #! and the fallback emit a defaultmap(tofrom:scalar) clause, which copies rather than reuses.
+    #! the caller passes default='present', and even then only CCE maps allocatables and
+    #! pointers as present; NVHPC/PGI and the fallback map them tofrom, which copies rather
+    #! than reuses, and LLVMFlang emits nothing at all.
     #! Do NOT #:stop here: GPU_DATA expands both backends before #if selects one, so
     #! aborting would break OpenACC builds, where no_create is supported natively.
     #:set no_create_val = ''
@@ -286,7 +287,16 @@
     #! Emit the body alone in that case -- a data region with nothing to map has nothing
     #! to do, which is what GPU_DATA's own #else branch already does when neither backend
     #! is enabled. A #:stop is not an option here, for the reason in OMP_NOCREATE_STR.
-    #:set has_clauses = clause_val.strip() != '' or extraOmpArgs_val.strip() != ''
+    #! Only no_create earns that silence. If the caller asked for some other clause and
+    #! the backend produced nothing for it -- default='present' on LLVMFlang, where
+    #! OMP_DEFAULT_STR returns an empty string -- keep emitting the bare directive so the
+    #! build fails loudly rather than silently discarding a region that was asked for.
+    #:set other_clause_requested = copy is not None or copyin is not None or &
+        & copyinReadOnly is not None or copyout is not None or create is not None or &
+        & present is not None or deviceptr is not None or attach is not None or &
+        & default is not None
+    #:set emitted_clause = clause_val.strip() != '' or extraOmpArgs_val.strip() != ''
+    #:set has_clauses = emitted_clause or other_clause_requested
     #:set omp_directive = '!$omp target data ' + clause_val + extraOmpArgs_val.strip('\n')
     #:set end_omp_directive = '!$omp end target data'
     #:if has_clauses
