@@ -1189,18 +1189,13 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
         #:endif
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
-        integer               :: i      !< Loop iterator over fluids
-        integer               :: n_mix  !< Material slots: excludes the void under bubbles_euler
+        integer               :: i  !< Loop iterator over fluids
 
-        ! Under bubbles_euler the last advection slot is the void fraction, not a material
-        ! (eqn_idx%alf == eqn_idx%adv%end), so the sum runs over the material slots only. With a single
-        ! liquid there is no slot to sum and its own coefficients are used, undiluted, which is what the
-        ! (1 - alf) division in the bubble sound speed expects. Under mpp_lim the volume fractions have
-        ! been renormalized to sum to one, so the whole array is the mixture again.
-        n_mix = num_fluids
-        if (bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 2)) n_mix = num_fluids - 1
-
-        if (bubbles_euler .and. n_mix <= 1) then
+        ! The bubbly closure is written for one carrier liquid, which keeps its own coefficients
+        ! undiluted: Gamma_l*p_l = (E - rho|u|^2/2)/(1 - alf) - Pi_inf_l, the void entering only through
+        ! the (1 - alf) that s_compute_pressure applies. There is nothing to sum - the last advection
+        ! slot is the void, not a material - and the checker holds num_fluids <= 2 here.
+        if (bubbles_euler) then
             rho_K = alpha_rho_K(1)
             gamma_K = gammas(1)
             pi_inf_K = pi_infs(1)
@@ -1212,7 +1207,7 @@ contains
             qv_K = 0._wp
 
             $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, n_mix
+            do i = 1, num_fluids
                 rho_K = rho_K + alpha_rho_K(i)
                 gamma_K = gamma_K + alpha_K(i)*gammas(i)
                 pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
