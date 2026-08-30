@@ -208,10 +208,9 @@ module m_amr
     !> DEVICE-DECLARED because `@:ALLOCATE` expands to `allocate` FOLLOWED BY `GPU_ENTER_DATA(create=)`, i.e. an `omp target enter
     !! data map` on the variable itself. Mapping a module allocatable that was never `declare target` has no device descriptor to
     !! attach to: Cray CCE aborts at runtime with `lib-4425 UNRECOVERABLE library error: Unitialized descriptor for ALLOCATE
-    !! statement argument`, while amdflang's runtime tolerates it and creates the mapping implicitly. Every other `@:ALLOCATE`d
-    !! module array here is declared the same way.
+    !! statement argument`, while amdflang's runtime tolerates it and creates the mapping implicitly. The fix is the `move_alloc` +
+    !! GPU_ENTER_DATA pair at the allocation site; do NOT add a GPU_DECLARE on top of it (see amr_scr_prim below).
     type(scalar_field), allocatable :: amr_cons_br(:)
-    $:GPU_DECLARE(create='[amr_cons_br]')
     !> Batched-bridge geometry. amr_br_w is one block's buffered k-width; block loc of a batch sits at k-offset (loc-1)*amr_br_w,
     !! carrying its own ghost shell, so consecutive blocks are separated by TWO ghost shells and no block's stencil can reach
     !! another's interior - the property the batched advance's correctness rests on.
@@ -222,9 +221,11 @@ module m_amr
     !! libomptarget retention plateau). Same shared-scratch pattern as amr_rhs_pb_f/amr_cg. L0 tile slots are the exception and keep
     !! per-slot arrays (see s_amr_alloc_slot).
     type(scalar_field), allocatable :: amr_scr_prim(:), amr_scr_rhs(:)
-    !> Device-declared for the same reason as amr_cons_br above: `@:ALLOCATE` issues a target enter-data map, which needs a
-    !! declare-target descriptor to attach to. `amr_scr_prim` is where Frontier's CCE build aborted (m_amr.fpp:8379).
-    $:GPU_DECLARE(create='[amr_scr_prim, amr_scr_rhs]')
+    !> NOT device-declared. A GPU_DECLARE(create=) on a module allocatable binds a present-table entry to the descriptor at program
+    !! init; the `move_alloc` below then swaps that descriptor out and every later kernel lookup misses, which failed all 36 AMR
+    !! tests on Frontier CCE gpu-acc with `find_in_present_table failed`. The `move_alloc` + GPU_ENTER_DATA pair at the allocation
+    !! site is what fixes the lib-4425 descriptor abort, and it is sufficient on its own - `amr_cg` has used exactly that shape,
+    !! with no declare, on every lane.
     !> True only while the REGRID path is inside s_amr_gather_coarse_patch, so the WAITALL bracket attributes to rb:wait rather than
     !! mixing in the per-step gather that shares this routine.
     logical :: amr_rg_gather = .false.
@@ -523,6 +524,7 @@ contains
         allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
         allocate (amr_owns_all(amr_max_blocks))
+        allocate (amr_touch(amr_max_blocks)); amr_touch = .false.  !< halo probe, see m_global_parameters
         allocate (amr_block_owner(amr_max_blocks))
         allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
         allocate (amr_fine_cut(0:num_procs - 1,1:max(amr_max_level, 1))); amr_fine_cut = -1_8
