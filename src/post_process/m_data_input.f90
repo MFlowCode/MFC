@@ -11,7 +11,7 @@ module m_data_input
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: amr_restart_blk_hdr_ints
+    use m_constants, only: amr_restart_blk_hdr_ints, amr_restart_blk_own_ints
     use m_mpi_proxy
     use m_mpi_common
     use m_compile_specific
@@ -627,6 +627,9 @@ contains
         character(LEN=path_len + 3*name_len) :: file_loc
         logical                              :: file_exist
         integer                              :: k, i, nblk, ghdr(3), reg(6), lvl, rm, rn, rp, cw
+        logical                              :: v2
+        integer                              :: nvar_f
+        integer                              :: np_old, orec, fmf, fnf, fpf, foff(3), fcnt(3)
         integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d, rr
         integer                              :: have_loc, have_glb
         logical                              :: owns
@@ -634,6 +637,7 @@ contains
 #ifdef MFC_MPI
         integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes
         integer                             :: bhdr(amr_restart_blk_hdr_ints)
+        integer                             :: fown(amr_restart_blk_own_ints)
         integer                             :: myext(3)
         integer, allocatable                :: wext(:), rext(:)
         integer, dimension(MPI_STATUS_SIZE) :: status
@@ -676,6 +680,15 @@ contains
             return
         end if
 
+        ! post_process deliberately runs with a LARGER sys_size than the simulation for 5eq Lagrange
+        ! bubbles: m_global_parameters (post) appends beta_idx = sys_size + 1 as a post-only output slot
+        ! (see the "post-only: beta_idx increment" note in m_global_parameters_common). The AMR file records
+        ! the SIMULATION's count, so comparing it against post's inflated sys_size rejected valid files --
+        ! every AMR + Lagrange-bubbles case died with "a different number of conserved variables". Compare
+        ! against, and read, the count the writer actually used.
+        nvar_f = sys_size
+        if (model_eqns == model_eqns_5eq .and. bubbles_lagrange) nvar_f = sys_size - 1
+
         if (.not. parallel_io) then
             open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
             read (2) ghdr
@@ -685,7 +698,7 @@ contains
                 call s_mpi_abort('amr post: the AMR fine-block file was written with a different rank count; ' &
                                  & // 'run post_process with the same number of ranks as the simulation')
             end if
-            if (ghdr(3) /= sys_size) then
+            if (ghdr(3) /= nvar_f) then
                 call s_mpi_abort('amr post: the AMR fine-block file was written with a different number of ' &
                                  & // 'conserved variables; the physics configuration must match the simulation')
             end if
@@ -716,7 +729,7 @@ contains
                     & // 'writer and reader header layouts have drifted')
                 amr_num_fine = amr_num_fine + 1
                 call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp, rr)
-                do i = 1, sys_size
+                do i = 1, nvar_f
                     read (2) amr_fine(amr_num_fine)%q_cons(i)%sf(0:fm,0:fn,0:fp)
                 end do
             end do
@@ -726,27 +739,18 @@ contains
             ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
             call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
-            ! the parallel layout is per-rank slices concatenated in WRITER rank order: a different
-            ! rank count or decomposition would silently misalign every block - fail closed instead
-            ! FORMAT v2 (a NEGATIVE rank count) marks the compact per-block ownership record. Only the
-            ! parallel_io writer emits it -- the serial branch still writes a POSITIVE num_procs, so this
-            ! guard belongs here and nowhere else. v2 is whole-block
-            ! ownership, one contiguous data chunk per block, and a 4-int (owner + 1, m, n, p) record in place
-            ! of the v1 3*np_old extent vector. The reader below is v1-only -- it derives fm/fn/fp from
-            ! wext at this rank's offset, sizes the data as a per-rank slice, and validates the layout with an
-            ! ALLGATHER -- none of which v2 satisfies. Without this branch the check just below fires
-            ! unconditionally (a negative can never equal num_procs) and blames a rank-count mismatch even at
-            ! matching rank counts, sending the reader after the wrong problem.
-            if (ghdr(1) < 0) then
-                call s_mpi_abort('amr post: this AMR fine-block file uses restart format v2 (whole-block ' &
-                                 & // 'ownership), which post_process does not read yet; post-process an ' &
-                                 & // 'AMR run only from a v1 file for now')
-            end if
-            if (ghdr(1) /= num_procs) then
+            ! FORMAT: a NEGATIVE rank count marks v2 (mirrors s_read_amr_restart in m_amr_restart). v2 stores one
+            ! CONTIGUOUS data chunk per block, written by that block's single owner, plus a 4-int
+            ! (owner + 1, m, n, p) record giving the block's FULL fine extent. v1 stores per-rank slices with a
+            ! 3*np_old extent vector, so its layout -- and only its layout -- depends on the writer's rank count.
+            v2 = ghdr(1) < 0
+            np_old = abs(ghdr(1))
+            orec = merge(amr_restart_blk_own_ints, 3*np_old, v2)
+            if (.not. v2 .and. ghdr(1) /= num_procs) then
                 call s_mpi_abort('amr post: the AMR fine-block file was written with a different rank count; ' &
                                  & // 'run post_process with the same number of ranks as the simulation')
             end if
-            if (ghdr(3) /= sys_size) then
+            if (ghdr(3) /= nvar_f) then
                 call s_mpi_abort('amr post: the AMR fine-block file was written with a different number of ' &
                                  & // 'conserved variables; the physics configuration must match the simulation')
             end if
@@ -760,8 +764,10 @@ contains
                 ! in m_constants so this mirrors s_write_amr_restart (and m_amr:s_read_amr_restart) exactly.
                 call MPI_FILE_READ_AT_ALL(ifile, disp0, bhdr, amr_restart_blk_hdr_ints, MPI_INTEGER, status, ierr)
                 reg = bhdr(1:6); lvl = bhdr(amr_restart_blk_hdr_ints)
-                call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), wext, &
-                                          & 3*num_procs, MPI_INTEGER, status, ierr)
+                if (.not. v2) then
+                    call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), wext, &
+                                              & 3*num_procs, MPI_INTEGER, status, ierr)
+                end if
                 do d = 1, 3
                     isect_lo(d) = max(reg(d), sidx(d))
                     isect_hi(d) = min(reg(3 + d), sidx(d) + ext(d))
@@ -769,6 +775,68 @@ contains
                 owns = isect_lo(1) <= isect_hi(1)
                 if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
                 if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
+
+                if (v2) then
+                    ! v2: one contiguous chunk per block, written by that block's single owner. The 4-int record
+                    ! carries the owner (+1) and the block's FULL fine extent, so every rank can size and stride
+                    ! the file without any collective -- no EXSCAN, and no per-rank layout check to drift.
+                    call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), fown, &
+                                              & amr_restart_blk_own_ints, MPI_INTEGER, status, ierr)
+                    fmf = fown(2); fnf = fown(3); fpf = fown(4)
+                    ! DATA PRESENCE COMES FROM THE FILE, not from geometry: a block with no owner has no chunk.
+                    if (fown(1) <= 0) owns = .false.
+                    cw = max(reg(4) - reg(1) + 1, 1)
+                    rr = 1
+                    if (fown(1) > 0) rr = (fmf + 1)/cw
+                    if (owns) then
+                        if (lvl < 1 .or. rr < 2 .or. mod(fmf + 1, cw) /= 0) then
+                            call s_mpi_abort('amr post: malformed fine-block header (level/extent inconsistent); ' &
+                                             & // 'the AMR restart writer and reader header layouts have drifted')
+                        end if
+                    end if
+                    cnt = 0
+                    if (owns) cnt = nvar_f*(fmf + 1)*(fnf + 1)*(fpf + 1)
+                    ddisp = disp0 + int((amr_restart_blk_hdr_ints + orec)*ibytes, MPI_OFFSET_KIND)
+                    allocate (buf(max(cnt, 1)))
+                    ! collective: every rank calls it, non-participants with count 0. Overlapping ranks read the
+                    ! same bytes, which is fine for a read, and each keeps only its own intersection below.
+                    call MPI_FILE_READ_AT_ALL(ifile, ddisp, buf, cnt*mpi_io_type, mpi_io_p, status, ierr)
+                    if (owns) then
+                        ! this rank keeps the intersection sub-box, in FINE cells relative to the block origin,
+                        ! so s_setup_amr_block still reconstructs coordinates from a LOCAL coarse index
+                        foff = 0; fcnt = 1
+                        do d = 1, 3
+                            foff(d) = (isect_lo(d) - reg(d))*rr
+                            fcnt(d) = (isect_hi(d) - isect_lo(d) + 1)*rr
+                        end do
+                        if (n == 0) then; foff(2) = 0; fcnt(2) = 1; end if
+                        if (p == 0) then; foff(3) = 0; fcnt(3) = 1; end if
+                        fm = fcnt(1) - 1; fn = fcnt(2) - 1; fp = fcnt(3) - 1
+                        amr_num_fine = amr_num_fine + 1
+                        call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp, rr)
+                        ! writer order is i -> fk -> fj -> fi with fi fastest, over the FULL block extent
+                        do i = 1, nvar_f
+                            do fk = 0, fp
+                                do fj = 0, fn
+                                    do fi = 0, fm
+                                        idx = (i - 1)*(fpf + 1)*(fnf + 1)*(fmf + 1) + (fk + foff(3))*(fnf + 1)*(fmf + 1) + (fj &
+                                               & + foff(2))*(fmf + 1) + (fi + foff(1)) + 1
+                                        amr_fine(amr_num_fine)%q_cons(i)%sf(fi, fj, fk) = buf(idx)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end if
+                    deallocate (buf)
+                    ! stride past the OWNER's whole chunk; a block with no owner contributed no data at all
+                    tot_cnt = int(0, MPI_OFFSET_KIND)
+                    if (fown(1) > 0) then
+                        tot_cnt = int(nvar_f, MPI_OFFSET_KIND)*int(fmf + 1, MPI_OFFSET_KIND)*int(fnf + 1, &
+                                      & MPI_OFFSET_KIND)*int(fpf + 1, MPI_OFFSET_KIND)
+                    end if
+                    disp0 = ddisp + tot_cnt*int(sbytes, MPI_OFFSET_KIND)
+                    cycle
+                end if
                 ! Use the file's authoritative per-rank fine extents from wext; derive rr per block.
                 fm = 0; fn = 0; fp = 0; rr = 1
                 if (owns) then
@@ -793,7 +861,7 @@ contains
                                      & // 'decomposition (e.g. the simulation used load_balance); the AMR overlay ' &
                                      & // 'requires the writing decomposition')
                 end if
-                cnt = sys_size*(fm + 1)*(fn + 1)*(fp + 1)
+                cnt = nvar_f*(fm + 1)*(fn + 1)*(fp + 1)
                 if (.not. owns) cnt = 0
                 my_cnt = int(cnt, MPI_OFFSET_KIND)
                 my_off = int(0, MPI_OFFSET_KIND)
@@ -808,7 +876,7 @@ contains
                     amr_num_fine = amr_num_fine + 1
                     call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp, rr)
                     idx = 0
-                    do i = 1, sys_size
+                    do i = 1, nvar_f
                         do fk = 0, fp
                             do fj = 0, fn
                                 do fi = 0, fm
