@@ -689,6 +689,8 @@ The value of `dt` needs to be sufficiently small to satisfy the Courant-Friedric
 `t_step_save` is the time step interval for data output during simulation.
 To newly start the simulation, set `t_step_start = 0`.
 To restart the simulation from $k$-th time step, set `t_step_start = k`; see @ref running "Restarting Cases".
+When `t_step_start > 0`, `./mfc.sh run` skips `pre_process` by default, since it would otherwise overwrite the
+restart data being resumed from. Pass `-t pre_process` explicitly (as in the restart workflow) if regenerating it is intended.
 
 ##### Adaptive Time-Stepping
 
