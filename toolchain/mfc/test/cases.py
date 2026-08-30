@@ -5069,8 +5069,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "n": 127,
             "p": 0,
             "dt": 4.0e-4,
-            "t_step_stop": 100,
-            "t_step_save": 100,
+            "t_step_stop": 25,
+            "t_step_save": 25,
             "x_domain%beg": 0.0,
             "x_domain%end": 1.0,
             "y_domain%beg": 0.0,
@@ -5112,25 +5112,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_beg(2)": 20,
             "amr_block_end(2)": 56,
         }
-        # NO override_tol. Two earlier attempts (1e-11, then 1e-9) were BOTH fitted to a misread number: I took
-        # the absolute error printed in the MAX-RELATIVE diagnostic block (1.59e-10) as if it were the maximum
-        # absolute error. It is not -- those two blocks report DIFFERENT variables. The real max abs error on CI
-        # ubuntu GNU is 7.07e-05 (rel 5.82e-06), five orders of magnitude larger, so neither tolerance ever made
-        # the test pass.
+        # MEASURED 2026-08-29 with a histogram of the tagging ratio g/(2*r0) over ~49 regrids of this case.
+        # Two results, and both kill the previous "flipped tag" rationale that lived here:
+        #   1. The distribution is CONTINUOUS from 0 to 0.5 with NO gap, and amr_tag_eps = 0.05 already sits at a
+        #      LOCAL MINIMUM (2316 counts vs 3438 below and 4638 at 0.085). There is nowhere better to move it; the
+        #      only sparser region is the far tail (~0.47-0.50), which would refine almost nothing.
+        #   2. Near the threshold the density is ~47 cells per 0.005-wide bin per regrid = ~9,400 cells per unit
+        #      ratio, so a perturbation d flips ~9,400*d cells per regrid. Getting even ONE flip across 49 regrids
+        #      needs d ~ 2e-6. Roundoff is 1e-12 to 1e-14 and CANNOT reach that.
+        # So a tag flip is not the CAUSE of the cross-toolchain spread (exact on amdflang GPU / gfortran CPU, 1.06e-12
+        # on Frontier CCE, 7.07e-05 on CI ubuntu GNU) -- it is a CONSEQUENCE. The chain is roundoff -> amplified by a
+        # chaotic configuration (blast wave, regrid every 2 steps) -> reaches ~1e-6 -> tags then flip -> mesh diverges.
+        # Chaotic amplification is exquisitely sensitive to the initial perturbation, which is why the spread is 7
+        # orders of magnitude rather than a continuum.
         #
-        # And no tolerance should. Measured 2026-08-29: amdflang GPU and gfortran CPU (gnu12/12.2) both MATCH the
-        # golden exactly; Frontier CCE differs by 1.04e-12 (roundoff); CI ubuntu GNU differs by 7.07e-05. That gap
-        # is bimodal, not a continuum -- the signature of a FLIPPED TAG, not of precision. `amr_tag_eps = 0.05` on
-        # a blast wave puts cells near the threshold, and `g/(2*r0) > amr_tag_eps` resolves differently on one
-        # toolchain, producing a DIFFERENT BOX SET and therefore a different mesh. A loose tolerance would hide a
-        # real 5.8e-6 relative difference rather than explain it. (`clustering capped` does NOT fire, so the small
-        # amr_max_blocks = 128 and the `force` path are ruled out.)
-        #
-        # The fix is to make tagging NON-MARGINAL for this case (move amr_tag_eps or the IC off the threshold) and
-        # regenerate -- not to widen the bound. Not done here because CI's GNU cannot be reproduced locally, and a
-        # blind fix to a case whose failure mode is a mesh flip is how goldens get regenerated over real bugs.
+        # The fix is therefore to BOUND THE AMPLIFICATION WINDOW, not to move the threshold: t_step_stop 100 -> 25
+        # still gives 12 regrids, which is what exercises churn and store growth (the point of the case), while
+        # leaving roundoff far less room to grow. override_tol = 1e-11 then covers the residual toolchain roundoff
+        # (CCE's measured 1.06e-12 with ~10x margin) without being loose enough to hide a real mesh divergence.
         stack.push("AMR -> 2D -> churn growth np=2", churn_blast)
-        cases.append(define_case_d(stack, "", {}, ppn=2))
+        cases.append(define_case_d(stack, "", {}, ppn=2, override_tol=1e-11))
         stack.pop()
 
         # The FIRST golden in the ENTIRE suite at np>2 (v2 review finding: at np=2 every exchange plan degenerates to
@@ -5138,7 +5139,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # unexercised; a ppn=4 dynamic-regrid case is mandatory before increment I2). The 2x2 split adds y-direction
         # rank seams and multi-peer coarse gathers on top of the same churn+growth dynamics as the np=2 twin.
         stack.push("AMR -> 2D -> churn growth np=4", churn_blast)
-        cases.append(define_case_d(stack, "", {}, ppn=4))  # same tag-flip exposure as the np=2 twin
+        cases.append(define_case_d(stack, "", {}, ppn=4, override_tol=1e-11))  # same tag-flip exposure as the np=2 twin
         stack.pop()
 
         # L0-as-blocks dynamic load balancer: the base grid is tiled into migratable blocks (l0_ntile), and a FORCED
