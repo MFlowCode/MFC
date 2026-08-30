@@ -152,6 +152,20 @@ contains
             end if
             if (cyl_coord) then
                 @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
+                ! zeroed for the same reason as flux_gsrc_rsx_vf above: nothing in the tree WRITES this array, but
+                ! s_finalize_riemann_solver_hatR copies all of 1:sys_size out of it into flux_gsrc_n(id), which m_rhs
+                ! folds into the RHS. Without this it fed uninitialized memory into the solution under cyl_coord.
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = -1, p_alloc
+                        do k = -1, n_alloc
+                            do j = -1, m_alloc
+                                flux_gsrc_hatR_rsx_vf(j, k, l, i) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
         end if
 
