@@ -911,6 +911,13 @@ contains
             amr_gb_box = amr_gb_box + int(ntot, 8)*6_8*4_8  ! every rank receives the WHOLE global box list
             ! the accepted-box array is sized to the cap; B0b keeps the bisection away from it, and a run that still reaches it
             ! truncates here exactly as the serial `if (nacc < cap)` guard did.
+            ! Silent truncation of the GLOBAL box set is a correctness cliff, not a capacity note: boxes
+            ! contributed by other ranks are discarded with no diagnostic and the mesh differs from the one
+            ! the tagger asked for. The `capped` flag above covers only the tree bisection, not this line.
+            if (ntot > cap .and. proc_rank == 0) then
+                print '(A,I0,A,I0,A)', ' [amr] WARNING: global accepted-box count ', ntot, ' exceeds amr_max_blocks = ', cap, &
+                    & '; the box set is TRUNCATED and the refined mesh ' // 'no longer matches the tag field. Raise amr_max_blocks.'
+            end if
             nacc = min(ntot, cap)
             do i = 1, nacc
                 alo(:,i) = gbx(1:3,i); ahi(:,i) = gbx(4:6,i)
@@ -1076,7 +1083,7 @@ contains
             ! replicated metadata whose gather costs 96 ms/step and whose scan costs 333-583 ms/step at 1e5 ranks.
             ! Counted from the declared shapes: 12 ints of geometry (region lo/hi, isect lo/hi) + level + owner +
             ! my_blk + several O(block) scratch/logical arrays, ~15 ints and 3 logicals per block.
-            print '(A,I0,A,I0)', '[amr-grideff] tagged ', tag_g, ' covered ', amr_n_covered
+            print '(A,I0,A,I0,A,I0)', '[amr-grideff] tagged ', tag_g, ' covered ', amr_n_covered, ' shaped ', amr_n_shaped
             print '(A,I0,A,I0,A,I0)', '[amr-mem] glob_bytes ', int(amr_max_blocks, 8)*18_8*4_8, ' own_blocks ', amr_n_my, &
                 & ' max_blocks ', amr_max_blocks
             ! HALO PROBE: distinct blocks whose metadata this rank read since the last regrid, against the blocks it
@@ -1358,6 +1365,13 @@ contains
                 end do
             end if
         end if
+
+        ! the FINAL footprint: every box here becomes fine blocks, so this is what rhs and every
+        ! block-count-driven phase actually pay for
+        do k = 1, nboxes
+            amr_n_shaped = amr_n_shaped + int(boxes(k)%hi(1) - boxes(k)%lo(1) + 1, 8)*int(boxes(k)%hi(2) - boxes(k)%lo(2) + 1, &
+                                              & 8)*int(boxes(k)%hi(3) - boxes(k)%lo(3) + 1, 8)
+        end do
 
     end subroutine s_amr_regrid_shape_boxes
 
