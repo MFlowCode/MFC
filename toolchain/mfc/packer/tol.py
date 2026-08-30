@@ -11,17 +11,22 @@ def _magnitudes(values: typing.List[float]) -> typing.List[float]:
     return [abs(v) for v in values if not math.isnan(v)]
 
 
-#: How far past the band a candidate may drift before a zero field counts as changed. The band is the
-#: larger of the tolerance and the golden's own magnitude, so a field that merely sits near the
-#: tolerance is judged against itself rather than against the tolerance it happens to be close to.
-_ZERO_FIELD_HEADROOM = 10.0
+#: How far past the band a value may drift before it counts as changed. The band is the larger of the
+#: tolerance and the golden field's own magnitude, so a field that merely sits near the tolerance is
+#: judged against itself rather than against a tolerance it happens to be close to. Two, not ten: it
+#: has to cover a sign flip of a value already at the band edge and nothing more.
+_ZERO_FIELD_HEADROOM = 2.0
 
 
 def _is_zero_field(values: typing.List[float], atol: float) -> bool:
     """A field the test cannot resolve from zero: every value is within the absolute tolerance of it.
     What such a field stores is roundoff, and which way that roundoff falls depends on the compiler's
-    association order, so comparing it pointwise tests the compiler rather than the solver. The
-    candidate is held to a band instead, see _zero_field_bound."""
+    association order, so comparing it pointwise against the golden tests the compiler rather than the
+    solver. Its values are compared against the band instead, see _zero_field_bound.
+
+    A rearrangement wholly inside the band - uniform +x becoming alternating +/-x - is invisible to
+    this rule, and inherently so: values the test cannot resolve from zero cannot be resolved from
+    each other either. Anything leaving the band is still caught, per value."""
     mags = _magnitudes(values)
     return bool(mags) and max(mags) <= atol
 
@@ -104,15 +109,17 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
         # gives a NaN relative error, which is_close() passes unconditionally, so such a
         # field was previously not checked at all.
         if _is_zero_field(gEntry.doubles, tol.absolute):
-            reached = max(_magnitudes(cEntry.doubles), default=0.0)
             bound = _zero_field_bound(gEntry.doubles, tol.absolute)
-            if any(math.isnan(v) for v in cEntry.doubles):
-                return None, f"{gFilepath} is zero in the golden but is NaN in the pack file."
-            if reached > bound:
-                return (
-                    None,
-                    f"{gFilepath} is zero in the golden (all values within the {tol.absolute:.2E} absolute " f"tolerance of it) but reaches {reached:.2E} in the candidate, past its {bound:.2E} band.",
-                )
+            for valIndex, cVal in enumerate(cEntry.doubles):
+                if math.isnan(cVal):
+                    return None, f"{gFilepath} is zero in the golden but is NaN in the pack file."
+                if abs(cVal) > bound:
+                    return (
+                        None,
+                        f"{gFilepath} is zero in the golden (all values within the {tol.absolute:.2E} absolute "
+                        f"tolerance of it) but value #{valIndex + 1} reaches {abs(cVal):.2E} in the candidate, "
+                        f"past its {bound:.2E} band.",
+                    )
             continue
 
         # Check if each variable is within tolerance
