@@ -452,6 +452,8 @@ contains
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
 
+        dbg_t_step = t_step  ! TEMPORARY DEBUG INSTRUMENTATION: see m_ibm
+
         ! Adaptive dt: initial stage
         if (adap_dt) call s_adaptive_dt_bubble(1)
 

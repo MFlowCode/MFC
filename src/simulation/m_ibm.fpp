@@ -48,6 +48,15 @@ module m_ibm
     real(wp), allocatable :: send_ft(:,:), recv_ft(:,:)
     real(wp), allocatable :: recv_forces_snap(:,:), recv_torques_snap(:,:)
 
+    ! TEMPORARY DEBUG INSTRUMENTATION state (remove once the IB force-communication bug is found):
+    ! dbg_t_step is set once per timestep by m_time_steppers; dbg_divergence_count/dbg_last_divergent_t_step track how many
+    ! distinct timesteps s_debug_log_ib_divergence has found a mismatch on, to gate the wire trace and stop the run once
+    ! two measurements are captured.
+    integer, save :: dbg_t_step = -1
+    integer, save :: dbg_divergence_count = 0
+    integer, save :: dbg_last_divergent_t_step = -1
+    integer, parameter :: dbg_track_gbl_id = 352  ! gbl_patch_id currently under investigation
+
 contains
 
     !> Allocates memory for the variables in the IBM module
@@ -1358,8 +1367,19 @@ contains
         integer                       :: i, j, k, l, pack_pos, unpack_pos, buf_size, ierr
         integer                       :: send_neighbor, recv_neighbor, recv_count, tag
         character(len=1), allocatable :: ib_force_send_buf(:), ib_force_recv_buf(:)
+        character(len=64)             :: fname_trace
+        integer                       :: unit_trace
+        logical                       :: trace_active
 
         if (num_procs == 1) return
+
+        ! TEMPORARY DEBUG INSTRUMENTATION (remove once found): trace the wire values for gbl_patch_id=2 at every send/recv,
+        ! gated to the known failure window only - this does file open/close per match and is too slow to run unconditionally.
+        write (fname_trace, '(A,I0,A)') 'ib_wire_trace_rank', proc_rank, '.log'
+        unit_trace = 950 + proc_rank
+        ! Only trace once the roster check (s_debug_log_ib_divergence) has confirmed at least one divergent timestep, so we
+        ! don't pay the per-send/recv file I/O cost before we know we're near a real event.
+        trace_active = (dbg_divergence_count >= 1)
 
         buf_size = storage_size(0)/8 + (storage_size(0)/8 + 6*storage_size(0._wp)/8)*size(patch_ib)
         allocate (ib_force_send_buf(buf_size), ib_force_recv_buf(buf_size))
@@ -1377,7 +1397,10 @@ contains
                 do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
                     ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
                     pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
+                    ! TEMPORARY: GPU offload disabled on this whole subroutine to test whether it's the source of the y/z
+                    ! force-communication corruption bug (see ib_wire_trace evidence) - these loops are tiny (num_ibs
+                    ! entries), no perf concern.
+                    ! $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
                     do i = 1, num_ibs
                         send_ids(i) = patch_ib(i)%gbl_patch_id
                         do l = 1, 3
@@ -1385,8 +1408,19 @@ contains
                             send_ft(l + 3,i) = torques(i,l)
                         end do
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
-                    $:GPU_UPDATE(host='[send_ids, send_ft]')
+                    ! $:END_GPU_PARALLEL_LOOP()
+                    ! $:GPU_UPDATE(host='[send_ids, send_ft]')
+                    if (trace_active) then
+                        do i = 1, num_ibs
+                            if (send_ids(i) == dbg_track_gbl_id) then
+                                open (unit=unit_trace, file=fname_trace, position='append', action='write', status='unknown')
+                                write (unit_trace, '(A,I0,A,I0,A,I0,A,I0,A,6ES16.8)') 'SEND phase=ACCUM axis=${X}$ k=', &
+                                    & k, ' from_rank=', proc_rank, ' to_rank=', send_neighbor, ' t_step=', dbg_t_step, &
+                                    & ' ft=', send_ft(:,i)
+                                close (unit_trace)
+                            end if
+                        end do
+                    end if
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
@@ -1399,8 +1433,20 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j, l]', copyin='[recv_ft, recv_ids]', copy='[forces, torques, &
-                                            & recv_forces_snap, recv_torques_snap]')
+                        if (trace_active) then
+                            do i = 1, recv_count
+                                if (recv_ids(i) == dbg_track_gbl_id) then
+                                    open (unit=unit_trace, file=fname_trace, position='append', action='write', &
+                                        & status='unknown')
+                                    write (unit_trace, '(A,I0,A,I0,A,I0,A,I0,A,6ES16.8)') &
+                                        & 'RECV phase=ACCUM axis=${X}$ k=', k, ' at_rank=', proc_rank, ' from_rank=', &
+                                        & recv_neighbor, ' t_step=', dbg_t_step, ' ft=', recv_ft(:,i)
+                                    close (unit_trace)
+                                end if
+                            end do
+                        end if
+                        ! $:GPU_PARALLEL_LOOP(private='[i, j, l]', copyin='[recv_ft, recv_ids]', copy='[forces, torques, &
+                        !                     & recv_forces_snap, recv_torques_snap]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
@@ -1413,7 +1459,21 @@ contains
                                 end do
                             end if
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
+                        ! $:END_GPU_PARALLEL_LOOP()
+                        ! TEMPORARY: checkpoint forces/torques for dbg_track_gbl_id (resolved fresh via lookup, not a
+                        ! hardcoded local index) right after this receive loop, independent of any id-matching logic in
+                        ! the loop above, to see if it changed even though nothing should have touched it.
+                        if (trace_active) then
+                            call s_get_neighborhood_idx(dbg_track_gbl_id, j)
+                            if (j > 0) then
+                                open (unit=unit_trace, file=fname_trace, position='append', action='write', status='unknown')
+                                write (unit_trace, '(A,I0,A,I0,A,I0,A,I0,A,6ES16.8)') &
+                                    & 'CHECKPOINT phase=ACCUM after=RECV_LOOP axis=${X}$ k=', k, ' at_rank=', proc_rank, &
+                                    & ' num_ibs=', num_ibs, ' local_idx=', j, ' forces+torques=', forces(j,:), torques(j,:)
+                                call s_debug_write_ib_lookup_state(unit_trace)
+                                close (unit_trace)
+                            end if
+                        end if
                     end if
                     tag = tag + 2
                 end do
@@ -1428,7 +1488,7 @@ contains
 
                 do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
                     pack_pos = 0
-                    $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
+                    ! $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
                     do i = 1, num_ibs
                         send_ids(i) = patch_ib(i)%gbl_patch_id
                         do l = 1, 3
@@ -1436,8 +1496,19 @@ contains
                             send_ft(l + 3,i) = torques(i,l)
                         end do
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
-                    $:GPU_UPDATE(host='[send_ids, send_ft]')
+                    ! $:END_GPU_PARALLEL_LOOP()
+                    ! $:GPU_UPDATE(host='[send_ids, send_ft]')
+                    if (trace_active) then
+                        do i = 1, num_ibs
+                            if (send_ids(i) == dbg_track_gbl_id) then
+                                open (unit=unit_trace, file=fname_trace, position='append', action='write', status='unknown')
+                                write (unit_trace, '(A,I0,A,I0,A,I0,A,I0,A,6ES16.8)') &
+                                    & 'SEND phase=BACKPROP axis=${X}$ k=', k, ' from_rank=', proc_rank, ' to_rank=', &
+                                    & send_neighbor, ' t_step=', dbg_t_step, ' ft=', send_ft(:,i)
+                                close (unit_trace)
+                            end if
+                        end do
+                    end if
                     call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
                     call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
@@ -1449,7 +1520,34 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j, l]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
+                        if (trace_active) then
+                            do i = 1, recv_count
+                                if (recv_ids(i) == dbg_track_gbl_id) then
+                                    open (unit=unit_trace, file=fname_trace, position='append', action='write', &
+                                        & status='unknown')
+                                    write (unit_trace, '(A,I0,A,I0,A,I0,A,I0,A,6ES16.8)') &
+                                        & 'RECV phase=BACKPROP axis=${X}$ k=', k, ' at_rank=', proc_rank, ' from_rank=', &
+                                        & recv_neighbor, ' t_step=', dbg_t_step, ' ft=', recv_ft(:,i)
+                                    close (unit_trace)
+                                end if
+                            end do
+                            ! TEMPORARY: dump every recv_ids(i) -> local index j resolution this receive will act on, to
+                            ! check for an ib_gbl_idx_lookup collision (a different received id resolving to
+                            ! gbl_patch_id=2's slot).
+                            do i = 1, recv_count
+                                call s_get_neighborhood_idx(recv_ids(i), j)
+                                if (j > 0) then
+                                    open (unit=unit_trace, file=fname_trace, position='append', action='write', &
+                                        & status='unknown')
+                                    write (unit_trace, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,6ES16.8)') &
+                                        & 'RESOLVE phase=BACKPROP axis=${X}$ k=', k, ' at_rank=', proc_rank, &
+                                        & ' recv_ids(i)=', recv_ids(i), ' local_j=', j, ' local_gbl_id=', &
+                                        & patch_ib(j)%gbl_patch_id, ' i=', i, ' ft=', recv_ft(:,i)
+                                    close (unit_trace)
+                                end if
+                            end do
+                        end if
+                        ! $:GPU_PARALLEL_LOOP(private='[i, j, l]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
@@ -1459,7 +1557,23 @@ contains
                                 end do
                             end if
                         end do
-                        $:END_GPU_PARALLEL_LOOP()
+                        ! $:END_GPU_PARALLEL_LOOP()
+                        ! TEMPORARY: checkpoint forces/torques for dbg_track_gbl_id (resolved fresh via lookup, not a
+                        ! hardcoded local index) right after this receive loop, independent of any id-matching logic in
+                        ! the loop above, to see if it changed even though nothing should have touched it.
+                        if (trace_active) then
+                            call s_get_neighborhood_idx(dbg_track_gbl_id, j)
+                            if (j > 0) then
+                                open (unit=unit_trace, file=fname_trace, position='append', action='write', &
+                                    & status='unknown')
+                                write (unit_trace, '(A,I0,A,I0,A,I0,A,I0,A,6ES16.8)') &
+                                    & 'CHECKPOINT phase=BACKPROP after=RECV_LOOP axis=${X}$ k=', k, ' at_rank=', &
+                                    & proc_rank, ' num_ibs=', num_ibs, ' local_idx=', j, ' forces+torques=', &
+                                    & forces(j,:), torques(j,:)
+                                call s_debug_write_ib_lookup_state(unit_trace)
+                                close (unit_trace)
+                            end if
+                        end if
                     end if
                     tag = tag + 2
                 end do
@@ -1608,12 +1722,30 @@ contains
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
                         patch_ib(num_ibs) = tmp_patch
                         ib_gbl_idx_lookup(tmp_patch%gbl_patch_id) = num_ibs
+
+                        ! TEMPORARY DEBUG INSTRUMENTATION: log every fresh broadcast receipt of dbg_track_gbl_id, ungated
+                        ! by trace_active, so we can see the full history of when this rank last got an updated copy and
+                        ! what it contained at that moment - not just near a detected divergence.
+                        if (tmp_patch%gbl_patch_id == dbg_track_gbl_id) then
+                            block
+                                character(len=64) :: dbg_bfname
+                                integer            :: dbg_bunit
+                                write (dbg_bfname, '(A,I0,A)') 'ib_broadcast_trace_rank', proc_rank, '.log'
+                                dbg_bunit = 990 + proc_rank
+                                open (unit=dbg_bunit, file=dbg_bfname, position='append', action='write', &
+                                    & status='unknown')
+                                write (dbg_bunit, '(A,I0,A,I0,A,I0)') 'NEW_BROADCAST t_step=', dbg_t_step, ' at_rank=', &
+                                    & proc_rank, ' from_rank=', recv_neighbor_list(nbr_idx)
+                                call s_debug_write_ib_state(dbg_bunit, tmp_patch)
+                                close (dbg_bunit)
+                            end block
+                        end if
                     end if
                 end do
             end do
 
             deallocate (send_buf, recv_bufs)
-            $:GPU_UPDATE(device='[patch_ib]')
+            $:GPU_UPDATE(device='[patch_ib, num_ibs]')
             call s_update_ib_lookup()
         end if
 #endif
@@ -1639,8 +1771,11 @@ contains
         integer                                     :: r2, jr, roster_unpack_pos
         logical                                     :: found
         type(ib_patch_parameters)                   :: roster_patch
+        logical                                     :: mismatch_found_this_call
 
         if (num_procs == 1) return
+
+        mismatch_found_this_call = .false.
 
         ! Gather each rank's Cartesian coords + flow-field boundary neighbor ranks (bc_x/y/z%beg/end) so a divergence dump can
         ! show the real adjacency graph instead of an assumed one.
@@ -1703,10 +1838,11 @@ contains
                                & any(patch_ib(i)%step_angles /= other_patch%step_angles)
 
                     if (mismatch) then
+                        mismatch_found_this_call = .true.
                         open (unit=unit_num, file=fname, position='append', action='write', status='unknown')
                         write (unit_num, '(A)') '===================================================================='
-                        write (unit_num, '(A,I0,A,ES23.15,A,I0,A,I0,A,I0)') 'DIVERGENCE t_step=', t_step, ' mytime=', mytime, &
-                            & ' gbl_patch_id=', patch_ib(i)%gbl_patch_id, ' rank_A=', proc_rank, ' rank_B=', r
+                        write (unit_num, '(A,I0,A,I0,A,I0,A,I0)') 'DIVERGENCE t_step=', t_step, ' gbl_patch_id=', &
+                            & patch_ib(i)%gbl_patch_id, ' rank_A=', proc_rank, ' rank_B=', r
                         write (unit_num, '(A,I0,A,I0,A,I0,A,I0,A,I0)') 'num_procs_x=', num_procs_x, ' num_procs_y=', &
                             & num_procs_y, ' num_procs_z=', num_procs_z, ' ib_neighborhood_radius=', ib_neighborhood_radius, &
                             & ' num_dims=', num_dims
@@ -1760,6 +1896,16 @@ contains
         end do
 
         deallocate (send_buf, recv_buf)
+
+        ! TEMPORARY DEBUG INSTRUMENTATION: stop after two distinct divergent timesteps have been captured, so the log
+        ! files don't grow unbounded once the mechanism is confirmed reproducible.
+        if (mismatch_found_this_call .and. t_step /= dbg_last_divergent_t_step) then
+            dbg_last_divergent_t_step = t_step
+            dbg_divergence_count = dbg_divergence_count + 1
+            if (dbg_divergence_count >= 2) then
+                call s_mpi_abort('TEMPORARY DEBUG INSTRUMENTATION: stopping after capturing 2 divergent timesteps')
+            end if
+        end if
 #endif
 
     end subroutine s_debug_log_ib_divergence
@@ -1785,6 +1931,47 @@ contains
 
     end subroutine s_debug_write_ib_state
 
+    !> TEMPORARY DEBUG INSTRUMENTATION: dumps local_ib_patch_ids (this rank's locally-owned patches) and every non-negative
+    !! entry of ib_gbl_idx_lookup (every patch this rank tracks, local+shadow), plus explicit self-consistency and
+    !! collision checks, so a stale or duplicate lookup entry is directly visible instead of inferred.
+    subroutine s_debug_write_ib_lookup_state(unit_num)
+
+        integer, intent(in) :: unit_num
+        integer              :: gi, gi2, jloc
+
+        write (unit_num, '(A,I0)') 'local_ib_patch_ids: num_local_ibs=', num_local_ibs
+        do jloc = 1, num_local_ibs
+            write (unit_num, '(A,I0,A,I0,A,I0)') '  local_owner_idx=', jloc, ' -> patch_ib_idx=', local_ib_patch_ids(jloc), &
+                & ' gbl_patch_id=', patch_ib(local_ib_patch_ids(jloc))%gbl_patch_id
+        end do
+
+        write (unit_num, '(A,I0,A,I0)') 'ib_gbl_idx_lookup non-negative entries: num_gbl_ibs=', num_gbl_ibs, ' num_ibs=', &
+            & num_ibs
+        do gi = 1, num_gbl_ibs
+            if (ib_gbl_idx_lookup(gi) > 0) then
+                write (unit_num, '(A,I0,A,I0)') '  gbl_id=', gi, ' -> local_idx=', ib_gbl_idx_lookup(gi)
+            end if
+        end do
+
+        do jloc = 1, num_ibs
+            if (ib_gbl_idx_lookup(patch_ib(jloc)%gbl_patch_id) /= jloc) then
+                write (unit_num, '(A,I0,A,I0,A,I0)') '  INCONSISTENT: patch_ib(', jloc, ')%gbl_patch_id=', &
+                    & patch_ib(jloc)%gbl_patch_id, ' but lookup points to local_idx=', &
+                    & ib_gbl_idx_lookup(patch_ib(jloc)%gbl_patch_id)
+            end if
+        end do
+        do gi = 1, num_gbl_ibs
+            if (ib_gbl_idx_lookup(gi) <= 0) cycle
+            do gi2 = gi + 1, num_gbl_ibs
+                if (ib_gbl_idx_lookup(gi2) == ib_gbl_idx_lookup(gi)) then
+                    write (unit_num, '(A,I0,A,I0,A,I0)') '  COLLISION: gbl_id=', gi, ' and gbl_id=', gi2, &
+                        & ' both map to local_idx=', ib_gbl_idx_lookup(gi)
+                end if
+            end do
+        end do
+
+    end subroutine s_debug_write_ib_lookup_state
+
     subroutine s_get_neighborhood_idx(gbl_idx, neighborhood_idx)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1797,25 +1984,20 @@ contains
 
     end subroutine s_get_neighborhood_idx
 
+    !> Rebuilds ib_gbl_idx_lookup from patch_ib on the host and mirrors the result to the device. Built on the host because
+    !! patch_ib is already host-current at every call site (compaction and neighbor-unpack are host-side Fortran), and
+    !! because the populate step is a scatter write (target index = patch_ib(i)%gbl_patch_id, not the loop index) that was
+    !! found to leave stale entries behind under GPU offload after compaction shrinks num_ibs.
     subroutine s_update_ib_lookup()
 
         integer :: i
 
-        ! reset the lookup
-        $:GPU_PARALLEL_LOOP(private='[i]')
-        do i = 1, num_gbl_ibs
-            ib_gbl_idx_lookup(i) = -1
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        ! populate the table
-        $:GPU_PARALLEL_LOOP(private='[i]')
+        ib_gbl_idx_lookup = -1
         do i = 1, num_ibs
             ib_gbl_idx_lookup(patch_ib(i)%gbl_patch_id) = i
         end do
-        $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_UPDATE(host='[ib_gbl_idx_lookup]')
+        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
 
     end subroutine s_update_ib_lookup
 
