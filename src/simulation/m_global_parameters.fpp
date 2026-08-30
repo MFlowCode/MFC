@@ -404,7 +404,11 @@ module m_global_parameters
     !! 1 means refinement is tight; 0.3 means 70% of the refined volume was never asked for, which inflates the geometric advantage
     !! and therefore the quoted payoff. Standard AMR practice reports it and MFC never has; `amr_tag_eps` and `amr_buf` are exactly
     !! the knobs it prices.
-    integer(8)           :: amr_n_tagged = 0, amr_n_covered = 0
+    integer(8) :: amr_n_tagged = 0, amr_n_covered = 0
+    !> Coarse volume the FINAL boxes occupy, counted after s_amr_regrid_shape_boxes has padded by amr_buf, clamped, size-capped,
+    !! clipped and tiled. amr_n_covered is taken before all of that, so it cannot see the pad -- which is where amr_buf's effect
+    !! actually lives. This is the number that prices over-coverage.
+    integer(8)           :: amr_n_shaped = 0
     logical, allocatable :: amr_touch(:)
     integer              :: amr_n_touch = 0, amr_n_touch_max = 0
     integer(8)           :: amr_touch_epoch = -1_8
