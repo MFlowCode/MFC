@@ -681,6 +681,18 @@ contains
             read (2) ghdr
             ! the layout offsets depend on both: a stale file from a different run configuration
             ! would otherwise misalign every record (mirrors the sim reader's header validation)
+            ! FORMAT v2 (a NEGATIVE rank count) marks the compact per-block ownership record: whole-block
+            ! ownership, one contiguous data chunk per block, and a 4-int (owner + 1, m, n, p) record in place
+            ! of the v1 3*np_old extent vector. The reader below is v1-only -- it derives fm/fn/fp from
+            ! wext at this rank's offset, sizes the data as a per-rank slice, and validates the layout with an
+            ! ALLGATHER -- none of which v2 satisfies. Without this branch the check just below fires
+            ! unconditionally (a negative can never equal num_procs) and blames a rank-count mismatch even at
+            ! matching rank counts, sending the reader after the wrong problem.
+            if (ghdr(1) < 0) then
+                call s_mpi_abort('amr post: this AMR fine-block file uses restart format v2 (whole-block ' &
+                                 & // 'ownership), which post_process does not read yet; post-process an ' &
+                                 & // 'AMR run only from a v1 file for now')
+            end if
             if (ghdr(1) /= num_procs) then
                 call s_mpi_abort('amr post: the AMR fine-block file was written with a different rank count; ' &
                                  & // 'run post_process with the same number of ranks as the simulation')
@@ -728,6 +740,18 @@ contains
             call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
             ! the parallel layout is per-rank slices concatenated in WRITER rank order: a different
             ! rank count or decomposition would silently misalign every block - fail closed instead
+            ! FORMAT v2 (a NEGATIVE rank count) marks the compact per-block ownership record: whole-block
+            ! ownership, one contiguous data chunk per block, and a 4-int (owner + 1, m, n, p) record in place
+            ! of the v1 3*np_old extent vector. The reader below is v1-only -- it derives fm/fn/fp from
+            ! wext at this rank's offset, sizes the data as a per-rank slice, and validates the layout with an
+            ! ALLGATHER -- none of which v2 satisfies. Without this branch the check just below fires
+            ! unconditionally (a negative can never equal num_procs) and blames a rank-count mismatch even at
+            ! matching rank counts, sending the reader after the wrong problem.
+            if (ghdr(1) < 0) then
+                call s_mpi_abort('amr post: this AMR fine-block file uses restart format v2 (whole-block ' &
+                                 & // 'ownership), which post_process does not read yet; post-process an ' &
+                                 & // 'AMR run only from a v1 file for now')
+            end if
             if (ghdr(1) /= num_procs) then
                 call s_mpi_abort('amr post: the AMR fine-block file was written with a different rank count; ' &
                                  & // 'run post_process with the same number of ranks as the simulation')
