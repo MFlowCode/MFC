@@ -314,11 +314,13 @@ contains
 
                                     ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
-                                               & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
-                                               & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                               & sqrt(1._wp + 5.e-1_wp*(f_isentrope_exponent(gamma_L) + 1._wp) &
+                                               & /f_isentrope_exponent(gamma_L)*(pres_SL - pres_L)/(pres_L &
+                                               & + f_isentrope_pressure(pi_inf_L, gamma_L))))
                                     Ms_R = max(1._wp, &
-                                               & sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))*(pres_SR/pres_R - 1._wp) &
-                                               & *pres_R/((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                               & sqrt(1._wp + 5.e-1_wp*(f_isentrope_exponent(gamma_R) + 1._wp) &
+                                               & /f_isentrope_exponent(gamma_R)*(pres_SR - pres_R)/(pres_R &
+                                               & + f_isentrope_pressure(pi_inf_R, gamma_R))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
@@ -668,11 +670,13 @@ contains
 
                                     ! Low Mach correction: Thornber et al. JCP (2008)
                                     Ms_L = max(1._wp, &
-                                               & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
-                                               & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                               & sqrt(1._wp + 5.e-1_wp*(f_isentrope_exponent(gamma_L) + 1._wp) &
+                                               & /f_isentrope_exponent(gamma_L)*(pres_SL - pres_L)/(pres_L &
+                                               & + f_isentrope_pressure(pi_inf_L, gamma_L))))
                                     Ms_R = max(1._wp, &
-                                               & sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))*(pres_SR/pres_R - 1._wp) &
-                                               & *pres_R/((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                               & sqrt(1._wp + 5.e-1_wp*(f_isentrope_exponent(gamma_R) + 1._wp) &
+                                               & /f_isentrope_exponent(gamma_R)*(pres_SR - pres_R)/(pres_R &
+                                               & + f_isentrope_pressure(pi_inf_R, gamma_R))))
 
                                     s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                     s_R = vel_R(dir_idx(1)) + c_R*Ms_R
@@ -1110,11 +1114,13 @@ contains
 
                                         ! Low Mach correction: Thornber et al. JCP (2008)
                                         Ms_L = max(1._wp, &
-                                                   & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L &
-                                                   & - 1._wp)*pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                                   & sqrt(1._wp + 5.e-1_wp*(f_isentrope_exponent(gamma_L) + 1._wp) &
+                                                   & /f_isentrope_exponent(gamma_L)*(pres_SL - pres_L)/(pres_L &
+                                                   & + f_isentrope_pressure(pi_inf_L, gamma_L))))
                                         Ms_R = max(1._wp, &
-                                                   & sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))*(pres_SR/pres_R &
-                                                   & - 1._wp)*pres_R/((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                                   & sqrt(1._wp + 5.e-1_wp*(f_isentrope_exponent(gamma_R) + 1._wp) &
+                                                   & /f_isentrope_exponent(gamma_R)*(pres_SR - pres_R)/(pres_R &
+                                                   & + f_isentrope_pressure(pi_inf_R, gamma_R))))
 
                                         s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                         s_R = vel_R(dir_idx(1)) + c_R*Ms_R

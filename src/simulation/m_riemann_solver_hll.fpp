@@ -267,9 +267,8 @@ contains
                                 pres_mag%L = 0.5_wp*(B2%L/Ga%L**2._wp + vdotB%L**2._wp)
                                 pres_mag%R = 0.5_wp*(B2%R/Ga%R**2._wp + vdotB%R**2._wp)
 
-                                ! Hard-coded EOS
-                                H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
-                                H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
+                                H_L = f_relativistic_enthalpy(pres_L, rho_L, gamma_L)
+                                H_R = f_relativistic_enthalpy(pres_R, rho_R, gamma_R)
                                 #:if not MFC_CASE_OPTIMIZATION or num_vels > 2
                                     cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
                                     cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
@@ -393,11 +392,13 @@ contains
 
                                 ! Low Mach correction: Thornber et al. JCP (2008)
                                 Ms_L = max(1._wp, &
-                                           & sqrt(1._wp + ((5.e-1_wp + gamma_L)/(1._wp + gamma_L))*(pres_SL/pres_L - 1._wp) &
-                                           & *pres_L/((pres_L + pi_inf_L/(1._wp + gamma_L)))))
+                                           & sqrt(1._wp + 5.e-1_wp*(f_isentrope_exponent(gamma_L) + 1._wp) &
+                                           & /f_isentrope_exponent(gamma_L)*(pres_SL - pres_L)/(pres_L &
+                                           & + f_isentrope_pressure(pi_inf_L, gamma_L))))
                                 Ms_R = max(1._wp, &
-                                           & sqrt(1._wp + ((5.e-1_wp + gamma_R)/(1._wp + gamma_R))*(pres_SR/pres_R - 1._wp) &
-                                           & *pres_R/((pres_R + pi_inf_R/(1._wp + gamma_R)))))
+                                           & sqrt(1._wp + 5.e-1_wp*(f_isentrope_exponent(gamma_R) + 1._wp) &
+                                           & /f_isentrope_exponent(gamma_R)*(pres_SR - pres_R)/(pres_R &
+                                           & + f_isentrope_pressure(pi_inf_R, gamma_R))))
 
                                 s_L = vel_L(dir_idx(1)) - c_L*Ms_L
                                 s_R = vel_R(dir_idx(1)) + c_R*Ms_R

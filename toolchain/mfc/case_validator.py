@@ -185,7 +185,10 @@ PHYSICS_DOCS = {
     "check_mhd": {
         "title": "Magnetohydrodynamics (MHD)",
         "category": "Feature Compatibility",
-        "explanation": ("Requires model_eqns = 2, num_fluids = 1, HLL or HLLD Riemann solver. No relativity with HLLD."),
+        "explanation": (
+            "Requires model_eqns = 2, num_fluids = 1, HLL or HLLD Riemann solver. No relativity with HLLD. "
+            "The relativistic enthalpy h = 1 + (Gamma + 1)p/rho carries no stiffness, so relativity requires pi_inf = 0."
+        ),
     },
     "check_surface_tension": {
         "title": "Surface Tension",
@@ -1001,6 +1004,11 @@ class CaseValidator:
         self.prohibit(mhd and num_fluids != 1, "MHD is only available for single-component flows (num_fluids = 1)")
         self.prohibit(mhd and model_eqns != 2, "MHD is only available for the 5-equation model (model_eqns = 2)")
         self.prohibit(relativity and not mhd, "relativity requires mhd to be enabled")
+        pi_inf = self.get("fluid_pp(1)%pi_inf")
+        self.prohibit(
+            relativity and pi_inf is not None and pi_inf != 0,
+            "relativity assumes an ideal gas; fluid_pp(1)%pi_inf must be 0",
+        )
         self.prohibit(Bx0 is not None and not mhd, "Bx0 must not be set if MHD is not enabled")
         self.prohibit(mhd and n is not None and n == 0 and Bx0 is None, "Bx0 must be set in 1D MHD simulations")
         self.prohibit(mhd and n is not None and n > 0 and Bx0 is not None, "Bx0 must not be set in 2D/3D MHD simulations")

@@ -28,7 +28,8 @@ module m_variables_conversion
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, f_bulk_modulus, &
         & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_pressure_on_isentrope, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
-        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+        & f_hypoelastic_energy, f_relativistic_enthalpy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, &
+        & isentrope_B, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -1393,6 +1394,19 @@ contains
 
     end function f_bulk_modulus
 
+    !> Relativistic specific enthalpy, h = 1 + (Gamma + 1)p/rho. Ideal gas only: the stiffness does not appear, so a fluid with a
+    !! nonzero pi_inf is not represented here (the validator refuses that combination).
+    function f_relativistic_enthalpy(pres, rho, gamma) result(H)
+
+        $:GPU_ROUTINE(function_name='f_relativistic_enthalpy', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: pres, rho, gamma
+        real(wp)             :: H
+
+        H = 1._wp + (gamma + 1._wp)*pres/rho
+
+    end function f_relativistic_enthalpy
+
     !> Speed of sound of a thermodynamic state. Enthalpy is not an argument: for a real state H, |u|^2 and qv all cancel out of c^2
     !! = ((Gamma + 1)p + Pi)/(Gamma rho). Averaged states, whose enthalpy is a free input, use the _avg variant.
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
@@ -1411,7 +1425,7 @@ contains
         if (chemistry) then  ! Reacting mixture sound speed
             c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
         else if (relativity) then  ! Relativistic sound speed, whose enthalpy is 1 + (Gamma + 1)p/rho
-            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/(1._wp + (gamma + 1._wp)*pres/rho))
+            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/f_relativistic_enthalpy(pres, rho, gamma))
         else
             ! Every case below is a bulk modulus over a density. The equation of state enters
             ! only through f_bulk_modulus; the cases differ in how the phases are mixed.
