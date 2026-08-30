@@ -15,7 +15,7 @@ module m_cbc
     use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
-        & get_mole_fractions, get_species_specific_heats_r
+        & get_mole_fractions
 
     implicit none
 
@@ -653,7 +653,6 @@ contains
                                 call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
                                 gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                             end if
-                        else
                         end if
 
                         ! Compute mixture sound speed
