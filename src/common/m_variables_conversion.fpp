@@ -1420,6 +1420,7 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: adv
         #:endif
         real(wp), intent(out) :: c
+        real(wp)              :: alf  !< Subgrid void fraction; dilute by construction
         integer               :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
@@ -1442,9 +1443,15 @@ contains
             else  ! the mixture coefficients already carry the mixing
                 c = f_bulk_modulus(pres, gamma, pi_inf)/rho
 
-                ! Bubble mixture to order O(\alpha): the void fraction dilutes the stiffness
+                ! Subgrid bubbles. rho is the carrier-liquid partial density, so the line above is already
+                ! c_l^2/(1 - alf); one more division gives the O(alf) mixture speed c = c_l/(1 - alf), where
+                ! c_l is the pure liquid sound speed m_qbmm forms for Keller-Miksis. alf is the subgrid void
+                ! fraction and is small by construction - the expansion has no meaning as alf approaches one,
+                ! so a value there means a wrong index or a case outside the dilute limit, not a number to
+                ! clamp. The toolchain warns at case load (MFlowCode/MFC#1793).
                 if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 1)) then
-                    c = c/(1._wp - adv(num_fluids))
+                    alf = adv(num_fluids)
+                    c = c/(1._wp - alf)
                 end if
             end if
 

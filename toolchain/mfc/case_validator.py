@@ -22,6 +22,10 @@ from .params.definitions import CONSTRAINTS
 from .params.namelist_parser import get_fortran_constants
 from .state import CFG
 
+# Above this the Ensemble-Averaged Bubble Model's O(alpha) expansion, which enters the closure as
+# 1/(1 - alpha), is outside the dilute limit it is derived in (MFlowCode/MFC#1793).
+DILUTE_VOID_FRACTION_MAX = 0.1
+
 # Physics documentation for check methods.
 # Each entry maps a check method name to metadata used by gen_physics_docs.py
 # to auto-generate docs/documentation/physics_constraints.md.
@@ -557,6 +561,20 @@ class CaseValidator:
             num_fluids is not None and num_fluids > 2,
             "The Ensemble-Averaged Bubble Model is derived for a single carrier liquid; num_fluids must be <= 2",
         )
+
+        # The subgrid void fraction enters the closure as 1/(1 - alpha), an O(alpha) expansion that only
+        # holds in the dilute limit. Outside it the Euler-Euler model is not recommended, so warn rather
+        # than refuse (MFlowCode/MFC#1793).
+        void_idx = num_fluids if num_fluids else 1
+        num_patches = self.get("num_patches", 0) or 0
+        for i in range(1, num_patches + 1):
+            alpha = self.get(f"patch_icpp({i})%alpha({void_idx})")
+            self.warn(
+                alpha is not None and alpha > DILUTE_VOID_FRACTION_MAX,
+                f"patch_icpp({i})%alpha({void_idx}) = {alpha} is not a dilute void fraction; the "
+                f"Ensemble-Averaged Bubble Model is an O(alpha) expansion and is not recommended above "
+                f"{DILUTE_VOID_FRACTION_MAX}",
+            )
 
         # BUBBLE PHYSICS PARAMETERS
         # Validate bubble reference parameters (bub_pp%)
