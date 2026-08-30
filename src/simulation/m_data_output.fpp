@@ -417,9 +417,9 @@ contains
             end if
         end if
 
-        ! TEMPORARY DEBUG INSTRUMENTATION: dump a small x-neighborhood around the violating cell (including into the ghost/
-        ! halo region on either side) to check for a sharp discontinuity right at a processor boundary versus a smoothly
-        ! diverging field, since ICFL blowups have been observed specifically near rank boundaries.
+        ! Dump a small x-neighborhood around the violating cell (reaching into the ghost/halo region on either side) to
+        ! distinguish a sharp discontinuity at a processor boundary - the signature of stale or corrupted halo/IB state -
+        ! from a smoothly diverging field, which indicates a genuine physical/numerical instability.
         print '(A)', '  x-neighborhood (dj, rho, pres, vel) around violating cell:'
         do j = max(-buff_size, j_hit - 3), min(m + buff_size, j_hit + 3)
             call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k_hit, l_hit)
