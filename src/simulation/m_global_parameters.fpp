@@ -394,6 +394,21 @@ module m_global_parameters
     !! register sites read it exactly where they read amr_cur today.
     integer :: amr_reg_cur = 0
 
+    !> HALO PROBE. Every block whose metadata this rank reads goes through s_amr_select_slot, so counting the DISTINCT slots it
+    !! touches between regrids measures exactly the halo a distributed metadata design would have to carry. This is the measurement
+    !! the whole "limit 3" project rests on and nobody has taken it: if distinct-touched is O(local) the distribution works; if it
+    !! is O(global blocks) it cannot, and the architecture needs rethinking before Phases 1-4 are built. Reset per mesh epoch
+    !! because that is when a halo would be rebuilt. Cost is one logical test per call, on a path that is already O(what it
+    !! measures).
+    !> GRID EFFICIENCY: coarse cells the tagger FLAGGED, against coarse cells the accepted boxes actually COVER. tagged/covered near
+    !! 1 means refinement is tight; 0.3 means 70% of the refined volume was never asked for, which inflates the geometric advantage
+    !! and therefore the quoted payoff. Standard AMR practice reports it and MFC never has; `amr_tag_eps` and `amr_buf` are exactly
+    !! the knobs it prices.
+    integer(8)           :: amr_n_tagged = 0, amr_n_covered = 0
+    logical, allocatable :: amr_touch(:)
+    integer              :: amr_n_touch = 0, amr_n_touch_max = 0
+    integer(8)           :: amr_touch_epoch = -1_8
+
 contains
 
     !> Make block slot islot the working slot: set amr_cur and copy its stored mirrors (region, intersection, ownership) into the
@@ -403,6 +418,11 @@ contains
 
         integer, intent(in) :: islot
 
+        if (allocated(amr_touch)) then
+            if (.not. amr_touch(islot)) then
+                amr_touch(islot) = .true.; amr_n_touch = amr_n_touch + 1
+            end if
+        end if
         amr_cur = islot
         amr_region_lo = amr_region_lo_all(:,islot); amr_region_hi = amr_region_hi_all(:,islot)
         amr_isect_lo = amr_isect_lo_all(:,islot); amr_isect_hi = amr_isect_hi_all(:,islot)
