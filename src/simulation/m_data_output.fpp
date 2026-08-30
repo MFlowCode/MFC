@@ -396,11 +396,35 @@ contains
                     near2_dist = dist; near2_id = i
                 end if
             end do
-            if (near1_id > 0) print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  nearest particle    id=', near1_id, ' dist=', &
-                & near1_dist, ' gap=', near1_dist - patch_ib(near1_id)%radius, ' vel=', patch_ib(near1_id)%vel
-            if (near2_id > 0) print '(A,I0,A,ES16.6,A,ES16.6)', '  2nd nearest particle id=', near2_id, ' dist=', near2_dist, &
-                & ' gap=', near2_dist - patch_ib(near2_id)%radius
+            if (near1_id > 0) then
+                print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  nearest particle    id=', near1_id, ' dist=', &
+                    & near1_dist, ' gap=', near1_dist - patch_ib(near1_id)%radius, ' vel=', patch_ib(near1_id)%vel
+                print '(A,3(ES16.6,1X))', '    centroid    = ', patch_ib(near1_id)%x_centroid, patch_ib(near1_id)%y_centroid, &
+                    & patch_ib(near1_id)%z_centroid
+                print '(A,3(ES16.6,1X))', '    angular_vel = ', patch_ib(near1_id)%angular_vel
+                print '(A,3(ES16.6,1X))', '    force       = ', patch_ib(near1_id)%force
+                print '(A,3(ES16.6,1X))', '    torque      = ', patch_ib(near1_id)%torque
+                print '(A,I0,A,ES16.6,A,ES16.6)', '    moving_ibm  = ', patch_ib(near1_id)%moving_ibm, ' mass=', &
+                    & patch_ib(near1_id)%mass, ' moment=', patch_ib(near1_id)%moment
+            end if
+            if (near2_id > 0) then
+                print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  2nd nearest particle id=', near2_id, ' dist=', &
+                    & near2_dist, ' gap=', near2_dist - patch_ib(near2_id)%radius, ' vel=', patch_ib(near2_id)%vel
+                print '(A,3(ES16.6,1X))', '    centroid    = ', patch_ib(near2_id)%x_centroid, patch_ib(near2_id)%y_centroid, &
+                    & patch_ib(near2_id)%z_centroid
+                print '(A,3(ES16.6,1X))', '    angular_vel = ', patch_ib(near2_id)%angular_vel
+                print '(A,3(ES16.6,1X))', '    force       = ', patch_ib(near2_id)%force
+            end if
         end if
+
+        ! TEMPORARY DEBUG INSTRUMENTATION: dump a small x-neighborhood around the violating cell (including into the ghost/
+        ! halo region on either side) to check for a sharp discontinuity right at a processor boundary versus a smoothly
+        ! diverging field, since ICFL blowups have been observed specifically near rank boundaries.
+        print '(A)', '  x-neighborhood (dj, rho, pres, vel) around violating cell:'
+        do j = max(-buff_size, j_hit - 3), min(m + buff_size, j_hit + 3)
+            call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k_hit, l_hit)
+            print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '    dj=', j - j_hit, ' rho=', rho, ' pres=', pres, ' vel=', vel
+        end do
 
         call flush (6)
 

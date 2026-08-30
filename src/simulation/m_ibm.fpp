@@ -193,6 +193,14 @@ contains
         type(ghost_point)      :: gp
         type(ghost_point)      :: innerp
 
+        ! TEMPORARY DEBUG INSTRUMENTATION: test whether clamping the moving-IB pressure-correction denominator (below) away
+        ! from zero prevents the ICFL blowups observed near strongly-coupled, high-force IBs. dbg_denom is the per-thread
+        ! (unclamped) denominator value; dbg_clamp_count/dbg_min_abs_denom are reduced across all ghost points this call.
+        real(wp) :: dbg_denom
+        integer  :: dbg_clamp_count
+        real(wp) :: dbg_min_abs_denom
+        real(wp), parameter :: dbg_denom_floor = 0.05_wp
+
         ! Per-ghost-point image-point interpolation results, stashed between the interpolation
         ! kernel and the correction kernel below so that the correction kernel never reads
         ! q_prim_vf (or pb_in/mv_in) at a cell another ghost point's correction may have already
@@ -240,6 +248,9 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
+            dbg_clamp_count = 0
+            dbg_min_abs_denom = huge(1._wp)
+
             @:ALLOCATE(alpha_rho_IP_buf(1:num_fluids, 1:num_gps), alpha_IP_buf(1:num_fluids, 1:num_gps), &
                        & pres_IP_buf(1:num_gps), c_IP_buf(1:num_gps), vel_IP_buf(1:3, 1:num_gps), &
                        & r_IP_buf(1:nb, 1:num_gps), v_IP_buf(1:nb, 1:num_gps), pb_IP_buf(1:nb, 1:num_gps), &
@@ -293,7 +304,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff]')
+                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, dbg_denom]', copy='[dbg_clamp_count, dbg_min_abs_denom]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -357,9 +368,20 @@ contains
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
                         ! Pressure correction for moving IB: accounts for acceleration of IB surface
-                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
-                                  & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
-                                  & *dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm))
+                        dbg_denom = 1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
+                                  & *dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm)
+
+                        ! TEMPORARY DEBUG INSTRUMENTATION: test whether flooring |dbg_denom| away from zero (preserving its
+                        ! sign) prevents the observed ICFL blowups near strongly-coupled, high-force IBs.
+                        $:GPU_ATOMIC(atomic='update')
+                        dbg_min_abs_denom = min(dbg_min_abs_denom, abs(dbg_denom))
+                        if (abs(dbg_denom) < dbg_denom_floor) then
+                            $:GPU_ATOMIC(atomic='update')
+                            dbg_clamp_count = dbg_clamp_count + 1
+                            dbg_denom = sign(dbg_denom_floor, dbg_denom)
+                        end if
+
+                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, l) + pres_IP/dbg_denom
                     end do
                 end if
 
@@ -519,6 +541,22 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
+
+            ! TEMPORARY DEBUG INSTRUMENTATION: report whenever the pressure-correction denominator clamp above actually
+            ! engaged this call, so we can confirm whether it's firing (and how close to zero it was) before/around an ICFL
+            ! blowup.
+            if (dbg_clamp_count > 0) then
+                block
+                    character(len=64) :: dbg_fname
+                    integer            :: dbg_unit
+                    write (dbg_fname, '(A,I0,A)') 'ib_pres_clamp_rank', proc_rank, '.log'
+                    dbg_unit = 980 + proc_rank
+                    open (unit=dbg_unit, file=dbg_fname, position='append', action='write', status='unknown')
+                    write (dbg_unit, '(A,I0,A,I0,A,ES16.6)') 't_step=', dbg_t_step, ' clamp_count=', dbg_clamp_count, &
+                        & ' min_abs_denom=', dbg_min_abs_denom
+                    close (dbg_unit)
+                end block
+            end if
 
             @:DEALLOCATE(alpha_rho_IP_buf, alpha_IP_buf, pres_IP_buf, c_IP_buf, vel_IP_buf, r_IP_buf, v_IP_buf, pb_IP_buf, &
                         & mv_IP_buf, nmom_IP_buf, presb_IP_buf, massv_IP_buf, Ys_IP_buf)
@@ -1030,6 +1068,7 @@ contains
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps)
+        $:GPU_UPDATE(device='[num_gps]')
         call s_find_ghost_points(ghost_points)
         call nvtxEndRange
 
