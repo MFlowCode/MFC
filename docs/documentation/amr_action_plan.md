@@ -226,6 +226,141 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-08-30 (44) — TWO EXPERT REVIEWS REORDER THE PROGRAM: the walls are P^3 and P^2, and subcycling is 2.84x
+
+Two independent reviews (AMR design; HPC scaling) were run against the code, docs and logs. Between them
+they overturned most of the plan that preceded this entry. Every number below was re-verified locally
+before being written down.
+
+### R1. The np8->512 weak-scaling ladder ALREADY EXISTED and had never been analysed
+
+`logs/cpuladder-0829_1826/np{8..512}` (one node, CPU, 125k cells/rank, 9 boxes/rank). A LATER ladder
+(`cpuladder-0829_2014`) died in syscheck on every rung, and that failure was mistaken for "we have no
+multi-rank scaling data". We had six clean doublings on disk the whole time.
+
+| np | 8 | 16 | 32 | 64 | 128 | 256 | 512 |
+|---|---|---|---|---|---|---|---|
+| wall (s) | 124.6 | 149.2 | 157.5 | 186.4 | 246.2 | 496.8 | 2088.6 |
+| `rg:clus` ms/call | 13.8 | 37.5 | 133.5 | 885 | 7,626 | 63,634 | - |
+| `rb:topo` ms/call | 0.021 | 0.070 | 0.263 | 1.03 | 5.63 | 22.5 | 88.4 |
+| `rhs` (s) | 91.7 | 100.1 | 107.3 | 117.6 | 139.0 | 195.2 | 325.3 |
+
+- **`rg:clus` grows 2.72/3.56/6.63/8.62/8.34x per doubling -> converging on 8 = 2^3, i.e. O(P^3).**
+  It overtakes `rhs` at np ~= 250 and is 75% of wall at np=512.
+- **`rb:topo` grows exactly 4x per doubling = O(P^2)** - which its own docstring
+  (`m_amr_regrid.fpp:57-58`) already states.
+- `rhs` grows 1.07-1.18x per doubling: the control that rules out CPU contention below np=256.
+- np>=256 is oversubscribed (128 cores/node), so absolute wall there is contaminated; the exponents are
+  read off np<=128.
+
+**The per-step global-scan work (W1) that this plan had as item 1 is `restr` + `rs:rfp` = 2.5% of wall at
+np=512, MEASURED.** It was being sized at 6-11% by extrapolation while a P^2 and a P^3 term sat beside it.
+
+### R2. There is effectively no Berger-Rigoutsos in the emitted box set
+
+The min-separation merge (`m_amr_regrid.fpp:944-963`) fuses accepted boxes into their BOUNDING BOX to a
+fixed point. BR's leaves tile the tagged region contiguously (gap 0), so for any `thr >= 1` the fixed
+point is the bounding box of each connected component of the tag set. `amr_cluster_eff` and `thr` cannot
+affect the result. Proof from our own logs, not inference:
+
+- `covered = 6,609,328 = 187 x 188 x 188` exactly - ONE box.
+- `boxes 64` at `amr_buf=4` and `boxes 27` at `amr_buf=1,2` are 4^3 and 3^3: the same single box re-tiled
+  by `s_amr_tile_box` (`m_amr.fpp:8010`, `ntl = (ext-1+64)/64`).
+- `covered` is IDENTICAL at buf1/buf2/buf4 while `thr` goes 12 -> 6.
+
+**So the 2.20x over-coverage is bounding-box-of-a-centred-Gaussian - this algorithm's BEST case.** For a
+thin spherical shell it is ~0.64*R/t (5-6x at R/t~9); for an oblique planar shock it is the whole domain.
+Every over-coverage number we have was measured on the geometry that hides the defect.
+
+**Why the merge exists is the actual finding:** `f_amr_seam` pairs same-level blocks only if face-adjacent
+AND transversely identical, and `s_amr_check_seam_topology` ABORTS otherwise. There is no general
+fine-fine box-intersection exchange. The merge guarantees every box comes from one regular tiling of one
+box, which makes exact-match seams automatic. **The over-coverage is the price of a missing FillPatch.**
+
+### R3. Subcycling is 2.84x faster, and the 1.55x in the banner is a MODEL, not a measurement
+
+`logs/subcycle2-0830_1601`, equal physical time (dt*steps held constant), identical box sets, escaped 0,
+NaN 0: `buf4_F1` (dt, 200 steps) **657.1 s** vs `buf4_T4` (4*dt, 50 steps) **231.6 s** = **2.84x**.
+
+The first A/B attempt was INVALID - it ran T at the same dt and step count as F, so T paid
+`amr_ref_ratio**amr_max_level` = 4x the fine substeps for the same physical time and came out 3x slower.
+Subcycling's whole point is that the coarse level is no longer held to the fine CFL.
+
+The 1.55x compiled into `m_amr.fpp:591` and asserted in `amr_per_level_distribution.md:141` is what a
+phase-share model predicts; the measured figure is higher because subcycling also quarters the regrid
+rate per unit physical time. **Both should be corrected to say "modelled" or replaced with the measurement.**
+
+Caveat before banking it: the T arms report `RESIDUAL` 51-70% because `s_amr_advance_fine_subcycle_all` /
+`s_amr_advance_children` carry NO `PH_*` brackets. The F arms report RESIDUAL -46% (nested double-count).
+**Neither phase table is a partition; do not rank work off either.**
+
+### WORK LIST, in evidence order
+
+1. **Subcycling.** Instrument the subcycle path (`PH_*` brackets), re-run F1/T4 with 3 repeats and a
+   solution diff, and if 2.84x holds make `amr_subcycle = T` the default. Then re-baseline the tax and
+   the AMReX head-to-head: every one of those numbers was measured on the slower of two algorithms.
+   Fix the two stale 1.55x claims regardless of the outcome.
+2. **Delete `rb:topo`'s O(P^2).** `s_amr_check_seam_topology` (`m_amr_regrid.fpp:63-99`) is an all-pairs
+   scan run every regrid AND every restart (`m_amr_restart.fpp:498`). `s_amr_build_seam_pairs`
+   (`m_amr.fpp:6348-6446`) already Morton-sorts the corners and binary-searches the single candidate per
+   (block, dim) - reuse that index. ~40 lines. Gate: `rb:topo` per-call exponent on the existing ladder
+   must fall from 4x to ~1x.
+3. **Localise `rg:clus`'s O(P^3) BEFORE building anything.** Bracket the wide `ALLREDUCE`
+   (`m_amr_regrid.fpp:706`) and the two narrow `WAITALL`s (`:763, :800`) separately, plus an `MPI_BARRIER`
+   immediately before the ALLREDUCE under its own counter; run np=32/64/128. Every existing counter
+   (`nodes` 2.9x, `rbytes` 12x, `wire_max` 20x, `shr_nodes_all` 32x) says flat-to-mild while wall went
+   38,000x - the gap between those counters and the wall IS the finding, and the mechanism is not yet known.
+4. **Measure over-coverage on non-blob geometry** (shock tube, two blobs, thin shell) before choosing a
+   clustering fix. This decides whether item 5 is worth 1.3x or 3x.
+5. **Remove the bounding-box merge**, either by snapping boxes to a global `amr_blocking_factor` lattice
+   (cheap; exact-match seams hold by construction) or by building a general fine-fine overlap exchange
+   (right; extends `amr_plan_based_exchange.md`'s plan machinery). Also rewrite the merge itself: it
+   restarts an O(n^2) double scan after each fusion, so it is O(n^3) in accepted boxes.
+6. **Level-2 nesting against the level-1 UNION, not per parent.** `m_amr_regrid.fpp:1508-1513` insets each
+   child by `amr_cpat_mar` = 3 coarse cells inside ITS OWN parent box, so the level-2 grid has a
+   structural hole at every level-1 tile seam: at most (43/49)^3 = 68% of a fully tagged parent region can
+   reach level 2, on a lattice set by `amr_max_grid_size` rather than by the flow. Accuracy first.
+7. **`amr_buf` 4 -> 1**: measured 1.13x wall (657.1 -> 517.4 s equivalent arms), 9% less refined volume,
+   `escaped 0` over 9 regrid samples. Confirm the cad audit on two more geometries, then change the default.
+
+### DEPRIORITISED, WITH REASONS
+
+- **W1 per-step scan conversion is NOT the mechanical change this plan assumed, and its proposed
+  verification is unsound.** The global scan order IS the message-matching protocol: reflux matches by
+  non-overtaking on unkeyed tags (`m_amr.fpp:2768`; `m_time_steppers.fpp:606` states the dependency
+  outright). A set-equality assertion cannot detect an ordering change, and cannot detect a CROSS-RANK
+  ordering disagreement at all. **Prerequisite: keyed `(family, block, epoch)` tags** - which W5 needs
+  anyway - and an order check (per-site CRC of the visited sequence, allreduced) rather than a set check.
+- **Metadata distribution stays deferred, but for a corrected reason.** `[amr-halo] touch_now == nboxes`
+  and `touch/own == P` exactly at np=128/256/512: the endstate's own gate for limit 3 is already returning
+  the FAILING verdict. The cause is not the storage layout but the QUERIES - `f_amr_parent_block`
+  (O(N) linear, ~25 call sites), `f_amr_face_is_seam` (`m_amr_registers.fpp:351-372`, O(N), called 6x per
+  reflux-face call inside per-block loops), `s_amr_sibling_face_weights` (O(N^2) per call). Replace the
+  searches with links (a `parent_of(:)` array + the existing Morton index, built once per regrid) FIRST;
+  distribution is mechanical after that and impossible before it.
+- **Rank aggregation stays deprioritised but the evidence is weaker than claimed:** every wire number
+  (4.43 MB mean message, 416 MB/s, "seam already sends one message per peer") was measured on
+  SHARED-MEMORY MPI on one node. A cross-node rung is needed to keep that conclusion.
+
+### KNOWN WALLS RECORDED (not yet scheduled)
+
+- **MPI tag space aborts at ~28k ranks.** `amr_tag_base(f) = amr_max_blocks + 100*f` with an `@:ASSERT`
+  against `tag_ub` (`m_amr.fpp:879-892`). Cray MPICH commonly reports `MPI_TAG_UB = 2^21-1`; at 75
+  blocks/rank that is ~28,000 ranks. Clean abort, not silent - but it is a wall on the shortest path.
+- **`[amr-mem]` under-reports replicated metadata by 10-20x.** It hardcodes 72 B/block
+  (`m_amr_regrid.fpp:1080`) and ignores `amr_slots(amr_max_blocks)` (a fat `t_level` descriptor, ~1-1.5 kB)
+  and the `amr_ovl_gather/scatter`, `amr_gpl_src/sz` arrays. True cost is ~0.6-1.6 kB/block = 5-12 GB/rank
+  at 7.5e6 global blocks: a live OOM risk at init, not a rounding error.
+- **`MPI_ALLREDUCE(MPI_IN_PLACE, cost, amr_num_blocks, ...)` (`m_amr.fpp:3190`)** is a dense reduction of
+  length GLOBAL BLOCK COUNT - 60 MB/rank at 7.5e6 blocks, of structurally sparse data. Should be an
+  ALLGATHERV.
+- **O(P) stack automatics on a per-stage path:** `cand(num_procs)`, `cl(3,num_procs)`, `ch(3,num_procs)`
+  (`m_amr.fpp:2679, 2779`) = ~2.8 MB of stack per call at 1e5 ranks.
+- **Per-level SFC needs >=1 box per rank PER LEVEL.** At 1e5 ranks with `amr_max_grid_size = 64` that is
+  >=2.6e10 refined coarse cells at each of level 1 and level 2, or ranks idle at a level. The only lever
+  is a smaller cap, which was measured ~20x worse per cell. Unresolved, and a stronger argument for the
+  batched-advance pillar than anything currently written down.
+
 ## 2026-08-28 (41) — np32 closes the sweep, and it REORDERS the program: the forest, not level 1, is the O(P) term
 
 Three points, per rank, weak-scaled (400^3 -> 800x400x400 -> 800x800x400):
