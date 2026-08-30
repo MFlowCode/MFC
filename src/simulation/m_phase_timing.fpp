@@ -39,7 +39,7 @@ module m_phase_timing
     public :: PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH
     public :: PH_GWPLAN, PH_GWPACK, PH_GWWAIT
     public :: PH_RSWAVE, PH_RSREST, PH_RSRFP
-    public :: PH_CVTB
+    public :: PH_CVTB, PH_BHALO
 
     integer, parameter :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
     integer, parameter :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
@@ -145,14 +145,19 @@ module m_phase_timing
     integer, parameter :: PH_RSREST = 57
     integer, parameter :: PH_RSRFP = 58
     !> 2a: the batched cons->prim conversion over all owned fine blocks (s_amr_convert_prim_batch, once per stage)
-    integer, parameter          :: PH_CVTB = 59
-    integer, parameter          :: PH_N = 59
+    integer, parameter :: PH_CVTB = 59
+    !> The BASE-GRID halo exchange (s_populate_variables_buffers) inside s_compute_rhs. It sits inside PH_COARSE, which is why the
+    !! uniform (amr=F) arm reported 95%% 'coarse' and no communication at all - the one number needed to say how much of AMR's 31%%
+    !! communication share is AMR's own rather than the solver's baseline.
+    integer, parameter          :: PH_BHALO = 60
+    integer, parameter          :: PH_N = 60
     character(len=8), parameter :: PH_NAME(PH_N) = [character(len=8)::'halo','gather', 'gfill', 'seam', 'rhs', 'rk', 'reflux', &
               & 'regrid', 'L0', 'coarse', 'rg:halo', 'rg:tag', 'rg:clus', 'rg:shape', 'rg:mig', 'rg:build', 'rb:gath', 'rb:ovl', &
               & 'rb:push', 'rb:wait', 'rb:mem', 'rb:unpk', 'swap', 'rb:own', 'rb:upd', 'rb:pack', 'rb:rsv', 'rb:seam', 'rb:post', &
               & 'rb:geo', 'rb:slot', 'rb:tail', 'rb:send', 'rb:flush', 'rb:xchg', 'rb:rec', 'rb:topo', 'pg:all', 'pg:send', &
               & 'pg:recv', 'rf:p2p', 'rf:app', 'rf:recv', 'rf:wait', 'restr', 'rg:part', 'rg:move', 'mg:wait', 'mg:slot', &
-              & 'mg:pack', 'mg:unpk', 'mg:push', 'gw:plan', 'gw:pack', 'gw:wait', 'rs:wave', 'rs:rest', 'rs:rfp', 'cvt:bat']
+              & 'mg:pack', 'mg:unpk', 'mg:push', 'gw:plan', 'gw:pack', 'gw:wait', 'rs:wave', 'rs:rest', 'rs:rfp', 'cvt:bat', &
+              & 'b:halo']
 
     real(wp) :: acc(PH_N) = 0._wp
     !> Entry count per phase. Time alone cannot distinguish "this region is slow" from "this region runs far more often than

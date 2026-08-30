@@ -29,6 +29,7 @@ module m_rhs
     use m_viscous
     use m_ibm
     use m_nvtx
+    use m_phase_timing
     use m_boundary_common
     use m_helper
     use m_surface_tension
@@ -677,7 +678,9 @@ contains
 
         if (igr) then
             call nvtxStartRange("RHS-COMMUNICATION")
+            call s_phase_tic(PH_BHALO)
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
+            call s_phase_toc(PH_BHALO)
             call nvtxEndRange
         end if
         if (.not. igr) then
@@ -691,7 +694,9 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
+            call s_phase_tic(PH_BHALO)
             call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
+            call s_phase_toc(PH_BHALO)
             call nvtxEndRange
         end if
 
