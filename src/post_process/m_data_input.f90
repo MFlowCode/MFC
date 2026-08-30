@@ -723,8 +723,9 @@ contains
                 ! fail-closed: a well-formed header has level >= 1 and a fine x-extent that is an integer
                 ! (>= 2) refinement of the coarse footprint. Reading the level field as an extent (the
                 ! post/writer header-layout drift) makes rr collapse to 0 and trips this.
-                if (lvl < 1 .or. rr < 2 .or. mod(fm + 1, &
-                    & cw) /= 0) &
+                ! level 0 is an L0 TILE (see the v2 path): legal, skipped, not corruption
+                if (lvl /= 0 .and. (lvl < 1 .or. rr < 2 .or. mod(fm + 1, &
+                    & cw) /= 0)) &
                     & call s_mpi_abort('amr post: malformed fine-block header (level/extent inconsistent); the AMR restart ' &
                     & // 'writer and reader header layouts have drifted')
                 amr_num_fine = amr_num_fine + 1
@@ -785,6 +786,13 @@ contains
                     fmf = fown(2); fnf = fown(3); fpf = fown(4)
                     ! DATA PRESENCE COMES FROM THE FILE, not from geometry: a block with no owner has no chunk.
                     if (fown(1) <= 0) owns = .false.
+                    ! LEVEL 0 = an L0 TILE, not a fine block. With l0_ntile > 0 the tiles occupy slots
+                    ! 1..l0_slot_off of the SAME pool and amr_num_blocks counts them, so the writer emits them
+                    ! here. Their data is the base grid re-tiled and is already in the level-0 restart file, so
+                    ! the overlay skips them - but the file offset must still advance past the record. Aborting
+                    ! on them (the old `lvl < 1` test) killed post_process on every AMR + L0-tiles case and
+                    ! blamed a writer/reader header drift that had not happened.
+                    if (lvl == 0) owns = .false.
                     cw = max(reg(4) - reg(1) + 1, 1)
                     rr = 1
                     if (fown(1) > 0) rr = (fmf + 1)/cw
@@ -846,8 +854,9 @@ contains
                     cw = max(isect_hi(1) - isect_lo(1) + 1, 1)
                     rr = (fm + 1)/cw
                     ! fail-closed: mirror the serial path's header sanity check (see s_read_amr_data serial branch)
-                    if (lvl < 1 .or. rr < 2 .or. mod(fm + 1, &
-                        & cw) /= 0) &
+                    ! level 0 is an L0 TILE (see the v2 path): legal, skipped, not corruption
+                    if (lvl /= 0 .and. (lvl < 1 .or. rr < 2 .or. mod(fm + 1, &
+                        & cw) /= 0)) &
                         & call s_mpi_abort('amr post: malformed fine-block header (level/extent inconsistent); the AMR restart ' &
                         & // 'writer and reader header layouts have drifted')
                 end if
