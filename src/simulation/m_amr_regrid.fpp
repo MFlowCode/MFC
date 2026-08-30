@@ -1001,6 +1001,7 @@ contains
         integer              :: i
         !> S3.2a-2: this rank's shallow-phase participation, and its max over ranks
         integer(8) :: me_l(3), me_g(3), hl_l(3), hl_g(3)
+        integer(8) :: tag_g
 
 #ifdef MFC_MPI
         integer :: mierr
@@ -1051,6 +1052,17 @@ contains
         ! EVERY rank must enter this collective -- it was originally written inside the `proc_rank == 0`
         ! guard below, so one rank called ALLREDUCE while the other seven ran ahead into different
         ! collectives and the job died with MPI_ERR_TRUNCATE. Reduce on all ranks; print on rank 0.
+        ! amr_n_tagged counts THIS rank's local tag_grid, so the global numerator is its SUM over ranks.
+        ! amr_n_covered is NOT summed: s_amr_cluster runs with reduce = .true., so every rank clusters the
+        ! same global tag set and already holds the same accepted-box volume. Printing the unreduced pair
+        ! from rank 0 made the ratio wrong by ~num_procs.
+        ! STILL APPROXIMATE, do not over-read it: the numerator mixes the level-1 and level-2 index spaces,
+        ! and it is accumulated BEFORE the amr_buf pad and the box merge, so real over-coverage is worse
+        ! than this ratio shows.
+        tag_g = amr_n_tagged
+#ifdef MFC_MPI
+        if (rank_time_wrt) call MPI_ALLREDUCE(amr_n_tagged, tag_g, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mierr)
+#endif
         hl_l = [int(amr_n_touch_max, 8), int(amr_n_touch, 8), int(amr_n_my, 8)]
         hl_g = hl_l
         if (rank_time_wrt) then
@@ -1064,7 +1076,7 @@ contains
             ! replicated metadata whose gather costs 96 ms/step and whose scan costs 333-583 ms/step at 1e5 ranks.
             ! Counted from the declared shapes: 12 ints of geometry (region lo/hi, isect lo/hi) + level + owner +
             ! my_blk + several O(block) scratch/logical arrays, ~15 ints and 3 logicals per block.
-            print '(A,I0,A,I0)', '[amr-grideff] tagged ', amr_n_tagged, ' covered ', amr_n_covered
+            print '(A,I0,A,I0)', '[amr-grideff] tagged ', tag_g, ' covered ', amr_n_covered
             print '(A,I0,A,I0,A,I0)', '[amr-mem] glob_bytes ', int(amr_max_blocks, 8)*18_8*4_8, ' own_blocks ', amr_n_my, &
                 & ' max_blocks ', amr_max_blocks
             ! HALO PROBE: distinct blocks whose metadata this rank read since the last regrid, against the blocks it
