@@ -842,7 +842,9 @@ contains
                     ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured
                     ! during
                     ! the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle
-                    ! multi-level reflux is future work; dt is the shared lock-step step.
+                    ! multi-level reflux happens on the SUBCYCLE path instead, inside s_amr_advance_children
+                    ! (s_amr_reflux_to_parent(dt_sub, .true.), m_amr.fpp), which is why this branch is
+                    ! lock-step only. dt is the shared lock-step step.
                     if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) then
                         call s_phase_tic(PH_RSRFP)
                         call s_amr_reflux_to_parent(dt, .false.)

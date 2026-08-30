@@ -588,8 +588,9 @@ contains
             if (.not. amr_subcycle .and. amr_max_level >= 1 .and. amr_regrid_int > 0) then
                 print '(A,I0,A)', ' [amr] NOTE: amr_subcycle = F integrates the coarse level ', amr_ref_ratio**amr_max_level, &
                     & 'x more often than its own CFL requires. ' &
-                    & // 'amr_subcycle = T was 1.55x faster per unit physical time (it is a DIFFERENT ' &
-                    & // 'time integration, not a drop-in).'
+                    & // 'a phase-share MODEL predicts amr_subcycle = T is ~1.55x faster per unit ' &
+                    & // 'physical time; one matched-resolution measurement gave 2.84x but its phase ' &
+                    & // 'table is incomplete. Neither figure is confirmed. T is a DIFFERENT time ' // 'integration, not a drop-in.'
             end if
 
             ! Frequent regridding is dominated by the per-cell tag sweep, which is flat in box count.
