@@ -50,6 +50,16 @@ covered in `docs/documentation/contributing.md`.
 - nvfortran 23.11/24.1 segfault (`fort2 TERMINATED by signal 11`) on a caller that passes a
   `parameter` array from `m_thermochem` (e.g. `molecular_weights`) into a declare-target routine.
   Read such arrays directly in the kernel, or pass a plain local computed from them.
+- The `USING_AMD` fypp guards (86 sites, `#:set` in `src/common/include/shared_parallel_macros.fpp`) are
+  load-bearing, not a stale workaround - do not "modernize" them away. They swap a device-global array
+  bound for a literal: `dimension(3)` for `num_dims`/`num_fluids` when case optimization is off (64
+  sites), and `dimension(20)` for `sys_size` in `m_compute_cbc` (21 sites, with a matching
+  `@:PROHIBIT` in `m_start_up` capping `sys_size <= 20` under AMD+CBC). Setting `USING_AMD = False`
+  and rebuilding amdflang `--gpu mp` without case optimization compiles CLEAN - 728 s, zero
+  diagnostics - and then NaNs at step 50 in CBC, riemann `wave_speeds=2`, IBM, surface tension,
+  QBMM/viscous and MHD HLLD, while both Lagrange bubble cases *complete* with out-of-tolerance
+  answers. Measured 2026-08-29 on MI210. A compile-only check returns green, so any future attempt to
+  drop these must run the tests, not just build.
 - The same "call it from the loop body" rule covers `m_thermochem`: calling `get_species_*` from
   inside a `GPU_ROUTINE` rather than from the kernel gave CCE OpenMP a runtime
   `Memory access fault by GPU node-N ... Reason: Unknown` on the first step (exit 134), while every
