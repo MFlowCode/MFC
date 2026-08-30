@@ -60,6 +60,12 @@ contains
 
         if (pc_count_ub(1) >= 0) then
             @:ALLOCATE(pc_iter_count(0:pc_count_ub(1), 0:pc_count_ub(2), 0:pc_count_ub(3)))
+            ! zeroed here because s_compute_load_weight reads it on the FIRST s_write_data_files, which for a run
+            ! saving at t_step_start precedes any relaxation sweep -- the only writer is the count_pc_iters branch.
+            ! The DEVICE copy is the one that matters: the reader (m_load_weight) is a GPU_PARALLEL_LOOP and the
+            ! writer is inside a device region, so a host-only assignment would never reach either.
+            pc_iter_count = 0._stp
+            $:GPU_UPDATE(device='[pc_iter_count]')
         end if
 
     end subroutine s_initialize_phasechange_module
