@@ -138,7 +138,7 @@ Measured 2026-08-02, 3D, np=8, 256^3 two-slab interface, `fine_work` IDENTICAL i
 |---|---|---|---|
 | `amr_max_grid_size` | 32 -> **64** | **3.2x** | nothing measurable here; bounded by device memory (96 OOMs in 3D) |
 | `amr_regrid_int` | 2 -> **8** | **1.39x** | the box set lags a moving feature |
-| `amr_subcycle` | F -> **T** | **1.55x** | a DIFFERENT time integration, not a free optimization |
+| `amr_subcycle` | F -> **T** | **1.55x (MODELLED)** | a DIFFERENT time integration, not a free optimization. 1.55x is a phase-share model, never measured. One matched-resolution arm pair (equal physical time, level 2 at the same dt in both) gave **2.84x**, but the T arm's phase table omits rhs/seam/reflux/gather/rk entirely, so that number is a wall ratio with no accounting behind it. See amr_action_plan (44). |
 | **combined (MEASURED, not multiplied)** | | **7.012x** | no code changes |
 
 Measured cumulatively at np=8, each row adding one lever, `fine_work` identical across the last three
