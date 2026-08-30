@@ -698,6 +698,14 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
+            # The simulation path above checks this; this one did not, so post_process could abort, segfault or
+            # fail outright and the test still reported PASS as long as the simulation goldens matched. That is
+            # how a total break of the AMR post-process reader shipped unnoticed: --test-all ran post_process on
+            # every AMR case and threw the result away.
+            if cmd.returncode != 0:
+                cons.print(cmd.stdout)
+                raise MFCException(f"Test {case}: post_process failed to execute.")
+
             silo_dir = os.path.join(case.get_dirpath(), "silo_hdf5", "p0")
             if os.path.isdir(silo_dir):
                 for silo_filename in os.listdir(silo_dir):
