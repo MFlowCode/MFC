@@ -968,6 +968,10 @@ contains
         if (capped .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tag clustering capped at amr_max_blocks = ', cap
 
         nboxes = nacc
+        do i = 1, nacc  ! grid-efficiency denominator: coarse volume the accepted boxes cover
+            amr_n_covered = amr_n_covered + int(ahi(1, i) - alo(1, i) + 1, 8)*int(ahi(2, i) - alo(2, i) + 1, 8)*int(ahi(3, &
+                                                & i) - alo(3, i) + 1, 8)
+        end do
         allocate (boxes(nboxes))
         do i = 1, nboxes
             boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
@@ -995,7 +999,8 @@ contains
         logical, allocatable :: old_owns(:)
         logical              :: same
         integer              :: i
-        integer(8)           :: me_l(3), me_g(3)  !< S3.2a-2: this rank's shallow-phase participation, and its max over ranks
+        !> S3.2a-2: this rank's shallow-phase participation, and its max over ranks
+        integer(8) :: me_l(3), me_g(3), hl_l(3), hl_g(3)
 
 #ifdef MFC_MPI
         integer :: mierr
@@ -1043,7 +1048,32 @@ contains
             call MPI_ALLREDUCE(me_l, me_g, 3, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mierr)
 #endif
         end if
+        ! EVERY rank must enter this collective -- it was originally written inside the `proc_rank == 0`
+        ! guard below, so one rank called ALLREDUCE while the other seven ran ahead into different
+        ! collectives and the job died with MPI_ERR_TRUNCATE. Reduce on all ranks; print on rank 0.
+        hl_l = [int(amr_n_touch_max, 8), int(amr_n_touch, 8), int(amr_n_my, 8)]
+        hl_g = hl_l
+        if (rank_time_wrt) then
+#ifdef MFC_MPI
+            call MPI_ALLREDUCE(hl_l, hl_g, 3, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mierr)
+#endif
+        end if
         if (rank_time_wrt .and. proc_rank == 0) then
+            ! MEMORY SCALING: bytes this rank holds that are sized by the GLOBAL block count, against the bytes
+            ! sized by what it actually OWNS. glob/own rising with P is the memory face of limit 3 -- the same
+            ! replicated metadata whose gather costs 96 ms/step and whose scan costs 333-583 ms/step at 1e5 ranks.
+            ! Counted from the declared shapes: 12 ints of geometry (region lo/hi, isect lo/hi) + level + owner +
+            ! my_blk + several O(block) scratch/logical arrays, ~15 ints and 3 logicals per block.
+            print '(A,I0,A,I0)', '[amr-grideff] tagged ', amr_n_tagged, ' covered ', amr_n_covered
+            print '(A,I0,A,I0,A,I0)', '[amr-mem] glob_bytes ', int(amr_max_blocks, 8)*18_8*4_8, ' own_blocks ', amr_n_my, &
+                & ' max_blocks ', amr_max_blocks
+            ! HALO PROBE: distinct blocks whose metadata this rank read since the last regrid, against the blocks it
+            ! OWNS. touch/own ~ O(1) means a distributed metadata design carries a BOUNDED halo; touch ~ nboxes means
+            ! every rank needs everything and distribution cannot help. This gates the whole limit-3 project.
+            ! MAX over ranks, not rank 0's own value. rank 0 owns a domain CORNER and is the LEAST connected rank
+            ! in the machine -- the [amr-scope-me] instrument beside this one already carries that warning, and the
+            ! first version of this probe ignored it and reported a corner rank's halo as if it were the machine's.
+            print '(A,I0,A,I0,A,I0)', '[amr-halo] touch_max ', hl_g(1), ' touch_now ', hl_g(2), ' own ', hl_g(3)
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope-me] me_nodes_max ', me_g(1), ' me_rb_max ', me_g(2), ' wire_max ', &
                 & me_g(3), ' shr_nodes_all ', amr_cl_shr_nodes_r, ' shr_rb_all ', amr_cl_shr_rb_r
             print '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
@@ -1056,6 +1086,15 @@ contains
                 & ' loc_nodes ', amr_cl_loc_nodes_r, ' loc_rb ', amr_cl_loc_rb_r, ' shr_maxdep ', amr_cl_shr_maxdep_r
             print '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-tree] maxdep ', amr_cl_maxdep, ' maxdep_leaf ', amr_cl_maxdep_leaf, &
                 & ' lmax ', amr_cl_lmax, ' ldepth ', amr_cl_ldepth, ' nodes ', amr_cl_nodes, ' rbytes ', amr_cl_rb
+        end if
+
+        ! HALO PROBE reset: AFTER the regrid's own global walks (clustering, owner assignment) so the count that
+        ! follows measures ONLY what the STEP path touches -- which is the halo a distributed metadata design must
+        ! carry. Keying the reset on the mesh epoch instead (the first version) folded the regrid's global passes
+        ! in and reported touch == nboxes, which answers a question nobody asked.
+        amr_n_touch_max = max(amr_n_touch_max, amr_n_touch)
+        if (allocated(amr_touch)) then
+            amr_touch = .false.; amr_n_touch = 0
         end if
 
     end subroutine s_amr_regrid
@@ -1095,6 +1134,7 @@ contains
                         & ci, cj, ck - 1)))
                     ! 2*r0 normalizes the 2-cell central difference (rho at i+1..i-1); the 2 is the stencil span, NOT amr_ref_ratio
                     if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
+                    if (tag_grid(ci, cj, ck)) amr_n_tagged = amr_n_tagged + 1_8  ! grid-efficiency numerator
                     ! the acoustic source support stays coarse (its spatials are coarse cell indices): suppress tags there so
                     ! the clusterer splits around the source
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
