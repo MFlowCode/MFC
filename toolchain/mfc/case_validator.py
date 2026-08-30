@@ -129,7 +129,13 @@ PHYSICS_DOCS = {
     "check_bubbles_euler": {
         "title": "Euler-Euler Bubble Model",
         "category": "Bubble Physics",
-        "explanation": ("Requires nb >= 1, positive reference quantities. Polydisperse requires odd nb > 1 and poly_sigma > 0. QBMM requires nnode = 4."),
+        "math": r"\Gamma_l\,p_l = \frac{1}{1-\alpha}\left(E - \tfrac{1}{2}\rho|\mathbf{u}|^2\right) - \Pi_{\infty,l}",
+        "explanation": (
+            "Requires nb >= 1, positive reference quantities. Polydisperse requires odd nb > 1 and poly_sigma > 0. "
+            "QBMM requires nnode = 4. The closure is written for a single carrier liquid, whose own coefficients "
+            "enter undiluted with the void fraction appearing only as the 1/(1 - alpha) on the energy, so "
+            "num_fluids <= 2 (the last advection slot being the void)."
+        ),
         "references": ["Bryngelson21"],
     },
     "check_bubbles_euler_simulation": {
@@ -532,6 +538,7 @@ class CaseValidator:
         thermal = self.get("thermal")
         model_eqns = self.get("model_eqns")
         cyl_coord = self.get("cyl_coord", "F") == "T"
+        num_fluids = self.get("num_fluids", 1)
 
         self.prohibit(nb is None or nb < 1, "The Ensemble-Averaged Bubble Model requires nb >= 1")
         self.prohibit(polydisperse and nb == 1, "Polydisperse bubble dynamics requires nb > 1")
@@ -540,6 +547,13 @@ class CaseValidator:
         self.prohibit(model_eqns == 3, "Bubble models untested with 6-equation model (model_eqns = 3)")
         self.prohibit(model_eqns == 1, "Bubble models untested with pi-gamma model (model_eqns = 1)")
         self.prohibit(cyl_coord, "Bubble models untested in cylindrical coordinates")
+        # The ensemble-averaged closure is written for one carrier liquid: the void fraction occupies
+        # the last advection slot and the liquid keeps its own coefficients, undiluted. Above two
+        # fluids the mixture rule has no derivation behind it (MFlowCode/MFC#1786).
+        self.prohibit(
+            num_fluids is not None and num_fluids > 2,
+            "The Ensemble-Averaged Bubble Model is derived for a single carrier liquid; num_fluids must be <= 2",
+        )
 
         # BUBBLE PHYSICS PARAMETERS
         # Validate bubble reference parameters (bub_pp%)
