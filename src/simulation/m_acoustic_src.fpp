@@ -134,8 +134,8 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         #:endif
-        real(wp)                            :: myRho, B_tait, qv_dummy
-        real(wp)                            :: sim_time, c, small_gamma
+        real(wp)                            :: myRho, pi_inf_mix, qv_dummy
+        real(wp)                            :: sim_time, c, gamma_mix
         real(wp)                            :: frequency_local, gauss_sigma_time_local
         real(wp)                            :: mass_src_diff, mom_src_diff
         real(wp)                            :: source_temporal
@@ -205,7 +205,7 @@ contains
 
                 deallocate (phi_rn)
 
-                $:GPU_PARALLEL_LOOP(private='[myalpha, myalpha_rho, myRho, B_tait, qv_dummy, c, small_gamma, frequency_local, &
+                $:GPU_PARALLEL_LOOP(private='[myalpha, myalpha_rho, myRho, pi_inf_mix, qv_dummy, c, gamma_mix, frequency_local, &
                                     & gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q]', &
                                     & copyin = '[sum_BB, freq_conv_flag, gauss_conv_flag, sim_time]')
                 do i = 1, num_points
@@ -220,10 +220,9 @@ contains
                         myalpha(q) = q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l)
                     end do
 
-                    call s_compute_mixture_coefficients(myalpha_rho, myalpha, myRho, small_gamma, B_tait, qv_dummy)
+                    call s_compute_mixture_coefficients(myalpha_rho, myalpha, myRho, gamma_mix, pi_inf_mix, qv_dummy)
 
-                    small_gamma = 1._wp/small_gamma + 1._wp
-                    c = sqrt(small_gamma*(q_prim_vf(eqn_idx%E)%sf(j, k, l) + ((small_gamma - 1._wp)/small_gamma)*B_tait)/myRho)
+                    call s_compute_speed_of_sound(q_prim_vf(eqn_idx%E)%sf(j, k, l), myRho, gamma_mix, pi_inf_mix, myalpha, c)
 
                     ! Wavelength to frequency conversion
                     if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
@@ -236,7 +235,7 @@ contains
 
                     if (dipole(ai)) then  ! Double amplitude & No momentum source term (only works for Planar)
                         mass_src(j, k, l) = mass_src(j, k, l) + 2._wp*mom_src_diff/c
-                        E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
+                        E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c*gamma_mix
                         cycle
                     end if
 
@@ -274,7 +273,7 @@ contains
                     mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
 
                     ! Update energy source term
-                    E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2._wp/(small_gamma - 1._wp)
+                    E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2._wp*gamma_mix
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
