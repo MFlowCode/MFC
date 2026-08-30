@@ -272,13 +272,11 @@ contains
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
-        @:ALLOCATE(eos_types(1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             isentrope_n(i) = f_isentrope_exponent(gammas(i))
-            eos_types(i) = fluid_pp(i)%eos
 
             ! Each EOS supplies its own coefficients. Resolved once here, not per cell: a branch in the mixture loop costs
             ! registers in the Riemann kernels. An EOS whose coefficients depend on state must move to per-cell evaluation.
@@ -1168,7 +1166,7 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eos_types)
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1191,9 +1189,18 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
         #:endif
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
-        integer               :: i  !< Loop iterator over fluids
+        integer               :: i      !< Loop iterator over fluids
+        integer               :: n_mix  !< Material slots: excludes the void under bubbles_euler
 
-        if (num_fluids == 1 .and. bubbles_euler) then
+        ! Under bubbles_euler the last advection slot is the void fraction, not a material
+        ! (eqn_idx%alf == eqn_idx%adv%end), so the sum runs over the material slots only. With a single
+        ! liquid there is no slot to sum and its own coefficients are used, undiluted, which is what the
+        ! (1 - alf) division in the bubble sound speed expects. Under mpp_lim the volume fractions have
+        ! been renormalized to sum to one, so the whole array is the mixture again.
+        n_mix = num_fluids
+        if (bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 2)) n_mix = num_fluids - 1
+
+        if (bubbles_euler .and. n_mix <= 1) then
             rho_K = alpha_rho_K(1)
             gamma_K = gammas(1)
             pi_inf_K = pi_infs(1)
@@ -1205,7 +1212,7 @@ contains
             qv_K = 0._wp
 
             $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
+            do i = 1, n_mix
                 rho_K = rho_K + alpha_rho_K(i)
                 gamma_K = gamma_K + alpha_K(i)*gammas(i)
                 pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
