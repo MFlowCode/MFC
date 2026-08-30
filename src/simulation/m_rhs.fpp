@@ -2328,49 +2328,49 @@ contains
             @:DEALLOCATE(alf_sum%sf)
         end if
 
-        if (.not. igr) then
-            if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
-                do i = num_dims, 1, -1
-                    if (i /= 1) then
-                        do l = 1, sys_size
-                            nullify (flux_n(i)%vf(l)%sf)
-                            nullify (flux_src_n(i)%vf(l)%sf)
-                            @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
+        if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
+            do i = num_dims, 1, -1
+                if (i /= 1) then
+                    do l = 1, sys_size
+                        nullify (flux_n(i)%vf(l)%sf)
+                        nullify (flux_src_n(i)%vf(l)%sf)
+                        @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
+                    end do
+                else
+                    do l = 1, sys_size
+                        @:DEALLOCATE(flux_n(i)%vf(l)%sf)
+                        @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
+                    end do
+
+                    if (viscous) then
+                        do l = eqn_idx%mom%beg, eqn_idx%E
+                            @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
-                    else
-                        do l = 1, sys_size
-                            @:DEALLOCATE(flux_n(i)%vf(l)%sf)
-                            @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
-                        end do
-
-                        if (viscous) then
-                            do l = eqn_idx%mom%beg, eqn_idx%E
-                                @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
-                            end do
-                        end if
-
-                        if (chem_params%diffusion .and. .not. viscous) then
-                            @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
-                        end if
-
-                        if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
-                            do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
-                                @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
-                            end do
-                        else
-                            do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
-                                nullify (flux_src_n(i)%vf(l)%sf)
-                            end do
-                        end if
-
-                        @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf)
                     end if
 
-                    @:DEALLOCATE(flux_n(i)%vf, flux_src_n(i)%vf, flux_gsrc_n(i)%vf)
-                end do
+                    if (chem_params%diffusion .and. .not. viscous) then
+                        @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
+                    end if
 
-                @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
-            end if
+                    if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
+                        do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
+                            @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
+                        end do
+                    else
+                        do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
+                            nullify (flux_src_n(i)%vf(l)%sf)
+                        end do
+                    end if
+
+                    @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf)
+                end if
+
+                @:DEALLOCATE(flux_n(i)%vf, flux_src_n(i)%vf, flux_gsrc_n(i)%vf)
+            end do
+
+            @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
+        end if
+        if (.not. igr) then
             do i = 1, num_dims
                 if (viscous) then
                     do l = eqn_idx%mom%beg, eqn_idx%mom%end
