@@ -785,6 +785,11 @@ class CaseValidator:
                 geometry == 2 and packing_method == 2,
                 f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
             )
+            shell_axis = self.get(f"particle_cloud({i})%shell_axis", 3)
+            self.prohibit(
+                geometry == 2 and shell_axis not in [1, 2, 3],
+                f"particle_cloud({i})%shell_axis must be 1 (x), 2 (y), or 3 (z)",
+            )
             if geometry == 2 and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
                 x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
                 y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
@@ -795,32 +800,34 @@ class CaseValidator:
                 y_end = self.get("y_domain%end", None)
                 z_beg = self.get("z_domain%beg", None)
                 z_end = self.get("z_domain%end", None)
+                # 2D has no z-axis; shell_axis values other than 1 (x) fall back to y, matching the
+                # fixed +y orientation used before shell_axis existed (see s_sample_cloud_candidate).
+                open_axis = shell_axis if (p > 0 or shell_axis == 1) else 2
 
-                if all(self._is_numeric(v) for v in [x_centroid, x_beg, x_end]):
-                    self.prohibit(
-                        x_centroid - shell_outer_radius < x_beg or x_centroid + shell_outer_radius > x_end,
-                        f"particle_cloud({i}) hemisphere shell x-extent must lie within x_domain",
-                    )
-                if n > 0 and all(self._is_numeric(v) for v in [y_centroid, y_beg, y_end, radius]):
-                    if p > 0:
+                axes = [
+                    (1, "x", x_centroid, x_beg, x_end),
+                    (2, "y", y_centroid, y_beg, y_end),
+                    (3, "z", z_centroid, z_beg, z_end),
+                ]
+                for axis_id, name, centroid, beg, end in axes:
+                    if axis_id == 2 and n == 0:
+                        continue
+                    if axis_id == 3 and p == 0:
+                        continue
+                    if not all(self._is_numeric(v) for v in [centroid, beg, end, radius]):
+                        continue
+                    if axis_id == open_axis:
+                        # the flat face sits at the centroid and the shell opens toward +axis; require
+                        # one particle radius of standoff so no particle surface sits on the domain wall.
                         self.prohibit(
-                            y_centroid - shell_outer_radius < y_beg or y_centroid + shell_outer_radius > y_end,
-                            f"particle_cloud({i}) hemisphere shell y-extent must lie within y_domain",
+                            centroid - radius < beg or centroid + shell_outer_radius > end,
+                            f"particle_cloud({i}) hemisphere shell must clear {name}_domain by one particle radius",
                         )
                     else:
-                        # 2D half-annulus opens toward +y from the flat face at y_centroid; require one
-                        # particle radius of standoff so no particle surface sits on the domain wall.
                         self.prohibit(
-                            y_centroid - radius < y_beg or y_centroid + shell_outer_radius > y_end,
-                            f"particle_cloud({i}) half-annulus must clear y_domain by one particle radius",
+                            centroid - shell_outer_radius < beg or centroid + shell_outer_radius > end,
+                            f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
                         )
-                if p > 0 and all(self._is_numeric(v) for v in [z_centroid, z_beg, z_end, radius]):
-                    # 3D hemisphere shell opens toward +z from the flat face at z_centroid; require one
-                    # particle radius of standoff so no particle surface sits on the domain wall.
-                    self.prohibit(
-                        z_centroid - radius < z_beg or z_centroid + shell_outer_radius > z_end,
-                        f"particle_cloud({i}) hemisphere shell must clear z_domain by one particle radius",
-                    )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
