@@ -22,7 +22,7 @@ module m_data_input
     implicit none
 
     private; public :: s_initialize_data_input_module, s_read_data_files, s_read_serial_data_files, s_read_parallel_data_files, &
-        & s_read_amr_data, s_free_amr_data, s_finalize_data_input_module
+        & s_read_amr_data, s_free_amr_data, s_finalize_data_input_module, f_save_exists
 
     abstract interface
 
@@ -115,6 +115,28 @@ contains
 #endif
 
     !> Helper subroutine to read IB data files
+    !> Does a saved restart exist for this index? Under cfl_dt the SIMULATION names saves by `save_count = int(mytime/t_save)`
+    !! (m_start_up.fpp), so when adaptive dt grows enough for one step to cross TWO t_save boundaries the index SKIPS and no file is
+    !! written for the intervening value. That gap is legitimate output, not a fault, but the post loop walks indices 0..n_save-1
+    !! and the reader aborts on the first absent one -- which killed post_process on every CFL-driven case. Only the shared-file
+    !! layout is checked: with file_per_process each rank owns a different file and the answer would not be rank-uniform, so that
+    !! path keeps the original fail-closed behaviour.
+    impure function f_save_exists(t_step) result(present_)
+
+        integer, intent(in)                  :: t_step
+        logical                              :: present_
+        character(LEN=path_len + 2*name_len) :: floc
+        character(LEN=name_len)              :: fnum
+
+        present_ = .true.
+        if (.not. parallel_io) return
+        if (file_per_process) return
+        write (fnum, '(I0,A)') t_step, '.dat'
+        floc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(fnum)
+        inquire (FILE=trim(floc), EXIST=present_)
+
+    end function f_save_exists
+
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
         character(len=*), intent(in)                :: file_loc_base
