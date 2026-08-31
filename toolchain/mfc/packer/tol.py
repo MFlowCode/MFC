@@ -27,6 +27,8 @@ def _is_zero_field(values: typing.List[float], atol: float) -> bool:
     A rearrangement wholly inside the band - uniform +x becoming alternating +/-x - is invisible to
     this rule, and inherently so: values the test cannot resolve from zero cannot be resolved from
     each other either. Anything leaving the band is still caught, per value."""
+    if any(math.isnan(v) for v in values):
+        return False
     mags = _magnitudes(values)
     return bool(mags) and max(mags) <= atol
 
@@ -39,12 +41,31 @@ def _zero_field_bound(values: typing.List[float], atol: float) -> float:
     return max(atol, _ZERO_FIELD_HEADROOM * max(_magnitudes(values), default=0.0))
 
 
+#: How far a golden sample of exactly zero may drift, as a fraction of the finest value the field
+#: actually resolves. Such a sample stores a sign, not a magnitude, so judging it against the bare
+#: absolute tolerance tests the compiler's association order rather than the solver.
+_ZERO_SAMPLE_FRACTION = 1e-2
+
+
+def _zero_sample_bound(values: typing.List[float], atol: float) -> float:
+    """The band a candidate must stay inside where the golden is exactly zero. Tied to the field's
+    resolution - its smallest nonzero magnitude - not its dynamic range: a fraction of the maximum
+    would license a "zero" of 1e3 in a field of 1e5."""
+    nonzero = [abs(v) for v in values if v != 0.0 and not math.isnan(v)]
+    if not nonzero:
+        return atol
+    return max(atol, _ZERO_SAMPLE_FRACTION * min(nonzero))
+
+
 def is_close(error: Error, tolerance: Tolerance) -> bool:
     if error.absolute <= tolerance.absolute:
         return True
 
+    # A golden value of exactly zero makes the relative error NaN. Such a sample has already failed
+    # the absolute check above, and there is nothing to take a ratio against, so it fails here rather
+    # than passing on an undefined comparison.
     if math.isnan(error.relative):
-        return True
+        return False
 
     if error.relative <= tolerance.relative:
         return True
@@ -105,9 +126,8 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
             return None, f"Variable count didn't match for {gFilepath}."
 
         # A field that is zero in the golden is checked for staying zero, not for
-        # reproducing its roundoff. This also closes a hole: a golden value of exactly 0
-        # gives a NaN relative error, which is_close() passes unconditionally, so such a
-        # field was previously not checked at all.
+        # reproducing its roundoff. Exact-zero samples inside an otherwise nonzero field do
+        # not come here; is_close() judges those on absolute error alone.
         if _is_zero_field(gEntry.doubles, tol.absolute):
             bound = _zero_field_bound(gEntry.doubles, tol.absolute)
             for valIndex, cVal in enumerate(cEntry.doubles):
@@ -123,6 +143,7 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
             continue
 
         # Check if each variable is within tolerance
+        zero_bound = _zero_sample_bound(gEntry.doubles, tol.absolute)
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):
             # Keep track of the error and average errors
             error = compute_error(cVal, gVal)
@@ -148,6 +169,12 @@ Variable n°{valIndex + 1} (1-indexed) in {gFilepath} {msg}:
                 return raise_err_with_failing_diagnostics("is NaN in the golden file")
             if math.isnan(cVal):
                 return raise_err_with_failing_diagnostics("is NaN in the pack file")
+
+            # An exact zero has no magnitude to take a ratio against; judge it against the band.
+            if gVal == 0.0:
+                if abs(cVal) > zero_bound:
+                    return raise_err_with_failing_diagnostics(f"is zero in the golden but reaches {abs(cVal):.2E}, past its {zero_bound:.2E} band")
+                continue
             if not is_close(error, tol):
                 return raise_err_with_failing_diagnostics("is not within tolerance")
 
