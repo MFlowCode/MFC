@@ -8164,10 +8164,18 @@ contains
         integer, intent(in) :: nloc
         integer             :: oldcap, newcap, i
         integer             :: c5, i4, k3, j2, i1
-        !> device-native staging doubles the array's device footprint transiently; above this many old columns, fall back to the
-        !! host round trip (device peak max(old, new)). 32 covers the startup/early-regrid growth events whose round trips dominated
-        !! short runs, while near-limit late growth keeps the OOM-safe path.
-        integer, parameter              :: amr_grow_dev_cap = 32
+        !> device-native staging transiently holds old + tmp columns on the device, and growth fires at the memory high-water mark
+        !! -- a measured OOM class (a +25%-increment transient alone tipped a 57.3 GiB np=4 run; see the cap-sweep history). The
+        !! guard used to be a COLUMN COUNT (32), but a column is ~33 MB at the default 64^3 block cap and ~1.8 GB on that 57 GiB run
+        !! -- the same count means wildly different bytes, and the store-capacity ratchet pushes production runs to 43-81 columns,
+        !! sending EVERY later growth on the full-store host PCIe round trip (measured 4.4 s/regrid vs 0.55 under the guard). Budget
+        !! the TRANSIENT ITSELF instead: stage on-device while the extra copy stays under amr_grow_dev_bytes; this admits the
+        !! measured production range and still routes any near-limit store to the OOM-safe host path, because a big store implies
+        !! big column bytes. KNOWN EXPOSURE (review D3): 4 GiB is 6% of a 64 GB GCD but 25% of a 16 GB card, and growth fires at the
+        !! high-water mark -- on sub-4-GiB stores a 16 GB card takes the device path where the old count guard host-pathed it. No
+        !! portable free-memory query exists here; revisit if a small-card production target appears.
+        integer(8), parameter           :: amr_grow_dev_bytes = 4_8*1024_8**3
+        integer(8)                      :: st_col_bytes
         logical                         :: want(4)
         real(stp), allocatable          :: tmp(:,:,:,:,:), hstage(:,:,:,:,:)
         type(scalar_field), allocatable :: tmp_br(:)  !< CCE descriptor workaround, see below
@@ -8197,7 +8205,9 @@ contains
 
         #:for ST, IDX in [('amr_cons_st', 1), ('amr_stor_st', 2), ('amr_gst_a', 3), ('amr_gst_b', 4)]
             if (want(${IDX}$)) then
-                if (oldcap > amr_grow_dev_cap) then
+                st_col_bytes = int(mbuf1_hi - mbuf1_lo + 1, 8)*int(mbuf2_hi - mbuf2_lo + 1, 8)*int(mbuf3_hi - mbuf3_lo + 1, &
+                                   & 8)*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
+                if (int(oldcap, 8)*st_col_bytes > amr_grow_dev_bytes) then
                     ! near-limit fallback: the device-native staging below transiently holds old + tmp = 2*oldcap columns
                     ! on the device, and growth fires exactly at the memory high-water mark - a measured OOM class (a
                     ! +25%-increment transient alone tipped a 57.3 GiB np=4 run; see the cap-sweep history). Above the

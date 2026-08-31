@@ -168,8 +168,9 @@ contains
         integer             :: oldcap, newcap
         integer             :: eq, t1, t2, c4
         !> device staging transiently doubles one register array's footprint; register slots are faces (~1.4 MB across all 12 arrays
-        !! vs tens of MB for a store column), so the byte transient of 512 register slots matches the store's 32-column threshold.
-        !! Above it, fall back to the host round trip (device peak max(old, new)).
+        !! vs tens of MB for a store column), so the byte transient of 512 register slots is of the order the store's old 32-column
+        !! threshold admitted (the store now budgets TRANSIENT BYTES instead; this site keeps the count guard because its per-array
+        !! transient is two orders smaller). Above it, fall back to the host round trip (device peak max(old, new)).
         integer, parameter    :: amr_reg_grow_dev_cap = 512
         real(wp), allocatable :: rtmp(:,:,:,:), rtmp_d(:,:,:,:)
 
