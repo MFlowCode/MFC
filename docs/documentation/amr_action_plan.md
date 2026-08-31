@@ -226,6 +226,55 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-08-31 (47) — LANDED AND AUDITED: the merge ships; the record is forensically corrected
+
+### What landed on up/mega (c881e4ee, 08a8f498, 805f26ea; 66/66 double-precision gate; CI cycling)
+- The binned candidate merge, review-hardened through TWO caught regressions: a stale-base file copy
+  that silently reverted d705abb6 (caught by code review), and a restored counter loop placed before
+  `nboxes = k` that clobbered the box count and crashed 1D dynamic regrid (caught by the first clean
+  gate). Fresh section timers attribute the remaining residual: at np32/64 the MERGE PASSES carry it
+  (93.5 -> ~350 ms, 3.7x/doubling) while sort (~3 -> 15) and gather (~1 -> 9) are noise.
+- The bytes-based growth guard, and the single-precision CI fix AT THE REAL CALL SITE -- the first fix
+  patched a function the test path never calls and shipped validated only by construction. The
+  single-precision lane has never actually tested post_process on master: post failure skips the silo
+  check silently (master test.py ~:565), so the lane was vacuously green for its whole life.
+
+### The toolchain-lock incident
+A `--dry-run --single` invocation set `single: true` in build/lock.yaml; every subsequent build/test
+without an explicit precision flag inherited it -- gates ran single-precision binaries against double
+goldens for ~3 hours (the "hung gate" and a phantom contention theory both trace to it). MFCFLAGS now
+carries `--no-single` permanently, and the lock is part of the gate's pre-test check.
+
+### Forensic corrections to this ledger (full table in the session record)
+- Merge A/B: only the np128 rung is a matched A/B (~7.9x); np32/64 arms were layout-mismatched
+  (-N1 vs -N2) -- treat 1.65x/3.2x as soft. All overnight numbers were measured on the superseded
+  draft binary; the clussplit ladder re-measures on the landed code (job 394960, in flight).
+- Entry 44's "np>=256 oversubscribed" is FALSE (the ladder ran on 8 nodes, 64-core; np512 = 64/node);
+  the np256/512 rhs jumps still lack an explanation. Entry 44's amr_buf "1.13x (657.1->517.4)" mixes
+  run sets; same-set pairs give 1.13x and 1.22x. The tag wall is 2^29-1 MEASURED (7.2e6 ranks), not
+  the 2^21 floor entry 44 resurrected. "476.2 of 477.1 s reconciled" is unreproducible from the
+  published tables (they double-count; residuals -13..-58%) -- the residency mechanism stands on the
+  calls x ms/call identity, not on that flourish.
+- Multi-node GPU is 0-for-2 and NOT explained by the sick-node list (mn16 died on a pml mismatch
+  between k004-002/k004-008, neither on the list; the prodsize np16 pre_process segfaulted on healthy
+  nodes). Syscheck passes 2-node with ALL UCX arms, so the failure is workload- or node-specific;
+  the real-workload matrix (394991) discriminates. Sick-node excludes remain necessary, not sufficient.
+- The host-CPU provenance print emitted EMPTY strings (nested quoting); every timing pair since entry
+  46 is host-unprovenanced. Fixed via a helper script. [amr-mem] under-reported the replicated
+  footprint 10-20x (72 B/block, ignoring amr_slots); fixed to count the slots array.
+
+### The standing decision queue (supersedes the reorder header where they differ)
+1. GATE the dirty-box continuation on 394960's np128 readout + this CI cycle + an np>2
+   churn/restart/multi-level local set. If the landed exponent is tame, DELETE the item.
+2. P-PRIME (tax/payoff re-baseline, production physics, landed binary) runs CONCURRENTLY on the held
+   node -- it decides whether more merge work is even the right program, and depends on nothing else.
+3. keep-tol v1 per the gated design (coverage gate + dynamic-constraint gate non-negotiable).
+4. Keyed-tags M0. 5. Multi-node GPU via 394991's readout. 6. Steering rung AFTER 4 (it segfaulted).
+7. Desk-only: adjudicate the NVHPC gpu-omp NaN branch-vs-master via CI archaeology.
+8. PROPOSED to the user: a Frontier GPU weak-scaling ladder (np 8 -> ~512 GCDs) -- both facts behind
+   the single-node-by-design constraint have fallen (AMR runs on Frontier since 08-28; multi-node MPI
+   was never broken); target-machine evidence would replace every CPU-proxy exponent, at zero hpcfund cost.
+
 ## 2026-08-31 (46) — SUBCYCLE VERDICT: PARITY AT MATCHED FIDELITY; the sweep is in and bit-identical
 
 ### R1. amr_subcycle gains ~nothing at the production operating point

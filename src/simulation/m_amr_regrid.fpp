@@ -1207,8 +1207,11 @@ contains
             ! Counted from the declared shapes: 12 ints of geometry (region lo/hi, isect lo/hi) + level + owner +
             ! my_blk + several O(block) scratch/logical arrays, ~15 ints and 3 logicals per block.
             print '(A,I0,A,I0,A,I0)', '[amr-grideff] tagged ', tag_g, ' covered ', amr_n_covered, ' shaped ', amr_n_shaped
-            print '(A,I0,A,I0,A,I0)', '[amr-mem] glob_bytes ', int(amr_max_blocks, 8)*18_8*4_8, ' own_blocks ', amr_n_my, &
-                & ' max_blocks ', amr_max_blocks
+            ! glob_bytes counts the metadata ints AND the amr_slots struct array (descriptors dominate at
+            ! ~1 kB/slot): the previous 72 B/block figure under-reported the replicated footprint 10-20x
+            ! and silently propped up the "metadata distribution deferred, ~180 MB/rank" decision.
+            print '(A,I0,A,I0,A,I0)', '[amr-mem] glob_bytes ', int(amr_max_blocks, 8)*18_8*4_8 + int(size(amr_slots), &
+                & 8)*int(storage_size(amr_slots(1)), 8)/8_8, ' own_blocks ', amr_n_my, ' max_blocks ', amr_max_blocks
             ! HALO PROBE: distinct blocks whose metadata this rank read since the last regrid, against the blocks it
             ! OWNS. touch/own ~ O(1) means a distributed metadata design carries a BOUNDED halo; touch ~ nboxes means
             ! every rank needs everything and distribution cannot help. This gates the whole limit-3 project.
