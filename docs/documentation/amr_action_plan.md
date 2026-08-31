@@ -226,6 +226,60 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-08-30 (45) — THE CADENCE RESULT WAS A BROKEN CONTROL; multi-node was never broken; the walls move again
+
+### R1. `fine_work` is a SNAPSHOT, and the regrid-cadence "2.56x" was mesh residency, not cost
+
+An int=20 vs int=80 A/B (equal dt*steps, `fine_work` identical to the digit at the FINAL regrid) showed
+int=20 2.56x slower with rhs itself 2x -- initially read as "frequent regridding degrades the machine".
+A code trace killed that: `fine_work` is per-regrid instantaneous, and the mesh reaches full depth at the
+SECOND regrid (level-2 children need a live level-1 sensor; `m_amr_regrid.fpp:1388-1394`), i.e. at step
+2*int. The int=20 run carried the full mesh for 160/200 steps, int=80 for 40/200: integrated fine
+cell-steps 1.86x apart. **rhs: 14,407 vs 7,230 calls at 15.16 vs 15.04 ms/call — 2x the CALLS, +0.8%
+per call.** The machine is not slower; the AMR exists sooner. Per-phase deltas reconcile 476.2 of the
+477.1 s gap. Every persistent-state hypothesis (mapping leak, capacity walk, slot scatter, lazy alloc)
+is DEAD, bounded at ~1% by the ms/call identity.
+
+Consequences: the int=80 arm silently UNDER-RESOLVED the flow for most of the run, and `[amr-cad]
+escaped 0` cannot see it (containment is only checked between regrids, not in the pre-refinement window
+after coarsening-lag). The valid subcycle pair is T4 vs Fc (SAME physical regrid cadence, same mesh
+trajectory): **subcycle proper = 1.36x** (224.3 vs 305.0 s), close to the modelled 1.55x. The honest
+matched-resolution F-vs-T needs T at int=5; queued as job 393184.
+
+### R2. Multi-node MPI was NEVER broken — three sick nodes were
+
+Job 391228: np8-512 over k003-[001-008], COMPLETED, default settings, sacct-verified. Every failure had
+one of k003-009 / k003-010 / k004-006 in the allocation (UCX-dead IB; mixed-PML abort or wireup death at
+the first barrier; the cluster module pins UCX_NET_DEVICES and silences UCX logs, so no fallback and no
+diagnostic). `--exclude` added to every harness. **`cpuladder-0829_1826` — the dataset behind the
+rg:clus/rb:topo exponents — is 8-node CROSS-NODE data**; the "everything is intra-node" caveat now
+applies only to GPU-side numbers, and the first 2-node GPU run is queued (393185).
+
+### R3. Two regrid-path levers found by the same trace (real, code-located)
+
+- **`amr_grow_dev_cap = 32` is exceeded once the ratchet passes it** (`m_amr.fpp:8172, 8206-8214`), so
+  every later store growth pays a FULL-STORE host PCIe round trip: rg:mig 4.4 s/regrid vs 0.55 when
+  under the cap. Ratchet final caps 32..81 at int=20 vs 26..43 at int=80 for the same live counts.
+- **Steady-state regrids never no-op**: the box set oscillates between two variants (fine_work
+  186,619,136 <-> 186,311,808), so `s_amr_regrid_boxes_unchanged` (exact comparison,
+  `m_amr_regrid.fpp:1839-1859`) never fires and each steady regrid migrates ~600 MB (87 blocks / 3.73 GB
+  over 10 regrids vs 3 / 144 MB over 2). A symmetric-difference tolerance (keep the old set when the new
+  one differs by less than a few % of volume) would make steady-state regrids nearly free.
+
+### R4. Keyed-tags design (W1/W5 prerequisite) is written
+
+(band, gen, seq) in 5+4+12 bits = 2^21-1 exactly; seq is the canonical per-(pair,band) sequence over the
+sorted transfer list, so tag demand is O(blocks/RANK), independent of global blocks and P -- the tag wall
+closes by construction. An always-on XOR order-oracle (per-site fold of (peer, seq, key), allreduced at
+finalize beside the existing [amr-xa] conservation asserts) catches cross-rank ordering divergence that
+no set-equality check can. Migration M0-M3 with a seeded-bug gate at M0. Zero wire bytes, no new
+collectives, bit-identical goldens at every step. Full note in the session records; land M0 first.
+
+### Queued beyond this session
+393181 np=128 / 393182 np=256 (2 nodes) / 393183 np=512 (4 nodes) clean CPU exponent points on mi2104x;
+393184 T-int5 (mi2508x); 393185 first multi-node GPU np=16 (2x MI250X). All pinned-binary, sick nodes
+excluded, provenance in-log.
+
 ## 2026-08-30 (44) — TWO EXPERT REVIEWS REORDER THE PROGRAM: the walls are P^3 and P^2, and subcycling is 2.84x
 
 Two independent reviews (AMR design; HPC scaling) were run against the code, docs and logs. Between them
