@@ -7637,34 +7637,45 @@ contains
 
         ! valid coarse CONS ghosts on BOTH lerp sources, ONCE for the whole setup loop (ALL ranks call: pairwise halo). Neither
         ! source is written below, so this is the loop-invariant hoist described in s_amr_subcycle_setup_block.
+        ! Subcycle phase brackets: the T arm's phase table was EMPTY of rhs/rk/gather/seam/halo (this whole
+        ! path carried no PH_* markers), so the measured 2.84x was a wall ratio with no accounting behind it.
+        ! Same phase ids as the lock-step path so the two budgets read side by side.
+        call s_phase_tic(PH_HALO)
         if (amr_xchg_coarse_ghosts) then
             call s_amr_exchange_coarse_cons_halo(q_old)
             call s_amr_exchange_coarse_cons_halo(q_new)
         end if
+        call s_phase_toc(PH_HALO)
 
         ! SETUP: each level-1 block prepares its two time-lerp ghost sources and zeros its registers (collective; ALL ranks call)
+        call s_phase_tic(PH_GATHER)
         do islot = 1, amr_num_blocks
             if (amr_block_level(islot) /= 1) cycle
             call s_amr_select_slot(islot)
             call s_amr_subcycle_setup_block(q_old, q_new, pb_old, mv_old, pb_in, mv_in)
         end do
+        call s_phase_toc(PH_GATHER)
 
         do sub = 1, 2
             do s = 1, 3
                 th = (real(sub - 1, wp) + c_abs(s))*0.5_wp
                 ! lerp every block's ghost shell to the stage time (+ substep-entry backup) BEFORE the seam halo reads interiors
+                call s_phase_tic(PH_GATHER)
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) /= 1) cycle
                     call s_amr_select_slot(islot)
                     if (.not. amr_rank_owns_block) cycle
                     call s_amr_subtree_stage_lerp(s, th)
                 end do
+                call s_phase_toc(PH_GATHER)
                 ! reconcile shared seam ghosts among ADJACENT same-level blocks so both sides compute a matching flux. Tiling can
                 ! split a wide feature into adjacent sub-blocks at ANY rank count (amr_maxc_fit caps a box at half the global extent
                 ! even at np=1), so the halo runs unconditionally - it self-no-ops when there are no seam pairs, keeping every
                 ! untiled
                 ! case byte-identical.
+                call s_phase_tic(PH_SEAM)
                 call s_amr_fine_fine_halo(0)
+                call s_phase_toc(PH_SEAM)
                 ! RHS + RK update every block from the reconciled ghost shell
                 do islot = 1, amr_num_blocks
                     if (amr_block_level(islot) /= 1) cycle
@@ -7732,6 +7743,7 @@ contains
         idwint = amr_slots(amr_cur)%idwbuff
         $:GPU_UPDATE(device='[idwint]')
         call s_amr_br_load(amr_loc_of(amr_cur))
+        call s_phase_tic(PH_RHS)
         if (qbmm .and. .not. polytropic) then
             ! the block's OWN side-state and rhs scratch (the coarse arrays stay untouched)
             call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, &
@@ -7739,9 +7751,11 @@ contains
         else
             call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
         end if
+        call s_phase_toc(PH_RHS)
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_amr_restore_coarse()
         amr_in_fine_advance = .false.
+        call s_phase_tic(PH_RK)
 
         ! RK stage update at the FINE time step (device kernel)
         call s_amr_fine_rk_update(amr_loc_of(amr_cur), amr_scr_rhs, coefs(s, 1), coefs(s, 2), coefs(s, 3), coefs(s, 4), dt_sub)
@@ -7757,6 +7771,7 @@ contains
         if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(th)
         ! IB state correction on the fine block after each substep RK update (no-op unless ib)
         call s_amr_ib_correct_fine(amr_scr_prim)
+        call s_phase_toc(PH_RK)
         if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_amr_subtree_stage_advance
@@ -7832,8 +7847,10 @@ contains
                     if (.not. amr_rank_owns_block) cycle
                     call s_amr_subtree_stage_lerp(s, th)
                 end do
+                call s_phase_tic(PH_SEAM)
                 call s_amr_fine_fine_halo(clev)
                 do kc = 1, amr_num_blocks
+                    call s_phase_toc(PH_SEAM)
                     if (amr_block_level(kc) /= clev) cycle
                     call s_amr_select_slot(kc)
                     if (.not. amr_rank_owns_block) cycle
@@ -7855,9 +7872,11 @@ contains
                 if (relax) call s_amr_relax_fine()
             end if
             if (amr_rank_owns_block .or. amr_block_owner(f_amr_parent_block(kc)) == proc_rank) then
+                call s_phase_tic(PH_RSRFP)
                 call s_amr_restrict_to_parent()
                 call s_amr_reflux_to_parent(dt_sub, .true.)
             end if
+            call s_phase_toc(PH_RSRFP)
         end do
 
     end subroutine s_amr_advance_children
