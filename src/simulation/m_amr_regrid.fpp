@@ -555,6 +555,13 @@ contains
         integer                 :: mg, ng, pg, t
         integer                 :: cap, nacc, i, j, k, d, sax, spos, thr, ntag
         integer(8), allocatable :: akey(:)  !< B1: Morton key of each accepted box's lo, the canonical merge order
+        integer, allocatable    :: nxt(:)  !< singly-linked survivor list: removal is O(1), so the merge is O(n) not O(n^2)
+        integer                 :: head, nlive, ppos
+        integer                 :: blo3(3), bhi3(3), nbmax, rng
+        integer, allocatable    :: prv(:)  !< predecessor links: a binned hit unlinks in O(1)
+        integer, allocatable    :: bh(:), bc(:)  !< bin heads + per-box chains (host scratch, rebuilt per pass)
+        integer                 :: ext_max, cellw, nbx, nby, nbz, bix, biy, biz, nb_tot, jbest, bxi, byi, bzi
+        integer(8)              :: n_pair, n_fuse, n_ppos  !< merge cost attribution (see below)
         integer, allocatable    :: gcnt(:), gdsp(:), sbx(:,:), gbx(:,:)  !< S3.2b: union of the per-rank accepted boxes
         integer                 :: ntot
         !> S3.2b-2: the level-order walk. kpos/kbat index the nodes kept at the current depth; bsig concatenates the signatures of
@@ -911,13 +918,12 @@ contains
             amr_gb_box = amr_gb_box + int(ntot, 8)*6_8*4_8  ! every rank receives the WHOLE global box list
             ! the accepted-box array is sized to the cap; B0b keeps the bisection away from it, and a run that still reaches it
             ! truncates here exactly as the serial `if (nacc < cap)` guard did.
-            ! Silent truncation of the GLOBAL box set is a correctness cliff, not a capacity note: boxes
-            ! contributed by other ranks are discarded with no diagnostic and the mesh differs from the one
-            ! the tagger asked for. The `capped` flag above covers only the tree bisection, not this line.
-            if (ntot > cap .and. proc_rank == 0) then
-                print '(A,I0,A,I0,A)', ' [amr] WARNING: global accepted-box count ', ntot, ' exceeds amr_max_blocks = ', cap, &
-                    & '; the box set is TRUNCATED and the refined mesh ' // 'no longer matches the tag field. Raise amr_max_blocks.'
-            end if
+            ! Silent truncation of the GLOBAL box set is a correctness cliff, not a capacity note: boxes past
+            ! the cap simply never refine, and at ~75 boxes/rank the gathered union crosses amr_max_blocks at
+            ! large rank counts long before any per-rank pressure shows. The capped flag only covers the
+            ! per-rank serial guard. (Restored after 582144f6 silently reverted it -- a stale-base file copy.)
+            if (ntot > cap .and. proc_rank == 0) print '(A,I0,A,I0)', ' [amr] WARNING: GLOBAL box union truncated: ', ntot, &
+                & ' accepted boxes, keeping ', cap
             nacc = min(ntot, cap)
             do i = 1, nacc
                 alo(:,i) = gbx(1:3,i); ahi(:,i) = gbx(4:6,i)
@@ -950,28 +956,145 @@ contains
 
         ! min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their bounding box
         thr = buff_size + 2*amr_buf
+        ! B1 requires the survivors to stay in the canonical Morton order the sort established, and the fusion
+        ! SEQUENCE to be reproducible, because the goldens depend on the resulting box set. The original form
+        ! removed the absorbed box by shifting every later entry down one slot: Theta(F*n) = O(n^2) total.
+        ! A next-pointer list removes in O(1) and visits survivors in the same order, so the same pairs are
+        ! tested in the same sequence and the same fusions happen -- bit-identical by construction.
+        !
+        ! THIS DOES NOT MAKE THE MERGE LINEAR, and an earlier version of this comment wrongly said so. Both
+        ! forms `exit outer` after every fusion and rescan from the head, costing Theta(p*n) pair tests where
+        ! p is the outer position of the next fusion, so the loop is O(F*n^2) = O(n^3) worst case. Measured
+        ! against nboxes (which doubles exactly per rung) rg:clus grows as n^3.0, so the CUBIC term is that
+        ! restart scan and this change removes only the quadratic shift beside it. The counters below exist to
+        ! keep that honest: an earlier estimate here was derived from amr_gb_box, which ACCUMULATES ntot across
+        ! calls, so a per-call n was overstated ~3x and the resulting arithmetic was wrong.
+        allocate (nxt(max(nacc, 1)))
+        do i = 1, nacc - 1
+            nxt(i) = i + 1
+        end do
+        if (nacc >= 1) nxt(nacc) = 0
+        ! head must be 0 when there is nothing to merge: nacc = 0 is reachable (a regrid where no cell is
+        ! tagged globally leaves nacc at its initialization, and the reduce path has no zero-tag guard), and
+        ! head = 1 there would enter the walk below and read nxt(1), which was never written. The original
+        ! shift-based loop was safe because `do i = 1, nacc - 1` simply never executed.
+        head = merge(1, 0, nacc >= 1); nlive = nacc
+        n_pair = 0_8; n_fuse = 0_8; n_ppos = 0_8
+        ! BINNED CANDIDATE MERGE. Measured regime (np=128 ladder): ~12,400 accepted leaves collapse to
+        ! ~1,150 boxes, i.e. F ~ 11,000 fusions per call, and each fusion restarted an O(n) scan plus an
+        ! O(n) shift -- the measured n^2.2-3.0 growth of rg:clus. (An earlier note here claimed the ladder
+        ! was fusion-FREE; that came from a counter that was declared and printed but never incremented --
+        ! the increment below is the fix, and nboxes vs ntot arithmetic refutes the claim.)
+        ! Soundness of the prune: tooclose(i,j) needs every per-dim gap < thr, which bounds
+        ! |alo(d,i)-alo(d,j)| by ext_max + thr - 1, so with bin width ext_max + thr every tooclose partner
+        ! of i lies within the 3^d neighbouring bins of i's lo. BIT-IDENTITY: for each i in list order we
+        ! take the MINIMUM surviving index j among candidates -- exactly the first tooclose j the linear
+        ! walk meets; the first i with a hit fuses and the pass restarts, as before. ext_max can grow when
+        ! a fusion grows a box, so bins are rebuilt at the top of every pass.
+        allocate (prv(max(nacc, 1)))
+        do i = 1, nacc
+            prv(i) = i - 1
+        end do
         changed = .true.
         do while (changed)
             changed = .false.
-            outer: do i = 1, nacc - 1
-                do j = i + 1, nacc
-                    tooclose = .true.
-                    do d = 1, num_dims
-                        if (max(alo(d, i), alo(d, j)) - min(ahi(d, i), ahi(d, j)) - 1 >= thr) tooclose = .false.
-                    end do
-                    if (tooclose) then
-                        alo(:,i) = min(alo(:,i), alo(:,j)); ahi(:,i) = max(ahi(:,i), ahi(:,j))
-                        ! B1: remove by shifting down, not by swapping with the last entry, so the list stays in the
-                        ! canonical order the sort established and later fusions keep preferring spatial neighbours.
-                        do k = j, nacc - 1
-                            alo(:,k) = alo(:,k + 1); ahi(:,k) = ahi(:,k + 1)
-                        end do
-                        nacc = nacc - 1; changed = .true.
-                        exit outer
-                    end if
+            if (nlive <= 1) exit
+            ext_max = 1; blo3 = huge(0); bhi3 = -huge(0)
+            i = head
+            do while (i /= 0)
+                do d = 1, num_dims
+                    ext_max = max(ext_max, ahi(d, i) - alo(d, i) + 1)
+                    blo3(d) = min(blo3(d), alo(d, i)); bhi3(d) = max(bhi3(d), alo(d, i))
                 end do
+                i = nxt(i)
+            end do
+            ! Bin over the LIVE boxes' lo-corner bounding box, not the global domain: a domain-sized grid is
+            ! replicated O(domain-volume) zeroing per pass on every rank (invisible at np<=512 where it is
+            ! smaller than n, dominant weak-scaled), and its nbx*nby*nbz overflows default integers past
+            ! ~8-11K cells/dim -- as a NEGATIVE allocate extent, i.e. silent out-of-bounds writes, not an
+            ! error. Relative binning also makes negative coordinates harmless by construction. cellw is
+            ! clamped UP so no dimension exceeds ~2*nlive^(1/3) bins: enlarging cellw keeps the prune sound
+            ! (bins only get coarser, the candidate set only grows), and bounds nb_tot at O(nlive).
+            nbmax = max(2, int(real(nlive)**(1.0/3.0)) + 1)*2
+            cellw = ext_max + thr
+            do d = 1, num_dims
+                rng = bhi3(d) - blo3(d) + 1
+                if (rng > cellw*nbmax) cellw = (rng + nbmax - 1)/nbmax
+            end do
+            nbx = (bhi3(1) - blo3(1))/cellw + 1; nby = 1; nbz = 1
+            if (n_glb > 0) nby = (bhi3(2) - blo3(2))/cellw + 1
+            if (p_glb > 0) nbz = (bhi3(3) - blo3(3))/cellw + 1
+            nb_tot = nbx*nby*nbz
+            if (allocated(bh)) then
+                if (size(bh) < nb_tot) deallocate (bh)
+            end if
+            if (.not. allocated(bh)) allocate (bh(nb_tot))
+            if (.not. allocated(bc)) allocate (bc(size(nxt)))
+            bh(1:nb_tot) = 0
+            i = head
+            do while (i /= 0)
+                bix = (alo(1, i) - blo3(1))/cellw; biy = 0; biz = 0
+                if (n_glb > 0) biy = (alo(2, i) - blo3(2))/cellw
+                if (p_glb > 0) biz = (alo(3, i) - blo3(3))/cellw
+                j = 1 + bix + nbx*(biy + nby*biz)
+                bc(i) = bh(j); bh(j) = i
+                i = nxt(i)
+            end do
+            i = head; ppos = 0
+            outer: do while (i /= 0)
+                ppos = ppos + 1
+                jbest = 0
+                bix = (alo(1, i) - blo3(1))/cellw; biy = 0; biz = 0
+                if (n_glb > 0) biy = (alo(2, i) - blo3(2))/cellw
+                if (p_glb > 0) biz = (alo(3, i) - blo3(3))/cellw
+                do bzi = max(0, biz - 1), min(nbz - 1, biz + 1)
+                    do byi = max(0, biy - 1), min(nby - 1, biy + 1)
+                        do bxi = max(0, bix - 1), min(nbx - 1, bix + 1)
+                            j = bh(1 + bxi + nbx*(byi + nby*bzi))
+                            do while (j /= 0)
+                                if (j > i) then
+                                    n_pair = n_pair + 1_8
+                                    tooclose = .true.
+                                    do d = 1, num_dims
+                                        if (max(alo(d, i), alo(d, j)) - min(ahi(d, i), ahi(d, j)) - 1 >= thr) tooclose = .false.
+                                    end do
+                                    if (tooclose .and. (jbest == 0 .or. j < jbest)) jbest = j
+                                end if
+                                j = bc(j)
+                            end do
+                        end do
+                    end do
+                end do
+                if (jbest /= 0) then
+                    alo(:,i) = min(alo(:,i), alo(:,jbest)); ahi(:,i) = max(ahi(:,i), ahi(:,jbest))
+                    nxt(prv(jbest)) = nxt(jbest)
+                    if (nxt(jbest) /= 0) prv(nxt(jbest)) = prv(jbest)
+                    n_fuse = n_fuse + 1_8; n_ppos = n_ppos + int(ppos, 8)
+                    nlive = nlive - 1; changed = .true.
+                    exit outer
+                end if
+                i = nxt(i)
             end do outer
         end do
+        if (allocated(bh)) deallocate (bh)
+        if (allocated(bc)) deallocate (bc)
+        deallocate (prv)
+        ! compact once, in list order
+        k = 0
+        i = head
+        do while (i /= 0)
+            k = k + 1
+            if (k /= i) then
+                alo(:,k) = alo(:,i); ahi(:,k) = ahi(:,i)
+            end if
+            i = nxt(i)
+        end do
+        nacc = nlive
+        if (rank_time_wrt .and. proc_rank == 0 .and. n_fuse > 0_8) then
+            print '(A,I0,A,I0,A,F0.1)', ' [amr-merge] pair_tests ', n_pair, ' fusions ', n_fuse, ' mean_outer_pos ', real(n_ppos, &
+                & wp)/real(n_fuse, wp)
+        end if
+        deallocate (nxt)
         if (capped .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tag clustering capped at amr_max_blocks = ', cap
 
         nboxes = nacc
@@ -1367,7 +1490,9 @@ contains
         end if
 
         ! the FINAL footprint: every box here becomes fine blocks, so this is what rhs and every
-        ! block-count-driven phase actually pay for
+        ! block-count-driven phase actually pay for. (Restored from d705abb6; a first restoration landed
+        ! this loop BEFORE `nboxes = k` and clobbered k -- nboxes became the loop exit value, crashing 1D
+        ! dynamic regrid. Placement at the subroutine end is load-bearing.)
         do k = 1, nboxes
             amr_n_shaped = amr_n_shaped + int(boxes(k)%hi(1) - boxes(k)%lo(1) + 1, 8)*int(boxes(k)%hi(2) - boxes(k)%lo(2) + 1, &
                                               & 8)*int(boxes(k)%hi(3) - boxes(k)%lo(3) + 1, 8)
