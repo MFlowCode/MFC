@@ -1,12 +1,12 @@
-This file was created on 2026-08-30 11:22:50.285095.
+This file was created on 2026-08-30 18:36:21.617008.
 
 mfc.sh:
 
-    Invocation: test --generate -j 8 --only 105673CA 11DAFD23 1E288DE4 356A5C50 3643454B 3B3F8C68 4927BF4B 5576FEEA 63F2D0C0 749F3DD3 BE0B2040 CE9DBA3F F3E2DAC6
+    Invocation: test --generate -j 8 --only 03D598D0 092A339C 0D21B728 105673CA 11DAFD23 1658214E 1E288DE4 356A5C50 3643454B 3B3F8C68 3D320EA4 41C830CC 4927BF4B 4EAA3C32 5576FEEA 5B7A746F 63F2D0C0 6F35CD77 749F3DD3 7912AB81 7B67FDE5 84FC700A 999812A9 9C3B986E 9ED54F28 A0E9B272 B2310476 BE0B2040 C4B81FF0 C5205982 CE9DBA3F D33BD146 DA54B209 F3E2DAC6 F4883338 F5493DA5 F9EB7B49 FC3FE863
     Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        e07ee640055f154819ece21e37051d68a09f721a on fix/speed-of-sound-from-state (dirty)
+    Git:        92091a23ca8369810ec121348c96de4a2e94e575 on fix/speed-of-sound-from-state (dirty)
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -15,10 +15,10 @@ syscheck:
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -74,7 +74,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
@@ -83,9 +83,9 @@ pre_process:
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -108,7 +108,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+syscheck:
 
     CMake Configuration:
     
@@ -119,8 +119,8 @@ post_process:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     

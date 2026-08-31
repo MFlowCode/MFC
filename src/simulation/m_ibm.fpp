@@ -399,14 +399,7 @@ contains
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_IP + dyn_pres
                 else
                     call s_compute_energy(pres_IP, alpha_rho_IP, alpha_IP, vel_sum_g, E_ghost)
-                    if (bubbles_euler) then
-                        ! Only the liquid carries the mixture energy, and the dynamic pressure sits
-                        ! outside that scaling - the inverse s_compute_pressure applies is
-                        ! E = (gamma p + pi_inf + qv)(1 - alf) + dyn_p, with alf the void fraction.
-                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = (E_ghost - dyn_pres)*(1._wp - alpha_IP(num_fluids)) + dyn_pres
-                    else
-                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = E_ghost
-                    end if
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = E_ghost
                 end if
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then

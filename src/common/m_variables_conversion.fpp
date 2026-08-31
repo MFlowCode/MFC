@@ -97,8 +97,8 @@ contains
                 ! Gamma/pi_inf model or five-equation model (Allaire et al. JCP 2002)
                 e_int = energy - dyn_p
             else
-                ! Bubble-augmented, with the void fraction correction
-                e_int = (energy - dyn_p)/(1._wp - alf)
+                ! Bubble-augmented; qv comes off before the division rather than being scaled by it
+                e_int = (energy - dyn_p - qv)/(1._wp - alf) + qv
             end if
 
             if (hypoelasticity .and. present(E_e_in)) then
@@ -837,9 +837,9 @@ contains
                             ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
                         else
-                            ! Bubble-augmented energy with void fraction correction
+                            ! Bubble-augmented energy; qv is an energy density and is not diluted
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + (1._wp - q_prim_vf(eqn_idx%alf)%sf(j, k, &
-                                      & l))*(gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + pi_inf)
+                                      & l))*(gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + pi_inf) + qv
                         end if
                     end if
 
@@ -1200,7 +1200,8 @@ contains
             rho_K = alpha_rho_K(1)
             gamma_K = gammas(1)
             pi_inf_K = pi_infs(1)
-            qv_K = qvs(1)
+            ! Energy per unit volume, as below: alpha_rho_K(1) is the liquid partial density
+            qv_K = alpha_rho_K(1)*qvs(1)
         else
             rho_K = 0._wp
             gamma_K = 0._wp
@@ -1269,7 +1270,11 @@ contains
 
         call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho, gamma, pi_inf, qv)
 
-        E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
+        ! E = dyn_p + (1 - alf)(gamma p + pi_inf) + qv. Only the liquid's internal energy is diluted;
+        ! qv is already an energy density.
+        E = gamma*pres + pi_inf
+        if (bubbles_euler) E = E*(1._wp - alpha_K(num_fluids))
+        E = E + qv + 5.e-1_wp*rho*vel_sum
 
     end subroutine s_compute_energy
 
@@ -1443,12 +1448,9 @@ contains
             else  ! the mixture coefficients already carry the mixing
                 c = f_bulk_modulus(pres, gamma, pi_inf)/rho
 
-                ! Subgrid bubbles. rho is the carrier-liquid partial density, so the line above is already
-                ! c_l^2/(1 - alf); one more division gives the O(alf) mixture speed c = c_l/(1 - alf), where
-                ! c_l is the pure liquid sound speed m_qbmm forms for Keller-Miksis. alf is the subgrid void
-                ! fraction and is small by construction - the expansion has no meaning as alf approaches one,
-                ! so a value there means a wrong index or a case outside the dilute limit, not a number to
-                ! clamp. The toolchain warns at case load (MFlowCode/MFC#1793).
+                ! Subgrid bubbles: c = c_l/(1 - alf), the carrier-liquid speed with an O(alf) void
+                ! correction. alf is dilute by construction; near one means a wrong index or an
+                ! out-of-regime case, which the toolchain warns about at case load (#1793).
                 if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 1)) then
                     alf = adv(num_fluids)
                     c = c/(1._wp - alf)
