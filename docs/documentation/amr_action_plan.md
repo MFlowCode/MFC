@@ -226,6 +226,53 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-08-31 (46) — SUBCYCLE VERDICT: PARITY AT MATCHED FIDELITY; the sweep is in and bit-identical
+
+### R1. amr_subcycle gains ~nothing at the production operating point
+
+The full controlled set (equal physical time; escaped 0, NaN 0, full phase accounting in every arm):
+
+| arm | dt | regrid cadence (phys) | mesh trajectory | wall (3 repeats or 1) |
+|---|---|---|---|---|
+| F1  (lockstep, int=20) | dt | every 20 dt | full by phys 40 | 782.1 / 665.2 / 591.7 (mean 679.7, spread ±14%) |
+| T4  (subcycle, int=20 steps) | 4dt | every 80 dt | full by phys 160 | 224.3 / 250.7 / 264.9 |
+| Fc  (lockstep, int=80) | dt | every 80 dt | full by phys 160 | 305.0 / 331.9 / 345.8 |
+| **T-int5 (subcycle, int=5 steps)** | 4dt | **every 20 dt** | **full by phys 40 (matches F1 exactly)** | **637.6** (queued MI250X node) |
+
+- **F1 / T-int5 = 1.07x, inside F1's own ±14% spread: PARITY.** The 2.84x that motivated this thread was
+  entirely mesh-residency + regrid-cadence artifacts of a broken control; the banner's modelled 1.55x
+  does not survive matched conditions either. Where the coarse-advance saving goes is visible in the
+  phase table: T-int5 seam = 92.0 s vs F1 62.3 (per-substep time-lerped exchanges), rhs 164.3 vs 218.5.
+- At LAZY matched cadence (T4 vs Fc) subcycling still shows 1.33x [~1.2-1.45] -- the saving exists but
+  is eaten at tight cadence. **Do NOT flip the default; close the "subcycle = 1.55x faster" thread.**
+- Systematic drift within the interleaved repeats (F1 monotone down 782->592, T4/Fc monotone up):
+  unexplained; treat any single-arm number on the interactive node as ±15% until it is.
+
+### R2. The "zero fusions" claim was an instrument that could not fire
+
+`[amr-merge]` counted fusions with an increment that was never written (declared, zeroed, printed under
+`n_fuse > 0` -- structurally silent). Arithmetic refutes the claim it produced: at np=128 the gathered
+union is ~12,416 leaves per call collapsing to 1,152 boxes = ~11,264 fusions PER CALL. Both regimes are
+fusion-heavy. Honesty rule: a gate (or instrument) that cannot fire is not a gate; ask what a stub scores.
+
+### R3. The binned merge is IN, bit-identical, committed on the cpu worktree (f7ca48df)
+
+Doubly-linked survivor list (O(1) unlink) + per-pass uniform bin grid of width ext_max + thr (sound: a
+tooclose pair is within that distance per dim); per i in list order the MINIMUM candidate index equals
+the linear walk's first hit, so the fusion sequence is identical by construction. Also fixes the
+`nacc == 0` uninitialized-next walk and the dead counter. Gates passed: 8 fusion-heavy AMR goldens
+bit-identical; counters fire (31/18 fusions, mean outer position 1.0 on churn). Held for the overnight
+mi2104x A/B before cherry-picking to up/mega.
+
+### Queued overnight (all pinned-binary, sick nodes excluded, 64 ranks/node after an OOM at 128/node)
+- 393195 sweep-side np=32/64/128; 393197 clean-binary np=128 baseline; 393198 sweep-side np=512 (8 nodes).
+  Before-side np=32/64 already banked: rg:clus 138.6 / 1074.9 ms/call (mi2104x, shas in each PIN).
+- 393182 np=256 running (128/node -- may OOM as np128 did; its log will say rc=137 if so).
+- 393185 first multi-node GPU rung (2x MI250X np=16) pending.
+- CI 33355971217 on 1301a914 (the 11-fix push) queued.
+- **Provenance warning from tonight: mi2104x hosts are MIXED (EPYC 7763 and 7V13) -- match hosts, not
+  just partitions, for timing pairs. The job logs now print the host CPU for exactly this reason.**
+
 ## 2026-08-30 (45) — THE CADENCE RESULT WAS A BROKEN CONTROL; multi-node was never broken; the walls move again
 
 ### R1. `fine_work` is a SNAPSHOT, and the regrid-cadence "2.56x" was mesh residency, not cost
