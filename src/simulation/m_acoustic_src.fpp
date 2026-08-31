@@ -222,10 +222,8 @@ contains
 
                     call s_compute_mixture_coefficients(myalpha_rho, myalpha, myRho, gamma_mix, pi_inf_mix, qv_dummy)
 
-                    ! Same rule as s_compute_speed_of_sound: subgrid bubbles dilute the carrier, so the
-                    ! injected wave travels at the mixture speed c_l/(1 - alf). Inlined rather than
-                    ! calling that routine, which faults CCE OpenACC from this loop (MFlowCode/MFC#1794);
-                    ! fold this back into the call once that is isolated.
+                    ! Mixture sound speed, as s_compute_speed_of_sound computes it. Inlined because that
+                    ! call faults CCE OpenACC from this loop (#1794); fold it back once that is isolated.
                     c = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(j, k, l), gamma_mix, pi_inf_mix)/myRho
                     if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 1)) then
                         c = c/(1._wp - myalpha(num_fluids))
