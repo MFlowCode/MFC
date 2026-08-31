@@ -424,6 +424,7 @@ contains
         real(wp)               :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
         real(wp)               :: vftmp, nbub_sc
         real(wp)               :: G_K
+        real(wp)               :: G_damaged                !< G_K after the continuum-damage knockdown
         real(wp)               :: pres
         integer                :: i, j, k, l               !< Generic loop iterators
         real(wp)               :: T
@@ -439,8 +440,8 @@ contains
         integer                :: iter                     !< Newton-Raphson iteration counter
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
-                            & rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, &
-                            & df_dW, iter]')
+                            & rhoYks, B, pres, vftmp, nbub_sc, G_K, G_damaged, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, &
+                            & dGa_dW, dp_dW, df_dW, iter]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -660,11 +661,16 @@ contains
                     end if
 
                     if (hypoelasticity) then
-                        if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(eqn_idx%damage)%sf(j, k, l)), 0._wp)
+                        ! The knockdown lands in its own variable rather than back in G_K. Self-assigning a scalar
+                        ! inside an offloaded teams loop makes NVHPC infer an implicit reduction(*:G_K) - even
+                        ! though G_K is private - and the reduction epilogue it then emits faults on an accumulator
+                        ! that does not exist. The block is dead unless hypoelasticity, but the epilogue is not.
+                        G_damaged = G_K
+                        if (cont_damage) G_damaged = G_K*max((1._wp - qK_cons_vf(eqn_idx%damage)%sf(j, k, l)), 0._wp)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, &
-                                       & l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, k, l), wp), G_K, &
+                                       & l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, k, l), wp), G_damaged, &
                                        & any(i == shear_indices))/gamma_K
                         end do
                     end if
