@@ -86,8 +86,10 @@ def parse(config: MFCConfig):
 
         subparser.error = custom_error
 
-    args: dict = vars(parser.parse_args(sys.argv[1:extra_index]))
+    cli_argv = sys.argv[1:extra_index]
+    args: dict = vars(parser.parse_args(cli_argv))
     args["--"] = sys.argv[extra_index + 1 :]
+    args["targets_explicit"] = any(tok in ("-t", "--targets") for tok in cli_argv)
 
     # Handle --help at top level
     if args.get("help") and args["command"] is None:
