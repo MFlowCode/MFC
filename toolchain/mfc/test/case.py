@@ -12,7 +12,7 @@ from typing import Callable, List, Optional, Set, Union
 from .. import case, common
 from ..build import SIMULATION, MFCTarget, get_target
 from ..run import input
-from ..state import ARG
+from ..state import ARG, CFG
 
 # Parameters that enable simulation output writing for post_process.
 # When post_process is a target, simulation must write field data so
@@ -54,6 +54,11 @@ POST_PROCESS_OFF_PARAMS = {
 def get_post_process_mods(case_params: dict) -> dict:
     """Return parameter modifications needed when post_process is a target."""
     mods = dict(POST_PROCESS_OUTPUT_PARAMS)
+    if CFG().single:
+        # BASE_CFG asks for double post output (precision = 2), which the validator rightly rejects on a
+        # --single build; every post_process case on the single-precision CI lane failed on this, invisibly
+        # until the suite started checking post's exit code.
+        mods["precision"] = 1
     if int(case_params.get("p", 0)) != 0:
         mods.update(POST_PROCESS_3D_PARAMS)
     return mods
