@@ -340,6 +340,11 @@ mods = {{}}
 
 if "post_process" in ARGS["mfc"]["targets"]:
     mods = {json.dumps(POST_PROCESS_OUTPUT_PARAMS)}
+    if ARGS["mfc"].get("single"):
+        # BASE_CFG asks for double post output (precision = 2), which the validator rightly rejects on a
+        # --single build. This guard must live HERE: the generated case embeds the post params directly,
+        # so a fix in get_post_process_mods (tried first) never reaches the test path.
+        mods["precision"] = 1
     if case['p'] != 0:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
 else:
