@@ -1131,6 +1131,7 @@ contains
         integer              :: i
         !> S3.2a-2: this rank's shallow-phase participation, and its max over ranks
         integer(8) :: me_l(3), me_g(3), hl_l(3), hl_g(3)
+        integer(8) :: ml_l(3), ml_g(3)  !< migration counters, SUM-reduced (see [amr-mig])
         integer(8) :: tag_g
 
 #ifdef MFC_MPI
@@ -1200,6 +1201,13 @@ contains
             call MPI_ALLREDUCE(hl_l, hl_g, 3, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mierr)
 #endif
         end if
+        ml_l = [amr_mig_blk, amr_mig_snd, amr_gb_mig]
+        ml_g = ml_l
+        if (rank_time_wrt) then
+#ifdef MFC_MPI
+            call MPI_ALLREDUCE(ml_l, ml_g, 3, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mierr)
+#endif
+        end if
         if (rank_time_wrt .and. proc_rank == 0) then
             ! MEMORY SCALING: bytes this rank holds that are sized by the GLOBAL block count, against the bytes
             ! sized by what it actually OWNS. glob/own rising with P is the memory face of limit 3 -- the same
@@ -1224,7 +1232,11 @@ contains
             print '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
                 & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' box_bytes ', amr_gb_box, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, &
                 & 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
-            print '(A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', amr_mig_blk, ' sends ', amr_mig_snd, ' bytes ', amr_gb_mig
+            ! ml_g holds the GLOBAL totals: the counters are incremented only for blocks THIS rank sends, so
+            ! the raw print was rank 0's lifetime bytes masquerading as the machine's -- the zero-cost audit
+            ! read a frozen 141 MB startup transient at every P off it. SUM reduced outside the rank-0 guard.
+            print '(A,I0,A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', ml_g(1), ' sends ', ml_g(2), ' bytes ', ml_g(3), &
+                & ' rank0_bytes ', amr_gb_mig
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope] shr_nodes ', amr_cl_shr_nodes, ' shr_rb ', amr_cl_shr_rb, &
                 & ' loc_nodes ', amr_cl_loc_nodes, ' loc_rb ', amr_cl_loc_rb, ' shr_maxdep ', amr_cl_shr_maxdep
             print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope-r] shr_nodes ', amr_cl_shr_nodes_r, ' shr_rb ', amr_cl_shr_rb_r, &
