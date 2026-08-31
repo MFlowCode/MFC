@@ -226,6 +226,46 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-08-31 (48) — FOUR SCALING QUESTIONS ANSWERED FROM BANKED LOGS; the memory wall measured
+
+### R1. The rhs growth above np128 is RANKS-PER-NODE DENSITY, not P (pending one confirmation)
+The cpuladder's density DOUBLED with every P doubling (8 nodes, ranks/node = np/8) -- a fully confounded
+design. Density-matched cross-ladder triples are flat in P to 0.8-4% over 4x P (64/node: cpuladder np512
+493.6, sweepfix np128 479.4, big512 np512 483.4 ms/call), while fixed-P density doublings reproduce the
+full 1.41x/1.66x jumps exactly (q-2-node np32->64->128: 202->286->479). rk (pure streaming) grows FASTER
+than rhs per density doubling and skew FALLS while the mean jumps: memory-bandwidth contention, not MPI,
+not physics. PRE-REGISTERED np1024 test (16 nodes = 64/node): rhs ~480-500 ms/call flat vs np512
+confirms; a ~1.6x jump falsifies. Consequence if confirmed: per-node rank density is a TUNING knob, and
+weak-scaling exponents must be measured at FIXED density (every prior mixed-density exponent is suspect).
+
+### R2. The dirty-box payoff GROWS with P and c-bar cannot create a crossover
+c-bar peaks at np64 (274) then FALLS to 47 at np512 (bounded by the nbmax clamp as the domain outgrows
+box extents). Structural laws from the counters: F = (88-91)*np, mean_outer_pos = np/2 to 3 digits,
+pair_tests ~ P^1.45. The fix's ratio is (n+F)/(F*mop) ~= 4/np INDEPENDENT of c-bar: 8x at np32, 127x at
+np512, ~250x predicted at np1024. The L1 merge section is >95% of rg:clus at every rung (93.5 -> ~350 ->
+~1100 ms/call at np32/64/128 on the LANDED binary).
+
+### R3. Migration in the ladder is a FROZEN STARTUP TRANSIENT -- and keep-tol has nothing to measure there
+[amr-mig] final bytes are bit-identical (141,139,968) across BOTH binaries and every rung np16-512: all
+migration happens in the first two regrids (the residency mechanism), then ZERO bytes/regrid forever.
+Two consequences: (a) the counter was rank-0-local and unreduced -- fixed this entry (SUM-reduced ml_g,
+rank0_bytes kept for continuity); (b) a keep-tol A/B on the ladder deck would MEASURE NOTHING -- its
+payoff exists only on moving-feature cases (the np8 GPU production case with its 600 MB/regrid churn).
+The keep-tol gate now REQUIRES a translating density-jump weak-scaled deck.
+
+### R4. escaped = 0 at every rung to np512; over-coverage FALLS slightly with P (2.44 -> 2.39 over 16x)
+No scaling physics-quality degradation at these P. Standing caveats unchanged (L1-only, finalize-only,
+blind pre-refinement). np1024 pre-registrations: escaped 0; cov/tag 2.37-2.39; [amr-mig] plateau at
+141 MB rank0-equivalent; c-bar median 25-50; mop ~512.
+
+### R5. The memory probe measured BOTH memory walls in one OOM
+np=128 at 128 ranks/node (honest counters): [amr-mem] glob_bytes = 201 MB/rank of replicated metadata
+(amr_slots descriptors; the old counter said 4.7 MB -- 40x under) while the rank owns 2 blocks; node
+peaked 424 GB before the kill => ~3.3 GB/rank FIXED per-rank footprint independent of local problem size
+(125K cells/rank = ~50 MB of fields). The OOM is ~6% metadata, ~dominant fixed footprint. NEW OPEN
+QUESTION with a cheap test: bracket the big allocations at init (or sample /proc/self/status per stage)
+on ONE rank and name the 3.3 GB. This is the number that sets ranks-per-node at 100K scale.
+
 ## 2026-08-31 (47) — LANDED AND AUDITED: the merge ships; the record is forensically corrected
 
 ### What landed on up/mega (c881e4ee, 08a8f498, 805f26ea; 66/66 double-precision gate; CI cycling)
