@@ -226,6 +226,30 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-01 (50) — W1 UNDERWAY; P-PRIME INTERIM: my own decision bands were misanchored
+
+### W1: 4 of 10 per-stage scans converted and PUSHED (acaae35d batch 1, dcfce95c batch 2)
+Epoch-keyed lists: amr_l1r (raw region x my interior), amr_l1p (region +/- amr_cpat_mar x my coarse
+range), amr_my_blk (owned, all levels -- keep the level filter in bodies). The lag-clear trap handled
+per the recipe (dedicated bubbles_lagrange-gated scan). Every batch: goldens 9/9 + M0 oracle silent +
+reldebug arm + GPU 66/66. REMAINING SIX: reflux-recv (m_amr.fpp ~2799: hoist f_amr_reflux_participates
+(rank-invariant) THEN convert -- predicate read, face-gates locality argument still to be made);
+freg_wave x2 (~2978-3134) and parent_fill_wave x2 (~7218-7441) -- predicates NOT yet read (the rule:
+read every call between loop head and filter before converting); restrict_parent_wave x1 (~4241).
+Payoff check AFTER all ten: np256/512 pair, restr/rs share must fall from 8.5-12% toward 1-2%.
+
+### P-PRIME (job 395203, r1-r2 in, r3 running): NO REGRESSION; my bands were wrong, not the code
+AMR arm absolute wall matches known F1 numbers (240st ~= 833-924s vs F1-derived ~815s) -- the landed
+code did NOT regress. Differenced same-shape tax (AMR vs uniform-at-coarse-400^3, 240-40): ~9.5-11.7x
+tonight vs 13.9x computed from the 08-29 taxrebase arms ON DISK (L2_prod/U_prod differenced) -- an
+IMPROVEMENT of ~25-30%. My pre-registered bands were anchored to "4.78x", whose derivation does NOT
+reproduce from the 08-29 walls at a glance -- I encoded an anchor without verifying its protocol.
+LESSON: a pre-registration is only as good as its anchor's provenance. Final banking on r3 + a
+reconciliation of what 4.78 actually measured (possibly a different quantity entirely).
+
+### Standing next actions (order): batch-3 W1 (six sites, predicates first) -> np1024 readout
+(TRUNCATION GREP FIRST) -> np512same -> keep-tol moving-deck A/B -> M1 (design note on disk) ->
+metadata tier-1 (trigger fired). User-gated: Frontier ladder, upstream landing sequence.
 ## 2026-09-01 (49) — FOUR LANDINGS, THE ORACLE, AND THE PHASE TRANSITION
 
 ### Landed (all gated; CI cycling)
