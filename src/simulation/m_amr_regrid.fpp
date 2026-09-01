@@ -557,6 +557,10 @@ contains
         integer(8), allocatable :: akey(:)  !< B1: Morton key of each accepted box's lo, the canonical merge order
         integer, allocatable    :: nxt(:)  !< singly-linked survivor list: removal is O(1), so the merge is O(n) not O(n^2)
         integer                 :: head, nlive, ppos
+        integer, allocatable    :: bp(:), bidx(:)  !< bin back-links + current bin of each live box (incremental refile)
+        integer                 :: dirty, aa, jb2, extd
+        logical                 :: need_build
+        integer(8)              :: n_backfuse, n_rebld
         integer                 :: blo3(3), bhi3(3), nbmax, rng
         integer, allocatable    :: prv(:)  !< predecessor links: a binned hit unlinks in O(1)
         integer, allocatable    :: bh(:), bc(:)  !< bin heads + per-box chains (host scratch, rebuilt per pass)
@@ -995,90 +999,68 @@ contains
         do i = 1, nacc
             prv(i) = i - 1
         end do
-        changed = .true.
-        do while (changed)
-            changed = .false.
-            if (nlive <= 1) exit
-            ext_max = 1; blo3 = huge(0); bhi3 = -huge(0)
-            i = head
-            do while (i /= 0)
-                do d = 1, num_dims
-                    ext_max = max(ext_max, ahi(d, i) - alo(d, i) + 1)
-                    blo3(d) = min(blo3(d), alo(d, i)); bhi3(d) = max(bhi3(d), alo(d, i))
-                end do
-                i = nxt(i)
-            end do
-            ! Bin over the LIVE boxes' lo-corner bounding box, not the global domain: a domain-sized grid is
-            ! replicated O(domain-volume) zeroing per pass on every rank (invisible at np<=512 where it is
-            ! smaller than n, dominant weak-scaled), and its nbx*nby*nbz overflows default integers past
-            ! ~8-11K cells/dim -- as a NEGATIVE allocate extent, i.e. silent out-of-bounds writes, not an
-            ! error. Relative binning also makes negative coordinates harmless by construction. cellw is
-            ! clamped UP so no dimension exceeds ~2*nlive^(1/3) bins: enlarging cellw keeps the prune sound
-            ! (bins only get coarser, the candidate set only grows), and bounds nb_tot at O(nlive).
-            nbmax = max(2, int(real(nlive)**(1.0/3.0)) + 1)*2
-            cellw = ext_max + thr
-            do d = 1, num_dims
-                rng = bhi3(d) - blo3(d) + 1
-                if (rng > cellw*nbmax) cellw = (rng + nbmax - 1)/nbmax
-            end do
-            nbx = (bhi3(1) - blo3(1))/cellw + 1; nby = 1; nbz = 1
-            if (n_glb > 0) nby = (bhi3(2) - blo3(2))/cellw + 1
-            if (p_glb > 0) nbz = (bhi3(3) - blo3(3))/cellw + 1
-            nb_tot = nbx*nby*nbz
-            if (allocated(bh)) then
-                if (size(bh) < nb_tot) deallocate (bh)
+        ! DIRTY-BOX CONTINUATION (differential control: amr-bench/tools/merge_ctl.f90, sequence-identical
+        ! to the restart merge on directed + random suites, 864 back-fusion chains; mutation m1 proves the
+        ! control can fail; m2 is proven benign by containment + (b)-exhaustion; m3's refile is kept as
+        ! O(1) insurance -- the control header carries the proofs).
+        ! After fusing (i, j) only box i changed, so instead of restarting the pass: (a) re-test earlier
+        ! survivors against the grown box (minimum index first -- exactly what the restart would find),
+        ! else (b) re-test all later survivors, else (c) the chain is exhausted and the walk resumes at
+        ! the survivor's live successor -- everything to its left is provably clean. Bins are built once
+        ! per cellw epoch and maintained incrementally: the absorbed box is unlinked, the survivor
+        ! re-filed when its lo crosses a bin (lo = min of members, so it can never drop below the epoch's
+        ! blo3). Extent growth past cellw - thr doubles cellw and rebuilds (amortized log(extent range)).
+        allocate (bp(max(nacc, 1)), bidx(max(nacc, 1)))
+        n_backfuse = 0_8; n_rebld = 0_8
+        cellw = 0
+        need_build = .true.
+        i = head; ppos = 0
+        outer: do while (i /= 0)
+            if (need_build) then
+                call s_mrg_build()
+                need_build = .false.
             end if
-            if (.not. allocated(bh)) allocate (bh(nb_tot))
-            if (.not. allocated(bc)) allocate (bc(size(nxt)))
-            bh(1:nb_tot) = 0
-            i = head
-            do while (i /= 0)
-                bix = (alo(1, i) - blo3(1))/cellw; biy = 0; biz = 0
-                if (n_glb > 0) biy = (alo(2, i) - blo3(2))/cellw
-                if (p_glb > 0) biz = (alo(3, i) - blo3(3))/cellw
-                j = 1 + bix + nbx*(biy + nby*biz)
-                bc(i) = bh(j); bh(j) = i
-                i = nxt(i)
-            end do
-            i = head; ppos = 0
-            outer: do while (i /= 0)
-                ppos = ppos + 1
-                jbest = 0
-                bix = (alo(1, i) - blo3(1))/cellw; biy = 0; biz = 0
-                if (n_glb > 0) biy = (alo(2, i) - blo3(2))/cellw
-                if (p_glb > 0) biz = (alo(3, i) - blo3(3))/cellw
-                do bzi = max(0, biz - 1), min(nbz - 1, biz + 1)
-                    do byi = max(0, biy - 1), min(nby - 1, biy + 1)
-                        do bxi = max(0, bix - 1), min(nbx - 1, bix + 1)
-                            j = bh(1 + bxi + nbx*(byi + nby*bzi))
-                            do while (j /= 0)
-                                if (j > i) then
-                                    n_pair = n_pair + 1_8
-                                    tooclose = .true.
-                                    do d = 1, num_dims
-                                        if (max(alo(d, i), alo(d, j)) - min(ahi(d, i), ahi(d, j)) - 1 >= thr) tooclose = .false.
-                                    end do
-                                    if (tooclose .and. (jbest == 0 .or. j < jbest)) jbest = j
-                                end if
-                                j = bc(j)
-                            end do
-                        end do
+            ppos = ppos + 1
+            jbest = f_mrg_qminj(i)
+            if (jbest /= 0) then
+                dirty = i
+                call s_mrg_fuse(dirty, jbest)
+                chain: do
+                    extd = 1
+                    do d = 1, num_dims
+                        extd = max(extd, ahi(d, dirty) - alo(d, dirty) + 1)
                     end do
-                end do
-                if (jbest /= 0) then
-                    alo(:,i) = min(alo(:,i), alo(:,jbest)); ahi(:,i) = max(ahi(:,i), ahi(:,jbest))
-                    nxt(prv(jbest)) = nxt(jbest)
-                    if (nxt(jbest) /= 0) prv(nxt(jbest)) = prv(jbest)
-                    n_fuse = n_fuse + 1_8; n_ppos = n_ppos + int(ppos, 8)
-                    nlive = nlive - 1; changed = .true.
-                    exit outer
-                end if
+                    if (extd > cellw - thr) then
+                        do while (extd > cellw - thr)
+                            cellw = cellw*2
+                        end do
+                        call s_mrg_build()
+                    else if (f_mrg_binof(dirty) /= bidx(dirty)) then
+                        call s_mrg_binun(dirty)
+                        call s_mrg_binreg(dirty)
+                    end if
+                    aa = f_mrg_qmina(dirty)
+                    if (aa /= 0) then
+                        call s_mrg_fuse(aa, dirty)
+                        n_backfuse = n_backfuse + 1_8
+                        dirty = aa
+                        cycle chain
+                    end if
+                    jb2 = f_mrg_qminj(dirty)
+                    if (jb2 /= 0) then
+                        call s_mrg_fuse(dirty, jb2)
+                        cycle chain
+                    end if
+                    exit chain
+                end do chain
+                i = nxt(dirty)
+            else
                 i = nxt(i)
-            end do outer
-        end do
+            end if
+        end do outer
         if (allocated(bh)) deallocate (bh)
         if (allocated(bc)) deallocate (bc)
-        deallocate (prv)
+        deallocate (prv, bp, bidx)
         ! compact once, in list order
         k = 0
         i = head
@@ -1091,8 +1073,11 @@ contains
         end do
         nacc = nlive
         if (rank_time_wrt .and. proc_rank == 0 .and. n_fuse > 0_8) then
-            print '(A,I0,A,I0,A,F0.1)', ' [amr-merge] pair_tests ', n_pair, ' fusions ', n_fuse, ' mean_outer_pos ', real(n_ppos, &
-                & wp)/real(n_fuse, wp)
+            ! field renamed from mean_outer_pos: under the restart merge ppos was per-pass scan depth (and
+            ! cbar = pair_tests/(fusions*mop) was valid); under the continuation ppos is the monotone
+            ! outer-visit index -- keeping the name would make old formulas silently misread new logs.
+            print '(A,I0,A,I0,A,F0.1,A,I0,A,I0)', ' [amr-merge] pair_tests ', n_pair, ' fusions ', n_fuse, ' mean_visit ', &
+                & real(n_ppos, wp)/real(n_fuse, wp), ' backfuse ', n_backfuse, ' rebuilds ', n_rebld
         end if
         deallocate (nxt)
         if (capped .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tag clustering capped at amr_max_blocks = ', cap
@@ -1107,6 +1092,166 @@ contains
             boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
         end do
         deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep, sig, ovr, akey)
+
+    contains
+
+        subroutine s_mrg_build()
+
+            integer :: ii, d2
+
+            n_rebld = n_rebld + 1_8
+            ext_max = 1; blo3 = huge(0); bhi3 = -huge(0)
+            ii = head
+            do while (ii /= 0)
+                do d2 = 1, num_dims
+                    ext_max = max(ext_max, ahi(d2, ii) - alo(d2, ii) + 1)
+                    blo3(d2) = min(blo3(d2), alo(d2, ii)); bhi3(d2) = max(bhi3(d2), alo(d2, ii))
+                end do
+                ii = nxt(ii)
+            end do
+            nbmax = max(2, int(real(nlive)**(1.0/3.0)) + 1)*2
+            cellw = max(cellw, ext_max + thr)
+            do d2 = 1, num_dims
+                rng = bhi3(d2) - blo3(d2) + 1
+                if (rng > cellw*nbmax) cellw = (rng + nbmax - 1)/nbmax
+            end do
+            nbx = (bhi3(1) - blo3(1))/cellw + 1; nby = 1; nbz = 1
+            if (n_glb > 0) nby = (bhi3(2) - blo3(2))/cellw + 1
+            if (p_glb > 0) nbz = (bhi3(3) - blo3(3))/cellw + 1
+            nb_tot = nbx*nby*nbz
+            if (allocated(bh)) then
+                if (size(bh) < nb_tot) deallocate (bh)
+            end if
+            if (.not. allocated(bh)) allocate (bh(nb_tot))
+            if (.not. allocated(bc)) allocate (bc(size(nxt)))
+            bh(1:nb_tot) = 0
+            ii = head
+            do while (ii /= 0)
+                call s_mrg_binreg(ii)
+                ii = nxt(ii)
+            end do
+
+        end subroutine s_mrg_build
+
+        integer function f_mrg_binof(ii) result(bb)
+
+            integer, intent(in) :: ii
+            integer             :: bx, by, bz
+
+            bx = (alo(1, ii) - blo3(1))/cellw; by = 0; bz = 0
+            if (n_glb > 0) by = (alo(2, ii) - blo3(2))/cellw
+            if (p_glb > 0) bz = (alo(3, ii) - blo3(3))/cellw
+            bb = 1 + bx + nbx*(by + nby*bz)
+
+        end function f_mrg_binof
+
+        subroutine s_mrg_binreg(ii)
+
+            integer, intent(in) :: ii
+            integer             :: bb
+
+            bb = f_mrg_binof(ii)
+            bc(ii) = bh(bb)
+            if (bh(bb) /= 0) bp(bh(bb)) = ii
+            bp(ii) = 0
+            bh(bb) = ii
+            bidx(ii) = bb
+
+        end subroutine s_mrg_binreg
+
+        subroutine s_mrg_binun(ii)
+
+            integer, intent(in) :: ii
+
+            if (bp(ii) /= 0) then
+                bc(bp(ii)) = bc(ii)
+            else
+                bh(bidx(ii)) = bc(ii)
+            end if
+            if (bc(ii) /= 0) bp(bc(ii)) = bp(ii)
+
+        end subroutine s_mrg_binun
+
+        subroutine s_mrg_fuse(x, y)
+
+            integer, intent(in) :: x, y
+
+            alo(:,x) = min(alo(:,x), alo(:,y)); ahi(:,x) = max(ahi(:,x), ahi(:,y))
+            nxt(prv(y)) = nxt(y)
+            if (nxt(y) /= 0) prv(nxt(y)) = prv(y)
+            call s_mrg_binun(y)
+            n_fuse = n_fuse + 1_8; n_ppos = n_ppos + int(ppos, 8)
+            nlive = nlive - 1
+
+        end subroutine s_mrg_fuse
+
+        integer function f_mrg_qminj(ii) result(best)
+
+            integer, intent(in) :: ii
+            integer             :: bx, by, bz, dx1, dy1, dz1, jj, d2, zl, zh, yl, yh
+            logical             :: tc
+
+            best = 0
+            bx = (alo(1, ii) - blo3(1))/cellw; by = 0; bz = 0
+            if (n_glb > 0) by = (alo(2, ii) - blo3(2))/cellw
+            if (p_glb > 0) bz = (alo(3, ii) - blo3(3))/cellw
+            zl = 0; zh = 0; yl = 0; yh = 0
+            if (p_glb > 0) then; zl = max(0, bz - 1); zh = min(nbz - 1, bz + 1); end if
+            if (n_glb > 0) then; yl = max(0, by - 1); yh = min(nby - 1, by + 1); end if
+            do dz1 = zl, zh
+                do dy1 = yl, yh
+                    do dx1 = max(0, bx - 1), min(nbx - 1, bx + 1)
+                        jj = bh(1 + dx1 + nbx*(dy1 + nby*dz1))
+                        do while (jj /= 0)
+                            if (jj > ii) then
+                                n_pair = n_pair + 1_8
+                                tc = .true.
+                                do d2 = 1, num_dims
+                                    if (max(alo(d2, ii), alo(d2, jj)) - min(ahi(d2, ii), ahi(d2, jj)) - 1 >= thr) tc = .false.
+                                end do
+                                if (tc .and. (best == 0 .or. jj < best)) best = jj
+                            end if
+                            jj = bc(jj)
+                        end do
+                    end do
+                end do
+            end do
+
+        end function f_mrg_qminj
+
+        integer function f_mrg_qmina(ii) result(best)
+
+            integer, intent(in) :: ii
+            integer             :: bx, by, bz, dx1, dy1, dz1, jj, d2, zl, zh, yl, yh
+            logical             :: tc
+
+            best = 0
+            bx = (alo(1, ii) - blo3(1))/cellw; by = 0; bz = 0
+            if (n_glb > 0) by = (alo(2, ii) - blo3(2))/cellw
+            if (p_glb > 0) bz = (alo(3, ii) - blo3(3))/cellw
+            zl = 0; zh = 0; yl = 0; yh = 0
+            if (p_glb > 0) then; zl = max(0, bz - 1); zh = min(nbz - 1, bz + 1); end if
+            if (n_glb > 0) then; yl = max(0, by - 1); yh = min(nby - 1, by + 1); end if
+            do dz1 = zl, zh
+                do dy1 = yl, yh
+                    do dx1 = max(0, bx - 1), min(nbx - 1, bx + 1)
+                        jj = bh(1 + dx1 + nbx*(dy1 + nby*dz1))
+                        do while (jj /= 0)
+                            if (jj < ii) then
+                                n_pair = n_pair + 1_8
+                                tc = .true.
+                                do d2 = 1, num_dims
+                                    if (max(alo(d2, ii), alo(d2, jj)) - min(ahi(d2, ii), ahi(d2, jj)) - 1 >= thr) tc = .false.
+                                end do
+                                if (tc .and. (best == 0 .or. jj < best)) best = jj
+                            end if
+                            jj = bc(jj)
+                        end do
+                    end do
+                end do
+            end do
+
+        end function f_mrg_qmina
 
     end subroutine s_amr_cluster
 
