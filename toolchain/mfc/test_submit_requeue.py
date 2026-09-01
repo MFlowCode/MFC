@@ -90,6 +90,8 @@ exit "${{code:-0}}"
         result.submissions = sorted(submissions.glob("submission-*.sh"))
         return result
 
+    run.scripts = scripts
+    run.state_dir = tmp_path / "state"
     return run
 
 
@@ -136,3 +138,19 @@ def test_a_known_outage_is_not_resubmitted(rig):
     # another allocation.
     result = rig("78")
     assert len(result.submissions) == 1
+
+
+def test_no_job_is_submitted_while_the_cluster_is_under_a_recorded_outage(rig):
+    # ci-outage.sh's whole promise is that later jobs "exit immediately instead
+    # of submitting a SLURM job that is going to fail". Checking it only inside
+    # the allocation means every job still pays the queue wait first -- hours on
+    # Phoenix embers -- before discovering the marker.
+    subprocess.run(
+        ["bash", str(rig.scripts / "ci-outage.sh"), "mark", "phoenix", "pypi unreachable"],
+        env={**os.environ, "MFC_CI_STATE_DIR": str(rig.state_dir)},
+        capture_output=True,
+        check=True,
+    )
+    result = rig("0")
+    assert len(result.submissions) == 0
+    assert result.returncode == 78

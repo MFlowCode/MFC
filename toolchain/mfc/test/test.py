@@ -15,7 +15,7 @@ from rich.panel import Panel
 
 from .. import common, sched
 from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
-from ..common import MFCException, does_command_exist, format_list_to_string, get_program_output, log_tail
+from ..common import MFCException, console_safe, does_command_exist, format_list_to_string, get_program_output, log_tail
 from ..packer import packer
 from ..packer import tol as packtol
 from ..printer import cons
@@ -519,7 +519,9 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
             raise MFCException("h5dump couldn't be found.")
         h5dump = shutil.which("h5dump")
 
-    output, err = get_program_output([h5dump, silo_filepath])
+    # merge_stderr: h5dump reports the actual reason on stderr, so capturing
+    # only stdout would leave the failure path with nothing to show.
+    output, err = get_program_output([h5dump, silo_filepath], merge_stderr=True)
 
     if err != 0:
         # h5dump's own message and the post_process log are the only evidence of
@@ -527,12 +529,24 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
         # failure reached CI as a bare path to a file on a machine nobody can
         # reach. Whether the silo file is absent or merely unreadable is the
         # first thing worth knowing.
-        exists = "missing" if not os.path.exists(silo_filepath) else f"{os.path.getsize(silo_filepath)} bytes"
+        # Never let describing the file replace the failure being reported: a
+        # broken symlink or an unreadable mount would raise OSError here and
+        # swallow the h5dump diagnostic entirely.
+        try:
+            exists = f"{os.path.getsize(silo_filepath)} bytes" if os.path.exists(silo_filepath) else "missing"
+        except OSError as size_exc:
+            exists = f"size unknown: {size_exc}"
+        # console_safe over the whole message: main.py renders this with Rich
+        # markup enabled, and the h5dump output and post_process log are full of
+        # bracketed paths. Unescaped, a MarkupError would be raised from inside
+        # the very handler meant to report this failure.
         raise MFCException(
-            f"Test {case}: Failed to run h5dump on {silo_filepath} ({exists}).\n"
-            f"h5dump said: {output.strip() or '(no output)'}\n"
-            f"{log_tail(out_filepath)}\n"
-            f"Case dictionary: {case.get_filepath()}."
+            console_safe(
+                f"Test {case}: Failed to run h5dump on {silo_filepath} ({exists}).\n"
+                f"h5dump said: {output.strip() or '(no output)'}\n"
+                f"{log_tail(out_filepath)}\n"
+                f"Case dictionary: {case.get_filepath()}."
+            )
         )
 
     if "nan," in output:

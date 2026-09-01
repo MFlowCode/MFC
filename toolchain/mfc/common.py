@@ -1,3 +1,4 @@
+import collections
 import logging
 import os
 import shutil
@@ -6,6 +7,7 @@ import sys
 import typing
 from os.path import abspath, dirname, join, normpath, realpath
 
+import rich.markup
 import yaml
 
 from .printer import cons
@@ -91,6 +93,18 @@ def file_read(filepath: str):
         raise MFCException(f'Failed to read from "{filepath}": {exc}') from exc
 
 
+def console_safe(text: str) -> str:
+    """Escape captured text so Rich renders it verbatim.
+
+    The console prints with markup enabled, and compiler/MPI output is full of
+    square brackets: absolute paths inside diagnostics, and "[host:pid]" rank
+    prefixes. Rich reads those as markup tags -- it raises MarkupError on an
+    unmatched closing tag like "[/lustre/...]" and silently swallows "[node1:1]".
+    Either way the diagnostic is destroyed at the moment it matters most.
+    """
+    return rich.markup.escape(text)
+
+
 def log_tail(filepath: str, max_lines: int = 60) -> str:
     """Return the end of a log file, ready to print into CI output.
 
@@ -106,15 +120,18 @@ def log_tail(filepath: str, max_lines: int = 60) -> str:
     header = f"--- last {max_lines} lines of {filepath} ---"
 
     try:
+        # A bounded deque, not f.read(): solver and benchmark logs reach tens of
+        # MB, and this runs on a path that is already failing. Memory stays
+        # proportional to max_lines rather than to the file.
         with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.read().splitlines()
+            lines = [line.rstrip("\n") for line in collections.deque(f, maxlen=max_lines)]
     except OSError as exc:
         return f"{header}\n(could not be read: {exc})"
 
     if not lines:
         return f"{header}\n(the log is empty -- the process likely died before writing anything)"
 
-    return "\n".join([header, *lines[-max_lines:]])
+    return "\n".join([header, *lines])
 
 
 def file_load_yaml(filepath: str):
@@ -156,8 +173,16 @@ def delete_directory(dirpath: str) -> None:
         shutil.rmtree(dirpath)
 
 
-def get_program_output(arguments: typing.List[str] = None, cwd=None):
-    with subprocess.Popen([str(_) for _ in arguments] or [], cwd=cwd, stdout=subprocess.PIPE) as proc:
+def get_program_output(arguments: typing.List[str] = None, cwd=None, merge_stderr: bool = False):
+    """Run a command and return (stdout, returncode).
+
+    merge_stderr folds stderr into the captured output. Off by default because
+    callers that parse stdout must not start seeing stderr mixed in; on for
+    diagnostics, where tools like h5dump report the actual reason on stderr and
+    capturing only stdout leaves nothing to show.
+    """
+    stderr = subprocess.STDOUT if merge_stderr else None
+    with subprocess.Popen([str(_) for _ in arguments] or [], cwd=cwd, stdout=subprocess.PIPE, stderr=stderr) as proc:
         return (proc.communicate()[0].decode(), proc.returncode)
 
 

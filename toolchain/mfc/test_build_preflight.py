@@ -37,16 +37,22 @@ def workspace(tmp_path):
     shutil.copytree(REPO / ".github", tmp_path / ".github")
     binz = tmp_path / "bin"
     binz.mkdir()
-    _exe(binz / "mpirun", '#!/bin/bash\nwhile [ "${1:-}" = "-np" ]; do shift 2; done\nexec "$@"\n')
+    passthrough = '#!/bin/bash\nwhile [ "${1:0:1}" = "-" ]; do shift; case "$1" in [0-9]*) shift;; esac; done\nexec "$@"\n'
+    _exe(binz / "mpirun", passthrough)
+    # frontier launches with srun; stub it so the real /usr/bin/srun on this box
+    # cannot stand in and try to submit an actual job.
+    _exe(binz / "srun", passthrough)
     trace = tmp_path / "trace.log"
 
-    def install_mfc(full_build_stdout="", full_build_rc=0, syscheck_rc=0):
+    def install_mfc(full_build_stdout="", full_build_rc=0, syscheck_rc=0, probe_build_stdout="", probe_build_rc=0):
         _exe(
             tmp_path / "mfc.sh",
             f"""#!/bin/bash
 echo "mfc.sh $*" >> {trace}
 for a in "$@"; do
   if [ "$a" = "syscheck" ]; then
+    printf '%s' {shlex_quote(probe_build_stdout)}
+    if [ {probe_build_rc} -ne 0 ]; then exit {probe_build_rc}; fi
     mkdir -p build/install/gpu/bin
     printf '#!/bin/bash\\necho probe ran\\nexit {syscheck_rc}\\n' > build/install/gpu/bin/syscheck
     chmod +x build/install/gpu/bin/syscheck
@@ -138,5 +144,37 @@ def test_the_build_output_is_still_shown_when_it_fails(workspace):
     # debuggable if whatever the build did print survives into the CI log.
     tmp_path, install_mfc, run, _ = workspace
     install_mfc(full_build_stdout="ftn-2116 ftn: INTERNAL\n", full_build_rc=1)
+    result = run()
+    assert "ftn-2116" in result.stdout + result.stderr
+
+
+def test_a_pypi_failure_during_the_probe_build_records_an_outage(workspace):
+    # The probe build is now the first mfc.sh call in the job, so it is what
+    # bootstraps build/venv from PyPI -- and on Phoenix clean_build has just
+    # deleted that venv, so it is rebuilt every time. Classifying only the solver
+    # build leaves the breaker blind to the outage it exists for.
+    tmp_path, install_mfc, run, _ = workspace
+    install_mfc(probe_build_stdout=PYPI_FAILURE, probe_build_rc=1)
+    run()
+    assert outage_recorded(tmp_path)
+
+
+def test_a_pypi_failure_during_the_probe_build_reports_the_outage_exit_code(workspace):
+    tmp_path, install_mfc, run, _ = workspace
+    install_mfc(probe_build_stdout=PYPI_FAILURE, probe_build_rc=1)
+    assert run().returncode == 78
+
+
+def test_an_ordinary_probe_build_failure_is_not_an_outage(workspace):
+    tmp_path, install_mfc, run, _ = workspace
+    install_mfc(probe_build_stdout="NVFORTRAN-S-0034-Syntax error\n", probe_build_rc=1)
+    result = run()
+    assert not outage_recorded(tmp_path)
+    assert result.returncode not in (77, 78)
+
+
+def test_the_probe_build_output_is_shown_when_it_fails(workspace):
+    tmp_path, install_mfc, run, _ = workspace
+    install_mfc(probe_build_stdout="ftn-2116 ftn: INTERNAL\n", probe_build_rc=1)
     result = run()
     assert "ftn-2116" in result.stdout + result.stderr

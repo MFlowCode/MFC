@@ -31,6 +31,16 @@ set -uo pipefail
 STATE_DIR="${MFC_CI_STATE_DIR:-$HOME/.mfc-ci-state}"
 TTL="${MFC_CI_OUTAGE_TTL_SECONDS:-1200}"
 
+# A non-numeric TTL would make the age comparison below emit "integer expression
+# expected" and exit with a code the caller reads as neither clear nor tripped.
+# Fall back to the default rather than letting a typo gate CI.
+case "$TTL" in
+    ''|*[!0-9]*)
+        echo "Ignoring non-numeric MFC_CI_OUTAGE_TTL_SECONDS='$TTL'; using 1200." >&2
+        TTL=1200
+        ;;
+esac
+
 EXIT_CLEAR=0
 EXIT_TRIPPED=1
 EXIT_USAGE=2

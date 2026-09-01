@@ -28,7 +28,11 @@ def workspace(tmp_path):
     shutil.copytree(REPO / ".github", tmp_path / ".github")
     binz = tmp_path / "bin"
     binz.mkdir()
-    _exe(binz / "mpirun", '#!/bin/bash\nwhile [ "${1:-}" = "-np" ]; do shift 2; done\nexec "$@"\n')
+    passthrough = '#!/bin/bash\nwhile [ "${1:0:1}" = "-" ]; do shift; case "$1" in [0-9]*) shift;; esac; done\nexec "$@"\n'
+    _exe(binz / "mpirun", passthrough)
+    # job_cluster here is frontier, whose launcher is srun. Without a stub the
+    # real /usr/bin/srun on this box would try to submit an actual job.
+    _exe(binz / "srun", passthrough)
     _exe(binz / "nvidia-smi", "#!/bin/bash\necho 'GPU 0: fake'\n")
     trace = tmp_path / "trace.log"
     _exe(tmp_path / "mfc.sh", f'#!/bin/bash\necho "mfc.sh $*" >> {trace}\nexit 0\n')

@@ -100,3 +100,15 @@ def test_an_unknown_subcommand_fails_with_a_usage_error(state_dir):
     result = run(state_dir, "frobnicate", "phoenix")
     assert result.returncode == 2
     assert "usage" in (result.stdout + result.stderr).lower()
+
+
+def test_a_non_numeric_ttl_falls_back_to_the_default_instead_of_erroring(state_dir):
+    # A typo in MFC_CI_OUTAGE_TTL_SECONDS must not make `check` exit with a code
+    # that is neither clear nor tripped -- that would gate CI on a config slip.
+    run(state_dir, "mark", "phoenix", "pypi unreachable")
+    assert run(state_dir, "check", "phoenix", ttl="not-a-number").returncode == TRIPPED
+
+
+def test_an_empty_ttl_falls_back_to_the_default(state_dir):
+    run(state_dir, "mark", "phoenix", "pypi unreachable")
+    assert run(state_dir, "check", "phoenix", ttl="").returncode == TRIPPED

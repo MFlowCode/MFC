@@ -39,13 +39,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 node="${SLURMD_NODENAME:-$(hostname -s 2>/dev/null || hostname)}"
 
 # --- Cluster-wide outage: requeuing cannot help, so skip rather than retry ---
-if ! bash "$SCRIPT_DIR/ci-outage.sh" check "$cluster"; then
+outage_rc=0
+bash "$SCRIPT_DIR/ci-outage.sh" check "$cluster" || outage_rc=$?
+if [ "$outage_rc" -eq 1 ]; then
     echo "Preflight: skipping on $node because $cluster is known to be down."
     exit $EXIT_OUTAGE
+elif [ "$outage_rc" -ne 0 ]; then
+    # Only exit 1 means "tripped". Anything else means the breaker could not be
+    # read at all (missing script, unreadable state dir), which says nothing
+    # about the cluster -- treating it as an outage would halt CI on a bug here.
+    echo "Preflight: could not read the outage breaker (exit $outage_rc); continuing."
 fi
 
 # --- Node health ---
-syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1)
+# Prefer an install matching this job's device (build/install is named e.g.
+# gpu-acc-<hash>, gpu-mp-<hash>), so a leftover install from another variant is
+# not probed instead. Fall back to any syscheck if none matches.
+syscheck_bin=$(find build/install -path "*${device}*" -name syscheck -type f 2>/dev/null | head -1)
+if [ -z "$syscheck_bin" ]; then
+    syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1)
+fi
 
 if [ -z "$syscheck_bin" ]; then
     # Nothing to probe with. A missing binary is a build problem, not a bad
@@ -57,15 +70,38 @@ fi
 
 echo "Preflight: probing $node with $syscheck_bin"
 
-# Launch under mpirun, not bare. Phoenix's openmpi/4.1.5 predates the PMIx that
-# shipped with its Slurm upgrade, and an MPI binary started bare inside an
-# allocation misreads the PMIx environment and aborts in MPI_Init.
-#
+# Launch the probe the way this cluster launches everything else. Phoenix uses
+# mpirun -- its openmpi predates the PMIx that shipped with its Slurm upgrade,
+# so a bare MPI binary misreads the environment and aborts in MPI_Init. Frontier
+# and frontier_amd use srun and Cray MPICH ships no mpirun at all, so running
+# one there fails 127 no matter how healthy the node is. See
+# toolchain/templates/{phoenix,frontier,frontier_amd}.mako.
+case "$cluster" in
+    phoenix)               launcher=(mpirun -np 1) ;;
+    frontier|frontier_amd) launcher=(srun -n1) ;;
+    *)                     launcher=() ;;
+esac
+
+# A launcher missing from PATH says nothing about the node. Probing bare is a
+# weaker test, but calling a healthy node bad is far worse: it costs three
+# allocations and blacklists three good nodes before giving up.
+if [ "${#launcher[@]}" -gt 0 ] && ! command -v "${launcher[0]}" >/dev/null 2>&1; then
+    echo "Preflight: ${launcher[0]} is not on PATH; probing without a launcher."
+    launcher=()
+fi
+
 # Output goes to the log verbatim. Only the exit status decides the verdict:
 # PMIX_ERR_NO_PERMISSIONS and friends from dstore_base.c are benign and appear
 # in more passing jobs than failing ones, so matching on log text would fail
 # healthy nodes.
-if mpirun -np 1 "$syscheck_bin" 2>&1; then
+probe_rc=0
+if [ "${#launcher[@]}" -eq 0 ]; then
+    "$syscheck_bin" 2>&1 || probe_rc=$?
+else
+    "${launcher[@]}" "$syscheck_bin" 2>&1 || probe_rc=$?
+fi
+
+if [ "$probe_rc" -eq 0 ]; then
     echo "Preflight: $node passed."
     exit $EXIT_HEALTHY
 fi

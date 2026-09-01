@@ -42,3 +42,22 @@ def test_names_the_log_so_the_full_file_can_still_be_found(tmp_path):
     log = tmp_path / "case.out"
     log.write_text("boom\n")
     assert "case.out" in log_tail(str(log))
+
+
+def test_reads_only_the_tail_of_a_large_log(tmp_path):
+    # Bounded memory matters: this runs on an already-failing path, and solver
+    # and benchmark logs reach tens of MB.
+    import tracemalloc
+
+    log = tmp_path / "big.out"
+    log.write_text("".join(f"line {i} {'x' * 200}\n" for i in range(200_000)))
+    assert log.stat().st_size > 40_000_000
+
+    tracemalloc.start()
+    body = log_tail(str(log), max_lines=20)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+
+    assert "line 199999" in body
+    assert "line 100000" not in body
+    assert peak < 5_000_000, f"peak {peak} suggests the whole file was read"

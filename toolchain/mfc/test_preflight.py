@@ -30,16 +30,40 @@ OUTAGE = 78
 
 @pytest.fixture
 def workspace(tmp_path):
-    """A workspace with a stubbed mpirun on PATH and a place for syscheck."""
-    binz = tmp_path / "bin"
-    binz.mkdir()
-    mpirun = binz / "mpirun"
-    # Passthrough: drop "-np N" and exec the binary, mirroring how build.sh runs
-    # syscheck under mpirun.
-    mpirun.write_text('#!/bin/bash\nwhile [ "${1:-}" = "-np" ]; do shift 2; done\nexec "$@"\n')
-    mpirun.chmod(mpirun.stat().st_mode | stat.S_IEXEC)
+    """A bare workspace. No launcher is on PATH unless a test installs one.
+
+    An earlier version of this fixture put a fake mpirun on PATH for every test,
+    which is exactly why it could not see that preflight ran mpirun on Frontier,
+    where the launcher is srun and Cray MPICH ships no mpirun at all.
+    """
+    (tmp_path / "bin").mkdir()
     (tmp_path / "state").mkdir()
+
+    # A hermetic PATH holding only the utilities the scripts need. This box has
+    # a real mpirun *and* a real /usr/bin/srun, either of which would silently
+    # stand in for a launcher the test meant to be absent.
+    sysbin = tmp_path / "sysbin"
+    sysbin.mkdir()
+    for tool in ("bash", "find", "head", "tail", "cat", "sed", "grep", "tr", "cut", "date", "mkdir", "mv", "rm", "hostname", "env", "sort", "wc", "dirname", "basename"):
+        for root in ("/usr/bin", "/bin"):
+            src = Path(root) / tool
+            if src.exists():
+                (sysbin / tool).symlink_to(src)
+                break
     return tmp_path
+
+
+def install_launcher(workspace, name):
+    """A passthrough launcher that records its argv, mirroring mpirun/srun."""
+    launcher = workspace / "bin" / name
+    launcher.write_text("#!/bin/bash\n" f'echo "$@" >> {workspace}/launched.txt\n' 'while [ "${1:0:1}" = "-" ]; do shift; case "$1" in [0-9]*) shift;; esac; done\n' 'exec "$@"\n')
+    launcher.chmod(launcher.stat().st_mode | stat.S_IEXEC)
+    return launcher
+
+
+def launched_with(workspace):
+    path = workspace / "launched.txt"
+    return path.read_text() if path.exists() else ""
 
 
 def write_syscheck(workspace, exit_code, message="syscheck says hello"):
@@ -54,7 +78,9 @@ def write_syscheck(workspace, exit_code, message="syscheck says hello"):
 def run(workspace, *args):
     env = {
         **os.environ,
-        "PATH": f"{workspace / 'bin'}:{os.environ['PATH']}",
+        # A controlled PATH, not the inherited one: this box has a real mpirun,
+        # and inheriting it makes "no launcher available" silently untestable.
+        "PATH": f"{workspace / 'bin'}:{workspace / 'sysbin'}",
         "MFC_CI_STATE_DIR": str(workspace / "state"),
         "SLURMD_NODENAME": "atl1-1-03-007-29-0",
     }
@@ -115,3 +141,39 @@ def test_does_not_report_a_node_fault_merely_because_pmix_printed_a_warning(work
     # would fail roughly one healthy job in six.
     write_syscheck(workspace, 0, message="PMIX ERROR: PMIX_ERR_NO_PERMISSIONS in file dstore_base.c at line 238")
     assert run(workspace).returncode == HEALTHY
+
+
+def test_uses_mpirun_on_phoenix(workspace):
+    install_launcher(workspace, "mpirun")
+    write_syscheck(workspace, 0)
+    assert run(workspace, "phoenix", "gpu").returncode == HEALTHY
+    assert "syscheck" in launched_with(workspace)
+
+
+def test_uses_srun_on_frontier(workspace):
+    # Frontier and frontier_amd launch every binary with srun
+    # (toolchain/templates/frontier.mako, frontier_amd.mako); Cray MPICH ships no
+    # mpirun, so running one there is not merely wrong, it cannot work.
+    install_launcher(workspace, "srun")
+    write_syscheck(workspace, 0)
+    assert run(workspace, "frontier", "gpu").returncode == HEALTHY
+    assert "syscheck" in launched_with(workspace)
+
+
+def test_a_missing_launcher_is_not_blamed_on_the_node(workspace):
+    # Without this, a launcher absent from PATH returns 127, preflight calls the
+    # node bad, and the requeue loop burns three allocations and blacklists three
+    # healthy nodes before declaring a cluster-wide problem.
+    write_syscheck(workspace, 0)
+    assert run(workspace, "frontier", "gpu").returncode == HEALTHY
+
+
+def test_a_breaker_that_cannot_be_read_does_not_halt_the_job(workspace):
+    # Exit 1 from ci-outage.sh means "tripped"; any other failure means the check
+    # itself broke. Conflating them turns a bug in the breaker into a CI outage.
+    write_syscheck(workspace, 0)
+    (workspace / "state").chmod(0o000)
+    try:
+        assert run(workspace, "phoenix", "gpu").returncode == HEALTHY
+    finally:
+        (workspace / "state").chmod(0o755)

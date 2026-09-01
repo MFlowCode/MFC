@@ -61,13 +61,39 @@ case "${job_variant:-}" in
     *)    echo "ERROR: unknown job_variant '$job_variant'"; exit 1 ;;
 esac
 
+# Run a build step with its output teed, and classify a failure before giving up.
+# Every ./mfc.sh call needs this, not just the solver build: the *first* one in
+# the job is what bootstraps build/venv from PyPI, so it is the one that sees a
+# package-index outage.
+log_base="build-${job_slug:-${job_device}-${job_interface}}"
+
+run_build_step() {
+    local log="$1"
+    shift
+    set +e
+    "$@" 2>&1 | tee "$log"
+    local rc=${PIPESTATUS[0]}
+    set -e
+    if [ "$rc" -ne 0 ]; then
+        local cls=0
+        bash .github/scripts/classify-build-failure.sh "$log" "$job_cluster" || cls=$?
+        if [ "$cls" -ne 0 ]; then
+            exit "$cls"
+        fi
+        exit "$rc"
+    fi
+}
+
 # --- Probe this node before committing the solver build to it ---
 # syscheck is a standalone target that links in 5-19 seconds, and it is already
 # built second in the ordinary build order. Building it on its own first and
 # running it here rejects an unusable node in about a minute, rather than after
 # the ~40 minute solver build that used to precede the first GPU touch. In the
 # Aug 2026 ECC failures that gap was a median of 38 minutes per job.
-./mfc.sh build -t syscheck -j 8 $build_opts
+#
+# Through retry_build so a transient blip still gets its nuke-and-retry, which a
+# bare invocation here would have quietly dropped.
+run_build_step "${log_base}-syscheck.log" retry_build ./mfc.sh build -t syscheck -j 8 $build_opts
 
 preflight_rc=0
 bash .github/scripts/preflight.sh "$job_cluster" "$job_device" || preflight_rc=$?
@@ -81,22 +107,5 @@ fi
 # Output is teed so a failure can be classified afterwards. Some Frontier CCE
 # and amdflang failures emit no compiler diagnostic at all, so whatever the
 # build did print is the only evidence there is.
-build_log="build-${job_slug:-${job_device}-${job_interface}}.log"
-
-set +e
 RETRY_VALIDATE_CMD="$validate_cmd" \
-    retry_build "${build_cmd[@]}" 2>&1 | tee "$build_log"
-build_rc=${PIPESTATUS[0]}
-set -e
-
-if [ "$build_rc" -ne 0 ]; then
-    # An unreachable package index is cluster-wide: no other node does better,
-    # so record it and let the rest of the matrix skip instead of each job
-    # spending ~33 minutes rediscovering it.
-    if grep -qE "Failed to fetch: .https://pypi|uv install failed|\(venv\) Installation failed" "$build_log"; then
-        bash .github/scripts/ci-outage.sh mark "$job_cluster" \
-            "PyPI/uv dependency install failed during build"
-        exit 78
-    fi
-    exit "$build_rc"
-fi
+    run_build_step "${log_base}.log" retry_build "${build_cmd[@]}"
