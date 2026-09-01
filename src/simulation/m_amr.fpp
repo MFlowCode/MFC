@@ -285,6 +285,8 @@ module m_amr
     !! touching it. NOTE the ownership notion: `amr_block_owner(k) == proc_rank` (SINGLE owner), which is NOT the same as
     !! `amr_rank_owns_block` (the multi-owner intersection). Loops testing the latter need their own list.
     integer, allocatable :: amr_l1r_blk(:)
+    integer, allocatable :: amr_l1p_blk(:)  !< padded variant: region +/- amr_cpat_mar vs my COARSE range
+    integer              :: amr_n_l1p = 0   !< (the stage-fill gather predicate; superset differs from amr_l1r)
     integer              :: amr_n_l1r = 0
     integer(8)           :: amr_l1r_epoch = -1_8
     !> Set wherever amr_block_owner is WRITTEN. s_amr_assign_block_owners is NOT the only writer -- a tiled level-2 block inherits
@@ -2785,7 +2787,7 @@ contains
 
 #ifdef MFC_MPI
         use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-        integer  :: k, r, ierr, nreq, cnt, idx, ncand, tq, nhr, nhs, j
+        integer  :: k, r, ierr, nreq, cnt, idx, ncand, tq, nhr, nhs, j, kk2
         integer  :: cand(num_procs), glo(3), ghi(3)
         logical  :: s_lo(3), s_hi(3), u_lo(3), u_hi(3)
         logical  :: cl(3, num_procs), ch(3, num_procs)
@@ -2857,10 +2859,12 @@ contains
                 end if
             #:endfor
         end do
-        do k = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do kk2 = 1, amr_n_my  ! W1: owned list; level filter kept
+            k = amr_my_blk(kk2)
             if (amr_block_level(k) /= 1) cycle
             call s_amr_select_slot(k)
-            if (amr_block_owner(k) /= proc_rank) cycle
+            if (amr_block_owner(k) /= proc_rank) cycle  ! belt-and-braces
             glo = 0; ghi = 0
             glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
             if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
@@ -3317,6 +3321,7 @@ contains
     impure subroutine s_amr_refresh_l1_recv()
 
         integer :: b, rlo(3), rhi(3), milo(3), mihi(3), bl(3), bh(3)
+        integer :: crlo(3), crhi(3), plo(3), phi(3), pl(3), ph(3), mar
 
         if (amr_l1r_epoch == amr_mesh_epoch) return
         if (allocated(amr_l1r_blk)) then
@@ -3324,6 +3329,13 @@ contains
         end if
         if (.not. allocated(amr_l1r_blk)) allocate (amr_l1r_blk(amr_max_blocks))
         call s_amr_rank_interior(proc_rank, milo, mihi)
+        call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
+        mar = amr_cpat_mar
+        if (allocated(amr_l1p_blk)) then
+            if (size(amr_l1p_blk) < amr_max_blocks) deallocate (amr_l1p_blk)
+        end if
+        if (.not. allocated(amr_l1p_blk)) allocate (amr_l1p_blk(amr_max_blocks))
+        amr_n_l1p = 0
         amr_n_l1r = 0
         do b = 1, amr_num_blocks
             if (amr_block_level(b) /= 1) cycle
@@ -3333,9 +3345,19 @@ contains
             if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, b); rhi(2) = amr_region_hi_all(2, b); end if
             if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, b); rhi(3) = amr_region_hi_all(3, b); end if
             call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
-            if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
-            amr_n_l1r = amr_n_l1r + 1
-            amr_l1r_blk(amr_n_l1r) = b
+            if (.not. (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3))) then
+                amr_n_l1r = amr_n_l1r + 1
+                amr_l1r_blk(amr_n_l1r) = b
+            end if
+            plo = rlo; phi = rhi
+            plo(1) = plo(1) - mar; phi(1) = phi(1) + mar
+            if (n_glb > 0) then; plo(2) = plo(2) - mar; phi(2) = phi(2) + mar; end if
+            if (p_glb > 0) then; plo(3) = plo(3) - mar; phi(3) = phi(3) + mar; end if
+            call s_amr_box_isect(plo, phi, crlo, crhi, pl, ph)
+            if (.not. (pl(1) > ph(1) .or. pl(2) > ph(2) .or. pl(3) > ph(3))) then
+                amr_n_l1p = amr_n_l1p + 1
+                amr_l1p_blk(amr_n_l1p) = b
+            end if
         end do
         amr_l1r_epoch = amr_mesh_epoch
 
@@ -6867,7 +6889,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
         real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
         logical :: do_pbmv
-        integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, nreq, qbase, pbase, ierr, kk
+        integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, nreq, qbase, pbase, ierr, kk, kk2
         integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff
         integer :: clo(3), chi(3), nsh, msl, isl, scells
         integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
@@ -6898,12 +6920,23 @@ contains
         ! SEND side: for every level-1 box someone else owns, my coarse-range slice of its padded patch box. The per-box lag
         ! guard and slot selection run here so every rank still visits every level-1 slot once per stage, as before.
         amr_fw_snx = 0; amr_fw_snp = 0
-        do k = 1, amr_num_blocks
-            if (amr_block_level(k) /= 1) cycle
+        ! W1: the Lagrangian-overlap safety check ran for EVERY level-1 block (mine included) inside the
+        ! old global scan; a list-based loop would silently narrow its coverage (the recipe's trap), so it
+        ! keeps a dedicated gated scan that costs something only when bubbles_lagrange is on.
+        if (bubbles_lagrange) then
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) /= 1) cycle
+                call s_amr_select_slot(k)
+                call s_amr_check_lag_clear()
+            end do
+        end if
+        ! W1: walk the PADDED cached list (region +/- amr_cpat_mar vs my coarse range -- this loop's exact
+        ! predicate); the body keeps its own intersection + empty cycle as belt-and-braces.
+        call s_amr_refresh_l1_recv()
+        do kk2 = 1, amr_n_l1p
+            k = amr_l1p_blk(kk2)
             call s_amr_select_slot(k)
-            call s_amr_check_lag_clear()
             owner = amr_block_owner(k)
-            if (owner == proc_rank) cycle
             plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; plo(2) = 0; plo(3) = 0
             if (n_glb > 0) plo(2) = amr_region_lo_all(2, k) - amr_cpat_mar
             if (p_glb > 0) plo(3) = amr_region_lo_all(3, k) - amr_cpat_mar
@@ -7118,10 +7151,12 @@ contains
         ! transfers were appended box-major, so each box's slabs are the next contiguous run), then the ghost fills - the
         ! same operations the per-box path ran, minus its rendezvous.
         ix = 1
-        do k = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do kk2 = 1, amr_n_my  ! W1: owned list; level filter kept (list carries all owned levels)
+            k = amr_my_blk(kk2)
             if (amr_block_level(k) /= 1) cycle
             call s_amr_select_slot(k)
-            if (.not. amr_rank_owns_block) cycle
+            if (.not. amr_rank_owns_block) cycle  ! belt-and-braces; list guarantees ownership
             call s_phase_tic(PH_GATHER)
             amr_cpat_off = 0
             amr_cpat_off(1) = amr_region_lo_all(1, k) - amr_cpat_mar
