@@ -2360,9 +2360,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                     # The shear-stress rows of this case stay near zero, so the absolute
                     # tolerance is the binding comparison there and compiler/backend roundoff
-                    # can exceed the suite default. override_tol is case-wide.
-                    is_axisym_hlld_no_alt_soundspeed = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace in {"HLLD", "HLLD -> ADC"} and alt_soundspeed == "F"
-                    tol = 1e-5 if is_axisym_hlld_no_alt_soundspeed else None
+                    # can exceed the suite default. This holds for both alt_soundspeed
+                    # variants -- nvhpc 25.5 drifts the alt_soundspeed=T rows to ~1.4e-6, past
+                    # the 1e-6 band. override_tol is case-wide.
+                    is_axisym_hlld = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace in {"HLLD", "HLLD -> ADC"}
+                    tol = 1e-5 if is_axisym_hlld else None
 
                     trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
                     cases.append(
