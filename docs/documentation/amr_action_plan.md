@@ -226,6 +226,66 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-01 (51) — W1 BATCH 3: all six remaining per-stage scans converted, and the scans were the SMALL half
+
+### The conversions (one commit, src/simulation/m_amr.fpp only)
+reflux-faces recv -> amr_l1p (the participates predicate is PROVABLY inside the padded list: region
++/-1 touching my decomp slab implies region +/-amr_cpat_mar (>=2) intersects my coarse range, a
+superset of the slab); freg recv + parent-fill send + restrict-parent recv -> ONE new list amr_fch_blk
+(level>=2, my parent, foreign child); freg send -> amr_my_blk; parent-fill consume -> amr_own_blk (the
+MULTI-owner amr_owns_all notion — amr_my_blk would have silently narrowed it, exactly the trap the
+list declarations warn about). The lag-clear guard kept its full coverage via the recipe's gated hoist.
+
+### The real find: the waves were QUADRATIC per stage, not linear
+f_amr_parent_block is itself an O(global blocks) scan, and every one of these waves called it per
+level>=2 block per stage — O(N^2)/stage. s_amr_sibling_face_weights hid the same shape (all blocks x
+a parent lookup each) PER CALL. Both are now epoch-cached in the one builder walk
+(s_amr_refresh_lists): amr_parent_blk plus a children CSR (query: child_idx(ptr(p-1)+1:ptr(p)),
+ptr(0)=0). The builder keeps the quadratic walk but pays it once per REGRID. Left deliberately: the
+subcycle per-box path, regrid/init/instrument callers, and O(1) level-1 calls; the restrict_wave
+wrapper's three descending scans are batch-4.
+
+### Independent audit: verdict fix-first, then land — all core claims survived attack
+The auditor (a) proved the l1p superset argument formally, (b) verified survivor set + ascending order
+at all six sites and the ix-cursor pairing, (c) caught that MY OWN pblk=0 hardening guarded the CSR
+build but not the query — amr_child_ptr(-1) on an orphan parent, a corruption AMPLIFIER where the old
+code degraded gracefully (fixed: early return), (d) flagged the re-entrant refresh inside a loop over
+the list it reallocates (fixed: callers refresh; the routine no longer does), (e) had the cache keyed
+on (epoch, num_blocks) to match s_amr_reg_prepare. Lesson: the guard I added under my own audit
+introduced the reachable half of the hazard it closed — independent review caught what self-review
+primed itself to miss.
+
+### The battery, with POSITIVE controls (the max_level=1 blindness catch)
+The batch-2 oracle deck (27DEC5B6) is max_level=1 — structurally blind to five of the six converted
+paths. New arms: F57C3A5B + EF58E377 (multi-level dynamic np=2, rank_time_wrt=T). Results: land gate
+69/69 on GPU; oracle silent with every family balanced; canary MFC_XA_SEED=1 ABORTS (oracle proven
+live); reldebug clean (0 runtime errors, finalize reached); fixed-tree re-pin BYTE-IDENTICAL family
+counts (auditor fixes behavior-neutral, so the 69/69 carries). ATTRIBUTION BY DIFFERENCING: F57C3A5B
+F2 = 20 msgs @ 10 steps vs 51 @ 20 steps — the marginal step adds 3 = one per RK stage, so the
+traffic IS the per-stage parent-fill wave through the fch loop (predicted 21, got 20); F5/F7 scale the
+same way. EF58E377's flat F2 (7=7) shows its towers co-locate after the early window — a deck-choice
+lesson, not a code property.
+
+### np1024 (395021) POSTMORTEM: failed BOTH pre-registered ways — and the rung is now memory-gated
+Truncation grep fired: 91k-98k boxes wanted, amr_max_blocks=65536 kept, every regrid clipped ~30%.
+Then the OOM killer took the run at 91% host memory (~3 GB/rank x 64 ranks/node). No readable scaling
+data. The rung cannot be rescheduled as-is: matched density (64/node) needs 16 nodes and OOMs; 32/node
+needs 32 nodes and mi2104x HAS 21. np1024 therefore waits on footprint reduction (metadata tier-1
+and/or store trim) — recorded as the second independent firing of the tier-1 trigger, this time at
+np=1024, two orders below the goal scale.
+
+### Instrument + harness notes
+amr_n_touch (halo probe) now counts only list survivors — any touch comparison spanning this commit is
+invalid. +5 replicated global-size int arrays (~20 B/block/rank) — a line item AGAINST tier-1's
+budget. Harness: `-t` on mfc.sh run/build is ONE space-separated flag (`-t pre_process simulation`);
+a repeated -t silently drops targets (argparse keeps the last) — same family as the --only rule. And
+LD_LIBRARY_PATH=/share/rock/lib breaks the post_process cmake configure; export it only at runtime.
+
+### Next actions (order)
+1) np256/512 payoff pair: restr/rs share 8.5-12% must fall toward 1-2%. 2) keep-tol moving-deck A/B.
+3) M1 (design on disk). 4) metadata tier-1 — now carrying TWO trigger firings. 5) W1 batch-4
+(restrict_wave wrapper scans + restrict_l1) only if the payoff readout says scans still show.
+
 ## 2026-09-01 (50) — W1 UNDERWAY; P-PRIME INTERIM: my own decision bands were misanchored
 
 ### W1: 4 of 10 per-stage scans converted and PUSHED (acaae35d batch 1, dcfce95c batch 2)
