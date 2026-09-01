@@ -90,12 +90,22 @@ if [ -n "$shard" ] && [ "$shard_count" -gt 1 ]; then
     fi
 fi
 
-# Probe this node before spending the allocation on it. Placed after the build,
-# not in the sbatch template: these scripts nuke and rebuild build/ themselves
-# (Phoenix does so precisely because its compute nodes are heterogeneous), so a
-# probe running earlier would test a stale binary from a previous job -- likely
-# built for another microarchitecture -- and a SIGILL there would be reported as
-# a bad node, excluding a healthy one.
+# Probe this node before pre-building every case on it. The probe needs a
+# syscheck binary, and where that comes from differs by mode:
+#
+#   sharded   - shard 1 already built syscheck under the marker coordination
+#               above and the others waited for it. Building it again here
+#               would run concurrently across shards that share build/install,
+#               which is the collision the coordination exists to prevent.
+#   unsharded - nothing has been built yet, so build the probe binary now. It
+#               links in seconds and is a no-op if it is already current.
+#
+# Getting this wrong is silent: the probe simply reports "no syscheck binary"
+# and skips, which is how the unsharded Phoenix path went unprobed at first.
+if [ -z "$shard" ] || [ "$shard_count" -le 1 ]; then
+    ./mfc.sh build -t syscheck -j 8 $gpu_opts
+fi
+
 preflight_rc=0
 bash .github/scripts/preflight.sh "$job_cluster" "${job_device:-gpu}" || preflight_rc=$?
 if [ "$preflight_rc" -ne 0 ]; then
