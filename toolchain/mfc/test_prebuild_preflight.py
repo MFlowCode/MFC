@@ -1,112 +1,44 @@
-"""The case-optimization pre-build must actually probe, in both shard modes.
+"""The case-optimization pre-build must NOT probe the node.
 
-The probe needs a syscheck binary to exist. In the sharded mode shard 1 builds
-one under the script's marker coordination and the others wait for it; in the
-unsharded mode nothing has been built when the probe runs, so it has to build
-the binary itself.
+Every other SLURM job MFC submits runs binaries built for the device it asked
+for. This one does not: test.yml submits it as a *cpu* allocation, because it is
+a --dry-run that only builds, while the binaries it produces are GPU builds.
 
-That asymmetry failed silently the first time: on Phoenix, where
-case-optimization is unsharded, the probe reported "no syscheck binary under
-build/install; skipping node probe" and did nothing at all. A guard that skips
-looks exactly like a guard that passed, which is why this is pinned.
+A syscheck built with --gpu asserts omp_get_num_devices() > 0 (or the OpenACC
+equivalent) and so exits non-zero on a node that has no GPU by design. Probing
+here reads that as a bad node. It did exactly that in CI: three healthy Phoenix
+nodes were condemned and two added to --exclude before the wrapper gave up,
+which is the precise false positive the whole guard exists to avoid.
+
+The GPU allocation that actually runs these cases is probed instead, in
+run_case_optimization.sh, where the allocation and the binary agree.
 """
 
-import os
-import shutil
-import stat
-import subprocess
 from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[2]
+SCRIPTS = Path(__file__).resolve().parents[2] / ".github" / "scripts"
+
+# Scripts that run binaries built for the device their allocation requested.
+PROBES = ["run_case_optimization.sh"]
+# Scripts whose allocation device deliberately differs from what they build.
+DOES_NOT_PROBE = ["prebuild-case-optimization.sh"]
 
 
-def _exe(path: Path, text: str):
-    path.write_text(text)
-    path.chmod(path.stat().st_mode | stat.S_IEXEC)
+@pytest.mark.parametrize("script", DOES_NOT_PROBE)
+def test_a_build_only_allocation_does_not_judge_its_node(script):
+    body = (SCRIPTS / script).read_text()
+    assert "preflight.sh" not in body, f"{script} runs on a cpu allocation but builds GPU binaries, so a probe " "there always fails and excludes a healthy node"
 
 
-@pytest.fixture
-def workspace(tmp_path):
-    shutil.copytree(REPO / ".github", tmp_path / ".github")
-    binz = tmp_path / "bin"
-    binz.mkdir()
-    _exe(
-        binz / "mpirun",
-        '#!/bin/bash\nwhile [ "${1:0:1}" = "-" ]; do shift; case "$1" in [0-9]*) shift;; esac; done\nexec "$@"\n',
-    )
-    trace = tmp_path / "trace.log"
-
-    def install_mfc(probe_exit=0):
-        _exe(
-            tmp_path / "mfc.sh",
-            f"""#!/bin/bash
-echo "mfc.sh $*" >> {trace}
-if [ "$1" = "load" ]; then return 0 2>/dev/null || exit 0; fi
-for a in "$@"; do
-  if [ "$a" = "syscheck" ]; then
-    mkdir -p build/install/gpu-acc-abc/bin
-    printf '#!/bin/bash\\nexit {probe_exit}\\n' > build/install/gpu-acc-abc/bin/syscheck
-    chmod +x build/install/gpu-acc-abc/bin/syscheck
-  fi
-done
-exit 0
-""",
-        )
-
-    def run(shard="", cluster="phoenix"):
-        env = {
-            **os.environ,
-            "PATH": f"{binz}:{os.environ['PATH']}",
-            "MFC_CI_STATE_DIR": str(tmp_path / "state"),
-            "SLURM_JOB_ID": "123456",
-            "SLURMD_NODENAME": "atl1-1-02-008-1-1",
-            "job_cluster": cluster,
-            "job_device": "gpu",
-            "job_interface": "acc",
-            "job_shard": shard,
-        }
-        return subprocess.run(
-            ["bash", ".github/scripts/prebuild-case-optimization.sh"],
-            capture_output=True,
-            text=True,
-            cwd=tmp_path,
-            env=env,
-            check=False,
-            timeout=120,
-        )
-
-    return tmp_path, install_mfc, run, trace
+@pytest.mark.parametrize("script", PROBES)
+def test_the_allocation_that_runs_the_cases_does_judge_its_node(script):
+    assert "preflight.sh" in (SCRIPTS / script).read_text()
 
 
-def test_the_unsharded_prebuild_really_probes(workspace):
-    # Phoenix runs case-optimization unsharded. This is the path that silently
-    # skipped.
-    _, install_mfc, run, _ = workspace
-    install_mfc(probe_exit=0)
-    out = run().stdout
-    assert "Preflight: probing" in out
-    assert "no syscheck binary" not in out
-
-
-def test_a_bad_node_stops_the_unsharded_prebuild(workspace):
-    _, install_mfc, run, trace = workspace
-    install_mfc(probe_exit=1)
-    result = run()
-    assert result.returncode == 77
-    assert "Pre-building" not in result.stdout
-
-
-def test_the_sharded_prebuild_does_not_rebuild_syscheck_concurrently(workspace):
-    # Shard 2 waits on shard 1's marker; building syscheck here would race the
-    # shared build/install that the coordination exists to serialize.
-    tmp_path, install_mfc, run, trace = workspace
-    install_mfc(probe_exit=0)
-    # frontier_amd, not phoenix: sharding is a frontier_amd mode, and phoenix's
-    # clean_build would move build/ aside and take the marker with it.
-    (tmp_path / "build").mkdir(exist_ok=True)
-    (tmp_path / "build" / ".prebuild-shared-targets-done").touch()
-    run(shard="2/3", cluster="frontier_amd")
-    builds = [c for c in trace.read_text().splitlines() if "build -t syscheck" in c]
-    assert builds == [], f"shard 2 must not build syscheck itself, got {builds}"
+def test_the_reason_is_recorded_where_someone_would_re_add_it():
+    # The next person to notice case-opt's pre-build is unprobed should find the
+    # reason in the file rather than rediscovering it through a red CI run.
+    body = (SCRIPTS / "prebuild-case-optimization.sh").read_text()
+    assert "cpu" in body and "probe" in body.lower()
