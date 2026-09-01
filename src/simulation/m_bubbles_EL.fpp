@@ -1361,9 +1361,7 @@ contains
                      & 2) <= pcomm_coords(1)%end) then
                 wrap_bubble_dir(k, 1) = 1
                 wrap_bubble_loc(k, 1) = 1
-            else if (mtn_pos(k, 1, 2) >= x_cb(m)) then
-                keep_bubble(k) = 0
-            else if (mtn_pos(k, 1, 2) < x_cb(-1)) then
+            else if (.not. (mtn_pos(k, 1, 2) >= x_cb(-1) .and. mtn_pos(k, 1, 2) < x_cb(m))) then
                 keep_bubble(k) = 0
             end if
 
@@ -1381,9 +1379,7 @@ contains
                      & 2) <= pcomm_coords(2)%end) then
                 wrap_bubble_dir(k, 2) = 1
                 wrap_bubble_loc(k, 2) = 1
-            else if (mtn_pos(k, 2, 2) >= y_cb(n)) then
-                keep_bubble(k) = 0
-            else if (mtn_pos(k, 2, 2) < y_cb(-1)) then
+            else if (.not. (mtn_pos(k, 2, 2) >= y_cb(-1) .and. mtn_pos(k, 2, 2) < y_cb(n))) then
                 keep_bubble(k) = 0
             end if
 
@@ -1402,9 +1398,7 @@ contains
                          & 2) <= pcomm_coords(3)%end) then
                     wrap_bubble_dir(k, 3) = 1
                     wrap_bubble_loc(k, 3) = 1
-                else if (mtn_pos(k, 3, 2) >= z_cb(p)) then
-                    keep_bubble(k) = 0
-                else if (mtn_pos(k, 3, 2) < z_cb(-1)) then
+                else if (.not. (mtn_pos(k, 3, 2) >= z_cb(-1) .and. mtn_pos(k, 3, 2) < z_cb(p))) then
                     keep_bubble(k) = 0
                 end if
             end if
