@@ -947,16 +947,52 @@ contains
         do i = 1, nacc
             akey(i) = f_morton(alo(1, i), alo(2, i), alo(3, i))
         end do
-        do i = 2, nacc
-            bkey = akey(i); tmp = alo(:,i); tmp2 = ahi(:,i)
-            j = i - 1
-            do while (j >= 1)
-                if (akey(j) <= bkey) exit
-                akey(j + 1) = akey(j); alo(:,j + 1) = alo(:,j); ahi(:,j + 1) = ahi(:,j)
-                j = j - 1
+        ! stable bottom-up mergesort on an index permutation (payload applied once at the end).
+        ! The insertion sort it replaces is O(n^2) over R concatenated per-rank runs -- measured growing
+        ! 5.1x over the first rank doubling (2.2x the next) -- comparable to the merge residual, and O(n^2)
+        ! worst-case over concatenated runs regardless.
+        ! Stability at key ties (fall back to acceptance order) is load-bearing for B1 and is proven by a
+        ! differential control (amr-bench/tools/sort_ctl.f90: identical orders incl. tie-heavy suites; an
+        ! unstable mutation diverges on 48 cases).
+        block
+            integer, allocatable    :: sperm(:), tperm(:), t2lo(:,:), t2hi(:,:)
+            integer(8), allocatable :: tkey(:)
+            integer                 :: sw, mslo, msmid, mshi, si, sj, sk
+            allocate (sperm(nacc), tperm(nacc), tkey(nacc), t2lo(3, nacc), t2hi(3, nacc))
+            do i = 1, nacc
+                sperm(i) = i
             end do
-            akey(j + 1) = bkey; alo(:,j + 1) = tmp; ahi(:,j + 1) = tmp2
-        end do
+            sw = 1
+            do while (sw < nacc)
+                mslo = 1
+                do while (mslo + sw <= nacc)
+                    msmid = mslo + sw - 1; mshi = min(mslo + 2*sw - 1, nacc)
+                    si = mslo; sj = msmid + 1; sk = mslo
+                    do while (si <= msmid .and. sj <= mshi)
+                        if (akey(si) <= akey(sj)) then
+                            tkey(sk) = akey(si); tperm(sk) = sperm(si); si = si + 1
+                        else
+                            tkey(sk) = akey(sj); tperm(sk) = sperm(sj); sj = sj + 1
+                        end if
+                        sk = sk + 1
+                    end do
+                    do while (si <= msmid)
+                        tkey(sk) = akey(si); tperm(sk) = sperm(si); si = si + 1; sk = sk + 1
+                    end do
+                    do while (sj <= mshi)
+                        tkey(sk) = akey(sj); tperm(sk) = sperm(sj); sj = sj + 1; sk = sk + 1
+                    end do
+                    akey(mslo:mshi) = tkey(mslo:mshi); sperm(mslo:mshi) = tperm(mslo:mshi)
+                    mslo = mslo + 2*sw
+                end do
+                sw = sw*2
+            end do
+            do i = 1, nacc
+                t2lo(:,i) = alo(:,sperm(i)); t2hi(:,i) = ahi(:,sperm(i))
+            end do
+            alo(:,1:nacc) = t2lo; ahi(:,1:nacc) = t2hi
+            deallocate (sperm, tperm, tkey, t2lo, t2hi)
+        end block
 
         ! min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their bounding box
         thr = buff_size + 2*amr_buf
