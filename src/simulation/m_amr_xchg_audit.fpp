@@ -13,7 +13,7 @@
 module m_amr_xchg_audit
 
     use m_precision_select
-    use m_global_parameters, only: rank_time_wrt, proc_rank
+    use m_global_parameters, only: rank_time_wrt, proc_rank, num_procs
     use m_mpi_proxy, only: s_mpi_abort
 
 #ifdef MFC_MPI
@@ -86,8 +86,21 @@ module m_amr_xchg_audit
     ! dir 1 = send, 2 = recv; a SENDRECV site records both.
     integer(8) :: xa_msgs(XA_NSITE, 2) = 0_8
     integer(8) :: xa_words(XA_NSITE, 2) = 0_8
-    integer    :: xa_tag_min(XA_NSITE) = huge(0)
-    integer    :: xa_tag_max(XA_NSITE) = -huge(0)
+    !> M0 ORDER ORACLE: per-site XOR folds of mix(pair, seq, key). Sender folds (unordered pair id, its nth-send-on-that-channel,
+    !! key); receiver folds the same triple for its nth-receive. Under the FIFO order contract the triples coincide
+    !! message-for-message, so the global BXOR of send-folds equals the global BXOR of recv-folds; any cross-rank ordering
+    !! divergence misaligns key<->seq and the finalize assert fires. The mixing hash is LOAD-BEARING: a raw packed-field XOR is
+    !! provably blind to pairwise transpositions (property control: amr-bench/tools/oracle_ctl.f90, verdict in
+    !! logs/oracle_ctl_final.log). xa_seq is O(P) per rank (368 B x P) -- acceptable for M0; M1 derives seq from the transfer plans
+    !! instead. Sites pass peer/key opt-in; unconverted sites fold nothing.
+    integer(8) :: xa_ord(XA_NSITE, 2) = 0_8
+    integer    :: xa_seed = -1  !< -1 unread, 0 off, 1 = corrupt one fold (canary)
+    !> canary latch: fire exactly once (an XOR accumulator can return to zero, so testing it would allow self-cancelling double
+    !! fires)
+    logical              :: xa_seeded = .false.
+    integer, allocatable :: xa_seq(:,:,:)  !< (site, dir, 0:np-1) per-channel message counters
+    integer              :: xa_tag_min(XA_NSITE) = huge(0)
+    integer              :: xa_tag_max(XA_NSITE) = -huge(0)
 
     ! I1b: per-xfer identity header (amr_plan_based_exchange.md "I1b implementation binding").
     ! XA_NH real(wp) words - [site, blk, bl(3), bh(3)] as exact integer-valued reals - are
@@ -113,16 +126,53 @@ contains
 
     !> Record one transfer at the MPI call site itself. idir: 1 = send, 2 = recv. nwords is the MPI count argument verbatim; tag is
     !! the tag argument verbatim.
-    impure subroutine s_xa_rec(isite, idir, nwords, tag)
+    impure subroutine s_xa_rec(isite, idir, nwords, tag, peer, key)
 
-        integer, intent(in) :: isite, idir, nwords, tag
+        integer, intent(in)           :: isite, idir, nwords, tag
+        integer, intent(in), optional :: peer, key
+        integer(8)                    :: pid, e
+        integer                       :: sq
 
         xa_msgs(isite, idir) = xa_msgs(isite, idir) + 1_8
         xa_words(isite, idir) = xa_words(isite, idir) + int(nwords, 8)
         xa_tag_min(isite) = min(xa_tag_min(isite), tag)
         xa_tag_max(isite) = max(xa_tag_max(isite), tag)
+        if (present(peer) .and. present(key)) then
+            ! seeded-bug canary: MFC_XA_SEED=1 corrupts exactly one fold on rank 0 (send side, first
+            ! keyed message) -- the finalize oracle MUST abort; proves the end-to-end wiring can fail.
+            if (xa_seed < 0) then
+                block
+                    character(len=8) :: ev
+                    integer          :: st
+                    call get_environment_variable("MFC_XA_SEED", ev, status=st)
+                    xa_seed = merge(1, 0, st == 0 .and. ev(1:1) == '1')
+                end block
+            end if
+            if (.not. allocated(xa_seq)) then
+                allocate (xa_seq(XA_NSITE, 2,0:num_procs - 1))
+                xa_seq = 0
+            end if
+            xa_seq(isite, idir, peer) = xa_seq(isite, idir, peer) + 1
+            if (xa_seed == 1 .and. proc_rank == 0 .and. idir == 1 .and. .not. xa_seeded) then
+                xa_ord(isite, 1) = ieor(xa_ord(isite, 1), 12345_8)  ! the canary corruption
+                xa_seeded = .true.
+            end if
+            sq = xa_seq(isite, idir, peer)
+            pid = ior(ishft(int(min(proc_rank, peer), 8), 20), int(max(proc_rank, peer), 8))
+            e = f_xa_mix(ieor(f_xa_mix(ieor(pid, ishft(int(sq, 8), 44))), int(key, 8)))
+            xa_ord(isite, idir) = ieor(xa_ord(isite, idir), e)
+        end if
 
     end subroutine s_xa_rec
+
+    pure integer(8) function f_xa_mix(x) result(z)
+        integer(8), intent(in) :: x
+        z = x + int(z'9E3779B97F4A7C15', 8)
+        z = ieor(z, ishft(z, -30))*int(z'BF58476D1CE4E5B9', 8)
+        z = ieor(z, ishft(z, -27))*int(z'94D049BB133111EB', 8)
+        z = ieor(z, ishft(z, -31))
+
+    end function f_xa_mix
 
     !> Write the XA_NH-word identity header into buf(1:XA_NH): the sending site id, the block the payload is for, and the slab [bl,
     !! bh] the sender packed. Call only under `if (XA_NH > 0)`.
@@ -160,7 +210,8 @@ contains
     !> Zero the accumulators (a future per-window use; finalize-report runs cumulative).
     impure subroutine s_xa_reset()
 
-        xa_msgs = 0_8; xa_words = 0_8
+        xa_msgs = 0_8; xa_words = 0_8; xa_ord = 0_8
+        if (allocated(xa_seq)) xa_seq = 0
         xa_tag_min = huge(0); xa_tag_max = -huge(0)
 
     end subroutine s_xa_reset
@@ -201,6 +252,36 @@ contains
             @:ASSERT(gm(f, 1) == gm(f, 2), "amr xchg audit: send/recv MESSAGE count mismatch in family "//fam_name(f))
             @:ASSERT(gw(f, 1) == gw(f, 2), "amr xchg audit: send/recv WORD count mismatch in family "//fam_name(f))
         end do
+
+        ! M0 order-oracle finalize check (see the xa_ord docs above)
+        block
+            integer(8) :: og(XA_NSITE, 2)
+            integer    :: isite, mierr2
+            og = xa_ord
+#ifdef MFC_MPI
+            call MPI_ALLREDUCE(MPI_IN_PLACE, og, XA_NSITE*2, MPI_INTEGER8, MPI_BXOR, MPI_COMM_WORLD, mierr2)
+#endif
+            ! sends and receives of the same traffic live under PAIRED sites (XA_*_SND vs XA_*_RCV):
+            ! aggregate by FAMILY (xa_fam) -- a per-site snd-vs-rcv compare mismatches structurally on
+            ! every healthy run (found by exactly that false positive).
+            block
+                integer(8) :: fs(0:63), fr(0:63)
+                integer    :: fam
+                fs = 0_8; fr = 0_8
+                do isite = 1, XA_NSITE
+                    fam = xa_fam(isite)
+                    fs(fam) = ieor(fs(fam), og(isite, 1))
+                    fr(fam) = ieor(fr(fam), og(isite, 2))
+                end do
+                do fam = 0, 63
+                    if (fs(fam) /= fr(fam)) then
+                        print '(A,I0,A,Z16,A,Z16)', ' [amr-xa] ORDER ORACLE MISMATCH family ', fam, ' snd ', fs(fam), ' rcv ', &
+                            & fr(fam)
+                        call s_mpi_abort('AMR exchange order oracle: send/recv order hashes diverge.')
+                    end if
+                end do
+            end block
+        end block
 
     end subroutine s_xa_report
 

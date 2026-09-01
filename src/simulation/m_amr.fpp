@@ -2817,7 +2817,7 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
-                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
+                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq, peer=amr_block_owner(k), key=k*8 + ${D}$*2)
                         call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
@@ -2836,7 +2836,7 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
-                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq)
+                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq, peer=amr_block_owner(k), key=k*8 + ${D}$*2 + 1)
                         call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
@@ -2898,7 +2898,7 @@ contains
                             nreq = nreq + 1
                             call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                             amr_fw_reqw(nreq) = -1
-                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
+                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq, peer=r, key=k*8 + ${D}$*2)
                             call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, &
                                            & amr_fw_req(nreq), ierr)
                         end if
@@ -2906,7 +2906,7 @@ contains
                             nreq = nreq + 1
                             call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                             amr_fw_reqw(nreq) = -1
-                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq)
+                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq, peer=r, key=k*8 + ${D}$*2 + 1)
                             call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, &
                                            & amr_fw_req(nreq), ierr)
                         end if
@@ -3007,7 +3007,7 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
-                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
+                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq, peer=cowner, key=k*8 + ${D}$*2 + 0)
                         call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
@@ -3020,7 +3020,7 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
-                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq)
+                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq, peer=cowner, key=k*8 + ${D}$*2 + 1)
                         call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
@@ -3067,7 +3067,7 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = -1
-                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
+                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq, peer=powner, key=k*8 + ${D}$*2 + 0)
                         call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
                     end if
@@ -3075,7 +3075,7 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = -1
-                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq)
+                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq, peer=powner, key=k*8 + ${D}$*2 + 1)
                         call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
                     end if
