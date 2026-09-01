@@ -278,6 +278,15 @@ module m_amr
     !! which the paired MPI_SENDRECVs depend on.
     integer, allocatable :: amr_my_blk(:)
     integer              :: amr_n_my = 0
+    !> W1: the level-1 blocks this rank RECEIVES restriction for -- not its own, and overlapping its interior. The predicate is
+    !! level + single-owner + geometry, all fixed between regrids, so the list is rebuilt once per mesh epoch and the per-stage loop
+    !! walks it instead of every block in the machine. Keyed on `amr_mesh_epoch`, NOT `amr_myblk_dirty`: that flag tracks owner
+    !! writes only, and this predicate also depends on level and region, which m_amr_regrid.fpp/m_amr_restart.fpp change without
+    !! touching it. NOTE the ownership notion: `amr_block_owner(k) == proc_rank` (SINGLE owner), which is NOT the same as
+    !! `amr_rank_owns_block` (the multi-owner intersection). Loops testing the latter need their own list.
+    integer, allocatable :: amr_l1r_blk(:)
+    integer              :: amr_n_l1r = 0
+    integer(8)           :: amr_l1r_epoch = -1_8
     !> Set wherever amr_block_owner is WRITTEN. s_amr_assign_block_owners is NOT the only writer -- a tiled level-2 block inherits
     !! its parent's owner (s_amr_add_l2_tile), and the restart/migration paths assign directly -- so a list built only in the
     !! assigner goes stale and a converted loop then visits the wrong blocks. Caught by the tiled-L2 multi-level dynamic-regrid
@@ -3303,6 +3312,35 @@ contains
 
     end subroutine s_amr_refresh_my_blocks
 
+    !> W1: rebuild the level-1 receive list when the mesh epoch has moved. One O(global blocks) walk per REGRID replaces one per RK
+    !! STAGE -- at 1e5 ranks the per-stage form is ~360 M evaluations per rank per step purely to find this rank's ~75 blocks.
+    impure subroutine s_amr_refresh_l1_recv()
+
+        integer :: b, rlo(3), rhi(3), milo(3), mihi(3), bl(3), bh(3)
+
+        if (amr_l1r_epoch == amr_mesh_epoch) return
+        if (allocated(amr_l1r_blk)) then
+            if (size(amr_l1r_blk) < amr_max_blocks) deallocate (amr_l1r_blk)
+        end if
+        if (.not. allocated(amr_l1r_blk)) allocate (amr_l1r_blk(amr_max_blocks))
+        call s_amr_rank_interior(proc_rank, milo, mihi)
+        amr_n_l1r = 0
+        do b = 1, amr_num_blocks
+            if (amr_block_level(b) /= 1) cycle
+            if (amr_block_owner(b) == proc_rank) cycle
+            rlo = 0; rhi = 0
+            rlo(1) = amr_region_lo_all(1, b); rhi(1) = amr_region_hi_all(1, b)
+            if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, b); rhi(2) = amr_region_hi_all(2, b); end if
+            if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, b); rhi(3) = amr_region_hi_all(3, b); end if
+            call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
+            if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
+            amr_n_l1r = amr_n_l1r + 1
+            amr_l1r_blk(amr_n_l1r) = b
+        end do
+        amr_l1r_epoch = amr_mesh_epoch
+
+    end subroutine s_amr_refresh_l1_recv
+
     impure subroutine s_amr_assign_block_owners()
 
         integer :: k, a, lev, maxlev, na
@@ -4424,16 +4462,18 @@ contains
         call s_amr_fw_szr(amr_fw_sq, qbase)
         ! recv plan (coarse-owner side): my interior x region(k) over level-1 blocks I do not own
         amr_fw_rnx = 0; amr_fw_rnp = 0
-        do k = 1, amr_num_blocks
-            if (amr_block_level(k) /= 1) cycle
+        ! W1: walk the cached receive list, not every block in the machine. The list carries exactly the
+        ! blocks that passed level + not-mine + overlap, so the three filters are gone; bl/bh are recomputed
+        ! because the body needs them and they are cheap over a short list.
+        call s_amr_refresh_l1_recv()
+        do kk = 1, amr_n_l1r
+            k = amr_l1r_blk(kk)
             owner = amr_block_owner(k)
-            if (owner == proc_rank) cycle
             rlo = 0; rhi = 0
             rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
             if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
             if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
             call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
-            if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
             if (amr_fw_map(owner) == 0) then
                 amr_fw_rnp = amr_fw_rnp + 1
                 call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
