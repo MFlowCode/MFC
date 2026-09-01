@@ -60,26 +60,3 @@ def test_failures_are_classified_into_the_categories_the_policy_cares_about():
     assert classify_error(Exception("NaN or Inf detected in the case.")) == "NaN detected"
     assert classify_error(Exception("Test case exceeded 1 hour timeout")) == "timeout"
     assert classify_error(Exception("something else entirely")) == ""
-
-
-def test_the_summary_says_which_classes_a_retry_actually_rescued(capsys):
-    # A bare rescue count cannot answer "which retries are worth keeping".
-    # A tolerance mismatch rescued by a retry means something very different
-    # from an execution failure rescued by one.
-    from mfc.test.test import _print_test_summary
-
-    _print_test_summary(10, 2, 0, 0, 1.0, [], [], rescued=3, rescued_by_class={"execution failed": 2, "tolerance mismatch": 1})
-    out = capsys.readouterr().out
-    assert "execution failed" in out
-    assert "tolerance mismatch" in out
-
-
-def test_the_summary_emits_one_machine_readable_line_for_aggregation(capsys):
-    # The numbers only become knowledge if they can be harvested across many
-    # runs without hand-reading logs, so emit one greppable line.
-    from mfc.test.test import _print_test_summary
-
-    _print_test_summary(10, 2, 0, 0, 1.0, [], [], rescued=3, rescued_by_class={"execution failed": 3})
-    out = capsys.readouterr().out
-    assert "MFC_RETRY_STATS" in out
-    assert "rescued=3" in out

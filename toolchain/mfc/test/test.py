@@ -1,4 +1,3 @@
-import collections
 import itertools
 import math
 import os
@@ -30,7 +29,6 @@ nSKIP = 0
 current_test_number = 0
 total_test_count = 0
 nRESCUED = 0  # cases that failed and were recovered by a retry (#1798)
-nRESCUED_BY_CLASS = collections.defaultdict(int)  # and of what kind
 errors = []
 failed_tests = []  # Track failed test details for summary
 test_start_time = None  # Track overall test duration
@@ -437,7 +435,7 @@ def test():
     seconds = total_duration % 60
 
     # Build the summary report
-    _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases, nRESCUED, dict(nRESCUED_BY_CLASS))
+    _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases, nRESCUED)
 
     # Write failed UUIDs to file for CI retry logic
     if failed_tests:
@@ -450,7 +448,7 @@ def test():
     sys.exit(nFAIL)
 
 
-def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float, failed_test_list: list, _skipped_cases: list, rescued: int = 0, rescued_by_class: dict = None):
+def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float, failed_test_list: list, _skipped_cases: list, rescued: int = 0):
     """Print a comprehensive test summary report."""
     total = passed + failed + skipped
 
@@ -482,8 +480,6 @@ def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, se
         # How often a retry actually earned its cost. See #1798: without this the
         # only measurable retry outcomes were the ones that failed anyway.
         summary_lines.append(f"  [yellow]{rescued:4d}[/yellow] recovered by a retry")
-        for cls, n in sorted((rescued_by_class or {}).items(), key=lambda kv: -kv[1]):
-            summary_lines.append(f"       [dim]{n:3d} {cls}[/dim]")
     summary_lines += [
         f"  [dim]{'─' * 12}[/dim]",
         f"  [bold]{total:4d}[/bold] total",
@@ -519,12 +515,6 @@ def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, se
     cons.print()
     cons.raw.print(Panel("\n".join(summary_lines), title="[bold]Test Summary[/bold]", border_style=border_style, padding=(1, 2)))
     cons.print()
-
-    # A single greppable line so retry value can be aggregated across runs
-    # without reading logs by hand -- see #1798 and
-    # .github/scripts/harvest-retry-stats.sh.
-    by_class = ",".join(f"{k}:{v}" for k, v in sorted((rescued_by_class or {}).items()))
-    cons.print(f"MFC_RETRY_STATS rescued={rescued} failed={failed} passed={passed} by_class={by_class or 'none'}", no_indent=True)
 
 
 def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
@@ -796,7 +786,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         return  # Exit gracefully if abort was requested
 
     nAttempts = 0
-    last_error_type = ""
+    last_error = None
     if ARG("single"):
         max_attempts = max(ARG("max_attempts"), 3)
     else:
@@ -820,10 +810,9 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
                     # very different things for a tolerance mismatch than for an
                     # execution failure.
                     nRESCUED += 1
-                    nRESCUED_BY_CLASS[last_error_type or "unclassified"] += 1
-                    cons.print(f"    [yellow]recovered on attempt {nAttempts}[/yellow] ({last_error_type or 'unclassified'}): {case.trace}")
+                    cons.print(f"    [yellow]recovered on attempt {nAttempts}[/yellow] ({classify_error(last_error) or 'unclassified'}): {case.trace}")
         except Exception as exc:
-            last_error_type = classify_error(exc)
+            last_error = exc
             if should_retry(nAttempts, max_attempts, abort_tests.is_set()):
                 continue
             nFAIL += 1
