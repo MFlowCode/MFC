@@ -263,6 +263,16 @@ module m_amr
     !! still tag per box (F1's unconverted path uses amr_cur, migration uses the column index), and the subcycle sites are an
     !! EXPLICIT deferral to increment I8, not I7 -- I7's own boundary is that any family left per-box keeps its tables.
     integer :: amr_tag_base(7) = 0
+    !> M1 keyed wave tags (family F5 first): tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init.
+    !! band 0 = reflux-faces wave, band 1 = freg wave. gen (mod 16) bumps at wave entry on EVERY rank (both call sites are
+    !! rank-unconditional), separating successive waves that share a band; seq is the message's position in the pair's canonically
+    !! ordered transfer list (ascending block id, then dim, lo before hi), derived independently by each end from replicated
+    !! metadata -- message matching stops depending on posting order, and the audit's per-peer O(P) sequence state is deleted.
+    integer              :: amr_m1_base = 0
+    integer              :: amr_tag_gen(0:1) = 0
+    integer, allocatable :: amr_tsq(:,:)      !< (0:np-1, dir) in-wave per-peer seq counters; touched-reset
+    integer, allocatable :: amr_tsq_tch(:,:)  !< touched peers per dir, so the reset is O(active peers), not O(P)
+    integer              :: amr_n_tsq(2) = 0
     !! cached per-block P2P overlap-rank lists (rebuilt with the seam list - same dirty flag): amr_ovl_gather(:,k) = ranks whose
     !! owned coarse range (s_amr_rank_coarse_range) intersects block k's amr_cpat_mar-padded patch box (gather contributors);
     !! amr_ovl_scatter(:,k) = ranks whose coarse interior (s_amr_rank_interior) intersects block k's region box (restrict-scatter
@@ -901,6 +911,8 @@ contains
             do f = 1, size(amr_tag_base)
                 amr_tag_base(f) = amr_max_blocks + 100*f
             end do
+            ! M1 band space starts at the next 65536 boundary above every legacy tag (bases + their mod-100 folds)
+            amr_m1_base = ((amr_tag_base(size(amr_tag_base)) + 100)/65536 + 1)*65536
         end block
 #ifdef MFC_MPI
         block
@@ -911,6 +923,7 @@ contains
             @:ASSERT(tag_ub_set, "MPI_TAG_UB attribute unavailable")
             @:ASSERT(amr_tag_base(size(amr_tag_base)) + 100 <= tag_ub, &
                      & "AMR tag space exceeds MPI_TAG_UB: amr_max_blocks is too large for this MPI's tag range")
+            @:ASSERT(amr_m1_base + 2*65536 <= tag_ub, "AMR keyed-tag band space exceeds MPI_TAG_UB")
         end block
 #endif
 
@@ -2787,17 +2800,17 @@ contains
     !! WAITALLed per box on both sides - an O(boxes) rendezvous chain. Here every rank walks the level-1 slots ascending: all
     !! receives post first (ZERO-COPY, directly into the freg host mirrors - each box owns a register slot, so no pool is needed and
     !! the message count is unchanged BY DESIGN), then the owners stage + multicast, then ONE waitall, then the receivers push to
-    !! device. All messages between a fixed (owner, participant) pair share tag amr_tag_base(5)+epoch and match by non-overtaking in
-    !! the (ascending box, ascending dim, lo-then-hi) order both sides derive from the same predicates the per-box form used
-    !! (amr_block_owner + the replicated region mirrors + the pure participation test). Under MFC_DEBUG the identity headers travel
-    !! as separate 8-word COMPANION messages, one per (box, peer) group ahead of its payloads (a prefix cannot ride a zero-copy
-    !! payload); they are never recorded in [amr-xa], so the family words stay exactly comparable. The register arrays are sized UP
-    !! FRONT: the apply can REALLOCATE them, so nothing may post into freg before s_amr_reg_prepare.
+    !! device. M1: every message carries its own keyed tag (band 0, per-pair seq in the (ascending box, ascending dim, lo-then-hi)
+    !! plan order both sides derive from the same predicates the per-box form used), so matching no longer depends on posting order
+    !! or MPI non-overtaking. Under MFC_DEBUG the identity headers travel as separate 8-word COMPANION messages, one per (box, peer)
+    !! group ahead of its payloads (a prefix cannot ride a zero-copy payload); they are never recorded in [amr-xa], so the family
+    !! words stay exactly comparable. The register arrays are sized UP FRONT: the apply can REALLOCATE them, so nothing may post
+    !! into freg before s_amr_reg_prepare.
     impure subroutine s_amr_reflux_faces_wave()
 
 #ifdef MFC_MPI
         use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-        integer  :: k, r, ierr, nreq, cnt, idx, ncand, tq, nhr, nhs, j, kk2
+        integer  :: k, r, ierr, nreq, cnt, idx, ncand, tq, nhr, nhs, j, kk2, sq
         integer  :: cand(num_procs), glo(3), ghi(3)
         logical  :: s_lo(3), s_hi(3), u_lo(3), u_hi(3)
         logical  :: cl(3, num_procs), ch(3, num_procs)
@@ -2805,7 +2818,7 @@ contains
 
         if (num_procs == 1) return
         call s_amr_reg_prepare()
-        tq = amr_tag_base(5) + int(mod(amr_mesh_epoch, 50_8))
+        call s_amr_m1_wave_open(0)
         nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
         ! W1: participates => the raw region +/-1 touches my interior slab => the region +/-amr_cpat_mar (>= 2) intersects my
@@ -2832,6 +2845,7 @@ contains
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = XA_NH
+                tq = f_amr_m1_tag(0, f_amr_m1_seq(amr_block_owner(k), 2))
                 call MPI_IRECV(amr_fw_rq(XA_NH*(nhr - 1) + 1), XA_NH, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                & amr_fw_req(nreq), ierr)
             end if
@@ -2842,7 +2856,8 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
-                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq, peer=amr_block_owner(k), key=k*8 + ${D}$*2)
+                        sq = f_amr_m1_seq(amr_block_owner(k), 2); tq = f_amr_m1_tag(0, sq)
+                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq, peer=amr_block_owner(k), key=k*8 + ${D}$*2, seq=sq)
                         call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
@@ -2861,7 +2876,8 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
-                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq, peer=amr_block_owner(k), key=k*8 + ${D}$*2 + 1)
+                        sq = f_amr_m1_seq(amr_block_owner(k), 2); tq = f_amr_m1_tag(0, sq)
+                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq, peer=amr_block_owner(k), key=k*8 + ${D}$*2 + 1, seq=sq)
                         call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
@@ -2916,6 +2932,7 @@ contains
                     nreq = nreq + 1
                     call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                     amr_fw_reqw(nreq) = -1
+                    tq = f_amr_m1_tag(0, f_amr_m1_seq(r, 1))
                     call MPI_ISEND(amr_fw_sq(XA_NH*(nhs - 1) + 1), XA_NH, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
                 end if
                 #:for D in [1, 2, 3]
@@ -2925,7 +2942,8 @@ contains
                             nreq = nreq + 1
                             call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                             amr_fw_reqw(nreq) = -1
-                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq, peer=r, key=k*8 + ${D}$*2)
+                            sq = f_amr_m1_seq(r, 1); tq = f_amr_m1_tag(0, sq)
+                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq, peer=r, key=k*8 + ${D}$*2, seq=sq)
                             call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, &
                                            & amr_fw_req(nreq), ierr)
                         end if
@@ -2933,7 +2951,8 @@ contains
                             nreq = nreq + 1
                             call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                             amr_fw_reqw(nreq) = -1
-                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq, peer=r, key=k*8 + ${D}$*2 + 1)
+                            sq = f_amr_m1_seq(r, 1); tq = f_amr_m1_tag(0, sq)
+                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq, peer=r, key=k*8 + ${D}$*2 + 1, seq=sq)
                             call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, &
                                            & amr_fw_req(nreq), ierr)
                         end if
@@ -2997,13 +3016,13 @@ contains
 
 #ifdef MFC_MPI
         use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-        integer  :: k, ierr, nreq, cnt, pblk, cowner, powner, tq, nhr, nhs, j, kk2
+        integer  :: k, ierr, nreq, cnt, pblk, cowner, powner, tq, nhr, nhs, j, kk2, sq
         real(wp) :: w_lo(3), w_hi(3), nanv
 
         if (num_procs == 1) return
         call s_amr_reg_prepare()
         call s_amr_refresh_lists()
-        tq = amr_tag_base(5) + 50 + int(mod(amr_mesh_epoch, 50_8))
+        call s_amr_m1_wave_open(1)
         nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
         ! W1: amr_fch_blk IS this loop's survivor set (level >= 2, my parent, foreign child), ascending like the scan it replaces;
@@ -3028,6 +3047,7 @@ contains
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = XA_NH
+                tq = f_amr_m1_tag(1, f_amr_m1_seq(cowner, 2))
                 call MPI_IRECV(amr_fw_rq(XA_NH*(nhr - 1) + 1), XA_NH, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
             end if
             #:for D in [1, 2, 3]
@@ -3037,7 +3057,8 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
-                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq, peer=cowner, key=k*8 + ${D}$*2 + 0)
+                        sq = f_amr_m1_seq(cowner, 2); tq = f_amr_m1_tag(1, sq)
+                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq, peer=cowner, key=k*8 + ${D}$*2 + 0, seq=sq)
                         call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
@@ -3050,7 +3071,8 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = cnt
-                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq, peer=cowner, key=k*8 + ${D}$*2 + 1)
+                        sq = f_amr_m1_seq(cowner, 2); tq = f_amr_m1_tag(1, sq)
+                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq, peer=cowner, key=k*8 + ${D}$*2 + 1, seq=sq)
                         call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
 #ifdef MFC_DEBUG
@@ -3090,6 +3112,7 @@ contains
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = -1
+                tq = f_amr_m1_tag(1, f_amr_m1_seq(powner, 1))
                 call MPI_ISEND(amr_fw_sq(XA_NH*(nhs - 1) + 1), XA_NH, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
             end if
             #:for D in [1, 2, 3]
@@ -3099,7 +3122,8 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = -1
-                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq, peer=powner, key=k*8 + ${D}$*2 + 0)
+                        sq = f_amr_m1_seq(powner, 1); tq = f_amr_m1_tag(1, sq)
+                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq, peer=powner, key=k*8 + ${D}$*2 + 0, seq=sq)
                         call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
                     end if
@@ -3107,7 +3131,8 @@ contains
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                         amr_fw_reqw(nreq) = -1
-                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq, peer=powner, key=k*8 + ${D}$*2 + 1)
+                        sq = f_amr_m1_seq(powner, 1); tq = f_amr_m1_tag(1, sq)
+                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq, peer=powner, key=k*8 + ${D}$*2 + 1, seq=sq)
                         call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, &
                                        & amr_fw_req(nreq), ierr)
                     end if
@@ -3422,6 +3447,51 @@ contains
         amr_l1r_nblk = amr_num_blocks
 
     end subroutine s_amr_refresh_lists
+
+    !> M1: open a keyed-tag wave -- clear the in-wave per-peer seq counters (touched entries only) and bump the band's generation.
+    !! MUST be called at wave entry on every rank (the wave call sites are rank-unconditional).
+    impure subroutine s_amr_m1_wave_open(band)
+
+        integer, intent(in) :: band
+        integer             :: i, d
+
+        if (.not. allocated(amr_tsq)) then
+            allocate (amr_tsq(0:num_procs - 1,2), amr_tsq_tch(num_procs, 2))
+            amr_tsq = 0; amr_n_tsq = 0
+        end if
+        do d = 1, 2
+            do i = 1, amr_n_tsq(d)
+                amr_tsq(amr_tsq_tch(i, d), d) = 0
+            end do
+            amr_n_tsq(d) = 0
+        end do
+        amr_tag_gen(band) = mod(amr_tag_gen(band) + 1, 16)
+
+    end subroutine s_amr_m1_wave_open
+
+    !> Next seq on the (peer, dir) channel of the open wave. dir: 1 = send, 2 = recv -- the two directions of the same peer are
+    !! DIFFERENT channels and never share a counter.
+    impure integer function f_amr_m1_seq(peer, idir) result(sq)
+
+        integer, intent(in) :: peer, idir
+
+        if (amr_tsq(peer, idir) == 0) then
+            amr_n_tsq(idir) = amr_n_tsq(idir) + 1
+            amr_tsq_tch(amr_n_tsq(idir), idir) = peer
+        end if
+        amr_tsq(peer, idir) = amr_tsq(peer, idir) + 1
+        sq = amr_tsq(peer, idir)
+        @:ASSERT(sq < 4096, "keyed-tag seq overflows its 12-bit field")
+
+    end function f_amr_m1_seq
+
+    pure integer function f_amr_m1_tag(band, sq) result(t)
+
+        integer, intent(in) :: band, sq
+
+        t = amr_m1_base + band*65536 + amr_tag_gen(band)*4096 + sq
+
+    end function f_amr_m1_tag
 
     impure subroutine s_amr_assign_block_owners()
 
