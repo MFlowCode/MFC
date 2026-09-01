@@ -288,7 +288,17 @@ module m_amr
     integer, allocatable :: amr_l1p_blk(:)  !< padded variant: region +/- amr_cpat_mar vs my COARSE range
     integer              :: amr_n_l1p = 0   !< (the stage-fill gather predicate; superset differs from amr_l1r)
     integer              :: amr_n_l1r = 0
+    integer, allocatable :: amr_fch_blk(:)  !< foreign children of my owned parents (level >= 2, powner == me, cowner /= me):
+    integer              :: amr_n_fch = 0   !! the freg-recv / parent-fill-send / restrict-parent-recv survivor superset
+    integer, allocatable :: amr_own_blk(:)  !< blocks this rank INTERSECTS (amr_owns_all -- the multi-owner notion, all levels)
+    integer              :: amr_n_own = 0
+    !> cached f_amr_parent_block (0 for level <= 1) -- the function is itself an O(global blocks) scan, so per-stage wave bodies
+    !! calling it per block were quadratic in the global block count
+    integer, allocatable :: amr_parent_blk(:)
+    integer, allocatable :: amr_child_ptr(:)   !< children of p = amr_child_idx(amr_child_ptr(p-1)+1 : amr_child_ptr(p)),
+    integer, allocatable :: amr_child_idx(:)   !! ascending; amr_child_ptr(0) = 0
     integer(8)           :: amr_l1r_epoch = -1_8
+    integer              :: amr_l1r_nblk = -1  !< second key half, matching s_amr_reg_prepare's (epoch, num_blocks) pair
     !> Set wherever amr_block_owner is WRITTEN. s_amr_assign_block_owners is NOT the only writer -- a tiled level-2 block inherits
     !! its parent's owner (s_amr_add_l2_tile), and the restart/migration paths assign directly -- so a list built only in the
     !! assigner goes stale and a converted loop then visits the wrong blocks. Caught by the tiled-L2 multi-level dynamic-regrid
@@ -2798,8 +2808,12 @@ contains
         tq = amr_tag_base(5) + int(mod(amr_mesh_epoch, 50_8))
         nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
-        do k = 1, amr_num_blocks
-            if (amr_block_level(k) /= 1) cycle
+        ! W1: participates => the raw region +/-1 touches my interior slab => the region +/-amr_cpat_mar (>= 2) intersects my
+        ! coarse range (a superset of the slab) => the block is in amr_l1p. Exact predicates below keep the survivor set and its
+        ! ascending order byte-identical to the full scan this replaces.
+        call s_amr_refresh_lists()
+        do kk2 = 1, amr_n_l1p
+            k = amr_l1p_blk(kk2)
             call s_amr_select_slot(k)
             if (amr_block_owner(k) == proc_rank) cycle
             if (.not. f_amr_reflux_participates(proc_rank)) cycle
@@ -2983,18 +2997,21 @@ contains
 
 #ifdef MFC_MPI
         use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-        integer  :: k, ierr, nreq, cnt, pblk, cowner, powner, tq, nhr, nhs, j
+        integer  :: k, ierr, nreq, cnt, pblk, cowner, powner, tq, nhr, nhs, j, kk2
         real(wp) :: w_lo(3), w_hi(3), nanv
 
         if (num_procs == 1) return
         call s_amr_reg_prepare()
+        call s_amr_refresh_lists()
         tq = amr_tag_base(5) + 50 + int(mod(amr_mesh_epoch, 50_8))
         nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
-        do k = 1, amr_num_blocks
-            if (amr_block_level(k) < 2) cycle
+        ! W1: amr_fch_blk IS this loop's survivor set (level >= 2, my parent, foreign child), ascending like the scan it replaces;
+        ! the exact tests stay as belt-and-braces
+        do kk2 = 1, amr_n_fch
+            k = amr_fch_blk(kk2)
             call s_amr_select_slot(k)
-            pblk = f_amr_parent_block(k)
+            pblk = amr_parent_blk(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. powner /= proc_rank) cycle
             ! seam clip: a face weighted 0 by the sibling-seam rule is never consumed by the parent-side reflux apply
@@ -3045,10 +3062,12 @@ contains
                 end if
             #:endfor
         end do
-        do k = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do kk2 = 1, amr_n_my  ! W1: owned list; level filter kept
+            k = amr_my_blk(kk2)
             if (amr_block_level(k) < 2) cycle
             call s_amr_select_slot(k)
-            pblk = f_amr_parent_block(k)
+            pblk = amr_parent_blk(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. cowner /= proc_rank) cycle
             ! seam clip, send side: the identical weight derivation as the recv walk (replicated metadata), so the
@@ -3114,7 +3133,7 @@ contains
         do j = 1, nhr
             k = amr_fw_rblk(j)
             call s_amr_select_slot(k)
-            pblk = f_amr_parent_block(k)
+            pblk = amr_parent_blk(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (XA_NH > 0) then
                 call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
@@ -3316,28 +3335,55 @@ contains
 
     end subroutine s_amr_refresh_my_blocks
 
-    !> W1: rebuild the level-1 receive list when the mesh epoch has moved. One O(global blocks) walk per REGRID replaces one per RK
-    !! STAGE -- at 1e5 ranks the per-stage form is ~360 M evaluations per rank per step purely to find this rank's ~75 blocks.
-    impure subroutine s_amr_refresh_l1_recv()
+    !> W1: rebuild the epoch-keyed block lists when the mesh epoch has moved. One O(global blocks) walk per REGRID replaces one per
+    !! RK STAGE -- at 1e5 ranks the per-stage form is ~360 M evaluations per rank per step purely to find this rank's ~75 blocks.
+    !! Also caches the parent index (f_amr_parent_block is itself an O(global blocks) scan, so a per-stage wave body calling it per
+    !! block was QUADRATIC in the global block count) and its children adjacency (the same scan hid inside
+    !! s_amr_sibling_face_weights). The cache build keeps that quadratic walk, but pays it once per regrid instead of per stage.
+    impure subroutine s_amr_refresh_lists()
 
         integer :: b, rlo(3), rhi(3), milo(3), mihi(3), bl(3), bh(3)
-        integer :: crlo(3), crhi(3), plo(3), phi(3), pl(3), ph(3), mar
+        integer :: crlo(3), crhi(3), plo(3), phi(3), pl(3), ph(3), mar, pblk, acc, nxt
 
-        if (amr_l1r_epoch == amr_mesh_epoch) return
-        if (allocated(amr_l1r_blk)) then
-            if (size(amr_l1r_blk) < amr_max_blocks) deallocate (amr_l1r_blk)
+        if (amr_l1r_epoch == amr_mesh_epoch .and. amr_l1r_nblk == amr_num_blocks) return
+        #:for A in ['amr_l1r_blk', 'amr_l1p_blk', 'amr_fch_blk', 'amr_own_blk', 'amr_parent_blk', 'amr_child_idx']
+            if (allocated(${A}$)) then
+                if (size(${A}$) < amr_max_blocks) deallocate (${A}$)
+            end if
+            if (.not. allocated(${A}$)) allocate (${A}$ (amr_max_blocks))
+        #:endfor
+        if (allocated(amr_child_ptr)) then
+            if (size(amr_child_ptr) < amr_max_blocks + 1) deallocate (amr_child_ptr)
         end if
-        if (.not. allocated(amr_l1r_blk)) allocate (amr_l1r_blk(amr_max_blocks))
+        if (.not. allocated(amr_child_ptr)) allocate (amr_child_ptr(0:amr_max_blocks))
         call s_amr_rank_interior(proc_rank, milo, mihi)
         call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
         mar = amr_cpat_mar
-        if (allocated(amr_l1p_blk)) then
-            if (size(amr_l1p_blk) < amr_max_blocks) deallocate (amr_l1p_blk)
-        end if
-        if (.not. allocated(amr_l1p_blk)) allocate (amr_l1p_blk(amr_max_blocks))
         amr_n_l1p = 0
         amr_n_l1r = 0
+        amr_n_fch = 0
+        amr_n_own = 0
+        amr_child_ptr(0:amr_num_blocks) = 0
         do b = 1, amr_num_blocks
+            if (amr_owns_all(b)) then
+                amr_n_own = amr_n_own + 1
+                amr_own_blk(amr_n_own) = b
+            end if
+            amr_parent_blk(b) = 0
+            if (amr_block_level(b) >= 2) then
+                pblk = f_amr_parent_block(b)
+                amr_parent_blk(b) = pblk
+                ! pblk == 0 (no parent found) is structurally impossible on a nested mesh, but an unguarded count would land in
+                ! amr_child_ptr(0) -- the base offset parent 1's query reads -- turning a broken mesh into silent corruption
+                if (pblk > 0) then
+                    amr_child_ptr(pblk) = amr_child_ptr(pblk) + 1
+                    if (amr_block_owner(pblk) == proc_rank .and. amr_block_owner(b) /= proc_rank) then
+                        amr_n_fch = amr_n_fch + 1
+                        amr_fch_blk(amr_n_fch) = b
+                    end if
+                end if
+                cycle
+            end if
             if (amr_block_level(b) /= 1) cycle
             if (amr_block_owner(b) == proc_rank) cycle
             rlo = 0; rhi = 0
@@ -3359,9 +3405,23 @@ contains
                 amr_l1p_blk(amr_n_l1p) = b
             end if
         end do
+        ! counts -> exclusive prefix, then the ascending fill bumps each amr_child_ptr(p) back up to p's INCLUSIVE end, restoring
+        ! the query invariant: children of p = amr_child_idx(amr_child_ptr(p-1)+1 : amr_child_ptr(p))
+        acc = 0
+        do b = 1, amr_num_blocks
+            nxt = amr_child_ptr(b); amr_child_ptr(b) = acc; acc = acc + nxt
+        end do
+        do b = 1, amr_num_blocks
+            if (amr_block_level(b) < 2) cycle
+            pblk = amr_parent_blk(b)
+            if (pblk == 0) cycle  ! uncounted above; a bump here would clobber a real entry
+            amr_child_ptr(pblk) = amr_child_ptr(pblk) + 1
+            amr_child_idx(amr_child_ptr(pblk)) = b
+        end do
         amr_l1r_epoch = amr_mesh_epoch
+        amr_l1r_nblk = amr_num_blocks
 
-    end subroutine s_amr_refresh_l1_recv
+    end subroutine s_amr_refresh_lists
 
     impure subroutine s_amr_assign_block_owners()
 
@@ -4280,11 +4340,12 @@ contains
         ! send plan + co-located folds (child-owner side)
         amr_fw_snx = 0; amr_fw_snp = 0
         call s_amr_refresh_my_blocks()
+        call s_amr_refresh_lists()
         do kk = 1, amr_n_my
             k = amr_my_blk(kk)
             if (amr_block_level(k) /= lev) cycle
             cowner = amr_block_owner(k)
-            pblk = f_amr_parent_block(k)
+            pblk = amr_parent_blk(k)
             powner = amr_block_owner(pblk)
             call s_amr_parent_foot(k, pblk, plo, phi)
             if (plo(1) > phi(1) .or. plo(2) > phi(2) .or. plo(3) > phi(3)) cycle
@@ -4322,11 +4383,13 @@ contains
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
         call s_amr_fw_szr(amr_fw_sq, qbase)
-        ! recv plan (parent-owner side): the same replicated walk, so per-peer transfer order matches the sender's
+        ! recv plan (parent-owner side): the same replicated walk, so per-peer transfer order matches the sender's.
+        ! W1: amr_fch_blk holds exactly these survivors across all levels >= 2, ascending; the level filter narrows to lev
         amr_fw_rnx = 0; amr_fw_rnp = 0
-        do k = 1, amr_num_blocks
+        do kk = 1, amr_n_fch
+            k = amr_fch_blk(kk)
             if (amr_block_level(k) /= lev) cycle
-            pblk = f_amr_parent_block(k)
+            pblk = amr_parent_blk(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. proc_rank /= powner) cycle
             call s_amr_parent_foot(k, pblk, plo, phi)
@@ -4403,8 +4466,8 @@ contains
             if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F7BW_SND, amr_fw_rblk(idx), amr_fw_rbl(:, &
                 & idx), amr_fw_rbh(:,idx))
             ! DEVICE unpack of the covered box only (the strided-update flang trap - see s_restrict_fine_to_coarse)
-            call s_l0_pack_unpack_block_st(amr_loc_of(f_amr_parent_block(amr_fw_rblk(idx))), amr_fw_rbl(1, idx), amr_fw_rbl(2, &
-                                           & idx), amr_fw_rbl(3, idx), amr_fw_rbh(1, idx) - amr_fw_rbl(1, idx), amr_fw_rbh(2, &
+            call s_l0_pack_unpack_block_st(amr_loc_of(amr_parent_blk(amr_fw_rblk(idx))), amr_fw_rbl(1, idx), amr_fw_rbl(2, idx), &
+                                           & amr_fw_rbl(3, idx), amr_fw_rbh(1, idx) - amr_fw_rbl(1, idx), amr_fw_rbh(2, &
                                            & idx) - amr_fw_rbl(2, idx), amr_fw_rbh(3, idx) - amr_fw_rbl(3, idx), &
                                            & amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + cnt), .false.)
         end do
@@ -4487,7 +4550,7 @@ contains
         ! W1: walk the cached receive list, not every block in the machine. The list carries exactly the
         ! blocks that passed level + not-mine + overlap, so the three filters are gone; bl/bh are recomputed
         ! because the body needs them and they are cheap over a short list.
-        call s_amr_refresh_l1_recv()
+        call s_amr_refresh_lists()
         do kk = 1, amr_n_l1r
             k = amr_l1r_blk(kk)
             owner = amr_block_owner(k)
@@ -4659,12 +4722,17 @@ contains
 
         integer, intent(in)   :: kb, pblk
         real(wp), intent(out) :: w_lo(3), w_hi(3)
-        integer               :: y, d
+        integer               :: c, y, d
+
+        ! W1: iterate pblk's cached children (same-parent guarantees same level) instead of scanning every block in the machine
+        ! with an O(global blocks) parent lookup per candidate. Every caller sits in a routine that already refreshed the
+        ! epoch-keyed lists; refreshing HERE would let a loop body reallocate the very list its caller iterates.
 
         w_lo = 1._wp; w_hi = 1._wp
-        do y = 1, amr_num_blocks  ! block outer, dim inner: f_amr_parent_block (a linear scan) is evaluated once per sibling
+        if (pblk <= 0) return  ! orphan parent: the old scan matched nothing (all weights 1); the CSR would index ptr(-1)
+        do c = amr_child_ptr(pblk - 1) + 1, amr_child_ptr(pblk)
+            y = amr_child_idx(c)
             if (y == kb) cycle
-            if (f_amr_parent_block(y) /= pblk) cycle  ! same-parent sibling tile only (guarantees same level)
             do d = 1, num_dims
                 if (f_amr_seam(kb, y, d)) w_hi(d) = 0._wp  ! sibling just above -> shared high face
                 if (f_amr_seam(y, kb, d)) w_lo(d) = 0._wp  ! sibling just below -> shared low face
@@ -4691,7 +4759,8 @@ contains
         real(wp)            :: w_lo(3), w_hi(3), mlo(3), mhi(3)
         logical             :: own_child, own_parent
 
-        pblk = f_amr_parent_block(amr_cur)
+        call s_amr_refresh_lists()  ! W1: cached parent (f_amr_parent_block is an O(global blocks) scan; this runs per block)
+        pblk = amr_parent_blk(amr_cur)
         own_child = amr_rank_owns_block
         own_parent = (amr_block_owner(pblk) == proc_rank)
         if (.not. (own_child .or. own_parent)) return
@@ -6932,7 +7001,7 @@ contains
         end if
         ! W1: walk the PADDED cached list (region +/- amr_cpat_mar vs my coarse range -- this loop's exact
         ! predicate); the body keeps its own intersection + empty cycle as belt-and-braces.
-        call s_amr_refresh_l1_recv()
+        call s_amr_refresh_lists()
         do kk2 = 1, amr_n_l1p
             k = amr_l1p_blk(kk2)
             call s_amr_select_slot(k)
@@ -7267,19 +7336,28 @@ contains
         tq = amr_tag_base(2) + int(mod(amr_mesh_epoch, 100_8))
 
         call s_phase_tic(PH_GATHER)
-        ! SEND side: every level-lev block whose parent I own but whose child-owner is another rank. The per-box lag guard and
-        ! slot selection run here so every rank still visits every level-lev slot once per stage, as before.
+        ! W1: the lag guard used to ride the send scan's visit of every level-lev block; it must keep that coverage (it checks
+        ! blocks this rank does NOT own), so it keeps its own global scan -- gated on the one configuration that needs it
+        if (bubbles_lagrange) then
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) /= lev) cycle
+                call s_amr_select_slot(k)
+                call s_amr_check_lag_clear()
+            end do
+        end if
+        call s_amr_refresh_lists()
+        ! SEND side: every level-lev block whose parent I own but whose child-owner is another rank -- amr_fch_blk narrowed to lev
         amr_fw_snx = 0; amr_fw_snp = 0
         if (.not. allocated(amr_fw_map)) then
             allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
                       & amr_fw_pp(0:num_procs - 1))
             amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
         end if
-        do k = 1, amr_num_blocks
+        do kk = 1, amr_n_fch
+            k = amr_fch_blk(kk)
             if (amr_block_level(k) /= lev) cycle
             call s_amr_select_slot(k)
-            call s_amr_check_lag_clear()
-            pblk = f_amr_parent_block(k)
+            pblk = amr_parent_blk(k)
             powner = amr_block_owner(pblk); cowner = amr_block_owner(k)
             if (powner == cowner .or. powner /= proc_rank) cycle
             call s_amr_parent_foot(k, pblk, plo, phi)
@@ -7327,7 +7405,7 @@ contains
         do kk = 1, amr_n_my
             k = amr_my_blk(kk)
             if (amr_block_level(k) /= lev) cycle
-            pblk = f_amr_parent_block(k)
+            pblk = amr_parent_blk(k)
             powner = amr_block_owner(pblk)
             if (powner == proc_rank) cycle
             call s_amr_parent_foot(k, pblk, plo, phi)
@@ -7383,7 +7461,7 @@ contains
         ! sbl/sbh hold the transfer's PATCH-LOCAL slab bounds; the frame comes from the box's parent foot.
         do ix = 1, amr_fw_snx
             k = amr_fw_sblk(ix)
-            call s_amr_parent_foot(k, f_amr_parent_block(k), plo, phi)
+            call s_amr_parent_foot(k, amr_parent_blk(k), plo, phi)
             amr_cpat_off = 0
             amr_cpat_off(1) = plo(1) - amr_cpat_mar
             if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
@@ -7391,7 +7469,7 @@ contains
             bl = amr_fw_sbl(:,ix); bh = amr_fw_sbh(:,ix)
             boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
             boff = amr_fw_sqbase(amr_fw_spi(ix)) + amr_fw_sqo(ix)
-            call s_amr_pack_parent_box_device_cons(amr_loc_of(f_amr_parent_block(k)), bl, bh, &
+            call s_amr_pack_parent_box_device_cons(amr_loc_of(amr_parent_blk(k)), bl, bh, &
                                                    & amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + boxsz))
             if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F2W_SND, k, bl, bh)
         end do
@@ -7423,12 +7501,15 @@ contains
         ! CONSUME, ascending slot order: per owned level-lev box, patch frame + the shell-slab parent copies (co-located) or
         ! the box's received transfers, then the ghost fills - the per-box path's operations, minus its rendezvous.
         ix = 1
-        do k = 1, amr_num_blocks
+        ! W1: amr_own_blk is the amr_owns_all (multi-owner INTERSECTION) set -- NOT amr_my_blk, whose single-owner notion would
+        ! silently narrow this loop (see the list declarations). Same ascending order, so the ix cursor pairing is untouched.
+        do kk = 1, amr_n_own
+            k = amr_own_blk(kk)
             if (amr_block_level(k) /= lev) cycle
             call s_amr_select_slot(k)
             if (.not. amr_rank_owns_block) cycle
             call s_phase_tic(PH_GATHER)
-            pblk = f_amr_parent_block(k)
+            pblk = amr_parent_blk(k)
             call s_amr_parent_foot(k, pblk, plo, phi)
             amr_cpat_off = 0
             amr_cpat_off(1) = plo(1) - amr_cpat_mar
@@ -10136,6 +10217,10 @@ contains
         if (allocated(amr_fw_rq)) deallocate (amr_fw_rq)
         if (allocated(amr_fw_rp)) deallocate (amr_fw_rp)
         if (allocated(amr_fw_req)) deallocate (amr_fw_req, amr_fw_reqw)
+        #:for A in ['amr_my_blk', 'amr_l1r_blk', 'amr_l1p_blk', 'amr_fch_blk', 'amr_own_blk', 'amr_parent_blk', &
+            'amr_child_ptr', 'amr_child_idx']
+            if (allocated(${A}$)) deallocate (${A}$)
+        #:endfor
         do i = 1, sys_size
             @:DEALLOCATE(amr_cg(i)%sf)
         end do
