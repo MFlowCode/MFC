@@ -91,16 +91,16 @@ module m_amr_xchg_audit
     !! message-for-message, so the global BXOR of send-folds equals the global BXOR of recv-folds; any cross-rank ordering
     !! divergence misaligns key<->seq and the finalize assert fires. The mixing hash is LOAD-BEARING: a raw packed-field XOR is
     !! provably blind to pairwise transpositions (property control: amr-bench/tools/oracle_ctl.f90, verdict in
-    !! logs/oracle_ctl_final.log). xa_seq is O(P) per rank (368 B x P) -- acceptable for M0; M1 derives seq from the transfer plans
-    !! instead. Sites pass peer/key opt-in; unconverted sites fold nothing.
+    !! logs/oracle_ctl_final.log). M1: seq is PLAN-DERIVED at the call site (each end computes the message's position in the pair's
+    !! canonically ordered transfer list from replicated metadata), so no per-peer O(P) counter state exists here anymore. Sites
+    !! pass peer/key/seq opt-in; unconverted sites fold nothing.
     integer(8) :: xa_ord(XA_NSITE, 2) = 0_8
-    integer    :: xa_seed = -1  !< -1 unread, 0 off, 1 = corrupt one fold (canary)
+    integer    :: xa_seed = -1  !< -1 unread, 0 off, 1 = corrupt one fold (canary), 2 = shift one plan seq (order-swap gate)
     !> canary latch: fire exactly once (an XOR accumulator can return to zero, so testing it would allow self-cancelling double
     !! fires)
-    logical              :: xa_seeded = .false.
-    integer, allocatable :: xa_seq(:,:,:)  !< (site, dir, 0:np-1) per-channel message counters
-    integer              :: xa_tag_min(XA_NSITE) = huge(0)
-    integer              :: xa_tag_max(XA_NSITE) = -huge(0)
+    logical :: xa_seeded = .false.
+    integer :: xa_tag_min(XA_NSITE) = huge(0)
+    integer :: xa_tag_max(XA_NSITE) = -huge(0)
 
     ! I1b: per-xfer identity header (amr_plan_based_exchange.md "I1b implementation binding").
     ! XA_NH real(wp) words - [site, blk, bl(3), bh(3)] as exact integer-valued reals - are
@@ -126,10 +126,10 @@ contains
 
     !> Record one transfer at the MPI call site itself. idir: 1 = send, 2 = recv. nwords is the MPI count argument verbatim; tag is
     !! the tag argument verbatim.
-    impure subroutine s_xa_rec(isite, idir, nwords, tag, peer, key)
+    impure subroutine s_xa_rec(isite, idir, nwords, tag, peer, key, seq)
 
         integer, intent(in)           :: isite, idir, nwords, tag
-        integer, intent(in), optional :: peer, key
+        integer, intent(in), optional :: peer, key, seq
         integer(8)                    :: pid, e
         integer                       :: sq
 
@@ -138,26 +138,30 @@ contains
         xa_tag_min(isite) = min(xa_tag_min(isite), tag)
         xa_tag_max(isite) = max(xa_tag_max(isite), tag)
         if (present(peer) .and. present(key)) then
-            ! seeded-bug canary: MFC_XA_SEED=1 corrupts exactly one fold on rank 0 (send side, first
-            ! keyed message) -- the finalize oracle MUST abort; proves the end-to-end wiring can fail.
+            @:ASSERT(present(seq), "keyed xa site must pass its plan-derived seq")
+            ! seeded-bug gates: MFC_XA_SEED=1 corrupts exactly one fold on rank 0 (send side, first keyed
+            ! message) -- proves the end-to-end wiring can fail; MFC_XA_SEED=2 shifts one plan seq on rank 0's
+            ! send side -- models a sender deriving a DIFFERENT plan order, the failure M1's keyed tags exist
+            ! to catch. The finalize oracle MUST abort under either seed.
             if (xa_seed < 0) then
                 block
                     character(len=8) :: ev
                     integer          :: st
                     call get_environment_variable("MFC_XA_SEED", ev, status=st)
-                    xa_seed = merge(1, 0, st == 0 .and. ev(1:1) == '1')
+                    xa_seed = 0
+                    if (st == 0 .and. ev(1:1) == '1') xa_seed = 1
+                    if (st == 0 .and. ev(1:1) == '2') xa_seed = 2
                 end block
             end if
-            if (.not. allocated(xa_seq)) then
-                allocate (xa_seq(XA_NSITE, 2,0:num_procs - 1))
-                xa_seq = 0
-            end if
-            xa_seq(isite, idir, peer) = xa_seq(isite, idir, peer) + 1
             if (xa_seed == 1 .and. proc_rank == 0 .and. idir == 1 .and. .not. xa_seeded) then
                 xa_ord(isite, 1) = ieor(xa_ord(isite, 1), 12345_8)  ! the canary corruption
                 xa_seeded = .true.
             end if
-            sq = xa_seq(isite, idir, peer)
+            sq = seq
+            if (xa_seed == 2 .and. proc_rank == 0 .and. idir == 1 .and. .not. xa_seeded) then
+                sq = sq + 1  ! the plan-order divergence
+                xa_seeded = .true.
+            end if
             pid = ior(ishft(int(min(proc_rank, peer), 8), 20), int(max(proc_rank, peer), 8))
             e = f_xa_mix(ieor(f_xa_mix(ieor(pid, ishft(int(sq, 8), 44))), int(key, 8)))
             xa_ord(isite, idir) = ieor(xa_ord(isite, idir), e)
@@ -211,7 +215,6 @@ contains
     impure subroutine s_xa_reset()
 
         xa_msgs = 0_8; xa_words = 0_8; xa_ord = 0_8
-        if (allocated(xa_seq)) xa_seq = 0
         xa_tag_min = huge(0); xa_tag_max = -huge(0)
 
     end subroutine s_xa_reset
