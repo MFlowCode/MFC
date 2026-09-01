@@ -28,6 +28,7 @@ nPASS = 0
 nSKIP = 0
 current_test_number = 0
 total_test_count = 0
+nRESCUED = 0  # cases that failed and were recovered by a retry (#1798)
 errors = []
 failed_tests = []  # Track failed test details for summary
 test_start_time = None  # Track overall test duration
@@ -434,7 +435,7 @@ def test():
     seconds = total_duration % 60
 
     # Build the summary report
-    _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases)
+    _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases, nRESCUED)
 
     # Write failed UUIDs to file for CI retry logic
     if failed_tests:
@@ -447,7 +448,7 @@ def test():
     sys.exit(nFAIL)
 
 
-def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float, failed_test_list: list, _skipped_cases: list):
+def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float, failed_test_list: list, _skipped_cases: list, rescued: int = 0):
     """Print a comprehensive test summary report."""
     total = passed + failed + skipped
 
@@ -474,6 +475,12 @@ def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, se
         f"  [bold green]{passed:4d}[/bold green] passed",
         f"  [bold red]{failed:4d}[/bold red] failed",
         f"  [bold yellow]{skipped:4d}[/bold yellow] skipped",
+    ]
+    if rescued:
+        # How often a retry actually earned its cost. See #1798: without this the
+        # only measurable retry outcomes were the ones that failed anyway.
+        summary_lines.append(f"  [yellow]{rescued:4d}[/yellow] recovered by a retry")
+    summary_lines += [
         f"  [dim]{'─' * 12}[/dim]",
         f"  [bold]{total:4d}[/bold] total",
         "",
@@ -729,8 +736,26 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         timeout_timer.cancel()  # Cancel timeout timer
 
 
+def should_retry(attempt: int, max_attempts: int, aborting: bool) -> bool:
+    """Whether a failed case gets another attempt.
+
+    Retries here are expensive and, as far as can be measured, rarely help:
+    bench.py's equivalent rescued 0 of 235 retried cases, and every recorded
+    failed test in a two-week sample shows the full attempt count. See #1798.
+
+    `aborting` is the part that was missing. The suite-wide abort fires when the
+    failure rate says the environment itself is broken -- a dead GPU, a bad node
+    -- and in that state every remaining attempt is guaranteed to fail. Retrying
+    through an abort turns the fail-fast into a slow one.
+    """
+    if aborting:
+        return False
+
+    return attempt < max_attempts
+
+
 def handle_case(case: TestCase, devices: typing.Set[int]):
-    global nFAIL, nPASS, nSKIP  # noqa: PLW0603
+    global nFAIL, nPASS, nSKIP, nRESCUED  # noqa: PLW0603
     global errors, failed_tests  # noqa: PLW0603
 
     # Check if we should abort before processing this case
@@ -752,8 +777,15 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
                 nSKIP += 1
             else:
                 nPASS += 1
+                if nAttempts > 1:
+                    # A rescue: the case failed and a retry recovered it. Nothing
+                    # recorded this before, so a pass on attempt 3 was
+                    # indistinguishable from a pass on attempt 1 -- which is why
+                    # the value of retrying could never be measured. See #1798.
+                    nRESCUED += 1
+                    cons.print(f"    [yellow]recovered on attempt {nAttempts}[/yellow]: {case.trace}")
         except Exception as exc:
-            if nAttempts < max_attempts:
+            if should_retry(nAttempts, max_attempts, abort_tests.is_set()):
                 continue
             nFAIL += 1
 
