@@ -226,6 +226,42 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-01 (49) — FOUR LANDINGS, THE ORACLE, AND THE PHASE TRANSITION
+
+### Landed (all gated; CI cycling)
+3eeb0807 dirty-box merge (rg:clus/call 25.0/64.5/149.4 ms at np32/64/128 = ~3.4-8x vs pre-port; slopes
+2.58x then 2.32x against the <=2.5x bar -- first rung MISSES, second PASSES; the registered merge_ms
+bracket was absent from the ladder binary, so rg:clus is a proxy that still contained the insertion
+sort). 17db5014 stable mergesort (20/20 byte-identical; closes that proxy gap going forward).
+5f57b034 the NVHPC clause revert -- root cause proven at PTX level; conforming-split alternative
+measured BROKEN on amdflang; cost re-measured interleaved at 6.3+/-3% (the 26.4% and 12.6% priors were
+operating-point and contamination artifacts respectively). 2c4b2f4e M0 order oracle (property control +
+family aggregation after a structural false positive + fatal seeded canary; F5 sites covered).
+
+### Independent-review corrections adopted
+"Counters exactly matching" was WRONG (only fusions is cross-implementation invariant; 10/12 lines
+matched); byte-identity of outputs is the claim that stands. Postport fusions invariance 19/19 at all
+three rungs. Flag-matrix sequential arms were contaminated by a concurrent gate on the same node --
+interleave and schedule exclusively, always. Both differential-control verdicts now SAVED as artifacts.
+
+### The mn16 postmortem CLOSES: k004-002 + k004-008 are a sick PAIR
+Probe 394289: plain CPU syscheck dies at MPI_Init on exactly that pair. Sick list is now FIVE nodes;
+excludes extended everywhere. The prodsize16 pre_process segv (healthy mi2104x nodes) remains separate
+and unexplained -- the GPU-side density story still has ZERO data.
+
+### Capstone audit verdicts (2026-08-31)
+- BUDGET CORRECTED: ~615-680 units remain (not 725); big-P exponents move to Frontier.
+- np1024 READ RULE: amr_max_blocks=65536 crosses truncation at EXACTLY np1024 -- grep the GLOBAL-
+  truncation warning in its log BEFORE banking any pre-registered number.
+- Metadata tier-1's trigger HAS FIRED (dirty-box landed+gated): scheduled after M1+W1-easy.
+- M1 design was transcript-only: now on disk (amr-bench/notes/m1_design.md). M0's xa_seq O(P) counters
+  (36.8 MB/rank at 1e5) are acceptable-interim and die at M1.
+- Next adjudications: the Case Opt CCE BUILD failure (assertion under case-opt -- blocks tier-1's gate);
+  the W1 stash@{1} receive-list pilot; D-l0's coverage cost; keep-tol's moving-deck A/B (deck built,
+  never queued); [amr-cad] level-2 blindness before keep-tol lands.
+- Phase transition acknowledged: remaining risk is EVIDENTIARY AND INTEGRATIVE (707-commit PR landing,
+  single-cluster evidence, Frontier access), not algorithmic. The pace-limiting decisions are the
+  Frontier ladder and the upstream landing sequence -- both user-gated.
 ## 2026-08-31 (48) — FOUR SCALING QUESTIONS ANSWERED FROM BANKED LOGS; the memory wall measured
 
 ### R1. The rhs growth above np128 is RANKS-PER-NODE DENSITY, not P (pending one confirmation)
