@@ -64,12 +64,21 @@ elif [ "$outage_rc" -ne 0 ]; then
 fi
 
 # --- Node health ---
-# Prefer an install matching this job's device (build/install is named e.g.
-# gpu-acc-<hash>, gpu-mp-<hash>), so a leftover install from another variant is
-# not probed instead. Fall back to any syscheck if none matches.
-syscheck_bin=$(find build/install -path "*${device}*" -name syscheck -type f 2>/dev/null | head -1)
+# Pick the *newest* install matching this job's device (build/install is named
+# e.g. gpu-acc-<hash>, gpu-mp-<hash>). Both halves matter: the device filter
+# avoids probing another variant's binary, and newest-wins avoids probing a
+# leftover from an earlier job. Not every caller nukes build/ first -- bench.sh
+# only does so on Phoenix -- and a stale binary compiled for a different
+# microarchitecture dies with SIGILL, which would be reported as a bad node and
+# get a perfectly healthy one excluded.
+newest_syscheck() {
+    find "$@" -name syscheck -type f -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -1 | cut -d' ' -f2-
+}
+
+syscheck_bin=$(newest_syscheck build/install -path "*${device}*")
 if [ -z "$syscheck_bin" ]; then
-    syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1)
+    syscheck_bin=$(newest_syscheck build/install)
 fi
 
 if [ -z "$syscheck_bin" ]; then

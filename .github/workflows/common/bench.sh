@@ -34,6 +34,18 @@ fi
 source .github/scripts/retry-build.sh
 retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
 
+# Probe this node before spending the allocation on it. Placed after the build,
+# not in the sbatch template: these scripts nuke and rebuild build/ themselves
+# (Phoenix does so precisely because its compute nodes are heterogeneous), so a
+# probe running earlier would test a stale binary from a previous job -- likely
+# built for another microarchitecture -- and a SIGILL there would be reported as
+# a bad node, excluding a healthy one.
+preflight_rc=0
+bash .github/scripts/preflight.sh "$job_cluster" "$job_device" || preflight_rc=$?
+if [ "$preflight_rc" -ne 0 ]; then
+    exit "$preflight_rc"
+fi
+
 # --- Bench cluster flag ---
 if [ "$job_cluster" = "phoenix" ]; then
     bench_cluster="phoenix-bench"
