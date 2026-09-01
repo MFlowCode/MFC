@@ -89,6 +89,22 @@ if [ -z "$syscheck_bin" ]; then
     exit $EXIT_HEALTHY
 fi
 
+# A binary built for a device this allocation did not ask for tells us nothing
+# about the node. The case-optimization pre-build is submitted as cpu (it is a
+# --dry-run that only builds) while producing GPU binaries, so its syscheck
+# asserts a device exists and fails on a GPU-less node by design. Read as a node
+# fault, that condemned three healthy Phoenix nodes and excluded two of them.
+# The mismatch is a property of the job, never of the machine.
+case "$syscheck_bin" in
+    *gpu-*) binary_device="gpu" ;;
+    *)      binary_device="cpu" ;;
+esac
+if [ "$device" = "cpu" ] && [ "$binary_device" = "gpu" ]; then
+    echo "Preflight: $device allocation but the available syscheck is a GPU build"
+    echo "  ($syscheck_bin); it cannot pass here, so skipping rather than judging $node."
+    exit $EXIT_HEALTHY
+fi
+
 echo "Preflight: probing $node with $syscheck_bin"
 
 # Launch the probe the way this cluster launches everything else. Phoenix uses

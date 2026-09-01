@@ -154,3 +154,16 @@ def test_no_job_is_submitted_while_the_cluster_is_under_a_recorded_outage(rig):
     result = rig("0")
     assert len(result.submissions) == 0
     assert result.returncode == 78
+
+
+def test_the_default_bound_is_one_requeue(rig):
+    """One requeue, not two.
+
+    A wrong probe costs one node per attempt: the run that condemned three
+    healthy Phoenix nodes was a bounded loop doing exactly what it was told.
+    Bad nodes are concentrated -- one accounted for 25 of 29 ECC failures -- so a
+    single requeue captures nearly all the benefit at half the blast radius.
+    """
+    result = rig("77,77,77,77")
+    assert result.returncode != 0
+    assert len(result.submissions) == 2  # original + 1 requeue

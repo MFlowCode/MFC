@@ -45,7 +45,7 @@ fi
 if [ "$monitor_exit" -ne 0 ]; then
     echo "Monitor exited with code $monitor_exit; re-checking SLURM job $job_id final state..."
     # Give the SLURM epilog time to finalize if the job just finished
-    sleep 30
+    sleep "${MFC_MONITOR_RECHECK_SECONDS:-30}"
     final_state=$(sacct -j "$job_id" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1 | tr -d ' ' || true)
     final_state="${final_state:-UNKNOWN}"
     final_exit=$(sacct -j "$job_id" -X --format=ExitCode --noheader --parsable2 2>/dev/null | head -n1 | tr -d ' ' || true)

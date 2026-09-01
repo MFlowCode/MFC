@@ -192,3 +192,36 @@ def test_it_refuses_to_judge_a_node_outside_a_slurm_allocation(workspace):
     write_syscheck(workspace, 1)
     env_without_slurm = {"MFC_NO_SLURM": "1"}
     assert run(workspace, "phoenix", "gpu", **env_without_slurm).returncode == HEALTHY
+
+
+def test_a_gpu_binary_in_a_cpu_allocation_is_not_a_node_fault(workspace):
+    """The failure that condemned three healthy Phoenix nodes.
+
+    The case-optimization pre-build is submitted as a cpu allocation but builds
+    GPU binaries, so the only syscheck available asserts a device exists and
+    exits non-zero on a node that has no GPU by design. That is a mismatch
+    between what the job asked for and what it built -- never evidence about the
+    node -- so the probe must decline to judge rather than blame it.
+    """
+    install_launcher(workspace, "mpirun")
+    target = workspace / "build" / "install" / "gpu-mp-abc123" / "bin"
+    target.mkdir(parents=True)
+    probe = target / "syscheck"
+    probe.write_text("#!/bin/bash\necho 'num_devices == 0'\nexit 1\n")
+    probe.chmod(probe.stat().st_mode | stat.S_IEXEC)
+
+    result = run(workspace, "phoenix", "cpu")
+    assert result.returncode == HEALTHY
+    assert "MFC_FAULT_NODE" not in result.stdout + result.stderr
+
+
+def test_a_gpu_binary_in_a_gpu_allocation_is_still_judged(workspace):
+    # The guard above must not blunt the actual feature.
+    install_launcher(workspace, "mpirun")
+    target = workspace / "build" / "install" / "gpu-mp-abc123" / "bin"
+    target.mkdir(parents=True)
+    probe = target / "syscheck"
+    probe.write_text("#!/bin/bash\nexit 1\n")
+    probe.chmod(probe.stat().st_mode | stat.S_IEXEC)
+
+    assert run(workspace, "phoenix", "gpu").returncode == NODE_FAULT

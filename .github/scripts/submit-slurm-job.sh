@@ -264,7 +264,13 @@ EOT
 # Node faults get a much tighter bound than preemption: preemption is routine on
 # 'embers' and says nothing about the node, whereas hitting a second unusable
 # node in a row means the problem is the cluster, not the draw.
-: "${MFC_MAX_NODE_RESUBMITS:=2}"
+#
+# One, not two. Each attempt costs a node if the probe is wrong, and it has been
+# wrong: a bounded loop faithfully condemned three healthy Phoenix nodes when the
+# probe was given a binary that could not run there. Bad nodes are concentrated
+# -- one accounted for 25 of 29 ECC failures -- so a single requeue captures
+# nearly all of the benefit at half the blast radius.
+: "${MFC_MAX_NODE_RESUBMITS:=1}"
 preempt_attempt=0
 node_attempt=0
 while :; do

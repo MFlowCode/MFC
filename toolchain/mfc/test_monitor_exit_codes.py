@@ -41,7 +41,14 @@ def slurm(tmp_path):
 
 
 def run_script(tmp_path, binz, name, *args):
-    env = {**os.environ, "PATH": f"{binz}:{os.environ['PATH']}"}
+    env = {
+        **os.environ,
+        "PATH": f"{binz}:{os.environ['PATH']}",
+        # This script really sleeps between polls; without these the file
+        # cost ~36s in every PR's Lint Gate.
+        "MFC_MONITOR_POLL_SECONDS": "0",
+        "MFC_MONITOR_RECHECK_SECONDS": "0",
+    }
     return subprocess.run(
         ["bash", str(SCRIPTS / name), *args],
         capture_output=True,
