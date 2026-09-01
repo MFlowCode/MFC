@@ -15,7 +15,7 @@ from rich.panel import Panel
 
 from .. import common, sched
 from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
-from ..common import MFCException, does_command_exist, format_list_to_string, get_program_output
+from ..common import MFCException, does_command_exist, format_list_to_string, get_program_output, log_tail
 from ..packer import packer
 from ..packer import tol as packtol
 from ..printer import cons
@@ -522,7 +522,18 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
     output, err = get_program_output([h5dump, silo_filepath])
 
     if err != 0:
-        raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+        # h5dump's own message and the post_process log are the only evidence of
+        # why the file could not be read, and both were being discarded: the
+        # failure reached CI as a bare path to a file on a machine nobody can
+        # reach. Whether the silo file is absent or merely unreadable is the
+        # first thing worth knowing.
+        exists = "missing" if not os.path.exists(silo_filepath) else f"{os.path.getsize(silo_filepath)} bytes"
+        raise MFCException(
+            f"Test {case}: Failed to run h5dump on {silo_filepath} ({exists}).\n"
+            f"h5dump said: {output.strip() or '(no output)'}\n"
+            f"{log_tail(out_filepath)}\n"
+            f"Case dictionary: {case.get_filepath()}."
+        )
 
     if "nan," in output:
         raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")

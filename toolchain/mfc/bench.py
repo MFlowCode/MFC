@@ -11,7 +11,7 @@ import uuid
 import rich.table
 
 from .build import DEFAULT_TARGETS, SIMULATION, get_targets
-from .common import MFC_BENCH_FILEPATH, MFC_BUILD_DIR, MFCException, create_directory, file_dump_yaml, file_load_yaml, format_list_to_string, system
+from .common import MFC_BENCH_FILEPATH, MFC_BUILD_DIR, MFCException, create_directory, file_dump_yaml, file_load_yaml, format_list_to_string, log_tail, system
 from .printer import cons
 from .state import ARG, CFG
 
@@ -87,7 +87,9 @@ def bench(targets=None):
                                 time.sleep(5)
                                 continue
                             cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {rc}")
-                            cons.print(f"[bold red]      Check log at: {log_filepath}[/bold red]")
+                            # Print the log, not just its path: this file lives
+                            # on the cluster and no artifact upload collects it.
+                            cons.print(log_tail(log_filepath))
                             failed_cases.append(case.slug)
                             break
 
@@ -99,6 +101,7 @@ def bench(targets=None):
                                 time.sleep(5)
                                 continue
                             cons.print(f"[bold red]ERROR[/bold red]: Summary file not created for {case.slug}")
+                            cons.print(log_tail(log_filepath))
                             cons.print(f"[bold red]      Expected: {summary_filepath}[/bold red]")
                             failed_cases.append(case.slug)
                             break

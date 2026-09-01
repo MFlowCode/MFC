@@ -61,5 +61,42 @@ case "${job_variant:-}" in
     *)    echo "ERROR: unknown job_variant '$job_variant'"; exit 1 ;;
 esac
 
+# --- Probe this node before committing the solver build to it ---
+# syscheck is a standalone target that links in 5-19 seconds, and it is already
+# built second in the ordinary build order. Building it on its own first and
+# running it here rejects an unusable node in about a minute, rather than after
+# the ~40 minute solver build that used to precede the first GPU touch. In the
+# Aug 2026 ECC failures that gap was a median of 38 minutes per job.
+./mfc.sh build -t syscheck -j 8 $build_opts
+
+preflight_rc=0
+bash .github/scripts/preflight.sh "$job_cluster" "$job_device" || preflight_rc=$?
+if [ "$preflight_rc" -ne 0 ]; then
+    # 77 (bad node) and 78 (recorded outage) travel back to submit-slurm-job.sh
+    # as this job's exit code, which decides whether to requeue elsewhere.
+    exit "$preflight_rc"
+fi
+
+# --- Solver build ---
+# Output is teed so a failure can be classified afterwards. Some Frontier CCE
+# and amdflang failures emit no compiler diagnostic at all, so whatever the
+# build did print is the only evidence there is.
+build_log="build-${job_slug:-${job_device}-${job_interface}}.log"
+
+set +e
 RETRY_VALIDATE_CMD="$validate_cmd" \
-    retry_build "${build_cmd[@]}" || exit 1
+    retry_build "${build_cmd[@]}" 2>&1 | tee "$build_log"
+build_rc=${PIPESTATUS[0]}
+set -e
+
+if [ "$build_rc" -ne 0 ]; then
+    # An unreachable package index is cluster-wide: no other node does better,
+    # so record it and let the rest of the matrix skip instead of each job
+    # spending ~33 minutes rediscovering it.
+    if grep -qE "Failed to fetch: .https://pypi|uv install failed|\(venv\) Installation failed" "$build_log"; then
+        bash .github/scripts/ci-outage.sh mark "$job_cluster" \
+            "PyPI/uv dependency install failed during build"
+        exit 78
+    fi
+    exit "$build_rc"
+fi

@@ -91,6 +91,32 @@ def file_read(filepath: str):
         raise MFCException(f'Failed to read from "{filepath}": {exc}') from exc
 
 
+def log_tail(filepath: str, max_lines: int = 60) -> str:
+    """Return the end of a log file, ready to print into CI output.
+
+    A failure that only prints the *path* to its log is undebuggable in CI: the
+    file sits on a cluster or inside a container that no artifact upload
+    collects. Benchmark cases dying with "exit code 143" and post_process
+    failures pointing at out_post.txt were both diagnosable only by someone with
+    a shell on the machine, minutes before the workspace was cleaned.
+
+    Never raises: this runs on a path that is already failing, and the absence
+    of the log is itself worth reporting.
+    """
+    header = f"--- last {max_lines} lines of {filepath} ---"
+
+    try:
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError as exc:
+        return f"{header}\n(could not be read: {exc})"
+
+    if not lines:
+        return f"{header}\n(the log is empty -- the process likely died before writing anything)"
+
+    return "\n".join([header, *lines[-max_lines:]])
+
+
 def file_load_yaml(filepath: str):
     try:
         with open(filepath, "r") as f:

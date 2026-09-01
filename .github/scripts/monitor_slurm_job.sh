@@ -262,6 +262,23 @@ if [ -z "$exit_code" ]; then
   exit 1
 fi
 
+# Infrastructure verdicts from the in-allocation preflight come back as the
+# job's own exit code. Relay them verbatim: flattening them to 1 would leave the
+# submit wrapper unable to tell "this node is unusable" (exclude it and try
+# again) from "the tests failed" (report it).
+case "$exit_code" in
+  77:*)
+    echo "Job $job_id failed preflight: the node is unusable — signaling caller to exclude it and resubmit."
+    monitor_success=1
+    exit 77
+    ;;
+  78:*)
+    echo "Job $job_id skipped: a cluster-wide outage is already recorded."
+    monitor_success=1
+    exit 78
+    ;;
+esac
+
 # Check if job succeeded
 if [ "$exit_code" != "0:0" ]; then
   echo "ERROR: Job $job_id failed with exit code $exit_code"
