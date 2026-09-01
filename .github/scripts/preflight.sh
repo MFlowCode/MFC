@@ -38,6 +38,18 @@ EXIT_OUTAGE=78
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 node="${SLURMD_NODENAME:-$(hostname -s 2>/dev/null || hostname)}"
 
+# Only judge a node from inside its own allocation. `mfc.sh load` is also used
+# for building on login nodes -- bench.yml and frontier/build.sh both load the
+# GPU module set there -- and a login node has no GPU to probe. Reporting a node
+# fault in that context would have the wrapper exclude a login node and requeue,
+# which is both wrong and hard to diagnose. Nothing calls the probe from a login
+# node today; this makes that a property of the probe rather than a convention
+# every future caller has to remember.
+if [ -z "${SLURM_JOB_ID:-}" ]; then
+    echo "Preflight: not inside a SLURM allocation; skipping the node probe."
+    exit $EXIT_HEALTHY
+fi
+
 # --- Cluster-wide outage: requeuing cannot help, so skip rather than retry ---
 outage_rc=0
 bash "$SCRIPT_DIR/ci-outage.sh" check "$cluster" || outage_rc=$?

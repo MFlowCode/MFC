@@ -76,6 +76,10 @@ exit {full_build_rc}
             "job_cluster": "frontier",
             "job_variant": "",
             "SLURMD_NODENAME": "frontier1234",
+            # These scripts only ever run inside a SLURM allocation
+            # (submit-slurm-job.sh is their sole caller), and the probe
+            # refuses to judge a node outside one.
+            "SLURM_JOB_ID": "123456",
         }
         return subprocess.run(
             ["bash", ".github/workflows/common/build.sh"],

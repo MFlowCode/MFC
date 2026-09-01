@@ -54,6 +54,10 @@ def workspace(tmp_path):
             "job_variant": "",
             "GITHUB_EVENT_NAME": "push",
             "SLURMD_NODENAME": "frontier9999",
+            # These scripts only ever run inside a SLURM allocation
+            # (submit-slurm-job.sh is their sole caller), and the probe
+            # refuses to judge a node outside one.
+            "SLURM_JOB_ID": "123456",
         }
         return subprocess.run(
             ["bash", ".github/workflows/common/test.sh"],

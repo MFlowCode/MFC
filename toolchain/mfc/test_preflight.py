@@ -75,7 +75,7 @@ def write_syscheck(workspace, exit_code, message="syscheck says hello"):
     return binary
 
 
-def run(workspace, *args):
+def run(workspace, *args, **overrides):
     env = {
         **os.environ,
         # A controlled PATH, not the inherited one: this box has a real mpirun,
@@ -83,7 +83,12 @@ def run(workspace, *args):
         "PATH": f"{workspace / 'bin'}:{workspace / 'sysbin'}",
         "MFC_CI_STATE_DIR": str(workspace / "state"),
         "SLURMD_NODENAME": "atl1-1-03-007-29-0",
+        # Present by default: these tests describe behaviour inside a job.
+        "SLURM_JOB_ID": "123456",
     }
+    if overrides.pop("MFC_NO_SLURM", None):
+        env.pop("SLURM_JOB_ID", None)
+    env.update(overrides)
     return subprocess.run(
         ["bash", str(SCRIPT), *(args or ("phoenix", "gpu"))],
         capture_output=True,
@@ -177,3 +182,13 @@ def test_a_breaker_that_cannot_be_read_does_not_halt_the_job(workspace):
         assert run(workspace, "phoenix", "gpu").returncode == HEALTHY
     finally:
         (workspace / "state").chmod(0o755)
+
+
+def test_it_refuses_to_judge_a_node_outside_a_slurm_allocation(workspace):
+    # mfc.sh load is used for building on login nodes too (bench.yml and
+    # frontier/build.sh both load the GPU module set there). A probe that ran in
+    # that context would find no usable GPU, call the login node bad, and have
+    # the wrapper exclude it and requeue. Only a real allocation can be judged.
+    write_syscheck(workspace, 1)
+    env_without_slurm = {"MFC_NO_SLURM": "1"}
+    assert run(workspace, "phoenix", "gpu", **env_without_slurm).returncode == HEALTHY
