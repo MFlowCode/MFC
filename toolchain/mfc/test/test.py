@@ -907,16 +907,31 @@ def summarize_rocm_debug_agent(out: str, max_disasm: int = 14) -> str:
     distribution hands the reader the wrong instruction.
 
     Returns '' when there is no agent report, so callers fall back to the raw
-    output. The regexes are anchored to ROCm 6.3.1's format observed on one
-    fault shape; a format change degrades to that fallback silently, which is
-    why a test asserts this returns non-empty on a known-good fixture.
+    output.
+
+    The format is NOT stable across ROCm versions, and the failure is silent --
+    no wave match means an empty summary and a fallback to tens of thousands of
+    raw lines, with nothing saying why. Measured between two versions:
+
+        6.3.1  wave_124: pc=0x7ff77e253408 (stopped, reason: MEMORY_VIOLATION)
+        7.2.0  wave_250: pc=0x7ff734dcbf3c (kernel_code_entry=0x... <...>,
+                         kernargs=0x...) (stopped, reason: MEMORY_VIOLATION)
+
+        6.3.1  Memory access fault by GPU node-4 (Agent handle: ...) on address
+        7.2.0  OFFLOAD ERROR: memory access fault by GPU 4 (agent ...) at ...
+
+    An earlier version required pc= and "(stopped, reason:" to be adjacent and
+    matched the fault line case-sensitively on "Memory". It returned nothing at
+    all for 65,210 lines of real 7.2.0 output. Hence the tolerant separator, and
+    reusing is_gpu_memory_fault rather than hardcoding one version's wording.
+    Both formats are pinned by fixtures below.
     """
-    waves = re.findall(r"^wave_\d+: pc=(0x[0-9a-f]+) \(stopped, reason: (\w+)\)", out, re.M)
+    waves = re.findall(r"^wave_\d+: pc=(0x[0-9a-f]+).*?\(stopped, reason: (\w+)\)", out, re.M)
     if not waves:
         return ""
 
     lines = out.splitlines()
-    fault = next((line for line in lines if "Memory access fault by GPU" in line), None)
+    fault = next((line for line in lines if is_gpu_memory_fault(line)), None)
     kernels = sorted({m.group(1) for m in re.finditer(r"^Disassembly for function (.+):$", out, re.M)})
     pcs = collections.Counter(pc for pc, _ in waves)
     reasons = collections.Counter(reason for _, reason in waves)
@@ -937,7 +952,7 @@ def summarize_rocm_debug_agent(out: str, max_disasm: int = 14) -> str:
         summary += lines[start : min(end + 1, start + max_disasm)]
 
     modal_pc = pcs.most_common(1)[0][0]
-    start = next((n for n, line in enumerate(lines) if re.match(r"^wave_\d+: pc=" + re.escape(modal_pc) + r" ", line)), None)
+    start = next((n for n, line in enumerate(lines) if re.match(r"^wave_\d+: pc=" + re.escape(modal_pc) + r"(?![0-9a-f])", line)), None)
     if start is not None:
         summary += ["", f"--- representative wave (modal PC {modal_pc}, {pcs[modal_pc]} of {len(waves)} waves) ---"]
         summary += lines[start : start + max_disasm]

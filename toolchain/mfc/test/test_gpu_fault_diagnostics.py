@@ -208,7 +208,7 @@ def test_a_restart_case_runs_with_the_diagnostics_too():
 # real output: the "(Agent handle: ...)" clause in the fault line, "End of
 # disassembly." as the terminator, and the blank line plus "scalar registers:"
 # header between a wave's pc line and its register dump.
-ROCM_AGENT_FIXTURE = """\
+ROCM_AGENT_FIXTURE_631 = """\
 Memory access fault by GPU node-4 (Agent handle: 0x3b24f40) on address 0x7ffb6a0f6000. Reason: Write access to a read-only page.
 Disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6:
     code object: file:///path/gpu-acc-c819d00b45/bin/simulation#offset=4657152&size=10843816
@@ -318,7 +318,7 @@ def test_the_summary_has_the_same_shape_as_the_real_report():
     """
     from mfc.test.test import summarize_rocm_debug_agent
 
-    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE)
+    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_631)
 
     for field in REAL_SUMMARY_FIELDS:
         assert field in summary, f"the summarizer no longer emits {field!r}"
@@ -326,3 +326,71 @@ def test_the_summary_has_the_same_shape_as_the_real_report():
     # The part that fails silently: no wave match means an empty summary and a
     # fall back to 14k raw lines, with nothing to say why.
     assert "s_tvd_rk$m_time_steppers_$ck_L486_6" in summary
+
+
+# ROCm 7.2.0 / AFAR OpenMP-offload format, verbatim from a real 65,210-line
+# report. Two things moved versus 6.3.1: the wave line gained
+# kernel_code_entry= and kernargs= BETWEEN the pc and the stop reason, and the
+# fault line is worded "OFFLOAD ERROR: memory access fault ... at virtual
+# address ... Reasons:" instead of "Memory access fault ... on address ...
+# Reason:". A summarizer written against 6.3.1 alone returns '' for all 65,210
+# lines and says nothing about why.
+ROCM_AGENT_FIXTURE_720 = """\
+OFFLOAD ERROR: memory access fault by GPU 4 (agent 0x55555896f810) at virtual address 0x7ffb61f02000. Reasons: Write access to a read-only page
+Disassembly for function __omp_offloading_8116438_1c00689b__QMm_time_steppersPs_tvd_rk_l486:
+    code object: memory://415882#offset=0x7ff736b8c040&size=17250800
+    loaded at: [0x7ff734000000-0x7ff736b0a4e8]
+ => 0x7ff734dcbf3c <+7484>:    s_waitcnt vmcnt(0) lgkmcnt(0)
+    0x7ff734dcbf40 <+7488>:    v_mul_f64 v[12:13], v[52:53], v[16:17]
+End of disassembly.
+wave_249: pc=0x7ff734dcbf3c (kernel_code_entry=0x7ff736b8c040 <__omp_offloading_8116438_1c00689b__QMm_time_steppersPs_tvd_rk_l486>, kernargs=0x7ffb61f00000) (stopped, reason: MEMORY_VIOLATION)
+
+scalar registers:
+            s0: d9800000            s1: 80007ffe
+wave_250: pc=0x7ff734dcbf3c (kernel_code_entry=0x7ff736b8c040 <__omp_offloading_8116438_1c00689b__QMm_time_steppersPs_tvd_rk_l486>, kernargs=0x7ffb61f00000) (stopped, reason: MEMORY_VIOLATION)
+
+scalar registers:
+            s0: d9800000            s1: 80007ffe
+"""
+
+
+def test_the_summarizer_handles_rocm_720_as_well_as_631():
+    """The version skew that silently produced nothing.
+
+    The first version required pc= and "(stopped, reason:" to be adjacent and
+    matched the fault line case-sensitively on "Memory". ROCm 7.2.0 puts
+    kernel_code_entry= and kernargs= between them and says "OFFLOAD ERROR:
+    memory access fault", so it returned '' for 65,210 lines of real output --
+    on the very lane it was meant to serve, with no error to explain it.
+    """
+    from mfc.test.test import summarize_rocm_debug_agent
+
+    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_720)
+
+    assert summary, "ROCm 7.2.0 agent output was not recognised"
+    assert "__omp_offloading_8116438_1c00689b__QMm_time_steppersPs_tvd_rk_l486" in summary
+    assert "memory access fault" in summary.lower()
+    assert "0x7ff734dcbf3c x2" in summary
+
+
+def test_both_rocm_formats_survive_together():
+    """Neither fixture may be fixed at the other's expense."""
+    from mfc.test.test import summarize_rocm_debug_agent
+
+    assert summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_631)
+    assert summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_720)
+
+
+def test_the_omp_symbol_still_carries_module_procedure_and_line():
+    """Flang mangling keeps all three facts, which is what makes it useful.
+
+    _QM<module> P<procedure> _l<line>: m_time_steppers, s_tvd_rk, line 486 --
+    the injected fault site, in a different mangling from CCE's OpenACC form.
+    """
+    from mfc.test.test import summarize_rocm_debug_agent
+
+    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_720)
+
+    assert "_QMm_time_steppers" in summary
+    assert "Ps_tvd_rk" in summary
+    assert "_l486" in summary
