@@ -177,11 +177,11 @@ contains
     end subroutine s_perform_time_step
 
     !> Derive requested flow quantities from primitive variables and write them to the formatted database files.
-    impure subroutine s_save_data(t_step, varname, pres, c, H)
+    impure subroutine s_save_data(t_step, varname, pres, c)
 
         integer, intent(inout)                 :: t_step
         character(LEN=name_len), intent(inout) :: varname
-        real(wp), intent(inout)                :: pres, c, H
+        real(wp), intent(inout)                :: pres, c
 
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end, &
              & -offset_z%beg:p + offset_z%end) :: liutex_mag
@@ -531,10 +531,7 @@ contains
 
                         pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
 
-                        H = ((gamma_sf(i, j, k) + 1._wp)*pres + pi_inf_sf(i, j, k) + qv_sf(i, j, k))/rho_sf(i, j, k)
-
-                        call s_compute_speed_of_sound(pres, rho_sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, k), H, adv, &
-                                                      & 0._wp, 0._wp, c, qv_sf(i, j, k))
+                        call s_compute_speed_of_sound(pres, rho_sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, k), adv, c)
 
                         out%q_sf(i, j, k) = c
                     end do

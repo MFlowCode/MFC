@@ -4,7 +4,6 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'inline_capillary.fpp'
 
 !> @brief Computes capillary source fluxes and color-function gradients for the diffuse-interface surface tension model
 module m_surface_tension
@@ -58,6 +57,41 @@ contains
     end subroutine s_initialize_surface_tension_module
 
     !> Compute the capillary source flux from reconstructed color-gradient fields
+    !> Capillary stress tensor of Schmidmayer et al. JCP (2017) for one face. Omega is intent(inout): the entries a given
+    !! dimensionality does not define are left as the caller had them, which is what the macro this replaced did.
+    subroutine s_compute_capillary_stress_tensor(sigma_c, w1, w2, w3, normW, Omega)
+
+        $:GPU_ROUTINE(function_name='s_compute_capillary_stress_tensor', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: sigma_c, w1, w2, w3, normW
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 3), intent(inout) :: Omega
+        #:else
+            real(wp), dimension(num_dims, num_dims), intent(inout) :: Omega
+        #:endif
+
+        Omega(1, 1) = -sigma_c*(w2*w2 + w3*w3)/normW
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+            Omega(2, 1) = sigma_c*w1*w2/normW
+            Omega(1, 2) = Omega(2, 1)
+
+            Omega(2, 2) = -sigma_c*(w1*w1 + w3*w3)/normW
+        #:endif
+
+        if (p > 0) then
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                Omega(3, 1) = sigma_c*w1*w3/normW
+                Omega(1, 3) = Omega(3, 1)
+
+                Omega(3, 2) = sigma_c*w2*w3/normW
+                Omega(2, 3) = Omega(3, 2)
+
+                Omega(3, 3) = -sigma_c*(w1*w1 + w2*w2)/normW
+            #:endif
+        end if
+
+    end subroutine s_compute_capillary_stress_tensor
+
     subroutine s_compute_capillary_source_flux(vSrc_rsx_vf, flux_src_vf, id, isx, isy, isz)
 
         real(wp), dimension(-1:,-1:,-1:,1:), intent(in)        :: vSrc_rsx_vf
@@ -98,7 +132,7 @@ contains
                         normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
-                            @:compute_capillary_stress_tensor()
+                            call s_compute_capillary_stress_tensor(sigma, w1, w2, w3, normW, Omega)
 
                             do i = 1, num_dims
                                 flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
@@ -141,7 +175,7 @@ contains
                             normW = (normWL + normWR)/2._wp
 
                             if (normW > capillary_cutoff) then
-                                @:compute_capillary_stress_tensor()
+                                call s_compute_capillary_stress_tensor(sigma, w1, w2, w3, normW, Omega)
 
                                 do i = 1, num_dims
                                     flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, &
@@ -184,7 +218,7 @@ contains
                             normW = (normWL + normWR)/2._wp
 
                             if (normW > capillary_cutoff) then
-                                @:compute_capillary_stress_tensor()
+                                call s_compute_capillary_stress_tensor(sigma, w1, w2, w3, normW, Omega)
 
                                 do i = 1, num_dims
                                     flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, &

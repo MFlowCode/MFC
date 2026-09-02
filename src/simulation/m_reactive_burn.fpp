@@ -15,6 +15,7 @@
 module m_reactive_burn
 
     use m_global_parameters
+    use m_variables_conversion, only: f_sg_thermal
 
     implicit none
 
@@ -53,8 +54,8 @@ contains
                         ! reactant phasic temperature from the stiffened-gas EOS T = (p + pi_inf)/((Gamma-1) rho cv).
                         ! rburn%ta = 0 (default) leaves the pure pressure-driven rate unchanged.
                         if (rburn%ta > 0._wp) then
-                            T_r = (pres + ps_inf(1))/((gs_min(1) - 1._wp)*cvs(1)*q_cons_vf(eqn_idx%cont%beg)%sf(x, y, &
-                                   & z)/q_prim_vf(eqn_idx%adv%beg)%sf(x, y, z))
+                            T_r = f_sg_thermal(pres, q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z)/q_prim_vf(eqn_idx%adv%beg)%sf(x, y, &
+                                               & z), isentrope_n(1), isentrope_B(1), cvs(1))
                             rate = rate*exp(-rburn%ta/T_r)
                         end if
 

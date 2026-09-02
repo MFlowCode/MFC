@@ -15,7 +15,7 @@ module m_cbc
     use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
-        & get_mole_fractions, get_species_specific_heats_r
+        & get_mole_fractions
 
     implicit none
 
@@ -501,7 +501,6 @@ contains
         real(wp)               :: rho         !< Cell averaged density
         real(wp)               :: pres        !< Cell averaged pressure
         real(wp)               :: E           !< Cell averaged energy
-        real(wp)               :: H           !< Cell averaged enthalpy
         real(wp)               :: gamma       !< Cell averaged specific heat ratio
         real(wp)               :: pi_inf      !< Cell averaged liquid stiffness
         real(wp)               :: qv          !< Cell averaged fluid reference energy
@@ -595,7 +594,7 @@ contains
                 ! FD2 or FD4 of RHS at j = 0
                 $:GPU_PARALLEL_LOOP(collapse=2, private='[r, k, alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, &
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
-                                    & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, H, &
+                                    & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
                                     & vel_dv_dt_sum, i, j]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
@@ -654,14 +653,10 @@ contains
                                 call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
                                 gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                             end if
-                        else
-                            E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_K_sum
                         end if
 
-                        H = (E + pres)/rho
-
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv_local, vel_K_sum, 0._wp, c, qv)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv_local, c)
 
                         ! First-Order Spatial Derivatives of Primitive Variables
 
@@ -840,13 +835,7 @@ contains
                                 dpi_inf_dt = dadv_dt(2)
                             #:endif
                         else
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                drho_dt = drho_dt + dalpha_rho_dt(i)
-                                dgamma_dt = dgamma_dt + dadv_dt(i)*gammas(i)
-                                dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_infs(i)
-                                dqv_dt = dqv_dt + dalpha_rho_dt(i)*qvs(i)
-                            end do
+                            call s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt)
                         end if
 
                         ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2

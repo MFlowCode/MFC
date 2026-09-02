@@ -81,9 +81,11 @@ data = {
     "sigma": 8.0,
     # Fluid Parameters (Water)
     "fluid_pp(1)%gamma": 1.0e00 / (2.1e00 - 1.0e00),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 2.1e00 * 1.0e06 / (2.1e00 - 1.0e00),
     # Fluid Parameters (Gas)
     "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+    "fluid_pp(2)%eos": "ideal_gas",
     "fluid_pp(2)%pi_inf": 0.0e00,
     # Air Patch
     "patch_icpp(1)%geometry": 9,
