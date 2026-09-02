@@ -797,10 +797,18 @@ def diagnostic_env(base: dict) -> dict:
     known out-of-bounds write injected into m_time_steppers, the last kernel
     logged before the fault was s_write_run_time_information in 111 of 140
     faults and m_time_steppers in none of them -- a confident, wrong suspect,
-    which is worse than no diagnostic at all. Serializing makes the runtime wait
-    on each dispatch so the fault is attributed to the kernel that caused it.
-    (Verified to be honoured on the AFAR/HIP path; whether CCE's own offload
-    runtime honours it is what the next CI run measures.)
+    which is worse than no diagnostic at all. Serializing is meant to make the
+    runtime wait on each dispatch so the fault lands on the kernel that caused
+    it.
+
+    Measured since: CCE does NOT honour these. The same injected fault under
+    CRAY_ACC_DEBUG with both variables set still blamed
+    s_write_run_time_information in 168 of 213 faults and m_time_steppers in
+    none -- an unchanged distribution. They are HIP runtime variables and CCE's
+    offload runtime is not HIP. Whether the AFAR/OpenMP path honours them is
+    NOT yet measured; do not assume it does because the variables are HIP's.
+    Until that is measured, the CCE lane's kernel log should be read as launch
+    history only -- it does not identify the faulting kernel.
 
     Cost, measured on the same machine: 13.7s -> 17.3s (1.27x) for a case that
     emitted 142,777 ACC: lines. Against the 1 hour TEST_TIMEOUT_SECONDS a case
