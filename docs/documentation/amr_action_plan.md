@@ -238,7 +238,9 @@ in both suspect allocations. Added to every exclude list (sixth sick node). **Th
 closes the constant-density ladder: 2876.7 s, rhs 2118 s (flat with 2120/2117/2116 at np64/128/256), rhs imbalance 1.03 (no
 straggler), truncation 0, escaped 0. Doublings at 64 ranks/node: 64->128 1.012/1.009, 128->256 1.010/1.010, 256->512 1.027 --
 every one far under the 1.20/1.15 AMReX bar. The non-rhs (AMR + comm) share grows ~5%/doubling to np256 and ~10% at the last
-doubling; the next scaling target, if any, is whichever phase carries that 10% (read from the rung logs), not the rhs.**
+doubling; the phases that carry it (np256 -> np512 means): regrid 64 -> 120 s, of which rg:build 44 -> 92, rb:tail 21 -> 48,
+rb:xchg 18 -> 43, rb:gath 13 -> 28 -- the REGRID REBUILD (gather/exchange/tail of the fill after a regrid), not the step path.
+That is the next scaling term if one is ever needed; at 12 regrids per 200 steps it is 4% of wall.**
 
 **Attribution (phase means over the two reps): regrid 322 -> 136 s, of which rg:clus 182.0 -> 6.2 s.** That
 is the dirty-box merge (3eeb0807), not W1. Every other phase moved within allocation noise (halo -17 s;
