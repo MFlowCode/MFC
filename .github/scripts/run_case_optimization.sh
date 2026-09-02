@@ -107,9 +107,13 @@ for case in "${benchmarks[@]}"; do
     # address with nothing to act on. Both variables are inert until a fault;
     # the debug agent is what gives CCE a faulting kernel at all, and is set
     # only where its library is actually reachable.
-    export OFFLOAD_TRACK_ALLOCATION_TRACES=true
-    export OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES=8
-    if [ -n "${ROCM_PATH:-}" ] && [ -f "$ROCM_PATH/lib/librocm-debug-agent.so.2" ]; then
+    export OFFLOAD_TRACK_ALLOCATION_TRACES="${OFFLOAD_TRACK_ALLOCATION_TRACES:-true}"
+    export OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES="${OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES:-8}"
+    # Skipped when the caller already chose a tool, or is collecting a GPU core
+    # dump -- the agent is mutually exclusive with one, so loading it anyway
+    # would leave them with no dump and no reason why.
+    if [ -z "${HSA_TOOLS_LIB:-}" ] && [ -z "${HSA_ENABLE_DEBUG:-}" ] \
+       && [ -n "${ROCM_PATH:-}" ] && [ -f "$ROCM_PATH/lib/librocm-debug-agent.so.2" ]; then
         export HSA_TOOLS_LIB=librocm-debug-agent.so.2
     fi
 

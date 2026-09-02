@@ -82,8 +82,12 @@ def fault_diagnostic_env(base: dict) -> dict:
     Returns a new dict: these run in worker threads, and mutating a shared
     environment would leak settings into every concurrent case.
     """
-    env = {
-        **base,
+    env = dict(base)
+
+    # Never clobber a setting the caller made. `mfc.sh test` and `mfc.sh bench`
+    # are developer commands, not just CI entry points, so anyone debugging by
+    # hand has to be able to choose their own values and have them survive.
+    defaults = {
         # Says whether the faulting address was ever a real host allocation,
         # separating an overrun of a known array from a wild pointer.
         "OFFLOAD_TRACK_ALLOCATION_TRACES": "true",
@@ -91,6 +95,8 @@ def fault_diagnostic_env(base: dict) -> dict:
         # advertises this itself in the fault message ("0 now, up to 8").
         "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES": "8",
     }
+    for name, value in defaults.items():
+        env.setdefault(name, value)
 
     # The only thing that gives CCE a faulting kernel. Measured on Frontier
     # under --gpu acc: it prints "Disassembly for function
@@ -122,8 +128,20 @@ def fault_diagnostic_env(base: dict) -> dict:
     # own fault report. Worst realistic case is one working diagnostic replacing
     # another strictly more detailed one; if a real AFAR fault shows otherwise,
     # gate this on the lane.
-    agent = rocm_debug_agent_path()
-    if agent is not None:
+    # Two ways the caller can say "stay out of my way", both of which mean a
+    # human is already debugging this run by hand:
+    #
+    #   HSA_TOOLS_LIB already set -- they chose a tool; do not replace it.
+    #   HSA_ENABLE_DEBUG set      -- they are collecting a GPU core dump, and
+    #                                the agent is mutually exclusive with one.
+    #                                Loading it anyway yields "Failed to enable
+    #                                debug interface" and no dump, with the
+    #                                cause being something the harness did
+    #                                behind them.
+    #
+    # The same reasoning covers an attached rocgdb, which trips the same
+    # already-attached path.
+    if "HSA_TOOLS_LIB" not in env and not env.get("HSA_ENABLE_DEBUG") and rocm_debug_agent_path() is not None:
         env["HSA_TOOLS_LIB"] = ROCM_DEBUG_AGENT
 
     return env

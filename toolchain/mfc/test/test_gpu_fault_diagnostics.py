@@ -504,3 +504,53 @@ def test_a_missing_agent_report_on_a_gpu_fault_is_called_out():
 
     assert "rocm_debug_agent_path() is not None" in src
     assert "format has changed" in src
+
+
+def test_a_core_dump_session_is_not_hijacked(monkeypatch):
+    """`mfc.sh test` is a developer command, not only a CI entry point.
+
+    The debug agent and ROCr core dumps are mutually exclusive -- measured. So
+    setting the agent behind someone who has asked for a dump gives them
+    "Failed to enable debug interface" and no dump, caused by the harness
+    rather than by anything they did.
+    """
+    from mfc.gpu_diagnostics import fault_diagnostic_env
+
+    monkeypatch.setenv("ROCM_PATH", tmp_agent_dir())
+
+    assert "HSA_TOOLS_LIB" in fault_diagnostic_env({})
+    assert "HSA_TOOLS_LIB" not in fault_diagnostic_env({"HSA_ENABLE_DEBUG": "1"})
+
+
+def test_an_explicit_tool_choice_is_not_replaced(monkeypatch):
+    from mfc.gpu_diagnostics import fault_diagnostic_env
+
+    monkeypatch.setenv("ROCM_PATH", tmp_agent_dir())
+
+    env = fault_diagnostic_env({"HSA_TOOLS_LIB": "libmy-own-tool.so"})
+
+    assert env["HSA_TOOLS_LIB"] == "libmy-own-tool.so"
+
+
+def test_explicit_offload_settings_survive():
+    """A developer tuning these by hand must not have them silently reset."""
+    from mfc.gpu_diagnostics import fault_diagnostic_env
+
+    env = fault_diagnostic_env(
+        {
+            "OFFLOAD_TRACK_ALLOCATION_TRACES": "false",
+            "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES": "2",
+        }
+    )
+
+    assert env["OFFLOAD_TRACK_ALLOCATION_TRACES"] == "false"
+    assert env["OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES"] == "2"
+
+
+def test_the_defaults_still_apply_when_nothing_was_chosen():
+    from mfc.gpu_diagnostics import fault_diagnostic_env
+
+    env = fault_diagnostic_env({})
+
+    assert env["OFFLOAD_TRACK_ALLOCATION_TRACES"] == "true"
+    assert env["OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES"] == "8"
