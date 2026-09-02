@@ -226,6 +226,26 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-01 (53) — np512 A/B CLOSED: new binary 5.0% faster; the gain is the dirty-box merge, W1 is wall-neutral here; a ledger-52 claim RETRACTED
+
+Job 396991, one 8-node allocation, arms interleaved old/new/old/new (old = 0831 pre-port binary 94c73c4d,
+new = batch-3 37488b20): old 3593.1 / 3620.4 s, new 3434.0 / 3415.6 s -> **new/old = 0.950 (-5.0%)**, spreads
+0.8% / 0.5%. rhs max/mean is 1.23-1.25 on ALL FOUR arms -> the straggler is this allocation, not either binary
+(pre-registered rule 2: no regression). Probes 397173/4/5 (single-node np64 on k002-005 / k003-002 / k003-003,
+the nodes shared with the earlier suspect allocation) are running to name the slow node.
+
+**Attribution (phase means over the two reps): regrid 322 -> 136 s, of which rg:clus 182.0 -> 6.2 s.** That
+is the dirty-box merge (3eeb0807), not W1. Every other phase moved within allocation noise (halo -17 s;
+restr/coarse/b:halo +6..15 s). At 4608 blocks the per-stage scans W1 deleted cost milliseconds, so **W1 is
+wall-neutral at np512 -- its value is asymptotic (the O(P)/O(N^2) terms at 1e5 ranks), which is what it was
+built for.** Say so; do not sell it as a np512 speedup.
+
+**RETRACTION of ledger 52's "rs:rfp per call 0.231 -> 0.100 ms is the robust W1 signature".** The OLD binary
+shows rs:rfp 59-66 s (0.09-0.10 ms/call) on today's allocation versus 154 s (0.231) on 0831 -- the phase
+carries waits and moved with the allocation, exactly the cross-day trap the same entry warns about. I fell
+into it one paragraph later. The only robust W1 evidence at np512 is "no regression"; the asymptotic
+evidence is structural (ledger 51).
+
 ## 2026-09-01 (52) — THE PROPER TAX TEST: MFC's AMR overhead is LOWER than AMReX's; the per-cell physics is the gap
 
 ### The old "tax over AMReX" was not a measurement
