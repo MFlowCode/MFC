@@ -492,6 +492,15 @@ contains
                                 q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
                             end if
                             if (igr) then
+                                ! ############ DO NOT MERGE ############
+                                ! Deliberate out-of-bounds device write, to make
+                                ! CI produce a real GPU memory fault so the retry
+                                ! diagnostics can be seen end to end in a job log.
+                                ! Scoped to igr so only a handful of tests fault
+                                ! instead of the whole GPU matrix.
+                                ! Revert with: git revert <this commit>
+                                q_cons_ts(1)%vf(i)%sf(j + 100000000, k, l) = 1._wp
+                                ! ######################################
                                 q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
                                           & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
                                           & l))/rk_coef(s, 4)
