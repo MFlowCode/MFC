@@ -7,12 +7,65 @@ from .pack import Pack
 Tolerance = Error
 
 
+def _magnitudes(values: typing.List[float]) -> typing.List[float]:
+    return [abs(v) for v in values if not math.isnan(v)]
+
+
+#: How far past the band a value may drift before it counts as changed. The band is the larger of the
+#: tolerance and the golden field's own magnitude, so a field that merely sits near the tolerance is
+#: judged against itself rather than against a tolerance it happens to be close to. Two, not ten: it
+#: has to cover a sign flip of a value already at the band edge and nothing more.
+_ZERO_FIELD_HEADROOM = 2.0
+
+
+def _is_zero_field(values: typing.List[float], atol: float) -> bool:
+    """A field the test cannot resolve from zero: every value is within the absolute tolerance of it.
+    What such a field stores is roundoff, and which way that roundoff falls depends on the compiler's
+    association order, so comparing it pointwise against the golden tests the compiler rather than the
+    solver. Its values are compared against the band instead, see _zero_field_bound.
+
+    A rearrangement wholly inside the band - uniform +x becoming alternating +/-x - is invisible to
+    this rule, and inherently so: values the test cannot resolve from zero cannot be resolved from
+    each other either. Anything leaving the band is still caught, per value."""
+    if any(math.isnan(v) for v in values):
+        return False
+    mags = _magnitudes(values)
+    return bool(mags) and max(mags) <= atol
+
+
+def _zero_field_bound(values: typing.List[float], atol: float) -> float:
+    """The band a zero field's candidate must stay inside. Scaled by the golden's own magnitude, not
+    the tolerance alone: single precision scales QBMM's 1e-10 by 1e8, so its tolerance is 1e-2 and
+    its bubble fields are constants a hair under that. Held to the bare tolerance, those fail for
+    drifting a few ulps, while a field storing genuine roundoff is orders below and unaffected."""
+    return max(atol, _ZERO_FIELD_HEADROOM * max(_magnitudes(values), default=0.0))
+
+
+#: How far a golden sample of exactly zero may drift, as a fraction of the finest value the field
+#: actually resolves. Such a sample stores a sign, not a magnitude, so judging it against the bare
+#: absolute tolerance tests the compiler's association order rather than the solver.
+_ZERO_SAMPLE_FRACTION = 1e-2
+
+
+def _zero_sample_bound(values: typing.List[float], atol: float) -> float:
+    """The band a candidate must stay inside where the golden is exactly zero. Tied to the field's
+    resolution - its smallest nonzero magnitude - not its dynamic range: a fraction of the maximum
+    would license a "zero" of 1e3 in a field of 1e5."""
+    nonzero = [abs(v) for v in values if v != 0.0 and not math.isnan(v)]
+    if not nonzero:
+        return atol
+    return max(atol, _ZERO_SAMPLE_FRACTION * min(nonzero))
+
+
 def is_close(error: Error, tolerance: Tolerance) -> bool:
     if error.absolute <= tolerance.absolute:
         return True
 
+    # A golden value of exactly zero makes the relative error NaN. Such a sample has already failed
+    # the absolute check above, and there is nothing to take a ratio against, so it fails here rather
+    # than passing on an undefined comparison.
     if math.isnan(error.relative):
-        return True
+        return False
 
     if error.relative <= tolerance.relative:
         return True
@@ -72,7 +125,25 @@ def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error
         if len(gEntry.doubles) != len(cEntry.doubles):
             return None, f"Variable count didn't match for {gFilepath}."
 
+        # A field that is zero in the golden is checked for staying zero, not for
+        # reproducing its roundoff. Exact-zero samples inside an otherwise nonzero field do
+        # not come here; is_close() judges those on absolute error alone.
+        if _is_zero_field(gEntry.doubles, tol.absolute):
+            bound = _zero_field_bound(gEntry.doubles, tol.absolute)
+            for valIndex, cVal in enumerate(cEntry.doubles):
+                if math.isnan(cVal):
+                    return None, f"{gFilepath} is zero in the golden but is NaN in the pack file."
+                if abs(cVal) > bound:
+                    return (
+                        None,
+                        f"{gFilepath} is zero in the golden (all values within the {tol.absolute:.2E} absolute "
+                        f"tolerance of it) but value #{valIndex + 1} reaches {abs(cVal):.2E} in the candidate, "
+                        f"past its {bound:.2E} band.",
+                    )
+            continue
+
         # Check if each variable is within tolerance
+        zero_bound = _zero_sample_bound(gEntry.doubles, tol.absolute)
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):
             # Keep track of the error and average errors
             error = compute_error(cVal, gVal)
@@ -98,6 +169,12 @@ Variable n°{valIndex + 1} (1-indexed) in {gFilepath} {msg}:
                 return raise_err_with_failing_diagnostics("is NaN in the golden file")
             if math.isnan(cVal):
                 return raise_err_with_failing_diagnostics("is NaN in the pack file")
+
+            # An exact zero has no magnitude to take a ratio against; judge it against the band.
+            if gVal == 0.0:
+                if abs(cVal) > zero_bound:
+                    return raise_err_with_failing_diagnostics(f"is zero in the golden but reaches {abs(cVal):.2E}, past its {zero_bound:.2E} band")
+                continue
             if not is_close(error, tol):
                 return raise_err_with_failing_diagnostics("is not within tolerance")
 
@@ -127,6 +204,10 @@ def find_maximum_errors_among_failing(
     for gFilepath, gEntry in golden.entries.items():
         cEntry = candidate.find(gFilepath)
         if cEntry is None:
+            continue
+
+        # Not compared by compare(); reporting it would point at a field that cannot fail.
+        if _is_zero_field(gEntry.doubles, tol.absolute):
             continue
 
         for valIndex, (gVal, cVal) in enumerate(zip(gEntry.doubles, cEntry.doubles)):

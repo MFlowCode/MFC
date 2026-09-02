@@ -111,9 +111,11 @@ config = {
     "acoustic(1)%delay": 2e-4,
     # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0 / (gamma_w - 1.0),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": gamma_w * pi_inf_w / (gamma_w - 1.0),
     "fluid_pp(1)%G": 0.0,
     "fluid_pp(2)%gamma": 1.0 / (gamma_e - 1.0),
+    "fluid_pp(2)%eos": "stiffened_gas",
     "fluid_pp(2)%pi_inf": gamma_e * pi_inf_e / (gamma_e - 1.0),
     "fluid_pp(2)%G": 1.5e9,
 }

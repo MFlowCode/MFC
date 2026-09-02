@@ -29,13 +29,21 @@ if [ -z "$script_path" ] || [ -z "$device" ] || [ -z "$interface" ] || [ -z "$cl
 fi
 
 sbatch_script_contents=$(cat "$script_path")
+
+# Nodes this job must not be scheduled onto. Seeded below per cluster with hosts
+# already known to be bad, and grown at runtime when the in-allocation preflight
+# reports a node fault (exit 77). Growing it automatically is the point: the two
+# Phoenix nodes in the seed list were each found by hand, diagnosed, and
+# committed, after one of them alone had eaten 25 jobs.
+node_exclude=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Detect job type from submitted script basename
 script_basename="$(basename "$script_path" .sh)"
 case "$script_basename" in
-    bench*) job_type="bench" ;;
-    *)      job_type="test"  ;;
+    bench*)          job_type="bench" ;;
+    build-and-test*) job_type="buildtest" ;;
+    *)               job_type="test"  ;;
 esac
 
 # --- Cluster configuration ---
@@ -47,6 +55,9 @@ case "$cluster" in
         qos="embers"
         extra_sbatch="#SBATCH --requeue"
         test_time="03:00:00"
+        # Combined build+test needs build headroom on top of the test budget;
+        # kept modest to still backfill under 'embers'.
+        buildtest_time="03:30:00"
         bench_time="04:00:00"
         gpu_partition_dynamic=true
         ;;
@@ -58,7 +69,10 @@ case "$cluster" in
         # CFD154; submitting under it now fails outright with "Invalid qos
         # specification". "normal" is the only QOS on this allocation without a
         # one-job-at-a-time cap, so it is the only one that can run the CI
-        # matrix concurrently.
+        # matrix concurrently. Note that the g1 partition carries its own
+        # partition QOS (also named "g1"), which slurmctld applies on its own
+        # when a job lands there. Do not add --qos=g1: CFD154 has no
+        # association with it and sbatch rejects the job outright.
         qos="normal"
         # Let each job's slurmstepd broker its own steps instead of routing
         # every srun through slurmctld. The in-job test suite launches ~1700+
@@ -85,11 +99,11 @@ case "$cluster" in
 esac
 
 # --- Time limit ---
-if [ "$job_type" = "bench" ]; then
-    sbatch_time="#SBATCH -t $bench_time"
-else
-    sbatch_time="#SBATCH -t $test_time"
-fi
+case "$job_type" in
+    bench)     sbatch_time="#SBATCH -t $bench_time" ;;
+    buildtest) sbatch_time="#SBATCH -t ${buildtest_time:-$test_time}" ;;
+    *)         sbatch_time="#SBATCH -t $test_time" ;;
+esac
 
 # --- Device-specific SBATCH options ---
 if [ "$device" = "cpu" ]; then
@@ -101,9 +115,11 @@ if [ "$device" = "cpu" ]; then
 #SBATCH --mem-per-cpu=8G"
             ;;
         frontier|frontier_amd)
+            # g1 is a dedicated 64-node carve-out; its nodes are not in batch,
+            # so CI starts promptly instead of queueing behind the machine.
             sbatch_device_opts="\
 #SBATCH -n 32
-#SBATCH -p batch"
+#SBATCH -p g1"
             ;;
     esac
 elif [ "$device" = "gpu" ]; then
@@ -122,16 +138,18 @@ elif [ "$device" = "gpu" ]; then
 
     case "$cluster" in
         phoenix)
+            # --exclude is rendered separately (see $node_exclude) so the
+            # preflight can add a node to it and resubmit.
             sbatch_device_opts="\
 #SBATCH -p $gpu_partition
 #SBATCH --ntasks-per-node=4
-#SBATCH -G2
-#SBATCH --exclude=atl1-1-03-007-29-0,atl1-1-03-007-31-0"
+#SBATCH -G2"
+            node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0"
             ;;
         frontier|frontier_amd)
             sbatch_device_opts="\
 #SBATCH -n 8
-#SBATCH -p batch"
+#SBATCH -p g1"
             ;;
     esac
 else
@@ -177,14 +195,38 @@ rm -f "$output_file"
 # --- Module load mode (short form) ---
 module_mode=$([ "$device" = "gpu" ] && echo "g" || echo "c")
 
+# --- Skip entirely if this cluster is already known to be down ---
+# Checking only inside the allocation would mean every matrix job still pays the
+# full queue wait -- hours on Phoenix 'embers' -- before finding the marker. Only
+# exit 1 means "tripped"; any other failure means the breaker itself could not be
+# read, which says nothing about the cluster.
+outage_rc=0
+bash "${SCRIPT_DIR}/ci-outage.sh" check "$cluster" || outage_rc=$?
+if [ "$outage_rc" -eq 1 ]; then
+    echo "::warning::Not submitting: $cluster is under a recorded outage."
+    exit 78
+elif [ "$outage_rc" -ne 0 ]; then
+    echo "Could not read the outage breaker (exit $outage_rc); submitting anyway."
+fi
+
 # --- Submit (with retries for transient SLURM errors) ---
 source "${SCRIPT_DIR}/retry-sbatch.sh"
-_sbatch_script=$(cat <<EOT
+# Re-rendered before every submission so a node added to $node_exclude by a
+# failed preflight actually takes effect on the retry.
+render_sbatch_script() {
+    local exclude_directive=""
+    # An `if`, not `[ ... ] && ...`: under `set -e` the latter returns non-zero
+    # whenever the list is empty and would abort the script.
+    if [ -n "$node_exclude" ]; then
+        exclude_directive="#SBATCH --exclude=${node_exclude}"
+    fi
+    cat <<EOT
 #!/bin/bash
 #SBATCH -J ${job_prefix}-${job_slug}
 #SBATCH --account=${account}
 #SBATCH -N 1
 ${sbatch_device_opts}
+${exclude_directive}
 ${sbatch_time}
 #SBATCH --qos=${qos}
 ${extra_sbatch}
@@ -196,12 +238,13 @@ set -x
 cd "\$SLURM_SUBMIT_DIR"
 echo "Running in \$(pwd):"
 
-job_slug="$job_slug"
-job_device="$device"
-job_interface="$interface"
-job_shard="$shard"
-job_variant="$variant"
-job_cluster="$cluster"
+# Exported so wrapper scripts (build-and-test.sh) run child scripts that inherit these.
+export job_slug="$job_slug"
+export job_device="$device"
+export job_interface="$interface"
+export job_shard="$shard"
+export job_variant="$variant"
+export job_cluster="$cluster"
 export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 
 . ./mfc.sh load -c $compiler_flag -m $module_mode
@@ -209,18 +252,78 @@ export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 $sbatch_script_contents
 
 EOT
-)
+}
 
-job_id=$(retry_sbatch "$_sbatch_script")
+# --- Submit + monitor, resubmitting on preemption
+# Phoenix preempts 'embers' jobs with PreemptMode=CANCEL (not REQUEUE), so a
+# preempted job is killed outright and `--requeue` never restarts it. When the
+# monitor reports preemption (exit 76), submit a fresh job and monitor again.
+# Bounded by MAX_PREEMPT_RESUBMITS as a runaway guard; the job-level
+# `timeout-minutes` (480m) remains the real backstop.
+: "${MAX_PREEMPT_RESUBMITS:=10}"
+# Node faults get a much tighter bound than preemption: preemption is routine on
+# 'embers' and says nothing about the node, whereas hitting a second unusable
+# node in a row means the problem is the cluster, not the draw.
+#
+# One, not two. Each attempt costs a node if the probe is wrong, and it has been
+# wrong: a bounded loop faithfully condemned three healthy Phoenix nodes when the
+# probe was given a binary that could not run there. Bad nodes are concentrated
+# -- one accounted for 25 of 29 ECC failures -- so a single requeue captures
+# nearly all of the benefit at half the blast radius.
+: "${MFC_MAX_NODE_RESUBMITS:=1}"
+preempt_attempt=0
+node_attempt=0
+while :; do
+    _sbatch_script=$(render_sbatch_script)
+    job_id=$(retry_sbatch "$_sbatch_script")
+    echo "Submitted batch job $job_id"
+    echo "$job_id" > "$id_file"
+    echo "Job ID written to $id_file"
+
+    # SUBMIT_ONLY=1 (parallel submission, e.g. benchmarks): the caller monitors
+    # each job and handles its own preemption resubmits.
+    if [ "${SUBMIT_ONLY:-0}" = "1" ]; then
+        echo "SUBMIT_ONLY mode: skipping monitor (job_id=$job_id output=$output_file)"
+        break
+    fi
+
+    monitor_rc=0
+    bash "$SCRIPT_DIR/run_monitored_slurm_job.sh" "$job_id" "$output_file" || monitor_rc=$?
+    if [ "$monitor_rc" -eq 0 ]; then
+        break
+    fi
+    if [ "$monitor_rc" -eq 76 ]; then
+        if [ "$preempt_attempt" -lt "$MAX_PREEMPT_RESUBMITS" ]; then
+            preempt_attempt=$((preempt_attempt + 1))
+            echo "::warning::SLURM job $job_id was preempted (Phoenix embers). Resubmitting a fresh job (attempt ${preempt_attempt}/${MAX_PREEMPT_RESUBMITS})."
+            rm -f "$output_file"
+            continue
+        fi
+        echo "::error::SLURM job preempted ${MAX_PREEMPT_RESUBMITS} times without completing; giving up."
+        exit 1
+    fi
+    if [ "$monitor_rc" -eq 77 ]; then
+        # The in-allocation preflight found this node unusable before any real
+        # work started. Exclude it and draw another node.
+        faulted_node=$(bash "$SCRIPT_DIR/node-exclude.sh" node-from "$output_file")
+        if [ "$node_attempt" -lt "$MFC_MAX_NODE_RESUBMITS" ]; then
+            node_attempt=$((node_attempt + 1))
+            node_exclude=$(bash "$SCRIPT_DIR/node-exclude.sh" merge "$node_exclude" "$faulted_node")
+            echo "::warning::SLURM job $job_id failed preflight on ${faulted_node:-an unidentified node}. Excluding it and resubmitting (attempt ${node_attempt}/${MFC_MAX_NODE_RESUBMITS}). Excluding: ${node_exclude}"
+            rm -f "$output_file"
+            continue
+        fi
+        echo "::error::Preflight failed on $((MFC_MAX_NODE_RESUBMITS + 1)) nodes in a row (excluded: ${node_exclude})."
+        echo "That is a cluster-wide problem rather than a bad draw; not resubmitting."
+        exit 1
+    fi
+    if [ "$monitor_rc" -eq 78 ]; then
+        # A recorded cluster-wide outage. Another node cannot help, so stop
+        # rather than spend more allocations proving the same point.
+        echo "::warning::Not resubmitting: $cluster is under a recorded outage."
+        exit "$monitor_rc"
+    fi
+    # Genuine failure (not preemption or infrastructure).
+    exit "$monitor_rc"
+done
 unset _sbatch_script
-
-echo "Submitted batch job $job_id"
-echo "$job_id" > "$id_file"
-echo "Job ID written to $id_file"
-
-# --- Monitor (skip if SUBMIT_ONLY=1, e.g. for parallel submission) ---
-if [ "${SUBMIT_ONLY:-0}" = "1" ]; then
-    echo "SUBMIT_ONLY mode: skipping monitor (job_id=$job_id output=$output_file)"
-else
-    bash "$SCRIPT_DIR/run_monitored_slurm_job.sh" "$job_id" "$output_file"
-fi

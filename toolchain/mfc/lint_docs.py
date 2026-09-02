@@ -69,6 +69,8 @@ CASE_MD_SKIP = {
     "zeros_default",
     # Analytic expression language: module name (not a case param)
     "m_constants",
+    # Build/run target name (not a case param)
+    "pre_process",
 }
 
 # Docs to check for parameter references, with per-file skip sets

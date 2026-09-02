@@ -19,6 +19,18 @@ if [ "$job_cluster" = "phoenix" ]; then
     trap 'rm -rf "$currentdir" || true' EXIT
 fi
 
+# --- Probe this node before running the suite ---
+# The build already probed a node, but not necessarily this one: outside
+# Phoenix's combined allocation the Build and Test steps are separate SLURM
+# submissions with no node affinity, and they landed on different nodes in 26 of
+# 29 measurable Frontier jobs. In the Aug 2026 ECC failures the build node was
+# healthy every time and the tests were what landed on the bad one.
+preflight_rc=0
+bash .github/scripts/preflight.sh "$job_cluster" "$job_device" || preflight_rc=$?
+if [ "$preflight_rc" -ne 0 ]; then
+    exit "$preflight_rc"
+fi
+
 # --- GPU detection and thread count ---
 device_opts=""
 rdma_opts=""

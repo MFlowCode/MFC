@@ -275,7 +275,7 @@ contains
                     if (adv_src_mode == adv_src_mode_vel_iface) then
                         ! u-interface: flux_src(adv%beg) holds one shared face-normal velocity. Pointer-alias adv%beg+1:adv%end to
                         ! the same memory so loops over adv%beg:adv%end can keep fluid indexing while still reading one value. This
-                        ! saves (num_fluids - 1) 3D field allocations.
+                        ! saves (num_fluids - 1) 3D field allocations
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
                             flux_src_n(i)%vf(l)%sf => flux_src_n(i)%vf(eqn_idx%adv%beg)%sf
                             $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
@@ -540,8 +540,6 @@ contains
                 @:ACC_SETUP_SFs(rhs_hatR_vf(i))
             end do
         end if
-
-        call s_initialize_pressure_relaxation_module
 
         ! Spatial body force source arrays - sized to include ghost cells so the
         ! same indexing as q_*_vf is valid; iteration is restricted to interior
@@ -1072,10 +1070,10 @@ contains
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
-                        blkmod1(k_loop, l_loop, q_loop) = ((gammas(1) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop) + pi_infs(1))/gammas(1) + (4._wp/3._wp)*G1_eff
-                        blkmod2(k_loop, l_loop, q_loop) = ((gammas(2) + 1._wp)*q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop) + pi_infs(2))/gammas(2) + (4._wp/3._wp)*G2_eff
+                        blkmod1(k_loop, l_loop, q_loop) = f_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop), &
+                                & gammas(1), pi_infs(1)) + (4._wp/3._wp)*G1_eff
+                        blkmod2(k_loop, l_loop, q_loop) = f_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop), &
+                                & gammas(2), pi_infs(2)) + (4._wp/3._wp)*G2_eff
                         alpha1(k_loop, l_loop, q_loop) = q_cons_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop)
 
                         if (bubbles_euler) then
@@ -2100,8 +2098,6 @@ contains
     impure subroutine s_finalize_rhs_module
 
         integer :: i, j, l
-
-        call s_finalize_pressure_relaxation_module
 
         if (.not. igr) then
             do j = eqn_idx%cont%beg, eqn_idx%cont%end

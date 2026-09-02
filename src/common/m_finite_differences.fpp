@@ -34,6 +34,7 @@ contains
         ! ghost-adjacent cell (e.g. an immersed boundary near a domain boundary) has a real coefficient to read instead of
         ! reading past the caller's allocation. offset_s, when given, widens this further (never narrows it) for callers
         ! that need more than fd_number_in of margin.
+
         if (present(offset_s)) then
             lB = -max(fd_number_in, offset_s%beg)
             lE = q + max(fd_number_in, offset_s%end)

@@ -148,6 +148,7 @@ contains
         integer :: i, j, k, l, q, r                                          !< Iterator variables
         integer :: patch_id, patch_id_temp                                   !< Patch ID of ghost point
         real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
+        real(wp) :: vel_sum_g, E_ghost                                       !< Ghost-point velocity magnitude and energy
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
         real(wp) :: qv_K
@@ -231,12 +232,10 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
-            @:ALLOCATE(alpha_rho_IP_buf(1:num_fluids, 1:num_gps), alpha_IP_buf(1:num_fluids, 1:num_gps), &
-                       & pres_IP_buf(1:num_gps), c_IP_buf(1:num_gps), vel_IP_buf(1:3, 1:num_gps), &
-                       & r_IP_buf(1:nb, 1:num_gps), v_IP_buf(1:nb, 1:num_gps), pb_IP_buf(1:nb, 1:num_gps), &
-                       & mv_IP_buf(1:nb, 1:num_gps), nmom_IP_buf(1:nb*nmom, 1:num_gps), &
-                       & presb_IP_buf(1:nb*nnode, 1:num_gps), massv_IP_buf(1:nb*nnode, 1:num_gps), &
-                       & Ys_IP_buf(1:num_species, 1:num_gps))
+            @:ALLOCATE(alpha_rho_IP_buf(1:num_fluids, 1:num_gps), alpha_IP_buf(1:num_fluids, 1:num_gps), pres_IP_buf(1:num_gps), &
+                       & c_IP_buf(1:num_gps), vel_IP_buf(1:3, 1:num_gps), r_IP_buf(1:nb, 1:num_gps), v_IP_buf(1:nb, 1:num_gps), &
+                       & pb_IP_buf(1:nb, 1:num_gps), mv_IP_buf(1:nb, 1:num_gps), nmom_IP_buf(1:nb*nmom, 1:num_gps), &
+                       & presb_IP_buf(1:nb*nnode, 1:num_gps), massv_IP_buf(1:nb*nnode, 1:num_gps), Ys_IP_buf(1:num_species, 1:num_gps))
 
             ! Phase 1: interpolate image-point primitives for every ghost point from the pre-correction field only. Kept in its
             ! own kernel (rather than fused with phase 2 below) so the kernel-launch boundary between them guarantees every
@@ -264,19 +263,19 @@ contains
                     call s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
 
-                alpha_rho_IP_buf(:, i) = alpha_rho_IP(1:num_fluids)
-                alpha_IP_buf(:, i) = alpha_IP(1:num_fluids)
+                alpha_rho_IP_buf(:,i) = alpha_rho_IP(1:num_fluids)
+                alpha_IP_buf(:,i) = alpha_IP(1:num_fluids)
                 pres_IP_buf(i) = pres_IP
-                vel_IP_buf(:, i) = vel_IP
+                vel_IP_buf(:,i) = vel_IP
                 c_IP_buf(i) = c_IP
-                r_IP_buf(:, i) = r_IP(1:nb)
-                v_IP_buf(:, i) = v_IP(1:nb)
-                pb_IP_buf(:, i) = pb_IP(1:nb)
-                mv_IP_buf(:, i) = mv_IP(1:nb)
-                nmom_IP_buf(:, i) = nmom_IP(1:nb*nmom)
-                presb_IP_buf(:, i) = presb_IP(1:nb*nnode)
-                massv_IP_buf(:, i) = massv_IP(1:nb*nnode)
-                Ys_IP_buf(:, i) = Ys_IP(1:num_species)
+                r_IP_buf(:,i) = r_IP(1:nb)
+                v_IP_buf(:,i) = v_IP(1:nb)
+                pb_IP_buf(:,i) = pb_IP(1:nb)
+                mv_IP_buf(:,i) = mv_IP(1:nb)
+                nmom_IP_buf(:,i) = nmom_IP(1:nb*nmom)
+                presb_IP_buf(:,i) = presb_IP(1:nb*nnode)
+                massv_IP_buf(:,i) = massv_IP(1:nb*nnode)
+                Ys_IP_buf(:,i) = Ys_IP(1:num_species)
             end do
             $:END_GPU_PARALLEL_LOOP()
 
@@ -284,7 +283,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff]')
+                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, vel_sum_g, E_ghost]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -300,19 +299,19 @@ contains
                 end if
 
                 ! Recover the image-point interpolation computed for this ghost point in phase 1
-                alpha_rho_IP(1:num_fluids) = alpha_rho_IP_buf(:, i)
-                alpha_IP(1:num_fluids) = alpha_IP_buf(:, i)
+                alpha_rho_IP(1:num_fluids) = alpha_rho_IP_buf(:,i)
+                alpha_IP(1:num_fluids) = alpha_IP_buf(:,i)
                 pres_IP = pres_IP_buf(i)
-                vel_IP = vel_IP_buf(:, i)
+                vel_IP = vel_IP_buf(:,i)
                 c_IP = c_IP_buf(i)
-                r_IP(1:nb) = r_IP_buf(:, i)
-                v_IP(1:nb) = v_IP_buf(:, i)
-                pb_IP(1:nb) = pb_IP_buf(:, i)
-                mv_IP(1:nb) = mv_IP_buf(:, i)
-                nmom_IP(1:nb*nmom) = nmom_IP_buf(:, i)
-                presb_IP(1:nb*nnode) = presb_IP_buf(:, i)
-                massv_IP(1:nb*nnode) = massv_IP_buf(:, i)
-                Ys_IP(1:num_species) = Ys_IP_buf(:, i)
+                r_IP(1:nb) = r_IP_buf(:,i)
+                v_IP(1:nb) = v_IP_buf(:,i)
+                pb_IP(1:nb) = pb_IP_buf(:,i)
+                mv_IP(1:nb) = mv_IP_buf(:,i)
+                nmom_IP(1:nb*nmom) = nmom_IP_buf(:,i)
+                presb_IP(1:nb*nnode) = presb_IP_buf(:,i)
+                massv_IP(1:nb*nnode) = massv_IP_buf(:,i)
+                Ys_IP(1:num_species) = Ys_IP_buf(:,i)
 
                 ! Injecting (burning) surface: replace the mirrored ghost composition with pure
                 ! injected fuel at the local pressure and the ambient (image-point) temperature.
@@ -422,11 +421,13 @@ contains
                 end if
 
                 ! Set momentum
+                vel_sum_g = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = eqn_idx%mom%beg, eqn_idx%mom%end
                     q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - eqn_idx%mom%beg + 1)
-                    dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)*vel_g(q - eqn_idx%mom%beg + 1)/2._wp
+                    vel_sum_g = vel_sum_g + vel_g(q - eqn_idx%mom%beg + 1)**2._wp
                 end do
+                dyn_pres = 5.e-1_wp*rho*vel_sum_g
 
                 ! Set continuity and adv vars
                 $:GPU_LOOP(parallelism='[seq]')
@@ -455,10 +456,9 @@ contains
                         q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
                     end do
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_IP + dyn_pres
-                else if (bubbles_euler) then
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
                 else
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
+                    call s_compute_energy(pres_IP, alpha_rho_IP, alpha_IP, vel_sum_g, E_ghost)
+                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = E_ghost
                 end if
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then
@@ -503,16 +503,16 @@ contains
                 if (model_eqns == model_eqns_6eq) then
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%int_en%beg, eqn_idx%int_en%end
-                        q_cons_vf(q)%sf(j, k, &
-                                  & l) = alpha_IP(q - eqn_idx%int_en%beg + 1)*(gammas(q - eqn_idx%int_en%beg + 1)*pres_IP &
-                                  & + pi_infs(q - eqn_idx%int_en%beg + 1))
+                        q_cons_vf(q)%sf(j, k, l) = f_phase_internal_energy(pres_IP, alpha_IP(q - eqn_idx%int_en%beg + 1), &
+                                  & alpha_rho_IP(q - eqn_idx%int_en%beg + 1), gammas(q - eqn_idx%int_en%beg + 1), &
+                                  & pi_infs(q - eqn_idx%int_en%beg + 1), qvs(q - eqn_idx%int_en%beg + 1))
                     end do
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
 
             @:DEALLOCATE(alpha_rho_IP_buf, alpha_IP_buf, pres_IP_buf, c_IP_buf, vel_IP_buf, r_IP_buf, v_IP_buf, pb_IP_buf, &
-                        & mv_IP_buf, nmom_IP_buf, presb_IP_buf, massv_IP_buf, Ys_IP_buf)
+                         & mv_IP_buf, nmom_IP_buf, presb_IP_buf, massv_IP_buf, Ys_IP_buf)
         end if
 
     end subroutine s_ibm_correct_state
@@ -1170,8 +1170,8 @@ contains
         $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
         do i = 1, num_ibs
             do l = 1, 3
-                patch_ib(i)%force(l) = forces(i,l)
-                patch_ib(i)%torque(l) = torques(i,l)
+                patch_ib(i)%force(l) = forces(i, l)
+                patch_ib(i)%torque(l) = torques(i, l)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -1382,8 +1382,8 @@ contains
                     do i = 1, num_ibs
                         send_ids(i) = patch_ib(i)%gbl_patch_id
                         do l = 1, 3
-                            send_ft(l,i) = forces(i,l)
-                            send_ft(l + 3,i) = torques(i,l)
+                            send_ft(l, i) = forces(i, l)
+                            send_ft(l + 3, i) = torques(i, l)
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
@@ -1407,10 +1407,10 @@ contains
                             if (j > 0) then
                                 ! add forces and subtract recv_snap prevent double-counting
                                 do l = 1, 3
-                                    forces(j,l) = forces(j,l) + recv_ft(l,i) - recv_forces_snap(j,l)
-                                    torques(j,l) = torques(j,l) + recv_ft(l + 3,i) - recv_torques_snap(j,l)
-                                    recv_forces_snap(j,l) = recv_ft(l,i)
-                                    recv_torques_snap(j,l) = recv_ft(l + 3,i)
+                                    forces(j, l) = forces(j, l) + recv_ft(l, i) - recv_forces_snap(j, l)
+                                    torques(j, l) = torques(j, l) + recv_ft(l + 3, i) - recv_torques_snap(j, l)
+                                    recv_forces_snap(j, l) = recv_ft(l, i)
+                                    recv_torques_snap(j, l) = recv_ft(l + 3, i)
                                 end do
                             end if
                         end do
@@ -1433,8 +1433,8 @@ contains
                     do i = 1, num_ibs
                         send_ids(i) = patch_ib(i)%gbl_patch_id
                         do l = 1, 3
-                            send_ft(l,i) = forces(i,l)
-                            send_ft(l + 3,i) = torques(i,l)
+                            send_ft(l, i) = forces(i, l)
+                            send_ft(l + 3, i) = torques(i, l)
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
@@ -1455,8 +1455,8 @@ contains
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
                                 do l = 1, 3
-                                    forces(j,l) = recv_ft(l,i)
-                                    torques(j,l) = recv_ft(l + 3,i)
+                                    forces(j, l) = recv_ft(l, i)
+                                    torques(j, l) = recv_ft(l + 3, i)
                                 end do
                             end if
                         end do
@@ -1596,7 +1596,7 @@ contains
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
             ! Unpack all received buffers
-            do nbr_idx = 1, ((2*ib_neighborhood_radius+1)**num_dims) - 1
+            do nbr_idx = 1, ((2*ib_neighborhood_radius + 1)**num_dims) - 1
                 if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
                 unpack_pos = 0
                 call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -1633,10 +1633,10 @@ contains
 
     end subroutine s_get_neighborhood_idx
 
-    !> Rebuilds ib_gbl_idx_lookup from patch_ib on the host and mirrors the result to the device. Built on the host because
-    !! patch_ib is already host-current at every call site (compaction and neighbor-unpack are host-side Fortran), and
-    !! because the populate step is a scatter write (target index = patch_ib(i)%gbl_patch_id, not the loop index) that was
-    !! found to leave stale entries behind under GPU offload after compaction shrinks num_ibs.
+    !> Rebuilds ib_gbl_idx_lookup from patch_ib on the host and mirrors the result to the device. Built on the host because patch_ib
+    !! is already host-current at every call site (compaction and neighbor-unpack are host-side Fortran), and because the populate
+    !! step is a scatter write (target index = patch_ib(i)%gbl_patch_id, not the loop index) that was found to leave stale entries
+    !! behind under GPU offload after compaction shrinks num_ibs.
     subroutine s_update_ib_lookup()
 
         integer :: i
