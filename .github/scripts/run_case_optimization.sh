@@ -107,8 +107,10 @@ for case in "${benchmarks[@]}"; do
     # address with nothing to act on. Both variables are inert until a fault;
     # the debug agent is what gives CCE a faulting kernel at all, and is set
     # only where its library is actually reachable.
-    export OFFLOAD_TRACK_ALLOCATION_TRACES="${OFFLOAD_TRACK_ALLOCATION_TRACES:-true}"
-    export OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES="${OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES:-8}"
+    # OFFLOAD_TRACK_ALLOCATION_TRACES / _NUM_KERNEL_LAUNCH_TRACES are deliberately
+    # NOT set: measured on an MI210 with amdflang, either one alone turns a
+    # 5.94 s test into a >400 s timeout, because they instrument every
+    # allocation and every kernel launch. See toolchain/mfc/gpu_diagnostics.py.
     # Skipped when the caller already chose a tool, or is collecting a GPU core
     # dump -- the agent is mutually exclusive with one, so loading it anyway
     # would leave them with no dump and no reason why.

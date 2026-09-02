@@ -53,13 +53,6 @@ def test_does_not_fire_on_benign_pmix_noise():
     assert not is_gpu_memory_fault("PMIX ERROR: PMIX_ERR_NO_PERMISSIONS in file dstore_base.c at line 238")
 
 
-def test_the_diagnostic_env_enables_allocation_tracking():
-    # AFAR's libomptarget reads this; CCE ignores it. Only AFAR gains anything
-    # from a diagnostic retry, so there is nothing to detect the cluster for.
-    env = fault_diagnostic_env({"PATH": "/usr/bin"})
-    assert env["OFFLOAD_TRACK_ALLOCATION_TRACES"] == "true"
-
-
 def test_the_diagnostic_env_preserves_the_existing_environment():
     env = fault_diagnostic_env({"PATH": "/usr/bin", "HOME": "/home/x"})
     assert env["PATH"] == "/usr/bin"
@@ -532,25 +525,21 @@ def test_an_explicit_tool_choice_is_not_replaced(monkeypatch):
     assert env["HSA_TOOLS_LIB"] == "libmy-own-tool.so"
 
 
-def test_explicit_offload_settings_survive():
-    """A developer tuning these by hand must not have them silently reset."""
-    from mfc.gpu_diagnostics import fault_diagnostic_env
+def test_the_expensive_offload_variables_are_not_set():
+    """They instrument every allocation and every kernel launch.
 
-    env = fault_diagnostic_env(
-        {
-            "OFFLOAD_TRACK_ALLOCATION_TRACES": "false",
-            "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES": "2",
-        }
-    )
+    Measured on an MI210 with amdflang/libomptarget: test AFBCBDFA takes 5.94 s
+    with neither, and times out past 400 s with either one alone -- an
+    unbounded run passed 30 minutes on a 6-second test. Always-on, that turns a
+    fault into a timeout and hides what it was meant to explain.
 
-    assert env["OFFLOAD_TRACK_ALLOCATION_TRACES"] == "false"
-    assert env["OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES"] == "2"
-
-
-def test_the_defaults_still_apply_when_nothing_was_chosen():
+    They looked free because the A/B that cleared them ran on CCE, whose
+    offload runtime ignores libomptarget variables entirely. If they ever come
+    back, they belong behind a fault, never on every run.
+    """
     from mfc.gpu_diagnostics import fault_diagnostic_env
 
     env = fault_diagnostic_env({})
 
-    assert env["OFFLOAD_TRACK_ALLOCATION_TRACES"] == "true"
-    assert env["OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES"] == "8"
+    assert "OFFLOAD_TRACK_ALLOCATION_TRACES" not in env
+    assert "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES" not in env

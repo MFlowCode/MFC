@@ -51,99 +51,45 @@ def is_gpu_memory_fault(text: str) -> bool:
 
 
 def fault_diagnostic_env(base: dict) -> dict:
-    """`base` plus the offload diagnostics that cost nothing until a fault.
+    """`base` plus the one diagnostic cheap enough to leave on.
 
-    These are set on EVERY run rather than on a retry. Both variables are
-    inert in a healthy run -- they only produce output when the runtime is
-    already aborting on a memory fault -- so paying for them up front makes the
-    first failure informative instead of spending a whole extra run to learn
-    the same thing.
+    Set on every run rather than on a retry: the ROCm debug agent writes nothing
+    until the runtime is already aborting on a memory fault, so a first failure
+    is explained without spending a second run to reproduce it.
 
-    That is the opposite of how this started. The original design retried a
-    faulted case with diagnostics on, which measurement showed was the wrong
-    shape: AFAR names the faulting kernel unaided in 189 of 189 faults, and
-    NVHPC prints its file, function and line.
-
-    CCE names nothing on its own and no CRAY_ACC_* variable helps -- but that
-    is a limit of CCE's trace, not of the machine. The ROCm debug agent works,
-    one layer down at ROCr: HSA_TOOLS_LIB=librocm-debug-agent.so.2 prints
-    "Disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6" -- the exact
-    injected fault site -- plus the faulting instruction and per-wave register
-    state, straight to the job log. It is deliberately not set here yet: its
-    cost on a healthy run is unmeasured, and that decides always-on versus a
-    documented recipe. See #1801.
-
-    Deliberately NOT set here: CRAY_ACC_DEBUG. It streams a line per launch and
-    per transfer for the whole run, and because dispatch is async its tail is
-    whatever ran next -- it blamed s_write_run_time_information in 81 of 102
-    traced faults and the true culprit in 0. A confident wrong suspect is worse
-    than silence, and it is not free the way these two are.
-
-    Returns a new dict: these run in worker threads, and mutating a shared
-    environment would leak settings into every concurrent case.
+    Two variables that used to live here were removed after measurement -- see
+    below. What is left is the agent, which is what names the faulting kernel.
     """
     env = dict(base)
 
-    # Never clobber a setting the caller made. `mfc.sh test` and `mfc.sh bench`
-    # are developer commands, not just CI entry points, so anyone debugging by
-    # hand has to be able to choose their own values and have them survive.
-    defaults = {
-        # Says whether the faulting address was ever a real host allocation,
-        # separating an overrun of a known array from a wild pointer.
-        "OFFLOAD_TRACK_ALLOCATION_TRACES": "true",
-        # Host stack traces for the most recent kernel launches. The runtime
-        # advertises this itself in the fault message ("0 now, up to 8").
-        "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES": "8",
-    }
-    for name, value in defaults.items():
-        env.setdefault(name, value)
+    # OFFLOAD_TRACK_ALLOCATION_TRACES and OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES
+    # USED TO BE SET HERE. They are not, and must not be, because they are not
+    # free: they instrument every allocation and every kernel launch, so a
+    # healthy run pays for them continuously.
+    #
+    # Measured on an MI210 with amdflang/libomptarget, test AFBCBDFA:
+    #
+    #     neither                     5.94 s   passes
+    #     allocation traces only      >400 s   timed out
+    #     launch traces only          >400 s   timed out
+    #     both                        >400 s   timed out
+    #
+    # An unbounded run went past 30 minutes on a 6-second test. Both variables
+    # are independently pathological, and against MFC's 1-hour test timeout that
+    # is enough to turn a fault into a timeout -- hiding the very thing they
+    # exist to explain.
+    #
+    # The earlier claim that they are "inert until the runtime is already
+    # aborting" was an inference from what they are documented to do, never a
+    # measurement. The Frontier A/B that appeared to confirm it ran on CCE,
+    # whose offload runtime ignores libomptarget variables entirely -- so it
+    # measured a lane where they do nothing and read that as evidence they cost
+    # nothing anywhere.
+    #
+    # What they added was one line saying whether the faulting address was ever
+    # a real allocation. The debug agent below names the faulting kernel, source
+    # line and registers, which subsumes it.
 
-    # The only thing that gives CCE a faulting kernel. Measured on Frontier
-    # under --gpu acc: it prints "Disassembly for function
-    # s_tvd_rk$m_time_steppers_$ck_L486_6", the exact injected fault site, with
-    # the faulting instruction and per-wave registers -- where no CRAY_ACC_*
-    # variable names it at all.
-    #
-    # Measured on all four lanes. The symbol form is set by the COMPILER, not by
-    # the offload model -- which is the opposite of what it looks like from any
-    # two of them:
-    #
-    #   CCE  acc  s_tvd_rk$m_time_steppers_$ck_L486_6
-    #   CCE  mp   s_tvd_rk$m_time_steppers_$ck_L486_16   (same scheme, counter differs)
-    #   AFAR mp   __omp_offloading_..._QMm_time_steppersPs_tvd_rk_l486  (Flang)
-    #
-    # All three carry module, subroutine and line. The summarizer does not care
-    # which -- its regex takes whatever the symbol is -- but anything that tries
-    # to parse the symbol must not assume one scheme per offload model.
-    #
-    # Cost, measured on Frontier CCE --gpu mp (ROCm 6.3.1, agent 2.0.3), four
-    # interleaved pairs:
-    #
-    #   healthy run   no effect detected. The agent's whole range sits inside
-    #                 the agent-free range; paired differences split 2 up / 2
-    #                 down, mean -0.045%. Resolution is ~0.8%, set by the
-    #                 agent-free spread -- an effect smaller than that would not
-    #                 show. "No effect detected at n=4", not "no effect".
-    #   healthy log   nothing at all. Output was 2661-2662 bytes with and
-    #                 without. The agent writes only when something faults.
-    #   faulting run  +0.387 s (1.60x of a 0.647 s baseline). Against the 1-hour
-    #                 test timeout that is 0.011%, so a fault cannot become a
-    #                 timeout -- which was the risk worth checking, since a
-    #                 diagnostic that hides the fault it explains is worse than
-    #                 none.
-    #
-    # The cost that is real is VOLUME: a faulting run emits 6.7 MB / ~13,630
-    # lines on that lane, and ~65,000 on AFAR. That is why summarize_rocm_debug_agent
-    # is not an optimisation -- it is what makes this tolerable always-on.
-    #
-    # Timings are CCE only. The AFAR lane produces twice the waves and was not
-    # re-timed, so quoting +0.387 s for it would be inference.
-    #
-    # Measured, not assumed: the agent does NOT supersede libomptarget on the
-    # AFAR lane. OFFLOAD ERROR lines = 1 and Libomptarget lines = 8, identical
-    # with and without it. (An earlier report of markers rising 19 -> 519 was a
-    # grep artifact: __omp_offloading_ matches a case-insensitive "OFFLOAD".)
-    # The agent is mutually exclusive with ROCr core dumps only.
     # Two ways the caller can say "stay out of my way", both of which mean a
     # human is already debugging this run by hand:
     #
