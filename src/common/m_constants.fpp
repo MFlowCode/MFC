@@ -114,6 +114,10 @@ module m_constants
     integer, parameter :: BC_DIRICHLET = -17
 
     ! Synthetic turbulence array size limits
+    !> Equation of state per fluid. Values must match _EOS_NAMES in toolchain/mfc/params/definitions.py; compound registry keys
+    !! cannot be auto-generated, so these are hand-written.
+    integer, parameter :: eos_stiffened_gas = 1
+    integer, parameter :: eos_ideal_gas = 2
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
     integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
 

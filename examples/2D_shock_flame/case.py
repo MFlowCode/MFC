@@ -136,6 +136,7 @@ case = {
     "patch_icpp(3)%alpha(1)": 1.0,
     "patch_icpp(3)%alpha_rho(1)": driver.density,
     "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0,
 }
 

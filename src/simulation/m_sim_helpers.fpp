@@ -5,7 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
+!> @brief Simulation helper routines for cell state, CFL calculation, and stability checks
 module m_sim_helpers
 
     use m_derived_types
@@ -14,7 +14,7 @@ module m_sim_helpers
 
     implicit none
 
-    private; public :: s_compute_enthalpy, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names
+    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names
 
     !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, the collision cap, or the ramp limiter)
     character(len=4)                          :: dt_limiter = 'none'
@@ -45,10 +45,10 @@ contains
 
     end function f_compute_filtered_dtheta
 
-    !> Computes enthalpy
-    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+    !> Computes the mixture coefficients, velocity and pressure of one cell
+    subroutine s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
 
-        $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_compute_cell_state',parallelism='[seq]', cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -58,7 +58,7 @@ contains
             real(wp), intent(inout), dimension(num_fluids) :: alpha
             real(wp), intent(inout), dimension(num_vels)   :: vel
         #:endif
-        real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, H, pres
+        real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, pres
         real(wp), intent(out)                 :: qv
         integer, intent(in)                   :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
@@ -67,7 +67,7 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: alpha_rho, Gs
         #:endif
-        real(wp) :: E, G_local
+        real(wp) :: G_local
         integer  :: i
 
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
@@ -97,16 +97,12 @@ contains
         end do
 
         if (igr) then
-            E = q_prim_vf(eqn_idx%E)%sf(j, k, l)
-            pres = (E - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
+            pres = (q_prim_vf(eqn_idx%E)%sf(j, k, l) - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
         else
             pres = q_prim_vf(eqn_idx%E)%sf(j, k, l)
-            E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
         end if
 
-        H = (E + pres)/rho
-
-    end subroutine s_compute_enthalpy
+    end subroutine s_compute_cell_state
 
     !> Computes stability criterion for a specified dt
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc, ccfl)

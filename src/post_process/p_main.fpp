@@ -15,7 +15,6 @@ program p_main
     character(LEN=name_len) :: varname
     real(wp)                :: pres
     real(wp)                :: c
-    real(wp)                :: H
     real(wp)                :: start, finish
 
     call s_initialize_mpi_domain()
@@ -41,7 +40,7 @@ program p_main
 
         call s_perform_time_step(t_step)
 
-        call s_save_data(t_step, varname, pres, c, H)
+        call s_save_data(t_step, varname, pres, c)
 
         call cpu_time(finish)
 
