@@ -99,3 +99,17 @@ def test_diagnostics_are_not_enabled_for_ordinary_failures():
     src = inspect.getsource(t.handle_case)
     # the enabling is guarded by the fault check, not unconditional
     assert "if is_gpu_memory_fault(" in src
+
+
+def test_a_diagnostic_retry_does_not_dump_its_whole_output():
+    # CRAY_ACC_DEBUG prints per kernel launch and per transfer: measured at
+    # 142,777 lines for a single 800-cell 1D case on Frontier. Echoing that into
+    # the CI log would bury the failure it is meant to explain. The fault is at
+    # the end, and the last launch before it is what names the kernel, so only
+    # the tail is worth keeping.
+    import inspect
+
+    from mfc.test import test as t
+
+    src = inspect.getsource(t._handle_case)
+    assert "log_tail" in src, "the diagnostic retry's output must be bounded"

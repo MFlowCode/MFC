@@ -631,7 +631,16 @@ def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
         common.file_write(out_filepath, cmd.stdout)
 
         if cmd.returncode != 0:
-            cons.print(cmd.stdout)
+            if env is None:
+                cons.print(cmd.stdout)
+            else:
+                # A diagnostic retry. CRAY_ACC_DEBUG prints per kernel launch and
+                # per transfer -- 142,777 lines for one 800-cell 1D case on
+                # Frontier -- so echoing it whole would bury the failure it is
+                # meant to explain. The fault comes last, and the launch just
+                # before it names the kernel and source line, so the tail is the
+                # part worth keeping. The full capture stays in out_pre_sim.txt.
+                cons.print(console_safe(log_tail(out_filepath, max_lines=80)))
             # Flag a GPU memory fault so the retry can re-run with the offload
             # runtime's diagnostics on. The address alone is not actionable; the
             # kernel and source line are.
@@ -769,6 +778,13 @@ def diagnostic_env(base: dict) -> dict:
     AFAR say whether the faulting address ever belonged to a real allocation.
     Each runtime ignores the other's variable, so both are set rather than
     detecting the cluster here.
+
+    Cost, measured on the same machine: 13.7s -> 17.3s (1.27x) for a case that
+    emitted 142,777 ACC: lines. Against the 1 hour TEST_TIMEOUT_SECONDS a case
+    would have to take ~2800s unaided before the diagnostic retry could push it
+    over, and the slowest case observed in CI is around 1000s -- so a retry
+    cannot turn a fault into a timeout, which would hide the very thing it is
+    trying to show.
 
     Returns a new dict: these run in worker threads, and mutating a shared
     environment would leak per-kernel logging into every concurrent case.
