@@ -589,7 +589,7 @@ def _handle_convergence_case(case: TestCase, start_time: float):
         raise MFCException(f"Test {case}: convergence rate check failed (see {log_dir}/convergence.log)")
 
 
-def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
+def _handle_case(case: TestCase, devices: typing.Set[int]):
     global current_test_number  # noqa: PLW0603
     start_time = time.time()
 
@@ -620,7 +620,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
         # Check timeout before starting
         if timeout_flag.is_set():
             raise TestTimeoutError("Test case exceeded 1 hour timeout")
-        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, env=env)
+        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, env=fault_diagnostic_env(dict(os.environ)))
 
         # Check timeout after simulation
         if timeout_flag.is_set():
@@ -631,18 +631,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
         common.file_write(out_filepath, cmd.stdout)
 
         if cmd.returncode != 0:
-            if env is None:
-                cons.print(cmd.stdout)
-            else:
-                # A diagnostic retry. The offload runtime prints the recent
-                # kernel-launch list and, with allocation tracking on, a verdict
-                # on the faulting address -- and both sit at the very end, just
-                # before the abort. Echoing the whole run would bury them, so
-                # keep the tail. The full capture stays in out_pre_sim.txt.
-                cons.print(console_safe(log_tail(out_filepath, max_lines=80)))
-            # Flag a GPU memory fault so the retry can re-run with the offload
-            # runtime's diagnostics on. The address alone is not actionable; the
-            # kernel and source line are.
+            cons.print(cmd.stdout)
+            # Marked so classify_error can bucket it; the diagnostics that make
+            # it actionable are already in the output above.
             if is_gpu_memory_fault(cmd.stdout):
                 raise MFCException(f"Test {case}: Failed to execute MFC {GPU_FAULT_MARKER}.")
             raise MFCException(f"Test {case}: Failed to execute MFC.")
@@ -765,8 +756,13 @@ def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
 GPU_FAULT_MARKER = "(memory access fault by GPU)"
 
 GPU_FAULT_SIGNATURES = (
+    # AMD/HSA -- Frontier, both CCE and AFAR builds.
     "memory access fault by gpu",
     "offload error: memory access fault",
+    # NVHPC -- Phoenix. Worded nothing like the AMD ones, so matching only the
+    # above meant 189 faults on a Phoenix gpu-acc shard were never recognised.
+    "cuda_error_illegal_address",
+    "accelerator fatal error",
 )
 
 
@@ -781,35 +777,40 @@ def is_gpu_memory_fault(text: str) -> bool:
     return any(sig in lowered for sig in GPU_FAULT_SIGNATURES)
 
 
-def diagnostic_env(base: dict) -> dict:
-    """`base` plus the one offload diagnostic measured to add information.
+def fault_diagnostic_env(base: dict) -> dict:
+    """`base` plus the offload diagnostics that cost nothing until a fault.
 
-    This started out setting CRAY_ACC_DEBUG and AMD_SERIALIZE_KERNEL/COPY too.
-    A fault injected into m_time_steppers (a known out-of-bounds device write)
-    measured what each was worth:
+    These are set on EVERY run rather than on a retry. Both variables are
+    inert in a healthy run -- they only produce output when the runtime is
+    already aborting on a memory fault -- so paying for them up front makes the
+    first failure informative instead of spending a whole extra run to learn
+    the same thing.
 
-      * AFAR/OpenMP already names the faulting kernel with no help from us --
-        "Kernel 0: omp target in _QMm_time_steppersPs_tvd_rk @ 486", correct in
-        90 of 90 faults, and printed on the *first* attempt. The premise this
-        retry was built on ("a fault reports only an address") is false here.
-      * CCE/OpenACC cannot name it at all. Across three runs CRAY_ACC_DEBUG
-        blamed s_write_run_time_information 386 times and the true culprit 0 of
-        473 -- dispatch is asynchronous, so its log's tail is whatever ran next.
-        A confidently wrong suspect is worse than none, so it is not set.
-      * AMD_SERIALIZE_* did not change either result; CCE ignores them (they are
-        HIP variables) and AFAR is already correct without them.
+    That is the opposite of how this started. The original design retried a
+    faulted case with diagnostics on, which measurement showed was the wrong
+    shape: on AFAR and NVHPC the runtime already names the faulting kernel
+    unaided (189/189 and exactly, respectively), and on CCE no environment
+    variable can name it at all -- CCE runs kernels async by default
+    (acc_model=auto_async_kernel) and only -h acc_model=auto_async_none makes
+    the abort land on the culprit, which is a compile flag a retry cannot set.
 
-    What remains is OFFLOAD_TRACK_ALLOCATION_TRACES, which is not free
-    information: it says whether the faulting address was ever a real host
-    allocation, separating "ran off the end of a known array" from "wild
-    pointer". It appeared in 60 retried faults and 0 unretried ones.
+    Deliberately NOT set here: CRAY_ACC_DEBUG. It streams a line per launch and
+    per transfer for the whole run, and because dispatch is async its tail is
+    whatever ran next -- it blamed s_write_run_time_information in 81 of 102
+    traced faults and the true culprit in 0. A confident wrong suspect is worse
+    than silence, and it is not free the way these two are.
 
     Returns a new dict: these run in worker threads, and mutating a shared
-    environment would leak diagnostics into every concurrent case.
+    environment would leak settings into every concurrent case.
     """
     return {
         **base,
+        # Says whether the faulting address was ever a real host allocation,
+        # separating an overrun of a known array from a wild pointer.
         "OFFLOAD_TRACK_ALLOCATION_TRACES": "true",
+        # Host stack traces for the most recent kernel launches. The runtime
+        # advertises this itself in the fault message ("0 now, up to 8").
+        "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES": "8",
     }
 
 
@@ -864,10 +865,6 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
     nAttempts = 0
     last_error = None
-    # Set once a GPU memory fault is seen, so the next attempt re-runs with the
-    # offload runtime's diagnostics enabled. Local to this case, so concurrent
-    # cases are unaffected.
-    case_env = None
     if ARG("single"):
         max_attempts = max(ARG("max_attempts"), 3)
     else:
@@ -877,7 +874,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         nAttempts += 1
 
         try:
-            _handle_case(case, devices, env=case_env)
+            _handle_case(case, devices)
             if ARG("dry_run"):
                 nSKIP += 1
             else:
@@ -894,13 +891,6 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
                     cons.print(f"    [yellow]recovered on attempt {nAttempts}[/yellow] ({classify_error(last_error) or 'unclassified'}): {case.trace}")
         except Exception as exc:
             last_error = exc
-            # A GPU memory fault reports only an address. The retry was going to
-            # happen anyway and, on the evidence, rescues almost nothing -- so
-            # spend it on reproducing the fault with diagnostics instead. These
-            # print per kernel launch, which is why they are not on by default.
-            if is_gpu_memory_fault(str(exc)) and case_env is None:
-                case_env = diagnostic_env(dict(os.environ))
-                cons.print(f"    [yellow]GPU memory fault[/yellow]: retrying {case.trace} with offload diagnostics enabled")
             if should_retry(nAttempts, max_attempts, abort_tests.is_set()):
                 continue
             nFAIL += 1

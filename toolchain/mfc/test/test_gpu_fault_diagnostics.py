@@ -21,7 +21,7 @@ Those diagnostics print per kernel launch, so they cannot be on for a whole run
 otherwise produce nothing.
 """
 
-from mfc.test.test import diagnostic_env, is_gpu_memory_fault
+from mfc.test.test import fault_diagnostic_env, is_gpu_memory_fault
 
 
 def test_recognises_the_hsa_level_fault_cce_reports():
@@ -46,12 +46,12 @@ def test_does_not_fire_on_benign_pmix_noise():
 def test_the_diagnostic_env_enables_allocation_tracking():
     # AFAR's libomptarget reads this; CCE ignores it. Only AFAR gains anything
     # from a diagnostic retry, so there is nothing to detect the cluster for.
-    env = diagnostic_env({"PATH": "/usr/bin"})
+    env = fault_diagnostic_env({"PATH": "/usr/bin"})
     assert env["OFFLOAD_TRACK_ALLOCATION_TRACES"] == "true"
 
 
 def test_the_diagnostic_env_preserves_the_existing_environment():
-    env = diagnostic_env({"PATH": "/usr/bin", "HOME": "/home/x"})
+    env = fault_diagnostic_env({"PATH": "/usr/bin", "HOME": "/home/x"})
     assert env["PATH"] == "/usr/bin"
     assert env["HOME"] == "/home/x"
 
@@ -60,21 +60,8 @@ def test_the_diagnostic_env_does_not_mutate_what_it_was_given():
     # These run in worker threads; mutating a shared environment would leak
     # diagnostics into every concurrently running case.
     base = {"PATH": "/usr/bin"}
-    diagnostic_env(base)
+    fault_diagnostic_env(base)
     assert "OFFLOAD_TRACK_ALLOCATION_TRACES" not in base
-
-
-def test_a_diagnostic_retry_does_not_dump_its_whole_output():
-    # A faulting run can emit six figures of offload logging. The kernel list
-    # and the allocation verdict both sit at the very end, immediately before
-    # the abort, so echoing the whole run would bury the thing it is meant to
-    # explain. Only the tail is worth keeping.
-    import inspect
-
-    from mfc.test import test as t
-
-    src = inspect.getsource(t._handle_case)
-    assert "log_tail" in src, "the diagnostic retry's output must be bounded"
 
 
 def test_the_marker_written_on_failure_is_the_one_the_retry_reads():
@@ -120,16 +107,42 @@ def test_the_marker_survives_rich_rendering():
     assert GPU_FAULT_MARKER in console.file.getvalue()
 
 
-def test_the_diagnostic_sets_only_what_was_measured_to_help():
-    """Each variable here has to earn its place.
+def test_the_diagnostics_are_on_for_every_run_not_just_a_retry():
+    """Attempt 1 has to be the informative one.
 
-    CRAY_ACC_DEBUG was measured to name the wrong kernel on CCE (0 of 473
-    faults correct) and AMD_SERIALIZE_* changed nothing on either lane, so both
-    were removed. Enabling a diagnostic that misattributes is worse than
-    enabling none, and this pins that they do not drift back in.
+    Both variables are inert until the runtime is already aborting on a memory
+    fault, so there is nothing to save by withholding them -- and withholding
+    them costs a whole extra run to learn what the first could have said.
     """
-    from mfc.test.test import diagnostic_env
+    import inspect
 
-    added = set(diagnostic_env({})) - set()
+    from mfc.test.test import _handle_case
 
-    assert added == {"OFFLOAD_TRACK_ALLOCATION_TRACES"}
+    src = inspect.getsource(_handle_case)
+
+    assert "fault_diagnostic_env" in src, "the run must carry the diagnostics"
+
+
+def test_nvhpc_faults_are_recognised():
+    """Phoenix words it nothing like Frontier does.
+
+    Matching only the AMD phrasing meant 189 faults on a Phoenix gpu-acc shard
+    were never recognised as GPU faults at all.
+    """
+    from mfc.test.test import is_gpu_memory_fault
+
+    nvhpc = "Accelerator Fatal Error: call to cuStreamSynchronize returned error 700 " "(CUDA_ERROR_ILLEGAL_ADDRESS): Illegal address during kernel execution"
+
+    assert is_gpu_memory_fault(nvhpc)
+
+
+def test_the_costly_cray_trace_is_not_enabled():
+    """It cannot attribute, and unlike the others it is not free.
+
+    CRAY_ACC_DEBUG streams a line per launch for the whole run and, because CCE
+    dispatches async by default, blamed the wrong kernel in 81 of 102 traced
+    faults and the right one in none.
+    """
+    from mfc.test.test import fault_diagnostic_env
+
+    assert "CRAY_ACC_DEBUG" not in fault_diagnostic_env({})
