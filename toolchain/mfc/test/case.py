@@ -171,7 +171,7 @@ class TestCase(case.Case):
         merge = {key: val for key, val in merge.items() if val is not None}
         super().__init__(merge)
 
-    def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
+    def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int], env: dict = None) -> subprocess.CompletedProcess:
         if gpus is not None and len(gpus) != 0:
             gpus_select = ["--gpus"] + [str(_) for _ in gpus]
         else:
@@ -191,7 +191,9 @@ class TestCase(case.Case):
 
         command = [mfc_script, "run", filepath, "--no-build", *tasks, *case_optimization, *jobs, "-t", *target_names, *gpus_select, *ARG("--")]
 
-        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        # env is per-subprocess, never os.environ: cases run in worker threads,
+        # so a mutated global would leak into every concurrent case.
+        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
     def run_restart(self, targets, gpus):
         """Run a restart roundtrip: simulate to midpoint, then restart to end."""

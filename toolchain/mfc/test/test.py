@@ -589,7 +589,7 @@ def _handle_convergence_case(case: TestCase, start_time: float):
         raise MFCException(f"Test {case}: convergence rate check failed (see {log_dir}/convergence.log)")
 
 
-def _handle_case(case: TestCase, devices: typing.Set[int]):
+def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
     global current_test_number  # noqa: PLW0603
     start_time = time.time()
 
@@ -620,7 +620,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         # Check timeout before starting
         if timeout_flag.is_set():
             raise TestTimeoutError("Test case exceeded 1 hour timeout")
-        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, env=env)
 
         # Check timeout after simulation
         if timeout_flag.is_set():
@@ -632,6 +632,11 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
         if cmd.returncode != 0:
             cons.print(cmd.stdout)
+            # Flag a GPU memory fault so the retry can re-run with the offload
+            # runtime's diagnostics on. The address alone is not actionable; the
+            # kernel and source line are.
+            if is_gpu_memory_fault(cmd.stdout):
+                raise MFCException(f"Test {case}: Failed to execute MFC. [gpu-memory-fault]")
             raise MFCException(f"Test {case}: Failed to execute MFC.")
 
         _assert_particle_cloud_ib_state(case)
@@ -736,6 +741,45 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         timeout_timer.cancel()  # Cancel timeout timer
 
 
+# A GPU memory fault as the runtimes report it. CCE surfaces the raw HSA
+# message; AFAR's offload runtime prints its own. Both are matched because the
+# retry diagnostics below help either way.
+GPU_FAULT_SIGNATURES = (
+    "memory access fault by gpu",
+    "offload error: memory access fault",
+)
+
+
+def is_gpu_memory_fault(text: str) -> bool:
+    """Whether output shows a GPU memory fault, as opposed to any other failure.
+
+    Deliberately narrow. PMIX_ERR_NO_PERMISSIONS and friends appear in 16% of
+    *passing* self-hosted jobs, so anything broader would fire constantly.
+    """
+    lowered = (text or "").lower()
+
+    return any(sig in lowered for sig in GPU_FAULT_SIGNATURES)
+
+
+def diagnostic_env(base: dict) -> dict:
+    """`base` plus the offload runtimes' fault diagnostics.
+
+    Measured on Frontier: CRAY_ACC_DEBUG=1 makes CCE name the kernel and source
+    line of the launch that faulted, and OFFLOAD_TRACK_ALLOCATION_TRACES makes
+    AFAR say whether the faulting address ever belonged to a real allocation.
+    Each runtime ignores the other's variable, so both are set rather than
+    detecting the cluster here.
+
+    Returns a new dict: these run in worker threads, and mutating a shared
+    environment would leak per-kernel logging into every concurrent case.
+    """
+    return {
+        **base,
+        "CRAY_ACC_DEBUG": "1",
+        "OFFLOAD_TRACK_ALLOCATION_TRACES": "true",
+    }
+
+
 def classify_error(exc: Exception) -> str:
     """Bucket a test failure into the categories the retry policy turns on.
 
@@ -787,6 +831,10 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
 
     nAttempts = 0
     last_error = None
+    # Set once a GPU memory fault is seen, so the next attempt re-runs with the
+    # offload runtime's diagnostics enabled. Local to this case, so concurrent
+    # cases are unaffected.
+    case_env = None
     if ARG("single"):
         max_attempts = max(ARG("max_attempts"), 3)
     else:
@@ -796,7 +844,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         nAttempts += 1
 
         try:
-            _handle_case(case, devices)
+            _handle_case(case, devices, env=case_env)
             if ARG("dry_run"):
                 nSKIP += 1
             else:
@@ -813,6 +861,13 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
                     cons.print(f"    [yellow]recovered on attempt {nAttempts}[/yellow] ({classify_error(last_error) or 'unclassified'}): {case.trace}")
         except Exception as exc:
             last_error = exc
+            # A GPU memory fault reports only an address. The retry was going to
+            # happen anyway and, on the evidence, rescues almost nothing -- so
+            # spend it on reproducing the fault with diagnostics instead. These
+            # print per kernel launch, which is why they are not on by default.
+            if is_gpu_memory_fault(str(exc)) and case_env is None:
+                case_env = diagnostic_env(dict(os.environ))
+                cons.print(f"    [yellow]GPU memory fault[/yellow]: retrying {case.trace} with offload diagnostics enabled")
             if should_retry(nAttempts, max_attempts, abort_tests.is_set()):
                 continue
             nFAIL += 1
