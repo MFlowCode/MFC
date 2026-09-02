@@ -40,8 +40,7 @@ module m_data_input
     type(scalar_field), allocatable, dimension(:), public    :: q_prim_vf  !< Primitive variables
     type(integer_field), allocatable, dimension(:,:), public :: bc_type    !< Boundary condition identifiers
     type(scalar_field), public                               :: q_T_sf     !< Temperature field
-    ! type(scalar_field), public :: ib_markers !<
-    type(integer_field), public :: ib_markers
+    type(integer_field), public                              :: ib_markers
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 

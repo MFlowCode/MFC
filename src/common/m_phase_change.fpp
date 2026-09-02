@@ -58,14 +58,12 @@ contains
         real(wp) :: rhoe, dynE, rhos      !< total internal energy, kinetic energy, and total entropy
         real(wp) :: rho, rM, m1, m2, MCT  !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF                   !< total volume fraction
-        ! $:GPU_DECLARE(create='[pS,TS,rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: p_infpT, sk, hk, gk, ek, rhok
         #:else
             real(wp), dimension(num_fluids) :: p_infpT, sk, hk, gk, ek, rhok
         #:endif
-        ! $:GPU_DECLARE(create='[p_infpT,sk,hk,gk,ek,rhok]')
 
         !> Generic loop iterators
         integer :: i, j, k, l
