@@ -614,15 +614,14 @@ Does not do anything for OpenMP currently
 pure, sequential per-thread helpers is:
 
 ```fortran
-subroutine s_accumulate_mixture_properties(nf, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
+subroutine s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
 
-    $:GPU_ROUTINE(function_name='s_accumulate_mixture_properties', parallelism='[seq]', cray_inline=True)
+    $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients', parallelism='[seq]', cray_inline=True)
 
-    integer, intent(in)                 :: nf
-    real(wp), dimension(nf), intent(in) :: alpha_rho_K, alpha_K
-    real(wp), intent(out)               :: rho_K, gamma_K, pi_inf_K, qv_K
+    real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
+    real(wp), intent(out)                       :: rho_K, gamma_K, pi_inf_K, qv_K
     ...
-end subroutine s_accumulate_mixture_properties
+end subroutine s_compute_mixture_coefficients
 ```
 
 **When to use it.** Extract a block into a `GPU_ROUTINE` helper when:

@@ -122,35 +122,22 @@ contains
                                 end if
                             end if
 
-                            ! Sum properties of all fluid components
-                            rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
-                            rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                rho%L = rho%L + alpha_rho_L(i)
-                                gamma%L = gamma%L + alpha_L(i)*gammas(i)
-                                pi_inf%L = pi_inf%L + alpha_L(i)*pi_infs(i)
-                                qv%L = qv%L + alpha_rho_L(i)*qvs(i)
-
-                                rho%R = rho%R + alpha_rho_R(i)
-                                gamma%R = gamma%R + alpha_R(i)*gammas(i)
-                                pi_inf%R = pi_inf%R + alpha_R(i)*pi_infs(i)
-                                qv%R = qv%R + alpha_rho_R(i)*qvs(i)
-                            end do
+                            call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho%L, gamma%L, pi_inf%L, qv%L)
+                            call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho%R, gamma%R, pi_inf%R, qv%R)
 
                             pres_mag%L = 0.5_wp*sum(B%L**2._wp)
                             pres_mag%R = 0.5_wp*sum(B%R**2._wp)
-                            E%L = gamma%L*pres%L + pi_inf%L + 0.5_wp*rho%L*vel_rms%L + qv%L + pres_mag%L
-                            E%R = gamma%R*pres%R + pi_inf%R + 0.5_wp*rho%R*vel_rms%R + qv%R + pres_mag%R  ! includes magnetic energy
+                            call s_compute_energy(pres%L, alpha_rho_L, alpha_L, vel_rms%L, E%L)
+                            E%L = E%L + pres_mag%L
+                            call s_compute_energy(pres%R, alpha_rho_R, alpha_R, vel_rms%R, E%R)
+                            E%R = E%R + pres_mag%R  ! includes magnetic energy
                             H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
                             ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
                             H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R
 
                             ! (2) Compute fast wave speeds
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha_L, vel_rms%L, &
-                                                          & 0._wp, c%L, qv%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H_no_mag%R, alpha_R, vel_rms%R, &
-                                                          & 0._wp, c%R, qv%R)
+                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L)
+                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R)
                             call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, norm_dir, c_fast%L, H_no_mag%L)
                             call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)
 
