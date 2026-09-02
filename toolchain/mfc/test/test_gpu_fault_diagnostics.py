@@ -121,3 +121,21 @@ def test_the_marker_survives_rich_rendering():
     console.print(f"Failed to execute MFC {GPU_FAULT_MARKER}.")
 
     assert GPU_FAULT_MARKER in console.file.getvalue()
+
+
+def test_the_diagnostic_serializes_kernel_dispatch():
+    """Without this the kernel log names the wrong suspect.
+
+    Dispatches are asynchronous, so the fault surfaces after the launch that
+    caused it. Measured against a known out-of-bounds write in m_time_steppers:
+    the last kernel logged before the fault was s_write_run_time_information in
+    111 of 140 faults and the true culprit in none. A trace that confidently
+    accuses the wrong kernel is worse than no trace, so the diagnostic run must
+    serialize.
+    """
+    from mfc.test.test import diagnostic_env
+
+    env = diagnostic_env({})
+
+    assert env["AMD_SERIALIZE_KERNEL"] == "3"
+    assert env["AMD_SERIALIZE_COPY"] == "3"

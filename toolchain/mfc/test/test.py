@@ -785,11 +785,22 @@ def is_gpu_memory_fault(text: str) -> bool:
 def diagnostic_env(base: dict) -> dict:
     """`base` plus the offload runtimes' fault diagnostics.
 
-    Measured on Frontier: CRAY_ACC_DEBUG=1 makes CCE name the kernel and source
-    line of the launch that faulted, and OFFLOAD_TRACK_ALLOCATION_TRACES makes
+    Measured on Frontier: CRAY_ACC_DEBUG=1 makes CCE log every kernel launch
+    with its name and source line, and OFFLOAD_TRACK_ALLOCATION_TRACES makes
     AFAR say whether the faulting address ever belonged to a real allocation.
     Each runtime ignores the other's variable, so both are set rather than
     detecting the cluster here.
+
+    AMD_SERIALIZE_KERNEL/COPY are what make the launch log worth reading.
+    Dispatches are asynchronous, so a fault is reported long after the launch
+    that caused it and the log's last entry is simply whatever ran next. With a
+    known out-of-bounds write injected into m_time_steppers, the last kernel
+    logged before the fault was s_write_run_time_information in 111 of 140
+    faults and m_time_steppers in none of them -- a confident, wrong suspect,
+    which is worse than no diagnostic at all. Serializing makes the runtime wait
+    on each dispatch so the fault is attributed to the kernel that caused it.
+    (Verified to be honoured on the AFAR/HIP path; whether CCE's own offload
+    runtime honours it is what the next CI run measures.)
 
     Cost, measured on the same machine: 13.7s -> 17.3s (1.27x) for a case that
     emitted 142,777 ACC: lines. Against the 1 hour TEST_TIMEOUT_SECONDS a case
@@ -805,6 +816,8 @@ def diagnostic_env(base: dict) -> dict:
         **base,
         "CRAY_ACC_DEBUG": "1",
         "OFFLOAD_TRACK_ALLOCATION_TRACES": "true",
+        "AMD_SERIALIZE_KERNEL": "3",
+        "AMD_SERIALIZE_COPY": "3",
     }
 
 
