@@ -832,10 +832,18 @@ def fault_diagnostic_env(base: dict) -> dict:
         "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES": "8",
     }
 
-    # The only thing that gives CCE a faulting kernel. Measured on Frontier: it
-    # prints "Disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6",
-    # the exact injected fault site, with the faulting instruction and per-wave
-    # registers -- where no CRAY_ACC_* variable names it at all.
+    # The only thing that gives CCE a faulting kernel. Measured on Frontier
+    # under --gpu acc: it prints "Disassembly for function
+    # s_tvd_rk$m_time_steppers_$ck_L486_6", the exact injected fault site, with
+    # the faulting instruction and per-wave registers -- where no CRAY_ACC_*
+    # variable names it at all.
+    #
+    # gpu-mp is EXPECTED to work but is untested: the agent hooks ROCr, which
+    # sits below both OpenACC and OpenMP offload, so it should fire either way.
+    # What is unverified is the attribution, not the firing -- that symbol is
+    # CCE's OpenACC mangling, and whether module, subroutine and line survive in
+    # the OpenMP-offload form has never been run. The summarizer does not care
+    # (its regex takes whatever the symbol is); the claim does.
     #
     # Cost on a healthy run: one paired A/B put it at 4.5645 ns/gp/eq/rhs
     # against an agent-free spread of 4.5301-4.5614, i.e. 0.07% above a range

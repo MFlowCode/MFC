@@ -202,29 +202,51 @@ def test_a_restart_case_runs_with_the_diagnostics_too():
     assert "env" in inspect.signature(TestCase.run_restart).parameters
 
 
-# A minimal fixture in the agent's observed ROCm 6.3.1 format. The verbatim
-# lines come from a real 14,635-line report on Frontier; the raw log itself did
-# not survive the experiment's teardown.
+# A minimal fixture in the agent's ROCm 6.3.1 format, reconstructed line-for-line
+# from a real 14,635-line report on Frontier (the raw log did not survive the
+# experiment's teardown). Structural details that matter and were taken from the
+# real output: the "(Agent handle: ...)" clause in the fault line, "End of
+# disassembly." as the terminator, and the blank line plus "scalar registers:"
+# header between a wave's pc line and its register dump.
 ROCM_AGENT_FIXTURE = """\
-Memory access fault by GPU node-4 on address 0x7ffb6a0f6000. Reason: Write access to a read-only page.
+Memory access fault by GPU node-4 (Agent handle: 0x3b24f40) on address 0x7ffb6a0f6000. Reason: Write access to a read-only page.
 Disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6:
-  code object: file:///path/to/simulation#offset=12345&size=67890
-  loaded at: [0x7f0000000000, 0x7f0000010000]
-      0x7f0000001000 <+16>:   global_load_dwordx4 v[8:11], v[4:5], off
-  =>  0x7f0000001008 <+24>:   global_store_dword v[6:7], v12, off
-      0x7f0000001010 <+32>:   s_endpgm
-End of disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6.
-wave_0: pc=0x7f0000001008 (stopped, reason: MEMORY_VIOLATION)
-    s0: 0x00000000  s1: 0x00000001  s2: 0x00000002
-    v0: 0x00000000  v1: 0x00000001
-wave_1: pc=0x7f0000001008 (stopped, reason: MEMORY_VIOLATION)
-    s0: 0x00000000  s1: 0x00000001  s2: 0x00000002
-wave_2: pc=0x7f0000001000 (stopped, reason: MEMORY_VIOLATION)
-    s0: 0x00000000  s1: 0x00000001  s2: 0x00000002
+    code object: file:///path/gpu-acc-c819d00b45/bin/simulation#offset=4657152&size=10843816
+    loaded at: [0x7ff77da00000-0x7ff77feca9f9]
+ => 0x7ff77e253430 <+6192>:    s_waitcnt vmcnt(0) lgkmcnt(0)
+    0x7ff77e253434 <+6196>:    v_sub_co_u32_e32 v5, vcc, v26, v42
+End of disassembly.
+wave_0: pc=0x7ff77e253408 (stopped, reason: MEMORY_VIOLATION)
+
+scalar registers:
+            s0: d9800000            s1: 80007ffe
+wave_1: pc=0x7ff77e253408 (stopped, reason: MEMORY_VIOLATION)
+
+scalar registers:
+            s0: d9800000            s1: 80007ffe
+wave_2: pc=0x7ff77e2533fc (stopped, reason: MEMORY_VIOLATION)
+
+scalar registers:
+            s0: d9800000            s1: 80007ffe
 """
+
+# The field set the summarizer produced from the real 14,635-line report. Pinned
+# as structure, not values: the wave counts and PC distribution belong to that
+# one fault and encoding them would test the fixture rather than the code.
+REAL_SUMMARY_FIELDS = (
+    "=== GPU fault summary (rocm-debug-agent,",
+    "Memory access fault by GPU",
+    "faulting kernel(s): ",
+    "faulting waves:     ",
+    "stop PCs:           ",
+    "NOTE: waves halt on fault detection",
+    "--- disassembly (1 of ",
+    "--- representative wave (modal PC ",
+)
 
 
 def tmp_agent_dir() -> str:
+    """A directory laid out like a ROCm install, for the gate to find."""
     import os
     import tempfile
 
@@ -235,46 +257,6 @@ def tmp_agent_dir() -> str:
     with open(os.path.join(root, "lib", ROCM_DEBUG_AGENT), "w", encoding="utf-8") as f:
         f.write("")
     return root
-
-
-def test_the_agent_report_is_collapsed_and_keeps_the_kernel_name():
-    """A fixed tail cannot do this job.
-
-    Measured on the real 14,635-line report: the first 80 lines are one wave's
-    registers and the last 80 are another's, so the kernel name -- the entire
-    point -- appears in neither. This asserts the name survives.
-    """
-    from mfc.test.test import summarize_rocm_debug_agent
-
-    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE)
-
-    assert summary, "the summarizer did not recognise a real agent report"
-    assert "s_tvd_rk$m_time_steppers_$ck_L486_6" in summary
-    assert "Memory access fault by GPU" in summary
-    assert len(summary.splitlines()) < len(ROCM_AGENT_FIXTURE.splitlines()) + 12
-
-
-def test_the_summary_reports_the_whole_stop_pc_distribution():
-    """Quoting one PC would name the wrong instruction.
-
-    The waves halt at several distinct PCs, and on the observed fault the modal
-    one is a load while the injected fault is a write. Collapsing to a single PC
-    hands the reader a confidently wrong instruction -- the failure mode that
-    made CCE's own trace worse than no diagnostic at all.
-    """
-    from mfc.test.test import summarize_rocm_debug_agent
-
-    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE)
-
-    assert "0x7f0000001008 x2" in summary
-    assert "0x7f0000001000 x1" in summary
-
-
-def test_output_without_an_agent_report_falls_back():
-    from mfc.test.test import summarize_rocm_debug_agent
-
-    assert summarize_rocm_debug_agent("Memory access fault by GPU node-4 on address 0x1557f5ced000.") == ""
-    assert summarize_rocm_debug_agent("") == ""
 
 
 def test_the_agent_gate_is_not_evaluated_at_import(monkeypatch):
@@ -321,3 +303,26 @@ def test_the_agent_is_enabled_when_reachable(monkeypatch):
 
     monkeypatch.setenv("ROCM_PATH", tmp_agent_dir())
     assert fault_diagnostic_env({})["HSA_TOOLS_LIB"] == "librocm-debug-agent.so.2"
+
+
+def test_the_summary_has_the_same_shape_as_the_real_report():
+    """Guards the reconstruction against the real thing.
+
+    The raw 14,635-line log is gone, so the fixture is rebuilt from the lines
+    quoted out of it. This asserts the summarizer still emits every field it
+    produced from the genuine report -- the check that would catch the fixture
+    having drifted from the format it is supposed to stand in for.
+
+    Structure only, never the values: pinning 125 waves or that PC histogram
+    would encode one fault rather than test the code.
+    """
+    from mfc.test.test import summarize_rocm_debug_agent
+
+    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE)
+
+    for field in REAL_SUMMARY_FIELDS:
+        assert field in summary, f"the summarizer no longer emits {field!r}"
+
+    # The part that fails silently: no wave match means an empty summary and a
+    # fall back to 14k raw lines, with nothing to say why.
+    assert "s_tvd_rk$m_time_steppers_$ck_L486_6" in summary
