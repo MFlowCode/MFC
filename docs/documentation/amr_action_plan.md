@@ -226,6 +226,26 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-02 (55) — THE AMReX CONTROLS: at its own GPU-sane grids AMReX's tax is 7.7-8.5x, not 20.5x
+
+Ledger 54 F2 predicted 6-8x. Measured (P2, reviewed twice; campaign logs/tax-proper2-0902_1208, all rows on k004-004, same
+pinned binaries with sha in PIN.txt, differenced 240-40, tax = AMR diff / the 19.5 s uniform diff):
+| config (400^3, 2 levels) | grids L1 + L2 (initial mesh) | AMR diff (s) | excess s/step | ms per grid-step | tax |
+| small grids, absolute tagging (the ledger-52 baseline, re-sourced from Run Time advance) | 1608 + 5351 | 399.1 | 1.58 | 0.23 | 20.47x |
+| BIG grids (max_grid_size 128, blocking 16, grid_eff 0.7), absolute tagging | 173 + 518 | 165.8 | 0.335 | 0.485 | **8.50x** |
+| big grids, RELATIVE tagging (|drho|/rho, same 0.008) | (README) | 149.8 | (README) | (README) | **7.68x** |
+| small grids, relative tagging | (README) | 344.0 | (README) | (README) | 17.64x |
+Grid SIZE is the lever (20.5 -> 8.5); tagging alone moves 20.5 -> 17.6. blocking_factor 32 is impossible for n_cell 400 (AMReX
+requires a power-of-two divisor; 16 used, failure job 400695 recorded). The k004-003 vs k004-004 swing on big/abs was 2.7%
+(8.28 vs 8.50), so the node caveat that voided cross-day single-code taxes is small here but the rows are on one node anyway.
+Grid counts are initial-mesh; the big-grid deck regrids to convergence twice at step 0 (13 vs 12 regrid lines) -- no effect on
+the timed window. Relative tagging still leaves AMReX's L1 17% below MFC's cell count; L2 close.
+
+**Reading (controller):** the honest AMReX bar at this operating point is ~8x. MFC's single-run 16.8x is twice that on the
+ratio, matching ledger 54's absolute-excess finding (3.02 vs 1.58 s/step at small grids; AMReX's big-grid excess is 0.34
+s/step -- MFC's is now ~9x AMReX's per step). Nothing here is a claim about MFC until Task 3 Step C (three MFC reps on two
+nodes, matched-order control) and Step D (AMR-arm profile) land; those are the next measurements.
+
 ## 2026-09-02 (54) — EXPERT REVIEW OVERTURNS LEDGER 52's INFERENCE: MFC's AMR overhead is ~2x AMReX's in SECONDS; the regrid term is O(P)
 
 An independent HPC-performance review of the 2026-09-01 artifacts (read-only, briefed to falsify). The DATA of ledger 52 stand;
