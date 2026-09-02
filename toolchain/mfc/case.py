@@ -374,6 +374,10 @@ gbl_id = patch_ib(i)%gbl_patch_id
             mhd = 1 if self.params.get("mhd", "F") == "T" else 0
             relativity = 1 if self.params.get("relativity", "F") == "T" else 0
             viscous = 1 if self.params.get("viscous", "F") == "T" else 0
+
+            # Case optimization compiles only the Riemann solver the case selects; -1 means the case
+            # did not pin one, in which case every solver is compiled (see m_riemann_solvers).
+            riemann_solver = int(self.params.get("riemann_solver", -1))
             igr = 1 if self.params.get("igr", "F") == "T" else 0
             igr_pres_lim = 1 if self.params.get("igr_pres_lim", "F") == "T" else 0
 
@@ -404,6 +408,7 @@ gbl_id = patch_ib(i)%gbl_patch_id
 #:set igr_pres_lim          = {igr_pres_lim}
 #:set igr_order             = {self.params.get("igr_order", 3)}
 #:set viscous               = {viscous}
+#:set riemann_solver        = {riemann_solver}
 """
 
         else:

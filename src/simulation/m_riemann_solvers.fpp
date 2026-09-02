@@ -51,11 +51,13 @@ contains
         ! misc/dev_notes/Riemann_and_RHS_source_terms_explanations.md (S5.3).
 
         #:for NAME, NUM in [('hll', 1), ('hllc', 2), ('hlld', 4), ('lf', 5)]
-            if (riemann_solver == ${NUM}$) then
-                call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
-                                               & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
-                                               & q_prim_vf, norm_dir, ix, iy, iz)
-            end if
+            #:if not MFC_CASE_OPTIMIZATION or riemann_solver in (-1, NUM)
+                if (riemann_solver == ${NUM}$) then
+                    call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
+                                                   & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
+                                                   & q_prim_vf, norm_dir, ix, iy, iz)
+                end if
+            #:endif
         #:endfor
 
     end subroutine s_riemann_solver
