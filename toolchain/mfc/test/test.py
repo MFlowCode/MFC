@@ -791,11 +791,17 @@ def fault_diagnostic_env(base: dict) -> dict:
 
     That is the opposite of how this started. The original design retried a
     faulted case with diagnostics on, which measurement showed was the wrong
-    shape: AFAR names the faulting kernel unaided in 189 of 189 faults, NVHPC
-    prints its file, function and line, and on CCE no environment variable can
-    name it at all -- CCE runs kernels async by default
-    (acc_model=auto_async_kernel) and only -h acc_model=auto_async_none makes
-    the abort land on the culprit, which is a compile flag a retry cannot set.
+    shape: AFAR names the faulting kernel unaided in 189 of 189 faults, and
+    NVHPC prints its file, function and line.
+
+    CCE names nothing on its own and no CRAY_ACC_* variable helps -- but that
+    is a limit of CCE's trace, not of the machine. The ROCm debug agent works,
+    one layer down at ROCr: HSA_TOOLS_LIB=librocm-debug-agent.so.2 prints
+    "Disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6" -- the exact
+    injected fault site -- plus the faulting instruction and per-wave register
+    state, straight to the job log. It is deliberately not set here yet: its
+    cost on a healthy run is unmeasured, and that decides always-on versus a
+    documented recipe. See #1801.
 
     Deliberately NOT set here: CRAY_ACC_DEBUG. It streams a line per launch and
     per transfer for the whole run, and because dispatch is async its tail is
