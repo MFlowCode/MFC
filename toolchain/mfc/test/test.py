@@ -632,8 +632,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
         if cmd.returncode != 0:
             cons.print(cmd.stdout)
-            # Marked so classify_error can bucket it; the diagnostics that make
-            # it actionable are already in the output above.
+            # Marked so classify_error buckets it as a GPU memory fault rather
+            # than a generic execution failure; the diagnostics that make it
+            # actionable are already in the output above.
             if is_gpu_memory_fault(cmd.stdout):
                 raise MFCException(f"Test {case}: Failed to execute MFC {GPU_FAULT_MARKER}.")
             raise MFCException(f"Test {case}: Failed to execute MFC.")
@@ -680,7 +681,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if timeout_flag.is_set():
                 raise TestTimeoutError("Test case exceeded 1 hour timeout")
 
-            restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices)
+            restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices, env=fault_diagnostic_env(dict(os.environ)))
 
             if timeout_flag.is_set():
                 raise TestTimeoutError("Test case exceeded 1 hour timeout")
@@ -740,18 +741,17 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         timeout_timer.cancel()  # Cancel timeout timer
 
 
-# A GPU memory fault as the runtimes report it. CCE surfaces the raw HSA
-# message; AFAR's offload runtime prints its own. Both are matched because the
-# retry diagnostics below help either way.
-# The marker _handle_case attaches to the exception it raises, for the retry in
-# handle_case to read back. Two constraints, both learned the hard way:
+# The marker _handle_case attaches to the exception it raises, so that
+# classify_error can tell a GPU memory fault from any other execution failure.
+# Two constraints, both learned the hard way:
 #
-#   * It must be one of the signatures below verbatim. The first version wrote
-#     "[gpu-memory-fault]" while the reader searched for "memory access fault by
-#     gpu", so the two never matched, the diagnostic never fired, and seven
-#     source-inspecting tests passed anyway.
+#   * It must be one of the signatures below verbatim, because classify_error
+#     recognises it by running the same matcher over the message. An earlier
+#     version wrote "[gpu-memory-fault]" while the reader searched for "memory
+#     access fault by gpu", so the two never matched and the feature was dead
+#     while seven source-inspecting tests passed.
 #   * No square brackets. main.py renders these messages through Rich, which
-#     parses "[...]" as a style tag and deletes it -- which is why the CI log
+#     parses "[...]" as a style tag and deletes it -- which is why a CI log
 #     showed a bare "Failed to execute MFC. " with the marker missing.
 GPU_FAULT_MARKER = "(memory access fault by GPU)"
 
@@ -761,8 +761,11 @@ GPU_FAULT_SIGNATURES = (
     "offload error: memory access fault",
     # NVHPC -- Phoenix. Worded nothing like the AMD ones, so matching only the
     # above meant 189 faults on a Phoenix gpu-acc shard were never recognised.
+    # Only the specific error: NVHPC prefixes unrelated failures with
+    # "Accelerator Fatal Error" too, including "call to cuMemAlloc returned
+    # error 2: Out of memory", which is not a memory fault and must not be
+    # classified as one.
     "cuda_error_illegal_address",
-    "accelerator fatal error",
 )
 
 
@@ -788,9 +791,9 @@ def fault_diagnostic_env(base: dict) -> dict:
 
     That is the opposite of how this started. The original design retried a
     faulted case with diagnostics on, which measurement showed was the wrong
-    shape: on AFAR and NVHPC the runtime already names the faulting kernel
-    unaided (189/189 and exactly, respectively), and on CCE no environment
-    variable can name it at all -- CCE runs kernels async by default
+    shape: AFAR names the faulting kernel unaided in 189 of 189 faults, NVHPC
+    prints its file, function and line, and on CCE no environment variable can
+    name it at all -- CCE runs kernels async by default
     (acc_model=auto_async_kernel) and only -h acc_model=auto_async_none makes
     the abort land on the culprit, which is a compile flag a retry cannot set.
 
@@ -831,6 +834,10 @@ def classify_error(exc: Exception) -> str:
         return "timeout"
     if "nan" in text:
         return "NaN detected"
+    # Before the generic branch: a GPU fault's message also contains "failed to
+    # execute", and it is the one execution failure a retry provably cannot fix.
+    if is_gpu_memory_fault(text):
+        return "GPU memory fault"
     if "failed to execute" in text:
         return "execution failed"
 

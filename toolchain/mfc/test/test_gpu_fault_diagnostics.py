@@ -146,3 +146,57 @@ def test_the_costly_cray_trace_is_not_enabled():
     from mfc.test.test import fault_diagnostic_env
 
     assert "CRAY_ACC_DEBUG" not in fault_diagnostic_env({})
+
+
+def test_a_gpu_fault_is_classified_as_its_own_kind_of_failure():
+    """The marker has to be read by something, or detecting the fault is inert.
+
+    _handle_case tags the exception, but for a while nothing consumed the tag:
+    classify_error bucketed every failure whose message contained "failed to
+    execute" as a generic execution failure, so a GPU memory fault -- the one
+    execution failure a retry provably cannot fix -- was indistinguishable from
+    a transient launcher problem in the failure summary and in #1798's rescue
+    accounting.
+    """
+    from mfc.common import MFCException
+    from mfc.test.test import GPU_FAULT_MARKER, classify_error
+
+    exc = MFCException(f"Test whatever: Failed to execute MFC {GPU_FAULT_MARKER}.")
+
+    assert classify_error(exc) == "GPU memory fault"
+
+
+def test_an_ordinary_execution_failure_is_still_bucketed_as_one():
+    from mfc.common import MFCException
+    from mfc.test.test import classify_error
+
+    assert classify_error(MFCException("Test whatever: Failed to execute MFC.")) == "execution failed"
+
+
+def test_an_nvhpc_out_of_memory_is_not_a_memory_fault():
+    """NVHPC prefixes unrelated failures with the same words.
+
+    "Accelerator Fatal Error" covers out-of-memory and launch failures as well
+    as illegal addresses, so matching that prefix would classify a GPU running
+    out of memory as a memory access fault and send the reader hunting for a
+    bad index that does not exist.
+    """
+    from mfc.test.test import is_gpu_memory_fault
+
+    oom = "Accelerator Fatal Error: call to cuMemAlloc returned error 2: Out of memory"
+
+    assert not is_gpu_memory_fault(oom)
+
+
+def test_a_restart_case_runs_with_the_diagnostics_too():
+    """Restart tests reach the GPU by a different path.
+
+    _handle_case runs them through run_restart rather than run, and that path
+    did not take an env, so a fault in a restart case produced none of the
+    diagnostics this module exists to provide.
+    """
+    import inspect
+
+    from mfc.test.case import TestCase
+
+    assert "env" in inspect.signature(TestCase.run_restart).parameters

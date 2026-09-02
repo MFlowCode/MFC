@@ -195,7 +195,7 @@ class TestCase(case.Case):
         # so a mutated global would leak into every concurrent case.
         return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
-    def run_restart(self, targets, gpus):
+    def run_restart(self, targets, gpus, env: dict = None):
         """Run a restart roundtrip: simulate to midpoint, then restart to end."""
         # NOTE: This method overrides t_step_save to produce exactly one save
         # per phase (at the boundary step). Tests using restart_check=True
@@ -214,7 +214,7 @@ class TestCase(case.Case):
             # Phase 1: Run to midpoint (generates restart data)
             self.params = {**orig, "t_step_stop": mid_step, "t_step_save": mid_step - orig["t_step_start"]}
             self.create_directory()
-            result1 = self.run(targets, gpus)
+            result1 = self.run(targets, gpus, env=env)
             if result1.returncode != 0:
                 return result1
 
@@ -226,7 +226,7 @@ class TestCase(case.Case):
             # is run — it reads grid + IC directly from p_all/p0/<mid_step>/.
             self.params = {**orig, "t_step_start": mid_step, "t_step_save": orig["t_step_stop"] - mid_step}
             self.create_directory()
-            result2 = self.run([SIMULATION], gpus)
+            result2 = self.run([SIMULATION], gpus, env=env)
 
             # Remove intermediate step files from D/ so only step 0 and
             # t_step_stop remain, matching the straight run's output.
