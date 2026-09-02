@@ -116,18 +116,34 @@ def fault_diagnostic_env(base: dict) -> dict:
     # which -- its regex takes whatever the symbol is -- but anything that tries
     # to parse the symbol must not assume one scheme per offload model.
     #
-    # Cost on a healthy run: one paired A/B put it at 4.5645 ns/gp/eq/rhs
-    # against an agent-free spread of 4.5301-4.5614, i.e. 0.07% above a range
-    # 0.69% wide -- inside the noise. That is n=1; the repeats were cancelled
-    # deliberately rather than measured, so this is "no effect detected", not
-    # "no effect".
+    # Cost, measured on Frontier CCE --gpu mp (ROCm 6.3.1, agent 2.0.3), four
+    # interleaved pairs:
     #
-    # Unverified: how this interacts with the AFAR variables above on the
-    # frontier_amd lane, where both are reachable. The agent is mutually
-    # exclusive with ROCr core dumps, so it may likewise supersede libomptarget's
-    # own fault report. Worst realistic case is one working diagnostic replacing
-    # another strictly more detailed one; if a real AFAR fault shows otherwise,
-    # gate this on the lane.
+    #   healthy run   no effect detected. The agent's whole range sits inside
+    #                 the agent-free range; paired differences split 2 up / 2
+    #                 down, mean -0.045%. Resolution is ~0.8%, set by the
+    #                 agent-free spread -- an effect smaller than that would not
+    #                 show. "No effect detected at n=4", not "no effect".
+    #   healthy log   nothing at all. Output was 2661-2662 bytes with and
+    #                 without. The agent writes only when something faults.
+    #   faulting run  +0.387 s (1.60x of a 0.647 s baseline). Against the 1-hour
+    #                 test timeout that is 0.011%, so a fault cannot become a
+    #                 timeout -- which was the risk worth checking, since a
+    #                 diagnostic that hides the fault it explains is worse than
+    #                 none.
+    #
+    # The cost that is real is VOLUME: a faulting run emits 6.7 MB / ~13,630
+    # lines on that lane, and ~65,000 on AFAR. That is why summarize_rocm_debug_agent
+    # is not an optimisation -- it is what makes this tolerable always-on.
+    #
+    # Timings are CCE only. The AFAR lane produces twice the waves and was not
+    # re-timed, so quoting +0.387 s for it would be inference.
+    #
+    # Measured, not assumed: the agent does NOT supersede libomptarget on the
+    # AFAR lane. OFFLOAD ERROR lines = 1 and Libomptarget lines = 8, identical
+    # with and without it. (An earlier report of markers rising 19 -> 519 was a
+    # grep artifact: __omp_offloading_ matches a case-insensitive "OFFLOAD".)
+    # The agent is mutually exclusive with ROCr core dumps only.
     # Two ways the caller can say "stay out of my way", both of which mean a
     # human is already debugging this run by hand:
     #
