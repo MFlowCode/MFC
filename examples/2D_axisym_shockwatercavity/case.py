@@ -257,8 +257,10 @@ print(
             "patch_icpp(4)%alpha(2)": 1.0e00,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gamw - 1),
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": gamw * piw / (gamw - 1),
             "fluid_pp(2)%gamma": 1.0e00 / (gama - 1),
+            "fluid_pp(2)%eos": "stiffened_gas",
             "fluid_pp(2)%pi_inf": gama * pia / (gama - 1),
         }
     )

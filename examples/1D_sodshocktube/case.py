@@ -67,6 +67,8 @@ print(
             "patch_icpp(2)%alpha_rho(1)": 0.125e00,
             "patch_icpp(2)%alpha(1)": 1.0,
             # Fluids Physical Parameters
+            # air: an ideal gas, so it carries no stiffness and pi_inf is not read
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
         }

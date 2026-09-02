@@ -151,6 +151,7 @@ case_dict = {
     # Patch: Sphere Immersed Boundary
     # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
+    "fluid_pp(1)%eos": "ideal_gas",
     "fluid_pp(1)%pi_inf": 0,
     "fluid_pp(1)%Re(1)": 1.0 / mu,
     "collision_model": 1,  # soft-sphere collision model

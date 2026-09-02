@@ -452,6 +452,31 @@ $:GPU_DECLARE(create='[my_array]')
 
 If an array is allocated inside an `if` block, its deallocation must follow the same condition.
 
+### How to Add an Equation of State
+
+Every stiffened-gas expression lives in `src/common/m_variables_conversion.fpp`. Adding a second EOS
+means supplying these, not grepping for `gammas`:
+
+| Operator | Gives |
+|---|---|
+| `s_compute_mixture_coefficients` / `_dt` | mixture \f$\Gamma, \Pi_\infty, q_v\f$ from the phase fractions, and their time derivative |
+| `f_pressure` / `s_compute_energy` | \f$p(e)\f$ and \f$E(p)\f$ |
+| `f_bulk_modulus` | \f$K(p)\f$ - every sound speed in MFC is \f$K/\rho\f$, differing only in how phases are mixed |
+| `s_compute_speed_of_sound` / `_avg` | that mixing: Wood's law, 6-equation, bubble-diluted |
+| `f_phase_internal_energy` | per-phase internal energy (6-equation model) |
+| `f_isentrope_exponent` / `f_isentrope_pressure` / `f_pressure_on_isentrope` | the isentrope \f$p + B = \textrm{const}\,\rho^n\f$ |
+| `f_sg_thermal` | the thermal law \f$p + B = (n-1)c_v\rho T\f$ |
+
+The first six are *mechanical* - they need only \f$p, \rho, e, c\f$. The last two are *caloric* and
+additionally need \f$c_v\f$ and \f$q'_v\f$. An EOS that supplies only the mechanical set cannot support
+phase change (`m_phase_change` also needs entropy and enthalpy) or reactive burn, so those features
+must be prohibited for it in `case_validator.py`.
+
+The coefficients arrive in two parameterizations of the same EOS: `gammas`/`pi_infs` are the stored
+forms the user supplies (see @ref sec-stored-forms), and `isentrope_n`/`isentrope_B` are the same EOS
+as \f$p + B = \textrm{const}\,\rho^n\f$, derived once at start-up. Convert with the `f_isentrope_*`
+operators rather than open-coding either relation.
+
 ### How to Add a Test Case
 
 **Step 1: Create a case file**

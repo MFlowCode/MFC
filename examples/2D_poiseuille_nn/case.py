@@ -123,6 +123,7 @@ print(
             "patch_icpp(1)%alpha(1)": 1.0,
             # Fluids Physical Parameters: single power-law (HB with tau0 = 0) fluid
             "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%pi_inf": 0.0,
             "fluid_pp(1)%Re(1)": 1.0 / K,
             "fluid_pp(1)%non_newtonian": "T",
