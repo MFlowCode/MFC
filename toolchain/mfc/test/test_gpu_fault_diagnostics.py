@@ -200,3 +200,124 @@ def test_a_restart_case_runs_with_the_diagnostics_too():
     from mfc.test.case import TestCase
 
     assert "env" in inspect.signature(TestCase.run_restart).parameters
+
+
+# A minimal fixture in the agent's observed ROCm 6.3.1 format. The verbatim
+# lines come from a real 14,635-line report on Frontier; the raw log itself did
+# not survive the experiment's teardown.
+ROCM_AGENT_FIXTURE = """\
+Memory access fault by GPU node-4 on address 0x7ffb6a0f6000. Reason: Write access to a read-only page.
+Disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6:
+  code object: file:///path/to/simulation#offset=12345&size=67890
+  loaded at: [0x7f0000000000, 0x7f0000010000]
+      0x7f0000001000 <+16>:   global_load_dwordx4 v[8:11], v[4:5], off
+  =>  0x7f0000001008 <+24>:   global_store_dword v[6:7], v12, off
+      0x7f0000001010 <+32>:   s_endpgm
+End of disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6.
+wave_0: pc=0x7f0000001008 (stopped, reason: MEMORY_VIOLATION)
+    s0: 0x00000000  s1: 0x00000001  s2: 0x00000002
+    v0: 0x00000000  v1: 0x00000001
+wave_1: pc=0x7f0000001008 (stopped, reason: MEMORY_VIOLATION)
+    s0: 0x00000000  s1: 0x00000001  s2: 0x00000002
+wave_2: pc=0x7f0000001000 (stopped, reason: MEMORY_VIOLATION)
+    s0: 0x00000000  s1: 0x00000001  s2: 0x00000002
+"""
+
+
+def tmp_agent_dir() -> str:
+    import os
+    import tempfile
+
+    from mfc.test.test import ROCM_DEBUG_AGENT
+
+    root = tempfile.mkdtemp()
+    os.makedirs(os.path.join(root, "lib"), exist_ok=True)
+    with open(os.path.join(root, "lib", ROCM_DEBUG_AGENT), "w", encoding="utf-8") as f:
+        f.write("")
+    return root
+
+
+def test_the_agent_report_is_collapsed_and_keeps_the_kernel_name():
+    """A fixed tail cannot do this job.
+
+    Measured on the real 14,635-line report: the first 80 lines are one wave's
+    registers and the last 80 are another's, so the kernel name -- the entire
+    point -- appears in neither. This asserts the name survives.
+    """
+    from mfc.test.test import summarize_rocm_debug_agent
+
+    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE)
+
+    assert summary, "the summarizer did not recognise a real agent report"
+    assert "s_tvd_rk$m_time_steppers_$ck_L486_6" in summary
+    assert "Memory access fault by GPU" in summary
+    assert len(summary.splitlines()) < len(ROCM_AGENT_FIXTURE.splitlines()) + 12
+
+
+def test_the_summary_reports_the_whole_stop_pc_distribution():
+    """Quoting one PC would name the wrong instruction.
+
+    The waves halt at several distinct PCs, and on the observed fault the modal
+    one is a load while the injected fault is a write. Collapsing to a single PC
+    hands the reader a confidently wrong instruction -- the failure mode that
+    made CCE's own trace worse than no diagnostic at all.
+    """
+    from mfc.test.test import summarize_rocm_debug_agent
+
+    summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE)
+
+    assert "0x7f0000001008 x2" in summary
+    assert "0x7f0000001000 x1" in summary
+
+
+def test_output_without_an_agent_report_falls_back():
+    from mfc.test.test import summarize_rocm_debug_agent
+
+    assert summarize_rocm_debug_agent("Memory access fault by GPU node-4 on address 0x1557f5ced000.") == ""
+    assert summarize_rocm_debug_agent("") == ""
+
+
+def test_the_agent_gate_is_not_evaluated_at_import(monkeypatch):
+    """The trap that would disable this on the one machine it is for.
+
+    On Frontier the library sits on disk the whole time, but /opt/rocm-*/lib
+    only reaches LD_LIBRARY_PATH once `mfc.sh load` has run. A gate captured in
+    a module-level constant answers before that and reports "absent" -- exactly
+    as it would on Phoenix, where the library genuinely is missing, and with no
+    way to tell the two apart. So it has to re-read the environment each call.
+    """
+    from mfc.test.test import rocm_debug_agent_path
+
+    # A machine with ROCm installed finds the real agent, so pin the
+    # environment rather than trusting whatever the host happens to have.
+    monkeypatch.setenv("ROCM_PATH", "")
+    monkeypatch.setenv("LD_LIBRARY_PATH", "")
+    assert rocm_debug_agent_path() is None
+
+    monkeypatch.setenv("ROCM_PATH", tmp_agent_dir())
+    assert rocm_debug_agent_path() is not None, "the gate did not re-read the environment"
+
+
+def test_the_agent_gate_follows_ld_library_path_too(monkeypatch):
+    """That is the variable `mfc.sh load` actually changes on Frontier."""
+    from mfc.test.test import rocm_debug_agent_path
+
+    monkeypatch.setenv("ROCM_PATH", "")
+    monkeypatch.setenv("LD_LIBRARY_PATH", "")
+    assert rocm_debug_agent_path() is None
+
+    import os
+
+    monkeypatch.setenv("LD_LIBRARY_PATH", os.path.join(tmp_agent_dir(), "lib"))
+    assert rocm_debug_agent_path() is not None
+
+
+def test_the_agent_is_enabled_when_reachable(monkeypatch):
+    from mfc.test.test import fault_diagnostic_env
+
+    monkeypatch.setenv("ROCM_PATH", "")
+    monkeypatch.setenv("LD_LIBRARY_PATH", "")
+    assert "HSA_TOOLS_LIB" not in fault_diagnostic_env({})
+
+    monkeypatch.setenv("ROCM_PATH", tmp_agent_dir())
+    assert fault_diagnostic_env({})["HSA_TOOLS_LIB"] == "librocm-debug-agent.so.2"

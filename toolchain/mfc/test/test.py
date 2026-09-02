@@ -1,6 +1,8 @@
+import collections
 import itertools
 import math
 import os
+import re
 import shutil
 import struct
 import sys
@@ -631,7 +633,15 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         common.file_write(out_filepath, cmd.stdout)
 
         if cmd.returncode != 0:
-            cons.print(cmd.stdout)
+            # The debug agent emits ~14k lines per fault, nearly all of it the
+            # same disassembly and register dump repeated per wave. Print the
+            # summary when there is one; the full capture is in out_pre_sim.txt.
+            agent_summary = summarize_rocm_debug_agent(cmd.stdout)
+            if agent_summary:
+                cons.print(console_safe(agent_summary))
+                cons.print(f"    full offload report: {out_filepath}")
+            else:
+                cons.print(cmd.stdout)
             # Marked so classify_error buckets it as a GPU memory fault rather
             # than a generic execution failure; the diagnostics that make it
             # actionable are already in the output above.
@@ -812,7 +822,7 @@ def fault_diagnostic_env(base: dict) -> dict:
     Returns a new dict: these run in worker threads, and mutating a shared
     environment would leak settings into every concurrent case.
     """
-    return {
+    env = {
         **base,
         # Says whether the faulting address was ever a real host allocation,
         # separating an overrun of a known array from a wild pointer.
@@ -821,6 +831,111 @@ def fault_diagnostic_env(base: dict) -> dict:
         # advertises this itself in the fault message ("0 now, up to 8").
         "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES": "8",
     }
+
+    # The only thing that gives CCE a faulting kernel. Measured on Frontier: it
+    # prints "Disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6",
+    # the exact injected fault site, with the faulting instruction and per-wave
+    # registers -- where no CRAY_ACC_* variable names it at all.
+    #
+    # Cost on a healthy run: one paired A/B put it at 4.5645 ns/gp/eq/rhs
+    # against an agent-free spread of 4.5301-4.5614, i.e. 0.07% above a range
+    # 0.69% wide -- inside the noise. That is n=1; the repeats were cancelled
+    # deliberately rather than measured, so this is "no effect detected", not
+    # "no effect".
+    #
+    # Unverified: how this interacts with the AFAR variables above on the
+    # frontier_amd lane, where both are reachable. The agent is mutually
+    # exclusive with ROCr core dumps, so it may likewise supersede libomptarget's
+    # own fault report. Worst realistic case is one working diagnostic replacing
+    # another strictly more detailed one; if a real AFAR fault shows otherwise,
+    # gate this on the lane.
+    agent = rocm_debug_agent_path()
+    if agent is not None:
+        env["HSA_TOOLS_LIB"] = ROCM_DEBUG_AGENT
+
+    return env
+
+
+ROCM_DEBUG_AGENT = "librocm-debug-agent.so.2"
+
+
+def rocm_debug_agent_path() -> typing.Optional[str]:
+    """Where the ROCm debug agent lives, or None if it is not reachable.
+
+    MUST be evaluated at call time, never cached at import. On Frontier the
+    library is on disk the whole time, but /opt/rocm-*/lib only reaches
+    LD_LIBRARY_PATH once `mfc.sh load` runs. A gate evaluated at import decides
+    "absent" on the one machine this exists for, and does it indistinguishably
+    from the Phoenix case where the library really is missing.
+
+    Probes for the file rather than dlopen'ing it: ctypes.CDLL would load a
+    debug agent into the test harness's own process to answer a question about
+    the subprocess.
+    """
+    rocm_path = os.environ.get("ROCM_PATH", "")
+    search = [os.path.join(rocm_path, "lib")] if rocm_path else []
+    search += os.environ.get("LD_LIBRARY_PATH", "").split(os.pathsep)
+
+    for directory in search:
+        if directory and os.path.isfile(os.path.join(directory, ROCM_DEBUG_AGENT)):
+            return os.path.join(directory, ROCM_DEBUG_AGENT)
+
+    return None
+
+
+def summarize_rocm_debug_agent(out: str, max_disasm: int = 14) -> str:
+    """Collapse librocm-debug-agent output to a bounded, informative summary.
+
+    The agent repeats an identical disassembly block and a 115-line register
+    dump per faulting wave -- 125 waves produced 14,635 lines on a 49x39 case.
+    Only the kernel name, fault reason, stop-PC distribution and one
+    representative wave carry information; the rest is duplicated.
+
+    A fixed tail cannot substitute. Measured on that log: the first 80 lines are
+    one wave's registers and the last 80 are another's, and the kernel name --
+    the entire point -- appears in neither. The stop-PC histogram is kept
+    because the waves halted at four distinct PCs whose modal one is a load
+    while the injected fault is a write, so quoting a single PC without the
+    distribution hands the reader the wrong instruction.
+
+    Returns '' when there is no agent report, so callers fall back to the raw
+    output. The regexes are anchored to ROCm 6.3.1's format observed on one
+    fault shape; a format change degrades to that fallback silently, which is
+    why a test asserts this returns non-empty on a known-good fixture.
+    """
+    waves = re.findall(r"^wave_\d+: pc=(0x[0-9a-f]+) \(stopped, reason: (\w+)\)", out, re.M)
+    if not waves:
+        return ""
+
+    lines = out.splitlines()
+    fault = next((line for line in lines if "Memory access fault by GPU" in line), None)
+    kernels = sorted({m.group(1) for m in re.finditer(r"^Disassembly for function (.+):$", out, re.M)})
+    pcs = collections.Counter(pc for pc, _ in waves)
+    reasons = collections.Counter(reason for _, reason in waves)
+
+    summary = [f"=== GPU fault summary (rocm-debug-agent, {len(lines)} lines collapsed) ==="]
+    if fault:
+        summary.append(fault.strip())
+    summary.append("faulting kernel(s): " + (", ".join(kernels) or "<none reported>"))
+    summary.append(f"faulting waves:     {len(waves)}  [" + ", ".join(f"{r} x{n}" for r, n in reasons.most_common()) + "]")
+    summary.append("stop PCs:           " + ", ".join(f"{pc} x{n}" for pc, n in pcs.most_common()))
+    summary.append("NOTE: waves halt on fault detection, so the PC is near -- not necessarily at -- the offending instruction.")
+
+    disasm_starts = [n for n, line in enumerate(lines) if line.startswith("Disassembly for function")]
+    if disasm_starts:
+        start = disasm_starts[0]
+        end = next((n for n, line in enumerate(lines[start:], start) if line.startswith("End of disassembly")), start + max_disasm)
+        summary += ["", f"--- disassembly (1 of {len(disasm_starts)} identical blocks) ---"]
+        summary += lines[start : min(end + 1, start + max_disasm)]
+
+    modal_pc = pcs.most_common(1)[0][0]
+    start = next((n for n, line in enumerate(lines) if re.match(r"^wave_\d+: pc=" + re.escape(modal_pc) + r" ", line)), None)
+    if start is not None:
+        summary += ["", f"--- representative wave (modal PC {modal_pc}, {pcs[modal_pc]} of {len(waves)} waves) ---"]
+        summary += lines[start : start + max_disasm]
+        summary.append(f"    ... (registers for {len(waves) - 1} further waves suppressed)")
+
+    return "\n".join(summary)
 
 
 def classify_error(exc: Exception) -> str:
