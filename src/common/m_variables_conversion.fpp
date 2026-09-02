@@ -28,8 +28,8 @@ module m_variables_conversion
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, f_bulk_modulus, &
         & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_pressure_on_isentrope, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
-        & f_hypoelastic_energy, f_relativistic_enthalpy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, &
-        & isentrope_B, cvs, qvs, qvps
+        & f_hypoelastic_energy, f_relativistic_enthalpy, s_eos_coefficients, s_finalize_variables_conversion_module, gammas, &
+        & isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -267,6 +267,8 @@ contains
         $:GPU_UPDATE(device='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
         @:ALLOCATE(gammas (1:num_fluids))
+        @:ALLOCATE(eoss (1:num_fluids), mg_rho0s (1:num_fluids), mg_c0s (1:num_fluids), mg_ss (1:num_fluids), &
+                   & mg_gruneisens (1:num_fluids))
         @:ALLOCATE(isentrope_n (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
         @:ALLOCATE(isentrope_B(1:num_fluids))
@@ -275,6 +277,7 @@ contains
         @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
 
+        any_state_dependent_eos = .false.
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             isentrope_n(i) = f_isentrope_exponent(gammas(i))
@@ -292,8 +295,15 @@ contains
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
+            eoss(i) = fluid_pp(i)%eos
+            mg_rho0s(i) = fluid_pp(i)%mg_rho0
+            mg_c0s(i) = fluid_pp(i)%mg_c0
+            mg_ss(i) = fluid_pp(i)%mg_s
+            mg_gruneisens(i) = fluid_pp(i)%mg_gruneisen
+            if (fluid_pp(i)%eos == eos_mie_gruneisen) any_state_dependent_eos = .true.
         end do
-        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc]')
+        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, mg_rho0s, mg_c0s, mg_ss, &
+                     & mg_gruneisens, any_state_dependent_eos]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -1173,7 +1183,7 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc)
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, mg_rho0s, mg_c0s, mg_ss, mg_gruneisens)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1283,6 +1293,49 @@ contains
         E = E + qv + 5.e-1_wp*rho*vel_sum
 
     end subroutine s_compute_energy
+
+    !> Coefficients of fluid i at density rho in the form rho e = Gamma p + Pi that every operator here consumes, with dPi/drho. Any
+    !! Mie-Gruneisen EOS p = p_ref + rho Gamma_G (e - e_ref) is this form with Gamma = 1/Gamma_G and Pi = rho e_ref - p_ref/Gamma_G;
+    !! a new family adds one case supplying its reference curve. Gamma_G is constant, so dGamma/drho = 0. Stiffened and ideal gas
+    !! keep the constants resolved at init, bit for bit.
+    subroutine s_eos_coefficients(rho, i, gamma, pi_inf, dpi)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: rho
+        integer, intent(in)   :: i
+        real(wp), intent(out) :: gamma, pi_inf, dpi
+        real(wp)              :: mu, d, p_ref, e_ref, dp_dmu, de_dmu, G0
+
+        select case (eoss(i))
+        case (eos_mie_gruneisen)
+            ! Linear-Hugoniot reference curve, u_s = c0 + s u_p: p_H = rho0 c0^2 mu (1 + mu)/(1 - (s - 1) mu)^2 on
+            ! compression, extended linearly on release, with the Hugoniot energy e_H = p_H mu/(2 rho0 (1 + mu)).
+            ! Pole at mu = 1/(s - 1); the validator warns when the initial state is near it.
+            mu = rho/mg_rho0s(i) - 1._wp
+            if (mu >= 0._wp) then
+                d = 1._wp - (mg_ss(i) - 1._wp)*mu
+                p_ref = mg_rho0s(i)*mg_c0s(i)**2*mu*(1._wp + mu)/(d*d)
+                dp_dmu = mg_rho0s(i)*mg_c0s(i)**2*((1._wp + 2._wp*mu)*d + 2._wp*(mg_ss(i) - 1._wp)*mu*(1._wp + mu))/(d*d*d)
+            else
+                p_ref = mg_rho0s(i)*mg_c0s(i)**2*mu
+                dp_dmu = mg_rho0s(i)*mg_c0s(i)**2
+            end if
+            e_ref = p_ref*mu/(2._wp*mg_rho0s(i)*(1._wp + mu))
+            de_dmu = (dp_dmu*mu*(1._wp + mu) + p_ref)/(2._wp*mg_rho0s(i)*(1._wp + mu)**2)
+            G0 = mg_gruneisens(i)
+        case default
+            gamma = gammas(i)
+            pi_inf = pi_infs(i)
+            dpi = 0._wp
+            return
+        end select
+
+        gamma = 1._wp/G0
+        pi_inf = rho*e_ref - p_ref/G0
+        dpi = e_ref + (rho*de_dmu - dp_dmu/G0)/mg_rho0s(i)  ! d/drho = (1/rho0) d/dmu
+
+    end subroutine s_eos_coefficients
 
     !> Exponent of the stiffened-gas isentrope p + B = const rho**n. Precomputed per fluid as isentrope_n.
     function f_isentrope_exponent(gamma) result(n)

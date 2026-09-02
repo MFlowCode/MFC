@@ -42,10 +42,12 @@ PHYSICS_DOCS = {
     "check_eos_selector": {
         "title": "Equation of State Selector",
         "category": "Thermodynamic Constraints",
-        "math": r"\Pi_\infty = 0 \;\; \text{for an ideal gas}",
+        "math": r"\rho e = \Gamma\,p + \Pi(\rho), \quad \Gamma = 1/\Gamma_G, \quad \Pi(\rho) = \rho\, e_{\mathrm{ref}}(\rho) - p_{\mathrm{ref}}(\rho)/\Gamma_G",
         "explanation": (
-            "An ideal gas is the stiffened-gas equation of state with no stiffness, so selecting it and also supplying a "
-            "nonzero pi_inf is contradictory. The selector determines the stiffness, not the input."
+            "Every backend supplies the same two coefficients. An ideal gas is the stiffened-gas form with no stiffness, so "
+            "selecting it and also supplying a nonzero pi_inf is contradictory. Mie-Gruneisen supplies a linear-Hugoniot "
+            "reference curve (mg_rho0, mg_c0, mg_s, mg_gruneisen) whose reference energy already carries the formation energy, so "
+            "qv must be zero; its parameters are read only when that backend is selected."
         ),
         "references": ["Wilfong26"],
     },
@@ -951,18 +953,52 @@ class CaseValidator:
             return
         eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
         eos_ideal_gas = eos_names["ideal_gas"]
+        eos_mg = eos_names["mie_gruneisen"]
         eos_values = set(eos_names.values())
         bub_fac = 1 if self.get("bubbles_euler", "F") == "T" else 0
         for i in range(1, num_fluids + 1 + bub_fac):
             eos = self.get(f"fluid_pp({i})%eos")
+            mg = {k: self.get(f"fluid_pp({i})%mg_{k}") for k in ("rho0", "c0", "s", "gruneisen")}
+            # An unset selector is stiffened gas, so stray mg_* parameters must be caught before the early return.
+            self.prohibit(
+                (eos if eos is not None else eos_names["stiffened_gas"]) != eos_mg and any(v is not None for v in mg.values()),
+                f"fluid_pp({i})%mg_* are only read when fluid_pp({i})%eos = 'mie_gruneisen'",
+            )
             if eos is None:
                 continue
-            self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas' or 'ideal_gas'")
+            self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas', 'ideal_gas' or 'mie_gruneisen'")
             pi_inf = self.get(f"fluid_pp({i})%pi_inf")
             self.prohibit(
                 eos == eos_ideal_gas and pi_inf is not None and pi_inf != 0,
                 f"fluid_pp({i})%eos = 'ideal_gas' requires fluid_pp({i})%pi_inf = 0 (an ideal gas has no stiffness)",
             )
+            self.prohibit(
+                eos == eos_mg and any(v is None for v in mg.values()),
+                f"fluid_pp({i})%eos = 'mie_gruneisen' requires fluid_pp({i})%mg_rho0, mg_c0, mg_s and mg_gruneisen",
+            )
+            if eos == eos_mg and all(v is not None for v in mg.values()):
+                self.prohibit(mg["rho0"] <= 0 or mg["c0"] <= 0 or mg["gruneisen"] <= 0, f"fluid_pp({i})%mg_rho0, mg_c0 and mg_gruneisen must be positive")
+                self.prohibit(mg["s"] < 1, f"fluid_pp({i})%mg_s must be >= 1 (u_s = c0 + s u_p; s < 1 gives no shock)")
+                qv = self.get(f"fluid_pp({i})%qv")
+                self.prohibit(
+                    qv is not None and qv != 0,
+                    f"fluid_pp({i})%qv must be 0 with eos = 'mie_gruneisen'; the reference energy e_ref(rho) carries it",
+                )
+                # The linear Hugoniot has a pole at mu = 1/(s - 1), its maximum compression. Only the initial
+                # state can be checked here; the solver does not guard the runtime density.
+                if mg["s"] > 1:
+                    rho_pole = mg["rho0"] * (1.0 + 1.0 / (mg["s"] - 1.0))
+                    num_patches = self.get("num_patches", 0) or 0
+                    for j in range(1, num_patches + 1):
+                        ar = self.get(f"patch_icpp({j})%alpha_rho({i})")
+                        a = self.get(f"patch_icpp({j})%alpha({i})")
+                        if not all(isinstance(v, (int, float)) for v in (ar, a)) or a <= 0:
+                            continue
+                        self.warn(
+                            ar / a > 0.8 * rho_pole,
+                            f"patch_icpp({j}) starts fluid {i} at rho = {ar/a:.4g}, within 20% of the Mie-Gruneisen "
+                            f"Hugoniot pole rho0*s/(s-1) = {rho_pole:.4g}; the reference curve is unphysical beyond it",
+                        )
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""

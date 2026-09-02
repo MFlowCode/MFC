@@ -896,8 +896,8 @@ def _load():
                 _r(f"{px}sph_har_coeff({ll},{mm})", REAL)
 
     # Values must match the hand-written eos_* constants in src/common/m_constants.fpp.
-    _EOS_NAMES = {"stiffened_gas": 1, "ideal_gas": 2}
-    _EOS_VALUE_LABELS = {1: "stiffened-gas", 2: "ideal-gas"}
+    _EOS_NAMES = {"stiffened_gas": 1, "ideal_gas": 2, "mie_gruneisen": 3}
+    _EOS_VALUE_LABELS = {1: "stiffened-gas", 2: "ideal-gas", 3: "Mie-Gruneisen"}
 
     # fluid_pp (10 fluids)
     # Members present in physical_parameters: gamma, pi_inf, Re, cv, qv, qvp, G.
@@ -905,10 +905,12 @@ def _load():
     # by upstream #1085/#1093 — they must NOT be registered (namelist read would crash).
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
-        CONSTRAINTS[f"fluid_pp({f})%eos"] = {"choices": [1, 2], "value_labels": _EOS_VALUE_LABELS, "names": _EOS_NAMES}
+        CONSTRAINTS[f"fluid_pp({f})%eos"] = {"choices": [1, 2, 3], "value_labels": _EOS_VALUE_LABELS, "names": _EOS_NAMES}
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
         _r(f"{px}eos", INT, math=r"\f$\mathrm{EOS}_k\f$")
+        for a, sym in [("mg_rho0", r"\f$\rho_{0,k}\f$"), ("mg_c0", r"\f$c_{0,k}\f$"), ("mg_s", r"\f$s_k\f$"), ("mg_gruneisen", r"\f$\Gamma_{G,k}\f$")]:
+            _r(f"{px}{a}", REAL, math=sym)
         _r(f"{px}G", REAL, {"hypoelasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")

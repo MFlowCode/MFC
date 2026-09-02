@@ -389,3 +389,40 @@ class TestAltSoundspeedHlld(ConstraintTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMieGruneisenSelector(ConstraintTestCase):
+    """fluid_pp(i)%eos = 'mie_gruneisen' requires its reference curve and forbids what it makes redundant."""
+
+    MG = {"fluid_pp(1)%eos": 3, "fluid_pp(1)%mg_rho0": 8930.0, "fluid_pp(1)%mg_c0": 3940.0, "fluid_pp(1)%mg_s": 1.49, "fluid_pp(1)%mg_gruneisen": 2.0}
+
+    def warnings_for(self, params):
+        validator = CaseValidator(dict(params))
+        validator.validate("simulation")
+        return "\n".join(validator.warnings)
+
+    def test_accepts_complete_curve(self):
+        self.assertAccepts({**BASE, **self.MG, "fluid_pp(1)%qv": 0.0})
+
+    def test_requires_all_four_parameters(self):
+        p = {**BASE, **self.MG}
+        del p["fluid_pp(1)%mg_s"]
+        self.assertRejects(p, "requires fluid_pp(1)%mg_rho0, mg_c0, mg_s and mg_gruneisen")
+
+    def test_rejects_parameters_under_stiffened_gas(self):
+        self.assertRejects({**BASE, "fluid_pp(1)%mg_c0": 3940.0}, "only read when fluid_pp(1)%eos = 'mie_gruneisen'")
+
+    def test_rejects_formation_energy(self):
+        self.assertRejects({**BASE, **self.MG, "fluid_pp(1)%qv": 1.0e5}, "qv must be 0 with eos = 'mie_gruneisen'")
+
+    def test_rejects_slope_below_one(self):
+        self.assertRejects({**BASE, **self.MG, "fluid_pp(1)%mg_s": 0.9}, "mg_s must be >= 1")
+
+    def test_warns_near_the_hugoniot_pole(self):
+        # rho_pole = rho0 * s/(s-1) = 8930 * 1.49/0.49 ~ 27157; start at 90% of it
+        p = {**BASE, **self.MG, "patch_icpp(1)%alpha(1)": 1.0, "patch_icpp(1)%alpha_rho(1)": 0.9 * 8930.0 * 1.49 / 0.49}
+        self.assertIn("Hugoniot pole", self.warnings_for(p))
+
+    def test_no_pole_warning_at_reference_density(self):
+        p = {**BASE, **self.MG, "patch_icpp(1)%alpha(1)": 1.0, "patch_icpp(1)%alpha_rho(1)": 8930.0}
+        self.assertNotIn("Hugoniot pole", self.warnings_for(p))
