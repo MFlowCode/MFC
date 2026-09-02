@@ -1,8 +1,6 @@
-import collections
 import itertools
 import math
 import os
-import re
 import shutil
 import struct
 import sys
@@ -18,6 +16,13 @@ from rich.panel import Panel
 from .. import common, sched
 from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
 from ..common import MFCException, console_safe, does_command_exist, format_list_to_string, get_program_output, log_tail
+from ..gpu_diagnostics import (
+    GPU_FAULT_MARKER,
+    fault_diagnostic_env,
+    is_gpu_memory_fault,
+    rocm_debug_agent_path,
+    summarize_rocm_debug_agent,
+)
 from ..packer import packer
 from ..packer import tol as packtol
 from ..printer import cons
@@ -642,6 +647,18 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 cons.print(f"    full offload report: {out_filepath}")
             else:
                 cons.print(cmd.stdout)
+                # Falling back is silent by nature: the raw output is printed
+                # and nothing says the summary was expected. That is exactly how
+                # a ROCm 6.3.1-only parser sat on the AFAR lane returning
+                # nothing for 65,210 lines of real 7.2.0 output. If the agent is
+                # reachable and this is a GPU fault, a missing summary means the
+                # agent did not load or its format moved again -- say so.
+                if is_gpu_memory_fault(cmd.stdout) and rocm_debug_agent_path() is not None:
+                    cons.print(
+                        "    [yellow]warning[/yellow]: the ROCm debug agent is available and this is a GPU "
+                        "memory fault, but no agent report was recognised. Either the agent did not load, or "
+                        "its output format has changed and summarize_rocm_debug_agent needs updating."
+                    )
             # Marked so classify_error buckets it as a GPU memory fault rather
             # than a generic execution failure; the diagnostics that make it
             # actionable are already in the output above.
@@ -749,233 +766,6 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         raise MFCException(f"Test {case} exceeded 1 hour timeout. This may indicate a hung simulation or misconfigured case. {log_msg}") from exc
     finally:
         timeout_timer.cancel()  # Cancel timeout timer
-
-
-# The marker _handle_case attaches to the exception it raises, so that
-# classify_error can tell a GPU memory fault from any other execution failure.
-# Two constraints, both learned the hard way:
-#
-#   * It must be one of the signatures below verbatim, because classify_error
-#     recognises it by running the same matcher over the message. An earlier
-#     version wrote "[gpu-memory-fault]" while the reader searched for "memory
-#     access fault by gpu", so the two never matched and the feature was dead
-#     while seven source-inspecting tests passed.
-#   * No square brackets. main.py renders these messages through Rich, which
-#     parses "[...]" as a style tag and deletes it -- which is why a CI log
-#     showed a bare "Failed to execute MFC. " with the marker missing.
-GPU_FAULT_MARKER = "(memory access fault by GPU)"
-
-GPU_FAULT_SIGNATURES = (
-    # AMD/HSA -- Frontier, both CCE and AFAR builds.
-    "memory access fault by gpu",
-    "offload error: memory access fault",
-    # NVHPC -- Phoenix. Worded nothing like the AMD ones, so matching only the
-    # above meant 189 faults on a Phoenix gpu-acc shard were never recognised.
-    # Only the specific error: NVHPC prefixes unrelated failures with
-    # "Accelerator Fatal Error" too, including "call to cuMemAlloc returned
-    # error 2: Out of memory", which is not a memory fault and must not be
-    # classified as one.
-    "cuda_error_illegal_address",
-)
-
-
-def is_gpu_memory_fault(text: str) -> bool:
-    """Whether output shows a GPU memory fault, as opposed to any other failure.
-
-    Deliberately narrow. PMIX_ERR_NO_PERMISSIONS and friends appear in 16% of
-    *passing* self-hosted jobs, so anything broader would fire constantly.
-    """
-    lowered = (text or "").lower()
-
-    return any(sig in lowered for sig in GPU_FAULT_SIGNATURES)
-
-
-def fault_diagnostic_env(base: dict) -> dict:
-    """`base` plus the offload diagnostics that cost nothing until a fault.
-
-    These are set on EVERY run rather than on a retry. Both variables are
-    inert in a healthy run -- they only produce output when the runtime is
-    already aborting on a memory fault -- so paying for them up front makes the
-    first failure informative instead of spending a whole extra run to learn
-    the same thing.
-
-    That is the opposite of how this started. The original design retried a
-    faulted case with diagnostics on, which measurement showed was the wrong
-    shape: AFAR names the faulting kernel unaided in 189 of 189 faults, and
-    NVHPC prints its file, function and line.
-
-    CCE names nothing on its own and no CRAY_ACC_* variable helps -- but that
-    is a limit of CCE's trace, not of the machine. The ROCm debug agent works,
-    one layer down at ROCr: HSA_TOOLS_LIB=librocm-debug-agent.so.2 prints
-    "Disassembly for function s_tvd_rk$m_time_steppers_$ck_L486_6" -- the exact
-    injected fault site -- plus the faulting instruction and per-wave register
-    state, straight to the job log. It is deliberately not set here yet: its
-    cost on a healthy run is unmeasured, and that decides always-on versus a
-    documented recipe. See #1801.
-
-    Deliberately NOT set here: CRAY_ACC_DEBUG. It streams a line per launch and
-    per transfer for the whole run, and because dispatch is async its tail is
-    whatever ran next -- it blamed s_write_run_time_information in 81 of 102
-    traced faults and the true culprit in 0. A confident wrong suspect is worse
-    than silence, and it is not free the way these two are.
-
-    Returns a new dict: these run in worker threads, and mutating a shared
-    environment would leak settings into every concurrent case.
-    """
-    env = {
-        **base,
-        # Says whether the faulting address was ever a real host allocation,
-        # separating an overrun of a known array from a wild pointer.
-        "OFFLOAD_TRACK_ALLOCATION_TRACES": "true",
-        # Host stack traces for the most recent kernel launches. The runtime
-        # advertises this itself in the fault message ("0 now, up to 8").
-        "OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES": "8",
-    }
-
-    # The only thing that gives CCE a faulting kernel. Measured on Frontier
-    # under --gpu acc: it prints "Disassembly for function
-    # s_tvd_rk$m_time_steppers_$ck_L486_6", the exact injected fault site, with
-    # the faulting instruction and per-wave registers -- where no CRAY_ACC_*
-    # variable names it at all.
-    #
-    # Measured on all four lanes. The symbol form is set by the COMPILER, not by
-    # the offload model -- which is the opposite of what it looks like from any
-    # two of them:
-    #
-    #   CCE  acc  s_tvd_rk$m_time_steppers_$ck_L486_6
-    #   CCE  mp   s_tvd_rk$m_time_steppers_$ck_L486_16   (same scheme, counter differs)
-    #   AFAR mp   __omp_offloading_..._QMm_time_steppersPs_tvd_rk_l486  (Flang)
-    #
-    # All three carry module, subroutine and line. The summarizer does not care
-    # which -- its regex takes whatever the symbol is -- but anything that tries
-    # to parse the symbol must not assume one scheme per offload model.
-    #
-    # Cost on a healthy run: one paired A/B put it at 4.5645 ns/gp/eq/rhs
-    # against an agent-free spread of 4.5301-4.5614, i.e. 0.07% above a range
-    # 0.69% wide -- inside the noise. That is n=1; the repeats were cancelled
-    # deliberately rather than measured, so this is "no effect detected", not
-    # "no effect".
-    #
-    # Unverified: how this interacts with the AFAR variables above on the
-    # frontier_amd lane, where both are reachable. The agent is mutually
-    # exclusive with ROCr core dumps, so it may likewise supersede libomptarget's
-    # own fault report. Worst realistic case is one working diagnostic replacing
-    # another strictly more detailed one; if a real AFAR fault shows otherwise,
-    # gate this on the lane.
-    agent = rocm_debug_agent_path()
-    if agent is not None:
-        env["HSA_TOOLS_LIB"] = ROCM_DEBUG_AGENT
-
-    return env
-
-
-ROCM_DEBUG_AGENT = "librocm-debug-agent.so.2"
-
-
-def rocm_debug_agent_path() -> typing.Optional[str]:
-    """Where the ROCm debug agent lives, or None if it is not reachable.
-
-    MUST be evaluated at call time, never cached at import. On Frontier the
-    library is on disk the whole time, but /opt/rocm-*/lib only reaches
-    LD_LIBRARY_PATH once `mfc.sh load` runs. A gate evaluated at import decides
-    "absent" on the one machine this exists for, and does it indistinguishably
-    from the Phoenix case where the library really is missing.
-
-    Probes for the file rather than dlopen'ing it: ctypes.CDLL would load a
-    debug agent into the test harness's own process to answer a question about
-    the subprocess.
-    """
-    rocm_path = os.environ.get("ROCM_PATH", "")
-    search = [os.path.join(rocm_path, "lib")] if rocm_path else []
-    search += os.environ.get("LD_LIBRARY_PATH", "").split(os.pathsep)
-
-    for directory in search:
-        if directory and os.path.isfile(os.path.join(directory, ROCM_DEBUG_AGENT)):
-            return os.path.join(directory, ROCM_DEBUG_AGENT)
-
-    return None
-
-
-def summarize_rocm_debug_agent(out: str, max_disasm: int = 14) -> str:
-    """Collapse librocm-debug-agent output to a bounded, informative summary.
-
-    The agent repeats an identical disassembly block and a 115-line register
-    dump per faulting wave -- 125 waves produced 14,635 lines on a 49x39 case.
-    Only the kernel name, fault reason, stop-PC distribution and one
-    representative wave carry information; the rest is duplicated.
-
-    A fixed tail cannot substitute. Measured on that log: the first 80 lines are
-    one wave's registers and the last 80 are another's, and the kernel name --
-    the entire point -- appears in neither. The stop-PC histogram is kept
-    because the waves halted at four distinct PCs whose modal one is a load
-    while the injected fault is a write, so quoting a single PC without the
-    distribution hands the reader the wrong instruction.
-
-    Returns '' when there is no agent report, so callers fall back to the raw
-    output.
-
-    The format is NOT stable across ROCm versions, and the failure is silent --
-    no wave match means an empty summary and a fallback to tens of thousands of
-    raw lines, with nothing saying why. Measured between two versions:
-
-        6.3.1  wave_124: pc=0x7ff77e253408 (stopped, reason: MEMORY_VIOLATION)
-        7.2.0  wave_250: pc=0x7ff734dcbf3c (kernel_code_entry=0x... <...>,
-                         kernargs=0x...) (stopped, reason: MEMORY_VIOLATION)
-
-        6.3.1  Memory access fault by GPU node-4 (Agent handle: ...) on address
-        7.2.0  OFFLOAD ERROR: memory access fault by GPU 4 (agent ...) at ...
-
-    An earlier version required pc= and "(stopped, reason:" to be adjacent and
-    matched the fault line case-sensitively on "Memory". It returned nothing at
-    all for 65,210 lines of real 7.2.0 output. Hence the tolerant separator, and
-    reusing is_gpu_memory_fault rather than hardcoding one version's wording.
-    Both formats are pinned by fixtures below.
-
-    Validated against three real reports, not one:
-
-        CCE  acc  ROCm 6.3.1   14,635 lines -> 37
-        CCE  mp   ROCm 6.3.1   13,826 lines -> 35
-        AFAR mp   ROCm 7.2.0   65,210 lines -> 36
-
-    and output from a run with no agent loaded still yields '', so the fallback
-    is intact. The stop-PC histogram earns its place most on the CCE OpenMP
-    lane, which halts at seven distinct PCs (62/21/19/10/10/2/1) against four
-    for CCE OpenACC and one for AFAR: quoting a single PC would be wrong there
-    six times in seven.
-    """
-    waves = re.findall(r"^wave_\d+: pc=(0x[0-9a-f]+).*?\(stopped, reason: (\w+)\)", out, re.M)
-    if not waves:
-        return ""
-
-    lines = out.splitlines()
-    fault = next((line for line in lines if is_gpu_memory_fault(line)), None)
-    kernels = sorted({m.group(1) for m in re.finditer(r"^Disassembly for function (.+):$", out, re.M)})
-    pcs = collections.Counter(pc for pc, _ in waves)
-    reasons = collections.Counter(reason for _, reason in waves)
-
-    summary = [f"=== GPU fault summary (rocm-debug-agent, {len(lines)} lines collapsed) ==="]
-    if fault:
-        summary.append(fault.strip())
-    summary.append("faulting kernel(s): " + (", ".join(kernels) or "<none reported>"))
-    summary.append(f"faulting waves:     {len(waves)}  [" + ", ".join(f"{r} x{n}" for r, n in reasons.most_common()) + "]")
-    summary.append("stop PCs:           " + ", ".join(f"{pc} x{n}" for pc, n in pcs.most_common()))
-    summary.append("NOTE: waves halt on fault detection, so the PC is near -- not necessarily at -- the offending instruction.")
-
-    disasm_starts = [n for n, line in enumerate(lines) if line.startswith("Disassembly for function")]
-    if disasm_starts:
-        start = disasm_starts[0]
-        end = next((n for n, line in enumerate(lines[start:], start) if line.startswith("End of disassembly")), start + max_disasm)
-        summary += ["", f"--- disassembly (1 of {len(disasm_starts)} identical blocks) ---"]
-        summary += lines[start : min(end + 1, start + max_disasm)]
-
-    modal_pc = pcs.most_common(1)[0][0]
-    start = next((n for n, line in enumerate(lines) if re.match(r"^wave_\d+: pc=" + re.escape(modal_pc) + r"(?![0-9a-f])", line)), None)
-    if start is not None:
-        summary += ["", f"--- representative wave (modal PC {modal_pc}, {pcs[modal_pc]} of {len(waves)} waves) ---"]
-        summary += lines[start : start + max_disasm]
-        summary.append(f"    ... (registers for {len(waves) - 1} further waves suppressed)")
-
-    return "\n".join(summary)
 
 
 def classify_error(exc: Exception) -> str:

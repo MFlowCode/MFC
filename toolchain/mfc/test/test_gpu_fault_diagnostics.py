@@ -1,25 +1,35 @@
-"""A GPU memory fault should diagnose itself on the retry.
+"""A GPU memory fault should explain itself the first time.
 
-MFC already retries a failed case up to three times, and those retries rescue
-almost nothing -- 0 of 235 in bench, and every recorded failed test shows the
-full attempt count. That last fact is the useful one: when a case fails it
-fails all its attempts, so the retry is a free, already-paid-for reproduction
-of the fault.
+A fault reaches CI as an address and, without help, nothing else:
 
-Today a GPU memory fault reaches CI as an address and nothing else:
+    Memory access fault by GPU node-4 (Agent handle: 0x...) on address 0x...
 
-    Memory access fault by GPU node-9 (Agent handle: 0x...) on address 0x...
+Measured against a deliberately injected out-of-bounds write at
+m_time_steppers.fpp:486, on all four GPU lanes:
 
-Measured on Frontier, enabling the offload runtime's diagnostics turns the same
-fault into the kernel and the source line that caused it:
+  * NVHPC prints the file, function and line unaided.
+  * AFAR names the faulting kernel unaided, 189 of 189 faults.
+  * CCE names nothing on its own, and no CRAY_ACC_* variable helps -- its trace
+    blamed the wrong kernel in 81 of 102 traced faults, because dispatch is
+    async and the trace's tail is whatever ran next.
+  * The ROCm debug agent names it on every lane it is reachable on, including
+    both CCE lanes, at ROCr level and with no recompile.
 
-    ACC: Execute kernel <name> async(auto) from <file>:<line>
-    Memory access fault by GPU node-4 ...
+So the diagnostics are set on every run rather than on a retry: they are inert
+until the runtime is already aborting, and withholding them only cost an extra
+run to learn what the first could have said. The original retry design is gone.
 
-Those diagnostics print per kernel launch, so they cannot be on for a whole run
--- but they cost nothing on a retry that was going to happen anyway and would
-otherwise produce nothing.
+These tests exist because nearly every failure in this area was silent. A
+marker written on one side and never read on the other passed seven
+source-inspecting tests; a summarizer written against one ROCm version returned
+nothing for 65,210 lines of another's; a gpucore that "existed" was a
+zero-segment stub. What they have in common is an artifact that looked present
+while containing nothing, so these assert on content and on the hand-offs
+between parts, never on presence alone.
 """
+
+import pathlib
+import sys
 
 from mfc.test.test import fault_diagnostic_env, is_gpu_memory_fault
 
@@ -73,7 +83,7 @@ def test_the_marker_written_on_failure_is_the_one_the_retry_reads():
     gpu", so the two never matched and the feature was dead while seven tests
     passed. Assert the actual hand-off.
     """
-    from mfc.test.test import GPU_FAULT_MARKER, is_gpu_memory_fault
+    from mfc.gpu_diagnostics import GPU_FAULT_MARKER, is_gpu_memory_fault
 
     # what _handle_case raises when the run's output shows a GPU fault
     raised = f"Test whatever: Failed to execute MFC. {GPU_FAULT_MARKER}"
@@ -83,7 +93,7 @@ def test_the_marker_written_on_failure_is_the_one_the_retry_reads():
 
 
 def test_an_ordinary_failure_message_does_not_look_like_a_gpu_fault():
-    from mfc.test.test import is_gpu_memory_fault
+    from mfc.gpu_diagnostics import is_gpu_memory_fault
 
     assert not is_gpu_memory_fault("Test whatever: Failed to execute MFC.")
 
@@ -99,7 +109,7 @@ def test_the_marker_survives_rich_rendering():
 
     from rich.console import Console
 
-    from mfc.test.test import GPU_FAULT_MARKER
+    from mfc.gpu_diagnostics import GPU_FAULT_MARKER
 
     console = Console(file=io.StringIO(), force_terminal=False)
     console.print(f"Failed to execute MFC {GPU_FAULT_MARKER}.")
@@ -129,7 +139,7 @@ def test_nvhpc_faults_are_recognised():
     Matching only the AMD phrasing meant 189 faults on a Phoenix gpu-acc shard
     were never recognised as GPU faults at all.
     """
-    from mfc.test.test import is_gpu_memory_fault
+    from mfc.gpu_diagnostics import is_gpu_memory_fault
 
     nvhpc = "Accelerator Fatal Error: call to cuStreamSynchronize returned error 700 " "(CUDA_ERROR_ILLEGAL_ADDRESS): Illegal address during kernel execution"
 
@@ -143,7 +153,7 @@ def test_the_costly_cray_trace_is_not_enabled():
     dispatches async by default, blamed the wrong kernel in 81 of 102 traced
     faults and the right one in none.
     """
-    from mfc.test.test import fault_diagnostic_env
+    from mfc.gpu_diagnostics import fault_diagnostic_env
 
     assert "CRAY_ACC_DEBUG" not in fault_diagnostic_env({})
 
@@ -159,7 +169,8 @@ def test_a_gpu_fault_is_classified_as_its_own_kind_of_failure():
     accounting.
     """
     from mfc.common import MFCException
-    from mfc.test.test import GPU_FAULT_MARKER, classify_error
+    from mfc.gpu_diagnostics import GPU_FAULT_MARKER
+    from mfc.test.test import classify_error
 
     exc = MFCException(f"Test whatever: Failed to execute MFC {GPU_FAULT_MARKER}.")
 
@@ -181,7 +192,7 @@ def test_an_nvhpc_out_of_memory_is_not_a_memory_fault():
     out of memory as a memory access fault and send the reader hunting for a
     bad index that does not exist.
     """
-    from mfc.test.test import is_gpu_memory_fault
+    from mfc.gpu_diagnostics import is_gpu_memory_fault
 
     oom = "Accelerator Fatal Error: call to cuMemAlloc returned error 2: Out of memory"
 
@@ -250,7 +261,7 @@ def tmp_agent_dir() -> str:
     import os
     import tempfile
 
-    from mfc.test.test import ROCM_DEBUG_AGENT
+    from mfc.gpu_diagnostics import ROCM_DEBUG_AGENT
 
     root = tempfile.mkdtemp()
     os.makedirs(os.path.join(root, "lib"), exist_ok=True)
@@ -268,7 +279,7 @@ def test_the_agent_gate_is_not_evaluated_at_import(monkeypatch):
     as it would on Phoenix, where the library genuinely is missing, and with no
     way to tell the two apart. So it has to re-read the environment each call.
     """
-    from mfc.test.test import rocm_debug_agent_path
+    from mfc.gpu_diagnostics import rocm_debug_agent_path
 
     # A machine with ROCm installed finds the real agent, so pin the
     # environment rather than trusting whatever the host happens to have.
@@ -282,7 +293,7 @@ def test_the_agent_gate_is_not_evaluated_at_import(monkeypatch):
 
 def test_the_agent_gate_follows_ld_library_path_too(monkeypatch):
     """That is the variable `mfc.sh load` actually changes on Frontier."""
-    from mfc.test.test import rocm_debug_agent_path
+    from mfc.gpu_diagnostics import rocm_debug_agent_path
 
     monkeypatch.setenv("ROCM_PATH", "")
     monkeypatch.setenv("LD_LIBRARY_PATH", "")
@@ -295,7 +306,7 @@ def test_the_agent_gate_follows_ld_library_path_too(monkeypatch):
 
 
 def test_the_agent_is_enabled_when_reachable(monkeypatch):
-    from mfc.test.test import fault_diagnostic_env
+    from mfc.gpu_diagnostics import fault_diagnostic_env
 
     monkeypatch.setenv("ROCM_PATH", "")
     monkeypatch.setenv("LD_LIBRARY_PATH", "")
@@ -316,7 +327,7 @@ def test_the_summary_has_the_same_shape_as_the_real_report():
     Structure only, never the values: pinning 125 waves or that PC histogram
     would encode one fault rather than test the code.
     """
-    from mfc.test.test import summarize_rocm_debug_agent
+    from mfc.gpu_diagnostics import summarize_rocm_debug_agent
 
     summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_631)
 
@@ -363,7 +374,7 @@ def test_the_summarizer_handles_rocm_720_as_well_as_631():
     memory access fault", so it returned '' for 65,210 lines of real output --
     on the very lane it was meant to serve, with no error to explain it.
     """
-    from mfc.test.test import summarize_rocm_debug_agent
+    from mfc.gpu_diagnostics import summarize_rocm_debug_agent
 
     summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_720)
 
@@ -375,7 +386,7 @@ def test_the_summarizer_handles_rocm_720_as_well_as_631():
 
 def test_both_rocm_formats_survive_together():
     """Neither fixture may be fixed at the other's expense."""
-    from mfc.test.test import summarize_rocm_debug_agent
+    from mfc.gpu_diagnostics import summarize_rocm_debug_agent
 
     assert summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_631)
     assert summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_720)
@@ -387,7 +398,7 @@ def test_the_omp_symbol_still_carries_module_procedure_and_line():
     _QM<module> P<procedure> _l<line>: m_time_steppers, s_tvd_rk, line 486 --
     the injected fault site, in a different mangling from CCE's OpenACC form.
     """
-    from mfc.test.test import summarize_rocm_debug_agent
+    from mfc.gpu_diagnostics import summarize_rocm_debug_agent
 
     summary = summarize_rocm_debug_agent(ROCM_AGENT_FIXTURE_720)
 
@@ -405,7 +416,7 @@ def test_every_measured_symbol_form_yields_module_procedure_and_line():
     shows it is the compiler. Anything that parses these must not assume the
     former.
     """
-    from mfc.test.test import summarize_rocm_debug_agent
+    from mfc.gpu_diagnostics import summarize_rocm_debug_agent
 
     lanes = {
         "CCE acc": "s_tvd_rk$m_time_steppers_$ck_L486_6",
@@ -420,3 +431,76 @@ def test_every_measured_symbol_form_yields_module_procedure_and_line():
         assert summary, f"{lane}: agent report not recognised"
         assert symbol in summary, f"{lane}: symbol lost from the summary"
         assert "486" in summary, f"{lane}: source line lost"
+
+
+def test_the_bench_runner_summarizes_an_agent_report(tmp_path):
+    """bench.py ran GPU cases with no fault handling at all.
+
+    It printed a fixed log_tail on failure, which cannot surface an agent
+    report: the tail is one wave's registers and the kernel name is not in it.
+    """
+    from mfc.bench import bench_failure_report
+    from mfc.common import log_tail
+
+    # The fixture must be longer than log_tail's window, or the tail happens to
+    # contain the kernel name and the test passes against the old behaviour --
+    # proving nothing. A real report is 65,210 lines; this pads to just past the
+    # window so the tail cannot reach the kernel name, which is the actual
+    # failure being guarded against.
+    padding = "\n".join(f"    v{n}: 0x00000000" for n in range(200))
+    log = tmp_path / "case.out"
+    log.write_text(ROCM_AGENT_FIXTURE_720 + padding, encoding="utf-8")
+
+    assert "_QMm_time_steppersPs_tvd_rk_l486" not in log_tail(str(log)), "fixture too short to distinguish tail from summary"
+
+    report = bench_failure_report(str(log))
+
+    assert "__omp_offloading_8116438_1c00689b__QMm_time_steppersPs_tvd_rk_l486" in report
+    assert "GPU fault summary" in report
+
+
+def test_the_bench_runner_falls_back_when_there_is_no_agent_report(tmp_path):
+    """An ordinary build or tolerance failure must look exactly as it did."""
+    from mfc.bench import bench_failure_report
+
+    log = tmp_path / "case.out"
+    log.write_text("ordinary failure\nsomething went wrong\n", encoding="utf-8")
+
+    assert "something went wrong" in bench_failure_report(str(log))
+
+
+def test_the_shell_summarizer_reports_absence_by_exit_code(tmp_path):
+    """The case-opt script needs to know when to fall back, from a shell."""
+    import subprocess
+
+    script = pathlib.Path(__file__).resolve().parents[3] / ".github" / "scripts" / "summarize_gpu_fault.py"
+
+    agent = tmp_path / "agent.log"
+    agent.write_text(ROCM_AGENT_FIXTURE_720, encoding="utf-8")
+    found = subprocess.run([sys.executable, str(script), str(agent)], capture_output=True, text=True, check=False)
+    assert found.returncode == 0
+    assert "_QMm_time_steppersPs_tvd_rk_l486" in found.stdout
+
+    plain = tmp_path / "plain.log"
+    plain.write_text("ordinary failure\n", encoding="utf-8")
+    missing = subprocess.run([sys.executable, str(script), str(plain)], capture_output=True, text=True, check=False)
+    assert missing.returncode == 1
+    assert missing.stdout.strip() == ""
+
+
+def test_a_missing_agent_report_on_a_gpu_fault_is_called_out():
+    """The failure that already happened once, made visible.
+
+    A summarizer written against one ROCm version returned nothing for 65,210
+    lines of another's output, and the only symptom was raw output where a
+    summary should have been. If the agent is reachable and the failure is a GPU
+    fault, an unrecognised report has to say so.
+    """
+    import inspect
+
+    from mfc.test.test import _handle_case
+
+    src = inspect.getsource(_handle_case)
+
+    assert "rocm_debug_agent_path() is not None" in src
+    assert "format has changed" in src
