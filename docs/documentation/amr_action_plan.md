@@ -226,6 +226,29 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-02 (56) — THE "STATIC-SEED NaN" IS A SCRATCH-SIZING BUG SINCE a108dd37, AND IT IS NOT GPU-ONLY (two rulings retracted)
+
+Task 2's 12-arm matrix (report in the SDD workspace; fixtures under amr-bench/cpu/validator_fixtures/) measured the predicate:
+**a run NaNs exactly when a refined block's fine extent exceeds the rank's own coarse subdomain extent** -- reachable only when
+`amr_max_grid_size > 0` pins the box cap above the min-over-ranks local half-extent. It reproduces on CPU and GPU, at
+`amr_max_level = 1`, with any seed position, always at the first save after the first dynamic regrid (step 20); np=1, no-regrid,
+`amr_max_grid_size = 16` and `= 0` are clean. Mechanism: a108dd37 removed the abort that forbade this configuration, relying
+on 86782249's widening of m/n/p-keyed scratch to m_alloc/n_alloc/p_alloc -- which is INCOMPLETE on the z axis (a108dd37 was
+verified on a 2D case). Localized to s_amr_apply_reflux consuming a NaN `freg(3)%%hi` (the z faces) captured in the first
+post-regrid fine RHS; the owner's fine state and ghosts are clean. The same signature appears in a 199^3 log from 2026-08-29
+(the "prodsize16" class). The 100^3/np8 decks fail because the cap there resolves to 50 coarse cells (amr_maxc caps it below
+the requested 64) and so spans 100 fine cells against a 50-cell rank extent; the 400^3/np8 deck (cap 64 -> 128 fine cells,
+200-cell ranks) does not.
+
+**Retracted:** ledger-54/55-era rulings that this was "GPU-only" (Task 1's CPU arms ran 10-15 steps and never reached the
+step-20 regrid) and that it was a static-seed/multi-level property. Both were measurement-truncation errors, recorded as such.
+
+**Rulings:** (1) Task 2 lands an INIT-TIME runtime guard (`! lint: runtime-check`, named abort, decomposition-aware) so the
+configuration is refused before the first regrid, plus fixtures that must abort and the full AMR golden pass; (2) the real fix
+-- finish the z-axis _alloc widening -- is Task 11 with a 3D regression golden (the coverage gap that let a108dd37 through);
+(3) restoring the pre-a108dd37 cap bound is REJECTED: the rank-independent box cap is what makes every weak-scaling ladder's
+box set identical across rank counts.
+
 ## 2026-09-02 (55) — THE AMReX CONTROLS: at its own GPU-sane grids AMReX's tax is 7.7-8.5x, not 20.5x
 
 Ledger 54 F2 predicted 6-8x. Measured (P2, reviewed twice; campaign logs/tax-proper2-0902_1208, all rows on k004-004, same
