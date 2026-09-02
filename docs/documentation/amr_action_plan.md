@@ -226,6 +226,61 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-02 (54) — EXPERT REVIEW OVERTURNS LEDGER 52's INFERENCE: MFC's AMR overhead is ~2x AMReX's in SECONDS; the regrid term is O(P)
+
+An independent HPC-performance review of the 2026-09-01 artifacts (read-only, briefed to falsify). The DATA of ledger 52 stand;
+its conclusion does not. Findings, most severe first, all verified against the logs:
+
+**F1. The ratio was denominator-dominated -- by the very mechanism ledger 52 used to retract the advection bar.** Tax = (cells
+advanced / coarse cells) x (per-cell inflation): MFC 3.91 x 4.30 = 16.8; AMReX 4.26 x 4.81 = 20.5. In seconds the AMR excess over
+the ideal-at-uniform-rate is MFC 3.02 s/step (16.2 ns per fine cell) vs AMReX 1.58 s/step (7.6 ns). MFC's ratio looked better only
+because its physics denominator is 2.4x larger. **MFC's AMR infrastructure costs about twice AMReX's.** The "payoff 3.8x vs 3.1x"
+is 64/tax restated, not independent evidence.
+
+**F2. AMReX was handed a launch-bound grid set.** `amr_max_grid_size` is in COARSE cells (m_amr.fpp:678-695, "an absolute number
+of coarse cells"), AMReX's per-level `max_grid_size` is in that level's own cells: the caps differ 8x+ and the emitted sets 30x
+(AMReX 1608 L1 + 5351 L2 grids of ~28-32^3 vs MFC 64 + 160 boxes of ~830K cells). AMReX's excess is a constant ~0.22 ms per
+grid-step at BOTH 100^3 (0.214) and 400^3 (0.23): the "157x at 100^3" was the same per-grid cost, not a size-floor curiosity.
+Hypothesis: at ~500 grids (max_grid_size 128, blocking 32, grid_eff 0.7 -- the AMReX defaults we did not use) its tax is ~6-8x.
+Also MFC's requested amr_cluster_eff 0.9 delivered 0.41 ([amr-grideff] tagged/shaped), so "0.9 on both sides" compared
+90%-efficient tiny grids with 41%-efficient huge boxes.
+
+**F3. Per-level asymmetry and n=1.** Absolute-vs-relative tagging makes AMReX's L2 a solid ball (+36% cells) and MFC's a shell
+(+64% L1); cell-corrected the gap is ~9%, inside MFC's single-run spread (P-prime taxes 9.5/11.7/7.9 = +/-20%). MFC's uniform
+denominator carries an 11.4 s warm-up (24%) assumed equal across two unreplicated runs. The README's "6-eq" is wrong: model_eqns 2
+is the 5-equation model.
+
+**F4. The density ladder is flat ONLY because rhs dominates at <= np512; the same logs hold an O(P) regrid term.** regrid 23.6 ->
+44.0 -> 64.1 -> 119.9 s (doublings 1.83/1.46/1.87): rb:gath calls/rank 4282 -> 43816 = the GLOBAL block count, at constant 0.63
+ms/call; pg:all 3640 -> 37368 calls; rg:clus 0.5 -> 5.3 s (still O(P)). Extrapolated linearly to 1e5 ranks: regrid ~23,000 s vs
+rhs 2,118 s -- ~10% efficiency; crossover with rhs near np8-9K. On the GPU arm regrid is already 6.05 s/call at np8 (vs 2.36 CPU
+np64), so the crossover comes ~10x earlier in P there. Ledger 53's "4% of wall, if one is ever needed" was wrong in emphasis:
+this IS the exascale term. The deck (hcid 306, a replicated blob lattice; fine_work exactly 2.000x per rung, imbalance 1.000)
+cannot exercise imbalance or migration.
+
+**F5. The kernel program targeted the wrong operating point.** Inside the AMR arm MFC's own fine-block rhs runs at 7.58 ns/cell
+vs 3.13 in the uniform arm (2.4x), and the L0 advance at 155 vs 90 ms/call -- block-mode inflation (launch/map gaps) booked as
+"physics". Profiling uni_40 would see neither. And "2.4x vs AMReX per cell" compared WENO5+HLLC against 2nd-order PLM with no
+matched-order control, although the ladder deck (weno_order 1, riemann_solver 5) is one. On the GPU arm the data-movement
+phases (gather 83 + seam 56 + halo 45 + b:halo 59 + reflux 73 + swap 13 = 330 s = 42%) plus stepfill dead fraction 0.61 are
+exactly what batched advance / device packing target; demoting them was unjustified.
+
+**F6. Claim 3 (A/B -5.0% = rg:clus) stands.** But the pre-registered W1 payoff check FAILED: restr/rs shares are unchanged and
+their call counts are identical old vs new (restr 666,060 calls at np512 = O(P): 83,060 -> 665,460 over the ladder) -- the
+restrict-wave wrapper's per-block scans (batch-4, unconverted) still walk every block. "W1's value is asymptotic" has no
+instrument reading yet.
+
+### Rulings (controller)
+1. Ledger 52's inference is RETRACTED: MFC's AMR machinery is NOT at or better than SOTA; in seconds it is ~2x AMReX's overhead,
+   and the honest bar needs AMReX at its own GPU-sane grid configuration. 2. The plan's kernel program is DEMOTED again; the
+   per-GPU program is (a) profile the AMR ARM to split block-mode inflation into kernel vs launch/map, (b) batched advance /
+   device-side packing (Phase 2) restored above kernel work, (c) a matched-order control (weno_order 1) before any kernel claim.
+3. The regrid-rebuild term (Task 4) is PROMOTED to the top AMR item, with a GPU np8 -> np32/56 ladder on the local mi2508x nodes
+   (7 exist) to find where it crosses the physics on GPU. 4. Controls to run before any two-code number is quoted again: AMReX at
+   grid_eff 0.7 / max_grid_size 128 / blocking_factor 32 with RELATIVE tagging (one-line change in cns_tag_denerror), three MFC
+   reps per arm on two nodes, per-level cell counts reported. 5. Batch-4 (Task 6) is the W1 item that the F6 instrument can
+   actually see; run it with the restr call-count as the gate. Plan file updated (amr-bench/notes/plan_remaining_0902.md).
+
 ## 2026-09-01 (53) — np512 A/B CLOSED: new binary 5.0% faster; the gain is the dirty-box merge, W1 is wall-neutral here; a ledger-52 claim RETRACTED
 
 Job 396991, one 8-node allocation, arms interleaved old/new/old/new (old = 0831 pre-port binary 94c73c4d,
@@ -277,7 +332,7 @@ NOT tuned away).
 
 ### Result at the 400^3 point (the production-relevant one)
 | | AMR (s/200 steps) | uniform (s/200 steps) | overhead tax |
-| MFC (WENO5+HLLC, 6-eq) | 787.4 | 46.9 | 16.8x |
+| MFC (WENO5+HLLC, 5-eq model) | 787.4 | 46.9 | 16.8x |
 | AMReX GPU/CNS (PLM+Riemann) | 397.5 / 399.1 (two samples) | 18.6 / 19.5 | 21.3x / 20.5x |
 **MFC's AMR overhead ratio is ~20% LOWER than AMReX's own**, with AMReX carrying 12% more fine work.
 Payoff (fine-uniform twin = 1600^3, infeasible on 8 GPUs; extrapolated from each code's measured uniform
