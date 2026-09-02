@@ -144,19 +144,19 @@ contains
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
                         ! entropy
-                        sk(i) = cvs(i)*log((TS**gs_min(i))/((pS + ps_inf(i))**(gs_min(i) - 1.0_wp))) + qvps(i)
+                        sk(i) = cvs(i)*log((TS**isentrope_n(i))/((pS + isentrope_B(i))**(isentrope_n(i) - 1.0_wp))) + qvps(i)
 
                         ! enthalpy
-                        hk(i) = gs_min(i)*cvs(i)*TS + qvs(i)
+                        hk(i) = isentrope_n(i)*cvs(i)*TS + qvs(i)
 
                         ! Gibbs-free energy
                         gk(i) = hk(i) - TS*sk(i)
 
                         ! densities
-                        rhok(i) = (pS + ps_inf(i))/((gs_min(i) - 1)*cvs(i)*TS)
+                        rhok(i) = f_sg_thermal(pS, TS, isentrope_n(i), isentrope_B(i), cvs(i))
 
                         ! internal energy
-                        ek(i) = (pS + gs_min(i)*ps_inf(i))/(pS + ps_inf(i))*cvs(i)*TS + qvs(i)
+                        ek(i) = (pS + isentrope_n(i)*isentrope_B(i))/(pS + isentrope_B(i))*cvs(i)*TS + qvs(i)
                     end do
 
                     ! calculating volume fractions, internal energies, and total entropy
@@ -202,14 +202,14 @@ contains
         mCP = 0.0_wp; mQ = 0.0_wp; p_infpT_sum = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            p_infpT(i) = ps_inf(i)
+            p_infpT(i) = isentrope_B(i)
             p_infpT_sum = p_infpT_sum + abs(p_infpT(i))
         end do
         ! Performing tests before initializing the pT-equilibrium
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             ! sum of the total alpha*rho*cp of the system
-            mCP = mCP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*gs_min(i)
+            mCP = mCP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*isentrope_n(i)
 
             ! sum of the total alpha*rho*q of the system
             mQ = mQ + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
@@ -241,7 +241,8 @@ contains
         ! the Newton's solver
         pO = 0.0_wp
 
-        ! Maybe improve this condition afterwards. As long as the initial guess is in between -min(ps_inf) and infinity, a solution
+        ! Maybe improve this condition afterwards. As long as the initial guess is in between -min(isentrope_B) and infinity, a
+        ! solution
         ! should be able to be found.
         pS = 1.0e4_wp
 
@@ -262,10 +263,10 @@ contains
             gpp = 0.0_wp; gp = 0.0_wp; hp = 0.0_wp
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
-                gp = gp + (gs_min(i) - 1.0_wp)*q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
+                gp = gp + (isentrope_n(i) - 1.0_wp)*q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
                            & l)*cvs(i)*(rhoe + pS - mQ)/(mCP*(pS + p_infpT(i)))
 
-                gpp = gpp + (gs_min(i) - 1.0_wp)*q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
+                gpp = gpp + (isentrope_n(i) - 1.0_wp)*q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
                              & l)*cvs(i)*(p_infpT(i) - rhoe + mQ)/(mCP*(pS + p_infpT(i))**2)
             end do
 
@@ -296,32 +297,34 @@ contains
         integer                                             :: i
 
         ! reacting fluids contribute via (ml, mT - ml); inert fluids are summed from q_cons_vf
-        mCP = ml*cvs(lp)*gs_min(lp) + (mT - ml)*cvs(vp)*gs_min(vp)
+        mCP = ml*cvs(lp)*isentrope_n(lp) + (mT - ml)*cvs(vp)*isentrope_n(vp)
         mQ = ml*qvs(lp) + (mT - ml)*qvs(vp)
         mCVGP = 0.0_wp; mCVGP2 = 0.0_wp; mCPD = 0.0_wp; mQD = 0.0_wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             if ((i /= lp) .and. (i /= vp)) then
-                mCP = mCP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*gs_min(i)
+                mCP = mCP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*isentrope_n(i)
                 mQ = mQ + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
-                mCVGP = mCVGP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*(gs_min(i) - 1)/(pS + ps_inf(i))
-                mCVGP2 = mCVGP2 + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*(gs_min(i) - 1)/((pS + ps_inf(i))**2)
+                mCVGP = mCVGP + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*(isentrope_n(i) - 1)/(pS + isentrope_B(i))
+                mCVGP2 = mCVGP2 + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, &
+                                            & l)*cvs(i)*(isentrope_n(i) - 1)/((pS + isentrope_B(i))**2)
                 mQD = mQD + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
-                mCPD = mCPD + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*gs_min(i)
+                mCPD = mCPD + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*cvs(i)*isentrope_n(i)
             end if
         end do
 
-        TS = 1.0_wp/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp) &
-                     & *(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mCVGP)
+        TS = 1.0_wp/(mT*cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp)) + ml*(cvs(lp)*(isentrope_n(lp) - 1)/(pS &
+                     & + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp))) + mCVGP)
 
         ! (i) Gibbs free-energy equality
-        R2D(1) = TS*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*(1 - log(TS)) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) - 1) &
-            & *log(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))) + qvs(lp) - qvs(vp)
+        R2D(1) = TS*((cvs(lp)*isentrope_n(lp) - cvs(vp)*isentrope_n(vp))*(1 - log(TS)) - (qvps(lp) - qvps(vp)) + cvs(lp) &
+            & *(isentrope_n(lp) - 1)*log(pS + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) - 1)*log(pS + isentrope_B(vp))) &
+            & + qvs(lp) - qvs(vp)
 
         ! (ii) constant-energy condition
-        R2D(2) = rhoe + pS + ml*(qvs(vp) - qvs(lp)) - mT*qvs(vp) - mQD + (ml*(gs_min(vp)*cvs(vp) - gs_min(lp)*cvs(lp)) &
-            & - mT*gs_min(vp)*cvs(vp) - mCPD)/(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS &
-            & + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)
+        R2D(2) = rhoe + pS + ml*(qvs(vp) - qvs(lp)) - mT*qvs(vp) - mQD + (ml*(isentrope_n(vp)*cvs(vp) - isentrope_n(lp)*cvs(lp)) &
+            & - mT*isentrope_n(vp)*cvs(vp) - mCPD)/(ml*(cvs(lp)*(isentrope_n(lp) - 1)/(pS + isentrope_B(lp)) - cvs(vp) &
+            & *(isentrope_n(vp) - 1)/(pS + isentrope_B(vp))) + mT*cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp)) + mCVGP)
 
     end subroutine s_compute_ptg_residual
 
@@ -353,12 +356,13 @@ contains
         ! recover a physical pressure guess when the incoming pS is non-physical
         if (((pS < 0.0_wp) .and. ((q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) + q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, &
             & k, &
-            & l)) > ((rhoe - gs_min(lp)*ps_inf(lp)/(gs_min(lp) - 1))/qvs(lp)))) .or. ((pS >= 0.0_wp) .and. (pS < 1.0e-1_wp))) then
+            & l)) > ((rhoe - isentrope_n(lp)*isentrope_B(lp)/(isentrope_n(lp) - 1))/qvs(lp)))) .or. ((pS >= 0.0_wp) &
+            & .and. (pS < 1.0e-1_wp))) then
             pS = 1.0e4_wp
         end if
 
-        ! pressure floor (stiffened gas requires pS + ps_inf > 0 for both phases)
-        pmin = -min(ps_inf(lp), ps_inf(vp)) + 1.0_wp
+        ! pressure floor (stiffened gas requires pS + isentrope_B > 0 for both phases)
+        pmin = -min(isentrope_B(lp), isentrope_B(vp)) + 1.0_wp
 
         call s_compute_ptg_residual(ml, mT, pS, j, k, l, q_cons_vf, rhoe, R2D, TS, mCP, mQ, mCVGP, mCVGP2, mCPD)
         resnorm = sqrt(R2D(1)**2 + R2D(2)**2)
@@ -368,26 +372,30 @@ contains
             if ((resnorm <= ptgalpha_eps) .or. (resnorm <= (ptgalpha_eps/1.e6_wp)*rhoe)) exit
 
             ! 2x2 Jacobian of (Gibbs equality, energy) with respect to (ml, pS) at the current state
-            dFdT = -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TS) - (qvps(lp) - qvps(vp)) + cvs(lp)*(gs_min(lp) - 1)*log(pS &
-                     & + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))
-            dTdm = -(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))*TS**2
-            dTdp = (mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2 + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp))**2 - cvs(vp) &
-                    & *(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) + mCVGP2)*TS**2
+            dFdT = -(cvs(lp)*isentrope_n(lp) - cvs(vp)*isentrope_n(vp))*log(TS) - (qvps(lp) - qvps(vp)) + cvs(lp)*(isentrope_n(lp) &
+                     & - 1)*log(pS + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) - 1)*log(pS + isentrope_B(vp))
+            dTdm = -(cvs(lp)*(isentrope_n(lp) - 1)/(pS + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp))) &
+                     & *TS**2
+            dTdp = (mT*cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp))**2 + ml*(cvs(lp)*(isentrope_n(lp) - 1)/(pS &
+                    & + isentrope_B(lp))**2 - cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp))**2) + mCVGP2)*TS**2
 
             Jac(1, 1) = dFdT*dTdm
-            Jac(1, 2) = dFdT*dTdp + TS*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))
+            Jac(1, &
+                & 2) = dFdT*dTdp + TS*(cvs(lp)*(isentrope_n(lp) - 1)/(pS + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) - 1)/(pS &
+                & + isentrope_B(vp)))
             Jac(2, &
-                & 1) = qvs(vp) - qvs(lp) + (cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp))/(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS &
-                & + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) &
-                & + mCVGP) - (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) - mT*cvs(vp)*gs_min(vp) - mCPD)*(cvs(lp)*(gs_min(lp) &
-                & - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))/((ml*(cvs(lp)*(gs_min(lp) - 1)/(pS &
-                & + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) &
-                & + mCVGP)**2)
+                & 1) = qvs(vp) - qvs(lp) + (cvs(vp)*isentrope_n(vp) - cvs(lp)*isentrope_n(lp))/(ml*(cvs(lp)*(isentrope_n(lp) - 1) &
+                & /(pS + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp))) + mT*cvs(vp)*(isentrope_n(vp) &
+                & - 1)/(pS + isentrope_B(vp)) + mCVGP) - (ml*(cvs(vp)*isentrope_n(vp) - cvs(lp)*isentrope_n(lp)) - mT*cvs(vp) &
+                & *isentrope_n(vp) - mCPD)*(cvs(lp)*(isentrope_n(lp) - 1)/(pS + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) - 1) &
+                & /(pS + isentrope_B(vp)))/((ml*(cvs(lp)*(isentrope_n(lp) - 1)/(pS + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) &
+                & - 1)/(pS + isentrope_B(vp))) + mT*cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp)) + mCVGP)**2)
             Jac(2, &
-                & 2) = 1 + (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) - mT*cvs(vp)*gs_min(vp) - mCPD)*(ml*(cvs(lp)*(gs_min(lp) &
-                & - 1)/(pS + ps_inf(lp))**2 - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS &
-                & + ps_inf(vp))**2 + mCVGP2)/(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) - cvs(vp)*(gs_min(vp) - 1)/(pS &
-                & + ps_inf(vp))) + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)**2
+                & 2) = 1 + (ml*(cvs(vp)*isentrope_n(vp) - cvs(lp)*isentrope_n(lp)) - mT*cvs(vp)*isentrope_n(vp) - mCPD) &
+                & *(ml*(cvs(lp)*(isentrope_n(lp) - 1)/(pS + isentrope_B(lp))**2 - cvs(vp)*(isentrope_n(vp) - 1)/(pS &
+                & + isentrope_B(vp))**2) + mT*cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp))**2 + mCVGP2)/(ml*(cvs(lp) &
+                & *(isentrope_n(lp) - 1)/(pS + isentrope_B(lp)) - cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp))) &
+                & + mT*cvs(vp)*(isentrope_n(vp) - 1)/(pS + isentrope_B(vp)) + mCVGP)**2
 
             detJ = Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1)
             ! singular Jacobian: no usable Newton direction, accept the current (best) state

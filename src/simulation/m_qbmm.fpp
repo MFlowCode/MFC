@@ -755,15 +755,14 @@ contains
             real(wp), dimension(nterms,0:2,0:2) :: coeff
         #:endif
         real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
-        real(wp) :: n_tait, B_tait
         integer  :: id1, id2, id3, i1, i2, j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
         $:GPU_UPDATE(device='[is1_qbmm, is2_qbmm, is3_qbmm]')
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[id1, id2, id3, moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, &
-                            & coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, &
-                            & rho_mw, k_mw, grad_T, i1, i2, j]')
+                            & coeff, ht, r, q, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T, &
+                            & i1, i2, j]')
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
@@ -772,9 +771,8 @@ contains
                     rho = q_prim_vf(eqn_idx%cont%beg)%sf(id1, id2, id3)
 
                     if (bubble_model == bubble_model_keller_miksis) then
-                        n_tait = 1._wp/gammas(1) + 1._wp
-                        B_tait = pi_infs(1)*(n_tait - 1)/n_tait
-                        c = n_tait*(pres + B_tait)*(1._wp - alf)/(rho)
+                        ! rho is the liquid partial density, so (1 - alf) recovers the pure liquid value
+                        c = f_bulk_modulus(pres, gammas(1), pi_infs(1))*(1._wp - alf)/(rho)
                         c = merge(sqrt(c), sgm_eps, c > 0._wp)
                     end if
 

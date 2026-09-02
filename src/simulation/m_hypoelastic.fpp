@@ -11,6 +11,7 @@ module m_hypoelastic
     use m_global_parameters
     use m_finite_differences
     use m_helper
+    use m_variables_conversion, only: f_bulk_modulus
 
     implicit none
 
@@ -626,8 +627,8 @@ contains
                         ! Same two-component K as the HLLD anchor state (see m_riemann_solver_hypo_hlld.fpp), including the
                         ! verysmall denominator regularization
                         pres_K = q_prim_vf(eqn_idx%E)%sf(k, l, q)
-                        blkmod1_K = ((gammas(1) + 1._wp)*pres_K + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_hypo(1)
-                        blkmod2_K = ((gammas(2) + 1._wp)*pres_K + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_hypo(2)
+                        blkmod1_K = f_bulk_modulus(pres_K, gammas(1), pi_infs(1)) + (4._wp/3._wp)*Gs_hypo(1)
+                        blkmod2_K = f_bulk_modulus(pres_K, gammas(2), pi_infs(2)) + (4._wp/3._wp)*Gs_hypo(2)
                         K_K = q_prim_vf(eqn_idx%adv%beg)%sf(k, l, q)*q_prim_vf(eqn_idx%adv%end)%sf(k, l, &
                                         & q)*(blkmod2_K - blkmod1_K)/(q_prim_vf(eqn_idx%adv%beg)%sf(k, l, &
                                         & q)*blkmod2_K + q_prim_vf(eqn_idx%adv%end)%sf(k, l, q)*blkmod1_K + verysmall)
