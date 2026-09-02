@@ -226,6 +226,74 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-01 (52) — THE PROPER TAX TEST: MFC's AMR overhead is LOWER than AMReX's; the per-cell physics is the gap
+
+### The old "tax over AMReX" was not a measurement
+The bar came from AMReX `Advection_AmrCore` (ONE linear scalar) under the claim "physics cancels in the
+ratio". It does not: tax = 1 + fine/coarse physics + infrastructure/coarse physics, and the infrastructure
+term is a fixed cost per box-step, so cheap physics INFLATES a code's tax and heavy physics deflates it.
+And the denominator (coarse-only uniform, 8 ranks) is halo-bound: b:halo went 71 -> 22 ms/call between two
+MI250X nodes on one day with compute identical to the decimal, so MFC's own tax read 9.6x (P-prime) and
+16.8x (today) with the SAME AMR arm (846 s vs P-prime's 738-924 s). Single-code taxes across days are void.
+
+### The proper protocol (logs/tax-proper-0901_2105, README lists every asymmetry)
+Both codes, k004-004 (MI250X x8), same hour, 8 ranks, differenced 240-40 steps from each code's own
+step-loop timer. Identical problem by construction: unit periodic box, entropy blob rho = 1 + 4 exp(-r^2/
+0.015625) at p = 1, u = 1, gamma 1.4, inviscid, RK3; density-gradient tagging with the same skirt boundary
+(MFC |drho|/rho > 0.008 central, AMReX |drho| >= 0.008 one-sided); ref_ratio 2; regrid_int 20; NO subcycling
+(AMReX subcycling_mode=None, verified one L2 advance per coarse step, 12 regrids each); reflux on;
+max_grid_size 64; buffer 4; grid_eff 0.9. AMReX side = Tests/GPU/CNS (plain compressible NS, GPU-native,
+HIP gfx90a, amrex 26.08) with a new Exec/Blob problem carrying the MFC IC; the EB_CNS problems never
+register with CMake. Refined fraction: AMReX 208.7M fine cells/step vs MFC 186.3M (+12%, errs against AMReX;
+NOT tuned away).
+
+### Result at the 400^3 point (the production-relevant one)
+| | AMR (s/200 steps) | uniform (s/200 steps) | overhead tax |
+| MFC (WENO5+HLLC, 6-eq) | 787.4 | 46.9 | 16.8x |
+| AMReX GPU/CNS (PLM+Riemann) | 397.5 / 399.1 (two samples) | 18.6 / 19.5 | 21.3x / 20.5x |
+**MFC's AMR overhead ratio is ~20% LOWER than AMReX's own**, with AMReX carrying 12% more fine work.
+Payoff (fine-uniform twin = 1600^3, infeasible on 8 GPUs; extrapolated from each code's measured uniform
+per-cell cost x 64 -- both weak-scale flat, so it is fair and equal): **MFC AMR beats brute force 3.8x, AMReX
+3.1x.** Absolute (NOT a ratio claim): AMReX uniform 1.52 ns/cell-step vs MFC 3.66 (2.4x) -- that is the
+hydro kernels (2nd-order PLM, 5 vars vs WENO5/HLLC 6-eq), not AMR infrastructure. **Re-aim: the per-GPU
+lever is the physics kernels' cost per cell; the AMR machinery is at or better than SOTA on this protocol.**
+This demotes the batched-advance / device-packing Phase 2 below kernel work.
+
+### The 100^3 "payoff point" is below the GPU size floor -- AMReX proved it
+At 1M base cells AMReX's AMR came out 157x over uniform and 5.7x SLOWER than brute force at 400^3
+(~1800 grids of ~16^3 cannot feed a GPU). Not an AMR result; the benchmark-size-floor rule
+(>= 10% of node GPU memory) holds for both codes. MFC's 100^3 AMR deck FAILED three ways and is a real
+finding for the checker, not for the tax: a 13-cell seed NaNs at step 1 (degenerate nesting, no validator
+error); a 50-cell seed aborts with a NAMED scratch-cap error (2*L0-extent > amr_maxc_fit); a 24-cell seed
+straddling the 2x2x2 rank split (38..61 on 100^3) NaNs at step 1 -- the static multi-level seed with a
+nested L2 that spans multiple owners is a silent-NaN path (the 400^3 deck's seed sits inside ONE rank).
+Both NaN modes belong in case_validator.py as named errors; the straddling one may be a bug.
+
+### Same-day supporting results
+Constant-density weak scaling (64 ranks/node, one job per rung): np64 2742/2746 s, np128 2776/2772 s,
+np256 2804/2799 s -> doublings 1.012/1.010 and 1.009/1.010 on two independent allocations (0.2%
+repeatability) vs the 1.20/1.15 bar; rhs flat to 0.2%; non-rhs +5%/doubling. The packed ladder's
+1.16/1.53/1.72 were ranks-per-node density (np64 at 8/node = 1122 s vs 2742 s at 64/node: a 2.44x
+per-rank memory-bandwidth effect, irrelevant to 8-GPU-per-node runs). qladder.sh packed every rung onto
+the largest rung's node count -- qdens.sh (one job per rung) replaces it for scaling work.
+np512 A/B on ONE allocation (old = 0831 pre-port binary, new = batch-3): old 3593 / 3620 s, new 3434 s
+(new2 pending) -> the new binary is ~4.8% FASTER; the earlier "+11%" was allocation/time-of-day (the old
+binary ran 3079 s at 01:46 on an idle cluster and 3593-3620 s at 19:00 on a busy one). rs:rfp per call
+0.231 -> 0.100 ms is the robust W1 signature.
+
+### Harness lessons (each cost a resubmit today; all banked as memories)
+Never export the whole /share/rock/lib (UCX dlopens its mismatched libhsa-runtime64: segv at >=32 ranks/
+node on CPU nodes AND in syscheck at 8 ranks on the GPU node) -- quarantine the single .so; never parse
+colour-aliased `ls`; `pkill -f` self-matches (rc 144); nodeinfo's srun ran one task per rank; qladder
+submits before any post-hoc patch can land. M1 landed as 0f6e9f0c (keyed F5 tags, xa_seq deleted,
+seed-2 gate) with 16/16 goldens, byte-identical counts, both seeds aborting.
+
+### Next
+1) new2 + probes -> close the A/B and name the slow node. 2) case_validator entries for the two NaN seed
+modes; reproduce the straddling-seed NaN at np=8 CPU (a real bug candidate). 3) Kernel-cost program
+(the 2.4x per cell) becomes the per-GPU item; tier-1 metadata stays the exascale-memory item. 4) Frontier
+ladder remains user-gated.
+
 ## 2026-09-01 (51) — W1 BATCH 3: all six remaining per-stage scans converted, and the scans were the SMALL half
 
 ### The conversions (one commit, src/simulation/m_amr.fpp only)
