@@ -63,46 +63,28 @@ def fault_diagnostic_env(base: dict) -> dict:
     env = dict(base)
 
     # OFFLOAD_TRACK_ALLOCATION_TRACES and OFFLOAD_TRACK_NUM_KERNEL_LAUNCH_TRACES
-    # USED TO BE SET HERE. They are not, and must not be, because they are not
-    # free: they instrument every allocation and every kernel launch, so a
-    # healthy run pays for them continuously.
+    # were set here and had to be removed. They instrument every allocation and
+    # every kernel launch, so a healthy run pays continuously: on an MI210 with
+    # amdflang, test AFBCBDFA takes 5.94 s with neither and times out past 400 s
+    # with either one alone -- enough, against the 1-hour test timeout, to turn
+    # a fault into a timeout and hide what they exist to explain.
     #
-    # Measured on an MI210 with amdflang/libomptarget, test AFBCBDFA:
-    #
-    #     neither                     5.94 s   passes
-    #     allocation traces only      >400 s   timed out
-    #     launch traces only          >400 s   timed out
-    #     both                        >400 s   timed out
-    #
-    # An unbounded run went past 30 minutes on a 6-second test. Both variables
-    # are independently pathological, and against MFC's 1-hour test timeout that
-    # is enough to turn a fault into a timeout -- hiding the very thing they
-    # exist to explain.
-    #
-    # The earlier claim that they are "inert until the runtime is already
-    # aborting" was an inference from what they are documented to do, never a
-    # measurement. The Frontier A/B that appeared to confirm it ran on CCE,
-    # whose offload runtime ignores libomptarget variables entirely -- so it
-    # measured a lane where they do nothing and read that as evidence they cost
-    # nothing anywhere.
-    #
-    # What they added was one line saying whether the faulting address was ever
-    # a real allocation. The debug agent below names the faulting kernel, source
-    # line and registers, which subsumes it.
+    # They looked free only because the A/B that cleared them ran on CCE, whose
+    # offload runtime ignores libomptarget variables entirely. What they added,
+    # one line on whether the address was ever a real allocation, the agent's
+    # kernel name and source line subsume.
 
-    # Two ways the caller can say "stay out of my way", both of which mean a
-    # human is already debugging this run by hand:
+    # Skipped when the caller is already debugging by hand: they chose a tool,
+    # or they set HSA_ENABLE_DEBUG to collect a GPU core dump, which the agent
+    # is mutually exclusive with. Loading it anyway would leave them with
+    # "Failed to enable debug interface" and no dump. An attached rocgdb trips
+    # the same path.
     #
-    #   HSA_TOOLS_LIB already set -- they chose a tool; do not replace it.
-    #   HSA_ENABLE_DEBUG set      -- they are collecting a GPU core dump, and
-    #                                the agent is mutually exclusive with one.
-    #                                Loading it anyway yields "Failed to enable
-    #                                debug interface" and no dump, with the
-    #                                cause being something the harness did
-    #                                behind them.
-    #
-    # The same reasoning covers an attached rocgdb, which trips the same
-    # already-attached path.
+    # Cost, Frontier CCE --gpu mp over four interleaved pairs: no effect
+    # detected on a healthy run (resolution ~0.8%), no output at all until
+    # something faults, and +0.387 s on a faulting run -- 0.011% of the test
+    # timeout. ~3-4% on an MI210 (n=2). It does not supersede libomptarget's own
+    # report on the AFAR lane; it is exclusive with ROCr core dumps only.
     if "HSA_TOOLS_LIB" not in env and not env.get("HSA_ENABLE_DEBUG") and rocm_debug_agent_path() is not None:
         env["HSA_TOOLS_LIB"] = ROCM_DEBUG_AGENT
 
