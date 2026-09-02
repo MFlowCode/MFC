@@ -881,6 +881,7 @@ contains
         integer(kind=MPI_OFFSET_kind)        :: WP_MOK, var_MOK, MOK
         integer                              :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE)  :: status
+        character(len=10)                    :: t_step_string
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
 
@@ -891,21 +892,39 @@ contains
         WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
         MOK = int(1._wp, MPI_OFFSET_KIND)
 
-        write (file_loc, '(A)') 'ib.dat'
-        file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+        if (file_per_process) then
+            call s_int_to_str(time_step, t_step_string)
 
-        call s_mpi_barrier()
-        call s_delay_file_access(proc_rank)
+            if (proc_rank == 0) then
+                file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string)
+                call s_create_directory(trim(file_loc))
+            end if
+            call s_mpi_barrier()
+            call s_delay_file_access(proc_rank)
 
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            write (file_loc, '(A,I0,A,i7.7,A)') 'ib_markers_', time_step, '_', proc_rank, '.dat'
+            file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
 
-        var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(time_step/t_step_save))
-        if (time_step == 0) disp = 0
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, MPI_INTEGER, status, ierr)
+            call MPI_FILE_CLOSE(ifile, ierr)
+        else
+            write (file_loc, '(A)') 'ib.dat'
+            file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
 
-        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, 'native', mpi_info_int, ierr)
-        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, MPI_INTEGER, status, ierr)
-        call MPI_FILE_CLOSE(ifile, ierr)
+            call s_mpi_barrier()
+            call s_delay_file_access(proc_rank)
+
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+
+            var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(time_step/t_step_save))
+            if (time_step == 0) disp = 0
+
+            call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, 'native', mpi_info_int, ierr)
+            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, MPI_INTEGER, status, ierr)
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
 #endif
 
     end subroutine s_write_parallel_ib_data
