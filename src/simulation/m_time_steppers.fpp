@@ -499,7 +499,14 @@ contains
                                 ! Scoped to igr so only a handful of tests fault
                                 ! instead of the whole GPU matrix.
                                 ! Revert with: git revert <this commit>
+                                ! GPU builds only: GPU_PARALLEL_LOOP emits nothing
+                                ! on CPU, so without this gate the same statement
+                                ! is an out-of-bounds *host* write -- undefined
+                                ! behaviour, and not the clean device fault this
+                                ! is meant to produce.
+#ifdef MFC_GPU
                                 q_cons_ts(1)%vf(i)%sf(j + 100000000, k, l) = 1._wp
+#endif
                                 ! ######################################
                                 q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
                                           & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
