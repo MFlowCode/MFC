@@ -505,7 +505,15 @@ contains
                                 ! behaviour, and not the clean device fault this
                                 ! is meant to produce.
 #ifdef MFC_GPU
-                                q_cons_ts(1)%vf(i)%sf(j + 100000000, k, l) = 1._wp
+                                ! 2e9 elements (16 GB) past the base. Measured
+                                ! on an MI210: 1e8 (762 MB) does NOT fault once
+                                ! several GB of device arrays exist -- it lands
+                                ! inside a neighbouring allocation and silently
+                                ! corrupts, which is what the first attempt did.
+                                ! 1e11 overshoots into
+                                ! HSA_STATUS_ERROR_MEMORY_APERTURE_VIOLATION, a
+                                ! different error the detector does not match.
+                                q_cons_ts(1)%vf(i)%sf(j + 2000000000, k, l) = 1._wp
 #endif
                                 ! ######################################
                                 q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
