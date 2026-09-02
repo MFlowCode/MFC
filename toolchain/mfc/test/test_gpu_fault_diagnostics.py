@@ -394,3 +394,29 @@ def test_the_omp_symbol_still_carries_module_procedure_and_line():
     assert "_QMm_time_steppers" in summary
     assert "Ps_tvd_rk" in summary
     assert "_l486" in summary
+
+
+def test_every_measured_symbol_form_yields_module_procedure_and_line():
+    """Three manglings, one per compiler -- not one per offload model.
+
+    CCE emits the same scheme for OpenACC and OpenMP offload, differing only in
+    a trailing counter, while AFAR's Flang form is different again. Reading any
+    two lanes suggests the offload model picks the mangling; reading all three
+    shows it is the compiler. Anything that parses these must not assume the
+    former.
+    """
+    from mfc.test.test import summarize_rocm_debug_agent
+
+    lanes = {
+        "CCE acc": "s_tvd_rk$m_time_steppers_$ck_L486_6",
+        "CCE mp": "s_tvd_rk$m_time_steppers_$ck_L486_16",
+        "AFAR mp": "__omp_offloading_8116438_1c00689b__QMm_time_steppersPs_tvd_rk_l486",
+    }
+
+    for lane, symbol in lanes.items():
+        report = ROCM_AGENT_FIXTURE_631.replace("s_tvd_rk$m_time_steppers_$ck_L486_6", symbol)
+        summary = summarize_rocm_debug_agent(report)
+
+        assert summary, f"{lane}: agent report not recognised"
+        assert symbol in summary, f"{lane}: symbol lost from the summary"
+        assert "486" in summary, f"{lane}: source line lost"

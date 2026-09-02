@@ -838,12 +838,17 @@ def fault_diagnostic_env(base: dict) -> dict:
     # the faulting instruction and per-wave registers -- where no CRAY_ACC_*
     # variable names it at all.
     #
-    # gpu-mp is EXPECTED to work but is untested: the agent hooks ROCr, which
-    # sits below both OpenACC and OpenMP offload, so it should fire either way.
-    # What is unverified is the attribution, not the firing -- that symbol is
-    # CCE's OpenACC mangling, and whether module, subroutine and line survive in
-    # the OpenMP-offload form has never been run. The summarizer does not care
-    # (its regex takes whatever the symbol is); the claim does.
+    # Measured on all four lanes. The symbol form is set by the COMPILER, not by
+    # the offload model -- which is the opposite of what it looks like from any
+    # two of them:
+    #
+    #   CCE  acc  s_tvd_rk$m_time_steppers_$ck_L486_6
+    #   CCE  mp   s_tvd_rk$m_time_steppers_$ck_L486_16   (same scheme, counter differs)
+    #   AFAR mp   __omp_offloading_..._QMm_time_steppersPs_tvd_rk_l486  (Flang)
+    #
+    # All three carry module, subroutine and line. The summarizer does not care
+    # which -- its regex takes whatever the symbol is -- but anything that tries
+    # to parse the symbol must not assume one scheme per offload model.
     #
     # Cost on a healthy run: one paired A/B put it at 4.5645 ns/gp/eq/rhs
     # against an agent-free spread of 4.5301-4.5614, i.e. 0.07% above a range
@@ -925,6 +930,18 @@ def summarize_rocm_debug_agent(out: str, max_disasm: int = 14) -> str:
     all for 65,210 lines of real 7.2.0 output. Hence the tolerant separator, and
     reusing is_gpu_memory_fault rather than hardcoding one version's wording.
     Both formats are pinned by fixtures below.
+
+    Validated against three real reports, not one:
+
+        CCE  acc  ROCm 6.3.1   14,635 lines -> 37
+        CCE  mp   ROCm 6.3.1   13,826 lines -> 35
+        AFAR mp   ROCm 7.2.0   65,210 lines -> 36
+
+    and output from a run with no agent loaded still yields '', so the fallback
+    is intact. The stop-PC histogram earns its place most on the CCE OpenMP
+    lane, which halts at seven distinct PCs (62/21/19/10/10/2/1) against four
+    for CCE OpenACC and one for AFAR: quoting a single PC would be wrong there
+    six times in seven.
     """
     waves = re.findall(r"^wave_\d+: pc=(0x[0-9a-f]+).*?\(stopped, reason: (\w+)\)", out, re.M)
     if not waves:
