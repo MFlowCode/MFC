@@ -645,7 +645,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
             # runtime's diagnostics on. The address alone is not actionable; the
             # kernel and source line are.
             if is_gpu_memory_fault(cmd.stdout):
-                raise MFCException(f"Test {case}: Failed to execute MFC. [gpu-memory-fault]")
+                raise MFCException(f"Test {case}: Failed to execute MFC {GPU_FAULT_MARKER}.")
             raise MFCException(f"Test {case}: Failed to execute MFC.")
 
         _assert_particle_cloud_ib_state(case)
@@ -753,6 +753,18 @@ def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
 # A GPU memory fault as the runtimes report it. CCE surfaces the raw HSA
 # message; AFAR's offload runtime prints its own. Both are matched because the
 # retry diagnostics below help either way.
+# The marker _handle_case attaches to the exception it raises, for the retry in
+# handle_case to read back. Two constraints, both learned the hard way:
+#
+#   * It must be one of the signatures below verbatim. The first version wrote
+#     "[gpu-memory-fault]" while the reader searched for "memory access fault by
+#     gpu", so the two never matched, the diagnostic never fired, and seven
+#     source-inspecting tests passed anyway.
+#   * No square brackets. main.py renders these messages through Rich, which
+#     parses "[...]" as a style tag and deletes it -- which is why the CI log
+#     showed a bare "Failed to execute MFC. " with the marker missing.
+GPU_FAULT_MARKER = "(memory access fault by GPU)"
+
 GPU_FAULT_SIGNATURES = (
     "memory access fault by gpu",
     "offload error: memory access fault",

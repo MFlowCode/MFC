@@ -66,41 +66,6 @@ def test_the_diagnostic_env_does_not_mutate_what_it_was_given():
     assert "CRAY_ACC_DEBUG" not in base
 
 
-def test_a_gpu_fault_is_flagged_so_the_retry_can_react():
-    # _handle_case marks the exception when the run's output shows a GPU fault;
-    # the retry loop keys off that mark. Without the mark the retry is just
-    # another identical attempt.
-    import inspect
-
-    from mfc.test import test as t
-
-    src = inspect.getsource(t._handle_case)
-    assert "is_gpu_memory_fault" in src, "the failure path must classify GPU faults"
-    assert "gpu-memory-fault" in src
-
-
-def test_the_retry_loop_enables_diagnostics_after_a_gpu_fault():
-    import inspect
-
-    from mfc.test import test as t
-
-    src = inspect.getsource(t.handle_case)
-    assert "diagnostic_env" in src, "the retry must enable diagnostics"
-    assert "case_env" in src
-    # and must pass it to the run, not merely compute it
-    assert "env=case_env" in src
-
-
-def test_diagnostics_are_not_enabled_for_ordinary_failures():
-    import inspect
-
-    from mfc.test import test as t
-
-    src = inspect.getsource(t.handle_case)
-    # the enabling is guarded by the fault check, not unconditional
-    assert "if is_gpu_memory_fault(" in src
-
-
 def test_a_diagnostic_retry_does_not_dump_its_whole_output():
     # CRAY_ACC_DEBUG prints per kernel launch and per transfer: measured at
     # 142,777 lines for a single 800-cell 1D case on Frontier. Echoing that into
@@ -113,3 +78,46 @@ def test_a_diagnostic_retry_does_not_dump_its_whole_output():
 
     src = inspect.getsource(t._handle_case)
     assert "log_tail" in src, "the diagnostic retry's output must be bounded"
+
+
+def test_the_marker_written_on_failure_is_the_one_the_retry_reads():
+    """The round trip, which source inspection could not check.
+
+    _handle_case raises an exception carrying a marker; handle_case decides
+    whether to enable diagnostics by inspecting that exception. The first
+    version wrote "[gpu-memory-fault]" and read for "memory access fault by
+    gpu", so the two never matched and the feature was dead while seven tests
+    passed. Assert the actual hand-off.
+    """
+    from mfc.test.test import GPU_FAULT_MARKER, is_gpu_memory_fault
+
+    # what _handle_case raises when the run's output shows a GPU fault
+    raised = f"Test whatever: Failed to execute MFC. {GPU_FAULT_MARKER}"
+
+    # what handle_case must conclude from it
+    assert is_gpu_memory_fault(raised), "the retry cannot see the marker the failure wrote"
+
+
+def test_an_ordinary_failure_message_does_not_look_like_a_gpu_fault():
+    from mfc.test.test import is_gpu_memory_fault
+
+    assert not is_gpu_memory_fault("Test whatever: Failed to execute MFC.")
+
+
+def test_the_marker_survives_rich_rendering():
+    """Rich eats "[...]" as a style tag.
+
+    The marker is carried in an exception message that main.py prints through
+    Rich. A bracketed marker is silently deleted before it reaches the log, so
+    the one signal a human has that the diagnostic path was taken disappears.
+    """
+    import io
+
+    from rich.console import Console
+
+    from mfc.test.test import GPU_FAULT_MARKER
+
+    console = Console(file=io.StringIO(), force_terminal=False)
+    console.print(f"Failed to execute MFC {GPU_FAULT_MARKER}.")
+
+    assert GPU_FAULT_MARKER in console.file.getvalue()
