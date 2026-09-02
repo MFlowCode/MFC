@@ -228,7 +228,8 @@ exists, or the same class of breakage will keep accumulating undetected.
 
 ## 2026-09-02 (56) — THE "STATIC-SEED NaN" IS A SCRATCH-SIZING BUG SINCE a108dd37, AND IT IS NOT GPU-ONLY (two rulings retracted)
 
-Task 2's 12-arm matrix (report in the SDD workspace; fixtures under amr-bench/cpu/validator_fixtures/) measured the predicate:
+Task 2's 12-arm matrix (report in the SDD workspace; Task 1's decks under amr-bench/cpu/validator_fixtures/, the guard fixtures
+under amr-bench/gpu/task2/guard/) measured the predicate:
 **a run NaNs exactly when a refined block's fine extent exceeds the rank's own coarse subdomain extent** -- reachable only when
 `amr_max_grid_size > 0` pins the box cap above the min-over-ranks local half-extent. It reproduces on CPU and GPU, at
 `amr_max_level = 1`, with any seed position, always at the first save after the first dynamic regrid (step 20); np=1, no-regrid,
