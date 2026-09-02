@@ -634,12 +634,11 @@ def _handle_case(case: TestCase, devices: typing.Set[int], env: dict = None):
             if env is None:
                 cons.print(cmd.stdout)
             else:
-                # A diagnostic retry. CRAY_ACC_DEBUG prints per kernel launch and
-                # per transfer -- 142,777 lines for one 800-cell 1D case on
-                # Frontier -- so echoing it whole would bury the failure it is
-                # meant to explain. The fault comes last, and the launch just
-                # before it names the kernel and source line, so the tail is the
-                # part worth keeping. The full capture stays in out_pre_sim.txt.
+                # A diagnostic retry. The offload runtime prints the recent
+                # kernel-launch list and, with allocation tracking on, a verdict
+                # on the faulting address -- and both sit at the very end, just
+                # before the abort. Echoing the whole run would bury them, so
+                # keep the tail. The full capture stays in out_pre_sim.txt.
                 cons.print(console_safe(log_tail(out_filepath, max_lines=80)))
             # Flag a GPU memory fault so the retry can re-run with the offload
             # runtime's diagnostics on. The address alone is not actionable; the
@@ -783,49 +782,34 @@ def is_gpu_memory_fault(text: str) -> bool:
 
 
 def diagnostic_env(base: dict) -> dict:
-    """`base` plus the offload runtimes' fault diagnostics.
+    """`base` plus the one offload diagnostic measured to add information.
 
-    Measured on Frontier: CRAY_ACC_DEBUG=1 makes CCE log every kernel launch
-    with its name and source line, and OFFLOAD_TRACK_ALLOCATION_TRACES makes
-    AFAR say whether the faulting address ever belonged to a real allocation.
-    Each runtime ignores the other's variable, so both are set rather than
-    detecting the cluster here.
+    This started out setting CRAY_ACC_DEBUG and AMD_SERIALIZE_KERNEL/COPY too.
+    A fault injected into m_time_steppers (a known out-of-bounds device write)
+    measured what each was worth:
 
-    AMD_SERIALIZE_KERNEL/COPY are what make the launch log worth reading.
-    Dispatches are asynchronous, so a fault is reported long after the launch
-    that caused it and the log's last entry is simply whatever ran next. With a
-    known out-of-bounds write injected into m_time_steppers, the last kernel
-    logged before the fault was s_write_run_time_information in 111 of 140
-    faults and m_time_steppers in none of them -- a confident, wrong suspect,
-    which is worse than no diagnostic at all. Serializing is meant to make the
-    runtime wait on each dispatch so the fault lands on the kernel that caused
-    it.
+      * AFAR/OpenMP already names the faulting kernel with no help from us --
+        "Kernel 0: omp target in _QMm_time_steppersPs_tvd_rk @ 486", correct in
+        90 of 90 faults, and printed on the *first* attempt. The premise this
+        retry was built on ("a fault reports only an address") is false here.
+      * CCE/OpenACC cannot name it at all. Across three runs CRAY_ACC_DEBUG
+        blamed s_write_run_time_information 386 times and the true culprit 0 of
+        473 -- dispatch is asynchronous, so its log's tail is whatever ran next.
+        A confidently wrong suspect is worse than none, so it is not set.
+      * AMD_SERIALIZE_* did not change either result; CCE ignores them (they are
+        HIP variables) and AFAR is already correct without them.
 
-    Measured since: CCE does NOT honour these. The same injected fault under
-    CRAY_ACC_DEBUG with both variables set still blamed
-    s_write_run_time_information in 168 of 213 faults and m_time_steppers in
-    none -- an unchanged distribution. They are HIP runtime variables and CCE's
-    offload runtime is not HIP. Whether the AFAR/OpenMP path honours them is
-    NOT yet measured; do not assume it does because the variables are HIP's.
-    Until that is measured, the CCE lane's kernel log should be read as launch
-    history only -- it does not identify the faulting kernel.
-
-    Cost, measured on the same machine: 13.7s -> 17.3s (1.27x) for a case that
-    emitted 142,777 ACC: lines. Against the 1 hour TEST_TIMEOUT_SECONDS a case
-    would have to take ~2800s unaided before the diagnostic retry could push it
-    over, and the slowest case observed in CI is around 1000s -- so a retry
-    cannot turn a fault into a timeout, which would hide the very thing it is
-    trying to show.
+    What remains is OFFLOAD_TRACK_ALLOCATION_TRACES, which is not free
+    information: it says whether the faulting address was ever a real host
+    allocation, separating "ran off the end of a known array" from "wild
+    pointer". It appeared in 60 retried faults and 0 unretried ones.
 
     Returns a new dict: these run in worker threads, and mutating a shared
-    environment would leak per-kernel logging into every concurrent case.
+    environment would leak diagnostics into every concurrent case.
     """
     return {
         **base,
-        "CRAY_ACC_DEBUG": "1",
         "OFFLOAD_TRACK_ALLOCATION_TRACES": "true",
-        "AMD_SERIALIZE_KERNEL": "3",
-        "AMD_SERIALIZE_COPY": "3",
     }
 
 

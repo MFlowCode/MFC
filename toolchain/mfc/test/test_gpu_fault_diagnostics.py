@@ -43,12 +43,10 @@ def test_does_not_fire_on_benign_pmix_noise():
     assert not is_gpu_memory_fault("PMIX ERROR: PMIX_ERR_NO_PERMISSIONS in file dstore_base.c at line 238")
 
 
-def test_the_diagnostic_env_carries_both_runtimes():
-    # Frontier CCE reads CRAY_ACC_DEBUG; frontier_amd's AFAR build reads the
-    # OFFLOAD_ variable. Each runtime ignores the other's, verified on both, so
-    # setting both avoids having to detect the cluster here.
+def test_the_diagnostic_env_enables_allocation_tracking():
+    # AFAR's libomptarget reads this; CCE ignores it. Only AFAR gains anything
+    # from a diagnostic retry, so there is nothing to detect the cluster for.
     env = diagnostic_env({"PATH": "/usr/bin"})
-    assert env["CRAY_ACC_DEBUG"] == "1"
     assert env["OFFLOAD_TRACK_ALLOCATION_TRACES"] == "true"
 
 
@@ -63,15 +61,14 @@ def test_the_diagnostic_env_does_not_mutate_what_it_was_given():
     # diagnostics into every concurrently running case.
     base = {"PATH": "/usr/bin"}
     diagnostic_env(base)
-    assert "CRAY_ACC_DEBUG" not in base
+    assert "OFFLOAD_TRACK_ALLOCATION_TRACES" not in base
 
 
 def test_a_diagnostic_retry_does_not_dump_its_whole_output():
-    # CRAY_ACC_DEBUG prints per kernel launch and per transfer: measured at
-    # 142,777 lines for a single 800-cell 1D case on Frontier. Echoing that into
-    # the CI log would bury the failure it is meant to explain. The fault is at
-    # the end, and the last launch before it is what names the kernel, so only
-    # the tail is worth keeping.
+    # A faulting run can emit six figures of offload logging. The kernel list
+    # and the allocation verdict both sit at the very end, immediately before
+    # the abort, so echoing the whole run would bury the thing it is meant to
+    # explain. Only the tail is worth keeping.
     import inspect
 
     from mfc.test import test as t
@@ -123,19 +120,16 @@ def test_the_marker_survives_rich_rendering():
     assert GPU_FAULT_MARKER in console.file.getvalue()
 
 
-def test_the_diagnostic_serializes_kernel_dispatch():
-    """Without this the kernel log names the wrong suspect.
+def test_the_diagnostic_sets_only_what_was_measured_to_help():
+    """Each variable here has to earn its place.
 
-    Dispatches are asynchronous, so the fault surfaces after the launch that
-    caused it. Measured against a known out-of-bounds write in m_time_steppers:
-    the last kernel logged before the fault was s_write_run_time_information in
-    111 of 140 faults and the true culprit in none. A trace that confidently
-    accuses the wrong kernel is worse than no trace, so the diagnostic run must
-    serialize.
+    CRAY_ACC_DEBUG was measured to name the wrong kernel on CCE (0 of 473
+    faults correct) and AMD_SERIALIZE_* changed nothing on either lane, so both
+    were removed. Enabling a diagnostic that misattributes is worse than
+    enabling none, and this pins that they do not drift back in.
     """
     from mfc.test.test import diagnostic_env
 
-    env = diagnostic_env({})
+    added = set(diagnostic_env({})) - set()
 
-    assert env["AMD_SERIALIZE_KERNEL"] == "3"
-    assert env["AMD_SERIALIZE_COPY"] == "3"
+    assert added == {"OFFLOAD_TRACK_ALLOCATION_TRACES"}
