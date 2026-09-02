@@ -234,7 +234,11 @@ new = batch-3 37488b20): old 3593.1 / 3620.4 s, new 3434.0 / 3415.6 s -> **new/o
 (pre-registered rule 2: no regression). Probes 397173/4/5 (single-node np64 on k002-005 / k003-002 / k003-003,
 the nodes shared with the earlier suspect allocation): **k002-005 is the slow node -- np64 wall 3279 s vs 2738 / 2738 s on
 k003-002 / k003-003 and the 2742 s healthy reference (+19.6%; rhs 2316 vs 2113 s, rhs imbalance 1.13 INSIDE one node).** It sat
-in both suspect allocations. Added to every exclude list (sixth sick node). A clean np512 constant-density rung is queued.
+in both suspect allocations. Added to every exclude list (sixth sick node). **The clean np512 rung (397515, k002-005 excluded)
+closes the constant-density ladder: 2876.7 s, rhs 2118 s (flat with 2120/2117/2116 at np64/128/256), rhs imbalance 1.03 (no
+straggler), truncation 0, escaped 0. Doublings at 64 ranks/node: 64->128 1.012/1.009, 128->256 1.010/1.010, 256->512 1.027 --
+every one far under the 1.20/1.15 AMReX bar. The non-rhs (AMR + comm) share grows ~5%/doubling to np256 and ~10% at the last
+doubling; the next scaling target, if any, is whichever phase carries that 10% (read from the rung logs), not the rhs.**
 
 **Attribution (phase means over the two reps): regrid 322 -> 136 s, of which rg:clus 182.0 -> 6.2 s.** That
 is the dirty-box merge (3eeb0807), not W1. Every other phase moved within allocation noise (halo -17 s;
