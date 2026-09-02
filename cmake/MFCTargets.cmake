@@ -170,20 +170,6 @@ exit 0
 
                 target_link_libraries(${a_target} PRIVATE OpenACC::OpenACC_Fortran)
                 target_compile_definitions(${a_target} PRIVATE MFC_OpenACC MFC_GPU)
-
-                # DO NOT MERGE -- measurement only.
-                # CCE defaults to acc_model=auto_async_kernel, so kernels run
-                # asynchronously and a memory fault surfaces at an unrelated
-                # sync point: its trace blamed s_write_run_time_information in
-                # 81 of 102 traced faults and the true culprit in 0.
-                # auto_async_none runs them synchronously, which should put the
-                # abort on the kernel that faulted. This is here to find out
-                # whether that is true and what it costs; it is NOT a proposal
-                # to ship, because it would also stop CI exercising the async
-                # dispatch that real runs use.
-                if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-                    target_compile_options(${a_target} PRIVATE "-hacc_model=auto_async_none")
-                endif()
             elseif((MFC_OpenMP AND ARGS_OpenMP))
                 find_package(OpenMP)
 
