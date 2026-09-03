@@ -226,6 +226,53 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-03 (60) — PHASE 2 FIRST RESULTS: rdma_mpi=T legal under OpenMP (-4% wall); device pools buy NOTHING (falsifier confirmed on 240-step arms); the per-DISPATCH tax measured (21,000 tiny D2D copies/step); Task 6 (batch-4) merged; GPU_LOCK protocol
+
+**Increment 0 (amr-bench/notes/phase2_batched_advance.md, "Increment 0 RESULT").** The `rdma_mpi` checker gate predated the
+OpenMP host-data macro (m_checker.fpp:133 prohibited it unless ACC/PGI/Cray); relaxed for MFC_OpenMP on task10/inc0
+(230ed4eb). A standalone amdflang `use_device_addr` + MPI_Sendrecv ring probe passes on 8 GPUs (kernels/rdma_probe/
+probe_dev.out). Locked 240-step A/B, 2 reps interleaved: rdma T vs F byte-identical (6 restart_data files; D/ is empty at t_step_save = 240); halo 22.7 -> 12.6 s (-0.042 s/step),
+wall 705/685 -> 674/663 s (**-4%**). The harness default for AMR GPU decks becomes rdma_mpi=T; the code default stays F
+until the CCE lane sees it.
+
+**Increment 2a (F1/F2 device wire pools behind `amr_device_pack`, task10/inc0 22d131c8+939536c1, NOT merged).** All
+bit-identity gates pass (7 multi-level np=2 decks on/off, oracle [amr-xa] identical + seed-1 abort, 11 GPU goldens, CPU-vs-
+GPU); reviewed correct with the flag-off kernels token-identical to before. **The pre-registered falsifier fired:** gather
+0.283 -> 0.230 s/step (-0.053 vs >= 0.15), and the bracket-free 240-step A/B (off 680.1/655.8, on 679.2/662.9 s) shows no
+saving at all. Per CLAUDE.md the +158 LOC stays parked, not merged.
+
+**The per-dispatch tax (prof_hip).** rocprofv3 --memory-copy-trace on rank 0: 842-849k device-to-device copies of <= 1 KB
+per 40 steps (21,000/step, 7.8 us each, 0.165 s/step of GPU queue time), 12-13 after most kernel dispatches (35 after HLLC,
+45 after most br_store dispatches, mean 41) = one per referenced array descriptor, unchanged by the pools. 1,256 dispatches/step on rank 0, split
+between the per-block rhs kernels and the per-box pack/unpack/capture kernels. The lever is dispatch COUNT (batched advance,
+fused packs), not maps; pool-only rows 1/3/4/5 of the design are withdrawn. Steady-state accounting of the 2.87 s/step step on rank 0 (60-40 kernel diff, prof_steady: 1.03 s/step, NOT the
+0.54 naive 40-step average): GPU-side 1.20 s/step (kernels 1.03 + descriptor copies 0.17, same queue), host-only 1.67 s/step
+(58% of the step), of which launch latency is ~0.1. **~1.5 s/step of host-only time is unexplained**; the exchange brackets are
+dominated by their wait rows (rf:wait 3.99 of 4.35 s; coarse max-mean 2.4 s) -> rank skew / MPI progress at ~18 sync
+points per step is the leading candidate, host-side plan/loop work the other. Next measurement,
+before more code: a per-rank bracket-free timeline at the sync points (no GPU_WAIT) to split dispatch tax vs skew wait vs
+host work; the batched advance is ordered first only if the dispatch tax wins that split.
+
+**Instrument caveat, recorded.** `rank_time_wrt` brackets wrap every phase in GPU_WAIT (m_phase_timing.fpp:181/198); the
+bracketed wall equals the bracket-free wall (2.84-2.98 vs 2.90-2.94 s/step), so totals are safe, but bracket-local deltas
+under-read launch overlap; A/B verdicts use bracket-free 240-step walls.
+
+**Task 6 (W1 batch-4) MERGED** (a94607dd..17706ebb rebased on d4c50b8a): the three restrict-wave wrapper scans walk
+amr_own_blk / own ∪ fch (two-cursor descending merge, dedup proven), +24 LOC; restr calls/rank at np64 92,200 -> 2,975
+(rs:rfp 92,020 -> 2,795 = |own ∪ fch| per dense step, O(local)); 69/69 goldens, oracle identical, 16 GPU goldens. The QBMM
+pbmv scatter stays a global scan until Task 5's keyed tags. Reviewer's optional simplification (walk the children CSR of
+amr_my_blk instead of the merge; halves rs:rfp again and deletes the merge) is recorded for W1 batch 5. Wall A/Bs 404112
+(np512, cap-0 deck, ~3 h/arm) and 404113 (np64) are still running; pre-registered expectation wall-neutral.
+
+**Task 4 rung.** np256 (404070) aborted on the ledger-56 guard: the CPU ladder decks at np >= 256 (cap 64 on 50-cell ranks)
+were in the ledger-56 class, so the dens256/512 rungs of ledger 53 ran the UNFIXED code there (timings valid, answers
+suspect). Resubmitted on the Task-11 binary (404297/404298).
+
+**Process.** Timing A/Bs on the shared 8-GPU hold were contaminated by other agents' GPU gates (sacct shows the steps);
+every timing harness now holds amr-bench/GPU_LOCK and every agent waits on it; the 60-40 increment-0 arms are void.
+The NVHPC compile gate is broken independently of any branch (nvlink "Unknown arch name" on base 230ed4eb; last green
+08-29): tooling item.
+
 ## 2026-09-03 (59) — LEDGER 56 CLOSED: the unfinished widening was the WENO coefficient tail, on every axis; guard deleted, 3D np=8 golden added
 
 Task 11. The m/n/p_alloc widening (86782249) sized the WENO coefficient arrays (poly_coef_cb*, d_cb*, beta_coef_*) to the cap but
