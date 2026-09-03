@@ -3846,7 +3846,21 @@ contains
 
         integer :: bad_glb
 
+#ifdef MFC_MPI
+        integer  :: ierr
+        real(wp) :: t0, t1, tmin, tmax
+
+        t0 = MPI_Wtime()
+#endif
         call s_mpi_allreduce_integer_max(amr_xchg_bad, bad_glb)
+#ifdef MFC_MPI
+        t1 = MPI_Wtime()
+        if (rank_time_wrt) then
+            call MPI_ALLREDUCE(t0, tmin, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
+            call MPI_ALLREDUCE(t0, tmax, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+            if (proc_rank == 0) print '(A,ES10.3,A,ES10.3)', '[amr-rb] xchg_skew ', tmax - tmin, ' xchg_coll ', t1 - t0
+        end if
+#endif
         amr_xchg_coarse_ghosts = bad_glb == 1
         amr_xchg_bad = 0
 
