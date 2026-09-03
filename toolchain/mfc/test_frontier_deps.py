@@ -74,17 +74,22 @@ def test_a_successful_dependency_fetch_records_nothing(workspace):
     assert not outage_recorded(tmp_path)
 
 
-def test_a_pypi_outage_on_the_login_node_is_recorded(workspace):
+def test_a_pypi_failure_is_an_ordinary_build_failure(workspace):
+    """A flaky download must not red out the rest of the cluster.
+
+    The dependency install happens before any compute is committed -- on the
+    login node for Frontier -- so a failed fetch costs no allocation and there
+    is nothing to protect the matrix from. Recording it as a cluster-wide outage
+    skipped every other job on that cluster, including ones whose tests had
+    already passed, and uv already retries internally.
+    """
     tmp_path, install_mfc, run = workspace
     install_mfc(stdout=PYPI_FAILURE, rc=1)
-    run()
-    assert outage_recorded(tmp_path)
 
+    result = run()
 
-def test_a_pypi_outage_on_the_login_node_reports_the_outage_exit_code(workspace):
-    tmp_path, install_mfc, run = workspace
-    install_mfc(stdout=PYPI_FAILURE, rc=1)
-    assert run().returncode == 78
+    assert result.returncode == 1, "a failed download must fail only its own job"
+    assert not outage_recorded(tmp_path), "a failed download must not trip the cluster breaker"
 
 
 def test_an_ordinary_dependency_failure_is_not_an_outage(workspace):
