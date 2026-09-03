@@ -226,6 +226,25 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-03 (57) — MFC REPLICATED (3 reps, second node) + THE MATCHED-ORDER CONTROL: tax 12.4x +/- 2%; the AMR excess is 2.2-3.0 s/step regardless of scheme -- 7-9x AMReX's at its sane grids
+
+P3 (logs/tax-proper2-0902_1208/mfc, job 401281 on k004-003, three reps, same pinned binary, differenced 240-40; a
+partial rep on k004-001 agrees):
+| deck (400^3, 2 levels, np8 GPU) | AMR diff (s) x3 | uniform diff (s) x3 | tax x3 | excess s/step |
+| WENO5 + HLLC, 5-eq (the production scheme) | 643 / 665 / 683 | 53.5 / 53.1 / 53.9 | 12.0 / 12.5 / 12.7 -> **12.4x +/- 2%** | 2.17-2.36 |
+| weno_order 1 + riemann_solver 5 (matched-order control) | 625 / 636 / 698 | 27.3 / 27.5 / 26.5 | 22.9 / 23.1 / 26.3 -> **24.1x +/- 6.5%** | 2.59-2.97 |
+Reading: (1) the single-run 16.8x of ledger 52 was the slow-node outlier (k004-004; both its AMR arm 787 s and its uniform arm 46.9 s
+sit outside the k004-001/k004-003 spread) -- the replicated MFC tax at this point is ~12.4x; (2) the matched-order control is the
+cleanest demonstration yet that the RATIO is not a machinery metric: halving the physics cost per cell (uniform 53 -> 27 s) nearly
+DOUBLES the tax while the AMR excess in seconds stays at 2.2-3.0 s/step -- the infrastructure cost is scheme-independent, and it is
+the number to compare; (3) against AMReX at its own GPU-sane grids (ledger 55: excess 0.335 s/step, tax 8.5x on the same node class),
+**MFC's AMR infrastructure costs 7-9x AMReX's per step in seconds** at this operating point -- a much harsher verdict than any ratio,
+and the honest one. The MFC uniform arm at 8 GPUs is 3.5x AMReX's per cell (WENO5/HLLC vs PLM) and 1.6x at matched order (the w1
+uniform: 27 s vs AMReX 19.5 s) -- so the per-cell physics gap at matched order is ~1.6x, not 2.4x.
+Profiles: the rank-0 rocprofv3 arms produced only rank0_results.db (ROCm 7.2 needs --output-format csv); re-run on k004-003 and
+attached to this entry's follow-up. The np32 GPU rung (400713) failed at MPI_Init across k004-[002-004,009] -- a sick-node probe is
+queued; the np8 -> np16 doubling (1.33x, ledger note) stands as the only GPU scaling datum so far.
+
 ## 2026-09-02 (56) — THE "STATIC-SEED NaN" IS A SCRATCH-SIZING BUG SINCE a108dd37, AND IT IS NOT GPU-ONLY (two rulings retracted)
 
 Task 2's 12-arm matrix (report in the SDD workspace; Task 1's decks under amr-bench/cpu/validator_fixtures/, the guard fixtures
