@@ -402,28 +402,28 @@ def run_mg_wave_speed(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     """Sweep N; the measured speed of a small acoustic pulse must match the analytic Mie-Gruneisen c.
 
     The derivative term dPi/drho enters the sound speed but not the pressure, so a pulse is the one
-    observable that isolates it: without that term the speed is off by tens of percent. The residual
-    is the finite-amplitude correction O(drho/rho) of a simple wave, so the check is absolute, not a rate.
+    observable that isolates it: without that term the speed is off by tens of percent. The centroid of
+    drho moves at c up to the finite-amplitude correction O(drho/rho), so the check is absolute, not a rate.
     """
     errors = []
     with tempfile.TemporaryDirectory() as tmpdir:
         for N in spec.resolutions:
             cfg, run_dir = _run_mfc(spec.case_path, tmpdir, f"N{N}", ["-N", str(N)] + spec.extra_args, 1)
             rho0, c0, s, gruneisen = _mg_params(cfg)
-            p0 = float(cfg["patch_icpp(1)%pres"].split("+")[0])
+            p0 = float(cfg["patch_icpp(1)%pres"])
             c_exact = eos.sound_speed(rho0, p0, *eos.eos_coefficients(rho0, rho0, c0, s, gruneisen))
             Nt = int(cfg["t_step_stop"])
             T = Nt * float(cfg["dt"])
             x_cc = (np.arange(N) + 0.5) / N
-            peaks = []
+            centroids = []
             for step in (0, Nt):
-                rho = _read_field(run_dir, step, 1, 1, N)
-                i = int(np.argmax(rho))
-                if not 0 < i < N - 1:
-                    raise common.MFCException(f"N={N}: pulse peak at the boundary after step {step}")
-                a, b, c = rho[i - 1], rho[i], rho[i + 1]  # parabolic sub-cell peak
-                peaks.append(x_cc[i] + 0.5 * (a - c) / (a - 2.0 * b + c) / N)
-            errors.append(abs((peaks[1] - peaks[0]) / T - c_exact) / c_exact)
+                drho = _read_field(run_dir, step, 1, 1, N) - rho0
+                if drho.max() <= 0.0:
+                    raise common.MFCException(f"N={N}: no density excess at step {step}; the pulse patch did not take")
+                if drho[-1] > 0.01 * drho.max():
+                    raise common.MFCException(f"N={N}: pulse reached the boundary after step {step}")
+                centroids.append(float(np.sum(x_cc * drho) / np.sum(drho)))
+            errors.append(abs((centroids[1] - centroids[0]) / T - c_exact) / c_exact)
     widths = [6, 16]
     lines = [
         f"  analytic c = {c_exact:.6f}  (need every relative error <= {spec.tol:.1e})",
@@ -471,6 +471,40 @@ def run_mg_hugoniot(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
         lines.append(_table_line([f"{U:.3f}", f"{d_m:.5f}", f"{d_h:.5f}", f"{r_m:.5f}", f"{r_h:.5f}"], widths))
     lines.append(f"\n  Worst relative error: {worst:.4e}")
     return worst <= spec.tol, "\n".join(lines)
+
+
+def run_jwl_isentrope(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
+    """Sweep N; the released JWL fluid must lie on the closed-form isentrope through its initial state.
+
+    Left of the contact every cell keeps the left state's entropy, so its (rho, p) must satisfy
+    p = p_ref(V) + C V^-(omega + 1) with C fixed by (rho0, p0). Pressure is recovered from the
+    conserved energy with the same coefficients the solver uses; the reference curve enters both.
+    """
+    errors = []
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for N in spec.resolutions:
+            cfg, run_dir = _run_mfc(spec.case_path, tmpdir, f"N{N}", ["-N", str(N)] + spec.extra_args, 1)
+            jwl = [float(cfg[f"fluid_pp(1)%jwl_{k}"]) for k in ("rho0", "a", "b", "r1", "r2", "omega")]
+            rho0, p0 = float(cfg["patch_icpp(1)%alpha_rho(1)"]), float(cfg["patch_icpp(1)%pres"])
+            Nt = int(cfg["t_step_stop"])
+            rho, mom, E = (_read_field(run_dir, Nt, k, 1, N) for k in (1, 2, 3))
+            x_cc = (np.arange(N) + 0.5) / N
+            sel = (x_cc < 0.45) & (rho < 0.98 * rho0)  # the fan and the left star state, clear of the contact
+            if sel.sum() < 4:
+                raise common.MFCException(f"N={N}: only {int(sel.sum())} released cells left of the contact")
+            worst = 0.0
+            for r, m_, e_tot in zip(rho[sel], mom[sel], E[sel]):
+                gamma, pi, _ = eos.jwl_coefficients(r, *jwl)
+                p = (e_tot - 0.5 * m_**2 / r - pi) / gamma
+                p_s = eos.jwl_isentrope(r, *jwl, rho0, p0)
+                worst = max(worst, abs(p - p_s) / p_s)
+            errors.append(worst)
+    widths = [6, 8, 18]
+    lines = [f"  (need every relative error <= {spec.tol:.1e})", "", _table_line(["N", "cells", "worst |p - p_s|/p_s"], widths), _table_line(["-" * w for w in widths], widths)]
+    for N, err in zip(spec.resolutions, errors):
+        lines.append(_table_line([str(N), "", f"{err:.4e}"], widths))
+    lines.append(f"\n  Worst relative error: {max(errors):.4e}")
+    return max(errors) <= spec.tol, "\n".join(lines)
 
 
 # Entry point used by test.py.

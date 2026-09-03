@@ -7,7 +7,7 @@ from mfc import common
 
 from ..state import ARG
 from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
-from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
+from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_jwl_isentrope, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -129,6 +129,12 @@ def add_convergence_cases(cases):
         define_convergence_case(
             "Convergence -> Mie-Gruneisen -> acoustic speed",
             spec=ConvergenceSpec(runner=run_mg_wave_speed, case_path="examples/1D_mg_acoustic/case.py", expected_order=0.0, tol=1.0e-3, resolutions=[100, 200, 400]),
+        )
+    )
+    cases.append(
+        define_convergence_case(
+            "Convergence -> JWL -> isentropic release",
+            spec=ConvergenceSpec(runner=run_jwl_isentrope, case_path="examples/1D_jwl_release/case.py", expected_order=0.0, tol=1.0e-3, resolutions=[200, 400, 800]),
         )
     )
     cases.append(
@@ -685,6 +691,56 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                                 "fluid_pp(1)%mg_c0": 1.0,
                                 "fluid_pp(1)%mg_s": 1.5,
                                 "fluid_pp(1)%mg_gruneisen": 0.4,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=jwl",
+                            {
+                                "fluid_pp(1)%eos": "jwl",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%jwl_a": 6.0,
+                                "fluid_pp(1)%jwl_b": 0.15,
+                                "fluid_pp(1)%jwl_r1": 4.0,
+                                "fluid_pp(1)%jwl_r2": 1.0,
+                                "fluid_pp(1)%jwl_omega": 0.3,
+                                "fluid_pp(1)%jwl_rho0": 0.9,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen -> alt_soundspeed=T",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                                "alt_soundspeed": "T",
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen -> bc=-5",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                                "bc_x%beg": -5,
+                                "bc_x%end": -5,
                             },
                         )
                     )
@@ -2893,6 +2949,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_hypo_shear_contact",  # exercised by the convergence suite
                 "1D_mg_acoustic",  # exercised by the convergence suite
                 "1D_mg_impact",  # exercised by the convergence suite
+                "1D_jwl_release",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",
