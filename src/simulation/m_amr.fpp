@@ -4356,12 +4356,14 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
         real(wp), intent(in)                                   :: dt_reflux
-        integer                                                :: lev, k, io, ifc, ko, kf
+        integer                                                :: lev, k, kk, io, ifc, ko, kf
 
         call s_amr_refresh_lists()
         do lev = amr_max_level, 2, -1
             if (relax) then
-                do k = amr_num_blocks, 1, -1
+                ! W1: s_amr_relax_fine returns unless amr_rank_owns_block (the MULTI-owner amr_owns_all notion) -> amr_own_blk
+                do kk = amr_n_own, 1, -1
+                    k = amr_own_blk(kk)
                     if (amr_block_level(k) /= lev) cycle
                     call s_amr_select_slot(k)
                     call s_amr_relax_fine()
