@@ -112,6 +112,7 @@ print(
             "pi_fac": pi_fac,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gamma_w - 1.0e00),
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": gamma_w * (pi_inf_w / (rho_w * u_ref**2)) / (gamma_w - 1.0e00),
             "fluid_pp(1)%Re(1)": Re,
         }

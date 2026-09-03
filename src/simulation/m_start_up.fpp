@@ -553,8 +553,9 @@ contains
                                             & T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                             & l)*(gammas(i)*pres + pi_infs(i)) + v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
+                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = f_phase_internal_energy(pres, &
+                             & v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), gammas(i), &
+                             & pi_infs(i), qvs(i))
                     end do
                 end do
             end do

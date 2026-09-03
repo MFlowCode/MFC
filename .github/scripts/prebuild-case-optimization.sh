@@ -90,6 +90,15 @@ if [ -n "$shard" ] && [ "$shard_count" -gt 1 ]; then
     fi
 fi
 
+# Deliberately no node probe here. This pre-build is submitted as a *cpu*
+# allocation (see test.yml: it is --dry-run, so it only builds), while the
+# binaries it produces are GPU builds. syscheck built with --gpu therefore
+# asserts omp_get_num_devices() > 0 and exits non-zero on a node that has no
+# GPU by design -- which a probe would report as a bad node. It did: three
+# healthy Phoenix nodes were condemned and two excluded before the wrapper gave
+# up. The GPU allocation that actually runs these cases is probed instead, in
+# run_case_optimization.sh.
+
 idx=0
 for case in "${benchmarks[@]}"; do
     idx=$((idx + 1))
