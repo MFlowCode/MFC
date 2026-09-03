@@ -4401,7 +4401,8 @@ contains
             end do
         end do
         if (relax) then
-            do k = amr_num_blocks, 1, -1
+            do kk = amr_n_own, 1, -1  ! W1: same amr_rank_owns_block predicate as the level>=2 loop above
+                k = amr_own_blk(kk)
                 if (amr_block_level(k) /= 1) cycle
                 call s_amr_select_slot(k)
                 call s_amr_relax_fine()
