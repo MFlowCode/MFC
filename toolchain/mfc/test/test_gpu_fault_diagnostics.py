@@ -68,7 +68,7 @@ scalar registers:
 """
 
 
-# --- detection -------------------------------------------------------------
+# Detection.
 
 
 def test_recognises_each_runtime_wording():
@@ -117,7 +117,7 @@ def test_a_gpu_fault_gets_its_own_failure_class():
     assert classify_error(MFCException("Test x: Failed to execute MFC.")) == "execution failed"
 
 
-# --- what the run environment carries --------------------------------------
+# What the run environment carries.
 
 
 def test_only_the_agent_is_set():
@@ -196,7 +196,7 @@ def test_a_developer_debugging_by_hand_is_left_alone(monkeypatch):
     assert fault_diagnostic_env({"HSA_TOOLS_LIB": "libmine.so"})["HSA_TOOLS_LIB"] == "libmine.so"
 
 
-# --- collapsing the agent's output -----------------------------------------
+# Collapsing the agent's output.
 
 
 def test_both_rocm_formats_are_recognised():
@@ -263,7 +263,7 @@ def test_a_missing_agent_report_on_a_gpu_fault_is_called_out():
     assert "format has changed" in src
 
 
-# --- the other two callers -------------------------------------------------
+# The other two callers.
 
 
 def test_the_bench_runner_summarizes_rather_than_tailing(tmp_path):
