@@ -303,7 +303,6 @@ contains
         logical :: file_exist                               !< Logical used to check existence of current time-step directory
         character(LEN=15) :: FMT
         integer :: i, j, k, l, r
-        real(wp) :: gamma, lit_gamma, pi_inf, qv            !< Temporary EOS params
 
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir) // '/p_all'
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step
@@ -376,11 +375,6 @@ contains
         if (ib) then
             call s_write_serial_ib_data(t_step)
         end if
-
-        gamma = gammas(1)
-        lit_gamma = isentrope_n(1)
-        pi_inf = pi_infs(1)
-        qv = qvs(1)
 
         if (precision == precision_single) then
             FMT = "(2F30.3)"

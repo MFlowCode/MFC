@@ -67,7 +67,7 @@ contains
         integer                                                     :: t_step
         real(wp), dimension(nb)                                     :: nRtmp
         real(wp)                                                    :: nbub
-        real(wp)                                                    :: gamma, lit_gamma, pi_inf, qv
+        real(wp)                                                    :: gamma, pi_inf, qv
         real(wp)                                                    :: rho
         real(wp)                                                    :: pres, T
         real(wp)                                                    :: rhoYks(1:num_species)
@@ -165,7 +165,6 @@ contains
         end if
 
         gamma = gammas(1)
-        lit_gamma = isentrope_n(1)
         pi_inf = pi_infs(1)
         qv = qvs(1)
 
@@ -198,8 +197,6 @@ contains
                         end if
 
                         call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, qv)
-
-                        lit_gamma = f_isentrope_exponent(gamma)
 
                         if ((i >= eqn_idx%species%beg) .and. (i <= eqn_idx%species%end)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho
