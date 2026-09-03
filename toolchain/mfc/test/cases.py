@@ -7,7 +7,7 @@ from mfc import common
 
 from ..state import ARG
 from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
-from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_jwl_isentrope, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
+from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -134,7 +134,21 @@ def add_convergence_cases(cases):
     cases.append(
         define_convergence_case(
             "Convergence -> JWL -> isentropic release",
-            spec=ConvergenceSpec(runner=run_jwl_isentrope, case_path="examples/1D_jwl_release/case.py", expected_order=0.0, tol=1.0e-3, resolutions=[200, 400, 800]),
+            spec=ConvergenceSpec(runner=run_isentropic_release, case_path="examples/1D_isentropic_release/case.py", expected_order=0.0, tol=1.0e-3, resolutions=[200, 400, 800]),
+        )
+    )
+    cases.append(
+        define_convergence_case(
+            "Convergence -> Vinet -> isentropic release",
+            spec=ConvergenceSpec(
+                runner=run_isentropic_release, case_path="examples/1D_isentropic_release/case.py", extra_args=["--eos", "vinet"], expected_order=0.0, tol=5.0e-3, resolutions=[200, 400, 800]
+            ),
+        )
+    )
+    cases.append(
+        define_convergence_case(
+            "Convergence -> Mie-Gruneisen -> Hugoniot -> cubic",
+            spec=ConvergenceSpec(runner=run_mg_hugoniot, case_path="examples/1D_mg_impact/case.py", extra_args=["--s2", "0.3"], expected_order=0.0, tol=0.005, amps=[0.2, 0.5, 1.0, 1.5]),
         )
     )
     cases.append(
@@ -730,6 +744,73 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(
                         define_case_d(
                             stack,
+                            "eos=vinet",
+                            {
+                                "fluid_pp(1)%eos": "vinet",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%vinet_k0": 2.0,
+                                "fluid_pp(1)%vinet_k0p": 4.0,
+                                "fluid_pp(1)%vinet_rho0": 0.9,
+                                "fluid_pp(1)%vinet_gruneisen": 0.3,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen -> cubic Hugoniot",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                                "fluid_pp(1)%mg_s2": 0.2,
+                                "fluid_pp(1)%mg_s3": 0.05,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen -> model_eqns=3",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                                "fluid_pp(1)%mg_gruneisen_a": 0.5,
+                                "model_eqns": 3,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=jwl -> model_eqns=3",
+                            {
+                                "fluid_pp(1)%eos": "jwl",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%jwl_a": 6.0,
+                                "fluid_pp(1)%jwl_b": 0.15,
+                                "fluid_pp(1)%jwl_r1": 4.0,
+                                "fluid_pp(1)%jwl_r2": 1.0,
+                                "fluid_pp(1)%jwl_omega": 0.3,
+                                "fluid_pp(1)%jwl_rho0": 0.9,
+                                "model_eqns": 3,
+                            },
+                        )
+                    )
+                    cases.append(
+                        define_case_d(
+                            stack,
                             "eos=mie_gruneisen -> bc=-5",
                             {
                                 "fluid_pp(1)%eos": "mie_gruneisen",
@@ -1103,6 +1184,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
+                if slip and not viscous:
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            f"Circle{suffix} -> eos=mie_gruneisen",
+                            {
+                                "patch_ib(1)%geometry": 2,
+                                "n": 49,
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%pi_inf": None,
+                                "fluid_pp(1)%mg_rho0": 1.0,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.0,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                            },
+                        )
+                    )
                 if six_eqn_model:
                     cases.append(
                         define_case_d(
@@ -1520,6 +1619,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
 
+            if num_fluids == 2 and len(dimInfo[0]) == 2:
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "eos=mie_gruneisen",
+                        {
+                            "fluid_pp(1)%eos": "mie_gruneisen",
+                            "fluid_pp(1)%gamma": None,
+                            "fluid_pp(1)%pi_inf": None,
+                            "fluid_pp(1)%mg_rho0": 1000.0,
+                            "fluid_pp(1)%mg_c0": 1500.0,
+                            "fluid_pp(1)%mg_s": 2.0,
+                            "fluid_pp(1)%mg_gruneisen": 0.5,
+                        },
+                    )
+                )
             if len(dimInfo[0]) == 3:
                 stack.push(
                     "",
@@ -2949,7 +3064,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_hypo_shear_contact",  # exercised by the convergence suite
                 "1D_mg_acoustic",  # exercised by the convergence suite
                 "1D_mg_impact",  # exercised by the convergence suite
-                "1D_jwl_release",  # exercised by the convergence suite
+                "1D_isentropic_release",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",
@@ -3349,6 +3464,31 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # A Mie-Gruneisen reactant burning to JWL products: the two families share qv as the energy zero.
+        cases.append(
+            define_case_d(
+                stack,
+                "eos=mie_gruneisen -> jwl",
+                {
+                    "fluid_pp(1)%eos": "mie_gruneisen",
+                    "fluid_pp(1)%gamma": None,
+                    "fluid_pp(1)%pi_inf": None,
+                    "fluid_pp(1)%mg_rho0": 1900.0,
+                    "fluid_pp(1)%mg_c0": 2500.0,
+                    "fluid_pp(1)%mg_s": 1.5,
+                    "fluid_pp(1)%mg_gruneisen": 1.0,
+                    "fluid_pp(2)%eos": "jwl",
+                    "fluid_pp(2)%gamma": None,
+                    "fluid_pp(2)%pi_inf": None,
+                    "fluid_pp(2)%jwl_a": 3.0e10,
+                    "fluid_pp(2)%jwl_b": 2.0e9,
+                    "fluid_pp(2)%jwl_r1": 4.15,
+                    "fluid_pp(2)%jwl_r2": 0.95,
+                    "fluid_pp(2)%jwl_omega": 0.3,
+                    "fluid_pp(2)%jwl_rho0": 1900.0,
+                },
+            )
+        )
         # Same burn on the 6-equation model (model_eqns=3): the reactant->product qv release
         # must manifest through the qv-consistent phasic-pressure relaxation. Guards that the
         # 5-eq source term is correct on the 6-eq model and that the qv threading holds up.

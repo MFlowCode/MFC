@@ -100,35 +100,28 @@ def _pairwise_slope(err1: float, err2: float, x1: float, x2: float) -> float:
 
 
 def _run_mfc(case_path: str, tmpdir: str, run_tag: str, args: typing.List[str], num_ranks: int) -> typing.Tuple[dict, str]:
-    """Run case.py through ./mfc.sh and stash p_all/ in tmpdir/run_tag for reading."""
-    cfg_run = subprocess.run(
-        [sys.executable, case_path, "--mfc", "{}"] + args,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    """Run a private copy of case.py in tmpdir/run_tag; specs that share one case file may run concurrently.
+
+    The caller (./mfc.sh test) has already built, and concurrent installs race, so the run does not build.
+    """
+    run_dir = os.path.join(tmpdir, run_tag)
+    os.makedirs(run_dir, exist_ok=True)
+    case_copy = os.path.join(run_dir, "case.py")
+    shutil.copy(case_path, case_copy)
+    cfg_run = subprocess.run([sys.executable, case_copy, "--mfc", "{}"] + args, capture_output=True, text=True, check=False)
     if cfg_run.returncode != 0:
         raise common.MFCException(f"case.py failed:\n{cfg_run.stderr}")
     cfg = json.loads(cfg_run.stdout)
 
     sim = subprocess.run(
-        [MFC, "run", case_path, "-t", "pre_process", "simulation", "-n", str(num_ranks), "--"] + args,
+        [MFC, "run", case_copy, "--no-build", "-t", "pre_process", "simulation", "-n", str(num_ranks), "--"] + args,
         capture_output=True,
         text=True,
         check=False,
     )
     if sim.returncode != 0:
         raise common.MFCException(f"./mfc.sh run failed for {run_tag}\n{sim.stdout[-3000:]}\n{sim.stderr}")
-
-    case_dir = os.path.dirname(case_path)
-    src = os.path.join(case_dir, "p_all")
-    dst = os.path.join(tmpdir, run_tag, "p_all")
-    if os.path.exists(dst):
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
-    shutil.rmtree(src, ignore_errors=True)
-    shutil.rmtree(os.path.join(case_dir, "D"), ignore_errors=True)
-    return cfg, os.path.join(tmpdir, run_tag)
+    return cfg, run_dir
 
 
 def _conservation_at_step(run_dir: str, Nt: int, cell_vol: float, cons_vars, num_ranks: int, cell_count: int) -> dict:
@@ -450,13 +443,14 @@ def run_mg_hugoniot(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
             tag = f"U{U:.3f}".replace(".", "p")
             cfg, run_dir = _run_mfc(spec.case_path, tmpdir, tag, ["--U", str(U)] + spec.extra_args, 1)
             rho0, c0, s, gruneisen = _mg_params(cfg)
+            s2, s3 = (float(cfg.get(f"fluid_pp(1)%mg_{k}", 0.0)) for k in ("s2", "s3"))
             N, Nt = int(cfg["m"]) + 1, int(cfg["t_step_stop"])
             T = Nt * float(cfg["dt"])
             rho = _read_field(run_dir, Nt, 1, 1, N)
             x_cc = (np.arange(N) + 0.5) / N
             rho_s = float(np.median(rho[np.abs(x_cc - 0.5) < 0.02]))
             x_s = 0.5 + float(np.sum((rho[x_cc > 0.5] - rho0)) / N) / (rho_s - rho0)
-            u_s, rho_h = eos.hugoniot_state(0.5 * U, rho0, c0, s)
+            u_s, rho_h = eos.hugoniot_state(0.5 * U, rho0, c0, s, s2, s3)
             rows.append((U, (x_s - 0.5) / T, u_s - 0.5 * U, rho_s, rho_h))
     widths = [7, 11, 11, 11, 11]
     lines = [
@@ -473,18 +467,28 @@ def run_mg_hugoniot(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     return worst <= spec.tol, "\n".join(lines)
 
 
-def run_jwl_isentrope(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
-    """Sweep N; the released JWL fluid must lie on the closed-form isentrope through its initial state.
+def _reference(cfg):
+    """The reference curve and Gruneisen coefficient of fluid 1 from a case dict, by family."""
+    if cfg["fluid_pp(1)%eos"] in ("jwl", 4):
+        p = [float(cfg[f"fluid_pp(1)%jwl_{k}"]) for k in ("rho0", "a", "b", "r1", "r2")]
+        return (lambda r: eos.jwl_reference(r, *p)), float(cfg["fluid_pp(1)%jwl_omega"])
+    p = [float(cfg[f"fluid_pp(1)%vinet_{k}"]) for k in ("rho0", "k0", "k0p")]
+    return (lambda r: eos.vinet_reference(r, *p)), float(cfg["fluid_pp(1)%vinet_gruneisen"])
+
+
+def run_isentropic_release(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
+    """Sweep N; a released fluid whose reference curve is an isentrope must lie on the closed-form isentrope
+    through its initial state.
 
     Left of the contact every cell keeps the left state's entropy, so its (rho, p) must satisfy
-    p = p_ref(V) + C V^-(omega + 1) with C fixed by (rho0, p0). Pressure is recovered from the
-    conserved energy with the same coefficients the solver uses; the reference curve enters both.
+    p = p_ref(rho) + C (rho/rho0)^(1 + Gamma_G) with C fixed by (rho0, p0). Pressure is recovered from
+    the conserved energy with the same coefficients the solver uses; the reference curve enters both.
     """
     errors = []
     with tempfile.TemporaryDirectory() as tmpdir:
         for N in spec.resolutions:
             cfg, run_dir = _run_mfc(spec.case_path, tmpdir, f"N{N}", ["-N", str(N)] + spec.extra_args, 1)
-            jwl = [float(cfg[f"fluid_pp(1)%jwl_{k}"]) for k in ("rho0", "a", "b", "r1", "r2", "omega")]
+            reference, gruneisen = _reference(cfg)
             rho0, p0 = float(cfg["patch_icpp(1)%alpha_rho(1)"]), float(cfg["patch_icpp(1)%pres"])
             Nt = int(cfg["t_step_stop"])
             rho, mom, E = (_read_field(run_dir, Nt, k, 1, N) for k in (1, 2, 3))
@@ -494,15 +498,15 @@ def run_jwl_isentrope(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
                 raise common.MFCException(f"N={N}: only {int(sel.sum())} released cells left of the contact")
             worst = 0.0
             for r, m_, e_tot in zip(rho[sel], mom[sel], E[sel]):
-                gamma, pi, _ = eos.jwl_coefficients(r, *jwl)
+                gamma, pi, _, _ = eos.coefficients_from_curve(r, reference(r), gruneisen)
                 p = (e_tot - 0.5 * m_**2 / r - pi) / gamma
-                p_s = eos.jwl_isentrope(r, *jwl, rho0, p0)
+                p_s = eos.reference_isentrope(reference, gruneisen, r, rho0, p0)
                 worst = max(worst, abs(p - p_s) / p_s)
             errors.append(worst)
-    widths = [6, 8, 18]
-    lines = [f"  (need every relative error <= {spec.tol:.1e})", "", _table_line(["N", "cells", "worst |p - p_s|/p_s"], widths), _table_line(["-" * w for w in widths], widths)]
+    widths = [6, 18]
+    lines = [f"  (need every relative error <= {spec.tol:.1e})", "", _table_line(["N", "worst |p - p_s|/p_s"], widths), _table_line(["-" * w for w in widths], widths)]
     for N, err in zip(spec.resolutions, errors):
-        lines.append(_table_line([str(N), "", f"{err:.4e}"], widths))
+        lines.append(_table_line([str(N), f"{err:.4e}"], widths))
     lines.append(f"\n  Worst relative error: {max(errors):.4e}")
     return max(errors) <= spec.tol, "\n".join(lines)
 
