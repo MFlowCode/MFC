@@ -119,6 +119,7 @@ module m_constants
     integer, parameter :: eos_stiffened_gas = 1
     integer, parameter :: eos_ideal_gas = 2
     integer, parameter :: eos_mie_gruneisen = 3
+    integer, parameter :: eos_jwl = 4
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
     integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence
 

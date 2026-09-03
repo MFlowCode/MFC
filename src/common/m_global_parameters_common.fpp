@@ -57,8 +57,9 @@ module m_global_parameters_common
     !> Per-fluid EOS selector and Mie-Gruneisen reference curve, resolved once at init like the arrays above
     integer, allocatable, dimension(:) :: eoss
     real(wp), allocatable, dimension(:) :: mg_rho0s, mg_c0s, mg_ss, mg_gruneisens
+    real(wp), allocatable, dimension(:) :: jwl_as, jwl_bs, jwl_r1s, jwl_r2s, jwl_omegas, jwl_rho0s
     logical :: any_state_dependent_eos  !< True when some fluid's coefficients vary with density; set at init
-    $:GPU_DECLARE(create='[eoss, mg_rho0s, mg_c0s, mg_ss, mg_gruneisens, any_state_dependent_eos]')
+    $:GPU_DECLARE(create='[eoss, mg_rho0s, mg_c0s, mg_ss, mg_gruneisens, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, jwl_omegas, jwl_rho0s, any_state_dependent_eos]')
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity

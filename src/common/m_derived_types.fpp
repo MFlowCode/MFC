@@ -398,6 +398,12 @@ module m_derived_types
         real(wp)               :: mg_c0          !< Mie-Gruneisen bulk sound speed at mg_rho0
         real(wp)               :: mg_s           !< Mie-Gruneisen linear Hugoniot slope, u_s = c0 + s u_p
         real(wp)               :: mg_gruneisen   !< Gruneisen coefficient Gamma_G (not the shear modulus G)
+        real(wp)               :: jwl_a          !< JWL A
+        real(wp)               :: jwl_b          !< JWL B
+        real(wp)               :: jwl_r1         !< JWL R1
+        real(wp)               :: jwl_r2         !< JWL R2
+        real(wp)               :: jwl_omega      !< JWL omega (its Gruneisen coefficient)
+        real(wp)               :: jwl_rho0       !< JWL reference density
         logical                :: non_newtonian  !< Enable Herschel-Bulkley non-Newtonian viscosity
         real(wp)               :: K              !< HB consistency index
         real(wp)               :: nn             !< HB flow behavior index

@@ -410,7 +410,8 @@ def run_mg_wave_speed(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
         for N in spec.resolutions:
             cfg, run_dir = _run_mfc(spec.case_path, tmpdir, f"N{N}", ["-N", str(N)] + spec.extra_args, 1)
             rho0, c0, s, gruneisen = _mg_params(cfg)
-            c_exact = eos.sound_speed(rho0, float(cfg["patch_icpp(1)%pres"].split("+")[0]), rho0, c0, s, gruneisen)
+            p0 = float(cfg["patch_icpp(1)%pres"].split("+")[0])
+            c_exact = eos.sound_speed(rho0, p0, *eos.eos_coefficients(rho0, rho0, c0, s, gruneisen))
             Nt = int(cfg["t_step_stop"])
             T = Nt * float(cfg["dt"])
             x_cc = (np.arange(N) + 0.5) / N

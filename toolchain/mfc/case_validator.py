@@ -955,40 +955,52 @@ class CaseValidator:
             return
         eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
         eos_ideal_gas = eos_names["ideal_gas"]
-        eos_mg = eos_names["mie_gruneisen"]
-        eos_values = set(eos_names.values())
+        # The state-dependent families: selector value -> (parameter prefix, its parameters)
+        families = {
+            eos_names["mie_gruneisen"]: ("mg", ("rho0", "c0", "s", "gruneisen")),
+            eos_names["jwl"]: ("jwl", ("a", "b", "r1", "r2", "omega", "rho0")),
+        }
         bub_fac = 1 if self.get("bubbles_euler", "F") == "T" else 0
+        any_state_dependent = False
         for i in range(1, num_fluids + 1 + bub_fac):
             eos = self.get(f"fluid_pp({i})%eos")
-            mg = {k: self.get(f"fluid_pp({i})%mg_{k}") for k in ("rho0", "c0", "s", "gruneisen")}
-            # An unset selector is stiffened gas, so stray mg_* parameters must be caught before the early return.
-            self.prohibit(
-                (eos if eos is not None else eos_names["stiffened_gas"]) != eos_mg and any(v is not None for v in mg.values()),
-                f"fluid_pp({i})%mg_* are only read when fluid_pp({i})%eos = 'mie_gruneisen'",
-            )
+            effective = eos if eos is not None else eos_names["stiffened_gas"]
+            for value, (prefix, keys) in families.items():
+                self.prohibit(
+                    effective != value and any(self.get(f"fluid_pp({i})%{prefix}_{k}") is not None for k in keys),
+                    f"fluid_pp({i})%{prefix}_* are only read when fluid_pp({i})%eos = '{ {v: n for n, v in eos_names.items()}[value] }'",
+                )
             if eos is None:
                 continue
-            self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas', 'ideal_gas' or 'mie_gruneisen'")
+            self.prohibit(eos not in eos_names.values(), f"fluid_pp({i})%eos must be one of {', '.join(repr(n) for n in eos_names)}")
             self.prohibit(
                 eos == eos_ideal_gas and self.get(f"fluid_pp({i})%pi_inf") is not None,
                 f"fluid_pp({i})%eos = 'ideal_gas' has no stiffness; do not set fluid_pp({i})%pi_inf",
             )
+            if eos not in families:
+                continue
+            any_state_dependent = True
+            prefix, keys = families[eos]
+            name = {v: n for n, v in eos_names.items()}[eos]
+            par = {k: self.get(f"fluid_pp({i})%{prefix}_{k}") for k in keys}
             self.prohibit(
-                eos == eos_mg and any(v is None for v in mg.values()),
-                f"fluid_pp({i})%eos = 'mie_gruneisen' requires fluid_pp({i})%mg_rho0, mg_c0, mg_s and mg_gruneisen",
+                any(p is None for p in par.values()),
+                f"fluid_pp({i})%eos = '{name}' requires fluid_pp({i})%{prefix}_{{{', '.join(keys)}}}",
             )
-            if eos == eos_mg and all(v is not None for v in mg.values()):
-                self.prohibit(mg["rho0"] <= 0 or mg["c0"] <= 0 or mg["gruneisen"] <= 0, f"fluid_pp({i})%mg_rho0, mg_c0 and mg_gruneisen must be positive")
-                self.prohibit(mg["s"] < 1, f"fluid_pp({i})%mg_s must be >= 1 (u_s = c0 + s u_p; s < 1 gives no shock)")
-                for k in ("gamma", "pi_inf", "qv"):
-                    self.prohibit(
-                        self.get(f"fluid_pp({i})%{k}") is not None,
-                        f"fluid_pp({i})%{k} is not read with eos = 'mie_gruneisen'; the reference curve replaces it",
-                    )
+            for k in ("gamma", "pi_inf", "qv"):
+                self.prohibit(
+                    self.get(f"fluid_pp({i})%{k}") is not None,
+                    f"fluid_pp({i})%{k} is not read with eos = '{name}'; the reference curve replaces it",
+                )
+            if any(p is None for p in par.values()):
+                continue
+            if prefix == "mg":
+                self.prohibit(par["rho0"] <= 0 or par["c0"] <= 0 or par["gruneisen"] <= 0, f"fluid_pp({i})%mg_rho0, mg_c0 and mg_gruneisen must be positive")
+                self.prohibit(par["s"] < 1, f"fluid_pp({i})%mg_s must be >= 1 (u_s = c0 + s u_p; s < 1 gives no shock)")
                 # The linear Hugoniot has a pole at mu = 1/(s - 1), its maximum compression. Only the initial
                 # state can be checked here; the solver does not guard the runtime density.
-                if mg["s"] > 1:
-                    rho_pole = mg["rho0"] * (1.0 + 1.0 / (mg["s"] - 1.0))
+                if par["s"] > 1:
+                    rho_pole = par["rho0"] * (1.0 + 1.0 / (par["s"] - 1.0))
                     num_patches = self.get("num_patches", 0) or 0
                     for j in range(1, num_patches + 1):
                         ar = self.get(f"patch_icpp({j})%alpha_rho({i})")
@@ -1000,18 +1012,17 @@ class CaseValidator:
                             f"patch_icpp({j}) starts fluid {i} at rho = {ar/a:.4g}, within 20% of the Mie-Gruneisen "
                             f"Hugoniot pole rho0*s/(s-1) = {rho_pole:.4g}; the reference curve is unphysical beyond it",
                         )
-        if not any(self.get(f"fluid_pp({i})%eos") == eos_mg for i in range(1, num_fluids + 1)):
+            else:
+                self.prohibit(par["a"] <= 0 or par["omega"] <= 0 or par["rho0"] <= 0, f"fluid_pp({i})%jwl_a, jwl_omega and jwl_rho0 must be positive")
+                self.prohibit(not par["r1"] > par["r2"] > 0, f"fluid_pp({i})%jwl_r1 > jwl_r2 > 0 is required")
+        if not any_state_dependent:
             return
-        # The per-phase evaluation is wired through the 5-equation Riemann and time-step paths only; every
-        # feature below still reads the stiffened-gas coefficients directly or mixes without partial densities.
-        self.prohibit(self.get("model_eqns") != 2, "eos = 'mie_gruneisen' requires model_eqns = 2")
-        self.prohibit(self.get("riemann_solver") not in (1, 2, 5), "eos = 'mie_gruneisen' requires riemann_solver = 1, 2 or 5")
-        for flag in ("bubbles_euler", "bubbles_lagrange", "alt_soundspeed", "hypoelasticity", "ib", "igr", "relativity", "mhd", "chemistry", "acoustic_source", "probe_wrt", "c_wrt"):
-            self.prohibit(self.get(flag, "F") == "T", f"eos = 'mie_gruneisen' is not supported with {flag} = T")
-        for dir in "xyz":
-            for bound in ("beg", "end"):
-                bc = self.get(f"bc_{dir}%{bound}")
-                self.prohibit(isinstance(bc, int) and -12 <= bc <= -5, f"eos = 'mie_gruneisen' is not supported with characteristic boundary condition bc_{dir}%{bound}")
+        # The per-phase evaluation is wired through the 5-equation paths only; every feature below still
+        # reads the stiffened-gas coefficients directly.
+        self.prohibit(self.get("model_eqns") != 2, "a state-dependent eos (mie_gruneisen, jwl) requires model_eqns = 2")
+        self.prohibit(self.get("riemann_solver") not in (1, 2, 5), "a state-dependent eos (mie_gruneisen, jwl) requires riemann_solver = 1, 2 or 5")
+        for flag in ("bubbles_euler", "bubbles_lagrange", "hypoelasticity", "ib", "igr", "relativity", "mhd", "chemistry", "acoustic_source"):
+            self.prohibit(self.get(flag, "F") == "T", f"a state-dependent eos (mie_gruneisen, jwl) is not supported with {flag} = T")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""

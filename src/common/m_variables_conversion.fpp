@@ -268,7 +268,8 @@ contains
 
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(eoss (1:num_fluids), mg_rho0s (1:num_fluids), mg_c0s (1:num_fluids), mg_ss (1:num_fluids), &
-                   & mg_gruneisens (1:num_fluids))
+                   & mg_gruneisens (1:num_fluids), jwl_as (1:num_fluids), jwl_bs (1:num_fluids), jwl_r1s (1:num_fluids), &
+                   & jwl_r2s (1:num_fluids), jwl_omegas (1:num_fluids), jwl_rho0s (1:num_fluids))
         @:ALLOCATE(isentrope_n (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
         @:ALLOCATE(isentrope_B(1:num_fluids))
@@ -300,10 +301,16 @@ contains
             mg_c0s(i) = fluid_pp(i)%mg_c0
             mg_ss(i) = fluid_pp(i)%mg_s
             mg_gruneisens(i) = fluid_pp(i)%mg_gruneisen
-            if (fluid_pp(i)%eos == eos_mie_gruneisen) any_state_dependent_eos = .true.
+            jwl_as(i) = fluid_pp(i)%jwl_a
+            jwl_bs(i) = fluid_pp(i)%jwl_b
+            jwl_r1s(i) = fluid_pp(i)%jwl_r1
+            jwl_r2s(i) = fluid_pp(i)%jwl_r2
+            jwl_omegas(i) = fluid_pp(i)%jwl_omega
+            jwl_rho0s(i) = fluid_pp(i)%jwl_rho0
+            if (fluid_pp(i)%eos == eos_mie_gruneisen .or. fluid_pp(i)%eos == eos_jwl) any_state_dependent_eos = .true.
         end do
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, mg_rho0s, mg_c0s, mg_ss, &
-                     & mg_gruneisens, any_state_dependent_eos]')
+                     & mg_gruneisens, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, jwl_omegas, jwl_rho0s, any_state_dependent_eos]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -1183,7 +1190,8 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, mg_rho0s, mg_c0s, mg_ss, mg_gruneisens)
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, mg_rho0s, mg_c0s, mg_ss, &
+                     & mg_gruneisens, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, jwl_omegas, jwl_rho0s)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1243,16 +1251,17 @@ contains
     end subroutine s_compute_mixture_coefficients
 
     !> Time derivative of the mixture coefficients, mirroring s_compute_mixture_coefficients.
-    subroutine s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt)
+    subroutine s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, alpha_rho, adv, drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt)
 
         $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients_dt', parallelism='[seq]', cray_inline=True)
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: dalpha_rho_dt, dadv_dt
+            real(wp), dimension(3), intent(in) :: dalpha_rho_dt, dadv_dt, alpha_rho, adv
         #:else
-            real(wp), dimension(num_fluids), intent(in) :: dalpha_rho_dt, dadv_dt
+            real(wp), dimension(num_fluids), intent(in) :: dalpha_rho_dt, dadv_dt, alpha_rho, adv
         #:endif
         real(wp), intent(out) :: drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt
+        real(wp)              :: rho_i, gamma_i, pi_inf_i, dpi_i
         integer               :: i  !< Loop iterator over fluids
 
         dgamma_dt = 0._wp
@@ -1268,8 +1277,16 @@ contains
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
                 drho_dt = drho_dt + dalpha_rho_dt(i)
-                dgamma_dt = dgamma_dt + dadv_dt(i)*gammas(i)
-                dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_infs(i)
+                if (any_state_dependent_eos) then
+                    rho_i = alpha_rho(i)/max(adv(i), sgm_eps)
+                    call s_eos_coefficients(rho_i, i, gamma_i, pi_inf_i, dpi_i)
+                    ! d(alpha Pi(rho_i))/dt with rho_i = alpha_rho/alpha; the alpha in dPi/dt cancels
+                    dgamma_dt = dgamma_dt + dadv_dt(i)*gamma_i
+                    dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_inf_i + dpi_i*(dalpha_rho_dt(i) - rho_i*dadv_dt(i))
+                else
+                    dgamma_dt = dgamma_dt + dadv_dt(i)*gammas(i)
+                    dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_infs(i)
+                end if
                 dqv_dt = dqv_dt + dalpha_rho_dt(i)*qvs(i)
             end do
         end if
@@ -1303,8 +1320,8 @@ contains
 
     !> Coefficients of fluid i at density rho in the form rho e = Gamma p + Pi that every operator here consumes, with dPi/drho. Any
     !! Mie-Gruneisen EOS p = p_ref + rho Gamma_G (e - e_ref) is this form with Gamma = 1/Gamma_G and Pi = rho e_ref - p_ref/Gamma_G;
-    !! a new family adds one case supplying its reference curve. Gamma_G is constant, so dGamma/drho = 0. Stiffened and ideal gas
-    !! keep the constants resolved at init, bit for bit.
+    !! a new family adds one case supplying its reference curve (JWL: Gamma_G = omega). Gamma_G is constant, so dGamma/drho = 0.
+    !! Stiffened and ideal gas keep the constants resolved at init, bit for bit.
     subroutine s_eos_coefficients(rho, i, gamma, pi_inf, dpi)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1312,7 +1329,7 @@ contains
         real(wp), intent(in)  :: rho
         integer, intent(in)   :: i
         real(wp), intent(out) :: gamma, pi_inf, dpi
-        real(wp)              :: mu, d, p_ref, e_ref, dp_dmu, de_dmu, G0
+        real(wp)              :: mu, d, V, ea, eb, p_ref, e_ref, dp_dmu, de_dmu, dp_drho, de_drho, G0
 
         select case (eoss(i))
         case (eos_mie_gruneisen)
@@ -1330,7 +1347,19 @@ contains
             end if
             e_ref = p_ref*mu/(2._wp*mg_rho0s(i)*(1._wp + mu))
             de_dmu = (dp_dmu*mu*(1._wp + mu) + p_ref)/(2._wp*mg_rho0s(i)*(1._wp + mu)**2)
+            dp_drho = dp_dmu/mg_rho0s(i)
+            de_drho = de_dmu/mg_rho0s(i)
             G0 = mg_gruneisens(i)
+        case (eos_jwl)
+            ! JWL: p_ref = A exp(-R1 V) + B exp(-R2 V), V = rho0/rho. The curve is itself an isentrope, so de_ref = -p_ref d(1/rho).
+            V = jwl_rho0s(i)/rho
+            ea = jwl_as(i)*exp(-jwl_r1s(i)*V)
+            eb = jwl_bs(i)*exp(-jwl_r2s(i)*V)
+            p_ref = ea + eb
+            e_ref = (ea/jwl_r1s(i) + eb/jwl_r2s(i))/jwl_rho0s(i)
+            dp_drho = (jwl_rho0s(i)/rho**2)*(jwl_r1s(i)*ea + jwl_r2s(i)*eb)
+            de_drho = p_ref/rho**2
+            G0 = jwl_omegas(i)
         case default
             gamma = gammas(i)
             pi_inf = pi_infs(i)
@@ -1340,7 +1369,7 @@ contains
 
         gamma = 1._wp/G0
         pi_inf = rho*e_ref - p_ref/G0
-        dpi = e_ref + (rho*de_dmu - dp_dmu/G0)/mg_rho0s(i)  ! d/drho = (1/rho0) d/dmu
+        dpi = e_ref + rho*de_drho - dp_drho/G0
 
     end subroutine s_eos_coefficients
 
@@ -1497,7 +1526,7 @@ contains
             real(wp), dimension(num_fluids), intent(in), optional :: alpha_rho
         #:endif
         real(wp) :: alf  !< Subgrid void fraction; dilute by construction
-        real(wp) :: rho_q, gamma_q, pi_inf_q, dpi_q
+        real(wp) :: rho_q, gamma_q, pi_inf_q, dpi_q, blkmod_q
         integer  :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
@@ -1513,12 +1542,25 @@ contains
                 do q = 1, num_fluids
                     rho_q = alpha_rho(q)/max(adv(q), sgm_eps)
                     call s_eos_coefficients(rho_q, q, gamma_q, pi_inf_q, dpi_q)
-                    c = c + adv(q)*(f_bulk_modulus(pres, gamma_q, pi_inf_q) - rho_q*dpi_q/gamma_q)
+                    blkmod_q = f_bulk_modulus(pres, gamma_q, pi_inf_q) - rho_q*dpi_q/gamma_q
+                    if (alt_soundspeed) then
+                        c = c + adv(q)/blkmod_q
+                    else
+                        c = c + adv(q)*blkmod_q
+                    end if
                 end do
-                c = c/rho
+                if (alt_soundspeed) then
+                    c = 1._wp/(rho*c)
+                else
+                    c = c/rho
+                end if
             else if (alt_soundspeed) then  ! Wood's law: volume-weighted harmonic mean
-                c = 1._wp/(rho*(adv(1)/f_bulk_modulus(pres, gammas(1), pi_infs(1)) + adv(2)/f_bulk_modulus(pres, gammas(2), &
-                           & pi_infs(2))))
+                c = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = 1, num_fluids
+                    c = c + adv(q)/f_bulk_modulus(pres, gammas(q), pi_infs(q))
+                end do
+                c = 1._wp/(rho*c)
             else if (model_eqns == model_eqns_6eq) then  ! volume-weighted arithmetic mean
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')

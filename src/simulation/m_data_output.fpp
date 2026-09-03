@@ -1126,7 +1126,7 @@ contains
         real(wp)                        :: ptot
         real(wp)                        :: alf
         real(wp)                        :: alfgr
-        real(wp), dimension(num_fluids) :: alpha
+        real(wp), dimension(num_fluids) :: alpha, alpha_rho
         real(wp)                        :: gamma
         real(wp)                        :: pi_inf
         real(wp)                        :: qv
@@ -1215,6 +1215,7 @@ contains
                     end do
                     do s = 1, num_fluids
                         alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k, l)
+                        alpha_rho(s) = q_cons_vf(eqn_idx%cont%beg + s - 1)%sf(j - 2, k, l)
                     end do
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
@@ -1283,7 +1284,7 @@ contains
                     end if
 
                     ! Compute mixture sound Speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
                     if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                     accel = accel_mag(j - 2, k, l)
@@ -1319,6 +1320,7 @@ contains
                         end do
                         do s = 1, num_fluids
                             alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l)
+                            alpha_rho(s) = q_cons_vf(eqn_idx%cont%beg + s - 1)%sf(j - 2, k - 2, l)
                         end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
@@ -1365,7 +1367,7 @@ contains
                             Rdot(:) = nRdot(:)/nbub
                         end if
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
                         if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
                     end if
                 end if
@@ -1400,6 +1402,7 @@ contains
                             end do
                             do s = 1, num_fluids
                                 alpha(s) = q_cons_vf(eqn_idx%adv%beg + s - 1)%sf(j - 2, k - 2, l - 2)
+                                alpha_rho(s) = q_cons_vf(eqn_idx%cont%beg + s - 1)%sf(j - 2, k - 2, l - 2)
                             end do
 
                             dyn_p = 0.5_wp*rho*dot_product(vel, vel)
@@ -1433,7 +1436,7 @@ contains
                             end if
 
                             ! Compute mixture sound speed
-                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
+                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
                             if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)

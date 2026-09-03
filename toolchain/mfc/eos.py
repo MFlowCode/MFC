@@ -1,4 +1,6 @@
-"""The Mie-Gruneisen reference curve as m_variables_conversion computes it, for tests and validation cases."""
+"""The Mie-Gruneisen reference curves as m_variables_conversion computes them, for tests and validation cases."""
+
+import math
 
 
 def mg_reference(rho, rho0, c0, s):
@@ -16,16 +18,38 @@ def mg_reference(rho, rho0, c0, s):
     return p, e, dp_dmu / rho0, de_dmu / rho0
 
 
-def eos_coefficients(rho, rho0, c0, s, gruneisen):
-    """Gamma, Pi, dPi/drho: the three numbers s_eos_coefficients returns."""
-    p, e, dp, de = mg_reference(rho, rho0, c0, s)
+def jwl_reference(rho, rho0, a, b, r1, r2):
+    """p_ref, e_ref and their d/drho for the JWL curve p = A exp(-R1 V) + B exp(-R2 V), V = rho0/rho."""
+    V = rho0 / rho
+    ea, eb = a * math.exp(-r1 * V), b * math.exp(-r2 * V)
+    p = ea + eb
+    return p, (ea / r1 + eb / r2) / rho0, (rho0 / rho**2) * (r1 * ea + r2 * eb), p / rho**2
+
+
+def coefficients_from_curve(rho, curve, gruneisen):
+    """Gamma, Pi, dPi/drho from a reference curve (p, e, dp/drho, de/drho): what s_eos_coefficients returns."""
+    p, e, dp, de = curve
     return 1.0 / gruneisen, rho * e - p / gruneisen, e + rho * de - dp / gruneisen
 
 
-def sound_speed(rho, pres, rho0, c0, s, gruneisen):
+def eos_coefficients(rho, rho0, c0, s, gruneisen):
+    return coefficients_from_curve(rho, mg_reference(rho, rho0, c0, s), gruneisen)
+
+
+def jwl_coefficients(rho, rho0, a, b, r1, r2, omega):
+    return coefficients_from_curve(rho, jwl_reference(rho, rho0, a, b, r1, r2), omega)
+
+
+def sound_speed(rho, pres, gamma, pi, dpi):
     """c^2 = [((Gamma + 1) p + Pi)/rho - dPi/drho]/Gamma, the frozen single-phase speed the solver uses."""
-    gamma, pi, dpi = eos_coefficients(rho, rho0, c0, s, gruneisen)
     return ((((gamma + 1.0) * pres + pi) / rho - dpi) / gamma) ** 0.5
+
+
+def jwl_isentrope(rho, rho0, a, b, r1, r2, omega, rho_start, p_start):
+    """Pressure on the isentrope through (rho_start, p_start): p_ref(V) + C V^-(omega + 1), exact for JWL."""
+    V, V0 = rho0 / rho, rho0 / rho_start
+    C = (p_start - jwl_reference(rho_start, rho0, a, b, r1, r2)[0]) * V0 ** (omega + 1.0)
+    return jwl_reference(rho, rho0, a, b, r1, r2)[0] + C * V ** (-(omega + 1.0))
 
 
 def hugoniot_state(u_p, rho0, c0, s):

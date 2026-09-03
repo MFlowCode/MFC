@@ -416,13 +416,13 @@ class TestMieGruneisenSelector(ConstraintTestCase):
     def test_scope_is_the_five_equation_riemann_path(self):
         base = {**BASE, **self.MG}
         self.assertRejects({**base, "model_eqns": 3}, "requires model_eqns = 2")
-        self.assertRejects({**base, "alt_soundspeed": "T"}, "not supported with alt_soundspeed = T")
-        self.assertRejects({**base, "bc_x%beg": -5}, "characteristic boundary condition bc_x%beg")
+        self.assertRejects({**base, "hypoelasticity": "T"}, "not supported with hypoelasticity = T")
+        self.assertAccepts({**base, "bc_x%beg": -5, "bc_x%end": -5})
 
     def test_requires_all_four_parameters(self):
         p = {**BASE, **self.MG}
         del p["fluid_pp(1)%mg_s"]
-        self.assertRejects(p, "requires fluid_pp(1)%mg_rho0, mg_c0, mg_s and mg_gruneisen")
+        self.assertRejects(p, "requires fluid_pp(1)%mg_{rho0, c0, s, gruneisen}")
 
     def test_rejects_parameters_under_stiffened_gas(self):
         self.assertRejects({**BASE, "fluid_pp(1)%mg_c0": 3940.0}, "only read when fluid_pp(1)%eos = 'mie_gruneisen'")
@@ -446,3 +446,35 @@ class TestMieGruneisenSelector(ConstraintTestCase):
     def test_no_pole_warning_at_reference_density(self):
         p = {**BASE, **self.MG, "patch_icpp(1)%alpha(1)": 1.0, "patch_icpp(1)%alpha_rho(1)": 8930.0}
         self.assertNotIn("Hugoniot pole", self.warnings_for(p))
+
+
+class TestJwlSelector(ConstraintTestCase):
+    """fluid_pp(i)%eos = 'jwl' owns the six JWL parameters and nothing of the stiffened gas."""
+
+    JWL = {
+        "fluid_pp(1)%eos": 4,
+        "fluid_pp(1)%gamma": None,
+        "fluid_pp(1)%pi_inf": None,
+        "fluid_pp(1)%qv": None,
+        "fluid_pp(1)%jwl_a": 3.712e11,
+        "fluid_pp(1)%jwl_b": 3.231e9,
+        "fluid_pp(1)%jwl_r1": 4.15,
+        "fluid_pp(1)%jwl_r2": 0.95,
+        "fluid_pp(1)%jwl_omega": 0.3,
+        "fluid_pp(1)%jwl_rho0": 1630.0,
+    }
+
+    def test_accepts_complete_set(self):
+        self.assertAccepts({**BASE, **self.JWL})
+
+    def test_requires_all_six(self):
+        p = {**BASE, **self.JWL}
+        del p["fluid_pp(1)%jwl_omega"]
+        self.assertRejects(p, "requires fluid_pp(1)%jwl_{a, b, r1, r2, omega, rho0}")
+
+    def test_rejects_stiffened_gas_and_mg_parameters(self):
+        self.assertRejects({**BASE, **self.JWL, "fluid_pp(1)%gamma": 2.5}, "fluid_pp(1)%gamma is not read with eos = 'jwl'")
+        self.assertRejects({**BASE, **self.JWL, "fluid_pp(1)%mg_c0": 1.0}, "fluid_pp(1)%mg_* are only read when fluid_pp(1)%eos = 'mie_gruneisen'")
+
+    def test_requires_r1_above_r2(self):
+        self.assertRejects({**BASE, **self.JWL, "fluid_pp(1)%jwl_r2": 5.0}, "jwl_r1 > jwl_r2 > 0")

@@ -6,7 +6,7 @@ rho e = Gamma p + Pi form. These tests pin the maths that mapping rests on, with
 
 import pytest
 
-from mfc.eos import eos_coefficients, mg_reference
+from mfc.eos import eos_coefficients, jwl_coefficients, jwl_isentrope, jwl_reference, mg_reference
 
 # Copper-like, no calibrated material: order-of-magnitude values only.
 RHO0, C0, S, G0 = 8930.0, 3940.0, 1.49, 2.0
@@ -78,3 +78,50 @@ def test_release_branch_is_c1_at_rho0():
     assert p_dn == pytest.approx(-(C0**2) * eps, rel=1e-6)  # ... and from below, same slope
     assert dp_up == pytest.approx(dp_dn, rel=1e-6)
     assert dp_up == pytest.approx(C0**2, rel=1e-6)  # bulk modulus rho0 c0^2 over rho0
+
+
+# JWL, synthetic TNT-like magnitudes: no calibrated material.
+JWL = dict(rho0=1630.0, a=3.712e11, b=3.231e9, r1=4.15, r2=0.95)
+OMEGA = 0.30
+
+
+@pytest.mark.parametrize("rho", [1630.0, 1200.0, 800.0, 400.0])
+def test_jwl_curve_derivatives(rho):
+    """The analytic dp_ref/drho and de_ref/drho match central differences, and de_ref/drho = p_ref/rho^2."""
+    p, _, dp, de = jwl_reference(rho, **JWL)
+    h = rho * 1e-6
+    assert dp == pytest.approx(_fd(lambda r: jwl_reference(r, **JWL)[0], rho, h), rel=1e-8)
+    assert de == pytest.approx(_fd(lambda r: jwl_reference(r, **JWL)[1], rho, h), rel=1e-8)
+    assert de == pytest.approx(p / rho**2, rel=1e-14)
+
+
+@pytest.mark.parametrize("rho", [1630.0, 1200.0, 800.0, 400.0])
+def test_jwl_sound_speed_matches_isentrope(rho):
+    pres = 1.2 * jwl_reference(rho, **JWL)[0] + 1e8
+    gamma, pi, dpi = jwl_coefficients(rho, omega=OMEGA, **JWL)
+    c2 = (((gamma + 1.0) * pres + pi) / rho - dpi) / gamma
+    e = (gamma * pres + pi) / rho
+    h = rho * 1e-6
+
+    def p_at(r, e_):
+        g, pi_, _ = jwl_coefficients(r, omega=OMEGA, **JWL)
+        return (r * e_ - pi_) / g
+
+    c2_fd = (p_at(rho + h, e + pres / rho**2 * h) - p_at(rho - h, e - pres / rho**2 * h)) / (2.0 * h)
+    assert c2 > 0.0
+    assert c2 == pytest.approx(c2_fd, rel=1e-6)
+
+
+def test_jwl_isentrope_is_closed_form():
+    """Integrating de = p/rho^2 drho through the Gamma/Pi form reproduces p_ref(V) + C V^-(omega+1)."""
+    rho, p0 = JWL["rho0"], 2.0e10
+    gamma, pi, _ = jwl_coefficients(rho, omega=OMEGA, **JWL)
+    e = (gamma * p0 + pi) / rho
+    n, r_end = 20000, 800.0
+    dr = (rho - r_end) / n
+    for _ in range(n):
+        gamma, pi, _ = jwl_coefficients(rho, omega=OMEGA, **JWL)
+        p = (rho * e - pi) / gamma
+        e -= p / rho**2 * dr
+        rho -= dr
+    assert p == pytest.approx(jwl_isentrope(rho + dr, JWL["rho0"], JWL["a"], JWL["b"], JWL["r1"], JWL["r2"], OMEGA, JWL["rho0"], p0), rel=1e-4)
