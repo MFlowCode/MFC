@@ -656,7 +656,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 if is_gpu_memory_fault(cmd.stdout) and rocm_debug_agent_path() is not None:
                     cons.print(
                         "    [yellow]warning[/yellow]: the ROCm debug agent is available and this is a GPU "
-                        "memory fault, but no agent report was recognised. Either the agent did not load, or "
+                        "memory fault, but no agent report was recognised -- the agent did not load, the run "
+                        "was killed before it finished writing (a report is tens of thousands of lines), or "
                         "its output format has changed and summarize_rocm_debug_agent needs updating."
                     )
             # Marked so classify_error buckets it as a GPU memory fault rather

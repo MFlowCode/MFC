@@ -56,7 +56,9 @@ def workspace(tmp_path):
 def install_launcher(workspace, name):
     """A passthrough launcher that records its argv, mirroring mpirun/srun."""
     launcher = workspace / "bin" / name
-    launcher.write_text("#!/bin/bash\n" f'echo "$@" >> {workspace}/launched.txt\n' 'while [ "${1:0:1}" = "-" ]; do shift; case "$1" in [0-9]*) shift;; esac; done\n' 'exec "$@"\n')
+    # Skips options and their values by looking for the first executable
+    # argument, so it does not need to know which flags take a value.
+    launcher.write_text("#!/bin/bash\n" f'echo "$@" >> {workspace}/launched.txt\n' 'while [ $# -gt 0 ] && [ ! -x "$1" ]; do shift; done\n' 'exec "$@"\n')
     launcher.chmod(launcher.stat().st_mode | stat.S_IEXEC)
     return launcher
 

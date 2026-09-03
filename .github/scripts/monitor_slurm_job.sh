@@ -35,6 +35,15 @@ output_file="$2"
 echo "Submitted batch job $job_id"
 echo "Monitoring output file: $output_file"
 
+# Put the one thing a reader needs on the run's summary page. Without this,
+# learning why a job failed means opening a log of tens of thousands of lines --
+# and an infrastructure fault looks exactly like a test failure until you do.
+# Silent when not running under Actions.
+ci_summary() {
+  [ -n "${GITHUB_STEP_SUMMARY:-}" ] || return 0
+  printf '%b\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+}
+
 # Robustly check SLURM job state using squeue with sacct fallback.
 # Returns the state string (PENDING, RUNNING, COMPLETED, FAILED, etc.)
 # or "UNKNOWN" if both commands fail.
@@ -213,8 +222,14 @@ while true; do
   sleep "$MFC_MONITOR_POLL_SECONDS"
 done
 
-# Give tail a moment to flush the final lines, then stop streaming.
+# Give tail a moment to flush the final lines, then stop streaming. Whether it
+# was still alive decides how much needs reprinting below: if it streamed the
+# whole job, printing the file again just doubles every log.
 sleep 2
+streamed_ok=0
+if kill -0 "${tail_pid}" 2>/dev/null; then
+  streamed_ok=1
+fi
 kill "${tail_pid}" 2>/dev/null || true
 tail_pid=""
 
@@ -238,9 +253,20 @@ if [ -f "$output_file" ]; then
   done
 fi
 
+# Reprint only what streaming may have missed. `tail -f` above already emitted
+# the whole file as it was written, so cat'ing it again duplicated every job's
+# output -- measured at 3 copies of each line on a GPU job, and 65,000 lines of
+# offload diagnostics repeated for a single fault. The reprint exists solely as
+# a safety net for a tail that died mid-job, so it is bounded when tail survived
+# and complete only when it did not.
 echo ""
-echo "=== Final output ==="
-cat "$output_file"
+if [ "${streamed_ok:-0}" -eq 1 ]; then
+  echo "=== Final output (tail; the full log streamed above) ==="
+  tail -n "${MFC_MONITOR_FINAL_LINES:-40}" "$output_file"
+else
+  echo "=== Final output (streaming stopped early; reprinting in full) ==="
+  cat "$output_file"
+fi
 
 # Check exit status with sacct fallback
 exit_code=""
@@ -271,14 +297,18 @@ fi
 # job's own exit code. Relay them verbatim: flattening them to 1 would leave the
 # submit wrapper unable to tell "this node is unusable" (exclude it and try
 # again) from "the tests failed" (report it).
+faulted_node=$(grep -oE 'MFC_FAULT_NODE=[^ ]+' "$output_file" 2>/dev/null | tail -n1 | cut -d= -f2 || true)
+
 case "$exit_code" in
   77:*)
     echo "Job $job_id failed preflight: the node is unusable — signaling caller to exclude it and resubmit."
+    ci_summary "### :warning: Infrastructure fault — not a code or test failure\n\nNode \`${faulted_node:-unknown}\` could not run MFC (job \`$job_id\`). It is excluded and the job resubmitted elsewhere.\n"
     monitor_success=1
     exit 77
     ;;
   78:*)
     echo "Job $job_id skipped: a cluster-wide outage is already recorded."
+    ci_summary "### :warning: Skipped — cluster outage recorded\n\nJob \`$job_id\` was not run; a cluster-wide outage is already recorded. Not a code or test failure.\n"
     monitor_success=1
     exit 78
     ;;
@@ -287,6 +317,14 @@ esac
 # Check if job succeeded
 if [ "$exit_code" != "0:0" ]; then
   echo "ERROR: Job $job_id failed with exit code $exit_code"
+  # A GPU memory fault explains itself in a block the test harness prints; lift
+  # it onto the summary page so the faulting kernel and source line are visible
+  # without opening the log at all.
+  if grep -q 'GPU fault summary' "$output_file" 2>/dev/null; then
+    ci_summary "### GPU memory fault\n\n\`\`\`\n$(grep -A6 'GPU fault summary' "$output_file" | head -8 | sed 's/`/'"'"'/g')\n\`\`\`\n"
+  else
+    ci_summary "### Job \`$job_id\` failed (exit $exit_code)\n\n\`\`\`\n$(tail -n 15 "$output_file" | sed 's/`/'"'"'/g')\n\`\`\`\n"
+  fi
   exit 1
 fi
 

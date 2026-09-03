@@ -114,7 +114,12 @@ echo "Preflight: probing $node with $syscheck_bin"
 # one there fails 127 no matter how healthy the node is. See
 # toolchain/templates/{phoenix,frontier,frontier_amd}.mako.
 case "$cluster" in
-    phoenix)               launcher=(mpirun -np 1) ;;
+    # --bind-to none: a single-rank health probe has nothing to bind against,
+    # and Open MPI's default binding fails outright on some Phoenix nodes
+    # ("hwloc_set_cpubind returned Error for bitmap 0"), killing the process
+    # before the binary is even launched. That is a launcher problem, not a
+    # node problem -- but it condemned three healthy nodes before being caught.
+    phoenix)               launcher=(mpirun --bind-to none -np 1) ;;
     frontier|frontier_amd) launcher=(srun -n1) ;;
     *)                     launcher=() ;;
 esac
@@ -131,17 +136,52 @@ fi
 # PMIX_ERR_NO_PERMISSIONS and friends from dstore_base.c are benign and appear
 # in more passing jobs than failing ones, so matching on log text would fail
 # healthy nodes.
-probe_rc=0
-if [ "${#launcher[@]}" -eq 0 ]; then
-    "$syscheck_bin" 2>&1 || probe_rc=$?
-else
-    "${launcher[@]}" "$syscheck_bin" 2>&1 || probe_rc=$?
-fi
+# Captured to a variable, not a temp file: this runs before any module set is
+# guaranteed and mktemp is not always on PATH here.
+run_probe() {
+    probe_rc=0
+    if [ "$#" -eq 0 ]; then
+        probe_out=$("$syscheck_bin" 2>&1) || probe_rc=$?
+    else
+        probe_out=$("$@" "$syscheck_bin" 2>&1) || probe_rc=$?
+    fi
+}
+
+run_probe "${launcher[@]}"
+
+# If this launcher does not take the flags we added, drop them and probe again
+# rather than reporting a verdict about the node. Otherwise a launcher that
+# rejects an option would fail every probe, and -- because a failed launch is
+# treated as inconclusive below -- would silently switch the preflight off
+# instead of failing loudly.
+case "$probe_out" in
+    *"unrecognized option"*|*"unrecognized argument"*|*"Unknown option"*|*"invalid option"*)
+        if [ "${#launcher[@]}" -gt 1 ]; then
+            echo "Preflight: ${launcher[0]} rejected the probe's options; retrying with none of them."
+            run_probe "${launcher[0]}"
+        fi
+        ;;
+esac
+
+printf '%s\n' "$probe_out"
 
 if [ "$probe_rc" -eq 0 ]; then
     echo "Preflight: $node passed."
     exit $EXIT_HEALTHY
 fi
+
+# Only a binary that RAN and failed says anything about this node. When the
+# launcher never got as far as starting it, the verdict is about mpirun or the
+# allocation, and excluding the node is both wrong and expensive -- three
+# healthy Phoenix nodes were excluded this way, two jobs deep, before the run
+# gave up. Judge nothing on a launch that never happened.
+case "$probe_out" in
+    *"The specified application failed to start"*|*"unable to start the specified application"*|*"was killed without launching the target application"*)
+        echo "Preflight: the launcher could not start $syscheck_bin on $node;"
+        echo "  that is a launcher or allocation problem, not evidence about the node. Continuing."
+        exit $EXIT_HEALTHY
+        ;;
+esac
 
 echo "::error::Preflight failed on $node: syscheck could not run MFC here."
 echo "This is an INFRASTRUCTURE fault, not a code or test failure."
