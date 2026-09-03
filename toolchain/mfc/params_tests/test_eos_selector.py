@@ -30,8 +30,10 @@ def test_stiffened_gas_accepts_stiffness():
     assert _errors(**{"fluid_pp(1)%eos": EOS["stiffened_gas"], "fluid_pp(1)%pi_inf": 1.0e5}) == []
 
 
-def test_ideal_gas_accepts_zero_stiffness():
-    assert _errors(**{"fluid_pp(1)%eos": EOS["ideal_gas"], "fluid_pp(1)%pi_inf": 0.0}) == []
+def test_ideal_gas_owns_no_stiffness_parameter():
+    assert _errors(**{"fluid_pp(1)%eos": EOS["ideal_gas"], "fluid_pp(1)%pi_inf": None}) == []
+    errors = _errors(**{"fluid_pp(1)%eos": EOS["ideal_gas"], "fluid_pp(1)%pi_inf": 0.0})
+    assert len(errors) == 1 and "do not set fluid_pp(1)%pi_inf" in errors[0]
 
 
 def test_ideal_gas_rejects_nonzero_stiffness():

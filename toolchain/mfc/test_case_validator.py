@@ -394,7 +394,16 @@ if __name__ == "__main__":
 class TestMieGruneisenSelector(ConstraintTestCase):
     """fluid_pp(i)%eos = 'mie_gruneisen' requires its reference curve and forbids what it makes redundant."""
 
-    MG = {"fluid_pp(1)%eos": 3, "fluid_pp(1)%mg_rho0": 8930.0, "fluid_pp(1)%mg_c0": 3940.0, "fluid_pp(1)%mg_s": 1.49, "fluid_pp(1)%mg_gruneisen": 2.0}
+    MG = {
+        "fluid_pp(1)%eos": 3,
+        "fluid_pp(1)%gamma": None,
+        "fluid_pp(1)%pi_inf": None,
+        "fluid_pp(1)%qv": None,
+        "fluid_pp(1)%mg_rho0": 8930.0,
+        "fluid_pp(1)%mg_c0": 3940.0,
+        "fluid_pp(1)%mg_s": 1.49,
+        "fluid_pp(1)%mg_gruneisen": 2.0,
+    }
 
     def warnings_for(self, params):
         validator = CaseValidator(dict(params))
@@ -412,8 +421,13 @@ class TestMieGruneisenSelector(ConstraintTestCase):
     def test_rejects_parameters_under_stiffened_gas(self):
         self.assertRejects({**BASE, "fluid_pp(1)%mg_c0": 3940.0}, "only read when fluid_pp(1)%eos = 'mie_gruneisen'")
 
-    def test_rejects_formation_energy(self):
-        self.assertRejects({**BASE, **self.MG, "fluid_pp(1)%qv": 1.0e5}, "qv must be 0 with eos = 'mie_gruneisen'")
+    def test_rejects_the_stiffened_gas_parameters(self):
+        for k in ("gamma", "pi_inf", "qv"):
+            self.assertRejects({**BASE, **self.MG, f"fluid_pp(1)%{k}": 1.0}, f"fluid_pp(1)%{k} is not read with eos = 'mie_gruneisen'")
+
+    def test_ideal_gas_may_not_set_pi_inf(self):
+        self.assertRejects({**BASE, "fluid_pp(1)%eos": 2, "fluid_pp(1)%pi_inf": 0.0}, "has no stiffness; do not set fluid_pp(1)%pi_inf")
+        self.assertAccepts({**BASE, "fluid_pp(1)%eos": 2, "fluid_pp(1)%pi_inf": None, "fluid_pp(1)%qv": None})
 
     def test_rejects_slope_below_one(self):
         self.assertRejects({**BASE, **self.MG, "fluid_pp(1)%mg_s": 0.9}, "mg_s must be >= 1")

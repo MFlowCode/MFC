@@ -44,10 +44,12 @@ PHYSICS_DOCS = {
         "category": "Thermodynamic Constraints",
         "math": r"\rho e = \Gamma\,p + \Pi(\rho), \quad \Gamma = 1/\Gamma_G, \quad \Pi(\rho) = \rho\, e_{\mathrm{ref}}(\rho) - p_{\mathrm{ref}}(\rho)/\Gamma_G",
         "explanation": (
-            "Every backend supplies the same two coefficients. An ideal gas is the stiffened-gas form with no stiffness, so "
-            "selecting it and also supplying a nonzero pi_inf is contradictory. Mie-Gruneisen supplies a linear-Hugoniot "
+            "Every backend supplies the same two coefficients, and a case may only set the parameters its backend reads: an "
+            "ideal gas has no pi_inf, and a Mie-Gruneisen fluid has neither gamma, pi_inf nor qv. Mie-Gruneisen supplies a linear-Hugoniot "
             "reference curve (mg_rho0, mg_c0, mg_s, mg_gruneisen) whose reference energy already carries the formation energy, so "
             "qv must be zero; its parameters are read only when that backend is selected."
+            "The Mie-Gruneisen backend is evaluated per phase along the 5-equation Riemann and time-step paths; "
+            "the features it is refused with still read stiffened-gas coefficients directly."
         ),
         "references": ["Wilfong26"],
     },
@@ -967,10 +969,9 @@ class CaseValidator:
             if eos is None:
                 continue
             self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas', 'ideal_gas' or 'mie_gruneisen'")
-            pi_inf = self.get(f"fluid_pp({i})%pi_inf")
             self.prohibit(
-                eos == eos_ideal_gas and pi_inf is not None and pi_inf != 0,
-                f"fluid_pp({i})%eos = 'ideal_gas' requires fluid_pp({i})%pi_inf = 0 (an ideal gas has no stiffness)",
+                eos == eos_ideal_gas and self.get(f"fluid_pp({i})%pi_inf") is not None,
+                f"fluid_pp({i})%eos = 'ideal_gas' has no stiffness; do not set fluid_pp({i})%pi_inf",
             )
             self.prohibit(
                 eos == eos_mg and any(v is None for v in mg.values()),
@@ -979,11 +980,11 @@ class CaseValidator:
             if eos == eos_mg and all(v is not None for v in mg.values()):
                 self.prohibit(mg["rho0"] <= 0 or mg["c0"] <= 0 or mg["gruneisen"] <= 0, f"fluid_pp({i})%mg_rho0, mg_c0 and mg_gruneisen must be positive")
                 self.prohibit(mg["s"] < 1, f"fluid_pp({i})%mg_s must be >= 1 (u_s = c0 + s u_p; s < 1 gives no shock)")
-                qv = self.get(f"fluid_pp({i})%qv")
-                self.prohibit(
-                    qv is not None and qv != 0,
-                    f"fluid_pp({i})%qv must be 0 with eos = 'mie_gruneisen'; the reference energy e_ref(rho) carries it",
-                )
+                for k in ("gamma", "pi_inf", "qv"):
+                    self.prohibit(
+                        self.get(f"fluid_pp({i})%{k}") is not None,
+                        f"fluid_pp({i})%{k} is not read with eos = 'mie_gruneisen'; the reference curve replaces it",
+                    )
                 # The linear Hugoniot has a pole at mu = 1/(s - 1), its maximum compression. Only the initial
                 # state can be checked here; the solver does not guard the runtime density.
                 if mg["s"] > 1:
