@@ -1000,6 +1000,18 @@ class CaseValidator:
                             f"patch_icpp({j}) starts fluid {i} at rho = {ar/a:.4g}, within 20% of the Mie-Gruneisen "
                             f"Hugoniot pole rho0*s/(s-1) = {rho_pole:.4g}; the reference curve is unphysical beyond it",
                         )
+        if not any(self.get(f"fluid_pp({i})%eos") == eos_mg for i in range(1, num_fluids + 1)):
+            return
+        # The per-phase evaluation is wired through the 5-equation Riemann and time-step paths only; every
+        # feature below still reads the stiffened-gas coefficients directly or mixes without partial densities.
+        self.prohibit(self.get("model_eqns") != 2, "eos = 'mie_gruneisen' requires model_eqns = 2")
+        self.prohibit(self.get("riemann_solver") not in (1, 2, 5), "eos = 'mie_gruneisen' requires riemann_solver = 1, 2 or 5")
+        for flag in ("bubbles_euler", "bubbles_lagrange", "alt_soundspeed", "hypoelasticity", "ib", "igr", "relativity", "mhd", "chemistry", "acoustic_source", "probe_wrt", "c_wrt"):
+            self.prohibit(self.get(flag, "F") == "T", f"eos = 'mie_gruneisen' is not supported with {flag} = T")
+        for dir in "xyz":
+            for bound in ("beg", "end"):
+                bc = self.get(f"bc_{dir}%{bound}")
+                self.prohibit(isinstance(bc, int) and -12 <= bc <= -5, f"eos = 'mie_gruneisen' is not supported with characteristic boundary condition bc_{dir}%{bound}")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""

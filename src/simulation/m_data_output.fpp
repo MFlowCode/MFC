@@ -163,11 +163,11 @@ contains
         real(wp)                                            :: rho  !< Cell-avg. density
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha  !< Cell-avg. volume fraction
-            real(wp), dimension(3) :: vel    !< Cell-avg. velocity
+            real(wp), dimension(3) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
+            real(wp), dimension(3) :: vel               !< Cell-avg. velocity
         #:else
-            real(wp), dimension(num_fluids) :: alpha  !< Cell-avg. volume fraction
-            real(wp), dimension(num_vels)   :: vel    !< Cell-avg. velocity
+            real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
+            real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
         #:endif
         real(wp)               :: vel_sum                     !< Cell-avg. velocity sum
         real(wp)               :: pres                        !< Cell-avg. pressure
@@ -189,15 +189,15 @@ contains
         ccfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, icfl, vcfl, &
-                            & Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
+                            & icfl, vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
                             & reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
+                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp

@@ -6,27 +6,7 @@ rho e = Gamma p + Pi form. These tests pin the maths that mapping rests on, with
 
 import pytest
 
-
-def mg_reference(rho, rho0, c0, s):
-    """p_ref, e_ref and their d/drho for the linear-Hugoniot curve, as the Fortran computes them."""
-    mu = rho / rho0 - 1.0
-    if mu >= 0.0:
-        d = 1.0 - (s - 1.0) * mu
-        p = rho0 * c0**2 * mu * (1.0 + mu) / d**2
-        dp_dmu = rho0 * c0**2 * ((1.0 + 2.0 * mu) * d + 2.0 * (s - 1.0) * mu * (1.0 + mu)) / d**3
-    else:
-        p = rho0 * c0**2 * mu
-        dp_dmu = rho0 * c0**2
-    e = p * mu / (2.0 * rho0 * (1.0 + mu))
-    de_dmu = (dp_dmu * mu * (1.0 + mu) + p) / (2.0 * rho0 * (1.0 + mu) ** 2)
-    return p, e, dp_dmu / rho0, de_dmu / rho0
-
-
-def eos_coefficients(rho, rho0, c0, s, G0):
-    """Gamma, Pi, dPi/drho - the same three numbers s_eos_coefficients returns."""
-    p, e, dp, de = mg_reference(rho, rho0, c0, s)
-    return 1.0 / G0, rho * e - p / G0, e + rho * de - dp / G0
-
+from mfc.eos import eos_coefficients, mg_reference
 
 # Copper-like, no calibrated material: order-of-magnitude values only.
 RHO0, C0, S, G0 = 8930.0, 3940.0, 1.49, 2.0

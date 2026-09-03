@@ -411,7 +411,13 @@ class TestMieGruneisenSelector(ConstraintTestCase):
         return "\n".join(validator.warnings)
 
     def test_accepts_complete_curve(self):
-        self.assertAccepts({**BASE, **self.MG, "fluid_pp(1)%qv": 0.0})
+        self.assertAccepts({**BASE, **self.MG})
+
+    def test_scope_is_the_five_equation_riemann_path(self):
+        base = {**BASE, **self.MG}
+        self.assertRejects({**base, "model_eqns": 3}, "requires model_eqns = 2")
+        self.assertRejects({**base, "alt_soundspeed": "T"}, "not supported with alt_soundspeed = T")
+        self.assertRejects({**base, "bc_x%beg": -5}, "characteristic boundary condition bc_x%beg")
 
     def test_requires_all_four_parameters(self):
         p = {**BASE, **self.MG}

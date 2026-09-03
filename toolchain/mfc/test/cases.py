@@ -7,7 +7,7 @@ from mfc import common
 
 from ..state import ARG
 from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
-from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_sod_l1
+from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -125,6 +125,18 @@ def add_convergence_cases(cases):
                 )
             )
 
+    cases.append(
+        define_convergence_case(
+            "Convergence -> Mie-Gruneisen -> acoustic speed",
+            spec=ConvergenceSpec(runner=run_mg_wave_speed, case_path="examples/1D_mg_acoustic/case.py", expected_order=0.0, tol=1.0e-3, resolutions=[100, 200, 400]),
+        )
+    )
+    cases.append(
+        define_convergence_case(
+            "Convergence -> Mie-Gruneisen -> Hugoniot",
+            spec=ConvergenceSpec(runner=run_mg_hugoniot, case_path="examples/1D_mg_impact/case.py", expected_order=0.0, tol=0.005, amps=[0.2, 0.5, 1.0, 1.5]),
+        )
+    )
     for label, extra_args, expected, tol, min_N in _CONVERGENCE_SOD_SCHEMES:
         resolutions = [N for N in _RES_SOD_DEFAULT if min_N is None or N >= min_N]
         cases.append(
@@ -659,6 +671,23 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(3)%alpha(2)": 0.8,
                     },
                 )
+                if dimInfo[0] == ["x"]:
+                    # Fluid 1 on its own reference curve beside an ideal gas, so one kernel carries both EOS paths.
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "eos=mie_gruneisen",
+                            {
+                                "fluid_pp(1)%eos": "mie_gruneisen",
+                                "fluid_pp(1)%gamma": None,
+                                "fluid_pp(1)%qv": None,
+                                "fluid_pp(1)%mg_rho0": 0.9,
+                                "fluid_pp(1)%mg_c0": 1.0,
+                                "fluid_pp(1)%mg_s": 1.5,
+                                "fluid_pp(1)%mg_gruneisen": 0.4,
+                            },
+                        )
+                    )
 
                 if len(dimInfo[0]) > 1:
                     alter_capillary()
@@ -2862,6 +2891,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_advection_convergence",
                 "3D_advection_convergence",
                 "2D_hypo_shear_contact",  # exercised by the convergence suite
+                "1D_mg_acoustic",  # exercised by the convergence suite
+                "1D_mg_impact",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
                 "3D_IGR_TaylorGreenVortex_nvidia",

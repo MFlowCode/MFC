@@ -1281,7 +1281,7 @@ contains
 
                     call s_compute_mixture_coefficients(alpha_rho, adv, rho, gamma, pi_inf, qv)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c, alpha_rho)
 
                     Ma = maxvel/c
                     if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then

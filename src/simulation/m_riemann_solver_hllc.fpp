@@ -276,15 +276,15 @@ contains
                                                                  & qv_R, rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                 end if
 
-                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, alpha_rho_L)
 
-                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R, alpha_rho_R)
 
                                 ! Only the pressure-based wave-speed estimate reads the averaged state, and building it
                                 ! costs eight square roots per face under the Roe average.
                                 if (wave_speeds == wave_speeds_pressure) then
                                     call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
-                                                                      & H_avg, c_sum_Yi_Phi, alpha_R, c_avg)
+                                                                      & H_avg, c_sum_Yi_Phi, alpha_R, c_avg, alpha_rho_R)
                                 end if
 
                                 if (viscous) then
@@ -630,9 +630,9 @@ contains
                                     end do
                                 end if
 
-                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
+                                call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, alpha_rho_L)
 
-                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R)
+                                call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R, alpha_rho_R)
 
                                 ! Only the pressure-based wave-speed estimate reads the averaged state, and building it
                                 ! costs eight square roots per face under the Roe average.
@@ -640,7 +640,7 @@ contains
                                     ! Zero, not c_sum_Yi_Phi: this loop never forms the chemistry average, and
                                     ! chemistry with bubbles_euler/qbmm is prohibited, so the branch is unreachable.
                                     call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
-                                                                      & H_avg, 0._wp, alpha_R, c_avg)
+                                                                      & H_avg, 0._wp, alpha_R, c_avg, alpha_rho_R)
                                 end if
 
                                 if (viscous) then
@@ -1058,15 +1058,16 @@ contains
                                         end if
                                     end if
 
-                                    call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
+                                    call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, alpha_rho_L)
 
-                                    call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R)
+                                    call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R, alpha_rho_R)
 
                                     ! Only the pressure-based wave-speed estimate reads the averaged state, and building it
                                     ! costs eight square roots per face under the Roe average.
                                     if (wave_speeds == wave_speeds_pressure) then
                                         call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, &
-                                                                          & vel_avg_rms, H_avg, c_sum_Yi_Phi, alpha_R, c_avg)
+                                                                          & vel_avg_rms, H_avg, c_sum_Yi_Phi, alpha_R, c_avg, &
+                                                                          & alpha_rho_R)
                                     end if
 
                                     if (viscous) then
