@@ -339,6 +339,7 @@ PATTERNS = [
     (r"patch_icpp\((\d+)\)%modal_use_exp_form", "Use exp form for 2D modal patch {0}"),
     (r"patch_icpp\((\d+)\)%sph_har_coeff\((\d+),(-?\d+)\)", "Spherical harmonic coeff (l={1}, m={2}) for patch {0}"),
     # fluid_pp patterns
+    (r"fluid_pp\((\d+)\)%eos", "Equation of state selector for fluid {0}"),
     (r"fluid_pp\((\d+)\)%gamma", "Specific heat ratio for fluid {0}"),
     (r"fluid_pp\((\d+)\)%pi_inf", "Stiffness pressure for fluid {0}"),
     (r"fluid_pp\((\d+)\)%G", "Shear modulus for fluid {0}"),

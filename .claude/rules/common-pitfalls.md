@@ -36,6 +36,35 @@ covered in `docs/documentation/contributing.md`.
 - `@:ACC_SETUP_VFs(...)`/`@:ACC_SETUP_SFs(...)` GPU pointer setup compiles only under
   Cray. Around MPI: `GPU_UPDATE(host=...)` before send, `GPU_UPDATE(device=...)` after
   receive.
+- An array whose bound is a device global (`dimension(num_fluids)`, `dimension(num_species)`) may be
+  passed to a device routine **from a parallel-loop body, but not from inside another
+  `GPU_ROUTINE(parallelism='[seq]')`**. CCE OpenACC rejects the second form with
+  `ftn-7066 ... Global in accelerator routine without declare -- num_fluids`, and reports it at
+  whatever line it gave up on: remove one trigger and the message *walks forward* to the next call,
+  so the reported line is not the cause. Only the plain lanes fail - under `--case-optimization`
+  those bounds are `parameter`s, so a green Case Opt lane beside a failing plain one is the
+  signature. Every accepted call site in the tree already obeys this (`m_cbc`, `m_ibm`,
+  `m_bubbles_EL`, `s_compute_cell_state`): form such a call in the loop body and pass scalars
+  deeper. Neither `cray_inline` nor a `num_fluids_max` bound nor dropping optional dummies helps -
+  all three were measured.
+- nvfortran 23.11/24.1 segfault (`fort2 TERMINATED by signal 11`) on a caller that passes a
+  `parameter` array from `m_thermochem` (e.g. `molecular_weights`) into a declare-target routine.
+  Read such arrays directly in the kernel, or pass a plain local computed from them.
+- The `USING_AMD` fypp guards (86 sites, `#:set` in `src/common/include/shared_parallel_macros.fpp`) are
+  load-bearing, not a stale workaround - do not "modernize" them away. They swap a device-global array
+  bound for a literal: `dimension(3)` for `num_dims`/`num_fluids` when case optimization is off (64
+  sites), and `dimension(20)` for `sys_size` in `m_compute_cbc` (21 sites, with a matching
+  `@:PROHIBIT` in `m_start_up` capping `sys_size <= 20` under AMD+CBC). Setting `USING_AMD = False`
+  and rebuilding amdflang `--gpu mp` without case optimization compiles CLEAN - 728 s, zero
+  diagnostics - and then NaNs at step 50 in CBC, riemann `wave_speeds=2`, IBM, surface tension,
+  QBMM/viscous and MHD HLLD, while both Lagrange bubble cases *complete* with out-of-tolerance
+  answers. Measured 2026-08-29 on MI210. A compile-only check returns green, so any future attempt to
+  drop these must run the tests, not just build.
+- The same "call it from the loop body" rule covers `m_thermochem`: calling `get_species_*` from
+  inside a `GPU_ROUTINE` rather than from the kernel gave CCE OpenMP a runtime
+  `Memory access fault by GPU node-N ... Reason: Unknown` on the first step (exit 134), while every
+  other backend ran. Evaluate them at the call site and pass the arrays in. Note this one only shows
+  at runtime, and only on a case that reaches the path - the build is clean.
 
 ## Parameters
 
@@ -105,6 +134,27 @@ covered in `docs/documentation/contributing.md`.
 - Tests are generated programmatically in `toolchain/mfc/test/cases.py` (parameter
   modifications on `BASE_CFG` via the `CaseGeneratorStack` push/pop pattern); test UUID =
   CRC32 of the trace string; `./mfc.sh test -l` lists all.
+- `--only` matches whole trace *elements*, not substrings, and `_filter_only`
+  (`toolchain/mfc/test/test.py`) **ANDs labels while ORing UUIDs**. So `--only bubbles` matches
+  nothing (the element is `Bubbles`), and `--only low_Mach=1 low_Mach=2` asks for cases carrying
+  both and also matches nothing. It then exits **143**, which reads like an external kill rather
+  than an empty filter. Pass UUIDs whenever you want the union of several groups.
+- Sibling `define_case_d` calls off the same stack level are never *combined*. Two switches that
+  only matter together (`avg_state=1` needs `wave_speeds=2` to be read at all) therefore get zero
+  effective coverage unless something pushes one and defines the other beneath it. Check
+  reachability before trusting that a flag is tested.
+- `--no-build` silently runs whatever binary is on disk for a configuration it did not build.
+  Chemistry has its own config (`gpu-mp-chem-*`) that a plain `./mfc.sh build` never produces, so
+  a `--no-build` run reports failures from stale binaries and hides real compile breaks. Run
+  chemistry-touching sets without it.
+- Pick the newest binary by the *binary's* mtime (`ls -t build/install/*/bin/simulation`), not the
+  install directory's - a stale config's directory can be newer than a fresh build's.
+- The pre-commit hook lives in the main repo's `.git/hooks/` and git exports `GIT_DIR` there
+  during a commit, so from a worktree the toolchain lint enumerates the *other* checkout and
+  fails. Reproduce with `GIT_DIR=<main>/.git ./mfc.sh precheck`. Run precheck by hand and commit
+  with `--no-verify`.
+- `/tmp` is node-local: scratch does not survive a compute-node change, and its absence is
+  silence, not an error. Keep patches and resource baselines on a shared filesystem.
 - Golden files are tolerance-compared. Regenerate only the affected tests
   (`./mfc.sh test --generate --only <tests>`) — an unexplained golden-file diff is a bug
   report, not noise to be regenerated away.

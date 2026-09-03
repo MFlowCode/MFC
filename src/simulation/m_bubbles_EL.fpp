@@ -371,9 +371,7 @@ contains
         do i = 1, num_dims
             dynP = dynP + 0.5_wp*q_cons_vf(eqn_idx%cont%end + i)%sf(cell(1), cell(2), cell(3))**2/rhol
         end do
-        ! Stiffened-gas inversion; must match s_compute_pressure in m_variables_conversion,
-        ! including the qv (heat of formation) term, which is nonzero for phase-change fluids.
-        pliq = (q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf - qv)/gamma
+        pliq = f_pressure(q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)) - dynP, gamma, pi_inf, qv)
         if (pliq < 0) print *, "Negative pressure", proc_rank, q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, &
             & pliq, cell, dynP
 
@@ -659,7 +657,7 @@ contains
             ! Obtain liquid density and computing speed of sound from pinf
             call s_compute_species_fraction(q_prim_vf, cell(1), cell(2), cell(3), myalpha_rho, myalpha)
             call s_convert_species_to_mixture_variables_kernel(myRho, gamma, pi_inf, qv, myalpha, myalpha_rho, Re)
-            call s_compute_cson_from_pinf(q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
+            myCson = sqrt(f_bulk_modulus(myPinf, gamma, pi_inf)/myRho)
 
             ! Adaptive time stepping
             adap_dt_stop = 0
@@ -815,34 +813,6 @@ contains
         call nvtxEndRange
 
     end subroutine s_compute_bubbles_EL_source
-
-    !> Compute the speed of sound from a given driving pressure
-    subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
-
-        $:GPU_ROUTINE(function_name='s_compute_cson_from_pinf', parallelism='[seq]', cray_inline=True)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        real(wp), intent(in)                                :: pinf, rhol, gamma, pi_inf
-        integer, dimension(3), intent(in)                   :: cell
-        real(wp), intent(out)                               :: cson
-        real(wp)                                            :: E, H
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: vel
-        #:else
-            real(wp), dimension(num_dims) :: vel
-        #:endif
-        integer :: i
-
-        vel(:) = 0._wp
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_dims
-            vel(i) = q_prim_vf(i + eqn_idx%cont%end)%sf(cell(1), cell(2), cell(3))
-        end do
-        E = gamma*pinf + pi_inf + 0.5_wp*rhol*dot_product(vel, vel)
-        H = (E + pinf)/rhol
-        cson = sqrt((H - 0.5_wp*dot_product(vel, vel))/gamma)
-
-    end subroutine s_compute_cson_from_pinf
 
     !> Smear the bubble effects onto the Eulerian grid
     subroutine s_smear_voidfraction(bc_type)
@@ -1361,9 +1331,7 @@ contains
                      & 2) <= pcomm_coords(1)%end) then
                 wrap_bubble_dir(k, 1) = 1
                 wrap_bubble_loc(k, 1) = 1
-            else if (mtn_pos(k, 1, 2) >= x_cb(m)) then
-                keep_bubble(k) = 0
-            else if (mtn_pos(k, 1, 2) < x_cb(-1)) then
+            else if (.not. (mtn_pos(k, 1, 2) >= x_cb(-1) .and. mtn_pos(k, 1, 2) < x_cb(m))) then
                 keep_bubble(k) = 0
             end if
 
@@ -1381,9 +1349,7 @@ contains
                      & 2) <= pcomm_coords(2)%end) then
                 wrap_bubble_dir(k, 2) = 1
                 wrap_bubble_loc(k, 2) = 1
-            else if (mtn_pos(k, 2, 2) >= y_cb(n)) then
-                keep_bubble(k) = 0
-            else if (mtn_pos(k, 2, 2) < y_cb(-1)) then
+            else if (.not. (mtn_pos(k, 2, 2) >= y_cb(-1) .and. mtn_pos(k, 2, 2) < y_cb(n))) then
                 keep_bubble(k) = 0
             end if
 
@@ -1402,9 +1368,7 @@ contains
                          & 2) <= pcomm_coords(3)%end) then
                     wrap_bubble_dir(k, 3) = 1
                     wrap_bubble_loc(k, 3) = 1
-                else if (mtn_pos(k, 3, 2) >= z_cb(p)) then
-                    keep_bubble(k) = 0
-                else if (mtn_pos(k, 3, 2) < z_cb(-1)) then
+                else if (.not. (mtn_pos(k, 3, 2) >= z_cb(-1) .and. mtn_pos(k, 3, 2) < z_cb(p))) then
                     keep_bubble(k) = 0
                 end if
             end if
@@ -1764,9 +1728,6 @@ contains
             call my_inquire(trim(file_loc), file_exist)
             if (.not. file_exist) then
                 open (LAG_VOID_ID, FILE=trim(file_loc), form='formatted', position='rewind')
-                ! write (12, *) 'currentTime, averageVoidFraction, ', & 'maximumVoidFraction, totalParticlesVolume' write (12, *)
-                ! 'The averageVoidFraction value does ', & 'not reflect the real void fraction in the cloud since the ', & 'cells
-                ! which do not have bubbles are not accounted'
             else
                 open (LAG_VOID_ID, FILE=trim(file_loc), form='formatted', position='append')
             end if
