@@ -224,16 +224,16 @@ contains
 
                 if (i == 1) then
                     do l = 1, sys_size
-                        @:ALLOCATE(flux_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
-                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(flux_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
 
                     if (viscous .or. surface_tension) then
                         do l = eqn_idx%mom%beg, eqn_idx%E
-                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                     end if
 
@@ -248,32 +248,32 @@ contains
                     !
                     ! adv_src_mode_none: flux_src(adv%beg:adv%end) = zeros. No separate NC advection source term. Allocated
                     ! for structural consistency with s_finalize_riemann_solver.
-                    @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                               & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
 
                     if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
                         ! Alpha-interface needs separate per-fluid arrays. HLLD (adv_src_mode_none) allocates for structural
                         ! consistency with s_finalize_riemann_solver.
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
-                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                     end if
 
                     if (chemistry) then
                         do l = eqn_idx%species%beg, eqn_idx%species%end
-                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                         if (chem_params%diffusion .and. .not. viscous) then
-                            @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                                       & idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end if
                     end if
                 else
                     do l = 1, sys_size
-                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
                 end if
 
@@ -496,8 +496,8 @@ contains
             do i = 1, num_dims
                 @:ALLOCATE(nc_iface_vel_n(i)%vf(1:num_dims))
                 do l = 1, num_dims
-                    @:ALLOCATE(nc_iface_vel_n(i)%vf(l)%sf( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ALLOCATE(nc_iface_vel_n(i)%vf(l)%sf( idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                               & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 end do
             end do
             if (num_dims == 2) then
@@ -512,8 +512,8 @@ contains
                 do i = 1, num_dims
                     @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(1:num_dims))
                     do l = 1, num_dims
-                        @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(l)%sf( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(l)%sf( idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
                 end do
                 if (num_dims == 2) then
