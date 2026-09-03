@@ -1,12 +1,46 @@
-This file was created on 2026-09-03 02:43:57.293540.
+This file was created on 2026-09-03 17:43:26.219717.
 
 mfc.sh:
 
-    Invocation: test -j 8 --gpu mp --no-build --generate --only 471270BB 61AF4509 6AE3FB4E
+    Invocation: test -j 8 --gpu mp --no-build --generate --only 61AF4509 6AE3FB4E 4A0CDF9C
     Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        761bebe020ae46263805b6ad5de47c5b010ef45c on feature/mie-gruneisen-true (dirty)
+    Git:        e644cf79876d1651c5092d0a8bde1d368c76863d on feature/mie-gruneisen-true (dirty)
 
-pre_process:
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on k006-004-v7.hpcfund
+    
+        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
+        Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : ON
+    
+        Fypp    : /home1/sbryngelson/work/mfc-eos/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
+        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
+        FC       : /work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
 
     CMake Configuration:
     
@@ -15,9 +49,9 @@ pre_process:
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -74,41 +108,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on k006-004-v7.hpcfund
-    
-        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
-        Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : ON
-    
-        Fypp    : /home1/sbryngelson/work/mfc-eos/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
-        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
-        FC       : /work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-post_process:
+pre_process:
 
     CMake Configuration:
     
@@ -117,9 +117,9 @@ post_process:
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF

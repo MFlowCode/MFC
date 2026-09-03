@@ -11,7 +11,7 @@ module m_pressure_relaxation
 
     use m_derived_types
     use m_global_parameters
-    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, f_pressure, f_phase_internal_energy, &
+    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, f_pressure, s_phase_internal_energy, &
         & s_phase_coefficients, s_phase_density_on_isentrope, f_is_state_dependent
 
     implicit none
@@ -142,7 +142,7 @@ contains
                                           & dpi_K, dgamma_K)
                 pres_K_init(i) = ((q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, &
                             & k, l)*qvs(i))/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) - pi_inf_K)/gamma_K
-                if (.not. any_state_dependent_eos) then
+                if (.not. f_is_state_dependent(i)) then
                     if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*isentrope_B(i) + 1.e-8_wp) pres_K_init(i) = -(1._wp - 1.e-8_wp) &
                         & *isentrope_B(i) + 1.e-8_wp
                 end if
@@ -220,8 +220,9 @@ contains
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = f_phase_internal_energy(pres_relax, &
-                      & q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), i)
+            call s_phase_internal_energy(pres_relax, q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), &
+                                         & q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), i, &
+                                         & q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l))
         end do
 
     end subroutine s_correct_internal_energies

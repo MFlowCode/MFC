@@ -23,6 +23,8 @@ def mg_reference(rho, rho0, c0, s, s2=0.0, s3=0.0):
             us, dus = c0 + s * up + s2 * up**2 + s3 * up**3, s + 2.0 * s2 * up + 3.0 * s3 * up**2
             up -= (us * mu - up * (1.0 + mu)) / (dus * mu - (1.0 + mu))
         us, dus = c0 + s * up + s2 * up**2 + s3 * up**3, s + 2.0 * s2 * up + 3.0 * s3 * up**2
+        if up < 0.0 or not abs(us * mu - up * (1.0 + mu)) <= 1e-10 * c0 * (1.0 + mu):  # unconverged, or a spurious root
+            raise ValueError(f"no shock state at mu = {mu:.4g}: the fit's maximum compression is exceeded")
         dup_dmu = (up - us) / (dus * mu - (1.0 + mu))
         p = rho0 * us * up
         dp_dmu = rho0 * ((dus * up + us) * dup_dmu)
@@ -87,7 +89,7 @@ def rk4(slope, x0, y0, x1, steps):
 
 
 def isentrope_rk4(coefficients, rho_from, p_from, rho_to, steps=8):
-    """p after an isentropic density change, dp/drho = c^2: what f_phase_pressure_on_isentrope does."""
+    """p after an isentropic density change, dp/drho = c^2: what s_phase_pressure_on_isentrope does."""
     return rk4(lambda r, p: sound_speed(r, p, *coefficients(r)) ** 2, rho_from, p_from, rho_to, steps)
 
 

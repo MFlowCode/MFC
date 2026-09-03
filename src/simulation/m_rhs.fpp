@@ -1070,12 +1070,16 @@ contains
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
-                        blkmod1(k_loop, l_loop, q_loop) = f_phase_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop), q_prim_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop), &
-                                & q_prim_vf%vf(eqn_idx%cont%beg)%sf(k_loop, l_loop, q_loop), 1) + (4._wp/3._wp)*G1_eff
-                        blkmod2(k_loop, l_loop, q_loop) = f_phase_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, &
-                                & q_loop), q_prim_vf%vf(eqn_idx%adv%end)%sf(k_loop, l_loop, q_loop), &
-                                & q_prim_vf%vf(eqn_idx%cont%end)%sf(k_loop, l_loop, q_loop), 2) + (4._wp/3._wp)*G2_eff
+                        call s_phase_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop), &
+                                                  & q_prim_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop), &
+                                                  & q_prim_vf%vf(eqn_idx%cont%beg)%sf(k_loop, l_loop, q_loop), 1, blkmod1(k_loop, &
+                                                  & l_loop, q_loop))
+                        call s_phase_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop), &
+                                                  & q_prim_vf%vf(eqn_idx%adv%end)%sf(k_loop, l_loop, q_loop), &
+                                                  & q_prim_vf%vf(eqn_idx%cont%end)%sf(k_loop, l_loop, q_loop), 2, blkmod2(k_loop, &
+                                                  & l_loop, q_loop))
+                        blkmod1(k_loop, l_loop, q_loop) = blkmod1(k_loop, l_loop, q_loop) + (4._wp/3._wp)*G1_eff
+                        blkmod2(k_loop, l_loop, q_loop) = blkmod2(k_loop, l_loop, q_loop) + (4._wp/3._wp)*G2_eff
                         alpha1(k_loop, l_loop, q_loop) = q_cons_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop)
 
                         if (bubbles_euler) then

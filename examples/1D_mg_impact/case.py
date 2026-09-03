@@ -14,12 +14,13 @@ parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT")
 parser.add_argument("-N", type=int, default=800)
 parser.add_argument("--U", type=float, default=1.0, help="closing speed of the two slabs")
 parser.add_argument("--cfl", type=float, default=0.4)
-parser.add_argument("--s2", type=float, default=0.0, help="quadratic Hugoniot coefficient u_s = c0 + s u_p + s2 u_p^2")
+parser.add_argument("--s2", type=float, default=0.0, help="quadratic Hugoniot coefficient u_s = c0 + s u_p + s2 u_p^2 + s3 u_p^3")
+parser.add_argument("--s3", type=float, default=0.0, help="cubic Hugoniot coefficient")
 args = parser.parse_args()
 
 rho0, p0, c0, s, gruneisen = 1.0, 1.0e-3, 1.0, 1.5, 0.4
 N, L, T_end = args.N, 1.0, 0.2
-dt = args.cfl * (L / N) / (c0 + (s + 1.0 + args.s2 * args.U) * args.U)
+dt = args.cfl * (L / N) / (c0 + (s + 1.0 + (args.s2 + args.s3 * args.U) * args.U) * args.U)
 Nt = math.ceil(T_end / dt)
 dt = T_end / Nt
 
@@ -57,6 +58,7 @@ case = {
     "fluid_pp(1)%mg_s": s,
     "fluid_pp(1)%mg_gruneisen": gruneisen,
     **({"fluid_pp(1)%mg_s2": args.s2} if args.s2 else {}),
+    **({"fluid_pp(1)%mg_s3": args.s3} if args.s3 else {}),
 }
 for pid, (x_c, vel) in enumerate([(0.25, 0.5 * args.U), (0.75, -0.5 * args.U)], start=1):
     case.update(

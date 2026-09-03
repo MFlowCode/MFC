@@ -57,16 +57,11 @@ def test_sound_speed_matches_isentrope(rho, pres):
     assert c2 == pytest.approx(c2_fd, rel=1e-6)
 
 
-def test_stiffened_gas_is_the_degenerate_member():
-    """p_ref = -gamma pi_inf, e_ref = 0, Gamma_G = gamma - 1 reproduces MFC's stored gammas and pi_infs."""
-    gam, pinf = 4.4, 6.0e8  # water-like stiffened gas
-    Gamma_G = gam - 1.0
-    p_ref, e_ref = -gam * pinf, 0.0
-    rho = 1000.0
-    Gamma = 1.0 / Gamma_G
-    Pi = rho * e_ref - p_ref / Gamma_G
-    assert Gamma == pytest.approx(1.0 / (gam - 1.0), rel=1e-15)  # what MFC stores as gammas(i)
-    assert Pi == pytest.approx(gam * pinf / (gam - 1.0), rel=1e-15)  # what MFC stores as pi_infs(i)
+def test_cubic_hugoniot_refuses_states_past_its_maximum_compression():
+    """u_s = c0 + s u_p + s2 u_p^2 + s3 u_p^3 bounds mu; past that bound there is no shock state to reference."""
+    mg_reference(1.5 * RHO0, RHO0, C0, S, 0.3 / C0, 0.1 / C0**2)
+    with pytest.raises(ValueError, match="maximum compression"):
+        mg_reference(1.7 * RHO0, RHO0, C0, S, 0.3 / C0, 0.1 / C0**2)
 
 
 def test_release_branch_is_c1_at_rho0():
@@ -211,3 +206,15 @@ def test_vinet_curve_derivatives(rho):
     assert dp == pytest.approx(_fd(lambda r: vinet_reference(r, RHO0, k0, k0p)[0], rho, h), rel=1e-7)
     assert de == pytest.approx(_fd(lambda r: vinet_reference(r, RHO0, k0, k0p)[1], rho, h), rel=1e-7)
     assert vinet_reference(RHO0, RHO0, k0, k0p)[0] == 0.0
+
+
+def test_vinet_curve_is_pinned_to_its_parameters():
+    """K(rho0) = K0 and dK/dp at rho0 = K0', the two numbers the curve is fitted to."""
+    k0, k0p = 1.4e11, 5.0
+
+    def bulk(r):
+        return r * vinet_reference(r, RHO0, k0, k0p)[2]
+
+    h = RHO0 * 1e-6
+    assert bulk(RHO0) == pytest.approx(k0, rel=1e-12)
+    assert _fd(bulk, RHO0, h) / vinet_reference(RHO0, RHO0, k0, k0p)[2] == pytest.approx(k0p, rel=1e-6)

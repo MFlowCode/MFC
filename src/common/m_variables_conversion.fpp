@@ -26,10 +26,10 @@ module m_variables_conversion
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, f_bulk_modulus, &
-        & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, &
+        & f_pressure, s_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
-        & f_hypoelastic_energy, f_relativistic_enthalpy, s_eos_coefficients, s_phase_coefficients, f_phase_pressure_on_isentrope, &
-        & f_phase_temperature, f_is_state_dependent, f_phase_bulk_modulus, s_phase_density_on_isentrope, &
+        & f_hypoelastic_energy, f_relativistic_enthalpy, s_eos_coefficients, s_phase_coefficients, s_phase_pressure_on_isentrope, &
+        & s_phase_temperature, f_is_state_dependent, s_phase_bulk_modulus, s_phase_density_on_isentrope, &
         & s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
@@ -320,6 +320,11 @@ contains
                 rho0s(i) = fluid_pp(i)%jwl_rho0
                 t0s(i) = fluid_pp(i)%jwl_t0
                 gruneisen0s(i) = fluid_pp(i)%jwl_omega
+                gruneisen_as(i) = 0._wp
+            case default
+                rho0s(i) = dflt_real
+                t0s(i) = dflt_real
+                gruneisen0s(i) = dflt_real
                 gruneisen_as(i) = 0._wp
             case (eos_vinet)
                 rho0s(i) = fluid_pp(i)%vinet_rho0
@@ -889,9 +894,10 @@ contains
                     ! Six-equation model (Saurel et al. JCP 2009): compute per-phase internal energies
                     if (model_eqns == model_eqns_6eq) then
                         do i = 1, num_fluids
-                            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                                      & l)*(gammas(i)*q_prim_vf(eqn_idx%E)%sf(j, k, &
-                                      & l) + pi_infs(i)) + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
+                            call s_phase_internal_energy(q_prim_vf(eqn_idx%E)%sf(j, k, l), &
+                                                         & q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), &
+                                                         & q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), i, &
+                                                         & q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l))
                         end do
                     end if
 
@@ -1328,10 +1334,6 @@ contains
 
     end subroutine s_compute_energy
 
-    !> Coefficients of fluid i at density rho in the form rho e = Gamma p + Pi that every operator here consumes, with dPi/drho. Any
-    !! Mie-Gruneisen EOS p = p_ref + rho Gamma_G (e - e_ref) is this form with Gamma = 1/Gamma_G and Pi = rho e_ref - p_ref/Gamma_G;
-    !! a new family adds one case supplying its reference curve and Gruneisen coefficient (JWL: Gamma_G = omega). Stiffened and
-    !! ideal gas keep the constants resolved at init, bit for bit.
     !> The reference curve of a state-dependent EOS at rho: p_ref, e_ref, their d/drho, and Gamma_G with its d/drho. A new family
     !! adds one case here and nothing else.
     subroutine s_reference_curve(rho, i, p_ref, e_ref, dp_drho, de_drho, G0, dG0)
@@ -1342,7 +1344,7 @@ contains
         integer, intent(in)   :: i
         real(wp), intent(out) :: p_ref, e_ref, dp_drho, de_drho, G0, dG0
         real(wp)              :: mu, d, V, ea, eb, up, us, dus, dup_dmu, x, ex, dp_dmu, de_dmu
-        integer               :: n
+        integer               :: iter
 
         mu = rho/rho0s(i) - 1._wp
         select case (eoss(i))
@@ -1361,7 +1363,7 @@ contains
                 ! u_p solves u_s(u_p) mu = u_p (1 + mu): Newton from the linear fit, then implicit differentiation
                 up = mg_c0s(i)*mu/(1._wp - (mg_ss(i) - 1._wp)*mu)
                 $:GPU_LOOP(parallelism='[seq]')
-                do n = 1, 8
+                do iter = 1, 8
                     us = mg_c0s(i) + up*(mg_ss(i) + up*(mg_s2s(i) + up*mg_s3s(i)))
                     dus = mg_ss(i) + up*(2._wp*mg_s2s(i) + 3._wp*mg_s3s(i)*up)
                     up = up - (us*mu - up*(1._wp + mu))/(dus*mu - (1._wp + mu))
@@ -1485,7 +1487,7 @@ contains
         integer, intent(in)   :: i
         real(wp), intent(out) :: rho, gamma, pi_inf, dpi, dgamma
 
-        rho = alpha_rho/max(alpha, sgm_eps)
+        rho = max(alpha_rho, sgm_eps)/max(alpha, sgm_eps)
         if (any_state_dependent_eos) then
             call s_eos_coefficients(rho, i, gamma, pi_inf, dpi, dgamma)
         else
@@ -1509,100 +1511,105 @@ contains
 
     end function f_c2_from_coefficients
 
-    !> Frozen sound speed squared of one phase at (rho, p) from its own coefficients.
-    function f_phase_c2(rho, pres, i) result(c2)
+    !> Frozen sound speed squared of one phase at (rho, p) from its own coefficients. These helpers are subroutines, not functions:
+    !! a device function that calls a device subroutine is a pattern no other backend-tested code in MFC uses.
+    subroutine s_phase_c2(rho, pres, i, c2)
 
-        $:GPU_ROUTINE(function_name='f_phase_c2', parallelism='[seq]')
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in) :: rho, pres
-        integer, intent(in)  :: i
-        real(wp)             :: c2, gamma, pi_inf, dpi, dgamma
+        real(wp), intent(in)  :: rho, pres
+        integer, intent(in)   :: i
+        real(wp), intent(out) :: c2
+        real(wp)              :: gamma, pi_inf, dpi, dgamma
 
         call s_eos_coefficients(rho, i, gamma, pi_inf, dpi, dgamma)
         c2 = f_c2_from_coefficients(rho, pres, gamma, pi_inf, dpi, dgamma)
 
-    end function f_phase_c2
+    end subroutine s_phase_c2
 
     !> Slope of the ODE `kind` for fluid i: dp/drho = c^2 along an isentrope (x = rho, y = p), or the reference temperature dT/dV =
     !! (de_ref/dV + p_ref)/c_v - Gamma_G T/V (x = V, y = T), the Maxwell relation applied to e = e_ref + c_v (T - T_ref).
-    function f_ode_slope(kind, i, x, y) result(dydx)
+    subroutine s_ode_slope(kind, i, x, y, dydx)
 
-        $:GPU_ROUTINE(function_name='f_ode_slope', parallelism='[seq]')
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)  :: kind, i
-        real(wp), intent(in) :: x, y
-        real(wp)             :: dydx, p_ref, e_ref, dp_drho, de_drho, G0, dG0
+        integer, intent(in)   :: kind, i
+        real(wp), intent(in)  :: x, y
+        real(wp), intent(out) :: dydx
+        real(wp)              :: p_ref, e_ref, dp_drho, de_drho, G0, dG0
 
         if (kind == ode_isentrope) then
-            dydx = f_phase_c2(x, y, i)
+            call s_phase_c2(x, y, i, dydx)
         else
             call s_reference_curve(1._wp/x, i, p_ref, e_ref, dp_drho, de_drho, G0, dG0)
             dydx = (p_ref - de_drho/x**2)/cvs(i) - G0*y/x
         end if
 
-    end function f_ode_slope
+    end subroutine s_ode_slope
 
     !> Fixed-step classical RK4 for the ODE `kind` from (x0, y0) to x1.
-    function f_rk4(kind, i, x0, y0, x1) result(y)
+    subroutine s_rk4(kind, i, x0, y0, x1, y)
 
-        $:GPU_ROUTINE(function_name='f_rk4', parallelism='[seq]')
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)  :: kind, i
-        real(wp), intent(in) :: x0, y0, x1
-        real(wp)             :: y, x, h, k1, k2, k3, k4
-        integer              :: n
+        integer, intent(in)   :: kind, i
+        real(wp), intent(in)  :: x0, y0, x1
+        real(wp), intent(out) :: y
+        real(wp)              :: x, h, k1, k2, k3, k4
+        integer               :: step
 
         x = x0
         y = y0
         h = (x1 - x0)/eos_rk4_steps
         $:GPU_LOOP(parallelism='[seq]')
-        do n = 1, eos_rk4_steps
-            k1 = f_ode_slope(kind, i, x, y)
-            k2 = f_ode_slope(kind, i, x + 0.5_wp*h, y + 0.5_wp*h*k1)
-            k3 = f_ode_slope(kind, i, x + 0.5_wp*h, y + 0.5_wp*h*k2)
-            k4 = f_ode_slope(kind, i, x + h, y + h*k3)
+        do step = 1, eos_rk4_steps
+            call s_ode_slope(kind, i, x, y, k1)
+            call s_ode_slope(kind, i, x + 0.5_wp*h, y + 0.5_wp*h*k1, k2)
+            call s_ode_slope(kind, i, x + 0.5_wp*h, y + 0.5_wp*h*k2, k3)
+            call s_ode_slope(kind, i, x + h, y + h*k3, k4)
             y = y + h*(k1 + 2._wp*(k2 + k3) + k4)/6._wp
             x = x + h
         end do
 
-    end function f_rk4
+    end subroutine s_rk4
 
     !> Pressure of phase i after the isentropic density change rho -> xi rho: closed form for the constant-coefficient families,
     !! integrated for a state-dependent EOS (the star states it serves are close to rho).
-    function f_phase_pressure_on_isentrope(pres, rho, xi, i) result(p_isen)
+    subroutine s_phase_pressure_on_isentrope(pres, rho, xi, i, p_isen)
 
-        $:GPU_ROUTINE(function_name='f_phase_pressure_on_isentrope', parallelism='[seq]')
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in) :: pres, rho, xi
-        integer, intent(in)  :: i
-        real(wp)             :: p_isen
+        real(wp), intent(in)  :: pres, rho, xi
+        integer, intent(in)   :: i
+        real(wp), intent(out) :: p_isen
 
         if (f_is_state_dependent(i)) then
-            p_isen = f_rk4(ode_isentrope, i, rho, pres, xi*rho)
+            call s_rk4(ode_isentrope, i, rho, pres, xi*rho, p_isen)
         else
             p_isen = (pres + isentrope_B(i))*xi**isentrope_n(i) - isentrope_B(i)
         end if
 
-    end function f_phase_pressure_on_isentrope
+    end subroutine s_phase_pressure_on_isentrope
 
     !> Temperature of phase i at (rho, p): the stiffened-gas relation, or T_ref(rho) + (e - e_ref)/c_v.
-    function f_phase_temperature(rho, pres, i) result(T)
+    subroutine s_phase_temperature(rho, pres, i, T)
 
-        $:GPU_ROUTINE(function_name='f_phase_temperature', parallelism='[seq]')
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in) :: rho, pres
-        integer, intent(in)  :: i
-        real(wp)             :: T, p_ref, e_ref, dp_drho, de_drho, G0, dG0
+        real(wp), intent(in)  :: rho, pres
+        integer, intent(in)   :: i
+        real(wp), intent(out) :: T
+        real(wp)              :: p_ref, e_ref, dp_drho, de_drho, G0, dG0, T_ref
 
         if (f_is_state_dependent(i)) then
             call s_reference_curve(rho, i, p_ref, e_ref, dp_drho, de_drho, G0, dG0)
-            T = t0s(i)
-            T = f_rk4(ode_reference_temperature, i, 1._wp/rho0s(i), T, 1._wp/rho) + (pres - p_ref)/(rho*G0*cvs(i))
+            call s_rk4(ode_reference_temperature, i, 1._wp/rho0s(i), t0s(i), 1._wp/rho, T_ref)
+            T = T_ref + (pres - p_ref)/(rho*G0*cvs(i))
         else
             T = (pres + isentrope_B(i))/((isentrope_n(i) - 1._wp)*cvs(i)*rho)
         end if
 
-    end function f_phase_temperature
+    end subroutine s_phase_temperature
 
     !> Density of phase i on the isentrope through (rho_from, p_from) at p_to, and c^2 there: Newton on the pressure integrator,
     !! whose slope is c^2. The relaxation's own Newton wraps this, so a few steps suffice.
@@ -1613,49 +1620,51 @@ contains
         integer, intent(in)   :: i
         real(wp), intent(in)  :: rho_from, p_from, p_to
         real(wp), intent(out) :: rho_to, c2_to
-        integer               :: n
+        real(wp)              :: p_at, c2_at
+        integer               :: iter
 
         rho_to = rho_from
         $:GPU_LOOP(parallelism='[seq]')
-        do n = 1, 4
-            c2_to = f_phase_pressure_on_isentrope(p_from, rho_from, rho_to/rho_from, i)  ! p on the isentrope at rho_to
-            rho_to = rho_to - (c2_to - p_to)/f_phase_c2(rho_to, c2_to, i)
+        do iter = 1, 4
+            call s_phase_pressure_on_isentrope(p_from, rho_from, rho_to/rho_from, i, p_at)
+            call s_phase_c2(rho_to, p_at, i, c2_at)
+            rho_to = rho_to - (p_at - p_to)/c2_at
         end do
-        c2_to = f_phase_c2(rho_to, p_to, i)
+        call s_phase_c2(rho_to, p_to, i, c2_to)
 
     end subroutine s_phase_density_on_isentrope
 
-    !> Internal energy of one six-equation phase: volume-fraction-weighted stiffened-gas energy plus the heat of formation its
-    !! partial density carries. No kinetic term - that belongs to the mixture, not a phase.
     !> Internal energy per unit volume of phase i at pressure pres: alpha (Gamma p + Pi) + alpha_rho qv, with the coefficients at
     !! the phase's own density.
-    function f_phase_internal_energy(pres, alpha, alpha_rho, i) result(e_phase)
+    subroutine s_phase_internal_energy(pres, alpha, alpha_rho, i, e_phase)
 
-        $:GPU_ROUTINE(function_name='f_phase_internal_energy', parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_phase_internal_energy', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: pres, alpha, alpha_rho
-        integer, intent(in)  :: i
-        real(wp)             :: e_phase, rho, gamma, pi_inf, dpi, dgamma
+        real(wp), intent(in)  :: pres, alpha, alpha_rho
+        integer, intent(in)   :: i
+        real(wp), intent(out) :: e_phase
+        real(wp)              :: rho, gamma, pi_inf, dpi, dgamma
 
         call s_phase_coefficients(alpha_rho, alpha, i, rho, gamma, pi_inf, dpi, dgamma)
         e_phase = alpha*(gamma*pres + pi_inf) + alpha_rho*qvs(i)
 
-    end function f_phase_internal_energy
+    end subroutine s_phase_internal_energy
 
     !> Bulk modulus rho c^2 of phase i at pressure pres: f_bulk_modulus for a constant-coefficient fluid, bit for bit, minus the
     !! reference-curve terms rho (dPi/drho + p dGamma/drho)/Gamma otherwise.
-    function f_phase_bulk_modulus(pres, alpha, alpha_rho, i) result(blkmod)
+    subroutine s_phase_bulk_modulus(pres, alpha, alpha_rho, i, blkmod)
 
-        $:GPU_ROUTINE(function_name='f_phase_bulk_modulus', parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_phase_bulk_modulus', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: alpha_rho, alpha, pres
-        integer, intent(in)  :: i
-        real(wp)             :: blkmod, rho, gamma, pi_inf, dpi, dgamma
+        real(wp), intent(in)  :: alpha_rho, alpha, pres
+        integer, intent(in)   :: i
+        real(wp), intent(out) :: blkmod
+        real(wp)              :: rho, gamma, pi_inf, dpi, dgamma
 
         call s_phase_coefficients(alpha_rho, alpha, i, rho, gamma, pi_inf, dpi, dgamma)
         blkmod = f_bulk_modulus(pres, gamma, pi_inf) - rho*(dpi + pres*dgamma)/gamma
 
-    end function f_phase_bulk_modulus
+    end subroutine s_phase_bulk_modulus
 
     !> Elastic strain energy of one stress component, doubled for a shear component: the tensor stores it once, the energy counts
     !! both off-diagonal entries. Zero without a shear modulus.
@@ -1763,7 +1772,7 @@ contains
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
-                    blkmod_q = f_phase_bulk_modulus(pres, adv(q), alpha_rho(q), q)
+                    call s_phase_bulk_modulus(pres, adv(q), alpha_rho(q), q, blkmod_q)
                     if (alt_soundspeed) then
                         c = c + adv(q)/blkmod_q
                     else

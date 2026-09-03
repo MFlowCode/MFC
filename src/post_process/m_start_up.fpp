@@ -191,6 +191,7 @@ contains
         character(50)                   :: filename
         logical                         :: file_exists
         real(wp), dimension(num_fluids) :: alpha_rho
+        real(wp)                        :: T
         integer                         :: x_beg, x_end, y_beg, y_end, z_beg, z_end
 
         if (output_partial_domain) then
@@ -550,8 +551,10 @@ contains
                 do k = -offset_z%beg, p + offset_z%end
                     do j = -offset_y%beg, n + offset_y%end
                         do i = -offset_x%beg, m + offset_x%end
-                            out%q_sf(i, j, k) = f_phase_temperature(q_prim_vf(eqn_idx%cont%beg + l - 1)%sf(i, j, &
-                                     & k)/max(q_prim_vf(eqn_idx%E + l)%sf(i, j, k), sgm_eps), q_prim_vf(eqn_idx%E)%sf(i, j, k), l)
+                            call s_phase_temperature(q_prim_vf(eqn_idx%cont%beg + l - 1)%sf(i, j, &
+                                                     & k)/max(q_prim_vf(eqn_idx%E + l)%sf(i, j, k), sgm_eps), &
+                                                     & q_prim_vf(eqn_idx%E)%sf(i, j, k), l, T)
+                            out%q_sf(i, j, k) = T
                         end do
                     end do
                 end do

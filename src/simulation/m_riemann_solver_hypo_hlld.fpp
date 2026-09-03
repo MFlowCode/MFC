@@ -347,8 +347,8 @@ contains
 
                             ! Compute Riemann states
 
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R)
+                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L, alpha_rho_L)
+                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R, alpha_rho_R)
 
                             S_L = min(u_n_L - sqrt(max(verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L)), &
                                       & u_n_R - sqrt(max(verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R)))
@@ -527,10 +527,10 @@ contains
                                 K_hat = 0._wp
                                 if (alt_soundspeed) then
                                     pres_hat = q_prim_vf(eqn_idx%E)%sf(${HATIDX}$)
-                                    blkmod1_hat = f_phase_bulk_modulus(pres_hat, alpha_hat(1), alpha_rho_hat(1), &
-                                                                       & 1) + (4._wp/3._wp)*Gs_rs(1)
-                                    blkmod2_hat = f_phase_bulk_modulus(pres_hat, alpha_hat(2), alpha_rho_hat(2), &
-                                                                       & 2) + (4._wp/3._wp)*Gs_rs(2)
+                                    call s_phase_bulk_modulus(pres_hat, alpha_hat(1), alpha_rho_hat(1), 1, blkmod1_hat)
+                                    call s_phase_bulk_modulus(pres_hat, alpha_hat(2), alpha_rho_hat(2), 2, blkmod2_hat)
+                                    blkmod1_hat = blkmod1_hat + (4._wp/3._wp)*Gs_rs(1)
+                                    blkmod2_hat = blkmod2_hat + (4._wp/3._wp)*Gs_rs(2)
                                     K_hat = alpha_hat(1)*alpha_hat(2)*(blkmod2_hat - blkmod1_hat)/(alpha_hat(1)*blkmod2_hat &
                                                       & + alpha_hat(2)*blkmod1_hat + verysmall)
                                 end if

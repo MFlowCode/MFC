@@ -128,7 +128,7 @@ def add_convergence_cases(cases):
     cases.append(
         define_convergence_case(
             "Convergence -> Mie-Gruneisen -> acoustic speed",
-            spec=ConvergenceSpec(runner=run_mg_wave_speed, case_path="examples/1D_mg_acoustic/case.py", expected_order=0.0, tol=1.0e-3, resolutions=[100, 200, 400]),
+            spec=ConvergenceSpec(runner=run_mg_wave_speed, case_path="examples/1D_mg_acoustic/case.py", extra_args=["--a", "0.5"], expected_order=0.0, tol=1.0e-3, resolutions=[100, 200, 400]),
         )
     )
     cases.append(
@@ -148,7 +148,9 @@ def add_convergence_cases(cases):
     cases.append(
         define_convergence_case(
             "Convergence -> Mie-Gruneisen -> Hugoniot -> cubic",
-            spec=ConvergenceSpec(runner=run_mg_hugoniot, case_path="examples/1D_mg_impact/case.py", extra_args=["--s2", "0.3"], expected_order=0.0, tol=0.005, amps=[0.2, 0.5, 1.0, 1.5]),
+            spec=ConvergenceSpec(
+                runner=run_mg_hugoniot, case_path="examples/1D_mg_impact/case.py", extra_args=["--s2", "0.3", "--s3", "0.05"], expected_order=0.0, tol=0.005, amps=[0.2, 0.5, 1.0, 1.2]
+            ),
         )
     )
     cases.append(
@@ -761,6 +763,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             stack,
                             "eos=mie_gruneisen -> cubic Hugoniot",
                             {
+                                "patch_icpp(1)%alpha_rho(1)": 0.891,
                                 "fluid_pp(1)%eos": "mie_gruneisen",
                                 "fluid_pp(1)%gamma": None,
                                 "fluid_pp(1)%qv": None,
@@ -822,6 +825,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                                 "fluid_pp(1)%mg_gruneisen": 0.4,
                                 "bc_x%beg": -5,
                                 "bc_x%end": -5,
+                                "probe_wrt": "T",
+                                "fd_order": 1,
+                                "num_probes": 1,
+                                "probe(1)%x": 0.5,
                             },
                         )
                     )
@@ -1184,13 +1191,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
-                if slip and not viscous:
+                if slip and six_eqn_model:
                     cases.append(
                         define_case_d(
                             stack,
-                            f"Circle{suffix} -> eos=mie_gruneisen",
+                            f"Circle{suffix} -> model_eqns=3 -> eos=mie_gruneisen",
                             {
                                 "patch_ib(1)%geometry": 2,
+                                "model_eqns": 3,
                                 "n": 49,
                                 "fluid_pp(1)%eos": "mie_gruneisen",
                                 "fluid_pp(1)%gamma": None,
@@ -3464,31 +3472,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
-        # A Mie-Gruneisen reactant burning to JWL products: the two families share qv as the energy zero.
-        cases.append(
-            define_case_d(
-                stack,
-                "eos=mie_gruneisen -> jwl",
-                {
-                    "fluid_pp(1)%eos": "mie_gruneisen",
-                    "fluid_pp(1)%gamma": None,
-                    "fluid_pp(1)%pi_inf": None,
-                    "fluid_pp(1)%mg_rho0": 1900.0,
-                    "fluid_pp(1)%mg_c0": 2500.0,
-                    "fluid_pp(1)%mg_s": 1.5,
-                    "fluid_pp(1)%mg_gruneisen": 1.0,
-                    "fluid_pp(2)%eos": "jwl",
-                    "fluid_pp(2)%gamma": None,
-                    "fluid_pp(2)%pi_inf": None,
-                    "fluid_pp(2)%jwl_a": 3.0e10,
-                    "fluid_pp(2)%jwl_b": 2.0e9,
-                    "fluid_pp(2)%jwl_r1": 4.15,
-                    "fluid_pp(2)%jwl_r2": 0.95,
-                    "fluid_pp(2)%jwl_omega": 0.3,
-                    "fluid_pp(2)%jwl_rho0": 1900.0,
-                },
-            )
-        )
+        # A Mie-Gruneisen reactant burning to JWL products: the two families share qv as the energy zero, and the
+        # Arrhenius factor reads the reactant temperature from its own reference curve.
+        mg_to_jwl = {
+            "fluid_pp(1)%eos": "mie_gruneisen",
+            "fluid_pp(1)%gamma": None,
+            "fluid_pp(1)%pi_inf": None,
+            "fluid_pp(1)%mg_rho0": 1900.0,
+            "fluid_pp(1)%mg_c0": 2500.0,
+            "fluid_pp(1)%mg_s": 1.5,
+            "fluid_pp(1)%mg_gruneisen": 1.0,
+            "fluid_pp(2)%eos": "jwl",
+            "fluid_pp(2)%gamma": None,
+            "fluid_pp(2)%pi_inf": None,
+            "fluid_pp(2)%jwl_a": 3.0e10,
+            "fluid_pp(2)%jwl_b": 2.0e9,
+            "fluid_pp(2)%jwl_r1": 4.15,
+            "fluid_pp(2)%jwl_r2": 0.95,
+            "fluid_pp(2)%jwl_omega": 0.3,
+            "fluid_pp(2)%jwl_rho0": 1900.0,
+            "fluid_pp(1)%mg_t0": 300.0,
+            "fluid_pp(2)%jwl_t0": 300.0,
+        }
         # Same burn on the 6-equation model (model_eqns=3): the reactant->product qv release
         # must manifest through the qv-consistent phasic-pressure relaxation. Guards that the
         # 5-eq source term is correct on the 6-eq model and that the qv threading holds up.
@@ -3500,6 +3505,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # factor is O(0.4) at the IC temperature -- exercises the branch instead of leaving it ~1.
         stack.push("Arrhenius", {"rburn%ta": 500.0, "fluid_pp(1)%cv": 1500.0, "fluid_pp(2)%cv": 1500.0})
         cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "eos=mie_gruneisen -> jwl", mg_to_jwl))
         stack.pop()
         # Same burn on 2 MPI ranks: the rburn parameters must be broadcast to non-root ranks, or
         # rank 1's half of the domain burns with the sentinel default and diverges. The single-rank

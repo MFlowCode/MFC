@@ -57,11 +57,11 @@ PHYSICS_DOCS = {
         "math": r"\rho e = \Gamma\,p + \Pi(\rho), \quad \Gamma = 1/\Gamma_G, \quad \Pi(\rho) = \rho\, e_{\mathrm{ref}}(\rho) - p_{\mathrm{ref}}(\rho)/\Gamma_G",
         "explanation": (
             "Every backend supplies the same two coefficients, and a case may only set the parameters its backend reads: an "
-            "ideal gas has no pi_inf, and a state-dependent fluid has neither gamma nor pi_inf (qv stays a formation energy). Mie-Gruneisen supplies a linear-Hugoniot "
-            "reference curve (mg_rho0, mg_c0, mg_s, mg_gruneisen) whose reference energy already carries the formation energy, so "
-            "qv must be zero; its parameters are read only when that backend is selected."
-            "The Mie-Gruneisen backend is evaluated per phase along the 5-equation Riemann and time-step paths; "
-            "the features it is refused with still read stiffened-gas coefficients directly."
+            "ideal gas has no pi_inf, and a state-dependent fluid (mie_gruneisen, jwl, vinet) has neither gamma nor pi_inf; qv stays "
+            "a formation energy shared by every family. A family's parameters are read only when that family is selected, and a "
+            "temperature (T_wrt, or an Arrhenius burn rate) needs the reference temperature *_t0 as well as cv. The initial state "
+            "of every patch must lie inside the equation of state (rho e > 0 and c^2 > 0). The features a state-dependent fluid "
+            "is refused with still read stiffened-gas coefficients directly."
         ),
         "references": ["Wilfong26"],
     },
@@ -980,8 +980,11 @@ class CaseValidator:
                     continue
                 try:
                     gamma, pi, dpi, dgamma = coefficients(ar / a)
-                except (TypeError, ValueError, OverflowError, ZeroDivisionError):
-                    continue  # incomplete or out-of-range parameters are reported by the rules above
+                except TypeError:
+                    continue  # incomplete parameters are reported by the rules above
+                except (ValueError, OverflowError, ZeroDivisionError) as err:
+                    self.prohibit(True, f"patch_icpp({j}) starts fluid {i} outside its equation of state: rho = {ar/a:.4g} ({err})")
+                    continue
                 rho_e = gamma * p + pi
                 c2 = ((gamma + 1.0) * p + pi) / (ar / a) - dpi - p * dgamma
                 self.prohibit(
@@ -1004,7 +1007,7 @@ class CaseValidator:
         }
         optional = {"mg": ("gruneisen_a", "t0", "s2", "s3"), "jwl": ("t0",), "vinet": ("gruneisen_a", "t0")}
         bub_fac = 1 if self.get("bubbles_euler", "F") == "T" else 0
-        any_state_dependent = False
+        state_dependent = {}
         for i in range(1, num_fluids + 1 + bub_fac):
             eos = self.get(f"fluid_pp({i})%eos")
             effective = eos if eos is not None else eos_names["stiffened_gas"]
@@ -1022,8 +1025,8 @@ class CaseValidator:
             )
             if eos not in families:
                 continue
-            any_state_dependent = True
             prefix, keys = families[eos]
+            state_dependent[i] = prefix
             name = {v: n for n, v in eos_names.items()}[eos]
             par = {k: self.get(f"fluid_pp({i})%{prefix}_{k}") for k in keys}
             self.prohibit(
@@ -1050,13 +1053,22 @@ class CaseValidator:
             for i in range(1, (self.get("num_fluids") or 0) + 1):
                 cv = self.get(f"fluid_pp({i})%cv")
                 self.prohibit(cv is None or cv <= 0, f"T_wrt = T needs fluid_pp({i})%cv > 0")
-        if not any_state_dependent:
+        if not state_dependent:
             return
+        # A temperature integrates from the reference state, so it needs T at rho0 as well as cv.
+        rta = self.get("rburn%ta")
+        for i, prefix in state_dependent.items():
+            if self.get("T_wrt", "F") == "T" or (i == 1 and self._is_numeric(rta) and rta > 0):
+                t0 = self.get(f"fluid_pp({i})%{prefix}_t0")
+                self.prohibit(t0 is None or t0 <= 0, f"the temperature of fluid {i} needs fluid_pp({i})%{prefix}_t0 > 0")
         self._check_initial_states_inside_eos(num_fluids, eos_names)
         # The per-phase evaluation is wired through the 5-equation paths only; every feature below still
         # reads the stiffened-gas coefficients directly.
         self.prohibit(self.get("model_eqns") not in (2, 3), "a state-dependent eos (mie_gruneisen, jwl, vinet) requires model_eqns = 2 or 3")
         self.prohibit(self.get("riemann_solver") not in (1, 2, 5), "a state-dependent eos (mie_gruneisen, jwl, vinet) requires riemann_solver = 1, 2 or 5")
+        self.prohibit(self.get("wave_speeds") == 2, "a state-dependent eos (mie_gruneisen, jwl, vinet) requires wave_speeds = 1 (the PVRS estimate is stiffened-gas only)")
+        for j in range(1, (self.get("num_patches") or 0) + 1):
+            self.prohibit(self.get(f"patch_icpp({j})%hcid") in (202, 203), f"patch_icpp({j})%hcid = 202/203 read fluid_pp(1)%gamma, which a state-dependent eos does not set")
         for flag in ("bubbles_euler", "bubbles_lagrange", "igr", "relativity", "mhd", "chemistry", "relax"):
             self.prohibit(self.get(flag, "F") == "T", f"a state-dependent eos (mie_gruneisen, jwl, vinet) is not supported with {flag} = T")
 

@@ -14,10 +14,11 @@ parser = argparse.ArgumentParser(description="1D Mie-Gruneisen acoustic pulse")
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT")
 parser.add_argument("-N", type=int, default=200)
 parser.add_argument("--cfl", type=float, default=0.4)
+parser.add_argument("--a", type=float, default=0.0, help="Gruneisen slope: Gamma_G = Gamma_0 + a mu")
 args = parser.parse_args()
 
 rho0, p0, c0, s, gruneisen = 1.0, 1.0, 1.0, 1.5, 0.4
-c = math.sqrt(c0**2 + (1.0 + gruneisen) * p0 / rho0)  # the frozen speed at the reference state
+c = math.sqrt(c0**2 + (1.0 + gruneisen) * p0 / rho0 + args.a * p0 / (rho0 * gruneisen))  # the frozen speed at the reference state
 amp, x0, width = 1.0e-4, 0.25, 0.1
 N, L, T_end = args.N, 1.0, 0.3
 dt = args.cfl * (L / N) / c
@@ -74,6 +75,7 @@ print(
             "fluid_pp(1)%mg_c0": c0,
             "fluid_pp(1)%mg_s": s,
             "fluid_pp(1)%mg_gruneisen": gruneisen,
+            **({"fluid_pp(1)%mg_gruneisen_a": args.a} if args.a else {}),
         }
     )
 )

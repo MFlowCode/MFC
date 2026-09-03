@@ -391,6 +391,12 @@ def _mg_params(cfg: dict):
     return tuple(float(cfg[f"fluid_pp(1)%mg_{k}"]) for k in ("rho0", "c0", "s", "gruneisen"))
 
 
+def _worst(errors) -> float:
+    """max() drops NaN; a NaN error must fail the comparison, and NaN <= tol does."""
+    errors = list(errors)
+    return math.nan if any(math.isnan(e) for e in errors) else max(errors)
+
+
 def run_mg_wave_speed(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     """Sweep N; the measured speed of a small acoustic pulse must match the analytic Mie-Gruneisen c.
 
@@ -403,8 +409,9 @@ def run_mg_wave_speed(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
         for N in spec.resolutions:
             cfg, run_dir = _run_mfc(spec.case_path, tmpdir, f"N{N}", ["-N", str(N)] + spec.extra_args, 1)
             rho0, c0, s, gruneisen = _mg_params(cfg)
+            gruneisen_a = float(cfg.get("fluid_pp(1)%mg_gruneisen_a", 0.0))
             p0 = float(cfg["patch_icpp(1)%pres"])
-            c_exact = eos.sound_speed(rho0, p0, *eos.eos_coefficients(rho0, rho0, c0, s, gruneisen))
+            c_exact = eos.sound_speed(rho0, p0, *eos.eos_coefficients(rho0, rho0, c0, s, gruneisen, gruneisen_a))
             Nt = int(cfg["t_step_stop"])
             T = Nt * float(cfg["dt"])
             x_cc = (np.arange(N) + 0.5) / N
@@ -426,8 +433,8 @@ def run_mg_wave_speed(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     ]
     for i, N in enumerate(spec.resolutions):
         lines.append(_table_line([str(N), f"{errors[i]:.4e}"], widths))
-    lines.append(f"\n  Worst relative error: {max(errors):.4e}")
-    return max(errors) <= spec.tol, "\n".join(lines)
+    lines.append(f"\n  Worst relative error: {_worst(errors):.4e}")
+    return _worst(errors) <= spec.tol, "\n".join(lines)
 
 
 def run_mg_hugoniot(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
@@ -459,10 +466,9 @@ def run_mg_hugoniot(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
         _table_line(["U", "D measured", "D Hugoniot", "rho_s meas.", "rho_s Hug."], widths),
         _table_line(["-" * w for w in widths], widths),
     ]
-    worst = 0.0
     for U, d_m, d_h, r_m, r_h in rows:
-        worst = max(worst, abs(d_m - d_h) / d_h, abs(r_m - r_h) / r_h)
         lines.append(_table_line([f"{U:.3f}", f"{d_m:.5f}", f"{d_h:.5f}", f"{r_m:.5f}", f"{r_h:.5f}"], widths))
+    worst = _worst(e for _, d_m, d_h, r_m, r_h in rows for e in (abs(d_m - d_h) / d_h, abs(r_m - r_h) / r_h))
     lines.append(f"\n  Worst relative error: {worst:.4e}")
     return worst <= spec.tol, "\n".join(lines)
 
@@ -496,19 +502,19 @@ def run_isentropic_release(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
             sel = (x_cc < 0.45) & (rho < 0.98 * rho0)  # the fan and the left star state, clear of the contact
             if sel.sum() < 4:
                 raise common.MFCException(f"N={N}: only {int(sel.sum())} released cells left of the contact")
-            worst = 0.0
+            devs = []
             for r, m_, e_tot in zip(rho[sel], mom[sel], E[sel]):
                 gamma, pi, _, _ = eos.coefficients_from_curve(r, reference(r), gruneisen)
                 p = (e_tot - 0.5 * m_**2 / r - pi) / gamma
                 p_s = eos.reference_isentrope(reference, gruneisen, r, rho0, p0)
-                worst = max(worst, abs(p - p_s) / p_s)
-            errors.append(worst)
+                devs.append(abs(p - p_s) / p_s)
+            errors.append(_worst(devs))
     widths = [6, 18]
     lines = [f"  (need every relative error <= {spec.tol:.1e})", "", _table_line(["N", "worst |p - p_s|/p_s"], widths), _table_line(["-" * w for w in widths], widths)]
     for N, err in zip(spec.resolutions, errors):
         lines.append(_table_line([str(N), f"{err:.4e}"], widths))
-    lines.append(f"\n  Worst relative error: {max(errors):.4e}")
-    return max(errors) <= spec.tol, "\n".join(lines)
+    lines.append(f"\n  Worst relative error: {_worst(errors):.4e}")
+    return _worst(errors) <= spec.tol, "\n".join(lines)
 
 
 # Entry point used by test.py.

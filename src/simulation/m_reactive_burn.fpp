@@ -15,7 +15,7 @@
 module m_reactive_burn
 
     use m_global_parameters
-    use m_variables_conversion, only: f_phase_temperature
+    use m_variables_conversion, only: s_phase_temperature
 
     implicit none
 
@@ -54,8 +54,8 @@ contains
                         ! reactant's phasic temperature from its own EOS.
                         ! rburn%ta = 0 (default) leaves the pure pressure-driven rate unchanged.
                         if (rburn%ta > 0._wp) then
-                            T_r = f_phase_temperature(q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z)/q_prim_vf(eqn_idx%adv%beg)%sf(x, y, &
-                                                      & z), pres, 1)
+                            call s_phase_temperature(q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z)/q_prim_vf(eqn_idx%adv%beg)%sf(x, y, &
+                                                     & z), pres, 1, T_r)
                             rate = rate*exp(-rburn%ta/T_r)
                         end if
 

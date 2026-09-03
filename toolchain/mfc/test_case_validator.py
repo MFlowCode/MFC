@@ -436,9 +436,22 @@ class TestMieGruneisenSelector(ConstraintTestCase):
         self.assertRejects(bad, "starts fluid 1 outside its equation of state")
         self.assertAccepts({**BASE, **self.MG, "patch_icpp(1)%alpha_rho(1)": 8930.0, "patch_icpp(1)%alpha(1)": 1.0, "patch_icpp(1)%pres": 1.0e5})
 
-    def test_temperature_output_needs_cv(self):
+    def test_temperature_output_needs_cv_and_t0(self):
         self.assertRejects({**BASE, **self.MG, "T_wrt": "T", "fluid_pp(1)%cv": 0.0}, "T_wrt = T needs fluid_pp(1)%cv > 0")
+        self.assertRejects({**BASE, **self.MG, "T_wrt": "T", "fluid_pp(1)%cv": 400.0}, "needs fluid_pp(1)%mg_t0 > 0")
         self.assertAccepts({**BASE, **self.MG, "T_wrt": "T", "fluid_pp(1)%cv": 400.0, "fluid_pp(1)%mg_t0": 300.0})
+
+    def test_zero_density_is_singular(self):
+        self.assertRejects({**BASE, **self.MG, "patch_icpp(1)%alpha_rho(1)": 0.0, "patch_icpp(1)%alpha(1)": 1.0}, "outside its equation of state")
+
+    def test_cubic_fit_has_a_maximum_compression(self):
+        fit = {"fluid_pp(1)%mg_rho0": 1.0, "fluid_pp(1)%mg_c0": 1.0, "fluid_pp(1)%mg_s": 1.5, "fluid_pp(1)%mg_s2": 0.3, "fluid_pp(1)%mg_s3": 0.1}
+        cubic = {**BASE, **self.MG, **fit, "patch_icpp(1)%alpha(1)": 1.0, "patch_icpp(1)%pres": 1.0}
+        self.assertAccepts({**cubic, "patch_icpp(1)%alpha_rho(1)": 1.3})
+        self.assertRejects({**cubic, "patch_icpp(1)%alpha_rho(1)": 1.7}, "maximum compression is exceeded")
+
+    def test_pvrs_wave_speeds_are_refused(self):
+        self.assertRejects({**BASE, **self.MG, "wave_speeds": 2}, "requires wave_speeds = 1")
 
     def test_gruneisen_slope_is_optional_and_owned(self):
         self.assertAccepts({**BASE, **self.MG, "fluid_pp(1)%mg_gruneisen_a": 0.5})
@@ -481,6 +494,9 @@ class TestJwlSelector(ConstraintTestCase):
 
     def test_rejects_stiffened_gas_and_mg_parameters(self):
         self.assertRejects({**BASE, **self.JWL, "fluid_pp(1)%gamma": 2.5}, "fluid_pp(1)%gamma is not read with eos = 'jwl'")
+        self.assertRejects({**BASE, **self.JWL, "fluid_pp(1)%pi_inf": 0.0}, "fluid_pp(1)%pi_inf is not read with eos = 'jwl'")
+        # a sonic point: at ten times the reference density the JWL isentrope has dp/drho < 0 for these parameters
+        self.assertRejects({**BASE, **self.JWL, "patch_icpp(1)%alpha_rho(1)": 16300.0, "patch_icpp(1)%pres": 1.0}, "outside its equation of state")
         self.assertRejects({**BASE, **self.JWL, "fluid_pp(1)%mg_c0": 1.0}, "fluid_pp(1)%mg_* are only read when fluid_pp(1)%eos = 'mie_gruneisen'")
 
     def test_requires_r1_above_r2(self):
@@ -511,3 +527,5 @@ class TestVinetSelector(ConstraintTestCase):
         self.assertRejects(p, "requires fluid_pp(1)%vinet_{k0, k0p, rho0, gruneisen}")
         self.assertRejects({**BASE, **self.VINET, "fluid_pp(1)%vinet_k0p": 1.0}, "vinet_k0p must exceed 1")
         self.assertRejects({**BASE, **self.VINET, "fluid_pp(1)%mg_s2": 0.1}, "fluid_pp(1)%mg_* are only read when")
+        for k in ("gamma", "pi_inf"):
+            self.assertRejects({**BASE, **self.VINET, f"fluid_pp(1)%{k}": 1.0}, f"fluid_pp(1)%{k} is not read with eos = 'vinet'")
