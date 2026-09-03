@@ -224,7 +224,16 @@ contains
 
                     ! Mixture sound speed, as s_compute_speed_of_sound computes it. Inlined because that
                     ! call faults CCE OpenACC from this loop (#1794); fold it back once that is isolated.
-                    c = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(j, k, l), gamma_mix, pi_inf_mix)/myRho
+                    if (any_state_dependent_eos) then  ! frozen mixing of per-phase moduli, as in s_compute_speed_of_sound
+                        c = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_fluids
+                            c = c + myalpha(q)*f_phase_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(j, k, l), myalpha(q), myalpha_rho(q), q)
+                        end do
+                        c = c/myRho
+                    else
+                        c = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(j, k, l), gamma_mix, pi_inf_mix)/myRho
+                    end if
                     if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 1)) then
                         c = c/(1._wp - myalpha(num_fluids))
                     end if

@@ -1277,7 +1277,7 @@ contains
                         alpha_rho(l) = q_prim_vf(l)%sf(i, j, k)
                     end do
 
-                    Egint = Egint + f_phase_internal_energy(pres, adv(2), alpha_rho(2), gammas(2), pi_infs(2), qvs(2))*dV
+                    Egint = Egint + f_phase_internal_energy(pres, adv(2), alpha_rho(2), 2)*dV
 
                     call s_compute_mixture_coefficients(alpha_rho, adv, rho, gamma, pi_inf, qv)
 

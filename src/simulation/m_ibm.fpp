@@ -445,8 +445,7 @@ contains
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%int_en%beg, eqn_idx%int_en%end
                         q_cons_vf(q)%sf(j, k, l) = f_phase_internal_energy(pres_IP, alpha_IP(q - eqn_idx%int_en%beg + 1), &
-                                  & alpha_rho_IP(q - eqn_idx%int_en%beg + 1), gammas(q - eqn_idx%int_en%beg + 1), &
-                                  & pi_infs(q - eqn_idx%int_en%beg + 1), qvs(q - eqn_idx%int_en%beg + 1))
+                                  & alpha_rho_IP(q - eqn_idx%int_en%beg + 1), q - eqn_idx%int_en%beg + 1)
                     end do
                 end if
             end do

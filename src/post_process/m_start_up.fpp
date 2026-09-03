@@ -545,6 +545,21 @@ contains
             call s_write_field(varname, t_step)
         end if
 
+        if (T_wrt) then
+            do l = 1, num_fluids
+                do k = -offset_z%beg, p + offset_z%end
+                    do j = -offset_y%beg, n + offset_y%end
+                        do i = -offset_x%beg, m + offset_x%end
+                            out%q_sf(i, j, k) = f_phase_temperature(q_prim_vf(eqn_idx%cont%beg + l - 1)%sf(i, j, &
+                                     & k)/max(q_prim_vf(eqn_idx%E + l)%sf(i, j, k), sgm_eps), q_prim_vf(eqn_idx%E)%sf(i, j, k), l)
+                        end do
+                    end do
+                end do
+                write (varname, '(A,I0)') 'T', l
+                call s_write_field(varname, t_step)
+            end do
+        end if
+
         do i = 1, 3
             if (omega_wrt(i)) then
                 call s_derive_vorticity_component(i, q_prim_vf, out%q_sf)

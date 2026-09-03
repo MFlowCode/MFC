@@ -164,10 +164,6 @@ contains
             end do
         end if
 
-        gamma = gammas(1)
-        pi_inf = pi_infs(1)
-        qv = qvs(1)
-
         if (precision == precision_single) then
             FMT = "(2F30.3)"
         else
