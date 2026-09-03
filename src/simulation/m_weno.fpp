@@ -78,8 +78,8 @@ module m_weno
 
     !> Allocation-only counterparts of is1/is2/is3_weno, derived from m/n/p_alloc so the coefficient and reconstruction arrays can
     !! hold the largest refined block rather than just the coarse subdomain (s_amr_recompute_weno_coefs indexes them over a block's
-    !! bounds). Used ONLY in the @:ALLOCATE statements below: s_compute_weno_coefficients is still called with the true is*_weno, so
-    !! the inflated tail is never computed from cell-boundary coordinates that do not exist yet - AMR fills it per block. Identical
+    !! bounds). s_compute_weno_coefficients is still called with the true is*_weno, so the inflated tail is never computed from
+    !! cell-boundary coordinates that do not exist yet - it is filled by replicating the last computed cell (see there). Identical
     !! to is*_weno unless amr_max_grid_size pins a cap larger than the subdomain.
     type(int_bounds_info) :: is1_weno_a, is2_weno_a, is3_weno_a
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
@@ -879,6 +879,20 @@ contains
                         d_cbR_${XYZ}$ (4,:) = 1._wp/35._wp
                     end if
                 end if
+                ! The arrays extend to is${WENO_DIR}$_weno_a (m/n/p_alloc): past `is` lie the cells a refined block wider than
+                ! this subdomain occupies when amr_max_grid_size pins the cap above it (86782249), and they have no coarse cell
+                ! boundaries to compute from. The coefficients are ratios of spacings, so on a uniform grid every cell holds the
+                ! same values - the basis on which the fine advance reuses the coarse coefficients at all - and the last computed
+                ! cell is replicated into the tail. A nonuniform grid arms s_amr_recompute_weno_coefs, which overwrites the tail
+                ! from the block's own boundaries before it is read. Left unfilled, the reconstruction on such a block reads
+                ! whatever the allocation held, and its outer-face flux is NaN or silently wrong (ledger 56).
+                do i = is%end - weno_polyn + 1, is${WENO_DIR}$_weno_a%end - weno_polyn
+                    poly_coef_cbL_${XYZ}$ (i,:,:) = poly_coef_cbL_${XYZ}$ (is%end - weno_polyn,:,:)
+                    poly_coef_cbR_${XYZ}$ (i,:,:) = poly_coef_cbR_${XYZ}$ (is%end - weno_polyn,:,:)
+                    d_cbL_${XYZ}$ (:,i) = d_cbL_${XYZ}$ (:,is%end - weno_polyn)
+                    d_cbR_${XYZ}$ (:,i) = d_cbR_${XYZ}$ (:,is%end - weno_polyn)
+                    beta_coef_${XYZ}$ (i,:,:) = beta_coef_${XYZ}$ (is%end - weno_polyn,:,:)
+                end do
             end if
         #:endfor
 
