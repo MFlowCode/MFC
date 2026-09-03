@@ -102,7 +102,7 @@ def _pairwise_slope(err1: float, err2: float, x1: float, x2: float) -> float:
 def _run_mfc(case_path: str, tmpdir: str, run_tag: str, args: typing.List[str], num_ranks: int) -> typing.Tuple[dict, str]:
     """Run a private copy of case.py in tmpdir/run_tag; specs that share one case file may run concurrently.
 
-    The caller (./mfc.sh test) has already built, and concurrent installs race, so the run does not build.
+    The run builds: a case with analytic initial conditions carries its own build configuration.
     """
     run_dir = os.path.join(tmpdir, run_tag)
     os.makedirs(run_dir, exist_ok=True)
@@ -114,7 +114,7 @@ def _run_mfc(case_path: str, tmpdir: str, run_tag: str, args: typing.List[str], 
     cfg = json.loads(cfg_run.stdout)
 
     sim = subprocess.run(
-        [MFC, "run", case_copy, "--no-build", "-t", "pre_process", "simulation", "-n", str(num_ranks), "--"] + args,
+        [MFC, "run", case_copy, "-t", "pre_process", "simulation", "-n", str(num_ranks), "--"] + args,
         capture_output=True,
         text=True,
         check=False,
