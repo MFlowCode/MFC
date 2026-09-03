@@ -226,6 +226,27 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-03 (59) — LEDGER 56 CLOSED: the unfinished widening was the WENO coefficient tail, on every axis; guard deleted, 3D np=8 golden added
+
+Task 11. The m/n/p_alloc widening (86782249) sized the WENO coefficient arrays (poly_coef_cb*, d_cb*, beta_coef_*) to the cap but
+`s_compute_weno_coefficients` still filled them only over the coarse range, and the per-block refill it relied on
+(`s_amr_recompute_weno_coefs`) is armed ONLY on nonuniform grids. On a uniform grid a block wider than the subdomain therefore
+reconstructs from whatever the allocation held past the coarse fill -- in x, y AND z alike (the sweep reads the coefficient at every
+cell index it visits). The "only freg(3) is NaN" asymmetry of ledger 56 was the CONTENT of three different uninitialized heap
+tails (NaN in z, finite garbage in x/y -- i.e. x/y were silently WRONG, not clean), not a z-specific index; it is explained by
+code reading, not separately measured. Fix (m_weno.fpp, +14): after each direction's coefficient sweep, replicate the last computed
+cell into the tail -- on a uniform grid the coefficients are spacing ratios, identical in every cell, which is the same premise the
+fine advance already reuses coarse coefficients on; a stretched grid still recomputes per block and overwrites the tail. The
+dual-pass flux_n/flux_gsrc_n/flux_src_n and nc_iface_vel*_n scratch (m_rhs.fpp) are widened to idwbuff_alloc for symmetry
+(unreachable by any golden; identical allocation whenever the cap fits). Task 2's init-time guard is DELETED: every axis is legal.
+Golden A5DAD70D (3D 52^3, np=8 -> 26-cell ranks, cap 24, static 32-fine block then regrids at 10/20/30 into 32- and 48-fine-cell
+tiles): with the guard bypassed on the pre-fix code it dies at step 7 with "ICFL is NaN" (the falsifier); after the fix it passes
+on CPU (amdflang), GPU (OpenMP offload, 8 GCDs), and a gfortran -fcheck=bounds,pointer build. CPU-vs-GPU: step-0 output
+byte-identical, step-30 max |diff| 1.1e-14 over 843,648 values. The 69 pre-existing AMR goldens are unchanged (70/70), the np=2
+exchange-audit family counts on F57C3A5B are identical before/after, and both ledger-56 100^3/np=8 fixtures run 40 steps clean.
+The Lagrangian pressure-gradient FD coefficients (fd_coeff_*_pgrad, m_bubbles_EL.fpp) are also sized to m_alloc and filled once
+over the coarse range with no per-block refill, but that tail is unreachable: the EL source is skipped in the fine advance
+(m_rhs.fpp:922, `bubbles_lagrange .and. .not. amr_in_fine_advance`), so no validator rule is needed.
 ## 2026-09-03 (58) — TASK 3 REVIEW CORRECTIONS + THE STEADY-STATE AMR-ARM PROFILE: 64% of the AMR arm's wall has no kernel running; the excess is the host-staged exchanges (~1.0 s/step) + regrid (0.34), not the launch gaps inside rhs
 
 **Review of the Task 3 note (independent reviewer, 2026-09-03).** The MFC rows and both AMReX sane-grid rows reproduce to 3 s.f.

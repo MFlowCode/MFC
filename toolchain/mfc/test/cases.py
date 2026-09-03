@@ -5383,6 +5383,85 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (r') 3D pinned cap ABOVE a rank's coarse extent, np=8. The fine advance borrows the rank's solver scratch,
+        # widened to the cap by m/n/p_alloc (86782249); a108dd37 then let the cap exceed a rank subdomain on the strength
+        # of that widening, verified only in 2D. No golden pinned the cap above a rank's half-extent in 3D, so the z axis
+        # was never exercised and a 100^3/np=8 production deck NaN'd at the first regrid (ledger 56). 52^3 over 2x2x2
+        # ranks gives 26-cell subdomains (the decomposition floor is 25 = num_stcls_min*weno_order per rank); cap 24
+        # admits 48-fine-cell blocks at every level. amr_buf = 8 pads the tagged shell of the sphere into one solid
+        # ~32-cell ball and amr_cluster_eff = 0.4 lets Berger-Rigoutsos accept its bounding cube as ONE box (a ball
+        # fills pi/6 = 0.52 of it; the 0.7 default bisects it into ~90 shell fragments and amr_max_blocks truncates
+        # the union). The cap then tiles it into level-1 blocks of 16 coarse = 32 fine cells and level-2 blocks of up
+        # to 12 coarse = 48 fine cells - wider than the 26-cell subdomain on ALL THREE axes, from the static block
+        # (16 coarse = 32 fine) through the regrids at steps 10 and 20. Without the fix the run dies at step 6 with
+        # "ICFL is NaN".
+        stack.push(
+            "AMR -> 3D -> pinned max_grid_size above rank extent multi-level np=8",
+            {
+                "m": 51,
+                "n": 51,
+                "p": 51,
+                "dt": 4.0e-4,
+                "t_step_stop": 20,
+                "t_step_save": 20,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "z_domain%beg": 0.0,
+                "z_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "bc_z%beg": -3,
+                "bc_z%end": -3,
+                "num_patches": 2,
+                "patch_icpp(1)%geometry": 9,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%z_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%length_z": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%vel(3)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%geometry": 8,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%z_centroid": 0.5,
+                "patch_icpp(2)%radius": 0.15,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%vel(3)": 0.0,
+                "patch_icpp(2)%pres": 3.0,
+                "patch_icpp(2)%alpha_rho(1)": 2.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "amr": "T",
+                "amr_block_beg(1)": 18,
+                "amr_block_beg(2)": 18,
+                "amr_block_beg(3)": 18,
+                "amr_block_end(1)": 33,
+                "amr_block_end(2)": 33,
+                "amr_block_end(3)": 33,
+                "amr_regrid_int": 10,
+                "amr_tag_eps": 0.05,
+                "amr_buf": 8,
+                "amr_max_level": 2,
+                "amr_max_blocks": 64,
+                "amr_max_grid_size": 24,
+                "amr_cluster_eff": 0.4,
+                "amr_subcycle": "F",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=8))
+        stack.pop()
+
         # (s) amr_max_level = 3 - the ONLY golden with a THIRD refinement level. Every case above stops at 2, so the
         # per-level slot cap amr_maxc_fit/amr_ref_ratio**(lev - 1) was only ever evaluated at lev = 2, where it equals
         # the fixed /2 it replaced: the level-GENERAL form was untested by construction and a regression to /2 would
