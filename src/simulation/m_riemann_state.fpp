@@ -1133,7 +1133,6 @@ contains
                     end if
 
                     if (shear_stress) then
-                        ! current_tau_shear = 0.0_wp
                         call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
 
                         do i_dim = 1, num_dims
@@ -1147,7 +1146,6 @@ contains
                     end if
 
                     if (bulk_stress) then
-                        ! current_tau_bulk = 0.0_wp
                         call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
 
                         do i_dim = 1, num_dims
