@@ -282,6 +282,19 @@ restr/seam/halo: pack on device, one MPI call per family per step, no host stagi
 second half; the pre-registered gate stays bit-identity + the np=2 oracle, and the acceptance number is the steady-state
 60-40 profile above rerun on the same node (target: exchanges <= 0.3 s/step, busy >= 60%).
 
+**CORRECTION (same day, from the Task 10 design audit; verified at m_time_steppers.fpp:517-520):** the phase named `coarse`
+(PH_COARSE) brackets the level-0 `s_compute_rhs`, i.e. ideal-rate compute, not an exchange family -- its 0.28 s/step equals
+the uniform arm's whole step (0.267), and ~0.06-0.12 of it is the host-staged base halo (`b:halo`). The accounting above
+therefore reads: exchange families (gather 0.28 + reflux 0.15 + restr 0.13 + seam 0.09 + halo 0.07) **0.72 (40%)**; rhs
+inflation over ideal = (fine rhs 1.37 + coarse 0.28) - 1.047 = **0.60 (33%)**; regrid **0.35 (19%)**; other 0.15 (8%); sum 1.82.
+Batching's ceiling is 0.60, not 0.32, and the exchanges' margin over it is 1.2x, not 3x. The ordering (device-side packing
+first) still stands, on two facts the design audit found: the exchange brackets spend ~2.5% of their wall in kernels and the
+rest in ~685 per-transfer map-alloc-copy-free crossings per rank-step (the landed waves violate the exchange contract's
+persistent-pool rule), and MPI is not GPU-aware today (`rdma_mpi` default F). The margin is no longer large enough to skip the
+A/B: increment 0 of the design (rdma_mpi=T, zero code) and increment 2 (gather pools) carry pre-registered per-step savings that
+must show up or the attribution is wrong. Lesson booked: the second reviewer checked the arithmetic, not the phase semantics --
+a phase name is a claim about code, and it must be checked at its bracket site.
+
 Task 6 (batch-4) and Task 11 (z-widening) are running in separate worktrees (task6/batch4 in mfc-amr-cpu, task11/zwiden in
 mfc-amr-dev); Task 4's instrument landed (52d24698) and its np256/512 rbskew pair is queued (404070/404071).
 
