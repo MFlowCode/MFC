@@ -150,6 +150,12 @@ elif [ "$device" = "gpu" ]; then
             sbatch_device_opts="\
 #SBATCH -n 8
 #SBATCH -p g1"
+            # Seed, same as phoenix above: the preflight adds nodes to this at
+            # run time. frontier10202 produced all 183 GPU memory-access faults
+            # in run 33553417354 (43 distinct tests) while the same lanes passed
+            # on eight other g1 nodes with none. Its faults are intermittent --
+            # 379 of 382 tests still passed there -- so syscheck can clear it.
+            node_exclude="frontier10202"
             ;;
     esac
 else
