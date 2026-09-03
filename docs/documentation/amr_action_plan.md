@@ -226,6 +226,65 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-03 (58) — TASK 3 REVIEW CORRECTIONS + THE STEADY-STATE AMR-ARM PROFILE: 64% of the AMR arm's wall has no kernel running; the excess is the host-staged exchanges (~1.0 s/step) + regrid (0.34), not the launch gaps inside rhs
+
+**Review of the Task 3 note (independent reviewer, 2026-09-03).** The MFC rows and both AMReX sane-grid rows reproduce to 3 s.f.
+from the logs. Three corrections, applied to `amr-bench/notes/tax_controls_and_amr_profile.md`: (1) the AMReX small-grid row
+claimed 2 reps (397-399 / 18.6-19.5 / 20.5-21.3); only ONE measurement exists in any log (399.1 / 19.5 -> 20.5) -- the second
+point was never measured and is withdrawn. (2) The uniform-arm per-step ratios did not reproduce: MFC WENO5 is 2.74x AMReX's
+uniform cost (53.5 vs 19.5 s / 200 steps) and weno_order 1 is 1.39x, not 2.4x / 1.6x. (3) MFC's excess is 6.5-8.9x AMReX's
+0.335 s/step (full cross), not "7-9x". Ledger 57's headline "7-9x" and "1.6x" carry these corrections. (4) The k004-004 outlier
+is the AMR arm alone (787 vs 643-683 s); its uniform arm (46.9 s) was FASTER than k004-003's, compounding the 16.8x.
+
+**RETRACTED: "the AMR arm's kernels are NOT slower per cell (5.9 vs 8.5 ns)".** The reviewer used the amr_40 log's own
+`[amr-balance]` trace: fine_work 0.94M before step 1, 122.3M after the step-20 regrid, 186.6M after the step-40 regrid -- a
+mesh that run never computed on. The 5.9 ns divided 40 steps of kernel time by the 240-step arm's steady-state endpoint.
+Growth-weighted (steps 1-20 on 64.9M global cells, 21-40 on 186.3M): 11.7 ns per cell-stage, 38% SLOWER than uniform; the
+flagship WENO kernel 1.88 ns/cell on ~830K-cell blocks vs 0.86 on the 8M-cell uniform slab (2.2x -- this check has the same
+which-mesh defect, its per-call average pools three mesh states; the steady-state 1.6x below supersedes it). The 53% host-gap figure
+(kernel sum 22.0 s / wall 47.2 s) is independent of cell counts and stood -- but it was a pre-steady-state number too.
+
+**THE STEADY-STATE PROFILE (same node k004-003, same hour, pinned binaries, 2 reps, rank-0 rocprofv3):** difference a 60-step
+run against a 40-step run so steps 41-60 sit on the fully grown mesh (186.6M fine cells, one regrid at step 60 inside the window
+= the steady cadence). Harness: `amr-bench/logs/tax-proper2-0902_1208/mfc/prof_steady.sh` (prof_steady.out; `sim_s{1,2}.log`,
+`prof_s{1,2}/rank0_kernel_stats.csv` under `{amr,uni}_{40,60}`).
+
+| arm, steps 41-60 | rep | dwall (s) | s/step | rank-0 kernel time (s) | GPU busy | kernel ns per cell-stage (rank share) |
+| AMR (64M coarse + 186.6M fine) | 1 | 57.25 | 2.863 | 20.58 | **35.9%** | 10.95 |
+| AMR | 2 | 57.42 | 2.871 | 20.73 | **36.1%** | 11.03 |
+| uniform (64M) | 1 | 3.67 | 0.183 | 3.60 | 98% | 7.50 |
+| uniform | 2 | 5.69 | 0.284 | 3.51 | 62% | 7.32 |
+
+The uniform 20-step window is too short to read its busy fraction (3.7 vs 5.7 s across reps); its per-step cost from the
+240-40 arms is 0.267 s/step. The AMR window is robust (0.3% rep spread). Readout at steady state:
+- **64% of the AMR arm's wall has no kernel running** (20.6 s of kernels in 57.3 s), worse than the 53% pre-steady figure.
+- Kernels are **1.49x slower per cell** than uniform (11.0 vs 7.4 ns per cell-stage); WENO 1.14-1.18 ms/call on ~830K-cell
+  blocks = 1.38 ns/cell vs 0.87 uniform (1.6x). Not 2.2x: the pre-steady mesh had smaller blocks.
+- Ideal-at-uniform-rate for 250.6M cells = 0.267 x 250.6/64 = 1.047 s/step; AMR = 2.87 -> **excess 1.82 s/step in this
+  window** (the 240-40 arms give 2.17-2.36; the 20-step window has one regrid at its end whose mesh it never uses).
+- Phase split of the 57.3 s window (mean s per rank, rep 1 / rep 2): rhs 27.4 / 27.2; regrid 6.7 / 7.1; gather 5.9 / 5.4;
+  coarse 5.6 / 5.6; reflux 2.9 / 2.9; restr 2.7 / 2.7; seam 1.9 / 1.7; halo 1.1 / 1.8; rg:mig 3.8 / 3.9 (inside regrid).
+  Per step (2-rep means): rhs 1.37; exchanges = gather 0.28 + coarse 0.28 + reflux 0.15 + restr 0.13 + seam 0.09 + halo 0.07
+  = 1.00; regrid 0.35; everything else 0.15.
+- Reconciled accounting of the 1.82 s/step excess (the ideal rate lives inside rhs, so rhs minus ideal is the block-mode
+  term): rhs inflation 1.37 - 1.047 = **0.32 (18%)** -- this single number holds BOTH the per-cell kernel inefficiency and the
+  launch/map gaps inside rhs, they are not additive on top of it; exchanges **1.00 (55%)**; regrid **0.35 (19%)**; other 0.15
+  (8%). Sum 1.82. (The WENO 0.87 ns/cell uniform figure is the raw uni_60 per-run average; the rep-2 diff is corrupted by one
+  370 ms outlier call in uni_40 prof_s2.)
+
+**DECISION (revises Task 10's Step-1 ruling and the GOAL.md falsifier).** Exchanges are 55% of the excess and 3x any single
+rival term; batching the fine advance can at most remove the rhs inflation, 0.32 s/step (18%), and the CPU-side regrid (0.35)
+is Task 4/6/9's. The GOAL.md falsifier "if batching removes the launch gaps but the excess stays above ~1 s/step, the
+host-staged exchanges are the real Phase 2" has ALREADY FIRED on this measurement: even a perfect batching leaves 1.5 s/step.
+(Reviewer's caution, kept: the exchanges are not larger than all other terms COMBINED -- 1.00 vs 0.82 -- so the ordering rests on
+the 3x-per-term margin and on batching's 0.32 ceiling, not on "dominance".) Task 10's design note therefore starts from device-side packing of the six exchange families (gather/coarse/reflux/
+restr/seam/halo: pack on device, one MPI call per family per step, no host staging) and treats the batched advance as its
+second half; the pre-registered gate stays bit-identity + the np=2 oracle, and the acceptance number is the steady-state
+60-40 profile above rerun on the same node (target: exchanges <= 0.3 s/step, busy >= 60%).
+
+Task 6 (batch-4) and Task 11 (z-widening) are running in separate worktrees (task6/batch4 in mfc-amr-cpu, task11/zwiden in
+mfc-amr-dev); Task 4's instrument landed (52d24698) and its np256/512 rbskew pair is queued (404070/404071).
+
 ## 2026-09-03 (57) — MFC REPLICATED (3 reps, second node) + THE MATCHED-ORDER CONTROL: tax 12.4x +/- 2%; the AMR excess is 2.2-3.0 s/step regardless of scheme -- 7-9x AMReX's at its sane grids
 
 P3 (logs/tax-proper2-0902_1208/mfc, job 401281 on k004-003, three reps, same pinned binary, differenced 240-40; a
