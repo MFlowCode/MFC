@@ -239,10 +239,10 @@ cell into the tail -- on a uniform grid the coefficients are spacing ratios, ide
 fine advance already reuses coarse coefficients on; a stretched grid still recomputes per block and overwrites the tail. The
 dual-pass flux_n/flux_gsrc_n/flux_src_n and nc_iface_vel*_n scratch (m_rhs.fpp) are widened to idwbuff_alloc for symmetry
 (unreachable by any golden; identical allocation whenever the cap fits). Task 2's init-time guard is DELETED: every axis is legal.
-Golden A5DAD70D (3D 52^3, np=8 -> 26-cell ranks, cap 24, static 32-fine block then regrids at 10/20/30 into 32- and 48-fine-cell
-tiles): with the guard bypassed on the pre-fix code it dies at step 7 with "ICFL is NaN" (the falsifier); after the fix it passes
+Golden A5DAD70D (3D 52^3, np=8 -> 26-cell ranks, cap 24, static 32-fine block then regrids at 10/20 (20 steps; measured first at 30) into 32- and 48-fine-cell
+tiles): with the guard bypassed on the pre-fix code it dies at step 6 with "ICFL is NaN" (the falsifier); after the fix it passes
 on CPU (amdflang), GPU (OpenMP offload, 8 GCDs), and a gfortran -fcheck=bounds,pointer build. CPU-vs-GPU: step-0 output
-byte-identical, step-30 max |diff| 1.1e-14 over 843,648 values. The 69 pre-existing AMR goldens are unchanged (70/70), the np=2
+byte-identical, final-step max |diff| 1.1e-14 over 843,648 values (measured on the 30-step deck; the CPU-vs-GPU control on 476AA3A4 gives the same 1.0e-14, the platform norm). The 69 pre-existing AMR goldens are unchanged (70/70), the np=2
 exchange-audit family counts on F57C3A5B are identical before/after, and both ledger-56 100^3/np=8 fixtures run 40 steps clean.
 The Lagrangian pressure-gradient FD coefficients (fd_coeff_*_pgrad, m_bubbles_EL.fpp) are also sized to m_alloc and filled once
 over the coarse range with no per-block refill, but that tail is unreachable: the EL source is skipped in the fine advance
