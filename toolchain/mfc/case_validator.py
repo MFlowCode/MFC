@@ -44,10 +44,11 @@ PHYSICS_DOCS = {
         "category": "Thermodynamic Constraints",
         "math": r"\rho e = \Gamma\,p + \Pi(\rho), \quad \Gamma = 1/\Gamma_G, \quad \Pi(\rho) = \rho\, e_{\mathrm{ref}}(\rho) - p_{\mathrm{ref}}(\rho)/\Gamma_G",
         "explanation": (
-            "Every backend supplies the same two coefficients. An ideal gas is the stiffened-gas form with no stiffness, so "
-            "selecting it and also supplying a nonzero pi_inf is contradictory. Mie-Gruneisen supplies a linear-Hugoniot "
-            "reference curve (mg_rho0, mg_c0, mg_s, mg_gruneisen) whose reference energy already carries the formation energy, so "
-            "qv must be zero; its parameters are read only when that backend is selected."
+            "An ideal gas is the stiffened-gas equation of state with no stiffness, so a case that selects it may not "
+            "set pi_inf at all: the selector determines the stiffness, not the input. Mie-Gruneisen supplies a "
+            "linear-Hugoniot reference curve (mg_rho0, mg_c0, mg_s, mg_gruneisen) whose reference energy already "
+            "carries the formation energy, so qv must be zero; its parameters are read only when that backend is "
+            "selected."
         ),
         "references": ["Wilfong26"],
     },
@@ -967,10 +968,9 @@ class CaseValidator:
             if eos is None:
                 continue
             self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas', 'ideal_gas' or 'mie_gruneisen'")
-            pi_inf = self.get(f"fluid_pp({i})%pi_inf")
             self.prohibit(
-                eos == eos_ideal_gas and pi_inf is not None and pi_inf != 0,
-                f"fluid_pp({i})%eos = 'ideal_gas' requires fluid_pp({i})%pi_inf = 0 (an ideal gas has no stiffness)",
+                eos == eos_ideal_gas and self.get(f"fluid_pp({i})%pi_inf") is not None,
+                f"fluid_pp({i})%eos = 'ideal_gas' has no stiffness; do not set fluid_pp({i})%pi_inf",
             )
             self.prohibit(
                 eos == eos_mg and any(v is None for v in mg.values()),

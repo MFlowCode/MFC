@@ -125,7 +125,6 @@ data = {
     # Fluid Parameters Gas
     "fluid_pp(2)%gamma": 1.0 / (gamma_g - 1.0),
     "fluid_pp(2)%eos": "ideal_gas",
-    "fluid_pp(2)%pi_inf": 0.0e00,
     # Bubble parameters
     "bub_pp%R0ref": 1.0,
     "bub_pp%p0ref": 1.0,
