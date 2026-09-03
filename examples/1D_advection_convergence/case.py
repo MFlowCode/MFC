@@ -94,8 +94,10 @@ print(
             "patch_icpp(1)%alpha(1)": "0.5 + 0.2 * sin(2.0 * pi * x / lx)",
             "patch_icpp(1)%alpha(2)": "0.5 - 0.2 * sin(2.0 * pi * x / lx)",
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%pi_inf": 0.0,
             "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
+            "fluid_pp(2)%eos": "ideal_gas",
             "fluid_pp(2)%pi_inf": 0.0,
             **scheme_params,
         }

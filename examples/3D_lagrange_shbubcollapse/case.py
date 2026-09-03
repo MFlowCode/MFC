@@ -178,10 +178,12 @@ print(
             # Fluids Physical Parameters
             # Host medium
             "fluid_pp(1)%gamma": 1.0 / (gamma_host - 1.0),
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": gamma_host * (pi_inf_host / p0) / (gamma_host - 1.0),
             "fluid_pp(1)%Re(1)": 1.0 / (mu_host / (rho0 * c0 * x0)),
             # Bubble gas state
             "fluid_pp(2)%gamma": 1.0 / (gam_g - 1.0),
+            "fluid_pp(2)%eos": "ideal_gas",
             "fluid_pp(2)%pi_inf": 0.0e00,
             "fluid_pp(2)%Re(1)": 1.0 / (mu_g / (rho0 * c0 * x0)),
         }
