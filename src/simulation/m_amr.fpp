@@ -4356,8 +4356,9 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
         real(wp), intent(in)                                   :: dt_reflux
-        integer                                                :: lev, k
+        integer                                                :: lev, k, io, ifc, ko, kf
 
+        call s_amr_refresh_lists()
         do lev = amr_max_level, 2, -1
             if (relax) then
                 do k = amr_num_blocks, 1, -1
@@ -4369,8 +4370,28 @@ contains
             call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSREST)
             call s_amr_restrict_parent_wave(lev)
             call s_phase_toc(PH_RSREST); call s_phase_toc(PH_RESTR)
-            do k = amr_num_blocks, 1, -1
-                if (amr_block_level(k) /= lev) cycle
+            ! W1: s_amr_reflux_to_parent returns unless `own_child .or. own_parent` -- own_child = amr_rank_owns_block, the
+            ! MULTI-owner amr_owns_all notion (amr_own_blk, NOT amr_my_blk); own_parent = the level-lev children of my parents,
+            ! i.e. amr_fch_blk plus the ones I own myself, already in amr_own_blk. The two lists overlap, and a duplicate visit
+            ! would reflux twice, so walk their UNION: both lists are ascending, and a two-cursor merge from the tails visits each
+            ! block once, in the descending order the global scan had (the parent registers accumulate in that order).
+            io = amr_n_own; ifc = amr_n_fch
+            do
+                do while (io >= 1)
+                    if (amr_block_level(amr_own_blk(io)) == lev) exit
+                    io = io - 1
+                end do
+                do while (ifc >= 1)
+                    if (amr_block_level(amr_fch_blk(ifc)) == lev) exit
+                    ifc = ifc - 1
+                end do
+                ko = 0; kf = 0
+                if (io >= 1) ko = amr_own_blk(io)
+                if (ifc >= 1) kf = amr_fch_blk(ifc)
+                k = max(ko, kf)
+                if (k == 0) exit
+                if (ko == k) io = io - 1
+                if (kf == k) ifc = ifc - 1
                 call s_amr_select_slot(k)
                 call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSRFP)
                 call s_amr_reflux_to_parent(dt_reflux, .false.)
