@@ -73,6 +73,198 @@ module m_riemann_state
 
 contains
 
+    !> Elastic signal speed of Rodriguez et al. JCP (2019): the acoustic speed stiffened by the shear modulus and the normal elastic
+    !! stress. Callers subtract it for the left-going wave and add it for the right-going one.
+    function f_elastic_signal_speed(c, G, tau, rho) result(a)
+
+        $:GPU_ROUTINE(function_name='f_elastic_signal_speed', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: c, G, tau, rho
+        real(wp)             :: a
+
+        a = sqrt(max(verysmall, c*c + (((4._wp*G)/3._wp) + tau)/rho))
+
+    end function f_elastic_signal_speed
+
+    !> Low-Mach parameter of Thornber et al. JCP (2008): the larger of the two face Mach numbers, capped at one so the correction
+    !! switches itself off once the flow is no longer low speed.
+    function f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R) result(zcoef)
+
+        $:GPU_ROUTINE(function_name='f_low_Mach_zcoef', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: vel_L_rms, vel_R_rms  !< Left and right squared velocity magnitudes
+        real(wp), intent(in) :: c_L, c_R              !< Left and right sound speeds
+        real(wp)             :: zcoef
+
+        zcoef = min(1._wp, max(vel_L_rms**5.e-1_wp/c_L, vel_R_rms**5.e-1_wp/c_R))
+
+    end function f_low_Mach_zcoef
+
+    !> Low-Mach pressure correction added to the HLL and Lax-Friedrichs fluxes, which restores the pressure jump that the
+    !! dissipation of those fluxes over-damps at low Mach number. Zero unless low_Mach == 1.
+    function f_low_Mach_pcorr_hll(vel_L_rms, vel_R_rms, c_L, c_R, rho_L, rho_R, s_M, s_P) result(pcorr)
+
+        $:GPU_ROUTINE(function_name='f_low_Mach_pcorr_hll', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: vel_L_rms, vel_R_rms  !< Left and right squared velocity magnitudes
+        real(wp), intent(in) :: c_L, c_R              !< Left and right sound speeds
+        real(wp), intent(in) :: rho_L, rho_R          !< Left and right densities
+        real(wp), intent(in) :: s_M, s_P              !< Clamped left and right wave speeds
+        real(wp)             :: pcorr
+
+        pcorr = 0._wp
+        if (low_Mach == 1) then
+            pcorr = -(s_P - s_M)*(rho_L + rho_R)/8._wp*(f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R) - 1._wp)
+        end if
+
+    end function f_low_Mach_pcorr_hll
+
+    !> The same correction for the HLLC flux, where the star state supplies the pressure jump directly and the correction scales
+    !! with the mass flux through the acoustic waves instead. Zero unless low_Mach == 1.
+    function f_low_Mach_pcorr_hllc(vel_L_rms, vel_R_rms, c_L, c_R, rho_L, rho_R, s_L, s_R, vel_L_norm, vel_R_norm) result(pcorr)
+
+        $:GPU_ROUTINE(function_name='f_low_Mach_pcorr_hllc', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: vel_L_rms, vel_R_rms    !< Left and right squared velocity magnitudes
+        real(wp), intent(in) :: c_L, c_R                !< Left and right sound speeds
+        real(wp), intent(in) :: rho_L, rho_R            !< Left and right densities
+        real(wp), intent(in) :: s_L, s_R                !< Left and right wave speeds
+        real(wp), intent(in) :: vel_L_norm, vel_R_norm  !< Left and right wave-normal velocities
+        real(wp)             :: pcorr
+
+        pcorr = 0._wp
+        if (low_Mach == 1) then
+            pcorr = rho_L*rho_R*(s_L - vel_L_norm)*(s_R - vel_R_norm)*(vel_R_norm - vel_L_norm)/(rho_R*(s_R - vel_R_norm) &
+                                 & - rho_L*(s_L - vel_L_norm))*(f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R) - 1._wp)
+        end if
+
+    end function f_low_Mach_pcorr_hllc
+
+    !> The alternative low-Mach treatment of Thornber et al. JCP (2008) selected by low_Mach == 2: rather than correct the flux,
+    !! blend the wave-normal velocities towards their mean before the wave speeds are computed, which is why this mutates its
+    !! arguments and must be called ahead of s_L, s_R and s_S. The tangential velocities and vel_L/R_rms are deliberately left
+    !! untouched.
+    subroutine s_apply_low_Mach_velocity(vel_L_rms, vel_R_rms, c_L, c_R, vel_L_norm, vel_R_norm)
+
+        $:GPU_ROUTINE(function_name='s_apply_low_Mach_velocity', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)    :: vel_L_rms, vel_R_rms    !< Left and right squared velocity magnitudes
+        real(wp), intent(in)    :: c_L, c_R                !< Left and right sound speeds
+        real(wp), intent(inout) :: vel_L_norm, vel_R_norm  !< Left and right wave-normal velocities, blended in place
+        real(wp)                :: zcoef, vel_L_tmp, vel_R_tmp
+
+        zcoef = f_low_Mach_zcoef(vel_L_rms, vel_R_rms, c_L, c_R)
+
+        vel_L_tmp = 5.e-1_wp*((vel_L_norm + vel_R_norm) + zcoef*(vel_L_norm - vel_R_norm))
+        vel_R_tmp = 5.e-1_wp*((vel_L_norm + vel_R_norm) + zcoef*(vel_R_norm - vel_L_norm))
+
+        vel_L_norm = vel_L_tmp
+        vel_R_norm = vel_R_tmp
+
+    end subroutine s_apply_low_Mach_velocity
+
+    !> Interface-averaged state that the pressure-based wave-speed estimate reads. avg_state selects between the density-weighted
+    !! Roe average, which costs eight square roots per face, and the plain arithmetic mean; unlike the other solver switches this
+    !! one is not implied by the call site, so the dispatch stays here.
+    subroutine s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, qv_L, qv_R, rho_avg, vel_avg_rms, &
+                                       & H_avg, gamma_avg, qv_avg)
+
+        $:GPU_ROUTINE(function_name='s_compute_average_state', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: rho_L, rho_R      !< Left and right densities
+        real(wp), intent(in) :: H_L, H_R          !< Left and right total enthalpies
+        real(wp), intent(in) :: gamma_L, gamma_R  !< Left and right specific heat ratio functions
+        real(wp), intent(in) :: qv_L, qv_R        !< Left and right reference energies
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: vel_L, vel_R
+        #:else
+            real(wp), dimension(num_vels), intent(in) :: vel_L, vel_R
+        #:endif
+        real(wp), intent(out) :: rho_avg, H_avg, gamma_avg, qv_avg
+        real(wp), intent(out) :: vel_avg_rms  !< Squared magnitude of the averaged velocity, summed over all components
+        integer               :: i
+
+        vel_avg_rms = 0._wp
+
+        if (avg_state == avg_state_roe) then
+            rho_avg = sqrt(rho_L*rho_R)
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_vels
+                vel_avg_rms = vel_avg_rms + (sqrt(rho_L)*vel_L(i) + sqrt(rho_R)*vel_R(i))**2._wp/(sqrt(rho_L) + sqrt(rho_R))**2._wp
+            end do
+
+            H_avg = (sqrt(rho_L)*H_L + sqrt(rho_R)*H_R)/(sqrt(rho_L) + sqrt(rho_R))
+            gamma_avg = (sqrt(rho_L)*gamma_L + sqrt(rho_R)*gamma_R)/(sqrt(rho_L) + sqrt(rho_R))
+            qv_avg = (sqrt(rho_L)*qv_L + sqrt(rho_R)*qv_R)/(sqrt(rho_L) + sqrt(rho_R))
+        else
+            rho_avg = 5.e-1_wp*(rho_L + rho_R)
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_vels
+                vel_avg_rms = vel_avg_rms + (5.e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
+            end do
+
+            H_avg = 5.e-1_wp*(H_L + H_R)
+            gamma_avg = 5.e-1_wp*(gamma_L + gamma_R)
+            qv_avg = 5.e-1_wp*(qv_L + qv_R)
+        end if
+
+    end subroutine s_compute_average_state
+
+    !> Roe-averaged reacting-mixture quantities: replaces gamma_avg with the mixture Cp/Cv and builds the c_sum_Yi_Phi term
+    !! s_compute_speed_of_sound_avg needs. vel_avg_rms must be the full squared magnitude - its Phi_avg and vel_sum terms cancel to
+    !! leave the Roe sound speed, and only do so for the full magnitude.
+    subroutine s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR, &
+        & vel_avg_rms, gamma_avg, c_sum_Yi_Phi)
+
+        $:GPU_ROUTINE(function_name='s_compute_chemistry_average_state', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: rho_L, rho_R  !< Left and right densities
+        real(wp), intent(in) :: T_L, T_R      !< Left and right temperatures
+        real(wp), intent(in) :: vel_avg_rms   !< Squared magnitude of the averaged velocity
+        !> Per-species gas constants, formed by the caller: nvfortran cannot compile a caller that passes the constant
+        !! molecular_weights array into a declare-target routine.
+        !> Species enthalpies and heat capacities, evaluated by the caller. m_thermochem is called from the loop body rather than
+        !! from here: CCE faults the GPU on that call one routine deeper.
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
+        #:else
+            real(wp), dimension(num_species), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
+        #:endif
+        real(wp), intent(out) :: gamma_avg  !< Mixture Cp/Cv, replacing the density-weighted average
+        real(wp), intent(out) :: c_sum_Yi_Phi
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10) :: Yi_avg, Phi_avg, h_avg_2
+        #:else
+            real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_avg_2
+        #:endif
+        real(wp) :: Cp_avg, Cv_avg, T_avg, eps
+
+        eps = 0.001_wp
+
+        h_avg_2 = (sqrt(rho_L)*h_iL + sqrt(rho_R)*h_iR)/(sqrt(rho_L) + sqrt(rho_R))
+        Yi_avg = (sqrt(rho_L)*Ys_L + sqrt(rho_R)*Ys_R)/(sqrt(rho_L) + sqrt(rho_R))
+        T_avg = (sqrt(rho_L)*T_L + sqrt(rho_R)*T_R)/(sqrt(rho_L) + sqrt(rho_R))
+
+        if (abs(T_L - T_R) < eps) then
+            ! Case when T_L and T_R are very close
+            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*R_species(:))
+            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*R_species(:) - R_species(:)))
+        else
+            ! Normal calculation when T_L and T_R are sufficiently different
+            Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
+            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - R_species(:)))
+        end if
+
+        gamma_avg = Cp_avg/Cv_avg
+
+        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*R_species(:)*T_avg
+        c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
+
+    end subroutine s_compute_chemistry_average_state
+
     !> Dispatch to the subroutines that are utilized to compute the viscous source fluxes for either Cartesian or cylindrical
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
@@ -941,7 +1133,6 @@ contains
                     end if
 
                     if (shear_stress) then
-                        ! current_tau_shear = 0.0_wp
                         call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
 
                         do i_dim = 1, num_dims
@@ -955,7 +1146,6 @@ contains
                     end if
 
                     if (bulk_stress) then
-                        ! current_tau_bulk = 0.0_wp
                         call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
 
                         do i_dim = 1, num_dims
@@ -1029,33 +1219,6 @@ contains
         end do
 
     end subroutine s_calculate_bulk_stress_tensor
-
-    !> Accumulate the mixture density, specific heat ratio function, liquid stiffness function, and internal energy reference of one
-    !! Riemann state from its partial densities and volume fractions. The number of fluids is an explicit argument because the
-    !! 5-equation bubble model accumulates over num_fluids - 1 fluids.
-    subroutine s_accumulate_mixture_properties(nf, alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
-
-        $:GPU_ROUTINE(function_name='s_accumulate_mixture_properties', parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in)                 :: nf  !< Number of fluids to accumulate over
-        real(wp), dimension(nf), intent(in) :: alpha_rho_K, alpha_K
-        real(wp), intent(out)               :: rho_K, gamma_K, pi_inf_K, qv_K
-        integer                             :: i   !< Loop iterator over fluids
-
-        rho_K = 0._wp
-        gamma_K = 0._wp
-        pi_inf_K = 0._wp
-        qv_K = 0._wp
-
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, nf
-            rho_K = rho_K + alpha_rho_K(i)
-            gamma_K = gamma_K + alpha_K(i)*gammas(i)
-            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-            qv_K = qv_K + alpha_rho_K(i)*qvs(i)
-        end do
-
-    end subroutine s_accumulate_mixture_properties
 
     !> Compute the shear and volume Reynolds numbers of one Riemann state by inverse-weighting the fluid Reynolds numbers with the
     !! volume fractions.

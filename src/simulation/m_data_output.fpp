@@ -175,7 +175,6 @@ contains
         real(wp)               :: pi_inf                      !< Cell-avg. liquid stiffness function
         real(wp)               :: qv                          !< Cell-avg. internal energy reference value
         real(wp)               :: c                           !< Cell-avg. sound speed
-        real(wp)               :: H                           !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re                          !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
         real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
@@ -190,15 +189,15 @@ contains
         ccfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, &
-                            & vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, icfl, vcfl, &
+                            & Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
                             & reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp
@@ -379,7 +378,7 @@ contains
         end if
 
         gamma = gammas(1)
-        lit_gamma = gs_min(1)
+        lit_gamma = isentrope_n(1)
         pi_inf = pi_infs(1)
         qv = qvs(1)
 
@@ -1234,8 +1233,7 @@ contains
 
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
-                                                & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k, l), &
-                                                & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k, l), G_local)
+                                                & f_hypoelastic_energy(q_cons_vf, j - 2, k, l, rho, G_local))
                     else
                         call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, k, l), &
                                                 & dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1291,8 +1289,7 @@ contains
                     end if
 
                     ! Compute mixture sound Speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, &
-                                                  & 0._wp, c, qv)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
                     if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                     accel = accel_mag(j - 2, k, l)
@@ -1340,8 +1337,7 @@ contains
 
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, &
-                                                    & q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, k - 2, l), &
-                                                    & q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l), G_local)
+                                                    & f_hypoelastic_energy(q_cons_vf, j - 2, k - 2, l, rho, G_local))
                         else
                             call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l), q_cons_vf(eqn_idx%alf)%sf(j - 2, &
                                                     & k - 2, l), dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
@@ -1375,8 +1371,7 @@ contains
                             Rdot(:) = nRdot(:)/nbub
                         end if
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
-                                                      & 0._wp, 0._wp, c, qv)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
                         if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
                     end if
                 end if
@@ -1429,9 +1424,8 @@ contains
 
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
-                                                        & rho, qv, rhoYks, pres, T, q_cons_vf(eqn_idx%stress%beg)%sf(j - 2, &
-                                                        & k - 2, l - 2), q_cons_vf(eqn_idx%mom%beg)%sf(j - 2, k - 2, l - 2), &
-                                                        & G_local)
+                                                        & rho, qv, rhoYks, pres, T, f_hypoelastic_energy(q_cons_vf, j - 2, k - 2, &
+                                                        & l - 2, rho, G_local))
                             else
                                 call s_compute_pressure(q_cons_vf(eqn_idx%E)%sf(j - 2, k - 2, l - 2), &
                                                         & q_cons_vf(eqn_idx%alf)%sf(j - 2, k - 2, l - 2), dyn_p, pi_inf, gamma, &
@@ -1445,8 +1439,7 @@ contains
                             end if
 
                             ! Compute mixture sound speed
-                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, &
-                                                          & 0._wp, 0._wp, c, qv)
+                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
                             if (hypoelasticity) c = sqrt(c*c + (4._wp/3._wp)*G_local/rho)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)

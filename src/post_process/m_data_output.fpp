@@ -1239,9 +1239,9 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf, q_cons_vf
         real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
-        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H, qv
+        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, qv, MaxMa, MaxMa_glb, maxvel, c, Ma
         real(wp), dimension(num_vels) :: vel
-        real(wp), dimension(num_fluids) :: adv
+        real(wp), dimension(num_fluids) :: adv, alpha_rho
         integer :: i, j, k, l, s  !< looping indices
 
         Egk = 0._wp
@@ -1262,14 +1262,8 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    pres = 0._wp
                     dV = dx(i)*dy(j)*dz(k)
-                    rho = 0._wp
-                    gamma = 0._wp
-                    pi_inf = 0._wp
-                    qv = 0._wp
                     pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
-                    Egint = Egint + q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
                     do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                         Egk = Egk + 0.5_wp*q_prim_vf(eqn_idx%E + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
@@ -1278,17 +1272,16 @@ contains
                             maxvel = abs(vel(s))
                         end if
                     end do
-                    do l = 1, eqn_idx%adv%end - eqn_idx%E
+                    do l = 1, num_fluids
                         adv(l) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)
-                        gamma = gamma + adv(l)*gammas(l)
-                        pi_inf = pi_inf + adv(l)*pi_infs(l)
-                        rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
-                        qv = qv + adv(l)*q_prim_vf(l)%sf(i, j, k)*qvs(l)
+                        alpha_rho(l) = q_prim_vf(l)%sf(i, j, k)
                     end do
 
-                    H = ((gamma + 1._wp)*pres + pi_inf + qv)/rho
+                    Egint = Egint + f_phase_internal_energy(pres, adv(2), alpha_rho(2), gammas(2), pi_infs(2), qvs(2))*dV
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, 0._wp, 0._wp, c, qv)
+                    call s_compute_mixture_coefficients(alpha_rho, adv, rho, gamma, pi_inf, qv)
+
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
 
                     Ma = maxvel/c
                     if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then
