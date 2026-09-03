@@ -879,13 +879,10 @@ contains
                         d_cbR_${XYZ}$ (4,:) = 1._wp/35._wp
                     end if
                 end if
-                ! The arrays extend to is${WENO_DIR}$_weno_a (m/n/p_alloc): past `is` lie the cells a refined block wider than
-                ! this subdomain occupies when amr_max_grid_size pins the cap above it (86782249), and they have no coarse cell
-                ! boundaries to compute from. The coefficients are ratios of spacings, so on a uniform grid every cell holds the
-                ! same values - the basis on which the fine advance reuses the coarse coefficients at all - and the last computed
-                ! cell is replicated into the tail. A nonuniform grid arms s_amr_recompute_weno_coefs, which overwrites the tail
-                ! from the block's own boundaries before it is read. Left unfilled, the reconstruction on such a block reads
-                ! whatever the allocation held, and its outer-face flux is NaN or silently wrong (ledger 56).
+                ! The arrays extend to is${WENO_DIR}$_weno_a (m/n/p_alloc): the tail past `is` is read by a refined block wider
+                ! than this subdomain (amr_max_grid_size above the cap) and has no coarse boundaries to compute from. On a uniform
+                ! grid the coefficients are spacing ratios, identical in every cell, so the last computed cell is replicated; a
+                ! nonuniform grid arms s_amr_recompute_weno_coefs, which overwrites the tail per block (ledger 56/59).
                 do i = is%end - weno_polyn + 1, is${WENO_DIR}$_weno_a%end - weno_polyn
                     poly_coef_cbL_${XYZ}$ (i,:,:) = poly_coef_cbL_${XYZ}$ (is%end - weno_polyn,:,:)
                     poly_coef_cbR_${XYZ}$ (i,:,:) = poly_coef_cbR_${XYZ}$ (is%end - weno_polyn,:,:)
