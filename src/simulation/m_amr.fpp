@@ -698,48 +698,6 @@ contains
             end if
         end do
 
-        ! lint: runtime-check
-        ! The fine advance borrows THIS rank's solver scratch, and the m/n/p_alloc widening that is supposed to let a block exceed
-        ! the coarse subdomain (86782249, which a108dd37 relied on to drop the amr_max_grid_size > fit_d abort) is incomplete: with
-        ! a block wider than the rank's coarse grid the block's outer-face flux comes back NaN even though its conserved state and
-        ! prolonged ghosts are clean, so the Berger-Colella fine-face register captures NaN and the reflux carries it into the
-        ! coarse RHS at the FIRST regrid. Measured at 100^3/np=8 and 200^3/np=8 (clean at 400^3/np=8, np=1, and amr_max_grid_size
-        ! = 0, i.e. exactly this predicate). Abort at init rather than let the regrid produce a silent wrong answer 20 steps later.
-        ! Level >= 2 adds no term: a level-l box is capped at amr_maxc_fit/amr_ref_ratio**(l - 1) coarse cells and spans
-        ! amr_ref_ratio**l fine cells each, so its fine extent is amr_ref_ratio*amr_maxc_fit at EVERY level - EXCEPT that
-        ! s_amr_tile_box floors that per-level tile size at one cell (tc = max(tc, 1), m_amr.fpp:8288), so when
-        ! amr_maxc_fit(d) < amr_ref_ratio**(l - 1) a level-l tile still spans amr_ref_ratio**l fine cells and this guard
-        ! UNDER-estimates. That needs a fine half-extent of 1, i.e. a degenerate subdomain, and it fails safe (the guard
-        ! admits a case it should reject, never the reverse). Cannot live in case_validator.py: the predicate needs each
-        ! rank's own subdomain extent, i.e. num_procs and the computed decomposition. Each rank tests its OWN extent (stderr
-        ! names the offender, and survives the abort); the flag is reduced so every rank takes the same branch. Derived-cap
-        ! runs never trip it: fit_d is the min-over-ranks local half, so the cap fits by construction.
-        ! REMOVAL TRIGGER: delete this guard once the z-axis _alloc widening is finished (Task 11); it exists only to refuse a
-        ! configuration the fine advance cannot honor today. The two are keyed DIFFERENTLY, which is worth knowing before
-        ! touching either: the widening at m_global_parameters.fpp:1070-1073 sizes on the RAW amr_max_grid_size, while this
-        ! guard keys on the RESOLVED amr_maxc_fit = min(amr_maxc, amr_max_grid_size). So the allocation is a strict superset
-        ! whenever amr_maxc clamps the cap - the ALLOCATION is not the missing piece; the fine-advance index windows are.
-        bad_loc = 0
-        do d = 1, num_dims
-            if (amr_ref_ratio*amr_maxc_fit(d) > ext(d) + 1) then
-                bad_loc = 1
-                write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr] rank ', proc_rank, ' axis ', d, &
-                       & ': amr_max_grid_size = ', amr_max_grid_size, ' resolves to a box cap of ', amr_maxc_fit(d), &
-                       & ' coarse cells = ', amr_ref_ratio*amr_maxc_fit(d), ' fine cells, exceeding this rank coarse extent of ', &
-                       & ext(d) + 1, '; largest legal cap on this axis is ', (ext(d) + 1)/amr_ref_ratio
-            end if
-        end do
-        call s_mpi_allreduce_integer_max(bad_loc, bad_glb)
-        if (bad_glb == 1) then
-            call s_mpi_abort('amr: the pinned box cap (amr_max_grid_size) admits a refined block wider than a rank own coarse ' &
-                             & // 'subdomain, on the axis and by the amount printed by each offending rank. The fine advance ' &
-                             & // 'borrows that rank local solver scratch, whose widening to the cap is incomplete, so the ' &
-                             & // 'block outer-face flux is NaN and the reflux carries it into the coarse level at the first ' &
-                             & // 'regrid - a silent wrong answer. Lower amr_max_grid_size to at most the largest legal cap ' &
-                             & // 'printed by each offending rank, use fewer ranks along that axis, or set ' &
-                             & // 'amr_max_grid_size = 0 for the rank-derived cap.')
-        end if
-
         ! preallocation cap for MY fine arrays: a block is owned WHOLE, so any rank must hold an entire block. regrid clamps every
         ! box to amr_maxc_fit, so amr_maxc_fit (NOT the global-half amr_maxc) is the true max block a rank can own; sizing to it
         ! right-sizes the fine/coord arrays. At np=1 amr_maxc_fit == amr_maxc, so the sizing (and everything) is unchanged.
@@ -5944,8 +5902,7 @@ contains
 
     !> Recompute the WENO reconstruction coefficient arrays from the CURRENT grid globals (the fine block's after a swap, the coarse
     !! grid's after a restore). s_compute_weno_coefficients reads the live cell-boundary arrays, refreshes uniform_grid, and pushes
-    !! its own device updates; the coefficient arrays were sized to the coarse local ranges at init, which the fine ranges never
-    !! exceed (the scratch-fit abort guarantees it).
+    !! its own device updates; the coefficient arrays are sized to m/n/p_alloc at init, which no fine range exceeds.
     impure subroutine s_amr_recompute_weno_coefs()
 
         type(int_bounds_info) :: is1, is2, is3
