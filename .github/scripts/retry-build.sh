@@ -1,6 +1,8 @@
 #!/bin/bash
 # Provides retry_build(): 2-attempt loop.
-# On failure of attempt 1, nukes the entire build directory before attempt 2.
+# On failure of attempt 1, nukes the build directory before attempt 2, keeping
+# build/venv: a compute node cannot reinstall it (no route to PyPI), and a
+# failed reinstall is misread as a cluster-wide outage (#1813).
 # If RETRY_VALIDATE_CMD is set, runs it after a successful build; a non-zero
 # exit triggers the same nuke-and-retry, catching e.g. SIGILL from binaries
 # compiled on a different CPU architecture.
@@ -11,6 +13,10 @@
 # Delay between build attempts. Overridable so tests can exercise the retry
 # path without waiting on it; CI leaves it at the default.
 : "${MFC_BUILD_RETRY_DELAY:=30}"
+
+nuke_build() {
+    find build -mindepth 1 -maxdepth 1 ! -name venv -exec rm -rf {} + 2>/dev/null || true
+}
 
 retry_build() {
     local max_attempts=2
@@ -24,7 +30,7 @@ retry_build() {
                     echo "Post-build validation failed on attempt $attempt."
                     if [ $attempt -lt $max_attempts ]; then
                         echo "  Nuking build directory before retry..."
-                        rm -rf build 2>/dev/null || true
+                        nuke_build
                         sleep 5
                         attempt=$((attempt + 1))
                         continue
@@ -39,7 +45,7 @@ retry_build() {
         fi
         if [ $attempt -lt $max_attempts ]; then
             echo "  Build failed — nuking build directory before retry..."
-            rm -rf build 2>/dev/null || true
+            nuke_build
             sleep "$MFC_BUILD_RETRY_DELAY"
         else
             echo "Build failed after $max_attempts attempts."
