@@ -26,7 +26,7 @@ module m_variables_conversion
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, f_bulk_modulus, &
-        & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_pressure_on_isentrope, &
+        & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
         & f_hypoelastic_energy, f_relativistic_enthalpy, s_eos_coefficients, s_phase_coefficients, f_phase_pressure_on_isentrope, &
         & f_phase_temperature, f_is_state_dependent, f_phase_bulk_modulus, s_phase_density_on_isentrope, &
@@ -327,7 +327,7 @@ contains
                 gruneisen0s(i) = fluid_pp(i)%vinet_gruneisen
                 gruneisen_as(i) = fluid_pp(i)%vinet_gruneisen_a
             end select
-            if (f_is_state_dependent(fluid_pp(i)%eos)) any_state_dependent_eos = .true.
+            if (f_is_state_dependent(i)) any_state_dependent_eos = .true.
         end do
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, rho0s, t0s, gruneisen0s, &
                      & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps, any_state_dependent_eos]')
@@ -1401,15 +1401,15 @@ contains
 
     end subroutine s_reference_curve
 
-    !> Whether an EOS selector names a family whose coefficients vary with density.
-    function f_is_state_dependent(eos) result(yes)
+    !> Whether the EOS of fluid i is a family whose coefficients vary with density.
+    function f_is_state_dependent(i) result(yes)
 
         $:GPU_ROUTINE(function_name='f_is_state_dependent', parallelism='[seq]', cray_inline=True)
 
-        integer, intent(in) :: eos
+        integer, intent(in) :: i
         logical             :: yes
 
-        yes = eos == eos_mie_gruneisen .or. eos == eos_jwl .or. eos == eos_vinet
+        yes = eoss(i) == eos_mie_gruneisen .or. eoss(i) == eos_jwl .or. eoss(i) == eos_vinet
 
     end function f_is_state_dependent
 
@@ -1424,7 +1424,7 @@ contains
         real(wp), intent(out) :: gamma, pi_inf, dpi, dgamma
         real(wp)              :: p_ref, e_ref, dp_drho, de_drho, G0, dG0
 
-        if (.not. f_is_state_dependent(eoss(i))) then
+        if (.not. f_is_state_dependent(i)) then
             gamma = gammas(i)
             pi_inf = pi_infs(i)
             dpi = 0._wp
@@ -1474,18 +1474,6 @@ contains
         T_or_rho = (pres + B)/((n - 1._wp)*cv*rho_or_T)
 
     end function f_sg_thermal
-
-    !> Pressure after isentropic compression from `pres` through density ratio `xi`.
-    function f_pressure_on_isentrope(pres, xi, n, B) result(p_isen)
-
-        $:GPU_ROUTINE(function_name='f_pressure_on_isentrope', parallelism='[seq]', cray_inline=True)
-
-        real(wp), intent(in) :: pres, xi, n, B
-        real(wp)             :: p_isen
-
-        p_isen = (pres + B)*xi**n - B
-
-    end function f_pressure_on_isentrope
 
     !> Coefficients of phase i at its own density alpha_rho/alpha: the per-cell dispatch when some fluid's EOS is state dependent,
     !! the constants resolved at init otherwise (bit for bit).
@@ -1589,10 +1577,10 @@ contains
         integer, intent(in)  :: i
         real(wp)             :: p_isen
 
-        if (f_is_state_dependent(eoss(i))) then
+        if (f_is_state_dependent(i)) then
             p_isen = f_rk4(ode_isentrope, i, rho, pres, xi*rho)
         else
-            p_isen = f_pressure_on_isentrope(pres, xi, isentrope_n(i), isentrope_B(i))
+            p_isen = (pres + isentrope_B(i))*xi**isentrope_n(i) - isentrope_B(i)
         end if
 
     end function f_phase_pressure_on_isentrope
@@ -1606,11 +1594,12 @@ contains
         integer, intent(in)  :: i
         real(wp)             :: T, p_ref, e_ref, dp_drho, de_drho, G0, dG0
 
-        if (f_is_state_dependent(eoss(i))) then
+        if (f_is_state_dependent(i)) then
             call s_reference_curve(rho, i, p_ref, e_ref, dp_drho, de_drho, G0, dG0)
-            T = f_rk4(ode_reference_temperature, i, 1._wp/rho0s(i), t0s(i), 1._wp/rho) + (pres - p_ref)/(rho*G0*cvs(i))
+            T = t0s(i)
+            T = f_rk4(ode_reference_temperature, i, 1._wp/rho0s(i), T, 1._wp/rho) + (pres - p_ref)/(rho*G0*cvs(i))
         else
-            T = f_sg_thermal(pres, rho, isentrope_n(i), isentrope_B(i), cvs(i))
+            T = (pres + isentrope_B(i))/((isentrope_n(i) - 1._wp)*cvs(i)*rho)
         end if
 
     end function f_phase_temperature

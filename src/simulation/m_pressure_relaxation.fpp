@@ -162,7 +162,7 @@ contains
 
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
-                    if (.not. f_is_state_dependent(eoss(i))) then
+                    if (.not. f_is_state_dependent(i)) then
                         if (pres_relax <= -(1._wp - 1.e-8_wp)*isentrope_B(i) + 1.e-8_wp) pres_relax = -(1._wp - 1.e-8_wp) &
                             & *isentrope_B(i) + 1.e-8_wp
                     end if
