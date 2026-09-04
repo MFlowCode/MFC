@@ -24,9 +24,9 @@ module m_amr_regrid
         & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH, s_wait_tic, s_wait_toc, WT_REGRID
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
         & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, amr_gpk, &
-        & amr_gpk_role, amr_n_gpk, amr_gpk_contrib, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, &
-        & amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, s_amr_free_slot, &
-        & s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
+        & amr_gpk_role, amr_n_gpk, amr_gpk_contrib, amr_slot_live, amr_my_blk, amr_n_my, amr_maxc_fit, amr_seam_pairs_dirty, &
+        & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
+        & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
         & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
         & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
         & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, amr_gb_win, amr_gb_cost, &
@@ -2499,9 +2499,9 @@ contains
         type(t_box), intent(in)                                :: boxes(:)
         integer, intent(in)                                    :: nboxes, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(in)                                    :: old_owns(:)
-        integer                                                :: sh(3), k, kk, i, j, h, fi, fj, fk, ofi, ofj, ofk, ks, kks, ohi(3)
-        integer                                                :: c_lo, c_hi
-        integer, allocatable                                   :: last_use(:)
+        integer                                                :: sh(3), k, kk, i, j, h, hh, fi, fj, fk, ofi, ofj, ofk, ks, kks
+        integer                                                :: c_lo, c_hi, nh, ohi(3)
+        integer, allocatable                                   :: last_use(:), held(:), held_hi(:,:)
 
         ! 6) build each new slot: geometry (replicated on all ranks), prolong, then overlap-copy from every covering old slot
         ! box k lives in shared-pool slot ks = f_l0_slot(k) (identity without L0 tiles); old block kk in slot kks
@@ -2522,20 +2522,31 @@ contains
         ! what peaks device memory at np >= 2 - the replica count grows with np - so old-only slots are freed as soon as
         ! their last covering box is built (the loop below), and the freed dense indices recycle into the very next allocs.
         ! Region overlap (all regions are L0-cell coords at every level) is a superset of every per-cell stash read.
+        ! HELD old blocks only: the ones whose fine state this rank holds (its own stash, or a replica the migration delivered) -
+        ! s_amr_free_slot is a no-op on a dead slot and the carry-forward's kernel skips every cell of a non-overlapping pair, so
+        ! the old blocks this rank does not hold contributed nothing to either loop; and only this rank's OWNED new boxes read a
+        ! stash here, so last_use runs over amr_my_blk (a free can only move earlier, never past a read).
 
-        allocate (last_use(old_np)); last_use = 0
+        ! gather-batching step 1: derive the whole loop's gather message set up front (refreshes amr_my_blk / the epoch lists on
+        ! the new mesh); step 2 executes the exchange from it
+        call s_amr_build_gather_plan()
+
+        allocate (last_use(old_np), held(old_np), held_hi(3, old_np)); last_use = 0
+        nh = 0
         do kk = 1, old_np
+            if (.not. amr_slot_live(f_l0_slot(kk))) cycle
+            nh = nh + 1; held(nh) = kk
             ohi = old_ilo(:,kk)
             ohi(1) = ohi(1) + (old_ext(1, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
             if (n_glb > 0) ohi(2) = ohi(2) + (old_ext(2, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
             if (p_glb > 0) ohi(3) = ohi(3) + (old_ext(3, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
-            do k = 1, nboxes
+            held_hi(:,nh) = ohi
+            do i = 1, amr_n_my
+                k = amr_my_blk(i) - l0_slot_off
+                if (k < 1) cycle  ! L0 tile prefix
                 if (f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), ohi)) last_use(kk) = k
             end do
         end do
-
-        ! gather-batching step 1: derive the whole loop's gather message set up front; step 2 executes the exchange from it
-        call s_amr_build_gather_plan()
 
         ! Walk the participants chunk by chunk (amr_gpk is ascending, so each chunk's participants are one run amr_gpk(i:j)); a
         ! chunk nobody here owns, parents or contributes to has no message and no slot on this rank and is skipped whole.
@@ -2562,7 +2573,8 @@ contains
                 ! free the old-only slots no later iteration reads (last_use < k; s_amr_free_slot is a no-op once dead, and skipping
                 ! the boxes this rank has no role in only defers a free to the next visited box); a slot serving as a NEW owned
                 ! box keeps living - the reconcile decides it
-                do kk = 1, old_np
+                do hh = 1, nh
+                    kk = held(hh)
                     if (last_use(kk) >= k) cycle
                     kks = f_l0_slot(kk)
                     if (kks <= amr_num_blocks) then
@@ -2585,7 +2597,7 @@ contains
                 ! exactly this rank's roles; owners re-prolong from it below)
                 if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
                 if (amr_block_owner(ks) /= proc_rank) cycle
-                call s_amr_cov_note(old_np, old_ilo, old_ext, old_level)  ! [amr-cov] rebuild-gather coverage split
+                call s_amr_cov_note(nh, held, old_ilo, old_ext, old_level)  ! [amr-cov] rebuild-gather coverage split
                 ! prolong and overlap carry-forward are both DEVICE kernels now: the slot is built entirely in place where the
                 ! store is authoritative, and the per-box full-slot push (PH_RBPUSH) is gone.
                 call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()
@@ -2599,9 +2611,13 @@ contains
                 ! conservation. Detail-preserving same-level L2 migration (parent-fine overlap) is a later increment.
                 call s_phase_tic(PH_RBOVL)
                 if (amr_block_level(amr_cur) < 2) then
-                    do kk = 1, old_np
+                    do hh = 1, nh
+                        kk = held(hh)
                         ! same-level overlap only (a child's stash is 4x-framed)
                         if (old_level(kk) /= amr_block_level(amr_cur)) cycle
+                        ! same-level fine-index overlap <=> L0 region overlap; the kernel's cell guard made a non-overlapping pair
+                        ! a launch that copied nothing
+                        if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), held_hi(:,hh))) cycle
                         kks = f_l0_slot(kk)
                         ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
                         sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
@@ -2616,7 +2632,8 @@ contains
                     call s_amr_prolong_pbmv()
                     ! level>=2 re-prolongs only (the L0-frame overlap shift is wrong for a child)
                     if (amr_block_level(amr_cur) < 2) then
-                        do kk = 1, old_np
+                        do hh = 1, nh
+                            kk = held(hh)
                             if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
                             if (.not. old_owns(kk)) cycle
                             kks = f_l0_slot(kk)
@@ -2643,7 +2660,7 @@ contains
             end do
             i = j + 1
         end do
-        deallocate (last_use)
+        deallocate (last_use, held, held_hi)
         amr_gpl_valid = .false.  ! the plan describes THIS rebuild's box loop only; per-step gathers never consult it
 
         ! Drain the deferred gather sends now that every box has been posted: one WAITALL per rebuild instead of
