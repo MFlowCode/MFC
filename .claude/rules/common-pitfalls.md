@@ -60,15 +60,18 @@ covered in `docs/documentation/contributing.md`.
   QBMM/viscous and MHD HLLD, while both Lagrange bubble cases *complete* with out-of-tolerance
   answers. Measured 2026-08-29 on MI210. A compile-only check returns green, so any future attempt to
   drop these must run the tests, not just build.
-- Pass **scalars** into device routines, never an element of a device-resident array: a `declare create`
-  module array (`blkmod1(k,l,q)`, `gammas(i)`), an attached field (`q_prim_vf%vf(i)%sf(j,k,l)`), or a
-  dummy sized by a device global (`alpha_K(i)` with `dimension(num_fluids)`). Copy the element to a
-  local first and receive outputs into a local. CCE OpenACC compiles it clean and, unless it inlines
-  the callee, reads and writes the element at the wrong address: on PR #1811 a kernel wrote
-  `blkmod1(:,:,:)` through such a call and every cell stayed 0 while the host got 1.4 from the same
-  fields; every test through the path ended in `NaN(s) in timestep output` while CCE OpenMP, amdflang
-  and nvfortran were bit-identical. A leaf callee that gets inlined hides the bug, which is why the
-  parent PR passed. Expressions (`a/max(b, eps)`) are temporaries and are fine.
+- **CCE OpenACC (19.0.0 through 21.0.2, `-O2`; `-O0`/`-O1` correct): a device routine that contains a
+  `GPU_LOOP(parallelism='[seq]')` (itself or through what CCE inlines into it) must be called with
+  scalars, never with an array element as an actual argument.** With both ingredients present the
+  element is misaddressed: an `intent(in)` element reads as garbage, an `intent(out)` element is
+  never written. Either ingredient alone is fine, which is why master's `s_compute_pressure(q%sf(j,k,l),...)`
+  works (no loop) and `s_compute_mixture_coefficients` works (scalar actuals). PR #1811 added the
+  Newton and RK4 loops to the EOS helpers and every call that passed `%sf(j,k,l)` or `blkmod1(k,l,q)`
+  ended in `NaN(s) in timestep output` on the Frontier CCE OpenACC lanes only, bit-identical on every
+  other backend. Fix: copy elements to locals before the call, receive into a local. 37-line
+  reproducer and the bisection: sbryngelson/compiler-bugs `cce/acc-routine-element-by-reference`,
+  MFC #1815. Do not "fix" it by deleting the `seq` directives instead: they are the idiom master
+  uses in every device routine.
 - The same "call it from the loop body" rule covers `m_thermochem`: calling `get_species_*` from
   inside a `GPU_ROUTINE` rather than from the kernel gave CCE OpenMP a runtime
   `Memory access fault by GPU node-N ... Reason: Unknown` on the first step (exit 134), while every
