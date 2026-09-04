@@ -181,6 +181,7 @@ Both human reviewers and AI code reviewers reference this section.
 - **`stp` vs `wp` mixing:** In mixed-precision mode, `stp` (storage) may be half-precision while `wp` (working) is double. Conversions between them must be intentional, especially in MPI pack/unpack and RHS accumulation.
 - **No double-precision intrinsics:** `dsqrt`, `dexp`, `dlog`, `dble`, `dabs`, `real(8)`, `real(4)` are forbidden. Use generic intrinsics with `wp` kind.
 - **MPI type matching:** `mpi_p` must match `wp`; `mpi_io_p` must match `stp`. Mismatches corrupt communicated data.
+- **Scalars into device routines that loop:** a `GPU_ROUTINE` containing a ``GPU_LOOP(parallelism='[seq]')`` (itself or through what it calls) must be called with scalars, never an array element (`q%%sf(j,k,l)`, `alpha(i)`). Copy the element to a local first and receive results into a local. Cray OpenACC 19 to 21 miscompiles the pair silently ([#1815](https://github.com/MFlowCode/MFC/issues/1815)); the linter enforces it inside kernels and device routines.
 
 ### Memory and Allocation
 

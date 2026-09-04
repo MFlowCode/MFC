@@ -554,6 +554,130 @@ def check_checker_input_constraints(repo_root: Path) -> list[str]:
     return errors
 
 
+# Intrinsics and MFC function prefixes that make `name(args)` a value, not an array element.
+_VALUE_CALL_NAMES = re.compile(r"^(?:f_\w+|real|int|nint|abs|max|min|sqrt|exp|log|sign|merge|mod|huge|tiny|epsilon|size|lbound|ubound|present|allocated|associated)$", re.IGNORECASE)
+# `a(i)`, `q(i)%sf(j, k, l)`, `s%vf(1)%sf(k, l, m)`: an element reference and nothing else.
+_ELEMENT_ARG = re.compile(r"^([A-Za-z_]\w*)(?:\([^()]*\))?(?:%\w+(?:\([^()]*\))?)*\([^()]*\)$")
+_PROCEDURE_DECL = re.compile(r"^(?:(?:impure|pure|elemental|recursive|module|non_recursive)\s+)*(?:subroutine|function)\s+(\w+)", re.IGNORECASE)
+_PROCEDURE_END = re.compile(r"^end\s+(?:subroutine|function)\b", re.IGNORECASE)
+_CALL_SITE = re.compile(r"(?:\bcall\s+(\w+)|\b(f_\w+))\s*\(", re.IGNORECASE)
+
+
+def _split_top_level(text: str) -> list[str]:
+    """Split an argument list at the commas that are not inside parentheses."""
+    parts, depth, cur = [], 0, []
+    for ch in text:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append("".join(cur).strip())
+            cur = []
+        else:
+            cur.append(ch)
+    parts.append("".join(cur).strip())
+    return parts
+
+
+def _statements(lines: list[str]):
+    """Yield (first line number, statement) with Fortran continuation lines joined."""
+    buf, start = [], 0
+    for i, line in enumerate(lines, 1):
+        stripped = line.split("!", 1)[0].strip() if not line.strip().startswith("!") else ""
+        if not stripped:
+            continue
+        if not buf:
+            start = i
+        buf.append(stripped.lstrip("&").rstrip("&").strip())
+        if not stripped.endswith("&"):
+            yield start, " ".join(buf)
+            buf = []
+
+
+def _procedures(lines: list[str]):
+    """Yield (name, first line, last line, is device routine, has seq loop) per procedure.
+
+    Contained procedures nest; directives belong to the innermost one.
+    """
+    stack = []  # [name, first, device, looped]
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        m = _PROCEDURE_DECL.match(stripped)
+        if m and not stripped.lower().startswith("end"):
+            stack.append([m.group(1), i, False, False])
+            continue
+        if not stack:
+            continue
+        if "GPU_ROUTINE(" in stripped:
+            stack[-1][2] = True
+        elif "GPU_LOOP(" in stripped:
+            stack[-1][3] = True
+        elif _PROCEDURE_END.match(stripped):
+            name, first, device, looped = stack.pop()
+            yield name, first, i, device, looped
+
+
+def check_device_routine_element_args(repo_root: Path) -> list[str]:
+    """Flag an array element passed to a device routine that runs a seq loop.
+
+    CCE OpenACC (19.0.0 through 21.0.2, -O2) miscompiles the pair: a routine containing
+    `GPU_LOOP(parallelism='[seq]')`, called with an array element as an actual argument, reads
+    the element as garbage and never writes it back. Either alone is fine. The loop counts
+    when it sits in anything the routine calls, since CCE inlines the chain. Copy the element
+    to a scalar before the call and receive results into a scalar. See
+    .claude/rules/common-pitfalls.md and sbryngelson/compiler-bugs cce/acc-routine-element-by-reference.
+    """
+    src_dir = repo_root / SRC_DIR
+    files = {src: src.read_text(encoding="utf-8").splitlines() for src in _fortran_fpp_files(src_dir)}
+
+    device, looped, callees = set(), set(), {}
+    for lines in files.values():
+        for name, first, last, is_device, has_loop in _procedures(lines):
+            key = name.lower()
+            if is_device:
+                device.add(key)
+            if has_loop:
+                looped.add(key)
+            callees[key] = {(m.group(1) or m.group(2)).lower() for _, stmt in _statements(lines[first - 1 : last]) for m in _CALL_SITE.finditer(stmt)}
+    # A device routine that calls a looped routine carries the loop once CCE inlines it.
+    tainted = looped & device
+    while True:
+        more = {r for r in device - tainted if callees.get(r, set()) & tainted}
+        if not more:
+            break
+        tainted |= more
+
+    errors: list[str] = []
+    for src, lines in files.items():
+        rel = src.relative_to(repo_root)
+        device_lines = set()
+        for name, first, last, is_device, _ in _procedures(lines):
+            if is_device:
+                device_lines.update(range(first, last + 1))
+        kernel_depth = 0
+        for line_no, stmt in _statements(lines):
+            if "END_GPU_PARALLEL_LOOP" in stmt:
+                kernel_depth = max(0, kernel_depth - 1)
+            elif "GPU_PARALLEL_LOOP(" in stmt:
+                kernel_depth += 1
+            if kernel_depth == 0 and line_no not in device_lines:
+                continue  # host code passes elements freely
+            for m in _CALL_SITE.finditer(stmt):
+                name = (m.group(1) or m.group(2)).lower()
+                if name not in tainted:
+                    continue
+                depth, j = 1, m.end()
+                while j < len(stmt) and depth:
+                    depth += {"(": 1, ")": -1}.get(stmt[j], 0)
+                    j += 1
+                for arg in _split_top_level(stmt[m.end() : j - 1]):
+                    e = _ELEMENT_ARG.match(arg)
+                    if e and ":" not in arg and not _VALUE_CALL_NAMES.match(e.group(1)):
+                        errors.append(f"  {rel}:{line_no} `{arg}` into `{name}` (a device routine with a seq loop): pass a scalar, see common-pitfalls.md")
+    return errors
+
+
 def check_cluster_menu_slugs(repo_root: Path) -> list[str]:
     """Keep the ``./mfc.sh load`` cluster menu in sync with toolchain/modules.
 
@@ -614,6 +738,7 @@ def main():
     all_errors.extend(check_manual_registry_bcasts(repo_root))
     all_errors.extend(check_checker_input_constraints(repo_root))
     all_errors.extend(check_cluster_menu_slugs(repo_root))
+    all_errors.extend(check_device_routine_element_args(repo_root))
 
     if all_errors:
         print("Source lint failed:")

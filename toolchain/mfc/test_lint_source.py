@@ -2,6 +2,7 @@
 
 from mfc.lint_source import (
     _extract_bcast_roots,
+    check_device_routine_element_args,
     check_double_precision,
     check_integer_wp,
     check_manual_registry_bcasts,
@@ -148,3 +149,63 @@ def test_manual_residue_is_clean(tmp_path):
     _write_proxy(tmp_path, "simulation", body)
 
     assert check_manual_registry_bcasts(tmp_path) == []
+
+
+_LOOPED = """    subroutine s_curve(rho, i, p)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: rho
+        integer, intent(in) :: i
+        real(wp), intent(out) :: p
+        integer :: it
+        $:GPU_LOOP(parallelism='[seq]')
+        do it = 1, 8
+            p = p + rho
+        end do
+    end subroutine s_curve
+    subroutine s_wrap(rho, i, p)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: rho
+        integer, intent(in) :: i
+        real(wp), intent(out) :: p
+        call s_curve(rho, i, p)
+    end subroutine s_wrap
+    subroutine s_plain(rho, i, p)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: rho
+        integer, intent(in) :: i
+        real(wp), intent(out) :: p
+        p = rho
+    end subroutine s_plain
+"""
+
+
+def _KERNEL(body: str) -> str:
+    return "        $:GPU_PARALLEL_LOOP(collapse=3)\n        " + body + "\n        $:END_GPU_PARALLEL_LOOP()\n"
+
+
+def test_host_call_sites_are_not_flagged(tmp_path):
+    _write_src(tmp_path, "simulation/m_x.fpp", _LOOPED + "        call s_curve(q(1)%sf(j, k, l), 1, out(k, l, q))\n")
+    assert check_device_routine_element_args(tmp_path) == []
+
+
+def test_element_into_looped_device_routine_is_flagged(tmp_path):
+    _write_src(tmp_path, "simulation/m_x.fpp", _LOOPED + _KERNEL("call s_curve(q(1)%sf(j, k, l), 1, out(k, l, q))"))
+    errors = check_device_routine_element_args(tmp_path)
+    assert len(errors) == 2
+    assert "q(1)%sf(j, k, l)" in errors[0] and "out(k, l, q)" in errors[1]
+
+
+def test_element_reaches_the_loop_through_a_caller(tmp_path):
+    _write_src(tmp_path, "simulation/m_x.fpp", _LOOPED + _KERNEL("call s_wrap(pres, 1, blkmod(k, &\n            & l, q))"))
+    errors = check_device_routine_element_args(tmp_path)
+    assert len(errors) == 1 and "s_wrap" in errors[0]
+
+
+def test_scalars_expressions_and_loopless_routines_pass(tmp_path):
+    _write_src(
+        tmp_path,
+        "simulation/m_x.fpp",
+        _LOOPED
+        + _KERNEL("call s_curve(alpha_rho(i)/max(alpha(i), sgm_eps), i, p_i)\n        call s_plain(q(1)%sf(j, k, l), 1, out(k, l, q))\n        call s_curve(real(q(1)%sf(j, k, l), wp), 1, p_i)"),
+    )
+    assert check_device_routine_element_args(tmp_path) == []
