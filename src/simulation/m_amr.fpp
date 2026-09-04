@@ -822,6 +822,11 @@ contains
             end if
         end if
         if (weno_order == 1 .or. igr) amr_weno_coef_recompute = .false.  ! order 1 / IGR: no grid-dependent WENO coefficients
+        ! lint: runtime-check -- the batched slab installs only the leader's dx/dy/dz (not the cell boundaries), so a per-swap
+        ! coefficient
+        ! recompute would give members 2..nb coefficients from stale boundaries; the grid test above is the runtime authority
+        if (amr_batched_advance .and. amr_weno_coef_recompute) call s_mpi_abort('amr_batched_advance requires a uniform grid: ' &
+            & // 'the per-block WENO coefficient recompute is armed on this one')
 
         ! persistent global coarse boundaries: the fine-distribution owner rebuilds whole-block fine coordinates from these (needed
         ! once the fine level is decoupled from the coarse decomposition; harmless otherwise)

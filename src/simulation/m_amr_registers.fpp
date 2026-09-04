@@ -609,7 +609,6 @@ contains
         ! parent-of-level-1 child-creg loop (which would overwrite the real fine block's creg in the tile-swapped frame). Its creg
         ! comes from the dedicated L0 coarse RHS (amr_in_fine_advance=F). Pure-AMR has no level-0 slots so this never fires.
         if (amr_in_fine_advance .and. amr_block_level(amr_cur) == 0) return
-        islot = amr_reg_cur  ! working block's DENSE register slot (local => captured by value in the device kernels below)
         ! flux data was just written by device kernels; the face reads below run as device kernels too
         if (amr_subcycle) then
             if (amr_in_fine_advance) then
