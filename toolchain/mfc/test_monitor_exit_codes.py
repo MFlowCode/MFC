@@ -1,9 +1,9 @@
-"""The infrastructure exit codes must survive the trip back to the submit wrapper.
+"""The infrastructure exit code must survive the trip back to the submit wrapper.
 
-preflight.sh exits 77 (node fault) or 78 (recorded outage) inside the SLURM job.
+preflight.sh exits 77 (node fault) inside the SLURM job.
 That becomes the job's ExitCode, which monitor_slurm_job.sh reads and
 run_monitored_slurm_job.sh relays to the resubmit loop. If either layer flattens
-them to 1 -- as both did for every non-zero code before -- the loop sees a
+it to 1 -- as both did for every non-zero code before -- the loop sees a
 generic failure and the node is never excluded.
 """
 
@@ -60,7 +60,7 @@ def run_script(tmp_path, binz, name, *args):
     )
 
 
-@pytest.mark.parametrize("job_exit,expected", [("77:0", 77), ("78:0", 78)])
+@pytest.mark.parametrize("job_exit,expected", [("77:0", 77)])
 def test_monitor_relays_the_infrastructure_exit_code(slurm, job_exit, expected):
     tmp_path, binz, configure = slurm
     out = configure(job_exit)
@@ -73,7 +73,7 @@ def test_monitor_still_reports_an_ordinary_failure_as_one(slurm):
     assert run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(out)).returncode == 1
 
 
-@pytest.mark.parametrize("monitor_exit", [77, 78])
+@pytest.mark.parametrize("monitor_exit", [77])
 def test_the_runner_relays_the_infrastructure_exit_code(tmp_path, monitor_exit):
     # Stub the inner monitor so this exercises only the relaying layer.
     scripts = tmp_path / "scripts"
