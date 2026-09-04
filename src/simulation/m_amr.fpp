@@ -264,11 +264,11 @@ module m_amr
     !! EXPLICIT deferral to increment I8, not I7 -- I7's own boundary is that any family left per-box keeps its tables.
     integer :: amr_tag_base(7) = 0
     !> M1 keyed wave tags: tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init. band 0 =
-    !! reflux-faces wave, 1 = freg wave, 2 = parent-fill wave (F2W). gen (mod 16) bumps at wave entry on EVERY rank (every wave call
-    !! site is rank-unconditional), separating successive waves that share a band; seq is the message's position in the pair's
-    !! canonically ordered transfer list (ascending block id, then dim, lo before hi), derived independently by each end from
-    !! replicated metadata -- message matching stops depending on posting order, and the audit's per-peer O(P) sequence state is
-    !! deleted.
+    !! reflux-faces wave, 1 = freg wave, 2 = parent-fill wave (F2W), 3/4 = stage-fill q / pb-mv waves (F1W/F3W). gen (mod 16) bumps
+    !! at wave entry on EVERY rank (every wave call site is rank-unconditional), separating successive waves that share a band; seq
+    !! is the message's position in the pair's canonically ordered transfer list (ascending block id, then dim, lo before hi),
+    !! derived independently by each end from replicated metadata -- message matching stops depending on posting order, and the
+    !! audit's per-peer O(P) sequence state is deleted.
     integer              :: amr_m1_base = 0
     integer              :: amr_tag_gen(0:7) = 0
     integer, allocatable :: amr_tsq(:,:)      !< (0:np-1, dir) in-wave per-peer seq counters; touched-reset
@@ -7114,7 +7114,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
         real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
         logical :: do_pbmv
-        integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, nreq, qbase, pbase, ierr, kk, kk2
+        integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, sq, nreq, qbase, pbase, ierr, kk, kk2
         integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff
         integer :: clo(3), chi(3), nsh, msl, isl, scells
         integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
@@ -7129,8 +7129,9 @@ contains
         o1 = start_idx(1); o2 = 0; o3 = 0
         if (n_glb > 0) o2 = start_idx(2)
         if (p_glb > 0) o3 = start_idx(3)
-        tq = amr_tag_base(1) + int(mod(amr_mesh_epoch, 100_8))
-        tp = amr_tag_base(3) + int(mod(amr_mesh_epoch, 100_8))
+        ! two bands, one wave: the second open re-clears the shared per-peer seq counters before anything has posted, so a
+        ! peer's q message takes seq 1 and its pb/mv message seq 2 -- the same relative order on both ends
+        call s_amr_m1_wave_open(3); call s_amr_m1_wave_open(4)
 
         call s_phase_tic(PH_GATHER)
         call s_phase_tic(PH_GWPLAN)
@@ -7312,12 +7313,16 @@ contains
         nreq = 0
 #ifdef MFC_MPI
         do ip = 1, amr_fw_rnp
-            call s_xa_rec(XA_F1W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq)
+            sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tq = f_amr_m1_tag(3, sq)
+            call s_xa_rec(XA_F1W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
+                          & key=amr_fw_rnxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
             call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
                            & amr_fw_req(nreq), ierr)
             if (do_pbmv) then
-                call s_xa_rec(XA_F3W_RCV, 2, amr_fw_rpsz(ip) - amr_fw_rnxp(ip)*XA_NH, tp)
+                sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tp = f_amr_m1_tag(4, sq)
+                call s_xa_rec(XA_F3W_RCV, 2, amr_fw_rpsz(ip) - amr_fw_rnxp(ip)*XA_NH, tp, peer=amr_fw_rprank(ip), &
+                              & key=amr_fw_rnxp(ip), seq=sq)
                 nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rpsz(ip)
                 call MPI_IRECV(amr_fw_rp(amr_fw_rpbase(ip) + 1), amr_fw_rpsz(ip), mpi_p, amr_fw_rprank(ip), tp, MPI_COMM_WORLD, &
                                & amr_fw_req(nreq), ierr)
@@ -7341,12 +7346,16 @@ contains
         call s_phase_toc(PH_GWPACK)
 #ifdef MFC_MPI
         do ip = 1, amr_fw_snp
-            call s_xa_rec(XA_F1W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq)
+            sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tq = f_amr_m1_tag(3, sq)
+            call s_xa_rec(XA_F1W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
+                          & key=amr_fw_snxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = -1
             call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
                            & amr_fw_req(nreq), ierr)
             if (do_pbmv) then
-                call s_xa_rec(XA_F3W_SND, 1, amr_fw_spsz(ip) - amr_fw_snxp(ip)*XA_NH, tp)
+                sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tp = f_amr_m1_tag(4, sq)
+                call s_xa_rec(XA_F3W_SND, 1, amr_fw_spsz(ip) - amr_fw_snxp(ip)*XA_NH, tp, peer=amr_fw_sprank(ip), &
+                              & key=amr_fw_snxp(ip), seq=sq)
                 nreq = nreq + 1; amr_fw_reqw(nreq) = -1
                 call MPI_ISEND(amr_fw_sp(amr_fw_spbase(ip) + 1), amr_fw_spsz(ip), mpi_p, amr_fw_sprank(ip), tp, MPI_COMM_WORLD, &
                                & amr_fw_req(nreq), ierr)
