@@ -86,7 +86,6 @@ data = {
     # Fluid Parameters (Gas)
     "fluid_pp(2)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(2)%eos": "ideal_gas",
-    "fluid_pp(2)%pi_inf": 0.0e00,
     # Air Patch
     "patch_icpp(1)%geometry": 9,
     "patch_icpp(1)%x_centroid": 0,

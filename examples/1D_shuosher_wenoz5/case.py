@@ -71,7 +71,6 @@ print(
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
             "fluid_pp(1)%eos": "ideal_gas",
-            "fluid_pp(1)%pi_inf": 0.0,
         }
     )
 )
