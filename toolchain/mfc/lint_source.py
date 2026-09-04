@@ -621,10 +621,10 @@ def _procedures(lines: list[str]):
 def check_device_routine_element_args(repo_root: Path) -> list[str]:
     """Flag an array element passed to a device routine that runs a seq loop.
 
-    CCE OpenACC (19.0.0 through 21.0.2, -O2) miscompiles the pair: a routine containing
-    `GPU_LOOP(parallelism='[seq]')`, called with an array element as an actual argument, reads
-    the element as garbage and never writes it back. Either alone is fine. The loop counts
-    when it sits in anything the routine calls, since CCE inlines the chain. Copy the element
+    CCE OpenACC (19.0.0 through 21.0.2, -O2; OpenMP offload is correct) miscompiles the pair: a
+    routine containing any `GPU_LOOP`, called with an array element as an actual argument, reads
+    the element as garbage and never writes it back. Either alone is fine, every `routine` level
+    is affected, and the loop counts when it sits in anything the routine calls. Copy the element
     to a scalar before the call and receive results into a scalar. See
     .claude/rules/common-pitfalls.md and sbryngelson/compiler-bugs cce/acc-routine-element-by-reference.
     """
