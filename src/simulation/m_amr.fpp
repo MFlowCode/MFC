@@ -253,8 +253,10 @@ module m_amr
     !! amr_mesh_epoch now lives in m_global_parameters (m_amr_registers keys its participation-map rebuild on it and
     !! cannot use m_amr); it is use-associated here and re-exported, so importers of m_amr are unchanged.
     !! per-family plan message tag bases (families F1..F7, amr_plan_based_exchange.md): amr_max_blocks + 100*f keeps
-    !! the plan tag space disjoint from the legacy per-box space (tags in [1..amr_max_blocks]) while families convert;
-    !! the epoch is folded in as base + mod(amr_mesh_epoch, 100). The init MPI_TAG_UB assert is the scale tripwire, and its
+    !! the plan tag space disjoint from the legacy per-box space (tags in [1..amr_max_blocks]) while families convert.
+    !! M1 moved every wave family onto keyed tags (amr_m1_base bands below); the only remaining user is the regrid's per-box
+    !! migration, amr_tag_base(4) + mod(amr_mesh_epoch, 50) in m_amr_regrid.fpp -- (1..3, 5..7) are unused until M2 deletes
+    !! the array. The init MPI_TAG_UB assert is the scale tripwire, and its
     !! headroom is an implementation property that must be MEASURED, not assumed: this comment previously asserted a 2**21 ceiling
     !! (~2.1e6 blocks, ~28k ranks) and called it the second scaling wall after W4. Measured 2026-08-28: Open MPI 4.1.8 reports
     !! MPI_TAG_UB = 2**31 - 1 and Frontier's Cray MPICH reports 2**29 - 1 = 536870911, i.e. ~537e6 global blocks or ~7.2e6 ranks at
@@ -3031,9 +3033,9 @@ contains
 
     !> I5-F5b: the split-ownership level>=2 freg exchange as ONE wave, run once before the reflux fold (the registers are final
     !! after the advance, and the applies keep their per-box reverse-order position). Replaces one fully BLOCKING SEND/RECV pair per
-    !! dim per split child. Same zero-copy, companion-header, single-tag-by-order design as the faces wave; tag block
-    !! amr_tag_base(5)+50 keeps it disjoint from the faces wave's within the family. The subcycle path keeps its per-box exchange
-    !! inside s_amr_reflux_to_parent (do_xchg).
+    !! dim per split child. Same zero-copy, companion-header design as the faces wave; M1 keyed tags on band 1 (the faces wave is
+    !! band 0) keep it disjoint from the faces wave's within the family. The subcycle path keeps its per-box exchange inside
+    !! s_amr_reflux_to_parent (do_xchg).
     impure subroutine s_amr_freg_wave()
 
 #ifdef MFC_MPI
