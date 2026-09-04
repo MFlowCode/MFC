@@ -226,6 +226,30 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (66) — RETRACTION: the AMR restart metadata has NO uninitialized padding; the comparator was misreading the file, and the tier-1 restart byte-compare gate is not blocked
+
+Ledger 64 reported that `restart_data/lustre_amr_<step>.dat` carries 6 NaN words and 11 garbage words of uninitialized
+memory. **That is false, and the error was mine.** The file is a mixed record stream -- 3 int32 of global header, then per
+block 11 int32 (7 box+level, then owner+1, m, n, p) followed by `sys_size*(m+1)*(n+1)*(p+1)` reals. The 44-byte block
+header is not a multiple of 8, so every other block's real data sits 4 bytes off the float64 grid. The comparator
+(`logs/t9gpu-0903/cmp.py`) read the whole file as `float64`: reinterpreting int32 headers produced the "denormals",
+and a 4-byte-shifted window over real data produced the "NaNs" and turned last-bit mantissa noise into 1e+297 exponent
+differences. Verified independently: naive read = 402 words, 6 NaN, max 1.98e+303; layout-aware read of the same bytes =
+384 reals, **0 NaN, 0 denormals, max 1.2500**. File size 3216 = 12 + 3*(44 + 1024) exactly, so there are no holes, and the
+reader's own `disp0 /= fsz` check (m_amr_restart.fpp:468) would refuse the file if there were. A restart from it runs.
+
+**What I should have caught.** The three observations I cited as proof -- deterministic per build, byte-identical across
+two runs, byte-identical between two different binaries -- are what a CORRECT file does. Uninitialized heap does not
+reproduce bit-exactly across unrelated binaries; that was evidence against my own conclusion and I read it as support.
+The rule this adds: before believing a difference a tool reports, confirm the tool's format assumption matches the file.
+
+**Consequences.** (1) No code change was needed and none was made (the branch opened for it has zero commits). (2) The
+tier-1 metadata redesign's "np>=2 restart BYTE-compare" gate is NOT blocked -- it just has to be run same-build and
+same-node, since cross-build byte-identity is unachievable for any floating-point output (measured: 98 of 3216 bytes
+differ between a CPU and a GPU build, all in real mantissas, none in headers or holes, max 2.22e-16 against a field max
+of 1.25 -- one ulp). (3) Task 9's GPU gate is 9 of 9, not 8 of 9. (4) `cmp.py` is fixed and a layout-aware
+`amr-bench/amrcmp.py` now exists so this file is never read as flat float64 again.
+
 ## 2026-09-04 (65) — MASTER MERGED AND GATED ON THE COMBINATION; the batched advance PASSES its falsifier (0.29-0.44 s/step, 12.7%) but only with GPU-aware MPI off; PR #1628 is mergeable again
 
 **upstream/master is in.** The merge was built and reviewed on its own base (78c4b607: all 8 conflicts resolved by
@@ -296,7 +320,8 @@ comparator failed a candidate for NaNs that the reference carries in the same sl
 8 of 9 decks pass at rtol 1e-12: worst relative error 2.0e-3 on one AMR field of deck 00EB793A, 8.2e-13 on oracle_EF58E377,
 the rest at or below 1e-13.
 
-**The 9th deck is a pre-existing finding, not a Task 9 defect.** `restart_data/lustre_amr_<step>.dat` on deck 78314D65
+**The 9th deck is a pre-existing finding, not a Task 9 defect.** [RETRACTED 2026-09-04, see ledger (66): there is no
+uninitialized padding; the comparator misparsed a mixed int32/real record stream as pure float64.] `restart_data/lustre_amr_<step>.dat` on deck 78314D65
 carries 6 NaN words in fixed slots [163,164,167,228,231,267] plus 11 of 396 finite words that are uninitialized memory
 (denormals, max difference 1.16e+297). Proof it is not Task 9: the Task-5-only GPU binary and the Task-9 GPU binary write
 that file byte-identically; the difference is CPU-build vs GPU-build and appears with and without Task 9; and two runs of
