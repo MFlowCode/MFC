@@ -209,3 +209,30 @@ def test_scalars_expressions_and_loopless_routines_pass(tmp_path):
         + _KERNEL("call s_curve(alpha_rho(i)/max(alpha(i), sgm_eps), i, p_i)\n        call s_plain(q(1)%sf(j, k, l), 1, out(k, l, q))\n        call s_curve(real(q(1)%sf(j, k, l), wp), 1, p_i)"),
     )
     assert check_device_routine_element_args(tmp_path) == []
+
+
+def test_loop_inside_a_device_function_counts_and_propagates(tmp_path):
+    src = """    function f_looped(x, i) result(y)
+        $:GPU_ROUTINE(function_name='f_looped', parallelism='[seq]')
+        real(wp), intent(in) :: x
+        integer, intent(in) :: i
+        real(wp) :: y
+        integer :: it
+        y = x
+        $:GPU_LOOP(parallelism='[seq]')
+        do it = 1, 8
+            y = y + 1._wp
+        end do
+    end function f_looped
+    subroutine s_via_function(x, i, y)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: x
+        integer, intent(in) :: i
+        real(wp), intent(out) :: y
+        y = f_looped(x, i)
+    end subroutine s_via_function
+"""
+    calls = "out(k, l, q) = f_looped(q(1)%sf(k, l, q), 1)\n        call s_via_function(q(1)%sf(k, l, q), 1, tmp)\n        tmp = f_looped(p_scalar, 1)"
+    _write_src(tmp_path, "simulation/m_x.fpp", src + _KERNEL(calls))
+    errors = check_device_routine_element_args(tmp_path)
+    assert [e.split("`")[3] for e in errors] == ["f_looped", "s_via_function"]
