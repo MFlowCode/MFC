@@ -68,7 +68,6 @@ print(
             # air: an ideal gas, so it carries no stiffness and pi_inf is not read
             "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
-            "fluid_pp(1)%pi_inf": 0.0,
         }
     )
 )

@@ -531,9 +531,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def alter_eos():
-        # BASE_CFG already sets fluid_pp(1)%pi_inf = 0, so the fluid is an ideal gas either way and
-        # naming it one must not change a single digit. That is the point: it exercises the selector
-        # end to end without moving the physics.
+        # BASE_CFG's fluid is already an ideal gas, so this re-selection must not change a single digit.
         cases.append(define_case_d(stack, "eos=ideal_gas", {"fluid_pp(1)%eos": "ideal_gas"}))
 
     def alter_riemann_solvers(num_fluids):
@@ -647,7 +645,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     {
                         "fluid_pp(2)%gamma": 2.5,
                         "fluid_pp(2)%eos": "ideal_gas",
-                        "fluid_pp(2)%pi_inf": 0.0,
                         "patch_icpp(1)%alpha_rho(1)": 0.81,
                         "patch_icpp(1)%alpha(1)": 0.9,
                         "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -804,7 +801,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "cyl_coord": "T",
                 "fluid_pp(2)%gamma": 2.5,
                 "fluid_pp(2)%eos": "ideal_gas",
-                "fluid_pp(2)%pi_inf": 0.0,
                 "patch_icpp(1)%alpha_rho(1)": 0.81,
                 "patch_icpp(1)%alpha(1)": 0.9,
                 "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -883,7 +879,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "num_fluids": 2,
                 "fluid_pp(2)%gamma": 2.5,
                 "fluid_pp(2)%eos": "ideal_gas",
-                "fluid_pp(2)%pi_inf": 0.0,
                 "patch_icpp(1)%alpha_rho(1)": 0.81,
                 "patch_icpp(1)%alpha(1)": 0.9,
                 "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -1700,7 +1695,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "wenoz": "T",
                         "fluid_pp(1)%gamma": 2.5,
                         "fluid_pp(1)%eos": "ideal_gas",
-                        "fluid_pp(1)%pi_inf": 0.0,
                         "fluid_pp(1)%Re(1)": 1.6881644098979287,
                         "viscous": "T",
                         "patch_icpp(1)%geometry": 9,
@@ -1771,7 +1765,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "fluid_pp(1)%qvp": 0.0,
                             "fluid_pp(2)%gamma": 2.3266,
                             "fluid_pp(2)%eos": "ideal_gas",
-                            "fluid_pp(2)%pi_inf": 0.0e00,
                             "fluid_pp(2)%cv": 1040,
                             "fluid_pp(2)%qv": 2030000,
                             "fluid_pp(2)%qvp": -23400,
@@ -1799,7 +1792,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             {
                                 "fluid_pp(3)%gamma": 2.4870,
                                 "fluid_pp(3)%eos": "ideal_gas",
-                                "fluid_pp(3)%pi_inf": 0.0e00,
                                 "fluid_pp(3)%cv": 717.5,
                                 "fluid_pp(3)%qv": 0.0e00,
                                 "fluid_pp(3)%qvp": 0.0,
@@ -1951,7 +1943,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "fluid_pp(1)%pi_inf": 3515.0,
                             "fluid_pp(2)%gamma": 2.5,
                             "fluid_pp(2)%eos": "ideal_gas",
-                            "fluid_pp(2)%pi_inf": 0.0,
                             "patch_icpp(1)%alpha_rho(1)": 0.96,
                             "patch_icpp(1)%alpha(1)": 4e-02,
                             "patch_icpp(1)%alpha_rho(2)": 0.0,
@@ -2492,11 +2483,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "dt": 0.2 * dx / c_outer,
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
             "fluid_pp(1)%eos": "ideal_gas",
-            "fluid_pp(1)%pi_inf": 0.0,
             "fluid_pp(1)%G": G_solid,
             "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
             "fluid_pp(2)%eos": "ideal_gas",
-            "fluid_pp(2)%pi_inf": 0.0,
             "fluid_pp(2)%G": 0.0,
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
@@ -2565,11 +2554,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "dt": 0.2 * dx / c_outer,
                 "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
                 "fluid_pp(1)%eos": "ideal_gas",
-                "fluid_pp(1)%pi_inf": 0.0,
                 "fluid_pp(1)%G": G,
                 "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
                 "fluid_pp(2)%eos": "ideal_gas",
-                "fluid_pp(2)%pi_inf": 0.0,
                 "fluid_pp(2)%G": G,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2641,11 +2628,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "dt": 2.0e-3,
                 "fluid_pp(1)%gamma": 2.5,
                 "fluid_pp(1)%eos": "ideal_gas",
-                "fluid_pp(1)%pi_inf": 0.0,
                 "fluid_pp(1)%G": G,
                 "fluid_pp(2)%gamma": 2.5,
                 "fluid_pp(2)%eos": "ideal_gas",
-                "fluid_pp(2)%pi_inf": 0.0,
                 "fluid_pp(2)%G": G,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2724,7 +2709,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "fluid_pp(1)%G": 0.0,
                 "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
                 "fluid_pp(2)%eos": "ideal_gas",
-                "fluid_pp(2)%pi_inf": 0.0,
                 "fluid_pp(2)%G": 0.0,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2807,7 +2791,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "fluid_pp(1)%G": 1.0e6,
             "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
             "fluid_pp(2)%eos": "ideal_gas",
-            "fluid_pp(2)%pi_inf": 0.0,
             "fluid_pp(2)%G": 1.0e6,
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
@@ -3121,7 +3104,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "viscous": "T",
                 "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
                 "fluid_pp(1)%eos": "ideal_gas",
-                "fluid_pp(1)%pi_inf": 0.0,
                 "fluid_pp(1)%Re(1)": 100000,
                 "patch_icpp(1)%geometry": 1,
                 "patch_icpp(1)%hcid": 191,
@@ -3175,7 +3157,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "viscous": "T",
                 "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
                 "fluid_pp(1)%eos": "ideal_gas",
-                "fluid_pp(1)%pi_inf": 0.0,
                 "fluid_pp(1)%Re(1)": 100000,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%hcid": 291,
@@ -3229,7 +3210,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(1)%alpha(1)": 1,
                 "fluid_pp(1)%gamma": 1.0e00 / (1.9326e00 - 1.0e00),
                 "fluid_pp(1)%eos": "ideal_gas",
-                "fluid_pp(1)%pi_inf": 0,
                 "cantera_file": "h2o2.yaml",
                 "t_step_start": 0,
                 "t_step_stop": 50,
@@ -3697,7 +3677,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "num_fluids": 2,
                 "fluid_pp(2)%gamma": 2.5,
                 "fluid_pp(2)%eos": "ideal_gas",
-                "fluid_pp(2)%pi_inf": 0.0,
                 # Patch 1: fluid 1 background rectangle; length covers stretched extent (~1.39).
                 # vel(1)=0.5 provides advection so MTHINC reconstruction affects the solution.
                 "patch_icpp(1)%geometry": 3,
